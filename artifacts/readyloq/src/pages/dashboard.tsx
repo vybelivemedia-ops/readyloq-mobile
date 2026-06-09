@@ -1,186 +1,148 @@
-import { useGetAnalyticsDashboard, useListInspections } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Plus, ClipboardList, BrainCircuit, Activity, AlertTriangle, FileText, ImageIcon } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useListInspections, useGetAnalyticsDashboard } from "@workspace/api-client-react";
+import { Scan, Mic, ChevronRight, Clock, AlertTriangle, CheckCircle2, BrainCircuit, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
+
+const AI_HINTS = [
+  "Utility room inspections often reveal conducive conditions.",
+  "Common hallways may provide additional evidence.",
+  "Similar properties often have activity near floor drains.",
+  "Additional documentation near entry points may be beneficial.",
+  "Moisture conditions often correlate with cockroach harborage.",
+];
+
+function statusDot(status: string) {
+  if (status === "completed") return "bg-emerald-500";
+  if (status === "in-progress") return "bg-amber-500";
+  return "bg-blue-500";
+}
+
+function severityLabel(severity: string | null) {
+  if (severity === "critical") return "text-red-400";
+  if (severity === "high") return "text-orange-400";
+  if (severity === "medium") return "text-amber-400";
+  return "text-slate-400";
+}
 
 export default function Dashboard() {
-  const { data: dashboard, isLoading: isLoadingDash } = useGetAnalyticsDashboard();
-  const { data: inspections, isLoading: isLoadingInsp } = useListInspections({ limit: 5 });
+  const { data: inspections } = useListInspections();
+  const { data: stats } = useGetAnalyticsDashboard();
+  const [hint, setHint] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setHint(h => (h + 1) % AI_HINTS.length), 6000);
+    return () => clearInterval(t);
+  }, []);
+
+  const recent = (inspections ?? []).slice(0, 3);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Overview of recent activity and system status.</p>
+    <div className="min-h-[calc(100vh-5rem)] flex flex-col">
+      {/* Hero — START INSPECTION */}
+      <div className="flex-1 flex flex-col items-center justify-center pt-6 pb-8">
+        {/* AI Hint chip */}
+        <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-2xl px-4 py-3 mb-10 max-w-sm w-full mx-auto">
+          <BrainCircuit className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+          <p className="text-xs text-primary/90 leading-relaxed transition-all">{AI_HINTS[hint]}</p>
         </div>
-        <Link href="/inspections/new">
-          <Button className="w-full sm:w-auto shadow-md">
-            <Plus className="mr-2 h-4 w-4" />
-            New Inspection
-          </Button>
-        </Link>
-      </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-card shadow-sm border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Inspections</CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoadingDash ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-3xl font-bold text-foreground">{dashboard?.totalInspections || 0}</div>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">+{dashboard?.openInspections || 0} open</p>
-          </CardContent>
-        </Card>
+        {/* Main CTA */}
+        <Link href="/inspections/new" className="block">
+          <div className="group relative flex flex-col items-center cursor-pointer select-none">
+            {/* Outer glow ring */}
+            <div className="absolute inset-0 rounded-full bg-primary/20 blur-3xl scale-150 opacity-60 group-hover:opacity-90 transition-opacity" />
 
-        <Card className="bg-card shadow-sm border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Findings</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoadingDash ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-3xl font-bold text-foreground">{dashboard?.avgFindingsPerInspection?.toFixed(1) || 0}</div>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">Per inspection</p>
-          </CardContent>
-        </Card>
+            {/* Pulse rings */}
+            <div className="absolute w-48 h-48 rounded-full border border-primary/20 animate-ping" style={{ animationDuration: "2.5s" }} />
+            <div className="absolute w-56 h-56 rounded-full border border-primary/10 animate-ping" style={{ animationDuration: "2.5s", animationDelay: "0.5s" }} />
 
-        <Card className="bg-card shadow-sm border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">AI Confidence</CardTitle>
-            <BrainCircuit className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            {isLoadingDash ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-3xl font-bold text-primary">
-                {dashboard?.avgAiConfidence ? `${Math.round(dashboard.avgAiConfidence * 100)}%` : 'N/A'}
+            {/* Main button */}
+            <div className="relative w-44 h-44 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 border-2 border-primary/60 flex flex-col items-center justify-center gap-3 shadow-2xl group-hover:border-primary group-hover:from-primary/40 group-hover:scale-105 transition-all duration-300 animate-pulse-glow">
+              <div className="w-14 h-14 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                <Scan className="h-7 w-7 text-primary" />
               </div>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">Average accuracy</p>
-          </CardContent>
-        </Card>
+              <span className="text-primary font-bold text-base tracking-wide">START</span>
+              <span className="text-primary/70 text-xs tracking-widest uppercase">Inspection</span>
+            </div>
+          </div>
+        </Link>
 
-        <Card className="bg-card shadow-sm border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Reports Generated</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoadingDash ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-3xl font-bold text-foreground">{dashboard?.totalReports || 0}</div>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">All time</p>
-          </CardContent>
-        </Card>
+        {/* Voice hint */}
+        <div className="flex items-center gap-2 mt-10 text-muted-foreground text-xs">
+          <Mic className="h-3.5 w-3.5" />
+          <span>Or say &ldquo;Start inspection&rdquo;</span>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Quick Links */}
-        <Card className="bg-card shadow-sm">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tools and resources</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <Link href="/dataset">
-              <Button variant="outline" className="w-full h-24 flex flex-col gap-2 bg-card hover:bg-muted/50 hover:text-primary transition-colors border-border/60">
-                <ImageIcon className="h-6 w-6" />
-                <span>Dataset Library</span>
-              </Button>
-            </Link>
-            <Link href="/analysis">
-              <Button variant="outline" className="w-full h-24 flex flex-col gap-2 bg-card hover:bg-muted/50 hover:text-primary transition-colors border-border/60">
-                <BrainCircuit className="h-6 w-6" />
-                <span>AI Analysis</span>
-              </Button>
-            </Link>
-            <Link href="/reports">
-              <Button variant="outline" className="w-full h-24 flex flex-col gap-2 bg-card hover:bg-muted/50 hover:text-primary transition-colors border-border/60">
-                <FileText className="h-6 w-6" />
-                <span>Reports</span>
-              </Button>
-            </Link>
-            <Link href="/analytics">
-              <Button variant="outline" className="w-full h-24 flex flex-col gap-2 bg-card hover:bg-muted/50 hover:text-primary transition-colors border-border/60">
-                <Activity className="h-6 w-6" />
-                <span>Analytics</span>
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+      {/* Stats strip */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          {[
+            { label: "Total", value: stats.totalInspections, color: "text-foreground", icon: null },
+            { label: "Open", value: stats.openInspections, color: "text-amber-400", icon: null },
+            { label: "AI Conf.", value: `${Math.round(stats.avgAiConfidence * 100)}%`, color: "text-primary", icon: null },
+          ].map(s => (
+            <div key={s.label} className="bg-card border border-border/60 rounded-2xl px-3 py-3 text-center">
+              <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
-        {/* Recent Inspections */}
-        <Card className="bg-card shadow-sm">
-          <CardHeader>
-            <CardTitle>Recent Inspections</CardTitle>
-            <CardDescription>Latest field activity</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {isLoadingInsp ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="space-y-2 flex-1">
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                  </div>
-                ))
-              ) : inspections?.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground text-sm">
-                  No inspections found.
+      {/* Recent inspections */}
+      {recent.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent</p>
+            <Link href="/inspections">
+              <button className="text-[11px] text-primary font-medium flex items-center gap-0.5">
+                View all <ChevronRight className="h-3 w-3" />
+              </button>
+            </Link>
+          </div>
+          {recent.map(insp => (
+            <Link key={insp.id} href={`/inspections/${insp.id}`}>
+              <div className="flex items-center gap-3 bg-card border border-border/60 rounded-2xl px-4 py-3 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${statusDot(insp.status)}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate leading-tight">{insp.siteAddress}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {insp.technicianName}
+                    {insp.severity && (
+                      <span className={`ml-2 font-medium ${severityLabel(insp.severity)}`}>• {insp.severity}</span>
+                    )}
+                  </p>
                 </div>
-              ) : (
-                inspections?.slice(0, 4).map((inspection) => (
-                  <Link key={inspection.id} href={`/inspections/${inspection.id}`} className="block">
-                    <div className="flex items-center justify-between p-3 rounded-md border border-transparent hover:border-border hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          inspection.status === 'completed' ? 'bg-emerald-500' :
-                          inspection.status === 'in-progress' ? 'bg-amber-500' : 'bg-blue-500'
-                        }`} />
-                        <div className="truncate">
-                          <p className="text-sm font-medium leading-none truncate">{inspection.siteAddress}</p>
-                          <p className="text-xs text-muted-foreground mt-1 truncate">
-                            {inspection.technicianName} • {new Date(inspection.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded">
-                          {inspection.findingsCount || 0} findings
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                ))
-              )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {(insp.findingsCount ?? 0) > 0 && (
+                    <span className="text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      {insp.findingsCount} findings
+                    </span>
+                  )}
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Quick actions row */}
+      <div className="grid grid-cols-4 gap-2 mt-4">
+        {[
+          { href: "/analysis", icon: BrainCircuit, label: "Analysis", color: "text-primary" },
+          { href: "/reports", icon: CheckCircle2, label: "Reports", color: "text-emerald-400" },
+          { href: "/training", icon: Zap, label: "Learn", color: "text-amber-400" },
+          { href: "/analytics", icon: AlertTriangle, label: "Risk", color: "text-orange-400" },
+        ].map(a => (
+          <Link key={a.href} href={a.href}>
+            <div className="flex flex-col items-center gap-1.5 bg-card border border-border/60 rounded-2xl py-3 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer">
+              <a.icon className={`h-5 w-5 ${a.color}`} />
+              <span className="text-[10px] text-muted-foreground font-medium">{a.label}</span>
             </div>
-            <div className="mt-4 pt-4 border-t border-border">
-              <Link href="/inspections">
-                <Button variant="ghost" className="w-full text-sm text-primary hover:text-primary/80">
-                  View All Inspections
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+          </Link>
+        ))}
       </div>
     </div>
   );
