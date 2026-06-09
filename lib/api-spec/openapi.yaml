@@ -1,22 +1,35 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: ReadyLoq - AI-powered inspection intelligence platform
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: inspections
+    description: Inspection management
+  - name: analysis
+    description: AI analysis
+  - name: dataset
+    description: Dataset library
+  - name: reports
+    description: Report generation
+  - name: training
+    description: Training center
+  - name: analytics
+    description: Analytics dashboard
+  - name: branding
+    description: White-label branding
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +37,508 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── INSPECTIONS ──────────────────────────────────────────────────────────────
+  /inspections:
+    get:
+      operationId: listInspections
+      tags: [inspections]
+      summary: List all inspections
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: technicianId
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Inspection"
+    post:
+      operationId: createInspection
+      tags: [inspections]
+      summary: Create a new inspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InspectionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Inspection"
+
+  /inspections/{id}:
+    get:
+      operationId: getInspection
+      tags: [inspections]
+      summary: Get inspection by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Inspection"
+    patch:
+      operationId: updateInspection
+      tags: [inspections]
+      summary: Update inspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InspectionUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Inspection"
+    delete:
+      operationId: deleteInspection
+      tags: [inspections]
+      summary: Delete inspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /inspections/{id}/media:
+    post:
+      operationId: addInspectionMedia
+      tags: [inspections]
+      summary: Add media to inspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MediaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectionMedia"
+
+  # ── AI ANALYSIS ──────────────────────────────────────────────────────────────
+  /analysis:
+    get:
+      operationId: listAnalysisResults
+      tags: [analysis]
+      summary: List AI analysis results
+      parameters:
+        - name: inspectionId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalysisResult"
+
+  /analysis/{id}:
+    get:
+      operationId: getAnalysisResult
+      tags: [analysis]
+      summary: Get analysis result
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+
+  /analysis/{id}/feedback:
+    post:
+      operationId: submitAnalysisFeedback
+      tags: [analysis]
+      summary: Submit technician feedback on analysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+
+  /analysis/summary:
+    get:
+      operationId: getAnalysisSummary
+      tags: [analysis]
+      summary: Get aggregated AI analysis summary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisSummary"
+
+  # ── DATASET LIBRARY ───────────────────────────────────────────────────────────
+  /dataset:
+    get:
+      operationId: listDatasetImages
+      tags: [dataset]
+      summary: List dataset library images
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: pestType
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetPage"
+
+  /dataset/categories:
+    get:
+      operationId: listDatasetCategories
+      tags: [dataset]
+      summary: List all dataset categories with counts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DatasetCategory"
+
+  # ── REPORTS ──────────────────────────────────────────────────────────────────
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      summary: List generated reports
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+    post:
+      operationId: generateReport
+      tags: [reports]
+      summary: Generate a new report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /reports/{id}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Get report by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+    delete:
+      operationId: deleteReport
+      tags: [reports]
+      summary: Delete report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── TRAINING CENTER ───────────────────────────────────────────────────────────
+  /training/quizzes:
+    get:
+      operationId: listQuizzes
+      tags: [training]
+      summary: List all training quizzes
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quiz"
+
+  /training/quizzes/{id}:
+    get:
+      operationId: getQuiz
+      tags: [training]
+      summary: Get quiz with questions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quiz"
+
+  /training/quizzes/{id}/submit:
+    post:
+      operationId: submitQuiz
+      tags: [training]
+      summary: Submit quiz answers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizSubmission"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizResult"
+
+  /training/scores:
+    get:
+      operationId: listTrainingScores
+      tags: [training]
+      summary: List technician training scores
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrainingScore"
+
+  /training/leaderboard:
+    get:
+      operationId: getTrainingLeaderboard
+      tags: [training]
+      summary: Get training leaderboard
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+  # ── ANALYTICS ────────────────────────────────────────────────────────────────
+  /analytics/dashboard:
+    get:
+      operationId: getAnalyticsDashboard
+      tags: [analytics]
+      summary: Get full analytics dashboard data
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsDashboard"
+
+  /analytics/trends:
+    get:
+      operationId: getAnalyticsTrends
+      tags: [analytics]
+      summary: Get findings trends over time
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            default: "30d"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendDataPoint"
+
+  /analytics/technicians:
+    get:
+      operationId: getTechnicianPerformance
+      tags: [analytics]
+      summary: Get technician performance metrics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TechnicianPerformance"
+
+  /analytics/risk:
+    get:
+      operationId: getInfestationRisk
+      tags: [analytics]
+      summary: Get infestation risk assessment
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfestationRisk"
+
+  # ── BRANDING ─────────────────────────────────────────────────────────────────
+  /branding:
+    get:
+      operationId: getBranding
+      tags: [branding]
+      summary: Get white-label branding settings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+    patch:
+      operationId: updateBranding
+      tags: [branding]
+      summary: Update white-label branding settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandingUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Branding"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +546,436 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    # ── INSPECTION SCHEMAS ──────────────────────────────────────────────────────
+    Inspection:
+      type: object
+      required: [id, siteAddress, status, technicianName, createdAt]
+      properties:
+        id:          { type: integer }
+        siteAddress: { type: string }
+        clientName:  { type: ["string", "null"] }
+        technicianName: { type: string }
+        technicianId: { type: ["string", "null"] }
+        status:      { type: string }
+        pestTypes:
+          type: array
+          items: { type: string }
+        severity:    { type: ["string", "null"] }
+        notes:       { type: ["string", "null"] }
+        mediaCount:  { type: integer }
+        findingsCount: { type: integer }
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/InspectionMedia"
+        aiAnalysisId: { type: ["integer", "null"] }
+        createdAt:   { type: string }
+        completedAt: { type: ["string", "null"] }
+
+    InspectionInput:
+      type: object
+      required: [siteAddress, technicianName]
+      properties:
+        siteAddress:    { type: string }
+        clientName:     { type: string }
+        technicianName: { type: string }
+        technicianId:   { type: string }
+        notes:          { type: string }
+        pestTypes:
+          type: array
+          items: { type: string }
+
+    InspectionUpdate:
+      type: object
+      properties:
+        status:      { type: string }
+        notes:       { type: string }
+        severity:    { type: string }
+        pestTypes:
+          type: array
+          items: { type: string }
+        completedAt: { type: string }
+
+    InspectionMedia:
+      type: object
+      required: [id, inspectionId, mediaType, url, createdAt]
+      properties:
+        id:           { type: integer }
+        inspectionId: { type: integer }
+        mediaType:    { type: string }
+        url:          { type: string }
+        filename:     { type: ["string", "null"] }
+        caption:      { type: ["string", "null"] }
+        durationSec:  { type: ["integer", "null"] }
+        createdAt:    { type: string }
+
+    MediaInput:
+      type: object
+      required: [mediaType, url]
+      properties:
+        mediaType:   { type: string }
+        url:         { type: string }
+        filename:    { type: string }
+        caption:     { type: string }
+        durationSec: { type: integer }
+
+    # ── ANALYSIS SCHEMAS ────────────────────────────────────────────────────────
+    AnalysisResult:
+      type: object
+      required: [id, inspectionId, status, createdAt]
+      properties:
+        id:           { type: integer }
+        inspectionId: { type: integer }
+        status:       { type: string }
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        recommendations:
+          type: array
+          items: { type: string }
+        overallConfidence: { type: ["number", "null"] }
+        riskLevel:    { type: ["string", "null"] }
+        technicianFeedback: { type: ["string", "null"] }
+        feedbackStatus: { type: ["string", "null"] }
+        createdAt:    { type: string }
+
+    Finding:
+      type: object
+      required: [id, category, description, confidence]
+      properties:
+        id:            { type: integer }
+        category:      { type: string }
+        description:   { type: string }
+        confidence:    { type: number }
+        severity:      { type: string }
+        location:      { type: ["string", "null"] }
+        imageUrl:      { type: ["string", "null"] }
+        treatment:     { type: ["string", "null"] }
+        exclusionOpportunity: { type: ["boolean", "null"] }
+
+    FeedbackInput:
+      type: object
+      required: [feedbackStatus]
+      properties:
+        feedbackStatus: { type: string }
+        technicianFeedback: { type: string }
+
+    AnalysisSummary:
+      type: object
+      required: [totalAnalyses, avgConfidence, topFindings, findingsByCategory]
+      properties:
+        totalAnalyses:     { type: integer }
+        avgConfidence:     { type: number }
+        topFindings:
+          type: array
+          items:
+            type: object
+            required: [category, count]
+            properties:
+              category: { type: string }
+              count:    { type: integer }
+        findingsByCategory:
+          type: array
+          items:
+            type: object
+            required: [category, count, percentage]
+            properties:
+              category:   { type: string }
+              count:      { type: integer }
+              percentage: { type: number }
+
+    # ── DATASET SCHEMAS ─────────────────────────────────────────────────────────
+    DatasetImage:
+      type: object
+      required: [id, category, title, imageUrl, pestType, createdAt]
+      properties:
+        id:          { type: integer }
+        category:    { type: string }
+        title:       { type: string }
+        description: { type: ["string", "null"] }
+        imageUrl:    { type: string }
+        thumbnailUrl: { type: ["string", "null"] }
+        pestType:    { type: string }
+        severity:    { type: ["string", "null"] }
+        location:    { type: ["string", "null"] }
+        tags:
+          type: array
+          items: { type: string }
+        createdAt:   { type: string }
+
+    DatasetPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatasetImage"
+        total:  { type: integer }
+        page:   { type: integer }
+        limit:  { type: integer }
+
+    DatasetCategory:
+      type: object
+      required: [name, count, slug]
+      properties:
+        name:  { type: string }
+        slug:  { type: string }
+        count: { type: integer }
+        icon:  { type: ["string", "null"] }
+
+    # ── REPORT SCHEMAS ──────────────────────────────────────────────────────────
+    Report:
+      type: object
+      required: [id, inspectionId, title, status, createdAt]
+      properties:
+        id:              { type: integer }
+        inspectionId:    { type: integer }
+        title:           { type: string }
+        clientName:      { type: ["string", "null"] }
+        siteAddress:     { type: string }
+        status:          { type: string }
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        recommendations:
+          type: array
+          items: { type: string }
+        treatmentNotes:  { type: ["string", "null"] }
+        exclusionOpportunities:
+          type: array
+          items: { type: string }
+        technicianName:  { type: string }
+        inspectionDate:  { type: string }
+        severity:        { type: ["string", "null"] }
+        pdfUrl:          { type: ["string", "null"] }
+        createdAt:       { type: string }
+
+    ReportInput:
+      type: object
+      required: [inspectionId, title]
+      properties:
+        inspectionId:   { type: integer }
+        title:          { type: string }
+        treatmentNotes: { type: string }
+        includePhotos:  { type: boolean }
+        includeAiFindings: { type: boolean }
+
+    # ── TRAINING SCHEMAS ────────────────────────────────────────────────────────
+    Quiz:
+      type: object
+      required: [id, title, category, difficulty, questionCount]
+      properties:
+        id:            { type: integer }
+        title:         { type: string }
+        description:   { type: ["string", "null"] }
+        category:      { type: string }
+        difficulty:    { type: string }
+        questionCount: { type: integer }
+        passingScore:  { type: integer }
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuizQuestion"
+        averageScore:  { type: ["number", "null"] }
+        completedCount: { type: integer }
+
+    QuizQuestion:
+      type: object
+      required: [id, imageUrl, question, options, correctOption]
+      properties:
+        id:            { type: integer }
+        imageUrl:      { type: string }
+        question:      { type: string }
+        options:
+          type: array
+          items: { type: string }
+        correctOption: { type: integer }
+        explanation:   { type: ["string", "null"] }
+
+    QuizSubmission:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            required: [questionId, selectedOption]
+            properties:
+              questionId:     { type: integer }
+              selectedOption: { type: integer }
+
+    QuizResult:
+      type: object
+      required: [quizId, score, passed, totalQuestions, correctAnswers]
+      properties:
+        quizId:         { type: integer }
+        score:          { type: number }
+        passed:         { type: boolean }
+        totalQuestions: { type: integer }
+        correctAnswers: { type: integer }
+        feedback:
+          type: array
+          items:
+            type: object
+            required: [questionId, correct, explanation]
+            properties:
+              questionId:  { type: integer }
+              correct:     { type: boolean }
+              explanation: { type: ["string", "null"] }
+
+    TrainingScore:
+      type: object
+      required: [id, technicianName, quizId, quizTitle, score, passed, completedAt]
+      properties:
+        id:             { type: integer }
+        technicianName: { type: string }
+        technicianId:   { type: ["string", "null"] }
+        quizId:         { type: integer }
+        quizTitle:      { type: string }
+        score:          { type: number }
+        passed:         { type: boolean }
+        completedAt:    { type: string }
+
+    LeaderboardEntry:
+      type: object
+      required: [rank, technicianName, avgScore, totalQuizzes, badge]
+      properties:
+        rank:           { type: integer }
+        technicianName: { type: string }
+        technicianId:   { type: ["string", "null"] }
+        avgScore:       { type: number }
+        totalQuizzes:   { type: integer }
+        passRate:       { type: number }
+        badge:          { type: string }
+
+    # ── ANALYTICS SCHEMAS ───────────────────────────────────────────────────────
+    AnalyticsDashboard:
+      type: object
+      required: [totalInspections, completedInspections, openInspections, avgFindingsPerInspection, topPestTypes, recentActivity, inspectionsByStatus, monthlyInspections]
+      properties:
+        totalInspections:          { type: integer }
+        completedInspections:      { type: integer }
+        openInspections:           { type: integer }
+        avgFindingsPerInspection:  { type: number }
+        totalReports:              { type: integer }
+        avgAiConfidence:           { type: number }
+        topPestTypes:
+          type: array
+          items:
+            type: object
+            required: [pestType, count]
+            properties:
+              pestType: { type: string }
+              count:    { type: integer }
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+        inspectionsByStatus:
+          type: array
+          items:
+            type: object
+            required: [status, count]
+            properties:
+              status: { type: string }
+              count:  { type: integer }
+        monthlyInspections:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendDataPoint"
+
+    TrendDataPoint:
+      type: object
+      required: [date, value]
+      properties:
+        date:     { type: string }
+        value:    { type: number }
+        category: { type: ["string", "null"] }
+        label:    { type: ["string", "null"] }
+
+    ActivityItem:
+      type: object
+      required: [id, type, description, technicianName, createdAt]
+      properties:
+        id:             { type: integer }
+        type:           { type: string }
+        description:    { type: string }
+        technicianName: { type: string }
+        siteAddress:    { type: ["string", "null"] }
+        createdAt:      { type: string }
+
+    TechnicianPerformance:
+      type: object
+      required: [technicianName, inspectionCount, avgFindingsPerInspection, avgAiConfidence, completionRate]
+      properties:
+        technicianName:             { type: string }
+        technicianId:               { type: ["string", "null"] }
+        inspectionCount:            { type: integer }
+        avgFindingsPerInspection:   { type: number }
+        avgAiConfidence:            { type: number }
+        completionRate:             { type: number }
+        trainingScore:              { type: ["number", "null"] }
+        badge:                      { type: ["string", "null"] }
+
+    InfestationRisk:
+      type: object
+      required: [overallRisk, riskByPestType, riskTrend, highRiskSites]
+      properties:
+        overallRisk:   { type: string }
+        riskScore:     { type: number }
+        riskByPestType:
+          type: array
+          items:
+            type: object
+            required: [pestType, riskLevel, count]
+            properties:
+              pestType:  { type: string }
+              riskLevel: { type: string }
+              count:     { type: integer }
+        riskTrend:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendDataPoint"
+        highRiskSites:
+          type: array
+          items:
+            type: object
+            required: [siteAddress, riskScore, lastInspected]
+            properties:
+              siteAddress:   { type: string }
+              riskScore:     { type: number }
+              lastInspected: { type: string }
+
+    # ── BRANDING SCHEMAS ────────────────────────────────────────────────────────
+    Branding:
+      type: object
+      required: [id, companyName]
+      properties:
+        id:              { type: integer }
+        companyName:     { type: string }
+        logoUrl:         { type: ["string", "null"] }
+        primaryColor:    { type: ["string", "null"] }
+        accentColor:     { type: ["string", "null"] }
+        tagline:         { type: ["string", "null"] }
+        supportEmail:    { type: ["string", "null"] }
+        supportPhone:    { type: ["string", "null"] }
+        poweredByVisible: { type: boolean }
+        updatedAt:       { type: string }
+
+    BrandingUpdate:
+      type: object
+      properties:
+        companyName:     { type: string }
+        logoUrl:         { type: string }
+        primaryColor:    { type: string }
+        accentColor:     { type: string }
+        tagline:         { type: string }
+        supportEmail:    { type: string }
+        supportPhone:    { type: string }
+        poweredByVisible: { type: boolean }

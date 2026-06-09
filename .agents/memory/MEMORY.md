@@ -1,0 +1,1 @@
+- [ReadyLoq Architecture](readyloq-architecture.md) — stack, conventions, API routes, seed script location, Wouter base path fix
