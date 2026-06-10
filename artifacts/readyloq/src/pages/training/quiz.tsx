@@ -80,20 +80,25 @@ export default function QuizPage() {
     return (
       <div className="max-w-xl mx-auto space-y-5">
         <h1 className="text-xl font-bold">Quiz Results</h1>
-        <Card className={`${result.passed ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/30 bg-red-500/5"}`}>
+        <Card className={`${result.passed ? "border-emerald-500/30 bg-emerald-500/5" : "border-primary/20 bg-primary/5"}`}>
           <CardContent className="pt-6 text-center space-y-3">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${result.passed ? "bg-emerald-500/20" : "bg-red-500/20"}`}>
-              {result.passed ? <CheckCircle2 className="h-8 w-8 text-emerald-400" /> : <XCircle className="h-8 w-8 text-red-400" />}
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${result.passed ? "bg-emerald-500/20" : "bg-primary/10"}`}>
+              {result.passed ? <CheckCircle2 className="h-8 w-8 text-emerald-400" /> : <XCircle className="h-8 w-8 text-primary" />}
             </div>
             <div>
               <p className="text-3xl font-bold">{result.score}%</p>
-              <p className={`text-sm font-semibold mt-1 ${result.passed ? "text-emerald-400" : "text-red-400"}`}>
-                {result.passed ? "PASSED" : "FAILED"}
+              <p className={`text-sm font-semibold mt-1 ${result.passed ? "text-emerald-400" : "text-primary"}`}>
+                {result.passed ? "Great work!" : "Keep Practicing"}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
               {result.correctAnswers} of {result.totalQuestions} correct
             </p>
+            {!result.passed && (
+              <p className="text-xs text-muted-foreground italic">
+                Every inspection builds your knowledge. Review the explanations below.
+              </p>
+            )}
           </CardContent>
         </Card>
 

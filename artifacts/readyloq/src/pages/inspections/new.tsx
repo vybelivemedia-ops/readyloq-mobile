@@ -6,11 +6,16 @@ import { Input } from "@/components/ui/input";
 import {
   ArrowLeft, Mic, MicOff, Scan, CheckCircle2, Zap,
   ZoomIn, Sun, Aperture, Focus, Sparkles, Shield, BrainCircuit,
-  Camera, MapPin, ChevronDown, ChevronUp,
+  Camera, MapPin, ChevronDown, ChevronUp, X, Languages,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import {
+  type SupportedLang, type TermMatch, LANG_CONFIG,
+  matchTerminology, buildStructuredNote, type StructuredNote,
+} from "@/lib/voice-intelligence";
+import { useVoiceRecognition } from "@/hooks/use-voice-recognition";
 
 // ─── Zone Data ────────────────────────────────────────────────────────────────
 
@@ -293,6 +298,7 @@ export default function NewInspection() {
   const [technicianName, setTechnicianName] = useState("");
   const [activeZone, setActiveZone] = useState<string | null>(null);
 
+  const [inspectionLang, setInspectionLang] = useState<SupportedLang>("en");
   const [isRecording, setIsRecording] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [timer, setTimer] = useState(0);
@@ -300,14 +306,28 @@ export default function NewInspection() {
   const [visibleDetection, setVisibleDetection] = useState<Detection | null>(null);
   const [captured, setCaptured] = useState<CapturedItem[]>([]);
   const [createdId, setCreatedId] = useState<number | null>(null);
-  const [voiceActive, setVoiceActive] = useState(false);
   const [voiceHint, setVoiceHint] = useState(0);
+  const [voiceSuggestion, setVoiceSuggestion] = useState<TermMatch | null>(null);
+  const [pendingTranscript, setPendingTranscript] = useState("");
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const detectionRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const adjustingRef = useRef(false);
 
   const camera = useCamera();
+
+  const voice = useVoiceRecognition({
+    lang: LANG_CONFIG[inspectionLang].speechCode,
+    onFinalResult: (text) => {
+      setPendingTranscript(text);
+      const match = matchTerminology(text);
+      if (match) {
+        setVoiceSuggestion(match);
+      } else {
+        confirmVoiceNote(text, null);
+      }
+    },
+  });
 
   const allSelectedZones = [...selectedInterior, ...selectedExterior];
   const allAvailableInterior = INTERIOR_ZONES.filter(z => !selectedInterior.includes(z));
@@ -453,15 +473,37 @@ export default function NewInspection() {
   }
 
   function addVoiceNote() {
-    setVoiceActive(true);
-    setTimeout(() => {
-      setVoiceActive(false);
-      setCaptured(prev => [...prev, {
-        id: `voice-${Date.now()}`, type: "voice",
-        label: "Voice note recorded", url: "", ts: Date.now(),
-      }]);
-      toast({ title: "Voice note captured", description: "Added to inspection record." });
-    }, 2500);
+    if (voice.state === "listening") { voice.stop(); return; }
+    voice.start();
+  }
+
+  function confirmVoiceNote(transcript: string, match: TermMatch | null) {
+    const label = match
+      ? `${match.term.icon} ${match.term.professional}`
+      : `🎤 ${transcript}`;
+    const note: StructuredNote | undefined = match
+      ? buildStructuredNote(transcript, match, inspectionLang)
+      : undefined;
+    setCaptured(prev => [...prev, {
+      id: `voice-${Date.now()}`, type: "voice",
+      label, url: "", ts: Date.now(), note,
+    } as any]);
+    setVoiceSuggestion(null);
+    setPendingTranscript("");
+    voice.reset();
+    toast({
+      title: match ? `${match.term.professional}` : "Voice note captured",
+      description: match ? match.term.reportPhrase[inspectionLang] : "Added to inspection record.",
+    });
+  }
+
+  function dismissVoiceSuggestion() {
+    if (pendingTranscript) {
+      confirmVoiceNote(pendingTranscript, null);
+    } else {
+      setVoiceSuggestion(null);
+      voice.reset();
+    }
   }
 
   async function handleComplete() {
@@ -608,6 +650,32 @@ export default function NewInspection() {
           </div>
           <p className="text-[10px] text-muted-foreground/60 pt-1 border-t border-border/40">
             Camera permission required. ReadyLoq will automatically adjust focus, zoom, and exposure when evidence is detected.
+          </p>
+        </div>
+
+        {/* Language selector */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Languages className="h-3.5 w-3.5" /> Voice Language
+          </p>
+          <div className="flex gap-2">
+            {(["en", "es", "pt"] as SupportedLang[]).map(lang => {
+              const cfg = LANG_CONFIG[lang];
+              return (
+                <button key={lang} onClick={() => setInspectionLang(lang)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-sm font-semibold transition-all flex-1 justify-center",
+                    inspectionLang === lang
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border/60 bg-card text-muted-foreground hover:border-primary/30"
+                  )}>
+                  <span>{cfg.flag}</span> {cfg.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-muted-foreground/50 mt-1.5">
+            Voice notes and commands will be recognized in this language. Mixed-language speech is supported.
           </p>
         </div>
 
@@ -770,19 +838,65 @@ export default function NewInspection() {
           </div>
         )}
 
-        {/* Voice overlay */}
-        {voiceActive && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center animate-pulse">
-                <Mic className="h-9 w-9 text-primary" />
+        {/* Voice: Listening overlay */}
+        {voice.state === "listening" && (
+          <div className="absolute inset-0 z-30 flex items-end justify-center pb-48 bg-black/60 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4 px-6 w-full max-w-sm">
+              <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center animate-pulse">
+                <Mic className="h-7 w-7 text-primary" />
               </div>
-              <p className="text-white font-semibold">Listening…</p>
-              <div className="flex gap-1 items-end h-8">
+              <p className="text-white font-semibold text-sm">
+                {LANG_CONFIG[inspectionLang].flag} Listening…
+              </p>
+              {voice.interim && (
+                <div className="bg-black/60 border border-primary/30 rounded-2xl px-4 py-3 w-full text-center">
+                  <p className="text-white/80 text-sm italic">"{voice.interim}"</p>
+                </div>
+              )}
+              <div className="flex gap-1 items-end h-6">
                 {[3, 5, 8, 4, 7, 3, 6, 5, 4].map((h, i) => (
-                  <div key={i} className="w-1.5 bg-primary rounded-full animate-bounce"
-                    style={{ height: `${h * 3}px`, animationDelay: `${i * 80}ms` }} />
+                  <div key={i} className="w-1 bg-primary rounded-full animate-bounce"
+                    style={{ height: `${h * 2.5}px`, animationDelay: `${i * 80}ms` }} />
                 ))}
+              </div>
+              <button onClick={() => voice.stop()}
+                className="text-white/40 text-xs underline">Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Voice: Terminology suggestion overlay */}
+        {voiceSuggestion && voice.state !== "listening" && (
+          <div className="absolute inset-0 z-30 flex items-end justify-center pb-36 bg-black/70 backdrop-blur-sm">
+            <div className="w-full max-w-sm px-5 space-y-3">
+              <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">You said</p>
+                <p className="text-white/70 text-sm italic">"{pendingTranscript}"</p>
+                <div className="border-t border-border/40 pt-3">
+                  <p className="text-[10px] text-primary/70 uppercase tracking-wider font-semibold mb-1.5">Professional Term</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{voiceSuggestion.term.icon}</span>
+                    <div>
+                      <p className="text-white font-bold text-base">{voiceSuggestion.term.professional}</p>
+                      <p className="text-[11px] text-muted-foreground">{voiceSuggestion.term.reportPhrase[inspectionLang]}</p>
+                    </div>
+                  </div>
+                </div>
+                {voiceSuggestion.detectedLang !== "en" && (
+                  <p className="text-[10px] text-muted-foreground/60 italic">
+                    {voiceSuggestion.detectedLang === "es" ? "🇪🇸" : "🇧🇷"} {voiceSuggestion.term.translations[voiceSuggestion.detectedLang as "es" | "pt"]}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={dismissVoiceSuggestion}
+                  className="flex-1 h-12 rounded-2xl border border-border/50 bg-black/40 text-white/60 text-sm flex items-center justify-center gap-2">
+                  <X className="h-4 w-4" /> Save as-is
+                </button>
+                <button onClick={() => confirmVoiceNote(pendingTranscript, voiceSuggestion)}
+                  className="flex-1 h-12 rounded-2xl bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" /> Confirm
+                </button>
               </div>
             </div>
           </div>
@@ -816,8 +930,14 @@ export default function NewInspection() {
               <div className="w-8 h-8 rounded-lg bg-red-500" />
             </button>
 
-            <button onClick={addVoiceNote} disabled={voiceActive}
-              className="w-14 h-14 rounded-full border-2 border-primary/50 bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-all active:scale-95 disabled:opacity-40">
+            <button onClick={addVoiceNote}
+              disabled={voice.state === "processing" || !!voiceSuggestion}
+              className={cn(
+                "w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all active:scale-95 disabled:opacity-40",
+                voice.state === "listening"
+                  ? "border-primary bg-primary/30 animate-pulse"
+                  : "border-primary/50 bg-primary/10 hover:bg-primary/20"
+              )}>
               <Mic className="h-6 w-6 text-primary" />
             </button>
           </div>
