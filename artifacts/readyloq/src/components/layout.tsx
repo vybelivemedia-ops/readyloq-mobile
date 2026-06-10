@@ -29,8 +29,8 @@ const navItems = [
 
 const mobileNavItems = [
   { href: "/", label: "Scout", icon: Home },
-  { href: "/inspections", label: "Inspections", icon: ClipboardList },
-  { href: "/analysis", label: "Analysis", icon: BrainCircuit },
+  { href: "/inspections", label: "Jobs", icon: ClipboardList },
+  { href: "/analysis", label: "AI", icon: BrainCircuit },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/training", label: "Learn", icon: GraduationCap },
 ];
@@ -69,9 +69,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row bg-background text-foreground">
+    <div className="flex flex-col md:flex-row bg-background text-foreground" style={{ height: '100dvh' }}>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-56 flex-col border-r border-border/60 bg-card/50 backdrop-blur-sm">
+      <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border/60 bg-card/50 backdrop-blur-sm">
         <div className="p-5 pb-3">
           <div className="flex items-center gap-2.5 font-bold text-lg tracking-tight">
             <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
@@ -92,8 +92,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Mobile Header */}
-      <header className="md:hidden flex h-12 items-center justify-between border-b border-border/60 bg-card/80 backdrop-blur-sm px-4 sticky top-0 z-10">
+      {/* Mobile Header — expands into safe area at top */}
+      <header
+        className="md:hidden shrink-0 flex items-end justify-between border-b border-border/60 bg-card/90 backdrop-blur-md px-4 pb-3 sticky top-0 z-10"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}
+      >
         <div className="flex items-center gap-2 font-bold text-base">
           <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center">
             <Scan className="h-3.5 w-3.5 text-primary" />
@@ -114,7 +117,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">AI Inspection Copilot</p>
             </div>
-            <ScrollArea className="h-[calc(100vh-80px)] px-3 py-3">
+            <ScrollArea className="h-[calc(100dvh-80px)] px-3 py-3">
               <NavLinks onClick={() => setIsMobileMenuOpen(false)} />
             </ScrollArea>
           </SheetContent>
@@ -122,22 +125,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-h-0 pb-16 md:pb-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 md:p-7 max-w-5xl mx-auto w-full">
+      <main className="flex-1 min-h-0 flex flex-col overflow-hidden md:overflow-y-auto">
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
+        >
+          <div className="p-4 md:p-7 max-w-5xl mx-auto w-full md:pb-7">
             {children}
           </div>
         </div>
       </main>
 
-      {/* Mobile Bottom Nav — 5 items */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 border-t border-border/60 bg-card/95 backdrop-blur-md flex items-center justify-around px-1 z-20">
+      {/* Mobile Bottom Nav — safe area aware */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border/60 bg-card/95 backdrop-blur-md flex items-start justify-around px-1 pt-2 z-20"
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))' }}
+      >
         {mobileNavItems.map((item) => {
           const active = isActive(location, item.href);
           const isScout = item.href === "/";
           return (
             <Link key={item.href} href={item.href} className="flex-1 flex justify-center">
-              <div className={`flex flex-col items-center justify-center w-full h-full py-1 gap-1 rounded-xl transition-all ${
+              <div className={`flex flex-col items-center justify-start w-full gap-1 py-0.5 transition-all ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}>
                 {isScout && active ? (

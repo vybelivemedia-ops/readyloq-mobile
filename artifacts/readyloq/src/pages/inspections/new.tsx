@@ -654,7 +654,8 @@ export default function NewInspection() {
         </div>
 
         {/* ── Top bar ── */}
-        <div className="relative z-10 flex items-center justify-between px-5 pt-4 pb-2">
+        <div className="relative z-10 flex items-center justify-between px-5 pb-2"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))' }}>
           <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span className="text-white font-mono text-sm font-semibold">{formatTime(timer)}</span>
@@ -793,7 +794,8 @@ export default function NewInspection() {
         )}
 
         {/* ── Bottom controls ── */}
-        <div className="relative z-10 mt-auto px-6 pb-10 pt-4">
+        <div className="relative z-10 mt-auto px-6 pt-4"
+          style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 0px))' }}>
           <div className="text-center mb-5">
             <p className="text-white/25 text-xs">Say {VOICE_COMMANDS[voiceHint]}</p>
           </div>

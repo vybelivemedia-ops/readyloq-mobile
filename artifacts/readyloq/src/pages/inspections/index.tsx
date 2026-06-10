@@ -1,79 +1,158 @@
 import { useListInspections } from "@workspace/api-client-react";
 import { Link } from "wouter";
-import { Plus, Search, Filter, AlertCircle, FileText, MoreHorizontal } from "lucide-react";
+import { Plus, Search, AlertCircle, FileText, ChevronRight, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+
+function statusStyle(status: string) {
+  switch (status.toLowerCase()) {
+    case "completed":  return "bg-emerald-500/15 text-emerald-400 border-emerald-500/20";
+    case "in-progress": return "bg-amber-500/15 text-amber-400 border-amber-500/20";
+    case "pending":    return "bg-blue-500/15 text-blue-400 border-blue-500/20";
+    default:           return "bg-muted text-muted-foreground border-border";
+  }
+}
+
+function statusDot(status: string) {
+  switch (status.toLowerCase()) {
+    case "completed":   return "bg-emerald-500";
+    case "in-progress": return "bg-amber-500";
+    default:            return "bg-blue-500";
+  }
+}
+
+function severityColor(severity?: string | null) {
+  switch (severity?.toLowerCase()) {
+    case "critical": return "text-red-400";
+    case "high":     return "text-orange-400";
+    case "medium":   return "text-amber-400";
+    case "low":      return "text-emerald-400";
+    default:         return "text-muted-foreground";
+  }
+}
 
 export default function InspectionsList() {
   const [searchTerm, setSearchTerm] = useState("");
   const { data: inspections, isLoading } = useListInspections();
 
-  const filteredInspections = inspections?.filter(i =>
+  const filtered = inspections?.filter(i =>
     i.siteAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
     i.technicianName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (i.clientName && i.clientName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed': return 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20';
-      case 'in-progress': return 'bg-amber-500/15 text-amber-500 border-amber-500/20';
-      case 'pending': return 'bg-blue-500/15 text-blue-500 border-blue-500/20';
-      default: return 'bg-muted text-muted-foreground border-border';
-    }
-  };
-
-  const getSeverityColor = (severity?: string | null) => {
-    switch (severity?.toLowerCase()) {
-      case 'critical': return 'text-red-500';
-      case 'high': return 'text-orange-500';
-      case 'medium': return 'text-amber-500';
-      case 'low': return 'text-emerald-500';
-      default: return 'text-muted-foreground';
-    }
-  };
-
   return (
-    <div className="space-y-6 flex flex-col h-[calc(100vh-2rem)] md:h-[calc(100vh-4rem)]">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-shrink-0">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Inspections</h1>
-          <p className="text-muted-foreground mt-1">Manage field operations and data collection.</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Inspections</h1>
+          <p className="text-muted-foreground text-xs md:text-sm mt-0.5 hidden md:block">Manage field operations and data collection.</p>
         </div>
         <Link href="/inspections/new">
-          <Button className="w-full sm:w-auto shadow-md">
-            <Plus className="mr-2 h-4 w-4" />
+          <Button className="rounded-xl shadow-md shadow-primary/20 h-10 px-4 font-semibold shrink-0">
+            <Plus className="mr-1.5 h-4 w-4" />
             New Inspection
           </Button>
         </Link>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-3 flex-shrink-0">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      {/* Search */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
             placeholder="Search site, client, or tech..."
-            className="w-full pl-9 bg-card border-border/50 focus-visible:ring-primary/50"
+            className="pl-9 bg-card border-border/60 rounded-xl h-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="w-full sm:w-auto bg-card border-border/50">
-          <Filter className="mr-2 h-4 w-4" />
-          Filters
+        <Button variant="outline" className="h-10 px-3 rounded-xl border-border/60 bg-card">
+          <Filter className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className="border border-border/50 rounded-lg bg-card flex-1 overflow-hidden flex flex-col shadow-sm">
-        <div className="overflow-auto flex-1">
+      {/* ── MOBILE CARD LIST (hidden on md+) ── */}
+      <div className="md:hidden space-y-2.5">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-card border border-border/60 rounded-2xl p-4 space-y-2">
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <div className="flex gap-2 mt-1">
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </div>
+            </div>
+          ))
+        ) : filtered?.length === 0 ? (
+          <div className="bg-card border border-border/60 rounded-2xl p-10 text-center text-muted-foreground">
+            <FileText className="h-8 w-8 mx-auto mb-2 opacity-20" />
+            <p className="text-sm">No inspections found.</p>
+          </div>
+        ) : (
+          filtered?.map((insp) => (
+            <Link key={insp.id} href={`/inspections/${insp.id}`}>
+              <div className="bg-card border border-border/60 rounded-2xl px-4 py-3.5 active:bg-primary/5 transition-all cursor-pointer">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    {/* Address */}
+                    <div className="flex items-center gap-2">
+                      <div className={cn("w-2 h-2 rounded-full shrink-0 mt-0.5", statusDot(insp.status))} />
+                      <p className="text-sm font-semibold leading-tight truncate">{insp.siteAddress}</p>
+                    </div>
+                    {insp.clientName && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5 ml-4">{insp.clientName}</p>
+                    )}
+
+                    {/* Meta row */}
+                    <div className="flex items-center gap-2 mt-2 flex-wrap ml-4">
+                      <span className="text-[11px] text-muted-foreground">{insp.technicianName}</span>
+                      <span className="text-muted-foreground/40 text-[11px]">·</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {new Date(insp.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                      {insp.severity && (
+                        <>
+                          <span className="text-muted-foreground/40 text-[11px]">·</span>
+                          <span className={cn("text-[11px] font-semibold capitalize", severityColor(insp.severity))}>
+                            {insp.severity}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right side */}
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <Badge variant="outline" className={cn("text-[10px] font-semibold capitalize px-2 py-0.5 border rounded-full", statusStyle(insp.status))}>
+                      {insp.status}
+                    </Badge>
+                    {(insp.findingsCount ?? 0) > 0 && (
+                      <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                        {insp.findingsCount} findings
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+
+      {/* ── DESKTOP TABLE (hidden on mobile) ── */}
+      <div className="hidden md:block border border-border/50 rounded-2xl bg-card overflow-hidden shadow-sm">
+        <div className="overflow-auto">
           <Table>
-            <TableHeader className="bg-muted/30 sticky top-0 z-10 backdrop-blur-sm">
+            <TableHeader className="bg-muted/20">
               <TableRow className="border-border/50">
                 <TableHead>Site Address</TableHead>
                 <TableHead>Technician</TableHead>
@@ -81,7 +160,6 @@ export default function InspectionsList() {
                 <TableHead>Status</TableHead>
                 <TableHead>Severity</TableHead>
                 <TableHead className="text-right">Findings</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -94,69 +172,49 @@ export default function InspectionsList() {
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-5 w-8 ml-auto" /></TableCell>
-                    <TableCell></TableCell>
                   </TableRow>
                 ))
-              ) : filteredInspections?.length === 0 ? (
+              ) : filtered?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center justify-center">
-                      <FileText className="h-10 w-10 mb-2 opacity-20" />
-                      <p>No inspections found.</p>
-                      {searchTerm && <p className="text-sm mt-1">Try adjusting your search query.</p>}
-                    </div>
+                  <TableCell colSpan={6} className="h-48 text-center text-muted-foreground">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                    <p>No inspections found.</p>
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredInspections?.map((inspection) => (
-                  <TableRow key={inspection.id} className="border-border/30 hover:bg-muted/30 group">
+                filtered?.map((insp) => (
+                  <TableRow key={insp.id} className="border-border/30 hover:bg-muted/20 cursor-pointer">
                     <TableCell className="font-medium">
-                      <Link href={`/inspections/${inspection.id}`} className="hover:underline">
-                        {inspection.siteAddress}
+                      <Link href={`/inspections/${insp.id}`} className="hover:text-primary transition-colors">
+                        {insp.siteAddress}
                       </Link>
-                      {inspection.clientName && (
-                        <p className="text-xs text-muted-foreground mt-1 font-normal">{inspection.clientName}</p>
+                      {insp.clientName && (
+                        <p className="text-xs text-muted-foreground mt-0.5 font-normal">{insp.clientName}</p>
                       )}
                     </TableCell>
-                    <TableCell>{inspection.technicianName}</TableCell>
+                    <TableCell className="text-muted-foreground">{insp.technicianName}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {new Date(inspection.createdAt).toLocaleDateString()}
+                      {new Date(insp.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`font-medium ${getStatusColor(inspection.status)} border capitalize`}>
-                        {inspection.status}
+                      <Badge variant="outline" className={cn("font-medium border capitalize text-xs", statusStyle(insp.status))}>
+                        {insp.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {inspection.severity ? (
+                      {insp.severity ? (
                         <div className="flex items-center gap-1.5">
-                          <AlertCircle className={`h-4 w-4 ${getSeverityColor(inspection.severity)}`} />
-                          <span className="capitalize text-sm">{inspection.severity}</span>
+                          <AlertCircle className={cn("h-3.5 w-3.5", severityColor(insp.severity))} />
+                          <span className={cn("capitalize text-sm", severityColor(insp.severity))}>{insp.severity}</span>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
+                        <span className="text-muted-foreground/40">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
                       <span className="inline-flex items-center justify-center bg-primary/10 text-primary rounded-full px-2.5 py-0.5 text-xs font-semibold">
-                        {inspection.findingsCount || 0}
+                        {insp.findingsCount || 0}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover border-border">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/inspections/${inspection.id}`}>View Details</Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>Generate Report</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
