@@ -7,16 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Settings, Palette, Building2, Save, BrainCircuit, CheckCircle2 } from "lucide-react";
+import { Settings, Palette, Building2, Save, BrainCircuit, CheckCircle2, Crosshair, HardHat } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetBrandingQueryKey } from "@workspace/api-client-react";
+import { useRole } from "@/hooks/use-role";
 
 export default function SettingsPage() {
   const { data: branding, isLoading } = useGetBranding();
   const updateBranding = useUpdateBranding();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isManager, setRole } = useRole();
 
   const [form, setForm] = useState({
     companyName: "",
@@ -67,6 +69,33 @@ export default function SettingsPage() {
         </h1>
         <p className="text-muted-foreground text-sm mt-1">Configure white-label branding for your organization</p>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Crosshair className="h-4 w-4" /> View Mode
+          </CardTitle>
+          <CardDescription>
+            Manager view unlocks ReadyLoq Command — management-only opportunity, callback &amp; property risk intelligence.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${isManager ? "bg-primary/15" : "bg-muted"}`}>
+                {isManager ? <Crosshair className="h-4 w-4 text-primary" /> : <HardHat className="h-4 w-4 text-muted-foreground" />}
+              </div>
+              <div>
+                <p className="text-sm font-medium">{isManager ? "Manager" : "Technician"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {isManager ? "Full access including ReadyLoq Command" : "Field workspace — Command hidden"}
+                </p>
+              </div>
+            </div>
+            <Switch checked={isManager} onCheckedChange={v => setRole(v ? "manager" : "technician")} />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Form */}

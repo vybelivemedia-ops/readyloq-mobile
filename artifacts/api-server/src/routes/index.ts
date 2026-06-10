@@ -6,6 +6,7 @@ import datasetRouter from "./dataset";
 import reportsRouter from "./reports";
 import trainingRouter from "./training";
 import analyticsRouter from "./analytics";
+import intelligenceRouter from "./intelligence";
 import brandingRouter from "./branding";
 
 const router: IRouter = Router();
@@ -17,6 +18,7 @@ router.use("/dataset", datasetRouter);
 router.use("/reports", reportsRouter);
 router.use("/training", trainingRouter);
 router.use("/analytics", analyticsRouter);
+router.use("/intelligence", intelligenceRouter);
 router.use("/branding", brandingRouter);
 
 export default router;

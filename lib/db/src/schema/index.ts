@@ -1,5 +1,6 @@
 export * from "./inspections";
 export * from "./analysis";
+export * from "./callbacks";
 export * from "./dataset";
 export * from "./reports";
 export * from "./training";

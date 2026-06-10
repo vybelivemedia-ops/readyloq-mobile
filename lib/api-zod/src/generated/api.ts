@@ -627,6 +627,129 @@ export const GetInfestationRiskResponse = zod.object({
 
 
 /**
+ * @summary Get evidence-based opportunity intelligence
+ */
+export const GetOpportunityIntelligenceResponse = zod.object({
+  "totalOpportunities": zod.number(),
+  "exclusionCount": zod.number(),
+  "structuralCount": zod.number(),
+  "sanitationCount": zod.number(),
+  "moistureCount": zod.number(),
+  "followUpCount": zod.number(),
+  "unreportedCount": zod.number(),
+  "highRiskPropertyCount": zod.number(),
+  "byType": zod.array(zod.object({
+  "type": zod.string(),
+  "label": zod.string(),
+  "count": zod.number()
+})),
+  "opportunities": zod.array(zod.object({
+  "id": zod.string(),
+  "inspectionId": zod.number(),
+  "siteAddress": zod.string(),
+  "propertyType": zod.string(),
+  "type": zod.string(),
+  "typeLabel": zod.string(),
+  "category": zod.string(),
+  "finding": zod.string(),
+  "location": zod.string().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "severity": zod.string(),
+  "confidence": zod.number(),
+  "recommendation": zod.string(),
+  "documented": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Get callback intelligence (chains and patterns)
+ */
+export const GetCallbackIntelligenceResponse = zod.object({
+  "totalChains": zod.number(),
+  "totalCallbacks": zod.number(),
+  "callbackRate": zod.number(),
+  "resolvedCount": zod.number(),
+  "activityReducedCount": zod.number(),
+  "topCauses": zod.array(zod.object({
+  "cause": zod.string(),
+  "label": zod.string(),
+  "count": zod.number()
+})),
+  "recurringFindings": zod.array(zod.object({
+  "finding": zod.string(),
+  "count": zod.number()
+})),
+  "byPropertyType": zod.array(zod.object({
+  "propertyType": zod.string(),
+  "total": zod.number(),
+  "callbacks": zod.number()
+})),
+  "byPestType": zod.array(zod.object({
+  "pestType": zod.string(),
+  "total": zod.number(),
+  "callbacks": zod.number()
+})),
+  "pestRecurrence": zod.array(zod.object({
+  "pestType": zod.string(),
+  "count": zod.number(),
+  "recurrenceRate": zod.number()
+})),
+  "trend": zod.array(zod.object({
+  "month": zod.string(),
+  "label": zod.string(),
+  "total": zod.number(),
+  "callbacks": zod.number()
+})),
+  "conduciveConditions": zod.array(zod.object({
+  "condition": zod.string(),
+  "count": zod.number()
+})),
+  "chains": zod.array(zod.object({
+  "id": zod.number(),
+  "finding": zod.string(),
+  "recommendation": zod.string().nullish(),
+  "followUpVisit": zod.string().nullish(),
+  "outcome": zod.string(),
+  "outcomeLabel": zod.string(),
+  "propertyType": zod.string(),
+  "pestType": zod.string(),
+  "callbackCause": zod.string().nullish(),
+  "callbackCauseLabel": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Get property risk insights
+ */
+export const GetPropertyRiskInsightsResponse = zod.object({
+  "riskIndicators": zod.array(zod.object({
+  "condition": zod.string(),
+  "count": zod.number()
+})),
+  "recurringConditions": zod.array(zod.object({
+  "condition": zod.string(),
+  "count": zod.number()
+})),
+  "highRiskProperties": zod.array(zod.object({
+  "inspectionId": zod.number(),
+  "siteAddress": zod.string(),
+  "propertyType": zod.string(),
+  "riskScore": zod.number(),
+  "conditions": zod.array(zod.string()),
+  "findingCount": zod.number()
+})),
+  "riskTrend": zod.array(zod.object({
+  "month": zod.string(),
+  "label": zod.string(),
+  "value": zod.number()
+}))
+})
+
+
+/**
  * @summary Get white-label branding settings
  */
 export const GetBrandingResponse = zod.object({

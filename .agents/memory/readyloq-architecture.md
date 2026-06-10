@@ -58,6 +58,16 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 ## Seed Data
 - Seed script: `artifacts/api-server/src/seed.ts` — run with `npx tsx artifacts/api-server/src/seed.ts`
 - 8 inspections, 3 analysis results, 18 dataset images, 2 reports, 4 quizzes, 11 training scores seeded
+- Analyses exist only on inspections Riverside Apts (Multifamily), Oak Park Restaurant, Maple Ridge HOA
+- **The main seed.ts is NOT idempotent — do not re-run it on a populated DB (it duplicates).** Newer seeds (e.g. seed-callbacks.ts) are count-guarded and safe to re-run.
+
+## ReadyLoq Command (management-only intelligence module)
+- API: `artifacts/api-server/src/routes/intelligence.ts` → GET /intelligence/{opportunities,callbacks,property-risk}
+- Opportunities & property-risk are DERIVED at request time from `analysis_results.findings` (NOT stored). Mapping is an explicit `CATEGORY_OPP` record + the `exclusionOpportunity` flag + a couple of text overrides (door sweep→structural, moisture regex→moisture). No category keyword fuzzing.
+- "Unreported opportunity" = a finding maps to an opp type AND no recommendation string contains a matching keyword (`OPP_KEYWORDS`). Surfaced management-only. Generic words like "repair" are deliberately excluded from keywords to avoid false "documented".
+- Callback data comes from the `callbacks` table (schema in lib/db/src/schema/callbacks.ts, FK→inspections), seeded by `seed-callbacks.ts` (idempotent, backdated ~6 months).
+- Frontend: `src/pages/command.tsx` (recharts, matches analytics.tsx). Role view-mode via `src/hooks/use-role.ts` (useSyncExternalStore over localStorage "readyloq-role", Manager default). Toggle in settings.tsx.
+- Gating: `/command` Route is conditionally registered in App.tsx and the "Command" nav item is added to the role-aware `navItems` in layout.tsx (desktop sidebar + mobile Sheet only — the static 5-item `mobileNavItems` bottom bar is intentionally untouched).
 
 **Why (dark default):** Field techs use ReadyLoq on phones in varied lighting — dark mode is required for the product vision.
 **Why (Wouter base):** Strip trailing slash from BASE_URL to avoid double-slash routing bugs.

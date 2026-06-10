@@ -508,6 +508,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/InfestationRisk"
 
+  # ── INTELLIGENCE (ReadyLoq Command) ──────────────────────────────────────────
+  /intelligence/opportunities:
+    get:
+      operationId: getOpportunityIntelligence
+      tags: [intelligence]
+      summary: Get evidence-based opportunity intelligence
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunityIntelligence"
+
+  /intelligence/callbacks:
+    get:
+      operationId: getCallbackIntelligence
+      tags: [intelligence]
+      summary: Get callback intelligence (chains and patterns)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallbackIntelligence"
+
+  /intelligence/property-risk:
+    get:
+      operationId: getPropertyRiskInsights
+      tags: [intelligence]
+      summary: Get property risk insights
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyRiskInsights"
+
   # ── BRANDING ─────────────────────────────────────────────────────────────────
   /branding:
     get:
@@ -951,6 +991,191 @@ components:
               siteAddress:   { type: string }
               riskScore:     { type: number }
               lastInspected: { type: string }
+
+    # ── INTELLIGENCE SCHEMAS ────────────────────────────────────────────────────
+    OpportunityItem:
+      type: object
+      required: [id, inspectionId, siteAddress, propertyType, type, typeLabel, category, finding, severity, confidence, recommendation, documented]
+      properties:
+        id:            { type: string }
+        inspectionId:  { type: integer }
+        siteAddress:   { type: string }
+        propertyType:  { type: string }
+        type:          { type: string }
+        typeLabel:     { type: string }
+        category:      { type: string }
+        finding:       { type: string }
+        location:      { type: ["string", "null"] }
+        imageUrl:      { type: ["string", "null"] }
+        severity:      { type: string }
+        confidence:    { type: number }
+        recommendation: { type: string }
+        documented:    { type: boolean }
+
+    OpportunityIntelligence:
+      type: object
+      required: [totalOpportunities, exclusionCount, structuralCount, sanitationCount, moistureCount, followUpCount, unreportedCount, highRiskPropertyCount, byType, opportunities]
+      properties:
+        totalOpportunities:    { type: integer }
+        exclusionCount:        { type: integer }
+        structuralCount:       { type: integer }
+        sanitationCount:       { type: integer }
+        moistureCount:         { type: integer }
+        followUpCount:         { type: integer }
+        unreportedCount:       { type: integer }
+        highRiskPropertyCount: { type: integer }
+        byType:
+          type: array
+          items:
+            type: object
+            required: [type, label, count]
+            properties:
+              type:  { type: string }
+              label: { type: string }
+              count: { type: integer }
+        opportunities:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpportunityItem"
+
+    CallbackChain:
+      type: object
+      required: [id, finding, outcome, outcomeLabel, propertyType, pestType, createdAt]
+      properties:
+        id:                 { type: integer }
+        finding:            { type: string }
+        recommendation:     { type: ["string", "null"] }
+        followUpVisit:      { type: ["string", "null"] }
+        outcome:            { type: string }
+        outcomeLabel:       { type: string }
+        propertyType:       { type: string }
+        pestType:           { type: string }
+        callbackCause:      { type: ["string", "null"] }
+        callbackCauseLabel: { type: ["string", "null"] }
+        createdAt:          { type: string }
+
+    CallbackIntelligence:
+      type: object
+      required: [totalChains, totalCallbacks, callbackRate, resolvedCount, activityReducedCount, topCauses, recurringFindings, byPropertyType, byPestType, pestRecurrence, trend, conduciveConditions, chains]
+      properties:
+        totalChains:          { type: integer }
+        totalCallbacks:       { type: integer }
+        callbackRate:         { type: integer }
+        resolvedCount:        { type: integer }
+        activityReducedCount: { type: integer }
+        topCauses:
+          type: array
+          items:
+            type: object
+            required: [cause, label, count]
+            properties:
+              cause: { type: string }
+              label: { type: string }
+              count: { type: integer }
+        recurringFindings:
+          type: array
+          items:
+            type: object
+            required: [finding, count]
+            properties:
+              finding: { type: string }
+              count:   { type: integer }
+        byPropertyType:
+          type: array
+          items:
+            type: object
+            required: [propertyType, total, callbacks]
+            properties:
+              propertyType: { type: string }
+              total:        { type: integer }
+              callbacks:    { type: integer }
+        byPestType:
+          type: array
+          items:
+            type: object
+            required: [pestType, total, callbacks]
+            properties:
+              pestType:  { type: string }
+              total:     { type: integer }
+              callbacks: { type: integer }
+        pestRecurrence:
+          type: array
+          items:
+            type: object
+            required: [pestType, count, recurrenceRate]
+            properties:
+              pestType:       { type: string }
+              count:          { type: integer }
+              recurrenceRate: { type: integer }
+        trend:
+          type: array
+          items:
+            type: object
+            required: [month, label, total, callbacks]
+            properties:
+              month:     { type: string }
+              label:     { type: string }
+              total:     { type: integer }
+              callbacks: { type: integer }
+        conduciveConditions:
+          type: array
+          items:
+            type: object
+            required: [condition, count]
+            properties:
+              condition: { type: string }
+              count:     { type: integer }
+        chains:
+          type: array
+          items:
+            $ref: "#/components/schemas/CallbackChain"
+
+    HighRiskProperty:
+      type: object
+      required: [inspectionId, siteAddress, propertyType, riskScore, conditions, findingCount]
+      properties:
+        inspectionId: { type: integer }
+        siteAddress:  { type: string }
+        propertyType: { type: string }
+        riskScore:    { type: number }
+        conditions:
+          type: array
+          items: { type: string }
+        findingCount: { type: integer }
+
+    PropertyRiskInsights:
+      type: object
+      required: [riskIndicators, recurringConditions, highRiskProperties, riskTrend]
+      properties:
+        riskIndicators:
+          type: array
+          items:
+            type: object
+            required: [condition, count]
+            properties:
+              condition: { type: string }
+              count:     { type: integer }
+        recurringConditions:
+          type: array
+          items:
+            type: object
+            required: [condition, count]
+            properties:
+              condition: { type: string }
+              count:     { type: integer }
+        highRiskProperties:
+          type: array
+          items:
+            $ref: "#/components/schemas/HighRiskProperty"
+        riskTrend:
+          type: array
+          items:
+            type: object
+            required: [month, label, value]
+            properties:
+              month: { type: string }
+              label: { type: string }
+              value: { type: integer }
 
     # ── BRANDING SCHEMAS ────────────────────────────────────────────────────────
     Branding:

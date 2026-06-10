@@ -8,20 +8,24 @@ import {
   Settings,
   Menu,
   Scan,
+  Crosshair,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
+import { useRole } from "@/hooks/use-role";
 
-const navItems = [
+const baseNavItems = [
   { href: "/", label: "Scout", icon: Home },
   { href: "/inspections", label: "Stops", icon: ClipboardList },
   { href: "/analysis", label: "Evidence", icon: Camera },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/training", label: "Learn", icon: GraduationCap },
-  { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+const commandNavItem = { href: "/command", label: "Command", icon: Crosshair };
+const settingsNavItem = { href: "/settings", label: "Settings", icon: Settings };
 
 const mobileNavItems = [
   { href: "/", label: "Scout", icon: Home },
@@ -39,6 +43,13 @@ function isActive(location: string, href: string) {
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { isManager } = useRole();
+
+  const navItems = [
+    ...baseNavItems,
+    ...(isManager ? [commandNavItem] : []),
+    settingsNavItem,
+  ];
 
   const NavLinks = ({ onClick }: { onClick?: () => void }) => (
     <>

@@ -16,7 +16,9 @@ import TrainingCenter from "@/pages/training/index";
 import QuizPage from "@/pages/training/quiz";
 import Leaderboard from "@/pages/training/leaderboard";
 import AnalyticsDashboard from "@/pages/analytics";
+import CommandCenter from "@/pages/command";
 import SettingsPage from "@/pages/settings";
+import { useRole } from "@/hooks/use-role";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +27,7 @@ const queryClient = new QueryClient({
 });
 
 function Router() {
+  const { isManager } = useRole();
   return (
     <Layout>
       <Switch>
@@ -41,6 +44,7 @@ function Router() {
         <Route path="/training/leaderboard" component={Leaderboard} />
         <Route path="/training/:id" component={QuizPage} />
         <Route path="/analytics" component={AnalyticsDashboard} />
+        {isManager && <Route path="/command" component={CommandCenter} />}
         <Route path="/settings" component={SettingsPage} />
         <Route>
           <div className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center min-h-[50vh]">

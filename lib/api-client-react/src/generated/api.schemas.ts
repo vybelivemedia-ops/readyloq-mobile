@@ -340,6 +340,151 @@ export interface InfestationRisk {
   highRiskSites: InfestationRiskHighRiskSitesItem[];
 }
 
+export interface OpportunityItem {
+  id: string;
+  inspectionId: number;
+  siteAddress: string;
+  propertyType: string;
+  type: string;
+  typeLabel: string;
+  category: string;
+  finding: string;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  imageUrl?: string | null;
+  severity: string;
+  confidence: number;
+  recommendation: string;
+  documented: boolean;
+}
+
+export type OpportunityIntelligenceByTypeItem = {
+  type: string;
+  label: string;
+  count: number;
+};
+
+export interface OpportunityIntelligence {
+  totalOpportunities: number;
+  exclusionCount: number;
+  structuralCount: number;
+  sanitationCount: number;
+  moistureCount: number;
+  followUpCount: number;
+  unreportedCount: number;
+  highRiskPropertyCount: number;
+  byType: OpportunityIntelligenceByTypeItem[];
+  opportunities: OpportunityItem[];
+}
+
+export interface CallbackChain {
+  id: number;
+  finding: string;
+  /** @nullable */
+  recommendation?: string | null;
+  /** @nullable */
+  followUpVisit?: string | null;
+  outcome: string;
+  outcomeLabel: string;
+  propertyType: string;
+  pestType: string;
+  /** @nullable */
+  callbackCause?: string | null;
+  /** @nullable */
+  callbackCauseLabel?: string | null;
+  createdAt: string;
+}
+
+export type CallbackIntelligenceTopCausesItem = {
+  cause: string;
+  label: string;
+  count: number;
+};
+
+export type CallbackIntelligenceRecurringFindingsItem = {
+  finding: string;
+  count: number;
+};
+
+export type CallbackIntelligenceByPropertyTypeItem = {
+  propertyType: string;
+  total: number;
+  callbacks: number;
+};
+
+export type CallbackIntelligenceByPestTypeItem = {
+  pestType: string;
+  total: number;
+  callbacks: number;
+};
+
+export type CallbackIntelligencePestRecurrenceItem = {
+  pestType: string;
+  count: number;
+  recurrenceRate: number;
+};
+
+export type CallbackIntelligenceTrendItem = {
+  month: string;
+  label: string;
+  total: number;
+  callbacks: number;
+};
+
+export type CallbackIntelligenceConduciveConditionsItem = {
+  condition: string;
+  count: number;
+};
+
+export interface CallbackIntelligence {
+  totalChains: number;
+  totalCallbacks: number;
+  callbackRate: number;
+  resolvedCount: number;
+  activityReducedCount: number;
+  topCauses: CallbackIntelligenceTopCausesItem[];
+  recurringFindings: CallbackIntelligenceRecurringFindingsItem[];
+  byPropertyType: CallbackIntelligenceByPropertyTypeItem[];
+  byPestType: CallbackIntelligenceByPestTypeItem[];
+  pestRecurrence: CallbackIntelligencePestRecurrenceItem[];
+  trend: CallbackIntelligenceTrendItem[];
+  conduciveConditions: CallbackIntelligenceConduciveConditionsItem[];
+  chains: CallbackChain[];
+}
+
+export interface HighRiskProperty {
+  inspectionId: number;
+  siteAddress: string;
+  propertyType: string;
+  riskScore: number;
+  conditions: string[];
+  findingCount: number;
+}
+
+export type PropertyRiskInsightsRiskIndicatorsItem = {
+  condition: string;
+  count: number;
+};
+
+export type PropertyRiskInsightsRecurringConditionsItem = {
+  condition: string;
+  count: number;
+};
+
+export type PropertyRiskInsightsRiskTrendItem = {
+  month: string;
+  label: string;
+  value: number;
+};
+
+export interface PropertyRiskInsights {
+  riskIndicators: PropertyRiskInsightsRiskIndicatorsItem[];
+  recurringConditions: PropertyRiskInsightsRecurringConditionsItem[];
+  highRiskProperties: HighRiskProperty[];
+  riskTrend: PropertyRiskInsightsRiskTrendItem[];
+}
+
 export interface Branding {
   id: number;
   companyName: string;

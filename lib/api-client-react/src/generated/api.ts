@@ -25,6 +25,7 @@ import type {
   AnalyticsDashboard,
   Branding,
   BrandingUpdate,
+  CallbackIntelligence,
   DatasetCategory,
   DatasetPage,
   FeedbackInput,
@@ -40,6 +41,8 @@ import type {
   ListDatasetImagesParams,
   ListInspectionsParams,
   MediaInput,
+  OpportunityIntelligence,
+  PropertyRiskInsights,
   Quiz,
   QuizResult,
   QuizSubmission,
@@ -2034,6 +2037,237 @@ export function useGetInfestationRisk<TData = Awaited<ReturnType<typeof getInfes
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetInfestationRiskQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetOpportunityIntelligenceUrl = () => {
+
+
+
+
+  return `/api/intelligence/opportunities`
+}
+
+/**
+ * @summary Get evidence-based opportunity intelligence
+ */
+export const getOpportunityIntelligence = async ( options?: RequestInit): Promise<OpportunityIntelligence> => {
+
+  return customFetch<OpportunityIntelligence>(getGetOpportunityIntelligenceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOpportunityIntelligenceQueryKey = () => {
+    return [
+    `/api/intelligence/opportunities`
+    ] as const;
+    }
+
+
+export const getGetOpportunityIntelligenceQueryOptions = <TData = Awaited<ReturnType<typeof getOpportunityIntelligence>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOpportunityIntelligence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOpportunityIntelligenceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOpportunityIntelligence>>> = ({ signal }) => getOpportunityIntelligence({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOpportunityIntelligence>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOpportunityIntelligenceQueryResult = NonNullable<Awaited<ReturnType<typeof getOpportunityIntelligence>>>
+export type GetOpportunityIntelligenceQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get evidence-based opportunity intelligence
+ */
+
+export function useGetOpportunityIntelligence<TData = Awaited<ReturnType<typeof getOpportunityIntelligence>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOpportunityIntelligence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOpportunityIntelligenceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCallbackIntelligenceUrl = () => {
+
+
+
+
+  return `/api/intelligence/callbacks`
+}
+
+/**
+ * @summary Get callback intelligence (chains and patterns)
+ */
+export const getCallbackIntelligence = async ( options?: RequestInit): Promise<CallbackIntelligence> => {
+
+  return customFetch<CallbackIntelligence>(getGetCallbackIntelligenceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCallbackIntelligenceQueryKey = () => {
+    return [
+    `/api/intelligence/callbacks`
+    ] as const;
+    }
+
+
+export const getGetCallbackIntelligenceQueryOptions = <TData = Awaited<ReturnType<typeof getCallbackIntelligence>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallbackIntelligence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCallbackIntelligenceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCallbackIntelligence>>> = ({ signal }) => getCallbackIntelligence({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCallbackIntelligence>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCallbackIntelligenceQueryResult = NonNullable<Awaited<ReturnType<typeof getCallbackIntelligence>>>
+export type GetCallbackIntelligenceQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get callback intelligence (chains and patterns)
+ */
+
+export function useGetCallbackIntelligence<TData = Awaited<ReturnType<typeof getCallbackIntelligence>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallbackIntelligence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCallbackIntelligenceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPropertyRiskInsightsUrl = () => {
+
+
+
+
+  return `/api/intelligence/property-risk`
+}
+
+/**
+ * @summary Get property risk insights
+ */
+export const getPropertyRiskInsights = async ( options?: RequestInit): Promise<PropertyRiskInsights> => {
+
+  return customFetch<PropertyRiskInsights>(getGetPropertyRiskInsightsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPropertyRiskInsightsQueryKey = () => {
+    return [
+    `/api/intelligence/property-risk`
+    ] as const;
+    }
+
+
+export const getGetPropertyRiskInsightsQueryOptions = <TData = Awaited<ReturnType<typeof getPropertyRiskInsights>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPropertyRiskInsights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPropertyRiskInsightsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPropertyRiskInsights>>> = ({ signal }) => getPropertyRiskInsights({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPropertyRiskInsights>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPropertyRiskInsightsQueryResult = NonNullable<Awaited<ReturnType<typeof getPropertyRiskInsights>>>
+export type GetPropertyRiskInsightsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get property risk insights
+ */
+
+export function useGetPropertyRiskInsights<TData = Awaited<ReturnType<typeof getPropertyRiskInsights>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPropertyRiskInsights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPropertyRiskInsightsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
