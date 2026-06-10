@@ -7,6 +7,7 @@ import {
   ArrowLeft, Mic, MicOff, Scan, CheckCircle2, Zap,
   ZoomIn, Sun, Aperture, Focus, Sparkles, Shield, BrainCircuit,
   Camera, MapPin, ChevronDown, ChevronUp, X, Languages,
+  Battery, BatteryCharging, BatteryLow, BatteryWarning, Gauge,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +17,67 @@ import {
   matchTerminology, buildStructuredNote, type StructuredNote,
 } from "@/lib/voice-intelligence";
 import { useVoiceRecognition } from "@/hooks/use-voice-recognition";
+import { useBatteryStatus, suggestModeFromBattery } from "@/hooks/use-battery-status";
+
+// ─── Inspection Modes ─────────────────────────────────────────────────────────
+
+export type InspectionMode = "low-power" | "standard" | "enhanced";
+
+interface ModeConfig {
+  label: string;
+  short: string;
+  description: string;
+  badge: string;
+  aiDetections: boolean;
+  firstDetectionDelay: number;
+  detectionIntervalMin: number;
+  detectionIntervalRange: number;
+  cameraAdjustments: boolean;
+  colorClass: string;
+  borderClass: string;
+}
+
+const MODE_CONFIG: Record<InspectionMode, ModeConfig> = {
+  "low-power": {
+    label: "Low Power",
+    short: "LOW PWR",
+    description: "Voice & manual capture only · No AI processing",
+    badge: "text-emerald-400",
+    aiDetections: false,
+    firstDetectionDelay: 0,
+    detectionIntervalMin: 0,
+    detectionIntervalRange: 0,
+    cameraAdjustments: false,
+    colorClass: "text-emerald-400",
+    borderClass: "border-emerald-500/30 bg-emerald-500/10",
+  },
+  "standard": {
+    label: "Standard",
+    short: "STANDARD",
+    description: "Periodic AI assistance · Balanced battery use",
+    badge: "text-primary",
+    aiDetections: true,
+    firstDetectionDelay: 8000,
+    detectionIntervalMin: 28000,
+    detectionIntervalRange: 14000,
+    cameraAdjustments: false,
+    colorClass: "text-primary",
+    borderClass: "border-primary/30 bg-primary/10",
+  },
+  "enhanced": {
+    label: "Enhanced",
+    short: "ENHANCED",
+    description: "Full AI analysis · Higher battery usage",
+    badge: "text-amber-400",
+    aiDetections: true,
+    firstDetectionDelay: 5000,
+    detectionIntervalMin: 9000,
+    detectionIntervalRange: 7000,
+    cameraAdjustments: true,
+    colorClass: "text-amber-400",
+    borderClass: "border-amber-500/30 bg-amber-500/10",
+  },
+};
 
 // ─── Zone Data ────────────────────────────────────────────────────────────────
 
@@ -298,6 +360,12 @@ export default function NewInspection() {
   const [technicianName, setTechnicianName] = useState("");
   const [activeZone, setActiveZone] = useState<string | null>(null);
 
+  const battery = useBatteryStatus();
+  const [inspectionMode, setInspectionMode] = useState<InspectionMode>(() =>
+    suggestModeFromBattery({ level: 1, charging: true, supported: false, isLow: false, isCritical: false, displayPct: 100 })
+  );
+  const inspectionModeRef = useRef<InspectionMode>("standard");
+
   const [inspectionLang, setInspectionLang] = useState<SupportedLang>("en");
   const [isRecording, setIsRecording] = useState(false);
   const [micOn, setMicOn] = useState(true);
@@ -332,6 +400,28 @@ export default function NewInspection() {
   const allSelectedZones = [...selectedInterior, ...selectedExterior];
   const allAvailableInterior = INTERIOR_ZONES.filter(z => !selectedInterior.includes(z));
   const allAvailableExterior = EXTERIOR_ZONES.filter(z => !selectedExterior.includes(z));
+
+  // Keep ref in sync with state (used inside async callbacks)
+  useEffect(() => { inspectionModeRef.current = inspectionMode; }, [inspectionMode]);
+
+  // Suggest mode from battery level on setup screen
+  useEffect(() => {
+    if (step !== "setup") return;
+    const suggested = suggestModeFromBattery(battery);
+    setInspectionMode(suggested);
+  }, [battery.level, battery.charging, step]);
+
+  // Auto-downgrade to Low Power when battery drops below 20% during recording
+  useEffect(() => {
+    if (!battery.supported || !isRecording) return;
+    if (battery.isLow && inspectionModeRef.current !== "low-power") {
+      setInspectionMode("low-power");
+      toast({
+        title: `Battery at ${battery.displayPct}%`,
+        description: "Switched to Low Power Mode. Voice and manual capture still active.",
+      });
+    }
+  }, [battery.isLow, isRecording]);
 
   // Rotate voice hints
   useEffect(() => {
@@ -405,22 +495,49 @@ export default function NewInspection() {
     return url;
   }, [camera]);
 
+  // ── Simple capture for Standard mode (no zoom/focus pipeline) ─────────────
+  const performSimpleCapture = useCallback(async (detection: Detection): Promise<string> => {
+    adjustingRef.current = true;
+    camera.setAdjustmentPhase("Evidence detected…");
+    await sleep(500);
+    camera.setAdjustmentPhase("Capturing evidence…");
+    const url = await camera.captureFrame();
+    await sleep(300);
+    camera.setAdjustmentPhase("Evidence saved ✓");
+    await sleep(600);
+    camera.setAdjustmentPhase(null);
+    adjustingRef.current = false;
+    return url;
+  }, [camera]);
+
   // ── Start Recording ────────────────────────────────────────────────────────
   function startRecording() {
     setIsRecording(true);
     setTimer(0);
     timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);
+
+    const mode = inspectionModeRef.current;
+    if (!MODE_CONFIG[mode].aiDetections) return; // Low Power: no AI loop
+
     let dIdx = 0;
     const scheduleNext = () => {
-      const delay = dIdx === 0 ? 5000 : 9000 + Math.random() * 7000;
+      const cfg = MODE_CONFIG[inspectionModeRef.current];
+      // If mode was downgraded to low-power mid-inspection, stop scheduling
+      if (!cfg.aiDetections) return;
+      const delay = dIdx === 0
+        ? cfg.firstDetectionDelay
+        : cfg.detectionIntervalMin + Math.random() * cfg.detectionIntervalRange;
       detectionRef.current = setTimeout(async () => {
-        if (!isRecording && dIdx > 0) return;
+        const currentCfg = MODE_CONFIG[inspectionModeRef.current];
+        if (!currentCfg.aiDetections) return; // downgraded, stop
         const detection = { ...DETECTIONS[dIdx % DETECTIONS.length] };
         dIdx++;
         setDetections(prev => [detection, ...prev]);
         setVisibleDetection(detection);
         setTimeout(() => setVisibleDetection(null), 5000);
-        const url = await performIntelligentCapture(detection);
+        const url = currentCfg.cameraAdjustments
+          ? await performIntelligentCapture(detection)
+          : await performSimpleCapture(detection);
         setCaptured(prev => [...prev, {
           id: `capture-${Date.now()}`, type: "photo",
           label: detection.label, url, detection, ts: Date.now(),
@@ -653,6 +770,56 @@ export default function NewInspection() {
           </p>
         </div>
 
+        {/* Inspection Mode selector */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Gauge className="h-3.5 w-3.5" /> Inspection Mode
+            </p>
+            {battery.supported && (
+              <span className={cn("text-[10px] font-semibold flex items-center gap-1",
+                battery.isLow ? "text-amber-400" : "text-muted-foreground/50"
+              )}>
+                {battery.charging
+                  ? <BatteryCharging className="h-3 w-3" />
+                  : battery.isLow
+                    ? <BatteryWarning className="h-3 w-3" />
+                    : <Battery className="h-3 w-3" />
+                }
+                {battery.displayPct}%
+                {battery.isLow && " · Low battery"}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {(["low-power", "standard", "enhanced"] as InspectionMode[]).map(mode => {
+              const cfg = MODE_CONFIG[mode];
+              const isActive = inspectionMode === mode;
+              return (
+                <button key={mode} onClick={() => setInspectionMode(mode)}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 px-2 py-3 rounded-2xl border text-center transition-all",
+                    isActive ? cfg.borderClass : "border-border/50 bg-card hover:border-primary/20"
+                  )}>
+                  <span className={cn("text-xs font-bold tracking-wide",
+                    isActive ? cfg.colorClass : "text-muted-foreground")}>
+                    {cfg.label}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground leading-tight">
+                    {mode === "low-power" ? "Voice + Manual" : mode === "standard" ? "Periodic AI" : "Full AI"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-muted-foreground/50 mt-1.5">
+            {MODE_CONFIG[inspectionMode].description}
+            {battery.supported && battery.isLow && inspectionMode !== "low-power" && (
+              <span className="text-amber-400/80"> · Low Power recommended at {battery.displayPct}%</span>
+            )}
+          </p>
+        </div>
+
         {/* Language selector */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -744,12 +911,27 @@ export default function NewInspection() {
           <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
             <div className={cn("w-1.5 h-1.5 rounded-full", isAdjusting ? "bg-amber-400 animate-pulse" : "bg-primary")} />
             <span className={cn("text-[11px] font-semibold", isAdjusting ? "text-amber-400" : "text-primary")}>
-              {isAdjusting ? "ADJUSTING" : "INSPECTION ACTIVE"}
+              {isAdjusting ? "ADJUSTING" : MODE_CONFIG[inspectionMode].short}
             </span>
           </div>
 
-          <div className="text-white/50 text-xs bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
-            {captured.length} captured
+          <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
+            {battery.supported ? (
+              <>
+                {battery.charging
+                  ? <BatteryCharging className="h-3 w-3 text-emerald-400" />
+                  : battery.isLow
+                    ? <BatteryWarning className="h-3 w-3 text-amber-400 animate-pulse" />
+                    : <Battery className="h-3 w-3 text-white/50" />
+                }
+                <span className={cn("text-xs font-mono font-semibold",
+                  battery.isLow ? "text-amber-400" : "text-white/50")}>
+                  {battery.displayPct}%
+                </span>
+              </>
+            ) : (
+              <span className="text-white/50 text-xs">{captured.length} captured</span>
+            )}
           </div>
         </div>
 
