@@ -4,42 +4,63 @@ import { useCreateInspection, useAddInspectionMedia } from "@workspace/api-clien
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  ArrowLeft, Mic, MicOff, Scan, AlertTriangle, Camera,
-  CheckCircle2, Zap, ZoomIn, ZoomOut, Sun, Maximize2,
-  Aperture, Focus, Sparkles, Shield, BrainCircuit,
+  ArrowLeft, Mic, MicOff, Scan, CheckCircle2, Zap,
+  ZoomIn, Sun, Aperture, Focus, Sparkles, Shield, BrainCircuit,
+  Camera, MapPin, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-// ─── Constants ──────────────────────────────────────────────────────────────
+// ─── Zone Data ────────────────────────────────────────────────────────────────
+
+const INTERIOR_ZONES = [
+  "Hallways", "Stairwells", "Laundry Rooms", "Trash Rooms", "Boiler Rooms",
+  "Mechanical Rooms", "Utility Rooms", "Basements", "Storage Areas",
+  "Elevator Areas", "Mail Rooms", "Lobbies", "Maintenance Rooms",
+  "Vacant Units", "Occupied Units",
+];
+
+const EXTERIOR_ZONES = [
+  "Front Perimeter", "Rear Perimeter", "Foundation", "Dumpster Area",
+  "Landscaping", "Exterior Utility Penetrations", "Parking Areas", "Loading Areas",
+];
+
+const DEFAULT_INTERIOR = ["Hallways", "Laundry Rooms", "Trash Rooms", "Basements"];
+const DEFAULT_EXTERIOR: string[] = [];
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const PROPERTY_TYPES = [
-  "Single Family", "Multifamily", "Restaurant", "Commercial",
+  "Multifamily", "Single Family", "Commercial", "Restaurant",
   "Warehouse", "School", "Healthcare", "Hospitality",
 ];
 
-const AI_DETECTIONS = [
-  { id: 1, label: "Potential Mouse Droppings Detected",    severity: "high",   icon: "🐭", confidence: 0.91, zoom: 2.8, focus: "macro" as const },
-  { id: 2, label: "Potential Utility Penetration",         severity: "medium", icon: "⚠️", confidence: 0.87, zoom: 2.0, focus: "continuous" as const },
-  { id: 3, label: "Potential Moisture Condition",          severity: "medium", icon: "💧", confidence: 0.83, zoom: 1.8, focus: "continuous" as const },
-  { id: 4, label: "Potential Cockroach Harborage",         severity: "high",   icon: "🪳", confidence: 0.94, zoom: 3.2, focus: "macro" as const },
-  { id: 5, label: "Potential Rub Mark — Active Runway",    severity: "high",   icon: "🐀", confidence: 0.88, zoom: 2.5, focus: "macro" as const },
-  { id: 6, label: "Possible Entry Point Near Baseboard",   severity: "medium", icon: "🔍", confidence: 0.79, zoom: 2.2, focus: "continuous" as const },
-  { id: 7, label: "Conducive Moisture Condition",          severity: "medium", icon: "💧", confidence: 0.82, zoom: 1.6, focus: "continuous" as const },
-  { id: 8, label: "Potential Rat Droppings Detected",      severity: "high",   icon: "🐀", confidence: 0.90, zoom: 3.0, focus: "macro" as const },
-  { id: 9, label: "Structural Gap — Exclusion Opportunity",severity: "medium", icon: "🔧", confidence: 0.77, zoom: 2.0, focus: "continuous" as const },
+const DETECTIONS = [
+  { id: 1, label: "Potential Mouse Droppings Detected",     severity: "high",   icon: "🐭", confidence: 0.91, zoom: 2.8, focus: "macro" as const },
+  { id: 2, label: "Potential Utility Penetration",          severity: "medium", icon: "⚠️", confidence: 0.87, zoom: 2.0, focus: "continuous" as const },
+  { id: 3, label: "Potential Moisture Condition",           severity: "medium", icon: "💧", confidence: 0.83, zoom: 1.8, focus: "continuous" as const },
+  { id: 4, label: "Potential Cockroach Harborage",          severity: "high",   icon: "🪳", confidence: 0.94, zoom: 3.2, focus: "macro" as const },
+  { id: 5, label: "Potential Rub Mark — Active Runway",     severity: "high",   icon: "🐀", confidence: 0.88, zoom: 2.5, focus: "macro" as const },
+  { id: 6, label: "Possible Entry Point Near Baseboard",    severity: "medium", icon: "🔍", confidence: 0.79, zoom: 2.2, focus: "continuous" as const },
+  { id: 7, label: "Conducive Moisture Condition",           severity: "medium", icon: "💧", confidence: 0.82, zoom: 1.6, focus: "continuous" as const },
+  { id: 8, label: "Potential Rat Droppings Detected",       severity: "high",   icon: "🐀", confidence: 0.90, zoom: 3.0, focus: "macro" as const },
+  { id: 9, label: "Structural Gap — Exclusion Opportunity", severity: "medium", icon: "🔧", confidence: 0.77, zoom: 2.0, focus: "continuous" as const },
 ];
 
 const VOICE_COMMANDS = [
-  '"Start inspection"', '"Save finding"', '"Mouse activity"',
-  '"Rat activity"', '"Utility penetration"', '"Add note"',
-  '"Generate report"', '"End inspection"',
+  '"Fresh mouse droppings behind refrigerator"',
+  '"Utility penetration under sink"',
+  '"Heavy German roach activity"',
+  '"Missing door sweep rear exit"',
+  '"Save finding"',
+  '"Add note"',
+  '"End inspection"',
 ];
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Step = "setup" | "recording" | "review";
 type FocusMode = "continuous" | "macro" | "auto";
@@ -63,7 +84,7 @@ interface CameraCapabilities {
   supportsTorch: boolean;
 }
 
-// ─── Camera hook ─────────────────────────────────────────────────────────────
+// ─── Camera hook ──────────────────────────────────────────────────────────────
 
 function useCamera() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -81,7 +102,6 @@ function useCamera() {
     supportsTorch: false,
   });
 
-  // Visual state
   const [cssZoom, setCssZoom] = useState(1);
   const [currentZoom, setCurrentZoom] = useState(1);
   const [focusMode, setFocusMode] = useState<FocusMode>("continuous");
@@ -90,44 +110,29 @@ function useCamera() {
   const [detectionBox, setDetectionBox] = useState<DetectionBox | null>(null);
   const [adjustmentPhase, setAdjustmentPhase] = useState<string | null>(null);
 
-  // Start the camera
   const startCamera = useCallback(async () => {
     try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      });
       streamRef.current = stream;
       const track = stream.getVideoTracks()[0] as MediaStreamVideoTrack;
       trackRef.current = track;
-
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
       }
-
-      // Detect capabilities
       const caps = track.getCapabilities() as any;
-      const newCaps: CameraCapabilities = {
+      setCapabilities({
         supportsZoom: !!(caps.zoom),
         minZoom: caps.zoom?.min ?? 1,
         maxZoom: caps.zoom?.max ?? 5,
         supportsFocusMode: !!(caps.focusMode),
         availableFocusModes: (caps.focusMode as string[]) ?? [],
         supportsTorch: !!(caps.torch),
-      };
-      setCapabilities(newCaps);
-
-      // ImageCapture
-      if (typeof ImageCapture !== "undefined") {
-        imageCaptureRef.current = new ImageCapture(track);
-      }
-
+      });
+      if (typeof ImageCapture !== "undefined") imageCaptureRef.current = new ImageCapture(track);
       setPermission("granted");
     } catch (err: any) {
       if (err.name === "NotAllowedError") setPermission("denied");
@@ -136,37 +141,26 @@ function useCamera() {
     }
   }, []);
 
-  // Stop camera
   const stopCamera = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
     streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-    trackRef.current = null;
-    imageCaptureRef.current = null;
+    streamRef.current = null; trackRef.current = null; imageCaptureRef.current = null;
   }, []);
 
-  // Apply hardware zoom (smooth CSS transition if hw not available)
   const applyZoom = useCallback(async (targetZoom: number) => {
-    const clampedZoom = Math.min(Math.max(targetZoom, 1), capabilities.maxZoom);
-    setCurrentZoom(clampedZoom);
-    setCssZoom(clampedZoom);
-
+    const z = Math.min(Math.max(targetZoom, 1), capabilities.maxZoom);
+    setCurrentZoom(z); setCssZoom(z);
     if (capabilities.supportsZoom && trackRef.current) {
-      try {
-        await (trackRef.current as any).applyConstraints({ advanced: [{ zoom: clampedZoom }] });
-      } catch {}
+      try { await (trackRef.current as any).applyConstraints({ advanced: [{ zoom: z }] }); } catch {}
     }
   }, [capabilities]);
 
-  // Smooth zoom animation
   const smoothZoom = useCallback(async (targetZoom: number) => {
     const start = currentZoom;
     const end = Math.min(Math.max(targetZoom, 1), 5);
-    const steps = 20;
-    for (let i = 0; i <= steps; i++) {
-      const z = start + (end - start) * (i / steps);
-      setCssZoom(z);
-      setCurrentZoom(z);
+    for (let i = 0; i <= 20; i++) {
+      const z = start + (end - start) * (i / 20);
+      setCssZoom(z); setCurrentZoom(z);
       if (capabilities.supportsZoom && trackRef.current) {
         try { await (trackRef.current as any).applyConstraints({ advanced: [{ zoom: z }] }); } catch {}
       }
@@ -174,26 +168,22 @@ function useCamera() {
     }
   }, [currentZoom, capabilities]);
 
-  // Apply focus mode
   const applyFocusMode = useCallback(async (mode: FocusMode) => {
     setFocusMode(mode);
     if (capabilities.supportsFocusMode && trackRef.current) {
-      const available = capabilities.availableFocusModes;
       const mapped = mode === "macro" ? "manual" : "continuous";
-      if (available.includes(mapped)) {
+      if (capabilities.availableFocusModes.includes(mapped)) {
         try {
           await (trackRef.current as any).applyConstraints({ advanced: [{ focusMode: mapped }] });
           if (mode === "macro" && imageCaptureRef.current) {
-            await imageCaptureRef.current.setFocusDistance?.(0.05);
+            await (imageCaptureRef.current as any).setFocusDistance?.(0.05);
           }
         } catch {}
       }
     }
   }, [capabilities]);
 
-  // Capture a real frame
   const captureFrame = useCallback(async (): Promise<string> => {
-    // Try ImageCapture first (highest quality)
     if (imageCaptureRef.current) {
       try {
         const blob = await imageCaptureRef.current.takePhoto({
@@ -203,8 +193,6 @@ function useCamera() {
         return URL.createObjectURL(blob);
       } catch {}
     }
-
-    // Canvas fallback — draw the video frame
     const video = videoRef.current;
     if (video && video.readyState >= 2) {
       const canvas = captureRef.current ?? document.createElement("canvas");
@@ -212,52 +200,36 @@ function useCamera() {
       canvas.height = video.videoHeight || 720;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        if (lowLightActive) {
-          ctx.filter = "brightness(1.4) contrast(1.2)";
-        }
+        if (lowLightActive) ctx.filter = "brightness(1.4) contrast(1.2)";
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.filter = "none";
         return canvas.toDataURL("image/jpeg", 0.92);
       }
     }
-
-    // Fallback for desktop browser without camera
     return `https://picsum.photos/seed/${Math.floor(Math.random() * 50)}/800/600`;
   }, [lowLightActive]);
 
   // Detection bounding box animation
   useEffect(() => {
     const canvas = overlayRef.current;
-    const video = videoRef.current;
     if (!canvas || !detectionBox) return;
-
     const W = canvas.width = canvas.offsetWidth;
     const H = canvas.height = canvas.offsetHeight;
-    let progress = 0;
-    let animating = true;
-
+    let progress = 0; let animating = true;
     const draw = () => {
       if (!animating) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       ctx.clearRect(0, 0, W, H);
-
       progress = Math.min(progress + 0.04, 1);
       const { x, y, w, h } = detectionBox;
       const bx = x * W, by = y * H, bw = w * W, bh = h * H;
       const cornerLen = Math.min(bw, bh) * 0.22;
       const ease = 1 - Math.pow(1 - progress, 3);
-
-      // Animated box expanding in
       ctx.strokeStyle = `rgba(20, 184, 166, ${0.6 + 0.4 * ease})`;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 4]);
-      ctx.strokeRect(bx, by, bw * ease, bh * ease);
-      ctx.setLineDash([]);
-
-      // Corner brackets
-      ctx.strokeStyle = `rgba(20, 184, 166, ${ease})`;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2; ctx.setLineDash([8, 4]);
+      ctx.strokeRect(bx, by, bw * ease, bh * ease); ctx.setLineDash([]);
+      ctx.strokeStyle = `rgba(20, 184, 166, ${ease})`; ctx.lineWidth = 3;
       const corners = [
         [bx, by, cornerLen, 0, cornerLen, 0, 0, cornerLen],
         [bx + bw, by, -cornerLen, 0, -cornerLen, 0, 0, cornerLen],
@@ -271,38 +243,25 @@ function useCamera() {
         ctx.lineTo(px + dx2 * (1 - ease), py + dy3 * (1 - ease));
         ctx.stroke();
       }
-
-      // Crosshair center
       if (progress > 0.7) {
         const cx = bx + bw / 2, cy = by + bh / 2;
         const alpha = (progress - 0.7) / 0.3;
-        ctx.strokeStyle = `rgba(20, 184, 166, ${alpha * 0.8})`;
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = `rgba(20, 184, 166, ${alpha * 0.8})`; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(cx - 12, cy); ctx.lineTo(cx + 12, cy); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(cx, cy - 12); ctx.lineTo(cx, cy + 12); ctx.stroke();
-
-        // Circle around center
-        ctx.beginPath();
-        ctx.arc(cx, cy, 18 * alpha, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(20, 184, 166, ${alpha * 0.5})`;
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 18 * alpha, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(20, 184, 166, ${alpha * 0.5})`; ctx.stroke();
       }
-
       animFrameRef.current = requestAnimationFrame(draw);
     };
-
     draw();
     return () => { animating = false; cancelAnimationFrame(animFrameRef.current); };
   }, [detectionBox]);
 
-  // Clear canvas when no detection
   useEffect(() => {
     if (!detectionBox) {
       const canvas = overlayRef.current;
-      if (canvas) {
-        const ctx = canvas.getContext("2d");
-        ctx?.clearRect(0, 0, canvas.width, canvas.height);
-      }
+      if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
     }
   }, [detectionBox]);
 
@@ -326,8 +285,14 @@ export default function NewInspection() {
 
   const [step, setStep] = useState<Step>("setup");
   const [propertyType, setPropertyType] = useState("Multifamily");
+  const [selectedInterior, setSelectedInterior] = useState<string[]>(DEFAULT_INTERIOR);
+  const [selectedExterior, setSelectedExterior] = useState<string[]>(DEFAULT_EXTERIOR);
+  const [showAllInterior, setShowAllInterior] = useState(false);
+  const [showExterior, setShowExterior] = useState(false);
   const [siteAddress, setSiteAddress] = useState("");
   const [technicianName, setTechnicianName] = useState("");
+  const [activeZone, setActiveZone] = useState<string | null>(null);
+
   const [isRecording, setIsRecording] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [timer, setTimer] = useState(0);
@@ -344,21 +309,38 @@ export default function NewInspection() {
 
   const camera = useCamera();
 
+  const allSelectedZones = [...selectedInterior, ...selectedExterior];
+  const allAvailableInterior = INTERIOR_ZONES.filter(z => !selectedInterior.includes(z));
+  const allAvailableExterior = EXTERIOR_ZONES.filter(z => !selectedExterior.includes(z));
+
   // Rotate voice hints
   useEffect(() => {
-    const t = setInterval(() => setVoiceHint(h => (h + 1) % VOICE_COMMANDS.length), 3000);
+    const t = setInterval(() => setVoiceHint(h => (h + 1) % VOICE_COMMANDS.length), 4000);
     return () => clearInterval(t);
   }, []);
 
-  // Format MM:SS
+  // Rotate active zone during recording
+  useEffect(() => {
+    if (step !== "recording" || allSelectedZones.length === 0) return;
+    let idx = 0;
+    setActiveZone(allSelectedZones[0]);
+    const t = setInterval(() => {
+      idx = (idx + 1) % allSelectedZones.length;
+      setActiveZone(allSelectedZones[idx]);
+    }, 18000);
+    return () => clearInterval(t);
+  }, [step]);
+
   const formatTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  // ── Intelligent Camera Adjustment Pipeline ──────────────────────────────────
+  const toggleZone = (zone: string, list: string[], setList: (v: string[]) => void) => {
+    setList(list.includes(zone) ? list.filter(z => z !== zone) : [...list, zone]);
+  };
+
+  // ── Intelligent Camera Adjustment Pipeline ─────────────────────────────────
   const performIntelligentCapture = useCallback(async (detection: Detection): Promise<string> => {
     adjustingRef.current = true;
-
-    // Random detection box
     const margin = 0.15;
     const bw = 0.3 + Math.random() * 0.3;
     const bh = 0.25 + Math.random() * 0.25;
@@ -368,85 +350,64 @@ export default function NewInspection() {
 
     camera.setAdjustmentPhase("Confirming detection…");
     await sleep(700);
-
     camera.setAdjustmentPhase("Adjusting focus…");
     await camera.applyFocusMode(detection.focus);
     await sleep(800);
-
     camera.setAdjustmentPhase(`Zooming for clarity… ${detection.zoom.toFixed(1)}×`);
     await camera.smoothZoom(detection.zoom);
     await sleep(600);
 
-    // Low-light check — simulate ambient sensor
     const needsLowLight = Math.random() > 0.5;
     if (needsLowLight) {
       camera.setAdjustmentPhase("Low-light enhancement active…");
       camera.setLowLightActive(true);
       await sleep(500);
     }
-
     camera.setAdjustmentPhase("Stabilizing…");
     camera.setStabilizingActive(true);
     await sleep(500);
-
     camera.setAdjustmentPhase("Selecting best frame…");
     await sleep(600);
-
     camera.setAdjustmentPhase("Capturing evidence…");
     const url = await camera.captureFrame();
     await sleep(300);
-
     camera.setAdjustmentPhase("Evidence saved ✓");
     await sleep(800);
 
-    // Reset camera to default
     await camera.smoothZoom(1.0);
     await camera.applyFocusMode("continuous");
     camera.setLowLightActive(false);
     camera.setStabilizingActive(false);
     camera.setDetectionBox(null);
-
     await sleep(400);
     camera.setAdjustmentPhase(null);
     adjustingRef.current = false;
-
     return url;
   }, [camera]);
 
-  // ── Start Recording ─────────────────────────────────────────────────────────
+  // ── Start Recording ────────────────────────────────────────────────────────
   function startRecording() {
     setIsRecording(true);
     setTimer(0);
     timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);
-
     let dIdx = 0;
-    // First detection after 5s, then every 9-16s
     const scheduleNext = () => {
       const delay = dIdx === 0 ? 5000 : 9000 + Math.random() * 7000;
       detectionRef.current = setTimeout(async () => {
         if (!isRecording && dIdx > 0) return;
-
-        const detection = { ...AI_DETECTIONS[dIdx % AI_DETECTIONS.length] };
+        const detection = { ...DETECTIONS[dIdx % DETECTIONS.length] };
         dIdx++;
         setDetections(prev => [detection, ...prev]);
         setVisibleDetection(detection);
         setTimeout(() => setVisibleDetection(null), 5000);
-
         const url = await performIntelligentCapture(detection);
-
         setCaptured(prev => [...prev, {
-          id: `capture-${Date.now()}`,
-          type: "photo",
-          label: detection.label,
-          url,
-          detection,
-          ts: Date.now(),
+          id: `capture-${Date.now()}`, type: "photo",
+          label: detection.label, url, detection, ts: Date.now(),
         }]);
-
         scheduleNext();
       }, delay) as unknown as ReturnType<typeof setInterval>;
     };
-
     scheduleNext();
   }
 
@@ -464,15 +425,23 @@ export default function NewInspection() {
     camera.stopCamera();
   }, []);
 
-  // ── Begin Inspection ────────────────────────────────────────────────────────
   async function handleBeginInspection() {
-    if (!siteAddress || !technicianName) {
-      toast({ title: "Required fields missing", description: "Enter site address and your name.", variant: "destructive" });
+    if (!siteAddress) {
+      toast({ title: "Site address required", description: "Enter the property address to begin.", variant: "destructive" });
       return;
     }
+    const techName = technicianName.trim() || "Technician";
+    const zoneNote = allSelectedZones.length > 0
+      ? `Zones: ${allSelectedZones.join(", ")}`
+      : "";
     try {
       const result = await createInspection.mutateAsync({
-        data: { siteAddress, technicianName, pestTypes: [], notes: `Property type: ${propertyType}` },
+        data: {
+          siteAddress,
+          technicianName: techName,
+          pestTypes: [],
+          notes: [`Property type: ${propertyType}`, zoneNote].filter(Boolean).join(" | "),
+        },
       });
       setCreatedId(result.id);
       setStep("recording");
@@ -491,7 +460,7 @@ export default function NewInspection() {
         id: `voice-${Date.now()}`, type: "voice",
         label: "Voice note recorded", url: "", ts: Date.now(),
       }]);
-      toast({ title: "Voice note saved", description: "Added to inspection record." });
+      toast({ title: "Voice note captured", description: "Added to inspection record." });
     }, 2500);
   }
 
@@ -509,24 +478,26 @@ export default function NewInspection() {
     navigate(createdId ? `/inspections/${createdId}` : "/inspections");
   }
 
-  // ── STEP 1: SETUP ────────────────────────────────────────────────────────────
+  // ── STEP 1: SETUP ─────────────────────────────────────────────────────────────
   if (step === "setup") {
+    const visibleInterior = showAllInterior ? INTERIOR_ZONES : INTERIOR_ZONES.slice(0, 8);
     return (
-      <div className="max-w-lg mx-auto space-y-6 pt-2">
+      <div className="max-w-lg mx-auto space-y-5 pt-2 pb-6">
         <div className="flex items-center gap-3">
           <Link href="/"><Button variant="ghost" size="icon" className="h-8 w-8"><ArrowLeft className="h-4 w-4" /></Button></Link>
           <div>
             <h1 className="text-xl font-bold">New Inspection</h1>
-            <p className="text-muted-foreground text-xs mt-0.5">Set up site details before you begin</p>
+            <p className="text-muted-foreground text-xs mt-0.5">Select zones and begin</p>
           </div>
         </div>
 
+        {/* Property Type */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Property Type</p>
           <div className="grid grid-cols-2 gap-2">
             {PROPERTY_TYPES.map(t => (
               <button key={t} onClick={() => setPropertyType(t)}
-                className={cn("px-3 py-3 rounded-2xl border text-sm font-medium text-left transition-all",
+                className={cn("px-3 py-2.5 rounded-2xl border text-sm font-medium text-left transition-all",
                   propertyType === t
                     ? "border-primary bg-primary/15 text-primary"
                     : "border-border/60 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
@@ -537,20 +508,85 @@ export default function NewInspection() {
           </div>
         </div>
 
+        {/* Interior Zones */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Interior Zones</p>
+            <span className="text-[10px] text-primary font-semibold">{selectedInterior.length} selected</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {visibleInterior.map(zone => (
+              <button key={zone} onClick={() => toggleZone(zone, selectedInterior, setSelectedInterior)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full border text-[12px] font-medium transition-all",
+                  selectedInterior.includes(zone)
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border/50 bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                )}>
+                {zone}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setShowAllInterior(v => !v)}
+            className="mt-2 flex items-center gap-1 text-[11px] text-primary/70 font-medium">
+            {showAllInterior
+              ? <><ChevronUp className="h-3 w-3" /> Show fewer</>
+              : <><ChevronDown className="h-3 w-3" /> Show all {INTERIOR_ZONES.length} interior zones</>}
+          </button>
+        </div>
+
+        {/* Exterior Zones */}
+        <div>
+          <button onClick={() => setShowExterior(v => !v)}
+            className="flex items-center justify-between w-full mb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Exterior Zones</p>
+            <div className="flex items-center gap-2">
+              {selectedExterior.length > 0 && (
+                <span className="text-[10px] text-primary font-semibold">{selectedExterior.length} selected</span>
+              )}
+              {showExterior ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+            </div>
+          </button>
+          {showExterior && (
+            <div className="flex flex-wrap gap-2">
+              {EXTERIOR_ZONES.map(zone => (
+                <button key={zone} onClick={() => toggleZone(zone, selectedExterior, setSelectedExterior)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full border text-[12px] font-medium transition-all",
+                    selectedExterior.includes(zone)
+                      ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
+                      : "border-border/50 bg-card text-muted-foreground hover:border-emerald-500/30 hover:text-foreground"
+                  )}>
+                  {zone}
+                </button>
+              ))}
+            </div>
+          )}
+          {!showExterior && (
+            <p className="text-[11px] text-muted-foreground/60">Tap to add exterior zones to this inspection</p>
+          )}
+        </div>
+
+        {/* Site address */}
         <div className="space-y-3">
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Site Address</p>
-            <Input placeholder="123 Main St, City, State" value={siteAddress} onChange={e => setSiteAddress(e.target.value)}
-              className="bg-card border-border/60 rounded-xl h-12 text-base" />
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input placeholder="123 Main St, City, State" value={siteAddress}
+                onChange={e => setSiteAddress(e.target.value)}
+                className="bg-card border-border/60 rounded-xl h-12 text-base pl-9" />
+            </div>
           </div>
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Your Name</p>
-            <Input placeholder="Technician name" value={technicianName} onChange={e => setTechnicianName(e.target.value)}
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Technician <span className="text-muted-foreground/40 normal-case font-normal">(optional)</span></p>
+            <Input placeholder="Your name" value={technicianName}
+              onChange={e => setTechnicianName(e.target.value)}
               className="bg-card border-border/60 rounded-xl h-12 text-base" />
           </div>
         </div>
 
-        {/* AI Camera capabilities preview */}
+        {/* Camera capabilities */}
         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 space-y-3">
           <p className="text-xs font-semibold text-primary/80 uppercase tracking-wider flex items-center gap-1.5">
             <Aperture className="h-3.5 w-3.5" /> Intelligent Camera System
@@ -575,17 +611,6 @@ export default function NewInspection() {
           </p>
         </div>
 
-        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4">
-          <p className="text-xs font-semibold text-primary/80 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <Mic className="h-3 w-3" /> Voice Commands
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {VOICE_COMMANDS.slice(0, 5).map(cmd => (
-              <span key={cmd} className="text-[11px] text-muted-foreground bg-muted/40 px-2.5 py-1 rounded-full">{cmd}</span>
-            ))}
-          </div>
-        </div>
-
         <Button className="w-full h-14 text-base font-bold rounded-2xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
           disabled={createInspection.isPending} onClick={handleBeginInspection}>
           {createInspection.isPending
@@ -596,14 +621,14 @@ export default function NewInspection() {
     );
   }
 
-  // ── STEP 2: RECORDING ─────────────────────────────────────────────────────────
+  // ── STEP 2: RECORDING ──────────────────────────────────────────────────────────
   if (step === "recording") {
     const isAdjusting = !!camera.adjustmentPhase && camera.adjustmentPhase !== "Evidence saved ✓";
     const justCaptured = camera.adjustmentPhase === "Evidence saved ✓";
 
     return (
       <div className="fixed inset-0 bg-black flex flex-col z-50 overflow-hidden">
-        {/* ── Camera video feed ── */}
+        {/* Camera video feed */}
         <div className="absolute inset-0 bg-black">
           {camera.permission === "granted" ? (
             <video
@@ -613,35 +638,22 @@ export default function NewInspection() {
               style={{ transform: `scale(${camera.cssZoom})`, transformOrigin: "center center" }}
             />
           ) : (
-            /* Simulated viewfinder for desktop / no camera */
             <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
               <div className="absolute inset-0 opacity-10"
                 style={{ backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 60px, rgba(255,255,255,0.3) 60px, rgba(255,255,255,0.3) 61px), repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.3) 60px, rgba(255,255,255,0.3) 61px)" }} />
             </div>
           )}
-
-          {/* Canvas capture (hidden) */}
           <canvas ref={camera.captureRef} className="hidden" />
-
-          {/* Vignette */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-transparent to-black/70 pointer-events-none" />
-
-          {/* Low-light filter overlay */}
           {camera.lowLightActive && (
             <div className="absolute inset-0 bg-yellow-400/5 mix-blend-overlay pointer-events-none transition-opacity" />
           )}
-
-          {/* AI detection canvas overlay */}
           <canvas ref={camera.overlayRef}
             className="absolute inset-0 w-full h-full pointer-events-none"
             style={{ width: "100%", height: "100%" }} />
-
-          {/* Scanning line */}
           {!isAdjusting && (
             <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-primary/50 to-transparent animate-scan pointer-events-none" />
           )}
-
-          {/* Camera permission denied overlay */}
           {camera.permission === "denied" && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
               <div className="text-center p-6">
@@ -653,7 +665,7 @@ export default function NewInspection() {
           )}
         </div>
 
-        {/* ── Top bar ── */}
+        {/* Top bar */}
         <div className="relative z-10 flex items-center justify-between px-5 pb-2"
           style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))' }}>
           <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
@@ -664,7 +676,7 @@ export default function NewInspection() {
           <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
             <div className={cn("w-1.5 h-1.5 rounded-full", isAdjusting ? "bg-amber-400 animate-pulse" : "bg-primary")} />
             <span className={cn("text-[11px] font-semibold", isAdjusting ? "text-amber-400" : "text-primary")}>
-              {isAdjusting ? "AI ADJUSTING" : "AI ACTIVE"}
+              {isAdjusting ? "ADJUSTING" : "INSPECTION ACTIVE"}
             </span>
           </div>
 
@@ -673,57 +685,50 @@ export default function NewInspection() {
           </div>
         </div>
 
-        {/* ── Camera HUD strip ── */}
+        {/* HUD strip */}
         <div className="relative z-10 px-4 mt-1">
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Zoom */}
             <div className={cn(
               "flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-mono font-bold transition-all",
               isAdjusting && camera.cssZoom > 1.1
                 ? "bg-amber-400/20 border border-amber-400/40 text-amber-300"
                 : "bg-black/40 border border-white/10 text-white/60"
             )}>
-              <ZoomIn className="h-3 w-3" />
-              {camera.cssZoom.toFixed(1)}×
+              <ZoomIn className="h-3 w-3" />{camera.cssZoom.toFixed(1)}×
             </div>
-
-            {/* Focus mode */}
             <div className={cn(
               "flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase transition-all",
               camera.focusMode === "macro"
                 ? "bg-primary/20 border border-primary/40 text-primary"
                 : "bg-black/40 border border-white/10 text-white/50"
             )}>
-              <Focus className="h-3 w-3" />
-              {camera.focusMode}
+              <Focus className="h-3 w-3" />{camera.focusMode}
             </div>
-
-            {/* Low-light */}
             {camera.lowLightActive && (
               <div className="flex items-center gap-1 bg-yellow-500/20 border border-yellow-500/40 rounded-full px-2.5 py-1 text-[10px] font-semibold text-yellow-400 animate-pulse">
-                <Sun className="h-3 w-3" />
-                LOW LIGHT+
+                <Sun className="h-3 w-3" />LOW LIGHT+
               </div>
             )}
-
-            {/* Stabilizing */}
             {camera.stabilizingActive && (
               <div className="flex items-center gap-1 bg-blue-500/20 border border-blue-500/40 rounded-full px-2.5 py-1 text-[10px] font-semibold text-blue-400">
-                <Shield className="h-3 w-3" />
-                STABILIZED
+                <Shield className="h-3 w-3" />STABILIZED
+              </div>
+            )}
+            {/* Active zone indicator */}
+            {activeZone && (
+              <div className="flex items-center gap-1 bg-primary/15 border border-primary/30 rounded-full px-2.5 py-1 text-[10px] font-semibold text-primary">
+                <MapPin className="h-3 w-3" />{activeZone}
               </div>
             )}
           </div>
         </div>
 
-        {/* ── AI Adjustment phase display ── */}
+        {/* Adjustment phase */}
         <div className="relative z-10 px-5 mt-3 h-12">
           {camera.adjustmentPhase && (
             <div className={cn(
               "animate-slide-up flex items-center gap-3 backdrop-blur-md border rounded-2xl px-4 py-2.5 transition-all",
-              justCaptured
-                ? "bg-emerald-900/60 border-emerald-500/40"
-                : "bg-black/60 border-amber-500/30"
+              justCaptured ? "bg-emerald-900/60 border-emerald-500/40" : "bg-black/60 border-amber-500/30"
             )}>
               {justCaptured
                 ? <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
@@ -735,7 +740,7 @@ export default function NewInspection() {
           )}
         </div>
 
-        {/* ── Active detection toast ── */}
+        {/* Active detection toast */}
         <div className="relative z-10 px-5 mt-2 h-12">
           {visibleDetection && !camera.adjustmentPhase && (
             <div className="animate-slide-up flex items-center gap-3 bg-black/70 backdrop-blur-md border border-primary/30 rounded-2xl px-4 py-2.5">
@@ -748,7 +753,7 @@ export default function NewInspection() {
           )}
         </div>
 
-        {/* ── Detection history ── */}
+        {/* Finding history chips */}
         {detections.length > 0 && (
           <div className="relative z-10 px-5 mt-3">
             <div className="flex gap-2 overflow-x-auto pb-1">
@@ -765,7 +770,7 @@ export default function NewInspection() {
           </div>
         )}
 
-        {/* Voice active overlay */}
+        {/* Voice overlay */}
         {voiceActive && (
           <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-4">
@@ -788,32 +793,29 @@ export default function NewInspection() {
           <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
             <div className="text-center opacity-30">
               <BrainCircuit className="h-14 w-14 text-primary/50 mx-auto mb-3" />
-              <p className="text-white/40 text-sm">AI scanning environment…</p>
+              <p className="text-white/40 text-sm">Scanning environment…</p>
             </div>
           </div>
         )}
 
-        {/* ── Bottom controls ── */}
+        {/* Bottom controls */}
         <div className="relative z-10 mt-auto px-6 pt-4"
           style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 0px))' }}>
           <div className="text-center mb-5">
             <p className="text-white/25 text-xs">Say {VOICE_COMMANDS[voiceHint]}</p>
           </div>
           <div className="flex items-center justify-between gap-4">
-            {/* Mic toggle */}
             <button onClick={() => setMicOn(m => !m)}
               className={cn("w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all",
                 micOn ? "border-white/30 bg-white/10" : "border-red-500/50 bg-red-500/20")}>
               {micOn ? <Mic className="h-6 w-6 text-white" /> : <MicOff className="h-6 w-6 text-red-400" />}
             </button>
 
-            {/* STOP — large center */}
             <button onClick={stopRecording}
               className="w-20 h-20 rounded-full border-4 border-white/80 flex items-center justify-center bg-transparent hover:bg-white/10 transition-all active:scale-95">
               <div className="w-8 h-8 rounded-lg bg-red-500" />
             </button>
 
-            {/* Voice note */}
             <button onClick={addVoiceNote} disabled={voiceActive}
               className="w-14 h-14 rounded-full border-2 border-primary/50 bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-all active:scale-95 disabled:opacity-40">
               <Mic className="h-6 w-6 text-primary" />
@@ -826,17 +828,21 @@ export default function NewInspection() {
   }
 
   // ── STEP 3: REVIEW ────────────────────────────────────────────────────────────
+  const additionalInterior = INTERIOR_ZONES.filter(z => !selectedInterior.includes(z));
+  const additionalExterior = EXTERIOR_ZONES.filter(z => !selectedExterior.includes(z));
+  const hasAdditional = additionalInterior.length > 0 || additionalExterior.length > 0;
+
   return (
-    <div className="max-w-lg mx-auto space-y-5 pt-2">
+    <div className="max-w-lg mx-auto space-y-5 pt-2 pb-6">
       <div>
         <h1 className="text-xl font-bold flex items-center gap-2">
           <CheckCircle2 className="h-5 w-5 text-emerald-400" />
           Inspection Complete
         </h1>
-        <p className="text-muted-foreground text-xs mt-0.5">Review AI findings and save your record</p>
+        <p className="text-muted-foreground text-xs mt-0.5">Review findings and save your record</p>
       </div>
 
-      {/* Summary */}
+      {/* Summary stats */}
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-card border border-border/60 rounded-2xl p-3 text-center">
           <p className="text-xl font-bold text-primary">{captured.filter(c => c.type === "photo").length}</p>
@@ -844,7 +850,7 @@ export default function NewInspection() {
         </div>
         <div className="bg-card border border-border/60 rounded-2xl p-3 text-center">
           <p className="text-xl font-bold text-orange-400">{detections.length}</p>
-          <p className="text-[10px] text-muted-foreground">AI Findings</p>
+          <p className="text-[10px] text-muted-foreground">Findings</p>
         </div>
         <div className="bg-card border border-border/60 rounded-2xl p-3 text-center">
           <p className="text-xl font-bold text-foreground">{formatTime(timer)}</p>
@@ -852,15 +858,83 @@ export default function NewInspection() {
         </div>
       </div>
 
-      {/* Camera stats */}
+      {/* Zones Visited */}
+      {allSelectedZones.length > 0 && (
+        <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 text-emerald-400" />
+            Zones Visited
+            <span className="text-emerald-400 font-bold ml-auto">{allSelectedZones.length}</span>
+          </p>
+          {selectedInterior.length > 0 && (
+            <div>
+              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-1.5">Interior</p>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedInterior.map(z => (
+                  <span key={z} className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    {z}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {selectedExterior.length > 0 && (
+            <div>
+              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-1.5">Exterior</p>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedExterior.map(z => (
+                  <span key={z} className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {z}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Additional Zones Available */}
+      {hasAdditional && (
+        <div className="bg-card border border-border/50 rounded-2xl p-4 space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            Additional Zones Available
+          </p>
+          {additionalInterior.length > 0 && (
+            <div>
+              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-1.5">Interior</p>
+              <div className="flex flex-wrap gap-1.5">
+                {additionalInterior.map(z => (
+                  <span key={z} className="text-[11px] px-2.5 py-1 rounded-full bg-muted/30 text-muted-foreground border border-border/40">
+                    {z}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {additionalExterior.length > 0 && (
+            <div>
+              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-1.5">Exterior</p>
+              <div className="flex flex-wrap gap-1.5">
+                {additionalExterior.map(z => (
+                  <span key={z} className="text-[11px] px-2.5 py-1 rounded-full bg-muted/30 text-muted-foreground border border-border/40">
+                    {z}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Camera intelligence summary */}
       <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4">
         <p className="text-xs font-semibold text-primary/80 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-          <Aperture className="h-3.5 w-3.5" /> Camera Intelligence Summary
+          <Aperture className="h-3.5 w-3.5" /> Evidence Summary
         </p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
           {[
-            { label: "Auto-captures performed", value: captured.filter(c => c.type === "photo").length },
-            { label: "Auto-focus adjustments", value: detections.length },
+            { label: "Auto-captures", value: captured.filter(c => c.type === "photo").length },
+            { label: "Focus adjustments", value: detections.length },
             { label: "Zoom operations", value: detections.length },
             { label: "Voice notes", value: captured.filter(c => c.type === "voice").length },
           ].map(s => (
@@ -872,16 +946,16 @@ export default function NewInspection() {
         </div>
       </div>
 
-      {/* Captured evidence with real images */}
-      {captured.length > 0 && (
+      {/* Captured evidence */}
+      {captured.filter(c => c.type === "photo").length > 0 && (
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Captured Evidence</p>
           <div className="grid grid-cols-2 gap-2">
             {captured.filter(c => c.type === "photo").map(item => (
               <div key={item.id} className="bg-card border border-border/60 rounded-2xl overflow-hidden">
-                {item.url && item.url.startsWith("blob:") || item.url?.startsWith("http") || item.url?.startsWith("data:") ? (
+                {(item.url.startsWith("blob:") || item.url.startsWith("http") || item.url.startsWith("data:")) ? (
                   <img src={item.url} alt="" className="w-full h-28 object-cover" onError={e => {
-                    (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${Math.floor(Math.random()*20)}/400/300`;
+                    (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${Math.floor(Math.random() * 20)}/400/300`;
                   }} />
                 ) : (
                   <div className="w-full h-28 bg-muted/30 flex items-center justify-center">
@@ -896,7 +970,7 @@ export default function NewInspection() {
                         item.detection.severity === "high" ? "bg-orange-400" : "bg-amber-400"
                       )} />
                       <span className="text-[9px] text-muted-foreground/70">
-                        {item.detection.zoom.toFixed(1)}× zoom · {Math.round(item.detection.confidence * 100)}%
+                        {item.detection.zoom.toFixed(1)}× · {Math.round(item.detection.confidence * 100)}%
                       </span>
                     </div>
                   )}
@@ -915,10 +989,10 @@ export default function NewInspection() {
         </div>
       )}
 
-      {/* AI findings */}
+      {/* Findings list */}
       {detections.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">AI Findings</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Findings</p>
           <div className="space-y-1.5">
             {detections.map((d, i) => (
               <div key={`${d.id}-${i}`}
@@ -939,11 +1013,11 @@ export default function NewInspection() {
       {captured.length === 0 && detections.length === 0 && (
         <div className="bg-card border border-border/60 rounded-2xl p-8 text-center text-muted-foreground">
           <Scan className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No findings captured during this inspection.</p>
+          <p className="text-sm">No evidence captured during this inspection.</p>
         </div>
       )}
 
-      <div className="flex gap-3 pt-2 pb-4">
+      <div className="flex gap-3 pt-2">
         <Button variant="outline" className="flex-1 rounded-xl h-12" onClick={() => navigate("/inspections")}>
           Save Only
         </Button>

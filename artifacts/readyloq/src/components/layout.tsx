@@ -2,11 +2,9 @@ import { Link, useLocation } from "wouter";
 import {
   Home,
   ClipboardList,
-  BrainCircuit,
-  Image as ImageIcon,
+  Camera,
   FileText,
   GraduationCap,
-  BarChart3,
   Settings,
   Menu,
   Scan,
@@ -18,19 +16,17 @@ import { useState } from "react";
 
 const navItems = [
   { href: "/", label: "Scout", icon: Home },
-  { href: "/inspections", label: "Inspections", icon: ClipboardList },
-  { href: "/analysis", label: "Analysis", icon: BrainCircuit },
-  { href: "/dataset", label: "Dataset", icon: ImageIcon },
+  { href: "/inspections", label: "Stops", icon: ClipboardList },
+  { href: "/analysis", label: "Evidence", icon: Camera },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/training", label: "Learn", icon: GraduationCap },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 const mobileNavItems = [
   { href: "/", label: "Scout", icon: Home },
-  { href: "/inspections", label: "Jobs", icon: ClipboardList },
-  { href: "/analysis", label: "AI", icon: BrainCircuit },
+  { href: "/inspections", label: "Stops", icon: ClipboardList },
+  { href: "/analysis", label: "Evidence", icon: Camera },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/training", label: "Learn", icon: GraduationCap },
 ];
@@ -79,7 +75,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <span className="text-foreground">Ready<span className="text-primary">Loq</span></span>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1 pl-9">AI Inspection Copilot</p>
+          <p className="text-[10px] text-muted-foreground mt-1 pl-9">Inspection Copilot</p>
         </div>
         <ScrollArea className="flex-1 px-3 py-2">
           <NavLinks />
@@ -87,7 +83,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-border/40">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] text-muted-foreground">AI Active — Field OS v1.0</span>
+            <span className="text-[10px] text-muted-foreground">Inspection Active — Field OS v1.0</span>
           </div>
         </div>
       </aside>
@@ -115,7 +111,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Scan className="h-5 w-5 text-primary" />
                 <span>Ready<span className="text-primary">Loq</span></span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">AI Inspection Copilot</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Inspection Copilot</p>
             </div>
             <ScrollArea className="h-[calc(100dvh-80px)] px-3 py-3">
               <NavLinks onClick={() => setIsMobileMenuOpen(false)} />
