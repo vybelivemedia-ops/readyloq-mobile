@@ -11,6 +11,30 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Wouter routing with `<Router base={import.meta.env.BASE_URL.replace(/\/$/, "")}>` wrapper in App.tsx
 - Tailwind CSS + shadcn/ui, teal/cyan primary (--primary: 185 80% 46%)
 
+## Auth Architecture (Replit-managed Clerk)
+- Clerk provisioned via `setupClerkWhitelabelAuth()` — keys: CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, VITE_CLERK_PUBLISHABLE_KEY
+- Web auth is **cookie-based** — DO NOT add setAuthTokenGetter, Bearer tokens, or Authorization headers to browser API calls. Cookies are automatic for same-origin fetches.
+- `@clerk/express` clerkMiddleware in app.ts parses session cookies. Must come AFTER the Clerk proxy route and BEFORE body parsers.
+- CORS changed from `cors()` wildcard to `cors({ credentials: true, origin: true })` (required for cookie auth).
+- Clerk proxy middleware at `/api/__clerk` (production only; no-op in dev).
+- `publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)` — use this pattern, never inline the env var.
+- ClerkProvider must be INSIDE WouterRouter (needs useLocation) but wraps QueryClientProvider. See App.tsx.
+- Sign-in/sign-up routes: `/sign-in/*?` and `/sign-up/*?` — wildcard mandatory for OAuth sub-paths.
+- Appearance: `dark` theme from `@clerk/themes`, cssLayerName: "clerk", primary #0ea5e9, cardBox needs explicit bg (bg-slate-800).
+- CSS layers: `@layer theme, base, clerk, components, utilities;` must come BEFORE `@import "tailwindcss"` in index.css.
+- vite.config.ts: `tailwindcss({ optimize: false })` required for Clerk + Tailwind v4 CSS layer interop.
+
+## RBAC (server-side)
+- `usersTable` in lib/db/src/schema/users.ts: clerkUserId (unique), role ("technician"|"manager"). JIT-provisioned on first authenticated request.
+- `requireAuth` middleware: gets auth from getAuth(req), JIT creates user row, attaches req.user.
+- `requireRole("manager")` middleware: checks req.user.role, returns 403 if wrong role.
+- Routes: health (public), /auth/* (public + own requireAuth in handler), all others require requireAuth.
+- Intelligence routes: requireAuth + requireRole("manager") — double-gated server-side.
+- Branding: GET open to all auth users, PATCH manager-only (requireRole in branding.ts) + Zod validation via insertBrandingSchema.partial().safeParse().
+- `useCurrentUser()` hook (hooks/use-current-user.ts): fetches GET /api/auth/me, enabled only when isSignedIn, staleTime 5min.
+- Role from server replaces localStorage use-role.ts toggle. View Mode card removed from settings.tsx.
+- Layout.tsx uses useUser() (Clerk) for display name and useCurrentUser() for role. Sign-out via useClerk().signOut().
+
 ## Design Philosophy (per product vision)
 - Dark mode is the DEFAULT — `:root` holds dark vars; `.light` is opt-in. `main.tsx` adds `dark` class to `document.documentElement`
 - Home screen = one large "START INSPECTION" pulsing orb — NOT a stats dashboard
@@ -54,6 +78,8 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Hook query options pattern: `useGetThing(id, { query: { enabled: !!id } })`
 - API routes registered in `artifacts/api-server/src/routes/index.ts`
 - QueryClientProvider + TooltipProvider + Toaster all live in App.tsx (not main.tsx)
+- Health endpoint is at `/api/healthz` (not /health)
+- zod imports: use `zod/v4` (not `zod`) — matches drizzle-zod convention in codebase
 
 ## Seed Data
 - Seed script: `artifacts/api-server/src/seed.ts` — run with `npx tsx artifacts/api-server/src/seed.ts`
@@ -66,8 +92,8 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Opportunities & property-risk are DERIVED at request time from `analysis_results.findings` (NOT stored). Mapping is an explicit `CATEGORY_OPP` record + the `exclusionOpportunity` flag + a couple of text overrides (door sweep→structural, moisture regex→moisture). No category keyword fuzzing.
 - "Unreported opportunity" = a finding maps to an opp type AND no recommendation string contains a matching keyword (`OPP_KEYWORDS`). Surfaced management-only. Generic words like "repair" are deliberately excluded from keywords to avoid false "documented".
 - Callback data comes from the `callbacks` table (schema in lib/db/src/schema/callbacks.ts, FK→inspections), seeded by `seed-callbacks.ts` (idempotent, backdated ~6 months).
-- Frontend: `src/pages/command.tsx` (recharts, matches analytics.tsx). Role view-mode via `src/hooks/use-role.ts` (useSyncExternalStore over localStorage "readyloq-role", Manager default). Toggle in settings.tsx.
-- Gating: `/command` Route is conditionally registered in App.tsx and the "Command" nav item is added to the role-aware `navItems` in layout.tsx (desktop sidebar + mobile Sheet only — the static 5-item `mobileNavItems` bottom bar is intentionally untouched).
+- Frontend: `src/pages/command.tsx` (recharts, matches analytics.tsx). Role now from useCurrentUser() (server), not use-role.ts localStorage.
+- Gating: `/command` Route conditionally registered in App.tsx ProtectedRoutes based on isManager from useCurrentUser(). "Command" nav item added in layout.tsx based on same. Double-gated: requireAuth + requireRole("manager") on /intelligence/* server-side.
 
 ## V2 Intelligence Model — Phase 1 (technician copilot)
 - **Report Confidence model** = every finding shows three things: Confidence (existing `finding.confidence`), Evidence Quality, Verified status. Shared util `lib/finding-confidence.ts` (derive fns + label/class maps) + chip components in `components/finding-confidence-chips.tsx`. Rendered in analysis/detail + reports/detail.
@@ -84,3 +110,5 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 **Why (camera fallbacks):** Web camera APIs have inconsistent browser support; ImageCapture → canvas → picsum ensures the app always works.
 **Why (inspectionModeRef):** The AI detection loop is a recursive async setTimeout closure — React state is stale inside it. Always read `inspectionModeRef.current`, not the `inspectionMode` state, from inside that loop.
 **Why (Battery-first):** Technicians run 8–10 hour routes; battery drain is a real field complaint. Mode selection is a first-class product decision, not a settings toggle.
+**Why (cookie auth, no setAuthTokenGetter):** Web apps share origin with the API via Replit proxy — cookies are automatic. setAuthTokenGetter is only for Expo/mobile where there's no shared cookie jar.
+**Why (JIT user provisioning):** Users table only stores clerkUserId + role. Email/name come from Clerk directly (useUser() hook). JIT creates the DB row on first API call with default "technician" role. Manager role must be set via direct DB update for the pilot.

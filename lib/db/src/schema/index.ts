@@ -5,3 +5,4 @@ export * from "./dataset";
 export * from "./reports";
 export * from "./training";
 export * from "./branding";
+export * from "./users";

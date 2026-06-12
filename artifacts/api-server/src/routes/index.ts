@@ -1,5 +1,7 @@
 import { Router, type IRouter } from "express";
+import { requireAuth, requireRole } from "../middleware/require-auth";
 import healthRouter from "./health";
+import authRouter from "./auth";
 import inspectionsRouter from "./inspections";
 import analysisRouter from "./analysis";
 import datasetRouter from "./dataset";
@@ -12,13 +14,15 @@ import brandingRouter from "./branding";
 const router: IRouter = Router();
 
 router.use(healthRouter);
-router.use("/inspections", inspectionsRouter);
-router.use("/analysis", analysisRouter);
-router.use("/dataset", datasetRouter);
-router.use("/reports", reportsRouter);
-router.use("/training", trainingRouter);
-router.use("/analytics", analyticsRouter);
-router.use("/intelligence", intelligenceRouter);
-router.use("/branding", brandingRouter);
+router.use("/auth", authRouter);
+
+router.use("/inspections", requireAuth, inspectionsRouter);
+router.use("/analysis", requireAuth, analysisRouter);
+router.use("/dataset", requireAuth, datasetRouter);
+router.use("/reports", requireAuth, reportsRouter);
+router.use("/training", requireAuth, trainingRouter);
+router.use("/analytics", requireAuth, analyticsRouter);
+router.use("/intelligence", requireAuth, requireRole("manager"), intelligenceRouter);
+router.use("/branding", requireAuth, brandingRouter);
 
 export default router;

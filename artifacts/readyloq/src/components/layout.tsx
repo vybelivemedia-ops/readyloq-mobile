@@ -9,12 +9,16 @@ import {
   Menu,
   Scan,
   Crosshair,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
-import { useRole } from "@/hooks/use-role";
+import { useClerk, useUser } from "@clerk/react";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const baseNavItems = [
   { href: "/", label: "Scout", icon: Home },
@@ -43,13 +47,20 @@ function isActive(location: string, href: string) {
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isManager } = useRole();
+  const { data: currentUser } = useCurrentUser();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const isManager = currentUser?.role === "manager";
 
   const navItems = [
     ...baseNavItems,
     ...(isManager ? [commandNavItem] : []),
     settingsNavItem,
   ];
+
+  const displayName = user?.fullName || user?.emailAddresses?.[0]?.emailAddress || "User";
+  const initials = displayName[0]?.toUpperCase() ?? "U";
+  const roleLabel = currentUser?.role === "manager" ? "Manager" : "Technician";
 
   const NavLinks = ({ onClick }: { onClick?: () => void }) => (
     <>
@@ -91,15 +102,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <ScrollArea className="flex-1 px-3 py-2">
           <NavLinks />
         </ScrollArea>
-        <div className="p-4 border-t border-border/40">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] text-muted-foreground">Inspection Active — Field OS v1.0</span>
+        <div className="p-3 border-t border-border/40 space-y-2">
+          <div className="flex items-center gap-2.5 px-1">
+            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+              <span className="text-[11px] font-bold text-primary">{initials}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium truncate">{displayName}</p>
+              <p className="text-[10px] text-muted-foreground">{roleLabel}</p>
+            </div>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-8 px-2 rounded-lg"
+            onClick={() => signOut({ redirectUrl: basePath || "/" })}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            <span className="text-xs">Sign out</span>
+          </Button>
         </div>
       </aside>
 
-      {/* Mobile Header — expands into safe area at top */}
+      {/* Mobile Header */}
       <header
         className="md:hidden shrink-0 flex items-end justify-between border-b border-border/60 bg-card/90 backdrop-blur-md px-4 pb-3 sticky top-0 z-10"
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}
@@ -124,9 +149,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">Inspection Copilot</p>
             </div>
-            <ScrollArea className="h-[calc(100dvh-80px)] px-3 py-3">
+            <ScrollArea className="h-[calc(100dvh-160px)] px-3 py-3">
               <NavLinks onClick={() => setIsMobileMenuOpen(false)} />
             </ScrollArea>
+            <div className="p-3 border-t border-border/40 space-y-2 mx-3 mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                  <span className="text-[11px] font-bold text-primary">{initials}</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium truncate">{displayName}</p>
+                  <p className="text-[10px] text-muted-foreground">{roleLabel}</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2 text-muted-foreground h-8 px-2 rounded-lg"
+                onClick={() => { setIsMobileMenuOpen(false); signOut({ redirectUrl: basePath || "/" }); }}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="text-xs">Sign out</span>
+              </Button>
+            </div>
           </SheetContent>
         </Sheet>
       </header>
@@ -143,7 +188,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
 
-      {/* Mobile Bottom Nav — safe area aware */}
+      {/* Mobile Bottom Nav */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border/60 bg-card/95 backdrop-blur-md flex items-start justify-around px-1 pt-2 z-20"
         style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))' }}
