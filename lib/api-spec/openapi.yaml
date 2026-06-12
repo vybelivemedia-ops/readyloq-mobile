@@ -695,6 +695,7 @@ components:
         imageUrl:      { type: ["string", "null"] }
         treatment:     { type: ["string", "null"] }
         exclusionOpportunity: { type: ["boolean", "null"] }
+        evidenceQuality: { type: ["string", "null"] }
 
     FeedbackInput:
       type: object

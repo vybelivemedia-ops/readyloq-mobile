@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, FileText, MapPin, User, Calendar, AlertTriangle, CheckCircle2, ShieldCheck, Lightbulb, Download } from "lucide-react";
 import { Link } from "wouter";
+import { FindingConfidenceRow } from "@/components/finding-confidence-chips";
 
 function FindingSeverityDot({ severity }: { severity: string }) {
   const colors: Record<string, string> = { critical: "bg-red-500", high: "bg-orange-500", medium: "bg-amber-500", low: "bg-slate-500" };
@@ -116,10 +117,13 @@ export default function ReportDetail() {
             {findings.map((f: any) => (
               <div key={f.id} className="flex gap-3 text-sm">
                 <FindingSeverityDot severity={f.severity} />
-                <div className="flex-1">
-                  <span className="font-medium">{f.category}</span>
-                  {f.location && <span className="text-muted-foreground"> • {f.location}</span>}
-                  <p className="text-muted-foreground mt-0.5">{f.description}</p>
+                <div className="flex-1 space-y-1.5">
+                  <div>
+                    <span className="font-medium">{f.category}</span>
+                    {f.location && <span className="text-muted-foreground"> • {f.location}</span>}
+                    <p className="text-muted-foreground mt-0.5">{f.description}</p>
+                  </div>
+                  <FindingConfidenceRow finding={f} reportStatus={report.status} />
                 </div>
               </div>
             ))}

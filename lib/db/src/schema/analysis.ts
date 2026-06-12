@@ -26,6 +26,7 @@ export interface Finding {
   imageUrl: string | null;
   treatment: string | null;
   exclusionOpportunity: boolean | null;
+  evidenceQuality?: "excellent" | "good" | "fair" | null;
 }
 
 export const insertAnalysisResultSchema = createInsertSchema(analysisResultsTable).omit({ id: true, createdAt: true });

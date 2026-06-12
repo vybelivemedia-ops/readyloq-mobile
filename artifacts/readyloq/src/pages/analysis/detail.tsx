@@ -6,6 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, BrainCircuit, AlertTriangle, CheckCircle2, XCircle, HelpCircle, Lightbulb, ShieldCheck } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { EvidenceQualityChip, VerificationChip } from "@/components/finding-confidence-chips";
+import { deriveVerificationStatus } from "@/lib/finding-confidence";
+import { getVerificationChecks } from "@/lib/verification-kb";
+import { useCoaching } from "@/hooks/use-coaching";
 
 function ConfidenceBar({ value }: { value: number }) {
   const pct = Math.round(value * 100);
@@ -35,6 +39,7 @@ export default function AnalysisDetail() {
 
   const { data: result, isLoading, refetch } = useGetAnalysisResult(id, { query: { enabled: !!id } });
   const submitFeedback = useSubmitAnalysisFeedback();
+  const { coachingEnabled } = useCoaching();
 
   const handleFeedback = async (status: string) => {
     try {
@@ -156,6 +161,25 @@ export default function AnalysisDetail() {
                 </div>
               </div>
               <ConfidenceBar value={f.confidence} />
+              <div className="flex flex-wrap items-center gap-1.5">
+                <EvidenceQualityChip finding={f} />
+                <VerificationChip status={deriveVerificationStatus({ feedbackStatus: result.feedbackStatus })} />
+              </div>
+              {coachingEnabled && (
+                <div className="rounded bg-background/50 border border-border/60 p-2.5 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Verification suggestions
+                  </div>
+                  <ul className="space-y-1">
+                    {getVerificationChecks(f.category).map((check: string, i: number) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/60" />
+                        <span>{check}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {f.treatment && (
                 <div className="flex items-start gap-2 text-xs text-muted-foreground bg-background/50 rounded p-2">
                   <Lightbulb className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-400" />

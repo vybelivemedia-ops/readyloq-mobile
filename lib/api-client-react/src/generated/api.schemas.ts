@@ -86,6 +86,8 @@ export interface Finding {
   treatment?: string | null;
   /** @nullable */
   exclusionOpportunity?: boolean | null;
+  /** @nullable */
+  evidenceQuality?: string | null;
 }
 
 export interface AnalysisResult {

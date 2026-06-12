@@ -18,6 +18,10 @@ import {
 } from "@/lib/voice-intelligence";
 import { useVoiceRecognition } from "@/hooks/use-voice-recognition";
 import { useBatteryStatus, suggestModeFromBattery } from "@/hooks/use-battery-status";
+import { useCoaching } from "@/hooks/use-coaching";
+import { gradeCaptureQuality } from "@/lib/capture-quality";
+import { EvidenceQualityChip } from "@/components/finding-confidence-chips";
+import type { EvidenceQuality } from "@/lib/finding-confidence";
 
 // ─── Inspection Modes ─────────────────────────────────────────────────────────
 
@@ -143,6 +147,7 @@ interface DetectionBox { x: number; y: number; w: number; h: number; }
 interface CapturedItem {
   id: string; type: "photo" | "voice";
   label: string; url: string; detection?: Detection; ts: number;
+  evidenceQuality?: EvidenceQuality; captureTips?: string[];
 }
 
 interface CameraCapabilities {
@@ -377,11 +382,14 @@ export default function NewInspection() {
   const [voiceHint, setVoiceHint] = useState(0);
   const [voiceSuggestion, setVoiceSuggestion] = useState<TermMatch | null>(null);
   const [pendingTranscript, setPendingTranscript] = useState("");
+  const [captureNotice, setCaptureNotice] = useState<CapturedItem | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const detectionRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const adjustingRef = useRef(false);
+  const captureNoticeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const { coachingEnabled } = useCoaching();
   const camera = useCamera();
 
   const voice = useVoiceRecognition({
@@ -449,7 +457,7 @@ export default function NewInspection() {
   };
 
   // ── Intelligent Camera Adjustment Pipeline ─────────────────────────────────
-  const performIntelligentCapture = useCallback(async (detection: Detection): Promise<string> => {
+  const performIntelligentCapture = useCallback(async (detection: Detection): Promise<{ url: string; quality: EvidenceQuality; tips: string[] }> => {
     adjustingRef.current = true;
     const margin = 0.15;
     const bw = 0.3 + Math.random() * 0.3;
@@ -492,11 +500,14 @@ export default function NewInspection() {
     await sleep(400);
     camera.setAdjustmentPhase(null);
     adjustingRef.current = false;
-    return url;
+    const { quality, tips } = gradeCaptureQuality({
+      confidence: detection.confidence, lowLight: needsLowLight, stabilized: true, intelligent: true,
+    });
+    return { url, quality, tips };
   }, [camera]);
 
   // ── Simple capture for Standard mode (no zoom/focus pipeline) ─────────────
-  const performSimpleCapture = useCallback(async (detection: Detection): Promise<string> => {
+  const performSimpleCapture = useCallback(async (detection: Detection): Promise<{ url: string; quality: EvidenceQuality; tips: string[] }> => {
     adjustingRef.current = true;
     camera.setAdjustmentPhase("Evidence detected…");
     await sleep(500);
@@ -507,8 +518,37 @@ export default function NewInspection() {
     await sleep(600);
     camera.setAdjustmentPhase(null);
     adjustingRef.current = false;
-    return url;
+    const { quality, tips } = gradeCaptureQuality({
+      confidence: detection.confidence, lowLight: false, stabilized: false, intelligent: false,
+    });
+    return { url, quality, tips };
   }, [camera]);
+
+  // ── Evidence-quality notice + retake (recording only; camera is live here) ──
+  function showCaptureNotice(item: CapturedItem) {
+    setCaptureNotice(item);
+    if (captureNoticeRef.current) clearTimeout(captureNoticeRef.current);
+    captureNoticeRef.current = setTimeout(() => setCaptureNotice(null), 7000);
+  }
+
+  async function retakeLast() {
+    const notice = captureNotice;
+    if (!notice || !notice.detection || adjustingRef.current) return;
+    setCaptured(prev => prev.filter(c => c.id !== notice.id));
+    setCaptureNotice(null);
+    const detection = notice.detection;
+    const cfg = MODE_CONFIG[inspectionModeRef.current];
+    const cap = cfg.cameraAdjustments
+      ? await performIntelligentCapture(detection)
+      : await performSimpleCapture(detection);
+    const item: CapturedItem = {
+      id: `capture-${Date.now()}`, type: "photo",
+      label: detection.label, url: cap.url, detection, ts: Date.now(),
+      evidenceQuality: cap.quality, captureTips: cap.tips,
+    };
+    setCaptured(prev => [...prev, item]);
+    showCaptureNotice(item);
+  }
 
   // ── Start Recording ────────────────────────────────────────────────────────
   function startRecording() {
@@ -530,18 +570,23 @@ export default function NewInspection() {
       detectionRef.current = setTimeout(async () => {
         const currentCfg = MODE_CONFIG[inspectionModeRef.current];
         if (!currentCfg.aiDetections) return; // downgraded, stop
+        // Skip if a capture (e.g. a manual retake) is already running — never overlap pipelines.
+        if (adjustingRef.current) { scheduleNext(); return; }
         const detection = { ...DETECTIONS[dIdx % DETECTIONS.length] };
         dIdx++;
         setDetections(prev => [detection, ...prev]);
         setVisibleDetection(detection);
         setTimeout(() => setVisibleDetection(null), 5000);
-        const url = currentCfg.cameraAdjustments
+        const cap = currentCfg.cameraAdjustments
           ? await performIntelligentCapture(detection)
           : await performSimpleCapture(detection);
-        setCaptured(prev => [...prev, {
+        const item: CapturedItem = {
           id: `capture-${Date.now()}`, type: "photo",
-          label: detection.label, url, detection, ts: Date.now(),
-        }]);
+          label: detection.label, url: cap.url, detection, ts: Date.now(),
+          evidenceQuality: cap.quality, captureTips: cap.tips,
+        };
+        setCaptured(prev => [...prev, item]);
+        showCaptureNotice(item);
         scheduleNext();
       }, delay) as unknown as ReturnType<typeof setInterval>;
     };
@@ -552,6 +597,8 @@ export default function NewInspection() {
     setIsRecording(false);
     if (timerRef.current) clearInterval(timerRef.current);
     if (detectionRef.current) clearTimeout(detectionRef.current as unknown as ReturnType<typeof setTimeout>);
+    if (captureNoticeRef.current) clearTimeout(captureNoticeRef.current);
+    setCaptureNotice(null);
     camera.stopCamera();
     setStep("review");
   }
@@ -559,6 +606,7 @@ export default function NewInspection() {
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (detectionRef.current) clearTimeout(detectionRef.current as unknown as ReturnType<typeof setTimeout>);
+    if (captureNoticeRef.current) clearTimeout(captureNoticeRef.current);
     camera.stopCamera();
   }, []);
 
@@ -629,7 +677,11 @@ export default function NewInspection() {
         try {
           await addMedia.mutateAsync({
             id: createdId,
-            data: { mediaType: item.type, url: item.url, filename: item.label, caption: item.detection?.label },
+            data: {
+              mediaType: item.type, url: item.url, filename: item.label,
+              caption: [item.detection?.label, item.evidenceQuality ? `evidence:${item.evidenceQuality}` : null]
+                .filter(Boolean).join(" · "),
+            },
           });
         } catch {}
       }
@@ -1003,6 +1055,41 @@ export default function NewInspection() {
           )}
         </div>
 
+        {/* Evidence-quality notice (always shows score; tips + retake are coaching-gated) */}
+        {captureNotice && captureNotice.evidenceQuality && !camera.adjustmentPhase && (
+          <div className="relative z-10 px-5 mt-2">
+            <div className="animate-slide-up bg-black/70 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className={cn(
+                  "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full",
+                  captureNotice.evidenceQuality === "excellent" ? "bg-emerald-500/20 text-emerald-300" :
+                  captureNotice.evidenceQuality === "good" ? "bg-sky-500/20 text-sky-300" : "bg-amber-500/20 text-amber-300"
+                )}>
+                  <Camera className="h-3.5 w-3.5" />
+                  {captureNotice.evidenceQuality === "excellent" ? "Excellent evidence" :
+                   captureNotice.evidenceQuality === "good" ? "Good evidence" : "Add another photo"}
+                </span>
+                {coachingEnabled && (
+                  <button onClick={retakeLast} disabled={isAdjusting}
+                    className="text-[11px] font-semibold text-white/70 underline underline-offset-2 disabled:opacity-40">
+                    Retake
+                  </button>
+                )}
+              </div>
+              {coachingEnabled && captureNotice.captureTips && captureNotice.captureTips.length > 0 && (
+                <ul className="space-y-1">
+                  {captureNotice.captureTips.map((tip, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-[11px] text-white/60">
+                      <Sparkles className="h-3 w-3 mt-0.5 shrink-0 text-amber-400/80" />
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Finding history chips */}
         {detections.length > 0 && (
           <div className="relative z-10 px-5 mt-3">
@@ -1266,6 +1353,11 @@ export default function NewInspection() {
                 )}
                 <div className="p-2">
                   <p className="text-[10px] text-muted-foreground leading-tight line-clamp-2">{item.label}</p>
+                  {item.evidenceQuality && (
+                    <div className="mt-1.5">
+                      <EvidenceQualityChip finding={{ evidenceQuality: item.evidenceQuality }} />
+                    </div>
+                  )}
                   {item.detection && (
                     <div className="flex items-center gap-1 mt-1">
                       <span className={cn("w-1.5 h-1.5 rounded-full",

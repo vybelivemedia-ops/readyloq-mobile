@@ -188,7 +188,8 @@ export const ListAnalysisResultsResponseItem = zod.object({
   "location": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish()
+  "exclusionOpportunity": zod.boolean().nullish(),
+  "evidenceQuality": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "overallConfidence": zod.number().nullish(),
@@ -220,7 +221,8 @@ export const GetAnalysisResultResponse = zod.object({
   "location": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish()
+  "exclusionOpportunity": zod.boolean().nullish(),
+  "evidenceQuality": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "overallConfidence": zod.number().nullish(),
@@ -256,7 +258,8 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
   "location": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish()
+  "exclusionOpportunity": zod.boolean().nullish(),
+  "evidenceQuality": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "overallConfidence": zod.number().nullish(),
@@ -350,7 +353,8 @@ export const ListReportsResponseItem = zod.object({
   "location": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish()
+  "exclusionOpportunity": zod.boolean().nullish(),
+  "evidenceQuality": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "treatmentNotes": zod.string().nullish(),
@@ -399,7 +403,8 @@ export const GetReportResponse = zod.object({
   "location": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish()
+  "exclusionOpportunity": zod.boolean().nullish(),
+  "evidenceQuality": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "treatmentNotes": zod.string().nullish(),

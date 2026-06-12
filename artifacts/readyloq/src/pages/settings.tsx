@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Settings, Palette, Building2, Save, BrainCircuit, CheckCircle2, Crosshair, HardHat } from "lucide-react";
+import { Settings, Palette, Building2, Save, BrainCircuit, CheckCircle2, Crosshair, HardHat, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetBrandingQueryKey } from "@workspace/api-client-react";
 import { useRole } from "@/hooks/use-role";
+import { useCoaching } from "@/hooks/use-coaching";
 
 export default function SettingsPage() {
   const { data: branding, isLoading } = useGetBranding();
@@ -19,6 +20,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isManager, setRole } = useRole();
+  const { coachingEnabled, setCoaching } = useCoaching();
 
   const [form, setForm] = useState({
     companyName: "",
@@ -93,6 +95,34 @@ export default function SettingsPage() {
               </div>
             </div>
             <Switch checked={isManager} onCheckedChange={v => setRole(v ? "manager" : "technician")} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lightbulb className="h-4 w-4" /> Capture Coaching
+          </CardTitle>
+          <CardDescription>
+            Shows photo-quality tips at capture and verification suggestions per finding. Documentation
+            quality — evidence scores and report confidence — is always shown regardless of this setting.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${coachingEnabled ? "bg-primary/15" : "bg-muted"}`}>
+                <Lightbulb className={`h-4 w-4 ${coachingEnabled ? "text-primary" : "text-muted-foreground"}`} />
+              </div>
+              <div>
+                <p className="text-sm font-medium">{coachingEnabled ? "Coaching on" : "Coaching off"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {coachingEnabled ? "Capture tips & verification suggestions shown" : "Hands-off — tips & suggestions hidden"}
+                </p>
+              </div>
+            </div>
+            <Switch checked={coachingEnabled} onCheckedChange={setCoaching} />
           </div>
         </CardContent>
       </Card>
