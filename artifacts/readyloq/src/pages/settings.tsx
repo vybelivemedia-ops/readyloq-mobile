@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Settings, Palette, Building2, Save, BrainCircuit, CheckCircle2, Lightbulb } from "lucide-react";
+import { Settings, Palette, Building2, Save, BrainCircuit, CheckCircle2, Lightbulb, Layers } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetBrandingQueryKey } from "@workspace/api-client-react";
 import { useCoaching } from "@/hooks/use-coaching";
+import { Link } from "wouter";
 
 export default function SettingsPage() {
   const { data: branding, isLoading } = useGetBranding();
@@ -63,11 +64,19 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Settings className="h-6 w-6" /> Settings
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">Configure white-label branding for your organization</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Settings className="h-6 w-6" /> Settings
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">Configure white-label branding for your organization</p>
+        </div>
+        <Link href="/capability">
+          <Button variant="outline" size="sm" className="gap-2 text-muted-foreground hover:text-foreground shrink-0">
+            <Layers className="h-3.5 w-3.5" />
+            Capability Center
+          </Button>
+        </Link>
       </div>
 
       <Card>
