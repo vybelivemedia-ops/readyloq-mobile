@@ -1,22 +1,13 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { inspectionsTable, analysisResultsTable, callbacksTable, type Finding } from "@workspace/db";
+import { propertyTypeFor } from "../lib/property-intelligence";
 
 const router = Router();
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-function propertyTypeFor(clientName: string | null, siteAddress: string): string {
-  const s = `${clientName ?? ""} ${siteAddress}`.toLowerCase();
-  if (s.includes("warehouse") || s.includes("industrial")) return "Warehouse";
-  if (s.includes("restaurant") || s.includes("bakery") || s.includes("cafe") || s.includes("kitchen")) return "Restaurant";
-  if (s.includes("apartment") || s.includes("hoa") || s.includes("residence hall") || s.includes("campus")) return "Multifamily";
-  if (s.includes("office") || s.includes("commerce") || s.includes("square")) return "Commercial";
-  if (s.includes("residence") || s.includes("home") || s.includes("house")) return "Single Family";
-  return "Commercial";
-}
 
 type OppType = "exclusion" | "structural" | "sanitation" | "moisture" | "follow_up";
 

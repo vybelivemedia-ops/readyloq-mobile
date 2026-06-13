@@ -10,6 +10,7 @@ import trainingRouter from "./training";
 import analyticsRouter from "./analytics";
 import intelligenceRouter from "./intelligence";
 import brandingRouter from "./branding";
+import propertiesRouter from "./properties";
 import storageRouter from "./storage";
 
 const router: IRouter = Router();
@@ -26,5 +27,6 @@ router.use("/training", requireAuth, trainingRouter);
 router.use("/analytics", requireAuth, analyticsRouter);
 router.use("/intelligence", requireAuth, requireRole("manager"), intelligenceRouter);
 router.use("/branding", requireAuth, brandingRouter);
+router.use("/properties", requireAuth, propertiesRouter);
 
 export default router;

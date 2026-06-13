@@ -23,6 +23,7 @@ import { useCoaching } from "@/hooks/use-coaching";
 import { gradeCaptureQuality } from "@/lib/capture-quality";
 import { EvidenceQualityChip } from "@/components/finding-confidence-chips";
 import type { EvidenceQuality } from "@/lib/finding-confidence";
+import { PreInspectionIntel } from "@/components/property-intel";
 
 // ─── Inspection Modes ─────────────────────────────────────────────────────────
 
@@ -884,6 +885,7 @@ export default function NewInspection() {
                 className="bg-card border-border/60 rounded-xl h-12 text-base pl-9" />
             </div>
           </div>
+          <PreInspectionIntel siteAddress={siteAddress} />
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Technician <span className="text-muted-foreground/40 normal-case font-normal">(optional)</span></p>
             <Input placeholder="Your name" value={technicianName}

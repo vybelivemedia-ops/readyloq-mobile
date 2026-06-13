@@ -799,3 +799,225 @@ export const UpdateBrandingResponse = zod.object({
 })
 
 
+/**
+ * @summary List all known properties with an intelligence summary
+ */
+export const ListPropertiesResponseItem = zod.object({
+  "addressKey": zod.string(),
+  "siteAddress": zod.string(),
+  "clientName": zod.string().nullish(),
+  "propertyType": zod.string(),
+  "inspectionCount": zod.number(),
+  "hotspotCount": zod.number(),
+  "noteCount": zod.number(),
+  "openIssueCount": zod.number(),
+  "lastVisit": zod.string().nullish(),
+  "hasProfile": zod.boolean()
+})
+export const ListPropertiesResponse = zod.array(ListPropertiesResponseItem)
+
+
+/**
+ * @summary Look up property intelligence by free-text site address (pre-inspection)
+ */
+export const LookupPropertyQueryParams = zod.object({
+  "siteAddress": zod.coerce.string()
+})
+
+export const LookupPropertyResponse = zod.object({
+  "matchStatus": zod.string(),
+  "feed": zod.object({
+  "addressKey": zod.string(),
+  "siteAddress": zod.string(),
+  "clientName": zod.string().nullish(),
+  "propertyType": zod.string(),
+  "technicianKnowledge": zod.string().nullish(),
+  "hasProfile": zod.boolean(),
+  "updatedAt": zod.string().nullish(),
+  "hotspots": zod.array(zod.object({
+  "zone": zod.string(),
+  "description": zod.string(),
+  "severity": zod.enum(['low', 'medium', 'high'])
+})),
+  "recurringIssues": zod.array(zod.object({
+  "category": zod.string(),
+  "count": zod.number(),
+  "severity": zod.string(),
+  "lastSeen": zod.string().nullish(),
+  "sampleDescription": zod.string().nullish()
+})),
+  "historicalPhotos": zod.array(zod.object({
+  "url": zod.string(),
+  "caption": zod.string().nullish(),
+  "inspectionId": zod.number(),
+  "createdAt": zod.string().nullish()
+})),
+  "visitHistory": zod.array(zod.object({
+  "inspectionId": zod.number(),
+  "createdAt": zod.string(),
+  "status": zod.string(),
+  "technicianName": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "findingsCount": zod.number(),
+  "completedAt": zod.string().nullish()
+})),
+  "notes": zod.array(zod.object({
+  "id": zod.number(),
+  "addressKey": zod.string(),
+  "note": zod.string(),
+  "zone": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "authorName": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+}).optional(),
+  "suggestions": zod.array(zod.object({
+  "addressKey": zod.string(),
+  "siteAddress": zod.string(),
+  "clientName": zod.string().nullish(),
+  "propertyType": zod.string(),
+  "inspectionCount": zod.number(),
+  "hotspotCount": zod.number(),
+  "noteCount": zod.number(),
+  "openIssueCount": zod.number(),
+  "lastVisit": zod.string().nullish(),
+  "hasProfile": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Get the full intelligence feed for a property
+ */
+export const GetPropertyFeedParams = zod.object({
+  "addressKey": zod.coerce.string()
+})
+
+export const GetPropertyFeedResponse = zod.object({
+  "addressKey": zod.string(),
+  "siteAddress": zod.string(),
+  "clientName": zod.string().nullish(),
+  "propertyType": zod.string(),
+  "technicianKnowledge": zod.string().nullish(),
+  "hasProfile": zod.boolean(),
+  "updatedAt": zod.string().nullish(),
+  "hotspots": zod.array(zod.object({
+  "zone": zod.string(),
+  "description": zod.string(),
+  "severity": zod.enum(['low', 'medium', 'high'])
+})),
+  "recurringIssues": zod.array(zod.object({
+  "category": zod.string(),
+  "count": zod.number(),
+  "severity": zod.string(),
+  "lastSeen": zod.string().nullish(),
+  "sampleDescription": zod.string().nullish()
+})),
+  "historicalPhotos": zod.array(zod.object({
+  "url": zod.string(),
+  "caption": zod.string().nullish(),
+  "inspectionId": zod.number(),
+  "createdAt": zod.string().nullish()
+})),
+  "visitHistory": zod.array(zod.object({
+  "inspectionId": zod.number(),
+  "createdAt": zod.string(),
+  "status": zod.string(),
+  "technicianName": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "findingsCount": zod.number(),
+  "completedAt": zod.string().nullish()
+})),
+  "notes": zod.array(zod.object({
+  "id": zod.number(),
+  "addressKey": zod.string(),
+  "note": zod.string(),
+  "zone": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "authorName": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Create or update the authored intelligence for a property
+ */
+export const UpdatePropertyProfileParams = zod.object({
+  "addressKey": zod.coerce.string()
+})
+
+export const UpdatePropertyProfileBody = zod.object({
+  "siteAddress": zod.string().optional(),
+  "clientName": zod.string().optional(),
+  "propertyType": zod.string().optional(),
+  "technicianKnowledge": zod.string().optional(),
+  "hotspots": zod.array(zod.object({
+  "zone": zod.string(),
+  "description": zod.string(),
+  "severity": zod.enum(['low', 'medium', 'high'])
+})).optional()
+})
+
+export const UpdatePropertyProfileResponse = zod.object({
+  "addressKey": zod.string(),
+  "siteAddress": zod.string(),
+  "clientName": zod.string().nullish(),
+  "propertyType": zod.string(),
+  "technicianKnowledge": zod.string().nullish(),
+  "hasProfile": zod.boolean(),
+  "updatedAt": zod.string().nullish(),
+  "hotspots": zod.array(zod.object({
+  "zone": zod.string(),
+  "description": zod.string(),
+  "severity": zod.enum(['low', 'medium', 'high'])
+})),
+  "recurringIssues": zod.array(zod.object({
+  "category": zod.string(),
+  "count": zod.number(),
+  "severity": zod.string(),
+  "lastSeen": zod.string().nullish(),
+  "sampleDescription": zod.string().nullish()
+})),
+  "historicalPhotos": zod.array(zod.object({
+  "url": zod.string(),
+  "caption": zod.string().nullish(),
+  "inspectionId": zod.number(),
+  "createdAt": zod.string().nullish()
+})),
+  "visitHistory": zod.array(zod.object({
+  "inspectionId": zod.number(),
+  "createdAt": zod.string(),
+  "status": zod.string(),
+  "technicianName": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "findingsCount": zod.number(),
+  "completedAt": zod.string().nullish()
+})),
+  "notes": zod.array(zod.object({
+  "id": zod.number(),
+  "addressKey": zod.string(),
+  "note": zod.string(),
+  "zone": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "authorName": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Append a field note to a property
+ */
+export const AddPropertyNoteParams = zod.object({
+  "addressKey": zod.coerce.string()
+})
+
+export const AddPropertyNoteBody = zod.object({
+  "note": zod.string(),
+  "zone": zod.string().optional(),
+  "category": zod.string().optional(),
+  "authorName": zod.string().optional()
+})
+
+

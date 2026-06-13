@@ -9,6 +9,7 @@ import {
   Menu,
   Scan,
   Crosshair,
+  Building2,
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const baseNavItems = [
   { href: "/", label: "Scout", icon: Home },
   { href: "/inspections", label: "Stops", icon: ClipboardList },
+  { href: "/properties", label: "Sites", icon: Building2 },
   { href: "/analysis", label: "Evidence", icon: Camera },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/training", label: "Learn", icon: GraduationCap },
@@ -34,6 +36,7 @@ const settingsNavItem = { href: "/settings", label: "Settings", icon: Settings }
 const mobileNavItems = [
   { href: "/", label: "Scout", icon: Home },
   { href: "/inspections", label: "Stops", icon: ClipboardList },
+  { href: "/properties", label: "Sites", icon: Building2 },
   { href: "/analysis", label: "Evidence", icon: Camera },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/training", label: "Learn", icon: GraduationCap },

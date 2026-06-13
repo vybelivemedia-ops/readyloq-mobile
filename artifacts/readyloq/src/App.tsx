@@ -14,6 +14,8 @@ import Dashboard from "@/pages/dashboard";
 import InspectionsList from "@/pages/inspections/index";
 import NewInspection from "@/pages/inspections/new";
 import InspectionDetail from "@/pages/inspections/detail";
+import PropertiesList from "@/pages/properties/index";
+import PropertyDetail from "@/pages/properties/detail";
 import AnalysisList from "@/pages/analysis/index";
 import AnalysisDetail from "@/pages/analysis/detail";
 import DatasetLibrary from "@/pages/dataset";
@@ -190,6 +192,8 @@ function ProtectedRoutes() {
         <Route path="/inspections" component={InspectionsList} />
         <Route path="/inspections/new" component={NewInspection} />
         <Route path="/inspections/:id" component={InspectionDetail} />
+        <Route path="/properties" component={PropertiesList} />
+        <Route path="/properties/:addressKey" component={PropertyDetail} />
         <Route path="/analysis" component={AnalysisList} />
         <Route path="/analysis/:id" component={AnalysisDetail} />
         <Route path="/dataset" component={DatasetLibrary} />

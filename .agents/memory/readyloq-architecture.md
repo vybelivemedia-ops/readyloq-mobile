@@ -96,7 +96,8 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - `DETECTION_CATEGORY_MAP` (id→category) and `generateRecommendations(findings)` helpers in new.tsx
 
 ## Seed Data
-- Seed script: `artifacts/api-server/src/seed.ts` — run with `npx tsx artifacts/api-server/src/seed.ts`
+- **`tsx` is NOT installed — `npx tsx` fails ("tsx: not found"). Run seed scripts with `pnpm dlx tsx artifacts/api-server/src/<seed>.ts` from repo root.** (`pnpm --filter ... exec tsx` also fails.)
+- Seed script: `artifacts/api-server/src/seed.ts`
 - 8 inspections, 3 analysis results, 18 dataset images, 2 reports, 4 quizzes, 11 training scores seeded
 - Analyses exist only on inspections Riverside Apts (Multifamily), Oak Park Restaurant, Maple Ridge HOA
 - **The main seed.ts is NOT idempotent — do not re-run it on a populated DB (it duplicates).** Newer seeds (e.g. seed-callbacks.ts) are count-guarded and safe to re-run.
@@ -108,6 +109,16 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Callback data comes from the `callbacks` table (schema in lib/db/src/schema/callbacks.ts, FK→inspections), seeded by `seed-callbacks.ts` (idempotent, backdated ~6 months).
 - Frontend: `src/pages/command.tsx` (recharts, matches analytics.tsx). Role now from useCurrentUser() (server), not use-role.ts localStorage.
 - Gating: `/command` Route conditionally registered in App.tsx ProtectedRoutes based on isManager from useCurrentUser(). "Command" nav item added in layout.tsx based on same. Double-gated: requireAuth + requireRole("manager") on /intelligence/* server-side.
+
+## Property Intelligence Feed (per-property knowledge, available pre-inspection)
+- All property intelligence is keyed by `normalizeAddressKey(siteAddress)` (URL-safe hyphen slug) — the SAME helper used to group inspections. Read/write/derive paths MUST all key by it or profiles silently de-link from their inspections.
+- **Authored** data persisted: `property_profiles` (addressKey unique, siteAddress, clientName, propertyType, technicianKnowledge, hotspots jsonb) + `property_notes` (schema in lib/db/src/schema/properties.ts). **Derived at read time** (never stored): recurringIssues, historicalPhotos, visitHistory — computed from existing inspections/analyses/media in `buildFeed`.
+- Shared helper `artifacts/api-server/src/lib/property-intelligence.ts` (normalizeAddressKey/propertyTypeFor/severityRank/deriveRecurringIssues) reused by intelligence.ts AND routes/properties.ts.
+- **Invariant (enforced in PATCH):** a profile's stored `siteAddress` must normalize back to its `addressKey`. PATCH rejects a body siteAddress that normalizes to a different key — otherwise address lookups would miss the profile. **Why:** the feature's whole value is matching by address before a visit.
+- Hotspot severity is strictly `low|medium|high` everywhere (zod enum + OpenAPI `Hotspot.severity` enum). Frontend dropdown and defaults use these only; the generated `Hotspot` type is a union so Select onValueChange needs `v as Hotspot["severity"]`.
+- **Data is single-tenant/shared by design** — like ALL ReadyLoq routes, property routes are behind requireAuth only, with NO per-user/org scoping (no tenant column anywhere). An architect may flag "no per-tenant auth" — that is the app's intentional shared-data model, NOT a bug to fix.
+- Pre-inspection lookup: `GET /properties/lookup?siteAddress=` returns matchStatus exact|possible|none (possible = prefix or ≥50% token Jaccard on the slug). Frontend `PreInspectionIntel` (debounced 400ms, ≥4 chars) in components/property-intel.tsx, injected into inspections/new.tsx setup step.
+- Seed: `seed-properties.ts` (count-guarded, idempotent) attaches profiles to the Riverside/Oak addresses that already have analyses so derived sections populate.
 
 ## V2 Intelligence Model — Phase 1 (technician copilot)
 - **Report Confidence model** = every finding shows three things: Confidence (existing `finding.confidence`), Evidence Quality, Verified status. Shared util `lib/finding-confidence.ts` (derive fns + label/class maps) + chip components in `components/finding-confidence-chips.tsx`. Rendered in analysis/detail + reports/detail.

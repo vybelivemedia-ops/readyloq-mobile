@@ -517,6 +517,120 @@ export interface BrandingUpdate {
   poweredByVisible?: boolean;
 }
 
+export type HotspotSeverity = typeof HotspotSeverity[keyof typeof HotspotSeverity];
+
+
+export const HotspotSeverity = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export interface Hotspot {
+  zone: string;
+  description: string;
+  severity: HotspotSeverity;
+}
+
+export interface PropertySummary {
+  addressKey: string;
+  siteAddress: string;
+  /** @nullable */
+  clientName?: string | null;
+  propertyType: string;
+  inspectionCount: number;
+  hotspotCount: number;
+  noteCount: number;
+  openIssueCount: number;
+  /** @nullable */
+  lastVisit?: string | null;
+  hasProfile: boolean;
+}
+
+export interface RecurringIssue {
+  category: string;
+  count: number;
+  severity: string;
+  /** @nullable */
+  lastSeen?: string | null;
+  /** @nullable */
+  sampleDescription?: string | null;
+}
+
+export interface HistoricalPhoto {
+  url: string;
+  /** @nullable */
+  caption?: string | null;
+  inspectionId: number;
+  /** @nullable */
+  createdAt?: string | null;
+}
+
+export interface VisitHistoryItem {
+  inspectionId: number;
+  createdAt: string;
+  status: string;
+  /** @nullable */
+  technicianName?: string | null;
+  /** @nullable */
+  severity?: string | null;
+  findingsCount: number;
+  /** @nullable */
+  completedAt?: string | null;
+}
+
+export interface PropertyNote {
+  id: number;
+  addressKey: string;
+  note: string;
+  /** @nullable */
+  zone?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  authorName?: string | null;
+  createdAt: string;
+}
+
+export interface PropertyFeed {
+  addressKey: string;
+  siteAddress: string;
+  /** @nullable */
+  clientName?: string | null;
+  propertyType: string;
+  /** @nullable */
+  technicianKnowledge?: string | null;
+  hasProfile: boolean;
+  /** @nullable */
+  updatedAt?: string | null;
+  hotspots: Hotspot[];
+  recurringIssues: RecurringIssue[];
+  historicalPhotos: HistoricalPhoto[];
+  visitHistory: VisitHistoryItem[];
+  notes: PropertyNote[];
+}
+
+export interface PropertyLookupResult {
+  matchStatus: string;
+  feed?: PropertyFeed;
+  suggestions: PropertySummary[];
+}
+
+export interface PropertyProfileUpdate {
+  siteAddress?: string;
+  clientName?: string;
+  propertyType?: string;
+  technicianKnowledge?: string;
+  hotspots?: Hotspot[];
+}
+
+export interface PropertyNoteInput {
+  note: string;
+  zone?: string;
+  category?: string;
+  authorName?: string;
+}
+
 export type ListInspectionsParams = {
 status?: string;
 /**
@@ -551,5 +665,9 @@ limit?: number;
 
 export type GetAnalyticsTrendsParams = {
 period?: string;
+};
+
+export type LookupPropertyParams = {
+siteAddress: string;
 };
 

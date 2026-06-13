@@ -40,9 +40,16 @@ import type {
   ListAnalysisResultsParams,
   ListDatasetImagesParams,
   ListInspectionsParams,
+  LookupPropertyParams,
   MediaInput,
   OpportunityIntelligence,
+  PropertyFeed,
+  PropertyLookupResult,
+  PropertyNote,
+  PropertyNoteInput,
+  PropertyProfileUpdate,
   PropertyRiskInsights,
+  PropertySummary,
   Quiz,
   QuizResult,
   QuizSubmission,
@@ -2426,5 +2433,387 @@ export const useUpdateBranding = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateBrandingMutationOptions(options));
+    }
+
+export const getListPropertiesUrl = () => {
+
+
+
+
+  return `/api/properties`
+}
+
+/**
+ * @summary List all known properties with an intelligence summary
+ */
+export const listProperties = async ( options?: RequestInit): Promise<PropertySummary[]> => {
+
+  return customFetch<PropertySummary[]>(getListPropertiesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPropertiesQueryKey = () => {
+    return [
+    `/api/properties`
+    ] as const;
+    }
+
+
+export const getListPropertiesQueryOptions = <TData = Awaited<ReturnType<typeof listProperties>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProperties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPropertiesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProperties>>> = ({ signal }) => listProperties({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProperties>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPropertiesQueryResult = NonNullable<Awaited<ReturnType<typeof listProperties>>>
+export type ListPropertiesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all known properties with an intelligence summary
+ */
+
+export function useListProperties<TData = Awaited<ReturnType<typeof listProperties>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProperties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPropertiesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getLookupPropertyUrl = (params: LookupPropertyParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/properties/lookup?${stringifiedParams}` : `/api/properties/lookup`
+}
+
+/**
+ * @summary Look up property intelligence by free-text site address (pre-inspection)
+ */
+export const lookupProperty = async (params: LookupPropertyParams, options?: RequestInit): Promise<PropertyLookupResult> => {
+
+  return customFetch<PropertyLookupResult>(getLookupPropertyUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getLookupPropertyQueryKey = (params?: LookupPropertyParams,) => {
+    return [
+    `/api/properties/lookup`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getLookupPropertyQueryOptions = <TData = Awaited<ReturnType<typeof lookupProperty>>, TError = ErrorType<unknown>>(params: LookupPropertyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof lookupProperty>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getLookupPropertyQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof lookupProperty>>> = ({ signal }) => lookupProperty(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof lookupProperty>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type LookupPropertyQueryResult = NonNullable<Awaited<ReturnType<typeof lookupProperty>>>
+export type LookupPropertyQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Look up property intelligence by free-text site address (pre-inspection)
+ */
+
+export function useLookupProperty<TData = Awaited<ReturnType<typeof lookupProperty>>, TError = ErrorType<unknown>>(
+ params: LookupPropertyParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof lookupProperty>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getLookupPropertyQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPropertyFeedUrl = (addressKey: string,) => {
+
+
+
+
+  return `/api/properties/${addressKey}`
+}
+
+/**
+ * @summary Get the full intelligence feed for a property
+ */
+export const getPropertyFeed = async (addressKey: string, options?: RequestInit): Promise<PropertyFeed> => {
+
+  return customFetch<PropertyFeed>(getGetPropertyFeedUrl(addressKey),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPropertyFeedQueryKey = (addressKey: string,) => {
+    return [
+    `/api/properties/${addressKey}`
+    ] as const;
+    }
+
+
+export const getGetPropertyFeedQueryOptions = <TData = Awaited<ReturnType<typeof getPropertyFeed>>, TError = ErrorType<unknown>>(addressKey: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPropertyFeed>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPropertyFeedQueryKey(addressKey);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPropertyFeed>>> = ({ signal }) => getPropertyFeed(addressKey, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(addressKey), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPropertyFeed>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPropertyFeedQueryResult = NonNullable<Awaited<ReturnType<typeof getPropertyFeed>>>
+export type GetPropertyFeedQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the full intelligence feed for a property
+ */
+
+export function useGetPropertyFeed<TData = Awaited<ReturnType<typeof getPropertyFeed>>, TError = ErrorType<unknown>>(
+ addressKey: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPropertyFeed>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPropertyFeedQueryOptions(addressKey,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdatePropertyProfileUrl = (addressKey: string,) => {
+
+
+
+
+  return `/api/properties/${addressKey}`
+}
+
+/**
+ * @summary Create or update the authored intelligence for a property
+ */
+export const updatePropertyProfile = async (addressKey: string,
+    propertyProfileUpdate: PropertyProfileUpdate, options?: RequestInit): Promise<PropertyFeed> => {
+
+  return customFetch<PropertyFeed>(getUpdatePropertyProfileUrl(addressKey),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      propertyProfileUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdatePropertyProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePropertyProfile>>, TError,{addressKey: string;data: BodyType<PropertyProfileUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePropertyProfile>>, TError,{addressKey: string;data: BodyType<PropertyProfileUpdate>}, TContext> => {
+
+const mutationKey = ['updatePropertyProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePropertyProfile>>, {addressKey: string;data: BodyType<PropertyProfileUpdate>}> = (props) => {
+          const {addressKey,data} = props ?? {};
+
+          return  updatePropertyProfile(addressKey,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePropertyProfileMutationResult = NonNullable<Awaited<ReturnType<typeof updatePropertyProfile>>>
+    export type UpdatePropertyProfileMutationBody = BodyType<PropertyProfileUpdate>
+    export type UpdatePropertyProfileMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create or update the authored intelligence for a property
+ */
+export const useUpdatePropertyProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePropertyProfile>>, TError,{addressKey: string;data: BodyType<PropertyProfileUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePropertyProfile>>,
+        TError,
+        {addressKey: string;data: BodyType<PropertyProfileUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdatePropertyProfileMutationOptions(options));
+    }
+
+export const getAddPropertyNoteUrl = (addressKey: string,) => {
+
+
+
+
+  return `/api/properties/${addressKey}/notes`
+}
+
+/**
+ * @summary Append a field note to a property
+ */
+export const addPropertyNote = async (addressKey: string,
+    propertyNoteInput: PropertyNoteInput, options?: RequestInit): Promise<PropertyNote> => {
+
+  return customFetch<PropertyNote>(getAddPropertyNoteUrl(addressKey),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      propertyNoteInput,)
+  }
+);}
+
+
+
+
+export const getAddPropertyNoteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPropertyNote>>, TError,{addressKey: string;data: BodyType<PropertyNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addPropertyNote>>, TError,{addressKey: string;data: BodyType<PropertyNoteInput>}, TContext> => {
+
+const mutationKey = ['addPropertyNote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addPropertyNote>>, {addressKey: string;data: BodyType<PropertyNoteInput>}> = (props) => {
+          const {addressKey,data} = props ?? {};
+
+          return  addPropertyNote(addressKey,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddPropertyNoteMutationResult = NonNullable<Awaited<ReturnType<typeof addPropertyNote>>>
+    export type AddPropertyNoteMutationBody = BodyType<PropertyNoteInput>
+    export type AddPropertyNoteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Append a field note to a property
+ */
+export const useAddPropertyNote = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addPropertyNote>>, TError,{addressKey: string;data: BodyType<PropertyNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addPropertyNote>>,
+        TError,
+        {addressKey: string;data: BodyType<PropertyNoteInput>},
+        TContext
+      > => {
+      return useMutation(getAddPropertyNoteMutationOptions(options));
     }
 
