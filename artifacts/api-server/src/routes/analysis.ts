@@ -65,6 +65,31 @@ router.get("/summary", async (req, res) => {
   }
 });
 
+// POST /analysis — create analysis result from real inspection captures
+router.post("/", async (req, res) => {
+  try {
+    const { inspectionId, findings = [], recommendations = [], overallConfidence } = req.body;
+    if (!inspectionId) return res.status(400).json({ error: "inspectionId is required" });
+
+    const computed = overallConfidence ??
+      (findings.length > 0
+        ? Math.round(findings.reduce((s: number, f: any) => s + ((f.confidence ?? 0) * 100), 0) / findings.length)
+        : 0);
+
+    const [row] = await db.insert(analysisResultsTable).values({
+      inspectionId,
+      status: "complete",
+      findings,
+      recommendations,
+      overallConfidence: computed,
+    }).returning();
+
+    res.status(201).json(serializeResult(row));
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create analysis result" });
+  }
+});
+
 // GET /analysis/:id
 router.get("/:id", async (req, res) => {
   try {

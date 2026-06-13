@@ -81,6 +81,20 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Health endpoint is at `/api/healthz` (not /health)
 - zod imports: use `zod/v4` (not `zod`) — matches drizzle-zod convention in codebase
 
+## Object Storage (GCS via Replit)
+- Bucket: `replit-objstore-e989ae13-7af0-4fc5-942e-57b60a6fd134`; env vars: `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR`
+- Deps: `@google-cloud/storage` + `google-auth-library` in @workspace/api-server
+- Route: `artifacts/api-server/src/routes/storage.ts` — mounted in index.ts as `router.use(storageRouter)` (no auth guard — presigned URL is self-securing)
+- Storage.ts uses inline zod instead of `@workspace/api-zod` imports (api-zod doesn't have those types)
+- Upload flow: `POST /api/storage/uploads/request-url {name,size,contentType}` → `{uploadURL,objectPath}`; PUT uploadURL with bytes; serving URL = `/api/storage${objectPath}`
+- `uploadToStorage(url, filename)` helper in new.tsx: converts blob:/data: URLs to permanent GCS paths (gracefully falls back to original URL on error)
+
+## Analysis Creation (POST /analysis)
+- `POST /api/analysis` added to analysis.ts BEFORE `GET /:id` (avoid route conflict). Protected by requireAuth.
+- Body: `{inspectionId, findings[], recommendations[], overallConfidence?}` — computes avgConfidence from findings if not provided
+- Called automatically in `handleComplete()` after evidence uploads but before media records
+- `DETECTION_CATEGORY_MAP` (id→category) and `generateRecommendations(findings)` helpers in new.tsx
+
 ## Seed Data
 - Seed script: `artifacts/api-server/src/seed.ts` — run with `npx tsx artifacts/api-server/src/seed.ts`
 - 8 inspections, 3 analysis results, 18 dataset images, 2 reports, 4 quizzes, 11 training scores seeded

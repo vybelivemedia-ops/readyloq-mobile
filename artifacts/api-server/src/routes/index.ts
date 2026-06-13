@@ -10,11 +10,13 @@ import trainingRouter from "./training";
 import analyticsRouter from "./analytics";
 import intelligenceRouter from "./intelligence";
 import brandingRouter from "./branding";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
+router.use(storageRouter);
 
 router.use("/inspections", requireAuth, inspectionsRouter);
 router.use("/analysis", requireAuth, analysisRouter);

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
+import { useUser } from "@clerk/react";
 import { useCreateInspection, useAddInspectionMedia } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,6 +119,49 @@ const DETECTIONS = [
   { id: 8, label: "Potential Rat Droppings Detected",       severity: "high",   icon: "🐀", confidence: 0.90, zoom: 3.0, focus: "macro" as const },
   { id: 9, label: "Structural Gap — Exclusion Opportunity", severity: "medium", icon: "🔧", confidence: 0.77, zoom: 2.0, focus: "continuous" as const },
 ];
+
+const DETECTION_CATEGORY_MAP: Record<number, string> = {
+  1: "Rodent Activity",
+  2: "Structural Concern",
+  3: "Conducive Conditions",
+  4: "Cockroach Activity",
+  5: "Rodent Activity",
+  6: "Exclusion Opportunity",
+  7: "Conducive Conditions",
+  8: "Rodent Activity",
+  9: "Exclusion Opportunity",
+};
+
+function generateRecommendations(findings: Array<{ category: string }>): string[] {
+  const cats = new Set(findings.map(f => f.category));
+  const recs: string[] = [];
+  if (cats.has("Rodent Activity")) recs.push("Install tamper-resistant bait stations at all entry points and along active runways. Seal gaps > 1/4 inch.");
+  if (cats.has("Exclusion Opportunity")) recs.push("Seal all identified entry points with copper mesh and caulk. Install door sweeps where missing.");
+  if (cats.has("Cockroach Activity")) recs.push("Apply gel bait in harborage sites. Treat with IGR spray. Address all sanitation deficiencies.");
+  if (cats.has("Conducive Conditions")) recs.push("Address moisture sources immediately. Recommend dehumidification and plumbing repairs.");
+  if (cats.has("Structural Concern")) recs.push("Coordinate structural repairs to eliminate pest harborage and entry opportunities.");
+  if (recs.length === 0) recs.push("Continue routine monitoring. Schedule follow-up inspection in 30 days.");
+  return recs;
+}
+
+async function uploadToStorage(url: string, filename: string): Promise<string> {
+  if (!url.startsWith("blob:") && !url.startsWith("data:")) return url;
+  try {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    const urlRes = await fetch("/api/storage/uploads/request-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: filename, size: blob.size, contentType: blob.type || "image/jpeg" }),
+    });
+    if (!urlRes.ok) return url;
+    const { uploadURL, objectPath } = await urlRes.json();
+    await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": blob.type || "image/jpeg" }, body: blob });
+    return `/api/storage${objectPath}`;
+  } catch {
+    return url;
+  }
+}
 
 const VOICE_COMMANDS = [
   '"Fresh mouse droppings behind refrigerator"',
@@ -352,6 +396,7 @@ function useCamera() {
 export default function NewInspection() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useUser();
   const createInspection = useCreateInspection();
   const addMedia = useAddInspectionMedia();
 
@@ -363,6 +408,13 @@ export default function NewInspection() {
   const [showExterior, setShowExterior] = useState(false);
   const [siteAddress, setSiteAddress] = useState("");
   const [technicianName, setTechnicianName] = useState("");
+  const [completing, setCompleting] = useState(false);
+
+  useEffect(() => {
+    if (user?.fullName && !technicianName) {
+      setTechnicianName(user.fullName);
+    }
+  }, [user?.fullName]);
   const [activeZone, setActiveZone] = useState<string | null>(null);
 
   const battery = useBatteryStatus();
@@ -672,21 +724,64 @@ export default function NewInspection() {
   }
 
   async function handleComplete() {
-    if (createdId && captured.length > 0) {
-      for (const item of captured) {
+    setCompleting(true);
+    try {
+      // Step 1: Upload all blob/data URLs to permanent object storage
+      const permanentUrls: Record<string, string> = {};
+      const photoItems = captured.filter(i => i.type === "photo");
+      for (const item of photoItems) {
+        const permanent = await uploadToStorage(item.url, `inspection-${createdId}-${item.id}.jpg`);
+        permanentUrls[item.id] = permanent;
+      }
+
+      // Step 2: Create analysis result from captured detections
+      const detectedItems = photoItems.filter(i => i.detection);
+      if (createdId && detectedItems.length > 0) {
+        const findings = detectedItems.map((item, idx) => ({
+          id: idx + 1,
+          category: DETECTION_CATEGORY_MAP[item.detection!.id] ?? "Observation",
+          description: item.detection!.label,
+          confidence: item.detection!.confidence,
+          severity: item.detection!.severity,
+          location: siteAddress,
+          imageUrl: permanentUrls[item.id] ?? item.url,
+          treatment: null,
+          exclusionOpportunity: item.detection!.id === 6 || item.detection!.id === 9,
+          evidenceQuality: item.evidenceQuality ?? null,
+        }));
         try {
-          await addMedia.mutateAsync({
-            id: createdId,
-            data: {
-              mediaType: item.type, url: item.url, filename: item.label,
-              caption: [item.detection?.label, item.evidenceQuality ? `evidence:${item.evidenceQuality}` : null]
-                .filter(Boolean).join(" · "),
-            },
+          await fetch("/api/analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              inspectionId: createdId,
+              findings,
+              recommendations: generateRecommendations(findings),
+            }),
           });
         } catch {}
       }
+
+      // Step 3: Save all media records with permanent URLs
+      if (createdId && captured.length > 0) {
+        for (const item of captured) {
+          try {
+            await addMedia.mutateAsync({
+              id: createdId,
+              data: {
+                mediaType: item.type,
+                url: permanentUrls[item.id] ?? item.url,
+                filename: item.label,
+                caption: [item.detection?.label, item.evidenceQuality ? `evidence:${item.evidenceQuality}` : null]
+                  .filter(Boolean).join(" · "),
+              },
+            });
+          } catch {}
+        }
+      }
+    } finally {
+      navigate(createdId ? `/inspections/${createdId}` : "/inspections");
     }
-    navigate(createdId ? `/inspections/${createdId}` : "/inspections");
   }
 
   // ── STEP 1: SETUP ─────────────────────────────────────────────────────────────
@@ -946,7 +1041,7 @@ export default function NewInspection() {
               <div className="text-center p-6">
                 <Camera className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-white/70 text-sm">Camera access denied</p>
-                <p className="text-white/40 text-xs mt-1">Running in simulation mode</p>
+                <p className="text-white/40 text-xs mt-1">Photo capture unavailable — using manual entry</p>
               </div>
             </div>
           )}
@@ -1415,9 +1510,9 @@ export default function NewInspection() {
         <Button variant="outline" className="flex-1 rounded-xl h-12" onClick={() => navigate("/inspections")}>
           Save Only
         </Button>
-        <Button className="flex-1 rounded-xl h-12 font-semibold shadow-lg shadow-primary/20" onClick={handleComplete}>
+        <Button className="flex-1 rounded-xl h-12 font-semibold shadow-lg shadow-primary/20" onClick={handleComplete} disabled={completing}>
           <Zap className="mr-2 h-4 w-4" />
-          Save & Review
+          {completing ? "Saving evidence…" : "Save & Review"}
         </Button>
       </div>
     </div>

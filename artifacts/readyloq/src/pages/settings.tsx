@@ -23,6 +23,7 @@ export default function SettingsPage() {
 
   const [form, setForm] = useState({
     companyName: "",
+    logoUrl: "",
     primaryColor: "#0ea5e9",
     accentColor: "#06b6d4",
     tagline: "",
@@ -35,6 +36,7 @@ export default function SettingsPage() {
     if (branding) {
       setForm({
         companyName: branding.companyName,
+        logoUrl: branding.logoUrl ?? "",
         primaryColor: branding.primaryColor ?? "#0ea5e9",
         accentColor: branding.accentColor ?? "#06b6d4",
         tagline: branding.tagline ?? "",
@@ -127,7 +129,11 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Logo URL</Label>
-                <Input placeholder="https://yourcompany.com/logo.png" />
+                <Input
+                  placeholder="https://yourcompany.com/logo.png"
+                  value={form.logoUrl}
+                  onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))}
+                />
                 <p className="text-xs text-muted-foreground">Paste a URL to your company logo</p>
               </div>
             </CardContent>
