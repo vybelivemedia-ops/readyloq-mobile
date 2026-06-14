@@ -1,1 +1,2 @@
 - [ReadyLoq Architecture](readyloq-architecture.md) — stack, conventions, API routes, seed script location, Wouter base path fix
+- [API Server Testing](api-server-testing.md) — vitest + isolated `<db>_test` DB + Clerk getAuth mock; pre-existing TS7030 typecheck failures are baseline
