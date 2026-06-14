@@ -23,8 +23,8 @@ import type {
   AnalysisResult,
   AnalysisSummary,
   AnalyticsDashboard,
-  Branding,
-  BrandingUpdate,
+  BrandingProfile,
+  BrandingProfileInput,
   CallbackIntelligence,
   DatasetCategory,
   DatasetPage,
@@ -2296,11 +2296,11 @@ export const getGetBrandingUrl = () => {
 }
 
 /**
- * @summary Get white-label branding settings
+ * @summary Get the active white-label branding profile (public)
  */
-export const getBranding = async ( options?: RequestInit): Promise<Branding> => {
+export const getBranding = async ( options?: RequestInit): Promise<BrandingProfile> => {
 
-  return customFetch<Branding>(getGetBrandingUrl(),
+  return customFetch<BrandingProfile>(getGetBrandingUrl(),
   {
     ...options,
     method: 'GET'
@@ -2343,7 +2343,7 @@ export type GetBrandingQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get white-label branding settings
+ * @summary Get the active white-label branding profile (public)
  */
 
 export function useGetBranding<TData = Awaited<ReturnType<typeof getBranding>>, TError = ErrorType<unknown>>(
@@ -2364,37 +2364,191 @@ export function useGetBranding<TData = Awaited<ReturnType<typeof getBranding>>, 
 
 
 
-export const getUpdateBrandingUrl = () => {
+export const getGetActiveBrandingUrl = () => {
 
 
 
 
-  return `/api/branding`
+  return `/api/branding/active`
 }
 
 /**
- * @summary Update white-label branding settings
+ * @summary Get the active white-label branding profile (public)
  */
-export const updateBranding = async (brandingUpdate: BrandingUpdate, options?: RequestInit): Promise<Branding> => {
+export const getActiveBranding = async ( options?: RequestInit): Promise<BrandingProfile> => {
 
-  return customFetch<Branding>(getUpdateBrandingUrl(),
+  return customFetch<BrandingProfile>(getGetActiveBrandingUrl(),
   {
     ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      brandingUpdate,)
+    method: 'GET'
+
+
   }
 );}
 
 
 
 
-export const getUpdateBrandingMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBranding>>, TError,{data: BodyType<BrandingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateBranding>>, TError,{data: BodyType<BrandingUpdate>}, TContext> => {
 
-const mutationKey = ['updateBranding'];
+export const getGetActiveBrandingQueryKey = () => {
+    return [
+    `/api/branding/active`
+    ] as const;
+    }
+
+
+export const getGetActiveBrandingQueryOptions = <TData = Awaited<ReturnType<typeof getActiveBranding>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActiveBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetActiveBrandingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getActiveBranding>>> = ({ signal }) => getActiveBranding({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getActiveBranding>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetActiveBrandingQueryResult = NonNullable<Awaited<ReturnType<typeof getActiveBranding>>>
+export type GetActiveBrandingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the active white-label branding profile (public)
+ */
+
+export function useGetActiveBranding<TData = Awaited<ReturnType<typeof getActiveBranding>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActiveBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetActiveBrandingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListBrandingProfilesUrl = () => {
+
+
+
+
+  return `/api/branding/profiles`
+}
+
+/**
+ * @summary List all branding profiles (manager only)
+ */
+export const listBrandingProfiles = async ( options?: RequestInit): Promise<BrandingProfile[]> => {
+
+  return customFetch<BrandingProfile[]>(getListBrandingProfilesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBrandingProfilesQueryKey = () => {
+    return [
+    `/api/branding/profiles`
+    ] as const;
+    }
+
+
+export const getListBrandingProfilesQueryOptions = <TData = Awaited<ReturnType<typeof listBrandingProfiles>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBrandingProfiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBrandingProfilesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBrandingProfiles>>> = ({ signal }) => listBrandingProfiles({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBrandingProfiles>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBrandingProfilesQueryResult = NonNullable<Awaited<ReturnType<typeof listBrandingProfiles>>>
+export type ListBrandingProfilesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all branding profiles (manager only)
+ */
+
+export function useListBrandingProfiles<TData = Awaited<ReturnType<typeof listBrandingProfiles>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBrandingProfiles>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBrandingProfilesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateBrandingProfileUrl = () => {
+
+
+
+
+  return `/api/branding/profiles`
+}
+
+/**
+ * @summary Create a branding profile (manager only)
+ */
+export const createBrandingProfile = async (brandingProfileInput: BrandingProfileInput, options?: RequestInit): Promise<BrandingProfile> => {
+
+  return customFetch<BrandingProfile>(getCreateBrandingProfileUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      brandingProfileInput,)
+  }
+);}
+
+
+
+
+export const getCreateBrandingProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBrandingProfile>>, TError,{data: BodyType<BrandingProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBrandingProfile>>, TError,{data: BodyType<BrandingProfileInput>}, TContext> => {
+
+const mutationKey = ['createBrandingProfile'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -2404,10 +2558,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBranding>>, {data: BodyType<BrandingUpdate>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBrandingProfile>>, {data: BodyType<BrandingProfileInput>}> = (props) => {
           const {data} = props ?? {};
 
-          return  updateBranding(data,requestOptions)
+          return  createBrandingProfile(data,requestOptions)
         }
 
 
@@ -2417,22 +2571,451 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type UpdateBrandingMutationResult = NonNullable<Awaited<ReturnType<typeof updateBranding>>>
-    export type UpdateBrandingMutationBody = BodyType<BrandingUpdate>
-    export type UpdateBrandingMutationError = ErrorType<unknown>
+    export type CreateBrandingProfileMutationResult = NonNullable<Awaited<ReturnType<typeof createBrandingProfile>>>
+    export type CreateBrandingProfileMutationBody = BodyType<BrandingProfileInput>
+    export type CreateBrandingProfileMutationError = ErrorType<unknown>
 
     /**
- * @summary Update white-label branding settings
+ * @summary Create a branding profile (manager only)
  */
-export const useUpdateBranding = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBranding>>, TError,{data: BodyType<BrandingUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useCreateBrandingProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBrandingProfile>>, TError,{data: BodyType<BrandingProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof updateBranding>>,
+        Awaited<ReturnType<typeof createBrandingProfile>>,
         TError,
-        {data: BodyType<BrandingUpdate>},
+        {data: BodyType<BrandingProfileInput>},
         TContext
       > => {
-      return useMutation(getUpdateBrandingMutationOptions(options));
+      return useMutation(getCreateBrandingProfileMutationOptions(options));
+    }
+
+export const getGetBrandingProfileUrl = (id: number,) => {
+
+
+
+
+  return `/api/branding/profiles/${id}`
+}
+
+/**
+ * @summary Get a branding profile (manager only)
+ */
+export const getBrandingProfile = async (id: number, options?: RequestInit): Promise<BrandingProfile> => {
+
+  return customFetch<BrandingProfile>(getGetBrandingProfileUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBrandingProfileQueryKey = (id: number,) => {
+    return [
+    `/api/branding/profiles/${id}`
+    ] as const;
+    }
+
+
+export const getGetBrandingProfileQueryOptions = <TData = Awaited<ReturnType<typeof getBrandingProfile>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrandingProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBrandingProfileQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBrandingProfile>>> = ({ signal }) => getBrandingProfile(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBrandingProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBrandingProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getBrandingProfile>>>
+export type GetBrandingProfileQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a branding profile (manager only)
+ */
+
+export function useGetBrandingProfile<TData = Awaited<ReturnType<typeof getBrandingProfile>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrandingProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBrandingProfileQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateBrandingProfileUrl = (id: number,) => {
+
+
+
+
+  return `/api/branding/profiles/${id}`
+}
+
+/**
+ * @summary Update a branding profile (manager only)
+ */
+export const updateBrandingProfile = async (id: number,
+    brandingProfileInput: BrandingProfileInput, options?: RequestInit): Promise<BrandingProfile> => {
+
+  return customFetch<BrandingProfile>(getUpdateBrandingProfileUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      brandingProfileInput,)
+  }
+);}
+
+
+
+
+export const getUpdateBrandingProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBrandingProfile>>, TError,{id: number;data: BodyType<BrandingProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBrandingProfile>>, TError,{id: number;data: BodyType<BrandingProfileInput>}, TContext> => {
+
+const mutationKey = ['updateBrandingProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBrandingProfile>>, {id: number;data: BodyType<BrandingProfileInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateBrandingProfile(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBrandingProfileMutationResult = NonNullable<Awaited<ReturnType<typeof updateBrandingProfile>>>
+    export type UpdateBrandingProfileMutationBody = BodyType<BrandingProfileInput>
+    export type UpdateBrandingProfileMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a branding profile (manager only)
+ */
+export const useUpdateBrandingProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBrandingProfile>>, TError,{id: number;data: BodyType<BrandingProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBrandingProfile>>,
+        TError,
+        {id: number;data: BodyType<BrandingProfileInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateBrandingProfileMutationOptions(options));
+    }
+
+export const getDeleteBrandingProfileUrl = (id: number,) => {
+
+
+
+
+  return `/api/branding/profiles/${id}`
+}
+
+/**
+ * @summary Delete a branding profile (manager only)
+ */
+export const deleteBrandingProfile = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteBrandingProfileUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteBrandingProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBrandingProfile>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteBrandingProfile>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteBrandingProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteBrandingProfile>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteBrandingProfile(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteBrandingProfileMutationResult = NonNullable<Awaited<ReturnType<typeof deleteBrandingProfile>>>
+
+    export type DeleteBrandingProfileMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a branding profile (manager only)
+ */
+export const useDeleteBrandingProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBrandingProfile>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteBrandingProfile>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteBrandingProfileMutationOptions(options));
+    }
+
+export const getDuplicateBrandingProfileUrl = (id: number,) => {
+
+
+
+
+  return `/api/branding/profiles/${id}/duplicate`
+}
+
+/**
+ * @summary Duplicate a branding profile (manager only)
+ */
+export const duplicateBrandingProfile = async (id: number, options?: RequestInit): Promise<BrandingProfile> => {
+
+  return customFetch<BrandingProfile>(getDuplicateBrandingProfileUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getDuplicateBrandingProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateBrandingProfile>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof duplicateBrandingProfile>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['duplicateBrandingProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof duplicateBrandingProfile>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  duplicateBrandingProfile(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DuplicateBrandingProfileMutationResult = NonNullable<Awaited<ReturnType<typeof duplicateBrandingProfile>>>
+
+    export type DuplicateBrandingProfileMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Duplicate a branding profile (manager only)
+ */
+export const useDuplicateBrandingProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof duplicateBrandingProfile>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof duplicateBrandingProfile>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDuplicateBrandingProfileMutationOptions(options));
+    }
+
+export const getActivateBrandingProfileUrl = (id: number,) => {
+
+
+
+
+  return `/api/branding/profiles/${id}/activate`
+}
+
+/**
+ * @summary Set a branding profile as active (manager only)
+ */
+export const activateBrandingProfile = async (id: number, options?: RequestInit): Promise<BrandingProfile> => {
+
+  return customFetch<BrandingProfile>(getActivateBrandingProfileUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getActivateBrandingProfileMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activateBrandingProfile>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof activateBrandingProfile>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['activateBrandingProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof activateBrandingProfile>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  activateBrandingProfile(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ActivateBrandingProfileMutationResult = NonNullable<Awaited<ReturnType<typeof activateBrandingProfile>>>
+
+    export type ActivateBrandingProfileMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Set a branding profile as active (manager only)
+ */
+export const useActivateBrandingProfile = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activateBrandingProfile>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof activateBrandingProfile>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getActivateBrandingProfileMutationOptions(options));
+    }
+
+export const getRestoreBrandingDefaultsUrl = () => {
+
+
+
+
+  return `/api/branding/restore-defaults`
+}
+
+/**
+ * @summary Reset the default profile to ReadyLoq defaults and activate it (manager only)
+ */
+export const restoreBrandingDefaults = async ( options?: RequestInit): Promise<BrandingProfile> => {
+
+  return customFetch<BrandingProfile>(getRestoreBrandingDefaultsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRestoreBrandingDefaultsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreBrandingDefaults>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof restoreBrandingDefaults>>, TError,void, TContext> => {
+
+const mutationKey = ['restoreBrandingDefaults'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof restoreBrandingDefaults>>, void> = () => {
+
+
+          return  restoreBrandingDefaults(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RestoreBrandingDefaultsMutationResult = NonNullable<Awaited<ReturnType<typeof restoreBrandingDefaults>>>
+
+    export type RestoreBrandingDefaultsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reset the default profile to ReadyLoq defaults and activate it (manager only)
+ */
+export const useRestoreBrandingDefaults = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restoreBrandingDefaults>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof restoreBrandingDefaults>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRestoreBrandingDefaultsMutationOptions(options));
     }
 
 export const getListPropertiesUrl = () => {

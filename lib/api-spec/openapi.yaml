@@ -555,31 +555,150 @@ paths:
     get:
       operationId: getBranding
       tags: [branding]
-      summary: Get white-label branding settings
+      summary: Get the active white-label branding profile (public)
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Branding"
-    patch:
-      operationId: updateBranding
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/active:
+    get:
+      operationId: getActiveBranding
       tags: [branding]
-      summary: Update white-label branding settings
+      summary: Get the active white-label branding profile (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/profiles:
+    get:
+      operationId: listBrandingProfiles
+      tags: [branding]
+      summary: List all branding profiles (manager only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BrandingProfile"
+    post:
+      operationId: createBrandingProfile
+      tags: [branding]
+      summary: Create a branding profile (manager only)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/BrandingUpdate"
+              $ref: "#/components/schemas/BrandingProfileInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/profiles/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: getBrandingProfile
+      tags: [branding]
+      summary: Get a branding profile (manager only)
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Branding"
+                $ref: "#/components/schemas/BrandingProfile"
+    patch:
+      operationId: updateBrandingProfile
+      tags: [branding]
+      summary: Update a branding profile (manager only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandingProfileInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+    delete:
+      operationId: deleteBrandingProfile
+      tags: [branding]
+      summary: Delete a branding profile (manager only)
+      responses:
+        "204":
+          description: No Content
+
+  /branding/profiles/{id}/duplicate:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: duplicateBrandingProfile
+      tags: [branding]
+      summary: Duplicate a branding profile (manager only)
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/profiles/{id}/activate:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: activateBrandingProfile
+      tags: [branding]
+      summary: Set a branding profile as active (manager only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/restore-defaults:
+    post:
+      operationId: restoreBrandingDefaults
+      tags: [branding]
+      summary: Reset the default profile to ReadyLoq defaults and activate it (manager only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
 
   # ── PROPERTIES ───────────────────────────────────────────────────────────────
   /properties:
@@ -1283,32 +1402,59 @@ components:
               value: { type: integer }
 
     # ── BRANDING SCHEMAS ────────────────────────────────────────────────────────
-    Branding:
+    BrandingProfile:
       type: object
-      required: [id, companyName]
+      required: [id, name, isDefault, isActive, companyName, poweredByVisible, createdAt, updatedAt]
       properties:
-        id:              { type: integer }
-        companyName:     { type: string }
-        logoUrl:         { type: ["string", "null"] }
-        primaryColor:    { type: ["string", "null"] }
-        accentColor:     { type: ["string", "null"] }
-        tagline:         { type: ["string", "null"] }
-        supportEmail:    { type: ["string", "null"] }
-        supportPhone:    { type: ["string", "null"] }
-        poweredByVisible: { type: boolean }
-        updatedAt:       { type: string }
+        id:                  { type: integer }
+        name:                { type: string }
+        isDefault:           { type: boolean }
+        isActive:            { type: boolean }
+        companyName:         { type: string }
+        tagline:             { type: ["string", "null"] }
+        companyAddress:      { type: ["string", "null"] }
+        companyPhone:        { type: ["string", "null"] }
+        companyEmail:        { type: ["string", "null"] }
+        companyWebsite:      { type: ["string", "null"] }
+        licenseNumber:       { type: ["string", "null"] }
+        logoUrl:             { type: ["string", "null"] }
+        appIconUrl:          { type: ["string", "null"] }
+        primaryColor:        { type: ["string", "null"] }
+        secondaryColor:      { type: ["string", "null"] }
+        accentColor:         { type: ["string", "null"] }
+        reportFooterText:    { type: ["string", "null"] }
+        supportInfo:         { type: ["string", "null"] }
+        signatureDisclaimer: { type: ["string", "null"] }
+        emailSenderName:     { type: ["string", "null"] }
+        emailReplyTo:        { type: ["string", "null"] }
+        emailFooter:         { type: ["string", "null"] }
+        poweredByVisible:    { type: boolean }
+        createdAt:           { type: string }
+        updatedAt:           { type: string }
 
-    BrandingUpdate:
+    BrandingProfileInput:
       type: object
       properties:
-        companyName:     { type: string }
-        logoUrl:         { type: string }
-        primaryColor:    { type: string }
-        accentColor:     { type: string }
-        tagline:         { type: string }
-        supportEmail:    { type: string }
-        supportPhone:    { type: string }
-        poweredByVisible: { type: boolean }
+        name:                { type: string }
+        companyName:         { type: string }
+        tagline:             { type: ["string", "null"] }
+        companyAddress:      { type: ["string", "null"] }
+        companyPhone:        { type: ["string", "null"] }
+        companyEmail:        { type: ["string", "null"] }
+        companyWebsite:      { type: ["string", "null"] }
+        licenseNumber:       { type: ["string", "null"] }
+        logoUrl:             { type: ["string", "null"] }
+        appIconUrl:          { type: ["string", "null"] }
+        primaryColor:        { type: ["string", "null"] }
+        secondaryColor:      { type: ["string", "null"] }
+        accentColor:         { type: ["string", "null"] }
+        reportFooterText:    { type: ["string", "null"] }
+        supportInfo:         { type: ["string", "null"] }
+        signatureDisclaimer: { type: ["string", "null"] }
+        emailSenderName:     { type: ["string", "null"] }
+        emailReplyTo:        { type: ["string", "null"] }
+        emailFooter:         { type: ["string", "null"] }
+        poweredByVisible:    { type: boolean }
 
     # ── PROPERTY SCHEMAS ────────────────────────────────────────────────────────
     Hotspot:

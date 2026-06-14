@@ -26,7 +26,7 @@ router.use("/reports", requireAuth, reportsRouter);
 router.use("/training", requireAuth, trainingRouter);
 router.use("/analytics", requireAuth, analyticsRouter);
 router.use("/intelligence", requireAuth, requireRole("manager"), intelligenceRouter);
-router.use("/branding", requireAuth, brandingRouter);
+router.use("/branding", brandingRouter);
 router.use("/properties", requireAuth, propertiesRouter);
 
 export default router;

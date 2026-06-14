@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "OoVBpmERVPj2GcynjwLmR"
+uri = "file://artifacts/readyloq/public/suburban-logo.png"
+type = "image"
+title = "suburban pest logo"

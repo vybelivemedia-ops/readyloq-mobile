@@ -17,9 +17,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useClerk, useUser } from "@clerk/react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useBranding } from "@/components/branding-provider";
+import { brandLogoSrc } from "@/lib/branding";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
-const logoSrc = `${basePath}/logo.png`;
 
 const baseNavItems = [
   { href: "/", label: "Scout", icon: Home },
@@ -53,6 +54,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { data: currentUser } = useCurrentUser();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const branding = useBranding();
+  const logoSrc = brandLogoSrc(branding);
+  const companyName = branding.companyName;
   const isManager = currentUser?.role === "manager";
 
   const navItems = [
@@ -95,8 +99,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border/60 bg-card/50 backdrop-blur-sm">
         <div className="p-5 pb-3">
           <div className="flex items-center gap-2.5 font-bold text-lg tracking-tight">
-            <img src={logoSrc} alt="ReadyLoq" className="w-7 h-7 rounded-lg" />
-            <span className="text-foreground">Ready<span className="text-primary">Loq</span></span>
+            <img src={logoSrc} alt={companyName} className="w-7 h-7 rounded-lg object-contain" />
+            <span className="text-foreground truncate">{companyName}</span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1 pl-9">Inspection Copilot</p>
         </div>
@@ -130,9 +134,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         className="md:hidden shrink-0 flex items-end justify-between border-b border-border/60 bg-card/90 backdrop-blur-md px-4 pb-3 sticky top-0 z-10"
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}
       >
-        <div className="flex items-center gap-2 font-bold text-base">
-          <img src={logoSrc} alt="ReadyLoq" className="w-6 h-6 rounded-md" />
-          <span>Ready<span className="text-primary">Loq</span></span>
+        <div className="flex items-center gap-2 font-bold text-base min-w-0">
+          <img src={logoSrc} alt={companyName} className="w-6 h-6 rounded-md object-contain shrink-0" />
+          <span className="truncate">{companyName}</span>
         </div>
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
@@ -142,9 +146,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </SheetTrigger>
           <SheetContent side="right" className="w-64 p-0 bg-card border-l border-border/60">
             <div className="p-5 border-b border-border/60">
-              <div className="flex items-center gap-2 font-bold text-lg">
-                <img src={logoSrc} alt="ReadyLoq" className="w-6 h-6 rounded-md" />
-                <span>Ready<span className="text-primary">Loq</span></span>
+              <div className="flex items-center gap-2 font-bold text-lg min-w-0">
+                <img src={logoSrc} alt={companyName} className="w-6 h-6 rounded-md object-contain shrink-0" />
+                <span className="truncate">{companyName}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">Inspection Copilot</p>
             </div>

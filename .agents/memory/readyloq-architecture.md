@@ -30,7 +30,7 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - `requireRole("manager")` middleware: checks req.user.role, returns 403 if wrong role.
 - Routes: health (public), /auth/* (public + own requireAuth in handler), all others require requireAuth.
 - Intelligence routes: requireAuth + requireRole("manager") — double-gated server-side.
-- Branding: GET open to all auth users, PATCH manager-only (requireRole in branding.ts) + Zod validation via insertBrandingSchema.partial().safeParse().
+- Branding: multi-profile model (see White Label section). `GET /active` + `GET /` are PUBLIC; all CRUD is manager-only (requireRole in branding.ts).
 - `useCurrentUser()` hook (hooks/use-current-user.ts): fetches GET /api/auth/me, enabled only when isSignedIn, staleTime 5min.
 - Role from server replaces localStorage use-role.ts toggle. View Mode card removed from settings.tsx.
 - Layout.tsx uses useUser() (Clerk) for display name and useCurrentUser() for role. Sign-out via useClerk().signOut().
@@ -84,7 +84,7 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 ## Object Storage (GCS via Replit)
 - Bucket: `replit-objstore-e989ae13-7af0-4fc5-942e-57b60a6fd134`; env vars: `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR`
 - Deps: `@google-cloud/storage` + `google-auth-library` in @workspace/api-server
-- Route: `artifacts/api-server/src/routes/storage.ts` — mounted in index.ts as `router.use(storageRouter)` (no auth guard — presigned URL is self-securing)
+- Route: `artifacts/api-server/src/routes/storage.ts` — mounted in index.ts as `router.use(storageRouter)`. `POST /uploads/request-url` is now `requireAuth` (shared by technician photo + manager branding uploads). `GET /public-objects/*` stays public (logos render on the pre-sign-in login page). `GET /objects/*` is still unauthenticated — flagged for a follow-up to ACL-gate private inspection media.
 - Storage.ts uses inline zod instead of `@workspace/api-zod` imports (api-zod doesn't have those types)
 - Upload flow: `POST /api/storage/uploads/request-url {name,size,contentType}` → `{uploadURL,objectPath}`; PUT uploadURL with bytes; serving URL = `/api/storage${objectPath}`
 - `uploadToStorage(url, filename)` helper in new.tsx: converts blob:/data: URLs to permanent GCS paths (gracefully falls back to original URL on error)
@@ -124,6 +124,13 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Single brand mark for the whole app lives at `artifacts/readyloq/public/logo.png` (transparent-corner blue rounded-square "R"). Used by: favicon + apple-touch-icon (index.html via `%BASE_URL%logo.png`), in-app header marks (layout.tsx `logoSrc`), WelcomePage + Clerk `logoImageUrl` (App.tsx), and PDF cover `DEFAULT_LOGO` fallback (report-pdf.tsx).
 - **Do NOT use the AI background-removal tool on clean geometric/icon art** — it mangled the rounded-square edges (jagged blobs). For a logo that is a solid shape on a flat background, process geometrically with ImageMagick instead: `-trim` the margin, then composite a white `roundrectangle` mask with `-compose DstIn` (output `PNG32:` to force the alpha channel) for crisp transparent corners.
 - BASE_PATH for readyloq dev is `/` (so asset URLs resolve at root). Vite dev server runs on `$PORT` (was 20257); `%BASE_URL%` in index.html is replaced by Vite at serve time.
+
+## White Label / Branding Profiles (multi-profile re-branding, no code changes)
+- `branding_profiles` table (lib/db/src/schema/branding.ts) REPLACED the old single `branding` table — multiple saved profiles; the live one is the single row with `isActive=true`. `READYLOQ_DEFAULT_PROFILE` is the canonical default constant; one row is `isDefault=true` and protected (cannot be deleted; `restore-defaults` resets it to the constant and re-activates it).
+- API (routes/branding.ts) is mounted WITHOUT a global auth guard: `GET /active` + `GET /` (PDF alias) are PUBLIC (login/landing must brand before sign-in); everything below `router.use(requireAuth, requireRole("manager"))` is manager-only CRUD (list/create/get/patch/duplicate/delete/activate + `POST /restore-defaults`). `isDefault`/`isActive` are stripped from create/patch bodies and only change via the dedicated activate/restore endpoints. Color fields validated against hex (`firstInvalidColor` → 400).
+- **Runtime theming is centralized in `components/branding-provider.tsx` — it is the SINGLE place that calls `applyBrandingToDocument` (CSS vars/title/favicon), applying `effective = preview ?? active`. NEVER call applyBrandingToDocument from anywhere else — it races with the provider's active-profile refetch and gets clobbered.** Live preview goes through the `useBrandingPreview()` setter; `useBranding()` returns the effective profile so React-rendered logo/name live-update too.
+- White Label Manager UI lives in `components/white-label/*` (white-label-manager, profile-editor, brand-preview, image-cropper, profile-draft). Gated in settings.tsx behind `useCurrentUser().role === "manager"` (UX only; the server enforces requireRole). PDF branding flows through `useReportPdfData` → active profile, separate from live preview.
+- **Why public GET /active:** the unauthenticated login/landing/loading screens must show the active brand, so the active-profile read cannot require auth. Phase 1 is branding only — NO multi-company data tenancy.
 
 ## PDF Report Generation (@react-pdf/renderer)
 - `@react-pdf/renderer` installed in `@workspace/readyloq` (runtime dep). Vite requires `define: { global: 'globalThis' }` in vite.config.ts — do not remove this.

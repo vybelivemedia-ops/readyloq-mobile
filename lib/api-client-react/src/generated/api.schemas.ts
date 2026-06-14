@@ -487,33 +487,88 @@ export interface PropertyRiskInsights {
   riskTrend: PropertyRiskInsightsRiskTrendItem[];
 }
 
-export interface Branding {
+export interface BrandingProfile {
   id: number;
+  name: string;
+  isDefault: boolean;
+  isActive: boolean;
   companyName: string;
-  /** @nullable */
-  logoUrl?: string | null;
-  /** @nullable */
-  primaryColor?: string | null;
-  /** @nullable */
-  accentColor?: string | null;
   /** @nullable */
   tagline?: string | null;
   /** @nullable */
-  supportEmail?: string | null;
+  companyAddress?: string | null;
   /** @nullable */
-  supportPhone?: string | null;
-  poweredByVisible?: boolean;
-  updatedAt?: string;
+  companyPhone?: string | null;
+  /** @nullable */
+  companyEmail?: string | null;
+  /** @nullable */
+  companyWebsite?: string | null;
+  /** @nullable */
+  licenseNumber?: string | null;
+  /** @nullable */
+  logoUrl?: string | null;
+  /** @nullable */
+  appIconUrl?: string | null;
+  /** @nullable */
+  primaryColor?: string | null;
+  /** @nullable */
+  secondaryColor?: string | null;
+  /** @nullable */
+  accentColor?: string | null;
+  /** @nullable */
+  reportFooterText?: string | null;
+  /** @nullable */
+  supportInfo?: string | null;
+  /** @nullable */
+  signatureDisclaimer?: string | null;
+  /** @nullable */
+  emailSenderName?: string | null;
+  /** @nullable */
+  emailReplyTo?: string | null;
+  /** @nullable */
+  emailFooter?: string | null;
+  poweredByVisible: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface BrandingUpdate {
+export interface BrandingProfileInput {
+  name?: string;
   companyName?: string;
-  logoUrl?: string;
-  primaryColor?: string;
-  accentColor?: string;
-  tagline?: string;
-  supportEmail?: string;
-  supportPhone?: string;
+  /** @nullable */
+  tagline?: string | null;
+  /** @nullable */
+  companyAddress?: string | null;
+  /** @nullable */
+  companyPhone?: string | null;
+  /** @nullable */
+  companyEmail?: string | null;
+  /** @nullable */
+  companyWebsite?: string | null;
+  /** @nullable */
+  licenseNumber?: string | null;
+  /** @nullable */
+  logoUrl?: string | null;
+  /** @nullable */
+  appIconUrl?: string | null;
+  /** @nullable */
+  primaryColor?: string | null;
+  /** @nullable */
+  secondaryColor?: string | null;
+  /** @nullable */
+  accentColor?: string | null;
+  /** @nullable */
+  reportFooterText?: string | null;
+  /** @nullable */
+  supportInfo?: string | null;
+  /** @nullable */
+  signatureDisclaimer?: string | null;
+  /** @nullable */
+  emailSenderName?: string | null;
+  /** @nullable */
+  emailReplyTo?: string | null;
+  /** @nullable */
+  emailFooter?: string | null;
   poweredByVisible?: boolean;
 }
 

@@ -1,7 +1,8 @@
 import { db } from "@workspace/db";
 import {
   inspectionsTable, inspectionMediaTable, analysisResultsTable,
-  datasetImagesTable, reportsTable, quizzesTable, trainingScoresTable, brandingTable,
+  datasetImagesTable, reportsTable, quizzesTable, trainingScoresTable,
+  brandingProfilesTable, READYLOQ_DEFAULT_PROFILE,
 } from "@workspace/db";
 
 async function seed() {
@@ -334,14 +335,42 @@ async function seed() {
     { technicianName: "Sarah Williams", technicianId: "tech-002", quizId: quizzes[1].id, quizTitle: quizzes[1].title, score: 68, passed: false },
   ]);
 
-  // Branding defaults
-  await db.insert(brandingTable).values({
-    companyName: "ReadyLoq",
-    primaryColor: "#0ea5e9",
-    accentColor: "#06b6d4",
-    tagline: "AI-Powered Inspection Intelligence",
-    poweredByVisible: true,
-  }).onConflictDoNothing();
+  // Branding profiles: non-deletable ReadyLoq default (active) + a demo white-label profile
+  const existingProfiles = await db.select().from(brandingProfilesTable);
+  if (existingProfiles.length === 0) {
+    await db.insert(brandingProfilesTable).values([
+      {
+        ...READYLOQ_DEFAULT_PROFILE,
+        isDefault: true,
+        isActive: true,
+      },
+      {
+        name: "Suburban Pest Control",
+        isDefault: false,
+        isActive: false,
+        companyName: "Suburban Pest Control",
+        tagline: "Your Neighborhood Pest Experts",
+        companyAddress: "1420 Oak Ridge Ave, Springfield, IL 62704",
+        companyPhone: "(217) 555-0182",
+        companyEmail: "hello@suburbanpest.com",
+        companyWebsite: "https://suburbanpest.com",
+        licenseNumber: "IL-PCO-44821",
+        logoUrl: "suburban-logo.png",
+        appIconUrl: "suburban-logo.png",
+        primaryColor: "#16a34a",
+        secondaryColor: "#14532d",
+        accentColor: "#84cc16",
+        reportFooterText: "Suburban Pest Control — Confidential Inspection Report",
+        supportInfo: "hello@suburbanpest.com · (217) 555-0182",
+        signatureDisclaimer:
+          "This report certifies that a pest control inspection was conducted by Suburban Pest Control at the property on the stated date. All findings and recommendations represent conditions observed during this inspection.",
+        emailSenderName: "Suburban Pest Control",
+        emailReplyTo: "hello@suburbanpest.com",
+        emailFooter: "Suburban Pest Control · 1420 Oak Ridge Ave, Springfield, IL",
+        poweredByVisible: false,
+      },
+    ]);
+  }
 
   console.log("Seed complete!");
   process.exit(0);

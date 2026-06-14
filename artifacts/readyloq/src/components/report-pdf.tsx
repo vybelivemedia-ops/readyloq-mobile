@@ -6,10 +6,11 @@ import {
   Image,
   StyleSheet,
 } from "@react-pdf/renderer";
+import { brandLogoSrc } from "@/lib/branding";
 
 export type ReportMode = "customer" | "internal";
 
-const TEAL = "#0ea5e9";
+const DEFAULT_TEAL = "#0ea5e9";
 const DARK = "#0f172a";
 const NAVY = "#1e293b";
 const GRAY_700 = "#374151";
@@ -29,126 +30,140 @@ const SEV_COLOR: Record<string, string> = {
   low: "#64748b",
 };
 
-const S = StyleSheet.create({
-  page: {
-    fontFamily: "Helvetica",
-    backgroundColor: WHITE,
-    paddingTop: 44,
-    paddingBottom: 44,
-    paddingLeft: 44,
-    paddingRight: 44,
-    fontSize: 9,
-    color: DARK,
-    lineHeight: 1.5,
-  },
-  coverPage: {
-    fontFamily: "Helvetica",
-    backgroundColor: DARK,
-    padding: 0,
-    color: WHITE,
-  },
-  coverTopBar: { height: 10, backgroundColor: TEAL },
-  coverBody: { padding: 52, flex: 1 },
-  coverLogoBox: { marginBottom: 40 },
-  coverLogo: { width: 44, height: 44 },
-  coverCompany: { fontSize: 22, fontFamily: "Helvetica-Bold", color: WHITE, marginBottom: 4 },
-  coverTagline: { fontSize: 9, color: "#94a3b8" },
-  coverDivider: { height: 1, backgroundColor: TEAL, marginVertical: 28 },
-  coverReportTitle: { fontSize: 17, fontFamily: "Helvetica-Bold", color: WHITE, marginBottom: 6 },
-  coverReportSub: { fontSize: 9, color: "#94a3b8", marginBottom: 36 },
-  coverModeChip: {
-    alignSelf: "flex-start", paddingVertical: 3, paddingHorizontal: 10,
-    borderRadius: 12, marginBottom: 28,
-  },
-  coverModeText: { fontSize: 7, fontFamily: "Helvetica-Bold" },
-  coverMetaRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
-  coverMetaLabel: { width: 100, fontSize: 8, color: "#94a3b8", fontFamily: "Helvetica-Bold" },
-  coverMetaValue: { flex: 1, fontSize: 9, color: WHITE },
-  coverFooter: {
-    position: "absolute", bottom: 32, left: 52, right: 52,
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-  },
-  coverFooterText: { fontSize: 7, color: "#475569" },
+/** Resolve a possibly-relative asset path to an absolute URL for the PDF renderer. */
+function absolutePdfUrl(src: string): string {
+  if (/^https?:\/\//i.test(src) || src.startsWith("data:")) return src;
+  return `${window.location.origin}${src.startsWith("/") ? "" : "/"}${src}`;
+}
 
-  secHeader: { backgroundColor: TEAL, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 3, marginBottom: 18 },
-  secHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  secHeaderText: { fontSize: 11, fontFamily: "Helvetica-Bold", color: WHITE },
-  secHeaderSub: { fontSize: 7, color: "rgba(255,255,255,0.75)" },
+/**
+ * Build the PDF stylesheet at render time so the brand primary color (TEAL) is
+ * driven by the active branding profile rather than a hard-coded constant.
+ */
+function makeStyles(TEAL: string) {
+  return StyleSheet.create({
+    page: {
+      fontFamily: "Helvetica",
+      backgroundColor: WHITE,
+      paddingTop: 44,
+      paddingBottom: 44,
+      paddingLeft: 44,
+      paddingRight: 44,
+      fontSize: 9,
+      color: DARK,
+      lineHeight: 1.5,
+    },
+    coverPage: {
+      fontFamily: "Helvetica",
+      backgroundColor: DARK,
+      padding: 0,
+      color: WHITE,
+    },
+    coverTopBar: { height: 10, backgroundColor: TEAL },
+    coverBody: { padding: 52, flex: 1 },
+    coverLogoBox: { marginBottom: 40 },
+    coverLogo: { width: 44, height: 44 },
+    coverCompany: { fontSize: 22, fontFamily: "Helvetica-Bold", color: WHITE, marginBottom: 4 },
+    coverTagline: { fontSize: 9, color: "#94a3b8" },
+    coverDivider: { height: 1, backgroundColor: TEAL, marginVertical: 28 },
+    coverReportTitle: { fontSize: 17, fontFamily: "Helvetica-Bold", color: WHITE, marginBottom: 6 },
+    coverReportSub: { fontSize: 9, color: "#94a3b8", marginBottom: 36 },
+    coverModeChip: {
+      alignSelf: "flex-start", paddingVertical: 3, paddingHorizontal: 10,
+      borderRadius: 12, marginBottom: 28,
+    },
+    coverModeText: { fontSize: 7, fontFamily: "Helvetica-Bold" },
+    coverMetaRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
+    coverMetaLabel: { width: 100, fontSize: 8, color: "#94a3b8", fontFamily: "Helvetica-Bold" },
+    coverMetaValue: { flex: 1, fontSize: 9, color: WHITE },
+    coverFooter: {
+      position: "absolute", bottom: 32, left: 52, right: 52,
+      flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    },
+    coverFooterText: { fontSize: 7, color: "#475569" },
 
-  internalBadge: {
-    alignSelf: "flex-start", backgroundColor: AMBER_BG,
-    borderWidth: 1, borderColor: AMBER,
-    borderRadius: 3, paddingVertical: 3, paddingHorizontal: 8, marginBottom: 14,
-  },
-  internalBadgeText: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#92400e" },
+    secHeader: { backgroundColor: TEAL, paddingVertical: 9, paddingHorizontal: 12, borderRadius: 3, marginBottom: 18 },
+    secHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    secHeaderText: { fontSize: 11, fontFamily: "Helvetica-Bold", color: WHITE },
+    secHeaderSub: { fontSize: 7, color: "rgba(255,255,255,0.75)" },
 
-  riskBadge: { alignSelf: "flex-start", paddingVertical: 7, paddingHorizontal: 18, borderRadius: 4, marginBottom: 20 },
-  riskText: { fontSize: 15, fontFamily: "Helvetica-Bold", color: WHITE },
-  metricsRow: { flexDirection: "row", marginBottom: 24 },
-  metricCard: { flex: 1, borderRadius: 4, padding: 12, marginRight: 8, backgroundColor: GRAY_100 },
-  metricCardLast: { flex: 1, borderRadius: 4, padding: 12, backgroundColor: GRAY_100 },
-  metricValue: { fontSize: 20, fontFamily: "Helvetica-Bold", color: TEAL, marginBottom: 2 },
-  metricLabel: { fontSize: 7, color: GRAY_500 },
-  bodyText: { fontSize: 9, color: GRAY_700, lineHeight: 1.6 },
-  divider: { height: 1, backgroundColor: GRAY_200, marginVertical: 10 },
-  label: { fontSize: 7, fontFamily: "Helvetica-Bold", color: GRAY_500, marginBottom: 3 },
+    internalBadge: {
+      alignSelf: "flex-start", backgroundColor: AMBER_BG,
+      borderWidth: 1, borderColor: AMBER,
+      borderRadius: 3, paddingVertical: 3, paddingHorizontal: 8, marginBottom: 14,
+    },
+    internalBadgeText: { fontSize: 7, fontFamily: "Helvetica-Bold", color: "#92400e" },
 
-  findingCard: {
-    flexDirection: "row", marginBottom: 10, borderRadius: 4,
-    borderWidth: 1, borderColor: GRAY_200,
-  },
-  findingSevBar: { width: 4, borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
-  findingBody: { flex: 1, padding: 10 },
-  findingTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", marginBottom: 3 },
-  findingMeta: { flexDirection: "row", marginBottom: 4 },
-  findingMetaText: { fontSize: 7, color: GRAY_500, marginRight: 12 },
-  findingDesc: { fontSize: 8, color: GRAY_700, lineHeight: 1.5 },
-  findingConf: { fontSize: 7, color: TEAL, marginTop: 4 },
+    riskBadge: { alignSelf: "flex-start", paddingVertical: 7, paddingHorizontal: 18, borderRadius: 4, marginBottom: 20 },
+    riskText: { fontSize: 15, fontFamily: "Helvetica-Bold", color: WHITE },
+    metricsRow: { flexDirection: "row", marginBottom: 24 },
+    metricCard: { flex: 1, borderRadius: 4, padding: 12, marginRight: 8, backgroundColor: GRAY_100 },
+    metricCardLast: { flex: 1, borderRadius: 4, padding: 12, backgroundColor: GRAY_100 },
+    metricValue: { fontSize: 20, fontFamily: "Helvetica-Bold", color: TEAL, marginBottom: 2 },
+    metricLabel: { fontSize: 7, color: GRAY_500 },
+    bodyText: { fontSize: 9, color: GRAY_700, lineHeight: 1.6 },
+    divider: { height: 1, backgroundColor: GRAY_200, marginVertical: 10 },
+    label: { fontSize: 7, fontFamily: "Helvetica-Bold", color: GRAY_500, marginBottom: 3 },
 
-  photoGrid: { flexDirection: "row", flexWrap: "wrap" },
-  photoCell: { width: "48%", marginBottom: 12, marginRight: "2%" },
-  photoImg: { width: "100%", height: 148, borderRadius: 3 },
-  photoCaption: { fontSize: 7, color: GRAY_500, marginTop: 3 },
-  photoMeta: { fontSize: 6, color: "#9ca3af", marginTop: 1 },
+    findingCard: {
+      flexDirection: "row", marginBottom: 10, borderRadius: 4,
+      borderWidth: 1, borderColor: GRAY_200,
+    },
+    findingSevBar: { width: 4, borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
+    findingBody: { flex: 1, padding: 10 },
+    findingTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", marginBottom: 3 },
+    findingMeta: { flexDirection: "row", marginBottom: 4 },
+    findingMetaText: { fontSize: 7, color: GRAY_500, marginRight: 12 },
+    findingDesc: { fontSize: 8, color: GRAY_700, lineHeight: 1.5 },
+    findingConf: { fontSize: 7, color: TEAL, marginTop: 4 },
 
-  recItem: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
-  recBullet: {
-    width: 18, height: 18, borderRadius: 9,
-    backgroundColor: TEAL,
-    alignItems: "center", justifyContent: "center",
-    marginRight: 10, marginTop: 1, flexShrink: 0,
-  },
-  recBulletText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: WHITE },
-  recText: { flex: 1, fontSize: 9, color: GRAY_700, lineHeight: 1.5 },
+    photoGrid: { flexDirection: "row", flexWrap: "wrap" },
+    photoCell: { width: "48%", marginBottom: 12, marginRight: "2%" },
+    photoImg: { width: "100%", height: 148, borderRadius: 3 },
+    photoCaption: { fontSize: 7, color: GRAY_500, marginTop: 3 },
+    photoMeta: { fontSize: 6, color: "#9ca3af", marginTop: 1 },
 
-  obsBox: { backgroundColor: GRAY_100, borderRadius: 4, padding: 14, marginBottom: 12 },
-  obsBoxLabel: { fontSize: 7, fontFamily: "Helvetica-Bold", color: TEAL, marginBottom: 5 },
-  obsBoxText: { fontSize: 9, color: GRAY_700, lineHeight: 1.7 },
+    recItem: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
+    recBullet: {
+      width: 18, height: 18, borderRadius: 9,
+      backgroundColor: TEAL,
+      alignItems: "center", justifyContent: "center",
+      marginRight: 10, marginTop: 1, flexShrink: 0,
+    },
+    recBulletText: { fontSize: 8, fontFamily: "Helvetica-Bold", color: WHITE },
+    recText: { flex: 1, fontSize: 9, color: GRAY_700, lineHeight: 1.5 },
 
-  hotspotRow: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: GRAY_200 },
-  hotspotDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8, marginTop: 2, flexShrink: 0 },
-  hotspotZone: { fontSize: 8, fontFamily: "Helvetica-Bold", width: 110 },
-  hotspotSev: { width: 48, fontSize: 7, color: GRAY_500 },
-  hotspotDesc: { flex: 1, fontSize: 8, color: GRAY_700 },
+    obsBox: { backgroundColor: GRAY_100, borderRadius: 4, padding: 14, marginBottom: 12 },
+    obsBoxLabel: { fontSize: 7, fontFamily: "Helvetica-Bold", color: TEAL, marginBottom: 5 },
+    obsBoxText: { fontSize: 9, color: GRAY_700, lineHeight: 1.7 },
 
-  tableHeader: { flexDirection: "row", backgroundColor: TEAL, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 3, marginBottom: 2 },
-  tableHeaderText: { fontSize: 7, fontFamily: "Helvetica-Bold", color: WHITE },
-  tableRow: { flexDirection: "row", paddingVertical: 6, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: GRAY_200 },
-  tableCell: { fontSize: 8, color: GRAY_700 },
+    hotspotRow: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: GRAY_200 },
+    hotspotDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8, marginTop: 2, flexShrink: 0 },
+    hotspotZone: { fontSize: 8, fontFamily: "Helvetica-Bold", width: 110 },
+    hotspotSev: { width: 48, fontSize: 7, color: GRAY_500 },
+    hotspotDesc: { flex: 1, fontSize: 8, color: GRAY_700 },
 
-  sigBlock: { flex: 1, marginRight: 32 },
-  sigSpacer: { height: 48 },
-  sigLine: { borderBottomWidth: 1, borderBottomColor: GRAY_200, marginBottom: 6 },
-  sigName: { fontSize: 8, color: GRAY_700 },
-  sigRole: { fontSize: 7, color: GRAY_500, marginTop: 2 },
+    tableHeader: { flexDirection: "row", backgroundColor: TEAL, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 3, marginBottom: 2 },
+    tableHeaderText: { fontSize: 7, fontFamily: "Helvetica-Bold", color: WHITE },
+    tableRow: { flexDirection: "row", paddingVertical: 6, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: GRAY_200 },
+    tableCell: { fontSize: 8, color: GRAY_700 },
 
-  pageFooter: {
-    position: "absolute", bottom: 22, left: 44, right: 44,
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    borderTopWidth: 1, borderTopColor: GRAY_200, paddingTop: 6,
-  },
-  pageFooterText: { fontSize: 7, color: GRAY_500 },
-});
+    sigBlock: { flex: 1, marginRight: 32 },
+    sigSpacer: { height: 48 },
+    sigLine: { borderBottomWidth: 1, borderBottomColor: GRAY_200, marginBottom: 6 },
+    sigName: { fontSize: 8, color: GRAY_700 },
+    sigRole: { fontSize: 7, color: GRAY_500, marginTop: 2 },
+
+    pageFooter: {
+      position: "absolute", bottom: 22, left: 44, right: 44,
+      flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+      borderTopWidth: 1, borderTopColor: GRAY_200, paddingTop: 6,
+    },
+    pageFooterText: { fontSize: 7, color: GRAY_500 },
+  });
+}
+
+type Styles = ReturnType<typeof makeStyles>;
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
@@ -165,16 +180,16 @@ function sevColor(s: string | null | undefined) {
   return SEV_COLOR[(s ?? "low").toLowerCase()] ?? SEV_COLOR.low;
 }
 
-function PageFooter({ company, reportNum }: { company: string; reportNum: string }) {
+function PageFooter({ company, reportNum, footerText, S }: { company: string; reportNum: string; footerText: string; S: Styles }) {
   return (
     <View style={S.pageFooter} fixed>
-      <Text style={S.pageFooterText}>{company} — Confidential Inspection Report</Text>
+      <Text style={S.pageFooterText}>{company} — {footerText}</Text>
       <Text style={S.pageFooterText}>{reportNum}</Text>
     </View>
   );
 }
 
-function SectionHeader({ title, sub, internal }: { title: string; sub?: string; internal?: boolean }) {
+function SectionHeader({ title, sub, internal, S }: { title: string; sub?: string; internal?: boolean; S: Styles }) {
   return (
     <View style={S.secHeader}>
       <View style={S.secHeaderRow}>
@@ -186,15 +201,20 @@ function SectionHeader({ title, sub, internal }: { title: string; sub?: string; 
   );
 }
 
-function CoverPage({ report, branding, dateStr, reportNum, mode }: any) {
+function footerTextOf(branding: any): string {
+  return branding.reportFooterText || "Confidential Inspection Report";
+}
+
+function CoverPage({ report, branding, dateStr, reportNum, mode, S }: any) {
   const rc = riskColor(report.severity);
   const isInternal = mode === "internal";
+  const contact = [branding.companyEmail, branding.companyPhone].filter(Boolean).join("  ·  ");
   return (
     <Page size="LETTER" style={S.coverPage}>
       <View style={S.coverTopBar} />
       <View style={S.coverBody}>
         <View style={S.coverLogoBox}>
-          <Image src={branding.logoUrl || DEFAULT_LOGO} style={S.coverLogo} />
+          <Image src={absolutePdfUrl(brandLogoSrc(branding))} style={S.coverLogo} />
           <Text style={S.coverCompany}>{branding.companyName ?? "ReadyLoq"}</Text>
           {branding.tagline ? <Text style={S.coverTagline}>{branding.tagline}</Text> : null}
         </View>
@@ -240,16 +260,14 @@ function CoverPage({ report, branding, dateStr, reportNum, mode }: any) {
         </View>
       </View>
       <View style={S.coverFooter}>
-        <Text style={S.coverFooterText}>
-          {branding.supportEmail ?? ""}{branding.supportPhone ? "  ·  " + branding.supportPhone : ""}
-        </Text>
+        <Text style={S.coverFooterText}>{contact}</Text>
         <Text style={S.coverFooterText}>Generated {new Date().toLocaleDateString()}</Text>
       </View>
     </Page>
   );
 }
 
-function ExecutiveSummaryPage({ report, findings, recommendations, inspection, branding }: any) {
+function ExecutiveSummaryPage({ report, findings, recommendations, inspection, branding, S }: any) {
   const rc = riskColor(report.severity);
   const followUp = findings.some((f: any) => (f.severity ?? "") === "critical" || (f.severity ?? "") === "high");
   const areas = [...new Set((findings as any[]).map((f: any) => f.location).filter(Boolean))];
@@ -257,7 +275,7 @@ function ExecutiveSummaryPage({ report, findings, recommendations, inspection, b
   const reportNum = `RPT-${String(report.id).padStart(4, "0")}`;
   return (
     <Page size="LETTER" style={S.page}>
-      <SectionHeader title="Executive Summary" sub={report.siteAddress} />
+      <SectionHeader title="Executive Summary" sub={report.siteAddress} S={S} />
 
       <View style={[S.riskBadge, { backgroundColor: rc }]}>
         <Text style={S.riskText}>
@@ -310,17 +328,17 @@ function ExecutiveSummaryPage({ report, findings, recommendations, inspection, b
         </View>
       ) : null}
 
-      <PageFooter company={company} reportNum={reportNum} />
+      <PageFooter company={company} reportNum={reportNum} footerText={footerTextOf(branding)} S={S} />
     </Page>
   );
 }
 
-function FindingsPage({ findings, branding }: any) {
+function FindingsPage({ findings, branding, TEAL, S }: any) {
   const company = branding.companyName ?? "ReadyLoq";
   const reportNum = "Findings";
   return (
     <Page size="LETTER" style={S.page}>
-      <SectionHeader title={`Findings  (${findings.length})`} sub="Individual observations from inspection" />
+      <SectionHeader title={`Findings  (${findings.length})`} sub="Individual observations from inspection" S={S} />
       {(findings as any[]).map((f: any, i: number) => (
         <View key={i} style={S.findingCard} wrap={false}>
           <View style={[S.findingSevBar, { backgroundColor: sevColor(f.severity) }]} />
@@ -333,21 +351,21 @@ function FindingsPage({ findings, branding }: any) {
             </View>
             <Text style={S.findingDesc}>{f.description}</Text>
             {f.treatment ? (
-              <Text style={[S.findingDesc, { marginTop: 4, color: "#0ea5e9" }]}>Treatment: {f.treatment}</Text>
+              <Text style={[S.findingDesc, { marginTop: 4, color: TEAL }]}>Treatment: {f.treatment}</Text>
             ) : null}
           </View>
         </View>
       ))}
-      <PageFooter company={company} reportNum={reportNum} />
+      <PageFooter company={company} reportNum={reportNum} footerText={footerTextOf(branding)} S={S} />
     </Page>
   );
 }
 
-function PhotoEvidencePage({ photos, branding }: any) {
+function PhotoEvidencePage({ photos, branding, S }: any) {
   const company = branding.companyName ?? "ReadyLoq";
   return (
     <Page size="LETTER" style={S.page}>
-      <SectionHeader title="Photo Evidence" sub="Visual documentation captured during inspection" />
+      <SectionHeader title="Photo Evidence" sub="Visual documentation captured during inspection" S={S} />
       <View style={S.photoGrid}>
         {(photos as any[]).map((p: any, i: number) => (
           <View key={i} style={S.photoCell} wrap={false}>
@@ -357,16 +375,16 @@ function PhotoEvidencePage({ photos, branding }: any) {
           </View>
         ))}
       </View>
-      <PageFooter company={company} reportNum="Evidence" />
+      <PageFooter company={company} reportNum="Evidence" footerText={footerTextOf(branding)} S={S} />
     </Page>
   );
 }
 
-function RecommendationsPage({ recommendations, exclusionOpps, branding }: any) {
+function RecommendationsPage({ recommendations, exclusionOpps, branding, S }: any) {
   const company = branding.companyName ?? "ReadyLoq";
   return (
     <Page size="LETTER" style={S.page}>
-      <SectionHeader title="Recommendations" sub="Corrective actions and preventive measures" />
+      <SectionHeader title="Recommendations" sub="Corrective actions and preventive measures" S={S} />
       {(recommendations as string[]).map((rec: string, i: number) => (
         <View key={i} style={S.recItem} wrap={false}>
           <View style={S.recBullet}>
@@ -375,12 +393,12 @@ function RecommendationsPage({ recommendations, exclusionOpps, branding }: any) 
           <Text style={S.recText}>{rec}</Text>
         </View>
       ))}
-      <PageFooter company={company} reportNum="Recommendations" />
+      <PageFooter company={company} reportNum="Recommendations" footerText={footerTextOf(branding)} S={S} />
     </Page>
   );
 }
 
-function TechnicianObservationsPage({ report, inspection, branding }: any) {
+function TechnicianObservationsPage({ report, inspection, branding, S }: any) {
   const notes = inspection?.notes;
   const treatment = report.treatmentNotes;
   const voiceNotes = ((inspection?.media ?? []) as any[]).filter((m: any) => m.mediaType === "voice");
@@ -388,7 +406,7 @@ function TechnicianObservationsPage({ report, inspection, branding }: any) {
   const hasAny = notes || treatment || voiceNotes.length > 0;
   return (
     <Page size="LETTER" style={S.page}>
-      <SectionHeader title="Technician Observations" sub="Notes, field observations, and voice recordings" />
+      <SectionHeader title="Technician Observations" sub="Notes, field observations, and voice recordings" S={S} />
       {treatment ? (
         <View style={S.obsBox}>
           <Text style={S.obsBoxLabel}>TREATMENT NOTES</Text>
@@ -418,12 +436,12 @@ function TechnicianObservationsPage({ report, inspection, branding }: any) {
       {!hasAny ? (
         <Text style={[S.bodyText, { color: GRAY_500 }]}>No technician observations recorded for this inspection.</Text>
       ) : null}
-      <PageFooter company={company} reportNum="Observations" />
+      <PageFooter company={company} reportNum="Observations" footerText={footerTextOf(branding)} S={S} />
     </Page>
   );
 }
 
-function PropertyIntelPage({ propertyFeed, branding }: any) {
+function PropertyIntelPage({ propertyFeed, branding, S }: any) {
   const hotspots = (propertyFeed?.hotspots ?? []) as any[];
   const recurring = (propertyFeed?.recurringIssues ?? []) as any[];
   const knowledge = propertyFeed?.technicianKnowledge;
@@ -431,7 +449,7 @@ function PropertyIntelPage({ propertyFeed, branding }: any) {
   const company = branding.companyName ?? "ReadyLoq";
   return (
     <Page size="LETTER" style={S.page}>
-      <SectionHeader title="Property Intelligence" internal />
+      <SectionHeader title="Property Intelligence" internal S={S} />
       <View style={S.internalBadge}>
         <Text style={S.internalBadgeText}>INTERNAL USE ONLY — DO NOT SHARE WITH CUSTOMER</Text>
       </View>
@@ -491,18 +509,18 @@ function PropertyIntelPage({ propertyFeed, branding }: any) {
         </View>
       ) : null}
 
-      <PageFooter company={company} reportNum="Property Intel" />
+      <PageFooter company={company} reportNum="Property Intel" footerText={footerTextOf(branding)} S={S} />
     </Page>
   );
 }
 
-function ServiceHistoryPage({ propertyFeed, branding }: any) {
+function ServiceHistoryPage({ propertyFeed, branding, S }: any) {
   const visits = (propertyFeed?.visitHistory ?? []) as any[];
   const photos = (propertyFeed?.historicalPhotos ?? []) as any[];
   const company = branding.companyName ?? "ReadyLoq";
   return (
     <Page size="LETTER" style={S.page}>
-      <SectionHeader title="Service History" internal />
+      <SectionHeader title="Service History" internal S={S} />
       <View style={S.internalBadge}>
         <Text style={S.internalBadgeText}>INTERNAL USE ONLY</Text>
       </View>
@@ -548,12 +566,12 @@ function ServiceHistoryPage({ propertyFeed, branding }: any) {
         <Text style={[S.bodyText, { color: GRAY_500 }]}>No service history available for this property.</Text>
       ) : null}
 
-      <PageFooter company={company} reportNum="Service History" />
+      <PageFooter company={company} reportNum="Service History" footerText={footerTextOf(branding)} S={S} />
     </Page>
   );
 }
 
-function ManagementInsightsPage({ findings, propertyFeed, branding }: any) {
+function ManagementInsightsPage({ findings, propertyFeed, branding, S }: any) {
   const recurring = (propertyFeed?.recurringIssues ?? []) as any[];
   const visits = (propertyFeed?.visitHistory ?? []) as any[];
   const company = branding.companyName ?? "ReadyLoq";
@@ -564,7 +582,7 @@ function ManagementInsightsPage({ findings, propertyFeed, branding }: any) {
 
   return (
     <Page size="LETTER" style={S.page}>
-      <SectionHeader title="Management Insights" internal />
+      <SectionHeader title="Management Insights" internal S={S} />
       <View style={S.internalBadge}>
         <Text style={S.internalBadgeText}>INTERNAL USE ONLY</Text>
       </View>
@@ -636,17 +654,17 @@ function ManagementInsightsPage({ findings, propertyFeed, branding }: any) {
         <Text style={[S.bodyText, { color: GRAY_500 }]}>No significant risk indicators identified for this property.</Text>
       ) : null}
 
-      <PageFooter company={company} reportNum="Insights" />
+      <PageFooter company={company} reportNum="Insights" footerText={footerTextOf(branding)} S={S} />
     </Page>
   );
 }
 
-function SignaturePage({ report, branding, dateStr }: any) {
+function SignaturePage({ report, branding, dateStr, TEAL, S }: any) {
   const company = branding.companyName ?? "ReadyLoq";
   const reportNum = `RPT-${String(report.id).padStart(4, "0")}`;
   return (
     <Page size="LETTER" style={S.page}>
-      <SectionHeader title="Sign-Off" sub="Certification of inspection completion" />
+      <SectionHeader title="Sign-Off" sub="Certification of inspection completion" S={S} />
 
       <Text style={[S.bodyText, { marginBottom: 24 }]}>
         This report certifies that a pest control inspection was conducted at{" "}
@@ -672,12 +690,19 @@ function SignaturePage({ report, branding, dateStr }: any) {
         </View>
       </View>
 
+      {branding.signatureDisclaimer ? (
+        <Text style={[S.bodyText, { fontSize: 7, color: GRAY_500, marginBottom: 16 }]}>
+          {branding.signatureDisclaimer}
+        </Text>
+      ) : null}
+
       <View style={S.divider} />
       <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 12 }}>
         <View>
           <Text style={[S.label, { marginBottom: 2 }]}>{company.toUpperCase()}</Text>
-          {branding.supportEmail ? <Text style={S.bodyText}>{branding.supportEmail}</Text> : null}
-          {branding.supportPhone ? <Text style={S.bodyText}>{branding.supportPhone}</Text> : null}
+          {branding.companyEmail ? <Text style={S.bodyText}>{branding.companyEmail}</Text> : null}
+          {branding.companyPhone ? <Text style={S.bodyText}>{branding.companyPhone}</Text> : null}
+          {branding.supportInfo ? <Text style={[S.bodyText, { color: GRAY_500 }]}>{branding.supportInfo}</Text> : null}
           {branding.tagline ? <Text style={[S.bodyText, { color: TEAL, fontFamily: "Helvetica-Oblique", marginTop: 4 }]}>{branding.tagline}</Text> : null}
         </View>
         <View style={{ alignItems: "flex-end" }}>
@@ -687,7 +712,7 @@ function SignaturePage({ report, branding, dateStr }: any) {
           ) : null}
         </View>
       </View>
-      <PageFooter company={company} reportNum={reportNum} />
+      <PageFooter company={company} reportNum={reportNum} footerText={footerTextOf(branding)} S={S} />
     </Page>
   );
 }
@@ -708,15 +733,17 @@ export function ReportPDF({ report, inspection, branding, propertyFeed, mode }: 
   const dateStr = fmtDate(report.inspectionDate);
   const reportNum = `RPT-${String(report.id).padStart(4, "0")}`;
   const company = branding.companyName ?? "ReadyLoq";
+  const TEAL = branding.primaryColor || DEFAULT_TEAL;
+  const S = makeStyles(TEAL);
 
   return (
     <Document
       title={report.title}
       author={company}
       subject="Pest Control Inspection Report"
-      creator="ReadyLoq"
+      creator={company}
     >
-      <CoverPage report={report} branding={branding} dateStr={dateStr} reportNum={reportNum} mode={mode} />
+      <CoverPage report={report} branding={branding} dateStr={dateStr} reportNum={reportNum} mode={mode} S={S} />
 
       <ExecutiveSummaryPage
         report={report}
@@ -724,14 +751,15 @@ export function ReportPDF({ report, inspection, branding, propertyFeed, mode }: 
         recommendations={recommendations}
         inspection={inspection}
         branding={branding}
+        S={S}
       />
 
       {findings.length > 0 && (
-        <FindingsPage findings={findings} branding={branding} />
+        <FindingsPage findings={findings} branding={branding} TEAL={TEAL} S={S} />
       )}
 
       {photos.length > 0 && (
-        <PhotoEvidencePage photos={photos} branding={branding} />
+        <PhotoEvidencePage photos={photos} branding={branding} S={S} />
       )}
 
       {recommendations.length > 0 && (
@@ -739,20 +767,21 @@ export function ReportPDF({ report, inspection, branding, propertyFeed, mode }: 
           recommendations={recommendations}
           exclusionOpps={exclusionOpps}
           branding={branding}
+          S={S}
         />
       )}
 
-      <TechnicianObservationsPage report={report} inspection={inspection} branding={branding} />
+      <TechnicianObservationsPage report={report} inspection={inspection} branding={branding} S={S} />
 
       {mode === "internal" && (
         <>
-          <PropertyIntelPage propertyFeed={propertyFeed} branding={branding} />
-          <ServiceHistoryPage propertyFeed={propertyFeed} branding={branding} />
-          <ManagementInsightsPage findings={findings} propertyFeed={propertyFeed} branding={branding} />
+          <PropertyIntelPage propertyFeed={propertyFeed} branding={branding} S={S} />
+          <ServiceHistoryPage propertyFeed={propertyFeed} branding={branding} S={S} />
+          <ManagementInsightsPage findings={findings} propertyFeed={propertyFeed} branding={branding} S={S} />
         </>
       )}
 
-      <SignaturePage report={report} branding={branding} dateStr={dateStr} />
+      <SignaturePage report={report} branding={branding} dateStr={dateStr} TEAL={TEAL} S={S} />
     </Document>
   );
 }

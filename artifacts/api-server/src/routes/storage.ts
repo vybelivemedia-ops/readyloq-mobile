@@ -3,6 +3,7 @@ import { Readable } from "stream";
 import { z } from "zod/v4";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import { requireAuth } from "../middleware/require-auth";
 
 const RequestUploadUrlBody = z.object({
   name: z.string(),
@@ -24,8 +25,11 @@ const objectStorageService = new ObjectStorageService();
  * Request a presigned URL for file upload.
  * The client sends JSON metadata (name, size, contentType) — NOT the file.
  * Then uploads the file directly to the returned presigned URL.
+ *
+ * Requires authentication — only signed-in users (technicians uploading
+ * inspection photos, managers uploading branding assets) may mint upload URLs.
  */
-router.post("/storage/uploads/request-url", async (req: Request, res: Response) => {
+router.post("/storage/uploads/request-url", requireAuth, async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });

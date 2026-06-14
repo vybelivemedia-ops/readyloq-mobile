@@ -755,47 +755,305 @@ export const GetPropertyRiskInsightsResponse = zod.object({
 
 
 /**
- * @summary Get white-label branding settings
+ * @summary Get the active white-label branding profile (public)
  */
 export const GetBrandingResponse = zod.object({
   "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "isActive": zod.boolean(),
   "companyName": zod.string(),
-  "logoUrl": zod.string().nullish(),
-  "primaryColor": zod.string().nullish(),
-  "accentColor": zod.string().nullish(),
   "tagline": zod.string().nullish(),
-  "supportEmail": zod.string().nullish(),
-  "supportPhone": zod.string().nullish(),
-  "poweredByVisible": zod.boolean().optional(),
-  "updatedAt": zod.string().optional()
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
+  "poweredByVisible": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
 })
 
 
 /**
- * @summary Update white-label branding settings
+ * @summary Get the active white-label branding profile (public)
  */
-export const UpdateBrandingBody = zod.object({
+export const GetActiveBrandingResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "isActive": zod.boolean(),
+  "companyName": zod.string(),
+  "tagline": zod.string().nullish(),
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
+  "poweredByVisible": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary List all branding profiles (manager only)
+ */
+export const ListBrandingProfilesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "isActive": zod.boolean(),
+  "companyName": zod.string(),
+  "tagline": zod.string().nullish(),
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
+  "poweredByVisible": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListBrandingProfilesResponse = zod.array(ListBrandingProfilesResponseItem)
+
+
+/**
+ * @summary Create a branding profile (manager only)
+ */
+export const CreateBrandingProfileBody = zod.object({
+  "name": zod.string().optional(),
   "companyName": zod.string().optional(),
-  "logoUrl": zod.string().optional(),
-  "primaryColor": zod.string().optional(),
-  "accentColor": zod.string().optional(),
-  "tagline": zod.string().optional(),
-  "supportEmail": zod.string().optional(),
-  "supportPhone": zod.string().optional(),
+  "tagline": zod.string().nullish(),
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
   "poweredByVisible": zod.boolean().optional()
 })
 
-export const UpdateBrandingResponse = zod.object({
+
+/**
+ * @summary Get a branding profile (manager only)
+ */
+export const GetBrandingProfileParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBrandingProfileResponse = zod.object({
   "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "isActive": zod.boolean(),
   "companyName": zod.string(),
-  "logoUrl": zod.string().nullish(),
-  "primaryColor": zod.string().nullish(),
-  "accentColor": zod.string().nullish(),
   "tagline": zod.string().nullish(),
-  "supportEmail": zod.string().nullish(),
-  "supportPhone": zod.string().nullish(),
-  "poweredByVisible": zod.boolean().optional(),
-  "updatedAt": zod.string().optional()
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
+  "poweredByVisible": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Update a branding profile (manager only)
+ */
+export const UpdateBrandingProfileParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateBrandingProfileBody = zod.object({
+  "name": zod.string().optional(),
+  "companyName": zod.string().optional(),
+  "tagline": zod.string().nullish(),
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
+  "poweredByVisible": zod.boolean().optional()
+})
+
+export const UpdateBrandingProfileResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "isActive": zod.boolean(),
+  "companyName": zod.string(),
+  "tagline": zod.string().nullish(),
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
+  "poweredByVisible": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a branding profile (manager only)
+ */
+export const DeleteBrandingProfileParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Duplicate a branding profile (manager only)
+ */
+export const DuplicateBrandingProfileParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Set a branding profile as active (manager only)
+ */
+export const ActivateBrandingProfileParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ActivateBrandingProfileResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "isActive": zod.boolean(),
+  "companyName": zod.string(),
+  "tagline": zod.string().nullish(),
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
+  "poweredByVisible": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Reset the default profile to ReadyLoq defaults and activate it (manager only)
+ */
+export const RestoreBrandingDefaultsResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "isActive": zod.boolean(),
+  "companyName": zod.string(),
+  "tagline": zod.string().nullish(),
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
+  "poweredByVisible": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
 })
 
 

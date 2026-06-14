@@ -8,6 +8,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout";
+import { BrandingProvider, useBranding } from "@/components/branding-provider";
+import { brandLogoSrc, absoluteUrl } from "@/lib/branding";
+import type { BrandingProfile } from "@workspace/api-client-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import Dashboard from "@/pages/dashboard";
 import InspectionsList from "@/pages/inspections/index";
@@ -52,54 +55,55 @@ if (!clerkPubKey) {
   throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
 }
 
-const clerkAppearance = {
-  theme: dark,
-  cssLayerName: "clerk",
-  options: {
-    logoPlacement: "inside" as const,
-    logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/logo.png`,
-  },
-  variables: {
-    colorPrimary: "#0ea5e9",
-    colorBackground: "#1e293b",
-    colorForeground: "#f8fafc",
-    colorMutedForeground: "#94a3b8",
-    colorDanger: "#ef4444",
-    colorNeutral: "#334155",
-    colorInput: "#0f172a",
-    colorInputForeground: "#f8fafc",
-    fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-    borderRadius: "0.75rem",
-  },
-  elements: {
-    rootBox: "w-full flex justify-center",
-    cardBox: "bg-slate-800 rounded-2xl w-[440px] max-w-full overflow-hidden shadow-2xl border border-slate-700/50",
-    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-white font-bold",
-    headerSubtitle: "text-slate-400",
-    socialButtonsBlockButtonText: "text-slate-200",
-    formFieldLabel: "text-slate-300",
-    footerActionLink: "text-sky-400",
-    footerActionText: "text-slate-400",
-    dividerText: "text-slate-500",
-    identityPreviewEditButton: "text-sky-400",
-    formFieldSuccessText: "text-emerald-400",
-    alertText: "text-slate-200",
-    logoBox: "flex justify-center pb-1",
-    logoImage: "h-14 w-14",
-    socialButtonsBlockButton: "border-slate-600 bg-slate-700 hover:bg-slate-600",
-    formButtonPrimary: "bg-sky-500 hover:bg-sky-400 text-white font-semibold",
-    formFieldInput: "bg-slate-900 border-slate-600 text-white placeholder:text-slate-500",
-    footerAction: "border-slate-700/50",
-    dividerLine: "bg-slate-700",
-    alert: "border-slate-700/50",
-    otpCodeFieldInput: "bg-slate-900 border-slate-600 text-white",
-    formFieldRow: "",
-    main: "",
-  },
-};
+function buildClerkAppearance(branding: BrandingProfile) {
+  const primary = branding.primaryColor || "#0ea5e9";
+  return {
+    theme: dark,
+    cssLayerName: "clerk",
+    options: {
+      logoPlacement: "inside" as const,
+      logoLinkUrl: basePath || "/",
+      logoImageUrl: absoluteUrl(brandLogoSrc(branding)),
+    },
+    variables: {
+      colorPrimary: primary,
+      colorBackground: "#1e293b",
+      colorForeground: "#f8fafc",
+      colorMutedForeground: "#94a3b8",
+      colorDanger: "#ef4444",
+      colorNeutral: "#334155",
+      colorInput: "#0f172a",
+      colorInputForeground: "#f8fafc",
+      fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      borderRadius: "0.75rem",
+    },
+    elements: {
+      rootBox: "w-full flex justify-center",
+      cardBox: "bg-slate-800 rounded-2xl w-[440px] max-w-full overflow-hidden shadow-2xl border border-slate-700/50",
+      card: "!shadow-none !border-0 !bg-transparent !rounded-none",
+      footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
+      headerTitle: "text-white font-bold",
+      headerSubtitle: "text-slate-400",
+      socialButtonsBlockButtonText: "text-slate-200",
+      formFieldLabel: "text-slate-300",
+      footerActionText: "text-slate-400",
+      dividerText: "text-slate-500",
+      formFieldSuccessText: "text-emerald-400",
+      alertText: "text-slate-200",
+      logoBox: "flex justify-center pb-1",
+      logoImage: "h-14 w-14",
+      socialButtonsBlockButton: "border-slate-600 bg-slate-700 hover:bg-slate-600",
+      formButtonPrimary: "font-semibold",
+      formFieldInput: "bg-slate-900 border-slate-600 text-white placeholder:text-slate-500",
+      footerAction: "border-slate-700/50",
+      dividerLine: "bg-slate-700",
+      alert: "border-slate-700/50",
+      otpCodeFieldInput: "bg-slate-900 border-slate-600 text-white",
+      formFieldRow: "",
+      main: "",
+    },
+  };
+}
 
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
@@ -121,19 +125,20 @@ function ClerkQueryClientCacheInvalidator() {
 }
 
 function WelcomePage() {
+  const branding = useBranding();
   return (
     <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-background gap-8 px-6">
       <div className="text-center space-y-4">
         <img
-          src={`${basePath}/logo.png`}
-          alt="ReadyLoq"
-          className="w-20 h-20 rounded-2xl mx-auto"
+          src={brandLogoSrc(branding)}
+          alt={branding.companyName}
+          className="w-20 h-20 rounded-2xl mx-auto object-contain"
         />
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Ready<span className="text-primary">Loq</span>
-          </h1>
-          <p className="text-muted-foreground mt-1.5">AI-Powered Inspection Intelligence</p>
+          <h1 className="text-3xl font-bold tracking-tight">{branding.companyName}</h1>
+          {branding.tagline ? (
+            <p className="text-muted-foreground mt-1.5">{branding.tagline}</p>
+          ) : null}
         </div>
         <p className="text-sm text-muted-foreground max-w-xs">
           The field copilot for pest control professionals — smarter captures, better reports.
@@ -232,24 +237,25 @@ function AppRoutes() {
 
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
+  const branding = useBranding();
 
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
       proxyUrl={clerkProxyUrl}
-      appearance={clerkAppearance}
+      appearance={buildClerkAppearance(branding)}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
       localization={{
         signIn: {
           start: {
             title: "Welcome back",
-            subtitle: "Sign in to ReadyLoq",
+            subtitle: `Sign in to ${branding.companyName}`,
           },
         },
         signUp: {
           start: {
-            title: "Join ReadyLoq",
+            title: `Join ${branding.companyName}`,
             subtitle: "Create your inspection account",
           },
         },
@@ -257,13 +263,11 @@ function ClerkProviderWithRoutes() {
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
-      <QueryClientProvider client={queryClient}>
-        <ClerkQueryClientCacheInvalidator />
-        <TooltipProvider>
-          <AppRoutes />
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <ClerkQueryClientCacheInvalidator />
+      <TooltipProvider>
+        <AppRoutes />
+        <Toaster />
+      </TooltipProvider>
     </ClerkProvider>
   );
 }
@@ -271,7 +275,11 @@ function ClerkProviderWithRoutes() {
 export default function App() {
   return (
     <WouterRouter base={basePath}>
-      <ClerkProviderWithRoutes />
+      <QueryClientProvider client={queryClient}>
+        <BrandingProvider>
+          <ClerkProviderWithRoutes />
+        </BrandingProvider>
+      </QueryClientProvider>
     </WouterRouter>
   );
 }
