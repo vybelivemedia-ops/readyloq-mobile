@@ -15,7 +15,7 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Clerk provisioned via `setupClerkWhitelabelAuth()` — keys: CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, VITE_CLERK_PUBLISHABLE_KEY
 - Web auth is **cookie-based** — DO NOT add setAuthTokenGetter, Bearer tokens, or Authorization headers to browser API calls. Cookies are automatic for same-origin fetches.
 - `@clerk/express` clerkMiddleware in app.ts parses session cookies. Must come AFTER the Clerk proxy route and BEFORE body parsers.
-- CORS changed from `cors()` wildcard to `cors({ credentials: true, origin: true })` (required for cookie auth).
+- CORS is credentialed (`credentials: true`, required for cookie auth) but NOT `origin: true`. Origin is an explicit allowlist: `CORS_ALLOWED_ORIGINS` (comma-separated prod origins) plus Replit dev/preview origins that are allowed ONLY when `NODE_ENV !== "production"`. **Do NOT revert to `origin: true`** — with credentialed auth that lets any site make authenticated cross-origin reads. See app.ts.
 - Clerk proxy middleware at `/api/__clerk` (production only; no-op in dev).
 - `publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)` — use this pattern, never inline the env var.
 - ClerkProvider must be INSIDE WouterRouter (needs useLocation) but wraps QueryClientProvider. See App.tsx.
@@ -131,6 +131,12 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - **Runtime theming is centralized in `components/branding-provider.tsx` — it is the SINGLE place that calls `applyBrandingToDocument` (CSS vars/title/favicon), applying `effective = preview ?? active`. NEVER call applyBrandingToDocument from anywhere else — it races with the provider's active-profile refetch and gets clobbered.** Live preview goes through the `useBrandingPreview()` setter; `useBranding()` returns the effective profile so React-rendered logo/name live-update too.
 - White Label Manager UI lives in `components/white-label/*` (white-label-manager, profile-editor, brand-preview, image-cropper, profile-draft). Gated in settings.tsx behind `useCurrentUser().role === "manager"` (UX only; the server enforces requireRole). PDF branding flows through `useReportPdfData` → active profile, separate from live preview.
 - **Why public GET /active:** the unauthenticated login/landing/loading screens must show the active brand, so the active-profile read cannot require auth. Phase 1 is branding only — NO multi-company data tenancy.
+
+## ReadyLoq Marketing Site (artifacts/readyloq-marketing)
+- SEPARATE public marketing artifact from the app (artifacts/readyloq). Positioned as a **Property Intelligence & Operational Knowledge platform — NOT an AI pest-ID app.** Dev base path is `/site/`; in prod it deploys to ReadyLoq.com root while the app + API live at app.readyloq.com.
+- **Two-domain split is env-driven, not hardcoded:** marketing `src/config.ts` exposes `APP_URL` (from `VITE_APP_URL`) and `apiUrl()` (from `VITE_API_URL`); both empty in dev = same proxy origin. Cross-app links/API base must go through these, never hardcoded domains.
+- **Public assets (in /public) must resolve through `asset()` in config.ts (= `import.meta.env.BASE_URL` + file).** A bare root-relative `/foo.png` (img src, CSS `url()`, Tailwind `bg-[url()]`) escapes the `/site/` base and 404s. **Why:** design subagents default to root-relative paths; this silently breaks every image until prefixed.
+- **Leads are platform-level: `leads` table has NO company_id** (prospects aren't tenants yet; type = demo|contact). `POST /api/leads` is mounted PUBLIC in routes/index.ts (before the requireAuth block) with its OWN tighter rate limiter (15/15min) and validates against generated `CreateLeadBody`. This is the one intentional public write path — it only writes `leadsTable`.
 
 ## PDF Report Generation (@react-pdf/renderer)
 - `@react-pdf/renderer` installed in `@workspace/readyloq` (runtime dep). Vite requires `define: { global: 'globalThis' }` in vite.config.ts — do not remove this.

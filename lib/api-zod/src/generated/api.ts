@@ -1311,3 +1311,37 @@ export const AddPropertyNoteBody = zod.object({
 })
 
 
+/**
+ * @summary Capture a marketing-site lead (demo request or contact inquiry)
+ */
+export const createLeadBodyNameMax = 200;
+
+export const createLeadBodyEmailMax = 320;
+
+export const createLeadBodyPhoneMax = 50;
+
+export const createLeadBodyCompanyNameMax = 200;
+
+export const createLeadBodyRoleMax = 100;
+
+export const createLeadBodyTeamSizeMax = 50;
+
+export const createLeadBodyMessageMax = 5000;
+
+export const createLeadBodySourceMax = 200;
+
+
+
+export const CreateLeadBody = zod.object({
+  "type": zod.enum(['demo', 'contact']),
+  "name": zod.string().min(1).max(createLeadBodyNameMax),
+  "email": zod.string().email().max(createLeadBodyEmailMax),
+  "phone": zod.string().max(createLeadBodyPhoneMax).optional(),
+  "companyName": zod.string().max(createLeadBodyCompanyNameMax).optional(),
+  "role": zod.string().max(createLeadBodyRoleMax).optional(),
+  "teamSize": zod.string().max(createLeadBodyTeamSizeMax).optional(),
+  "message": zod.string().max(createLeadBodyMessageMax).optional(),
+  "source": zod.string().max(createLeadBodySourceMax).optional()
+})
+
+

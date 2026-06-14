@@ -16,12 +16,15 @@ import intelligenceRouter from "./intelligence";
 import brandingRouter from "./branding";
 import propertiesRouter from "./properties";
 import storageRouter from "./storage";
+import leadsRouter from "./leads";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use(storageRouter);
+// PUBLIC: marketing-site lead capture (no auth — prospects aren't users yet).
+router.use("/leads", leadsRouter);
 
 router.use("/inspections", requireAuth, requireCompany, inspectionsRouter);
 router.use("/analysis", requireAuth, requireCompany, analysisRouter);

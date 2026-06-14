@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/site/"
+title = "ReadyLoq.com"
+version = "1.0.0"
+id = "artifacts/readyloq-marketing"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/site/" ]
+localPort = 25413
+
+[services.development]
+run = "pnpm --filter @workspace/readyloq-marketing run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/readyloq-marketing", "run", "build" ]
+publicDir = "artifacts/readyloq-marketing/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25413"
+BASE_PATH = "/site/"

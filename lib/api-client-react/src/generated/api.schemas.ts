@@ -9,6 +9,70 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface Error {
+  error: string;
+}
+
+export type LeadType = typeof LeadType[keyof typeof LeadType];
+
+
+export const LeadType = {
+  demo: 'demo',
+  contact: 'contact',
+} as const;
+
+export interface Lead {
+  id: number;
+  type: LeadType;
+  name: string;
+  email: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  companyName?: string | null;
+  /** @nullable */
+  role?: string | null;
+  /** @nullable */
+  teamSize?: string | null;
+  /** @nullable */
+  message?: string | null;
+  status: string;
+  /** @nullable */
+  source?: string | null;
+  createdAt: string;
+}
+
+export type LeadInputType = typeof LeadInputType[keyof typeof LeadInputType];
+
+
+export const LeadInputType = {
+  demo: 'demo',
+  contact: 'contact',
+} as const;
+
+export interface LeadInput {
+  type: LeadInputType;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name: string;
+  /** @maxLength 320 */
+  email: string;
+  /** @maxLength 50 */
+  phone?: string;
+  /** @maxLength 200 */
+  companyName?: string;
+  /** @maxLength 100 */
+  role?: string;
+  /** @maxLength 50 */
+  teamSize?: string;
+  /** @maxLength 5000 */
+  message?: string;
+  /** @maxLength 200 */
+  source?: string;
+}
+
 export interface InspectionMedia {
   id: number;
   inspectionId: number;

@@ -8,3 +8,4 @@ export * from "./branding";
 export * from "./users";
 export * from "./properties";
 export * from "./companies";
+export * from "./leads";

@@ -25,6 +25,8 @@ tags:
     description: White-label branding
   - name: properties
     description: Property intelligence feed
+  - name: leads
+    description: Marketing site lead capture
 
 paths:
   /healthz:
@@ -815,6 +817,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/PropertyNote"
 
+  /leads:
+    post:
+      operationId: createLead
+      tags: [leads]
+      summary: Capture a marketing-site lead (demo request or contact inquiry)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   schemas:
     HealthStatus:
@@ -823,6 +850,44 @@ components:
         status:
           type: string
       required: [status]
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    # ── LEAD SCHEMAS ────────────────────────────────────────────────────────────
+    Lead:
+      type: object
+      required: [id, type, name, email, status, createdAt]
+      properties:
+        id:          { type: integer }
+        type:        { type: string, enum: [demo, contact] }
+        name:        { type: string }
+        email:       { type: string }
+        phone:       { type: ["string", "null"] }
+        companyName: { type: ["string", "null"] }
+        role:        { type: ["string", "null"] }
+        teamSize:    { type: ["string", "null"] }
+        message:     { type: ["string", "null"] }
+        status:      { type: string }
+        source:      { type: ["string", "null"] }
+        createdAt:   { type: string }
+
+    LeadInput:
+      type: object
+      required: [type, name, email]
+      properties:
+        type:        { type: string, enum: [demo, contact] }
+        name:        { type: string, minLength: 1, maxLength: 200 }
+        email:       { type: string, format: email, maxLength: 320 }
+        phone:       { type: string, maxLength: 50 }
+        companyName: { type: string, maxLength: 200 }
+        role:        { type: string, maxLength: 100 }
+        teamSize:    { type: string, maxLength: 50 }
+        message:     { type: string, maxLength: 5000 }
+        source:      { type: string, maxLength: 200 }
 
     # ── INSPECTION SCHEMAS ──────────────────────────────────────────────────────
     Inspection:
