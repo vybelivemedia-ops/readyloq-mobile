@@ -1,5 +1,6 @@
 import { db } from "@workspace/db";
 import { brandingProfilesTable, READYLOQ_DEFAULT_PROFILE } from "@workspace/db";
+import { getSeedCompanyId } from "./lib/seed-company";
 
 const SUBURBAN_DEMO = {
   name: "Suburban Pest Control",
@@ -33,9 +34,10 @@ async function run() {
     console.log(`Branding profiles already exist (${existing.length}). Skipping seed.`);
     process.exit(0);
   }
+  const companyId = await getSeedCompanyId();
   await db.insert(brandingProfilesTable).values([
-    { ...READYLOQ_DEFAULT_PROFILE, isDefault: true, isActive: true },
-    SUBURBAN_DEMO,
+    { ...READYLOQ_DEFAULT_PROFILE, isDefault: true, isActive: true, companyId },
+    { ...SUBURBAN_DEMO, companyId },
   ]);
   console.log("Seeded branding profiles: ReadyLoq Default (active) + Suburban Pest Control.");
   process.exit(0);

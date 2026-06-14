@@ -4,12 +4,17 @@ import {
   datasetImagesTable, reportsTable, quizzesTable, trainingScoresTable,
   brandingProfilesTable, READYLOQ_DEFAULT_PROFILE,
 } from "@workspace/db";
+import { getSeedCompanyId } from "./lib/seed-company";
 
 async function seed() {
   console.log("Seeding database...");
 
+  // All demo data belongs to the reserved seed (legacy) company.
+  const companyId = await getSeedCompanyId();
+  const withCo = <T extends object>(rows: T[]) => rows.map((r) => ({ ...r, companyId }));
+
   // Inspections
-  const inspections = await db.insert(inspectionsTable).values([
+  const inspections = await db.insert(inspectionsTable).values(withCo([
     {
       siteAddress: "1842 Riverside Dr, Austin, TX 78701",
       clientName: "Riverside Apartments LLC",
@@ -106,17 +111,17 @@ async function seed() {
       mediaCount: 0,
       findingsCount: 0,
     },
-  ]).returning();
+  ])).returning();
 
   console.log(`Created ${inspections.length} inspections`);
 
   // Media for first inspection
-  await db.insert(inspectionMediaTable).values([
+  await db.insert(inspectionMediaTable).values(withCo([
     { inspectionId: inspections[0].id, mediaType: "photo", url: "https://picsum.photos/seed/pest1/800/600", filename: "entry_point_01.jpg", caption: "Main entry point behind refrigerator" },
     { inspectionId: inspections[0].id, mediaType: "photo", url: "https://picsum.photos/seed/pest2/800/600", filename: "droppings_01.jpg", caption: "Rodent droppings near utility pipe" },
     { inspectionId: inspections[0].id, mediaType: "photo", url: "https://picsum.photos/seed/pest3/800/600", filename: "gnaw_marks.jpg", caption: "Gnaw marks on electrical conduit" },
     { inspectionId: inspections[0].id, mediaType: "voice", url: "", filename: "field_notes.m4a", caption: "Site overview voice note", durationSec: 45 },
-  ]);
+  ]));
 
   // Analysis results
   const findings1 = [
@@ -127,7 +132,7 @@ async function seed() {
     { id: 5, category: "Moisture Condition", description: "Leaking pipe creating harborage moisture for pests", confidence: 0.85, severity: "medium", location: "Bathroom vanity", imageUrl: null, treatment: "Repair leak immediately, dry out area with dehumidifier", exclusionOpportunity: false },
   ];
 
-  const analyses = await db.insert(analysisResultsTable).values([
+  const analyses = await db.insert(analysisResultsTable).values(withCo([
     {
       inspectionId: inspections[0].id,
       status: "complete",
@@ -177,7 +182,7 @@ async function seed() {
       overallConfidence: 0.94,
       riskLevel: "critical",
     },
-  ]).returning();
+  ])).returning();
 
   // Update inspection findingsCount to match
   await db.update(inspectionsTable).set({ findingsCount: analyses[0].findings?.length ?? 0, aiAnalysisId: analyses[0].id }).where(eq(inspectionsTable.id, inspections[0].id));
@@ -185,7 +190,7 @@ async function seed() {
   console.log(`Created ${analyses.length} analysis results`);
 
   // Dataset images
-  const datasetImages = await db.insert(datasetImagesTable).values([
+  const datasetImages = await db.insert(datasetImagesTable).values(withCo([
     { category: "pest_activity", title: "Norway Rat Entry Point", description: "Classic gnaw marks and rub trails around pipe penetration", imageUrl: "https://picsum.photos/seed/rat1/600/400", thumbnailUrl: "https://picsum.photos/seed/rat1/300/200", pestType: "Rodents", severity: "high", location: "Utility room", tags: ["rodent", "entry-point", "gnaw-mark", "norway-rat"] },
     { category: "pest_activity", title: "German Cockroach Harborage", description: "Egg cases and fecal spotting in kitchen cabinet corner", imageUrl: "https://picsum.photos/seed/roach1/600/400", thumbnailUrl: "https://picsum.photos/seed/roach1/300/200", pestType: "Cockroaches", severity: "critical", location: "Kitchen", tags: ["cockroach", "german", "oothecae", "harborage"] },
     { category: "pest_activity", title: "Bed Bug Cast Skins", description: "Molted exoskeletons and fecal spotting in mattress seam", imageUrl: "https://picsum.photos/seed/bedbug1/600/400", thumbnailUrl: "https://picsum.photos/seed/bedbug1/300/200", pestType: "Bed Bugs", severity: "critical", location: "Bedroom", tags: ["bed-bug", "cast-skin", "fecal-spot", "mattress"] },
@@ -204,12 +209,12 @@ async function seed() {
     { category: "pest_activity", title: "Mouse Nest in Insulation", description: "Active mouse nest constructed in wall insulation", imageUrl: "https://picsum.photos/seed/mouse1/600/400", thumbnailUrl: "https://picsum.photos/seed/mouse1/300/200", pestType: "Rodents", severity: "high", location: "Wall cavity", tags: ["rodent", "mouse", "nest", "insulation"] },
     { category: "pest_activity", title: "Wasp Nest Under Eave", description: "Large paper wasp nest under building eave", imageUrl: "https://picsum.photos/seed/wasp1/600/400", thumbnailUrl: "https://picsum.photos/seed/wasp1/300/200", pestType: "Wasps", severity: "medium", location: "Exterior eave", tags: ["wasp", "nest", "eave", "stinging-insect"] },
     { category: "pest_activity", title: "Stored Product Pest", description: "Indian meal moth larvae and webbing in grain storage", imageUrl: "https://picsum.photos/seed/moth1/600/400", thumbnailUrl: "https://picsum.photos/seed/moth1/300/200", pestType: "Stored Product Pests", severity: "medium", location: "Pantry storage", tags: ["stored-product", "moth", "larvae", "pantry"] },
-  ]).returning();
+  ])).returning();
 
   console.log(`Created ${datasetImages.length} dataset images`);
 
   // Reports
-  await db.insert(reportsTable).values([
+  await db.insert(reportsTable).values(withCo([
     {
       inspectionId: inspections[0].id,
       title: "Residential Rodent Assessment — Riverside Dr",
@@ -244,12 +249,12 @@ async function seed() {
       inspectionDate: "2026-06-01",
       severity: "critical",
     },
-  ]);
+  ]));
 
   console.log("Created reports");
 
   // Quizzes
-  const quizzes = await db.insert(quizzesTable).values([
+  const quizzes = await db.insert(quizzesTable).values(withCo([
     {
       title: "Rodent Identification & Behavior",
       description: "Test your ability to identify Norway rats, roof rats, and house mice from field photos",
@@ -316,12 +321,12 @@ async function seed() {
         { id: 5, imageUrl: "https://picsum.photos/seed/termite4/600/400", question: "What is the most appropriate initial response when finding active subterranean termites in a structure?", options: ["Apply liquid spot treatment and close the case", "Document thoroughly, assess extent of damage, recommend full liquid + bait program", "Recommend only bait stations — liquid treatments are outdated", "Schedule treatment for 90 days later"], correctOption: 1, explanation: "A comprehensive program combining liquid soil treatment (for immediate protection) and monitoring/baiting stations provides the most complete protection against subterranean termite colonies" },
       ],
     },
-  ]).returning();
+  ])).returning();
 
   console.log(`Created ${quizzes.length} quizzes`);
 
   // Training scores
-  await db.insert(trainingScoresTable).values([
+  await db.insert(trainingScoresTable).values(withCo([
     { technicianName: "Marcus Chen", technicianId: "tech-001", quizId: quizzes[0].id, quizTitle: quizzes[0].title, score: 92, passed: true },
     { technicianName: "Marcus Chen", technicianId: "tech-001", quizId: quizzes[1].id, quizTitle: quizzes[1].title, score: 80, passed: true },
     { technicianName: "Marcus Chen", technicianId: "tech-001", quizId: quizzes[2].id, quizTitle: quizzes[2].title, score: 100, passed: true },
@@ -333,12 +338,12 @@ async function seed() {
     { technicianName: "Elena Torres", technicianId: "tech-004", quizId: quizzes[2].id, quizTitle: quizzes[2].title, score: 88, passed: true },
     { technicianName: "Marcus Chen", technicianId: "tech-001", quizId: quizzes[3].id, quizTitle: quizzes[3].title, score: 88, passed: true },
     { technicianName: "Sarah Williams", technicianId: "tech-002", quizId: quizzes[1].id, quizTitle: quizzes[1].title, score: 68, passed: false },
-  ]);
+  ]));
 
   // Branding profiles: non-deletable ReadyLoq default (active) + a demo white-label profile
   const existingProfiles = await db.select().from(brandingProfilesTable);
   if (existingProfiles.length === 0) {
-    await db.insert(brandingProfilesTable).values([
+    await db.insert(brandingProfilesTable).values(withCo([
       {
         ...READYLOQ_DEFAULT_PROFILE,
         isDefault: true,
@@ -369,7 +374,7 @@ async function seed() {
         emailFooter: "Suburban Pest Control · 1420 Oak Ridge Ave, Springfield, IL",
         poweredByVisible: false,
       },
-    ]);
+    ]));
   }
 
   console.log("Seed complete!");

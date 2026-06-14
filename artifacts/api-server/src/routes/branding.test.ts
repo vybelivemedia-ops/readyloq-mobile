@@ -22,33 +22,51 @@ import {
   db,
   usersTable,
   brandingProfilesTable,
+  companiesTable,
   READYLOQ_DEFAULT_PROFILE,
 } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const MANAGER_ID = "test_manager_clerk_id";
 const TECH_ID = "test_tech_clerk_id";
+
+let platformCompanyId: number;
+let testCompanyId: number;
 
 function asUser(id: string | null) {
   authState.userId = id;
 }
 
+async function findOrCreateCompany(name: string, slug: string): Promise<number> {
+  const [existing] = await db
+    .select()
+    .from(companiesTable)
+    .where(eq(companiesTable.slug, slug));
+  if (existing) return existing.id;
+  const [row] = await db.insert(companiesTable).values({ name, slug }).returning();
+  return row.id;
+}
+
 beforeAll(async () => {
+  // The reserved platform company owns the pre-login brand; the test company is
+  // an ordinary tenant whose managers manage their own branding.
+  platformCompanyId = await findOrCreateCompany("ReadyLoq Platform", "platform");
+  testCompanyId = await findOrCreateCompany("Branding Test Co", "branding-test-co");
   await db.delete(usersTable);
   await db.insert(usersTable).values([
-    { clerkUserId: MANAGER_ID, role: "manager" },
-    { clerkUserId: TECH_ID, role: "technician" },
+    { clerkUserId: MANAGER_ID, role: "manager", companyId: testCompanyId },
+    { clerkUserId: TECH_ID, role: "technician", companyId: testCompanyId },
   ]);
 });
 
 beforeEach(async () => {
   asUser(null);
-  // Reset branding to a single protected, active default profile before each test.
+  // Reset branding for both the platform (pre-login brand) and the test company.
   await db.delete(brandingProfilesTable);
-  await db.insert(brandingProfilesTable).values({
-    ...READYLOQ_DEFAULT_PROFILE,
-    isDefault: true,
-    isActive: true,
-  });
+  await db.insert(brandingProfilesTable).values([
+    { ...READYLOQ_DEFAULT_PROFILE, companyId: platformCompanyId, isDefault: true, isActive: true },
+    { ...READYLOQ_DEFAULT_PROFILE, companyId: testCompanyId, isDefault: true, isActive: true },
+  ]);
 });
 
 async function createProfile(name: string, extra: Record<string, unknown> = {}) {
@@ -60,8 +78,8 @@ async function createProfile(name: string, extra: Record<string, unknown> = {}) 
   return res;
 }
 
-describe("GET /api/branding/active (public)", () => {
-  it("returns 200 with the active profile without authentication", async () => {
+describe("GET /api/branding/active (public, platform brand)", () => {
+  it("returns 200 with the platform active profile without authentication", async () => {
     const res = await request(app).get("/api/branding/active");
     expect(res.status).toBe(200);
     expect(res.body.companyName).toBe("ReadyLoq");
@@ -70,6 +88,20 @@ describe("GET /api/branding/active (public)", () => {
 
   it("serves the same active profile from the GET / alias", async () => {
     const res = await request(app).get("/api/branding/");
+    expect(res.status).toBe(200);
+    expect(res.body.isActive).toBe(true);
+  });
+});
+
+describe("GET /api/branding/company (authed, caller's brand)", () => {
+  it("returns 401 when unauthenticated", async () => {
+    const res = await request(app).get("/api/branding/company");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns the caller company's active profile for any member", async () => {
+    asUser(TECH_ID);
+    const res = await request(app).get("/api/branding/company");
     expect(res.status).toBe(200);
     expect(res.body.isActive).toBe(true);
   });
@@ -159,7 +191,7 @@ describe("hex color validation", () => {
 });
 
 describe("activation is transactional (exactly one active profile)", () => {
-  it("activates a profile and deactivates all others", async () => {
+  it("activates a profile, deactivates others, and never touches the platform brand", async () => {
     const created = await createProfile("Activate Me");
     expect(created.status).toBe(201);
 
@@ -175,14 +207,19 @@ describe("activation is transactional (exactly one active profile)", () => {
     expect(active).toHaveLength(1);
     expect(active[0].id).toBe(created.body.id);
 
-    // Public endpoint reflects the new active profile.
+    // The caller company's brand reflects the new active profile...
+    const companyRes = await request(app).get("/api/branding/company");
+    expect(companyRes.body.id).toBe(created.body.id);
+
+    // ...but the public/platform pre-login brand is unaffected.
     const publicRes = await request(app).get("/api/branding/active");
-    expect(publicRes.body.id).toBe(created.body.id);
+    expect(publicRes.body.companyName).toBe("ReadyLoq");
+    expect(publicRes.body.id).not.toBe(created.body.id);
   });
 });
 
 describe("deleting the active profile falls back to the default", () => {
-  it("re-activates the default profile after the active one is removed", async () => {
+  it("re-activates the company default profile after the active one is removed", async () => {
     const created = await createProfile("Temp Active");
     asUser(MANAGER_ID);
     await request(app).post(`/api/branding/profiles/${created.body.id}/activate`);
@@ -192,15 +229,15 @@ describe("deleting the active profile falls back to the default", () => {
     );
     expect(del.status).toBe(204);
 
-    const publicRes = await request(app).get("/api/branding/active");
-    expect(publicRes.status).toBe(200);
-    expect(publicRes.body.isDefault).toBe(true);
-    expect(publicRes.body.isActive).toBe(true);
+    const companyRes = await request(app).get("/api/branding/company");
+    expect(companyRes.status).toBe(200);
+    expect(companyRes.body.isDefault).toBe(true);
+    expect(companyRes.body.isActive).toBe(true);
   });
 });
 
 describe("restore-defaults", () => {
-  it("resets the default profile to canonical values and re-activates it", async () => {
+  it("resets the company default profile to canonical values and re-activates it", async () => {
     // Activate a non-default profile first.
     const created = await createProfile("Other Brand", { companyName: "Other Brand" });
     asUser(MANAGER_ID);
@@ -212,11 +249,11 @@ describe("restore-defaults", () => {
     expect(restore.body.isActive).toBe(true);
     expect(restore.body.companyName).toBe(READYLOQ_DEFAULT_PROFILE.companyName);
 
-    const publicRes = await request(app).get("/api/branding/active");
-    expect(publicRes.body.isDefault).toBe(true);
-    expect(publicRes.body.companyName).toBe("ReadyLoq");
+    const companyRes = await request(app).get("/api/branding/company");
+    expect(companyRes.body.isDefault).toBe(true);
+    expect(companyRes.body.companyName).toBe("ReadyLoq");
 
-    // Still exactly one active profile.
+    // Still exactly one active profile in the company.
     const list = await request(app).get("/api/branding/profiles");
     const active = list.body.filter((p: { isActive: boolean }) => p.isActive);
     expect(active).toHaveLength(1);

@@ -1,9 +1,11 @@
-import { pgTable, serial, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { companiesTable } from "./companies";
 
 export const brandingProfilesTable = pgTable("branding_profiles", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   name: text("name").notNull(),
   isDefault: boolean("is_default").notNull().default(false),
   isActive: boolean("is_active").notNull().default(false),
@@ -44,6 +46,7 @@ export const insertBrandingProfileSchema = createInsertSchema(brandingProfilesTa
   id: true,
   createdAt: true,
   updatedAt: true,
+  companyId: true,
 });
 
 export type BrandingProfile = typeof brandingProfilesTable.$inferSelect;

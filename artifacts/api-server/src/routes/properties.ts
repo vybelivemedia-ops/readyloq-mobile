@@ -9,13 +9,14 @@ import {
   type Finding,
   type Hotspot,
 } from "@workspace/db";
-import { eq, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   normalizeAddressKey,
   propertyTypeFor,
   deriveRecurringIssues,
 } from "../lib/property-intelligence";
+import { getCompanyId } from "../lib/tenant";
 
 const router = Router();
 
@@ -63,12 +64,18 @@ function addressesSimilar(a: string, b: string): boolean {
 }
 
 // Build the per-property summaries used by GET / and GET /lookup.
-async function buildSummaries() {
+async function buildSummaries(companyId: number) {
   const [allInspections, profiles, allNotes, allAnalyses] = await Promise.all([
-    db.select().from(inspectionsTable),
-    db.select().from(propertyProfilesTable),
-    db.select().from(propertyNotesTable),
-    db.select().from(analysisResultsTable),
+    db.select().from(inspectionsTable).where(eq(inspectionsTable.companyId, companyId)),
+    db
+      .select()
+      .from(propertyProfilesTable)
+      .where(eq(propertyProfilesTable.companyId, companyId)),
+    db.select().from(propertyNotesTable).where(eq(propertyNotesTable.companyId, companyId)),
+    db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId)),
   ]);
 
   const groups = new Map<string, InspectionRow[]>();
@@ -85,7 +92,8 @@ async function buildSummaries() {
   const profileByKey = new Map(profiles.map((p) => [p.addressKey, p]));
 
   const noteCountByKey = new Map<string, number>();
-  for (const n of allNotes) noteCountByKey.set(n.addressKey, (noteCountByKey.get(n.addressKey) ?? 0) + 1);
+  for (const n of allNotes)
+    noteCountByKey.set(n.addressKey, (noteCountByKey.get(n.addressKey) ?? 0) + 1);
 
   const categoriesByKey = new Map<string, Set<string>>();
   for (const a of allAnalyses) {
@@ -124,11 +132,28 @@ async function buildSummaries() {
 }
 
 // Build the full intelligence feed for one normalized addressKey.
-async function buildFeed(addressKey: string) {
+async function buildFeed(addressKey: string, companyId: number) {
   const [profileRows, allInspections, notes] = await Promise.all([
-    db.select().from(propertyProfilesTable).where(eq(propertyProfilesTable.addressKey, addressKey)),
-    db.select().from(inspectionsTable),
-    db.select().from(propertyNotesTable).where(eq(propertyNotesTable.addressKey, addressKey)).orderBy(desc(propertyNotesTable.createdAt)),
+    db
+      .select()
+      .from(propertyProfilesTable)
+      .where(
+        and(
+          eq(propertyProfilesTable.companyId, companyId),
+          eq(propertyProfilesTable.addressKey, addressKey),
+        ),
+      ),
+    db.select().from(inspectionsTable).where(eq(inspectionsTable.companyId, companyId)),
+    db
+      .select()
+      .from(propertyNotesTable)
+      .where(
+        and(
+          eq(propertyNotesTable.companyId, companyId),
+          eq(propertyNotesTable.addressKey, addressKey),
+        ),
+      )
+      .orderBy(desc(propertyNotesTable.createdAt)),
   ]);
   const profile = profileRows[0];
 
@@ -141,8 +166,24 @@ async function buildFeed(addressKey: string) {
   let media: (typeof inspectionMediaTable.$inferSelect)[] = [];
   if (ids.length > 0) {
     [analyses, media] = await Promise.all([
-      db.select().from(analysisResultsTable).where(inArray(analysisResultsTable.inspectionId, ids)),
-      db.select().from(inspectionMediaTable).where(inArray(inspectionMediaTable.inspectionId, ids)),
+      db
+        .select()
+        .from(analysisResultsTable)
+        .where(
+          and(
+            eq(analysisResultsTable.companyId, companyId),
+            inArray(analysisResultsTable.inspectionId, ids),
+          ),
+        ),
+      db
+        .select()
+        .from(inspectionMediaTable)
+        .where(
+          and(
+            eq(inspectionMediaTable.companyId, companyId),
+            inArray(inspectionMediaTable.inspectionId, ids),
+          ),
+        ),
     ]);
   }
 
@@ -197,54 +238,58 @@ async function buildFeed(addressKey: string) {
 }
 
 // GET /properties — list known properties with intelligence summary
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
   try {
-    res.json(await buildSummaries());
+    const companyId = getCompanyId(req);
+    return res.json(await buildSummaries(companyId));
   } catch {
-    res.status(500).json({ error: "Failed to list properties" });
+    return res.status(500).json({ error: "Failed to list properties" });
   }
 });
 
 // GET /properties/lookup?siteAddress=... — pre-inspection lookup
 router.get("/lookup", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const siteAddress = typeof req.query.siteAddress === "string" ? req.query.siteAddress : "";
     if (!siteAddress.trim()) {
       return res.json({ matchStatus: "none", suggestions: [] });
     }
     const key = normalizeAddressKey(siteAddress);
-    const summaries = await buildSummaries();
+    const summaries = await buildSummaries(companyId);
 
     const exact = summaries.find((s) => s.addressKey === key);
     if (exact) {
-      const feed = await buildFeed(key);
+      const feed = await buildFeed(key, companyId);
       return res.json({ matchStatus: "exact", feed, suggestions: [] });
     }
 
     const possible = summaries.filter((s) => addressesSimilar(key, s.addressKey)).slice(0, 5);
-    res.json({
+    return res.json({
       matchStatus: possible.length > 0 ? "possible" : "none",
       suggestions: possible,
     });
   } catch {
-    res.status(500).json({ error: "Failed to look up property" });
+    return res.status(500).json({ error: "Failed to look up property" });
   }
 });
 
 // GET /properties/:addressKey — full intelligence feed
 router.get("/:addressKey", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const key = normalizeAddressKey(decodeURIComponent(req.params.addressKey));
     if (!key) return res.status(400).json({ error: "Invalid address key" });
-    res.json(await buildFeed(key));
+    return res.json(await buildFeed(key, companyId));
   } catch {
-    res.status(500).json({ error: "Failed to load property feed" });
+    return res.status(500).json({ error: "Failed to load property feed" });
   }
 });
 
 // PATCH /properties/:addressKey — create/update authored intelligence
 router.patch("/:addressKey", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const key = normalizeAddressKey(decodeURIComponent(req.params.addressKey));
     if (!key) return res.status(400).json({ error: "Invalid address key" });
 
@@ -256,15 +301,29 @@ router.patch("/:addressKey", async (req, res) => {
     // Guard the core invariant: a profile's siteAddress must always normalize to
     // its addressKey, or future address lookups would silently miss the profile.
     if (parsed.data.siteAddress && normalizeAddressKey(parsed.data.siteAddress) !== key) {
-      return res.status(400).json({ error: "siteAddress does not match the address key for this property" });
+      return res
+        .status(400)
+        .json({ error: "siteAddress does not match the address key for this property" });
     }
 
-    const [existing] = await db.select().from(propertyProfilesTable).where(eq(propertyProfilesTable.addressKey, key));
+    const [existing] = await db
+      .select()
+      .from(propertyProfilesTable)
+      .where(
+        and(
+          eq(propertyProfilesTable.companyId, companyId),
+          eq(propertyProfilesTable.addressKey, key),
+        ),
+      );
 
     let siteAddress: string | undefined = parsed.data.siteAddress ?? existing?.siteAddress;
     if (!siteAddress) {
-      const allInspections = await db.select().from(inspectionsTable);
-      siteAddress = allInspections.find((i) => normalizeAddressKey(i.siteAddress) === key)?.siteAddress;
+      const allInspections = await db
+        .select()
+        .from(inspectionsTable)
+        .where(eq(inspectionsTable.companyId, companyId));
+      siteAddress = allInspections.find((i) => normalizeAddressKey(i.siteAddress) === key)
+        ?.siteAddress;
     }
     if (!siteAddress) {
       return res.status(400).json({ error: "siteAddress is required to create a property profile" });
@@ -281,27 +340,36 @@ router.patch("/:addressKey", async (req, res) => {
           hotspots: parsed.data.hotspots ?? existing.hotspots,
           updatedAt: new Date(),
         })
-        .where(eq(propertyProfilesTable.addressKey, key));
+        .where(
+          and(
+            eq(propertyProfilesTable.companyId, companyId),
+            eq(propertyProfilesTable.addressKey, key),
+          ),
+        );
     } else {
       await db.insert(propertyProfilesTable).values({
+        companyId,
         addressKey: key,
         siteAddress,
         clientName: parsed.data.clientName ?? null,
-        propertyType: parsed.data.propertyType ?? propertyTypeFor(parsed.data.clientName ?? null, siteAddress),
+        propertyType:
+          parsed.data.propertyType ??
+          propertyTypeFor(parsed.data.clientName ?? null, siteAddress),
         technicianKnowledge: parsed.data.technicianKnowledge ?? null,
         hotspots: parsed.data.hotspots ?? [],
       });
     }
 
-    res.json(await buildFeed(key));
+    return res.json(await buildFeed(key, companyId));
   } catch {
-    res.status(500).json({ error: "Failed to update property profile" });
+    return res.status(500).json({ error: "Failed to update property profile" });
   }
 });
 
 // POST /properties/:addressKey/notes — append a field note
 router.post("/:addressKey/notes", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const key = normalizeAddressKey(decodeURIComponent(req.params.addressKey));
     if (!key) return res.status(400).json({ error: "Invalid address key" });
 
@@ -313,6 +381,7 @@ router.post("/:addressKey/notes", async (req, res) => {
     const [row] = await db
       .insert(propertyNotesTable)
       .values({
+        companyId,
         addressKey: key,
         note: parsed.data.note,
         zone: parsed.data.zone ?? null,
@@ -321,9 +390,9 @@ router.post("/:addressKey/notes", async (req, res) => {
       })
       .returning();
 
-    res.status(201).json({ ...row, createdAt: iso(row.createdAt) as string });
+    return res.status(201).json({ ...row, createdAt: iso(row.createdAt) as string });
   } catch {
-    res.status(500).json({ error: "Failed to add property note" });
+    return res.status(500).json({ error: "Failed to add property note" });
   }
 });
 

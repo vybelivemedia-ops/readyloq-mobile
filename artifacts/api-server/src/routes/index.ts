@@ -1,5 +1,9 @@
 import { Router, type IRouter } from "express";
-import { requireAuth, requireRole } from "../middleware/require-auth";
+import {
+  requireAuth,
+  requireCompany,
+  requireRole,
+} from "../middleware/require-auth";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import inspectionsRouter from "./inspections";
@@ -19,14 +23,20 @@ router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use(storageRouter);
 
-router.use("/inspections", requireAuth, inspectionsRouter);
-router.use("/analysis", requireAuth, analysisRouter);
-router.use("/dataset", requireAuth, datasetRouter);
-router.use("/reports", requireAuth, reportsRouter);
-router.use("/training", requireAuth, trainingRouter);
-router.use("/analytics", requireAuth, analyticsRouter);
-router.use("/intelligence", requireAuth, requireRole("manager"), intelligenceRouter);
+router.use("/inspections", requireAuth, requireCompany, inspectionsRouter);
+router.use("/analysis", requireAuth, requireCompany, analysisRouter);
+router.use("/dataset", requireAuth, requireCompany, datasetRouter);
+router.use("/reports", requireAuth, requireCompany, reportsRouter);
+router.use("/training", requireAuth, requireCompany, trainingRouter);
+router.use("/analytics", requireAuth, requireCompany, analyticsRouter);
+router.use(
+  "/intelligence",
+  requireAuth,
+  requireCompany,
+  requireRole("manager"),
+  intelligenceRouter,
+);
 router.use("/branding", brandingRouter);
-router.use("/properties", requireAuth, propertiesRouter);
+router.use("/properties", requireAuth, requireCompany, propertiesRouter);
 
 export default router;

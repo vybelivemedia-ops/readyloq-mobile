@@ -1,8 +1,29 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { z } from "zod/v4";
-import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
-import { requireAuth } from "../middleware/require-auth";
+import { db } from "@workspace/db";
+import { companiesTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import {
+  ObjectStorageService,
+  ObjectNotFoundError,
+  objectPathCompanyScope,
+} from "../lib/objectStorage";
+import { requireAuth, requireCompany } from "../middleware/require-auth";
+import { getCompanyId } from "../lib/tenant";
+
+// Objects uploaded before multi-tenancy carry no company segment and belong to
+// the reserved "legacy" company. Cache its id so serve-time checks stay cheap.
+let legacyCompanyIdCache: number | null = null;
+async function getLegacyCompanyId(): Promise<number | null> {
+  if (legacyCompanyIdCache != null) return legacyCompanyIdCache;
+  const [row] = await db
+    .select()
+    .from(companiesTable)
+    .where(eq(companiesTable.slug, "legacy"));
+  legacyCompanyIdCache = row?.id ?? null;
+  return legacyCompanyIdCache;
+}
 
 const RequestUploadUrlBody = z.object({
   name: z.string(),
@@ -28,31 +49,37 @@ const objectStorageService = new ObjectStorageService();
  * Requires authentication — only signed-in users (technicians uploading
  * inspection photos, managers uploading branding assets) may mint upload URLs.
  */
-router.post("/storage/uploads/request-url", requireAuth, async (req: Request, res: Response) => {
-  const parsed = RequestUploadUrlBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Missing or invalid required fields" });
-    return;
-  }
+router.post(
+  "/storage/uploads/request-url",
+  requireAuth,
+  requireCompany,
+  async (req: Request, res: Response) => {
+    const parsed = RequestUploadUrlBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Missing or invalid required fields" });
+      return;
+    }
 
-  try {
-    const { name, size, contentType } = parsed.data;
+    try {
+      const { name, size, contentType } = parsed.data;
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      const companyId = getCompanyId(req);
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL(companyId);
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
 
-    res.json(
-      RequestUploadUrlResponse.parse({
-        uploadURL,
-        objectPath,
-        metadata: { name, size, contentType },
-      }),
-    );
-  } catch (error) {
-    req.log.error({ err: error }, "Error generating upload URL");
-    res.status(500).json({ error: "Failed to generate upload URL" });
-  }
-});
+      res.json(
+        RequestUploadUrlResponse.parse({
+          uploadURL,
+          objectPath,
+          metadata: { name, size, contentType },
+        }),
+      );
+    } catch (error) {
+      req.log.error({ err: error }, "Error generating upload URL");
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  },
+);
 
 /**
  * GET /storage/public-objects/*
@@ -92,42 +119,60 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
  * GET /storage/objects/*
  *
  * Serve private object entities (inspection photos, voice notes) from
- * PRIVATE_OBJECT_DIR. Requires authentication: only signed-in technicians and
- * managers may fetch these. Browser <img>/fetch requests are same-origin, so
- * the Clerk session cookie is sent automatically — no Authorization header.
+ * PRIVATE_OBJECT_DIR. Requires auth + a company. Browser <img>/fetch requests
+ * are same-origin, so the Clerk session cookie is sent automatically.
  *
- * Note: ReadyLoq is single-tenant / shared-data by design (no per-user/org
- * scoping on any route), so authentication is the access boundary here. Objects
- * carry no ACL policy metadata, so a per-object canAccessObjectEntity check
- * would reject every request; requireAuth is the correct gate for this model.
+ * Tenant boundary: an object's owning company is encoded in its path
+ * (companies/{id}/...). Callers may only read objects belonging to their own
+ * company; legacy (pre-tenancy) objects require legacy-company membership. Any
+ * mismatch 404s — we never reveal that another company's object exists.
  */
-router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const raw = req.params.path;
-    const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
-    const objectPath = `/objects/${wildcardPath}`;
-    const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+router.get(
+  "/storage/objects/*path",
+  requireAuth,
+  requireCompany,
+  async (req: Request, res: Response) => {
+    try {
+      const raw = req.params.path;
+      const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
+      const objectPath = `/objects/${wildcardPath}`;
 
-    const response = await objectStorageService.downloadObject(objectFile);
+      const callerCompanyId = getCompanyId(req);
+      const scope = objectPathCompanyScope(objectPath);
+      if (scope === "legacy") {
+        const legacyId = await getLegacyCompanyId();
+        if (legacyId == null || callerCompanyId !== legacyId) {
+          res.status(404).json({ error: "Object not found" });
+          return;
+        }
+      } else if (scope !== callerCompanyId) {
+        res.status(404).json({ error: "Object not found" });
+        return;
+      }
 
-    res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
+      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
 
-    if (response.body) {
-      const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
-      nodeStream.pipe(res);
-    } else {
-      res.end();
+      const response = await objectStorageService.downloadObject(objectFile);
+
+      res.status(response.status);
+      response.headers.forEach((value, key) => res.setHeader(key, value));
+
+      if (response.body) {
+        const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
+        nodeStream.pipe(res);
+      } else {
+        res.end();
+      }
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) {
+        req.log.warn({ err: error }, "Object not found");
+        res.status(404).json({ error: "Object not found" });
+        return;
+      }
+      req.log.error({ err: error }, "Error serving object");
+      res.status(500).json({ error: "Failed to serve object" });
     }
-  } catch (error) {
-    if (error instanceof ObjectNotFoundError) {
-      req.log.warn({ err: error }, "Object not found");
-      res.status(404).json({ error: "Object not found" });
-      return;
-    }
-    req.log.error({ err: error }, "Error serving object");
-    res.status(500).json({ error: "Failed to serve object" });
-  }
-});
+  },
+);
 
 export default router;

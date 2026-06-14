@@ -1,9 +1,11 @@
 import { pgTable, serial, text, integer, real, jsonb, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { companiesTable } from "./companies";
 
 export const quizzesTable = pgTable("quizzes", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   title: text("title").notNull(),
   description: text("description"),
   category: text("category").notNull(),
@@ -17,6 +19,7 @@ export const quizzesTable = pgTable("quizzes", {
 
 export const trainingScoresTable = pgTable("training_scores", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   technicianName: text("technician_name").notNull(),
   technicianId: text("technician_id"),
   quizId: integer("quiz_id").notNull().references(() => quizzesTable.id),
@@ -35,8 +38,8 @@ export interface QuizQuestion {
   explanation: string | null;
 }
 
-export const insertQuizSchema = createInsertSchema(quizzesTable).omit({ id: true });
-export const insertTrainingScoreSchema = createInsertSchema(trainingScoresTable).omit({ id: true, completedAt: true });
+export const insertQuizSchema = createInsertSchema(quizzesTable).omit({ id: true, companyId: true });
+export const insertTrainingScoreSchema = createInsertSchema(trainingScoresTable).omit({ id: true, completedAt: true, companyId: true });
 
 export type Quiz = typeof quizzesTable.$inferSelect;
 export type TrainingScore = typeof trainingScoresTable.$inferSelect;

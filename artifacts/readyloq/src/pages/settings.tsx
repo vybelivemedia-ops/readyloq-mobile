@@ -4,14 +4,14 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Settings, Lightbulb, Layers, Lock } from "lucide-react";
 import { useCoaching } from "@/hooks/use-coaching";
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCurrentUser, isManagerRole } from "@/hooks/use-current-user";
 import { WhiteLabelManager } from "@/components/white-label/white-label-manager";
 import { Link } from "wouter";
 
 export default function SettingsPage() {
   const { coachingEnabled, setCoaching } = useCoaching();
   const { data: currentUser, isLoading } = useCurrentUser();
-  const isManager = currentUser?.role === "manager";
+  const isManager = isManagerRole(currentUser?.role);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">

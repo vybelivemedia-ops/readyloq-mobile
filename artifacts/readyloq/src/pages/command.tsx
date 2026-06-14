@@ -12,7 +12,7 @@ import {
   Crosshair, PhoneIncoming, ShieldAlert, Lightbulb, AlertTriangle, ArrowRight,
   TrendingDown, Building2, Sparkles, EyeOff, MapPin, CheckCircle2, RotateCcw,
 } from "lucide-react";
-import { useRole } from "@/hooks/use-role";
+import { useCurrentUser, isManagerRole } from "@/hooks/use-current-user";
 
 const COLORS = ["#0ea5e9", "#06b6d4", "#22d3ee", "#38bdf8", "#7dd3fc", "#bae6fd"];
 
@@ -47,14 +47,15 @@ function ManagementOnly() {
       </div>
       <h2 className="text-xl font-bold mb-1">ReadyLoq Command</h2>
       <p className="text-muted-foreground text-sm max-w-sm">
-        This intelligence workspace is available to management accounts. Switch to the Manager view in Settings to access it.
+        This intelligence workspace is available to manager and owner accounts. Contact your company owner if you need access.
       </p>
     </div>
   );
 }
 
 export default function CommandCenter() {
-  const { isManager } = useRole();
+  const { data: currentUser } = useCurrentUser();
+  const isManager = isManagerRole(currentUser?.role);
   const { data: opp, isLoading: loadingOpp } = useGetOpportunityIntelligence();
   const { data: cb, isLoading: loadingCb } = useGetCallbackIntelligence();
   const { data: risk, isLoading: loadingRisk } = useGetPropertyRiskInsights();

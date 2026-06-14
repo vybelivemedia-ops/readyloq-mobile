@@ -2,9 +2,11 @@ import { pgTable, serial, integer, text, real, jsonb, timestamp } from "drizzle-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { inspectionsTable } from "./inspections";
+import { companiesTable } from "./companies";
 
 export const analysisResultsTable = pgTable("analysis_results", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   inspectionId: integer("inspection_id").notNull().references(() => inspectionsTable.id, { onDelete: "cascade" }),
   status: text("status").notNull().default("pending"), // "pending" | "complete" | "failed"
   findings: jsonb("findings").$type<Finding[]>().default([]),
@@ -29,6 +31,6 @@ export interface Finding {
   evidenceQuality?: "excellent" | "good" | "fair" | null;
 }
 
-export const insertAnalysisResultSchema = createInsertSchema(analysisResultsTable).omit({ id: true, createdAt: true });
+export const insertAnalysisResultSchema = createInsertSchema(analysisResultsTable).omit({ id: true, createdAt: true, companyId: true });
 export type AnalysisResult = typeof analysisResultsTable.$inferSelect;
 export type InsertAnalysisResult = z.infer<typeof insertAnalysisResultSchema>;

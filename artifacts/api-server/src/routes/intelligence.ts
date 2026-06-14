@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { inspectionsTable, analysisResultsTable, callbacksTable, type Finding } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { propertyTypeFor } from "../lib/property-intelligence";
+import { getCompanyId } from "../lib/tenant";
 
 const router = Router();
 
@@ -182,8 +184,15 @@ const OUTCOME_LABEL: Record<string, string> = {
 // ---------------------------------------------------------------------------
 router.get("/opportunities", async (req, res) => {
   try {
-    const inspections = await db.select().from(inspectionsTable);
-    const analyses = await db.select().from(analysisResultsTable);
+    const companyId = getCompanyId(req);
+    const inspections = await db
+      .select()
+      .from(inspectionsTable)
+      .where(eq(inspectionsTable.companyId, companyId));
+    const analyses = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId));
 
     interface OppItem {
       id: string;
@@ -263,7 +272,11 @@ router.get("/opportunities", async (req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/callbacks", async (req, res) => {
   try {
-    const all = await db.select().from(callbacksTable);
+    const companyId = getCompanyId(req);
+    const all = await db
+      .select()
+      .from(callbacksTable)
+      .where(eq(callbacksTable.companyId, companyId));
 
     const totalChains = all.length;
     const occurred = all.filter((c) => c.outcome === "callback_occurred");
@@ -386,9 +399,19 @@ router.get("/callbacks", async (req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/property-risk", async (req, res) => {
   try {
-    const inspections = await db.select().from(inspectionsTable);
-    const analyses = await db.select().from(analysisResultsTable);
-    const callbacks = await db.select().from(callbacksTable);
+    const companyId = getCompanyId(req);
+    const inspections = await db
+      .select()
+      .from(inspectionsTable)
+      .where(eq(inspectionsTable.companyId, companyId));
+    const analyses = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId));
+    const callbacks = await db
+      .select()
+      .from(callbacksTable)
+      .where(eq(callbacksTable.companyId, companyId));
 
     // Per-property condition sets
     const propertyConditions: { conditions: string[] }[] = [];

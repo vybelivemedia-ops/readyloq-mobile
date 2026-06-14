@@ -1,2 +1,3 @@
 - [ReadyLoq Architecture](readyloq-architecture.md) — stack, conventions, API routes, seed script location, Wouter base path fix
+- [ReadyLoq multi-tenancy](readyloq-multitenancy.md) — per-company isolation rules (new tables/queries/child writes), reserved platform/legacy companies, storage scoping, vitest harness, frontend typecheck gotcha
 - [API Server Testing](api-server-testing.md) — vitest + isolated `<db>_test` DB + Clerk getAuth mock; pre-existing TS7030 typecheck failures are baseline

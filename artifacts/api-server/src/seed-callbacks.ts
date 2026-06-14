@@ -1,5 +1,6 @@
 import { db } from "@workspace/db";
-import { inspectionsTable, callbacksTable, type InsertCallback } from "@workspace/db";
+import { inspectionsTable, callbacksTable } from "@workspace/db";
+import { getSeedCompanyId } from "./lib/seed-company";
 
 // Idempotent seed for the Callback Intelligence chains used by ReadyLoq Command.
 // Safe to run multiple times: it no-ops if callbacks already exist. It references
@@ -81,11 +82,13 @@ async function seedCallbacks() {
     ["Campus", "Bed Bugs", "Bed bug spread to adjacent room", null, false, "callback_occurred", "adjacent_spread", "Shared wall void between rooms", 28],
   ];
 
-  const values: InsertCallback[] = rows.map(([needle, pestType, finding, recommendation, followUpVisit, outcome, callbackCause, conduciveCondition, dAgo]) => {
+  const companyId = await getSeedCompanyId();
+  const values: (typeof callbacksTable.$inferInsert)[] = rows.map(([needle, pestType, finding, recommendation, followUpVisit, outcome, callbackCause, conduciveCondition, dAgo]) => {
     const insp = byClient(needle);
     const createdAt = daysAgo(dAgo);
     const resolved = outcome === "resolved" || outcome === "activity_reduced";
     return {
+      companyId,
       inspectionId: insp.id,
       propertyType: propertyTypeFor(insp.clientName, insp.siteAddress),
       pestType,

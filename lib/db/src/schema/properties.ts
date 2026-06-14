@@ -1,6 +1,7 @@
-import { pgTable, serial, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, jsonb, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { companiesTable } from "./companies";
 
 // Property Intelligence Feed — the authored overlay that persists across all
 // visits to a property. Recurring issues, historical photos, and visit history
@@ -8,6 +9,7 @@ import { z } from "zod/v4";
 // inspection_media, and inspections. Everything is keyed by a normalized
 // addressKey (see artifacts/api-server/src/lib/property-intelligence.ts) so it
 // stays consistent with the existing siteAddress grouping in intelligence.ts.
+// addressKey is unique PER COMPANY (two companies may track the same address).
 
 export interface Hotspot {
   zone: string;
@@ -15,20 +17,28 @@ export interface Hotspot {
   severity: "low" | "medium" | "high";
 }
 
-export const propertyProfilesTable = pgTable("property_profiles", {
-  id: serial("id").primaryKey(),
-  addressKey: text("address_key").notNull().unique(),
-  siteAddress: text("site_address").notNull(),
-  clientName: text("client_name"),
-  propertyType: text("property_type"),
-  technicianKnowledge: text("technician_knowledge"),
-  hotspots: jsonb("hotspots").$type<Hotspot[]>().default([]),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const propertyProfilesTable = pgTable(
+  "property_profiles",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id),
+    addressKey: text("address_key").notNull(),
+    siteAddress: text("site_address").notNull(),
+    clientName: text("client_name"),
+    propertyType: text("property_type"),
+    technicianKnowledge: text("technician_knowledge"),
+    hotspots: jsonb("hotspots").$type<Hotspot[]>().default([]),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    companyAddressKey: uniqueIndex("property_profiles_company_address_key").on(t.companyId, t.addressKey),
+  }),
+);
 
 export const propertyNotesTable = pgTable("property_notes", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   addressKey: text("address_key").notNull(),
   note: text("note").notNull(),
   zone: text("zone"),
@@ -37,8 +47,8 @@ export const propertyNotesTable = pgTable("property_notes", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertPropertyProfileSchema = createInsertSchema(propertyProfilesTable).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertPropertyNoteSchema = createInsertSchema(propertyNotesTable).omit({ id: true, createdAt: true });
+export const insertPropertyProfileSchema = createInsertSchema(propertyProfilesTable).omit({ id: true, createdAt: true, updatedAt: true, companyId: true });
+export const insertPropertyNoteSchema = createInsertSchema(propertyNotesTable).omit({ id: true, createdAt: true, companyId: true });
 
 export type PropertyProfile = typeof propertyProfilesTable.$inferSelect;
 export type InsertPropertyProfile = z.infer<typeof insertPropertyProfileSchema>;

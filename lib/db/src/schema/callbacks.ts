@@ -2,6 +2,7 @@ import { pgTable, serial, integer, text, boolean, timestamp } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { inspectionsTable } from "./inspections";
+import { companiesTable } from "./companies";
 
 // Tracks the Finding -> Recommendation -> Follow-Up -> Outcome chain used by
 // ReadyLoq Command's Callback Intelligence. This is the only persisted table for
@@ -9,6 +10,7 @@ import { inspectionsTable } from "./inspections";
 // existing analysis_results.findings so they remain strictly evidence-based.
 export const callbacksTable = pgTable("callbacks", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   inspectionId: integer("inspection_id").notNull().references(() => inspectionsTable.id, { onDelete: "cascade" }),
   propertyType: text("property_type").notNull(), // Multifamily | Restaurant | Commercial | Warehouse | Single Family
   pestType: text("pest_type").notNull(),
@@ -22,6 +24,6 @@ export const callbacksTable = pgTable("callbacks", {
   resolvedAt: timestamp("resolved_at"),
 });
 
-export const insertCallbackSchema = createInsertSchema(callbacksTable).omit({ id: true });
+export const insertCallbackSchema = createInsertSchema(callbacksTable).omit({ id: true, companyId: true });
 export type Callback = typeof callbacksTable.$inferSelect;
 export type InsertCallback = z.infer<typeof insertCallbackSchema>;

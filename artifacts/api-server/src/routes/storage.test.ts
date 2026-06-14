@@ -29,13 +29,19 @@ vi.mock("../lib/objectStorage", () => {
 });
 
 import app from "../app";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, companiesTable } from "@workspace/db";
 
 const TECH_ID = "test_storage_tech_clerk_id";
 
 beforeAll(async () => {
   await db.delete(usersTable);
-  await db.insert(usersTable).values([{ clerkUserId: TECH_ID, role: "technician" }]);
+  const [company] = await db
+    .insert(companiesTable)
+    .values({ name: "Storage Test Co", slug: `storage-test-${Date.now()}` })
+    .returning();
+  await db
+    .insert(usersTable)
+    .values([{ clerkUserId: TECH_ID, role: "technician", companyId: company.id }]);
 });
 
 beforeEach(() => {

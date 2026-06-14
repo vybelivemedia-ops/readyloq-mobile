@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import {
   useGetActiveBranding,
   getGetActiveBrandingQueryKey,
+  useGetCompanyBranding,
+  getGetCompanyBrandingQueryKey,
   type BrandingProfile,
 } from "@workspace/api-client-react";
 import { DEFAULT_BRANDING, DEFAULT_LOGO, applyBrandingToDocument } from "@/lib/branding";
@@ -40,9 +42,15 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const { data, isLoading } = useGetActiveBranding({
     query: { queryKey: getGetActiveBrandingQueryKey(), staleTime: 60_000 },
   });
+  // Post-login the caller's company brand overrides the platform default. When
+  // signed out or not yet onboarded this request 401/403s and is ignored, so
+  // the pre-login experience keeps the platform (ReadyLoq) brand.
+  const { data: companyBrand } = useGetCompanyBranding({
+    query: { queryKey: getGetCompanyBrandingQueryKey(), staleTime: 60_000, retry: false },
+  });
   const [preview, setPreview] = useState<BrandingProfile | null>(null);
 
-  const active = data ?? DEFAULT_BRANDING;
+  const active = companyBrand ?? data ?? DEFAULT_BRANDING;
   const effective = preview ?? active;
 
   useEffect(() => {

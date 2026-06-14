@@ -1,9 +1,11 @@
-import { pgTable, serial, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { companiesTable } from "./companies";
 
 export const datasetImagesTable = pgTable("dataset_images", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   category: text("category").notNull(), // "pest_activity" | "exclusion" | "sanitation" | "moisture" | "structural"
   title: text("title").notNull(),
   description: text("description"),
@@ -16,6 +18,6 @@ export const datasetImagesTable = pgTable("dataset_images", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertDatasetImageSchema = createInsertSchema(datasetImagesTable).omit({ id: true, createdAt: true });
+export const insertDatasetImageSchema = createInsertSchema(datasetImagesTable).omit({ id: true, createdAt: true, companyId: true });
 export type DatasetImage = typeof datasetImagesTable.$inferSelect;
 export type InsertDatasetImage = z.infer<typeof insertDatasetImageSchema>;

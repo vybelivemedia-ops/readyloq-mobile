@@ -2441,6 +2441,83 @@ export function useGetActiveBranding<TData = Awaited<ReturnType<typeof getActive
 
 
 
+export const getGetCompanyBrandingUrl = () => {
+
+
+
+
+  return `/api/branding/company`
+}
+
+/**
+ * @summary Get the caller company's active branding profile (authenticated)
+ */
+export const getCompanyBranding = async ( options?: RequestInit): Promise<BrandingProfile> => {
+
+  return customFetch<BrandingProfile>(getGetCompanyBrandingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompanyBrandingQueryKey = () => {
+    return [
+    `/api/branding/company`
+    ] as const;
+    }
+
+
+export const getGetCompanyBrandingQueryOptions = <TData = Awaited<ReturnType<typeof getCompanyBranding>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompanyBrandingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompanyBranding>>> = ({ signal }) => getCompanyBranding({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompanyBranding>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCompanyBrandingQueryResult = NonNullable<Awaited<ReturnType<typeof getCompanyBranding>>>
+export type GetCompanyBrandingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the caller company's active branding profile (authenticated)
+ */
+
+export function useGetCompanyBranding<TData = Awaited<ReturnType<typeof getCompanyBranding>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCompanyBrandingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListBrandingProfilesUrl = () => {
 
 

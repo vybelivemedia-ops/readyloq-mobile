@@ -11,7 +11,7 @@ import { Layout } from "@/components/layout";
 import { BrandingProvider, useBranding } from "@/components/branding-provider";
 import { brandLogoSrc, absoluteUrl } from "@/lib/branding";
 import type { BrandingProfile } from "@workspace/api-client-react";
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCurrentUser, isManagerRole } from "@/hooks/use-current-user";
 import Dashboard from "@/pages/dashboard";
 import InspectionsList from "@/pages/inspections/index";
 import NewInspection from "@/pages/inspections/new";
@@ -30,6 +30,7 @@ import AnalyticsDashboard from "@/pages/analytics";
 import CommandCenter from "@/pages/command";
 import SettingsPage from "@/pages/settings";
 import CapabilityCenter from "@/pages/capability";
+import Onboarding from "@/pages/onboarding";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -187,10 +188,13 @@ function HomeRoute() {
 function ProtectedRoutes() {
   const { isLoaded, isSignedIn } = useAuth();
   const { data: currentUser } = useCurrentUser();
-  const isManager = currentUser?.role === "manager";
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
+  if (!currentUser) return null;
+  if (currentUser.companyId == null) return <Onboarding />;
+
+  const isManager = isManagerRole(currentUser.role);
 
   return (
     <Layout>

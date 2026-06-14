@@ -819,6 +819,38 @@ export const GetActiveBrandingResponse = zod.object({
 
 
 /**
+ * @summary Get the caller company's active branding profile (authenticated)
+ */
+export const GetCompanyBrandingResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "isDefault": zod.boolean(),
+  "isActive": zod.boolean(),
+  "companyName": zod.string(),
+  "tagline": zod.string().nullish(),
+  "companyAddress": zod.string().nullish(),
+  "companyPhone": zod.string().nullish(),
+  "companyEmail": zod.string().nullish(),
+  "companyWebsite": zod.string().nullish(),
+  "licenseNumber": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "appIconUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish(),
+  "secondaryColor": zod.string().nullish(),
+  "accentColor": zod.string().nullish(),
+  "reportFooterText": zod.string().nullish(),
+  "supportInfo": zod.string().nullish(),
+  "signatureDisclaimer": zod.string().nullish(),
+  "emailSenderName": zod.string().nullish(),
+  "emailReplyTo": zod.string().nullish(),
+  "emailFooter": zod.string().nullish(),
+  "poweredByVisible": zod.boolean(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
  * @summary List all branding profiles (manager only)
  */
 export const ListBrandingProfilesResponseItem = zod.object({

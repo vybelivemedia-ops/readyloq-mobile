@@ -106,7 +106,7 @@ export class ObjectStorageService {
     return new Response(webStream, { headers });
   }
 
-  async getObjectEntityUploadURL(): Promise<string> {
+  async getObjectEntityUploadURL(companyId: number): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -115,8 +115,11 @@ export class ObjectStorageService {
       );
     }
 
+    // Namespace uploads under the caller's company. The company id encoded in
+    // the object path is the tenant boundary enforced at serve time, so a URL
+    // from one company can never be read by another (see objectPathCompanyScope).
     const objectId = randomUUID();
-    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+    const fullPath = `${privateObjectDir}/companies/${companyId}/uploads/${objectId}`;
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
@@ -262,6 +265,24 @@ async function signObjectURL({
     );
   }
 
-  const { signed_url: signedURL } = await response.json();
+  const { signed_url: signedURL } = (await response.json()) as { signed_url: string };
   return signedURL;
+}
+
+/**
+ * Determine which company an object entity path belongs to, based on its
+ * namespaced prefix. New uploads live under `companies/{id}/...`; objects
+ * created before multi-tenancy have no company segment and map to the legacy
+ * company (only legacy-company members may read them).
+ *
+ * Example: "/objects/companies/5/uploads/abc" -> 5; "/objects/uploads/abc" -> "legacy".
+ */
+export function objectPathCompanyScope(objectPath: string): number | "legacy" {
+  const withoutPrefix = objectPath.replace(/^\/objects\//, "");
+  const parts = withoutPrefix.split("/");
+  if (parts[0] === "companies" && parts.length >= 2) {
+    const cid = Number(parts[1]);
+    if (Number.isInteger(cid) && cid > 0) return cid;
+  }
+  return "legacy";
 }

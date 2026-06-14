@@ -1,9 +1,11 @@
 import { pgTable, serial, text, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { companiesTable } from "./companies";
 
 export const inspectionsTable = pgTable("inspections", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   siteAddress: text("site_address").notNull(),
   clientName: text("client_name"),
   technicianName: text("technician_name").notNull(),
@@ -21,6 +23,7 @@ export const inspectionsTable = pgTable("inspections", {
 
 export const inspectionMediaTable = pgTable("inspection_media", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
   inspectionId: integer("inspection_id").notNull().references(() => inspectionsTable.id, { onDelete: "cascade" }),
   mediaType: text("media_type").notNull(), // "photo" | "video" | "voice"
   url: text("url").notNull(),
@@ -30,8 +33,8 @@ export const inspectionMediaTable = pgTable("inspection_media", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertInspectionSchema = createInsertSchema(inspectionsTable).omit({ id: true, createdAt: true, mediaCount: true, findingsCount: true, aiAnalysisId: true });
-export const insertInspectionMediaSchema = createInsertSchema(inspectionMediaTable).omit({ id: true, createdAt: true });
+export const insertInspectionSchema = createInsertSchema(inspectionsTable).omit({ id: true, createdAt: true, mediaCount: true, findingsCount: true, aiAnalysisId: true, companyId: true });
+export const insertInspectionMediaSchema = createInsertSchema(inspectionMediaTable).omit({ id: true, createdAt: true, companyId: true });
 
 export type Inspection = typeof inspectionsTable.$inferSelect;
 export type InsertInspection = z.infer<typeof insertInspectionSchema>;

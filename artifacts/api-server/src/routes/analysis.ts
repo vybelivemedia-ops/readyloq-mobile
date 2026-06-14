@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { analysisResultsTable, inspectionsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
+import { getCompanyId } from "../lib/tenant";
 
 const router = Router();
 
@@ -17,21 +18,32 @@ function serializeResult(row: typeof analysisResultsTable.$inferSelect) {
 // GET /analysis
 router.get("/", async (req, res) => {
   try {
-    const inspectionId = req.query.inspectionId ? parseInt(req.query.inspectionId as string) : undefined;
-    let rows = await db.select().from(analysisResultsTable).orderBy(desc(analysisResultsTable.createdAt));
-    if (inspectionId) rows = rows.filter(r => r.inspectionId === inspectionId);
-    res.json(rows.map(serializeResult));
+    const companyId = getCompanyId(req);
+    const inspectionId = req.query.inspectionId
+      ? parseInt(req.query.inspectionId as string)
+      : undefined;
+    let rows = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId))
+      .orderBy(desc(analysisResultsTable.createdAt));
+    if (inspectionId) rows = rows.filter((r) => r.inspectionId === inspectionId);
+    return res.json(rows.map(serializeResult));
   } catch (err) {
-    res.status(500).json({ error: "Failed to list analysis results" });
+    return res.status(500).json({ error: "Failed to list analysis results" });
   }
 });
 
 // GET /analysis/summary
 router.get("/summary", async (req, res) => {
   try {
-    const rows = await db.select().from(analysisResultsTable);
-    const completed = rows.filter(r => r.status === "complete");
-    const allFindings = completed.flatMap(r => (r.findings ?? []) as any[]);
+    const companyId = getCompanyId(req);
+    const rows = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId));
+    const completed = rows.filter((r) => r.status === "complete");
+    const allFindings = completed.flatMap((r) => (r.findings ?? []) as any[]);
 
     const categoryMap: Record<string, number> = {};
     for (const f of allFindings) {
@@ -50,72 +62,104 @@ router.get("/summary", async (req, res) => {
       percentage: total > 0 ? Math.round((count / total) * 100) : 0,
     }));
 
-    const avgConfidence = completed.length > 0
-      ? completed.reduce((sum, r) => sum + (r.overallConfidence ?? 0), 0) / completed.length
-      : 0;
+    const avgConfidence =
+      completed.length > 0
+        ? completed.reduce((sum, r) => sum + (r.overallConfidence ?? 0), 0) / completed.length
+        : 0;
 
-    res.json({
+    return res.json({
       totalAnalyses: completed.length,
       avgConfidence: Math.round(avgConfidence * 10) / 10,
       topFindings,
       findingsByCategory,
     });
   } catch (err) {
-    res.status(500).json({ error: "Failed to get summary" });
+    return res.status(500).json({ error: "Failed to get summary" });
   }
 });
 
 // POST /analysis — create analysis result from real inspection captures
 router.post("/", async (req, res) => {
   try {
-    const { inspectionId, findings = [], recommendations = [], overallConfidence } = req.body;
+    const companyId = getCompanyId(req);
+    const {
+      inspectionId,
+      findings = [],
+      recommendations = [],
+      overallConfidence,
+    } = req.body;
     if (!inspectionId) return res.status(400).json({ error: "inspectionId is required" });
 
-    const computed = overallConfidence ??
+    // Child write: the parent inspection must belong to the caller's company.
+    const [inspection] = await db
+      .select()
+      .from(inspectionsTable)
+      .where(
+        and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)),
+      );
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+
+    const computed =
+      overallConfidence ??
       (findings.length > 0
-        ? Math.round(findings.reduce((s: number, f: any) => s + ((f.confidence ?? 0) * 100), 0) / findings.length)
+        ? Math.round(
+            findings.reduce(
+              (s: number, f: any) => s + (f.confidence ?? 0) * 100,
+              0,
+            ) / findings.length,
+          )
         : 0);
 
-    const [row] = await db.insert(analysisResultsTable).values({
-      inspectionId,
-      status: "complete",
-      findings,
-      recommendations,
-      overallConfidence: computed,
-    }).returning();
+    const [row] = await db
+      .insert(analysisResultsTable)
+      .values({
+        companyId,
+        inspectionId,
+        status: "complete",
+        findings,
+        recommendations,
+        overallConfidence: computed,
+      })
+      .returning();
 
-    res.status(201).json(serializeResult(row));
+    return res.status(201).json(serializeResult(row));
   } catch (err) {
-    res.status(500).json({ error: "Failed to create analysis result" });
+    return res.status(500).json({ error: "Failed to create analysis result" });
   }
 });
 
 // GET /analysis/:id
 router.get("/:id", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
-    const [row] = await db.select().from(analysisResultsTable).where(eq(analysisResultsTable.id, id));
+    const [row] = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(and(eq(analysisResultsTable.id, id), eq(analysisResultsTable.companyId, companyId)));
     if (!row) return res.status(404).json({ error: "Not found" });
-    res.json(serializeResult(row));
+    return res.json(serializeResult(row));
   } catch (err) {
-    res.status(500).json({ error: "Failed to get analysis" });
+    return res.status(500).json({ error: "Failed to get analysis" });
   }
 });
 
 // POST /analysis/:id/feedback
 router.post("/:id/feedback", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
     const { feedbackStatus, technicianFeedback } = req.body;
     if (!feedbackStatus) return res.status(400).json({ error: "feedbackStatus is required" });
-    const [row] = await db.update(analysisResultsTable)
+    const [row] = await db
+      .update(analysisResultsTable)
       .set({ feedbackStatus, technicianFeedback: technicianFeedback ?? null })
-      .where(eq(analysisResultsTable.id, id))
+      .where(and(eq(analysisResultsTable.id, id), eq(analysisResultsTable.companyId, companyId)))
       .returning();
     if (!row) return res.status(404).json({ error: "Not found" });
-    res.json(serializeResult(row));
+    return res.json(serializeResult(row));
   } catch (err) {
-    res.status(500).json({ error: "Failed to submit feedback" });
+    return res.status(500).json({ error: "Failed to submit feedback" });
   }
 });
 

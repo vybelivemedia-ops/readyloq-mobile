@@ -16,7 +16,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useClerk, useUser } from "@clerk/react";
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCurrentUser, isManagerRole } from "@/hooks/use-current-user";
 import { useBranding } from "@/components/branding-provider";
 import { brandLogoSrc } from "@/lib/branding";
 
@@ -57,7 +57,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const branding = useBranding();
   const logoSrc = brandLogoSrc(branding);
   const companyName = branding.companyName;
-  const isManager = currentUser?.role === "manager";
+  const isManager = isManagerRole(currentUser?.role);
 
   const navItems = [
     ...baseNavItems,

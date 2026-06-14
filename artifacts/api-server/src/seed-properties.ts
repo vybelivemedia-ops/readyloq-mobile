@@ -2,6 +2,7 @@ import { db } from "@workspace/db";
 import { propertyProfilesTable, propertyNotesTable } from "@workspace/db";
 import type { Hotspot } from "@workspace/db";
 import { normalizeAddressKey } from "./lib/property-intelligence";
+import { getSeedCompanyId } from "./lib/seed-company";
 
 // Idempotent: only seeds when property_profiles is empty. Attaches authored
 // intelligence to addresses that already have inspections/analyses so the
@@ -58,9 +59,11 @@ async function main() {
     return;
   }
 
+  const companyId = await getSeedCompanyId();
   for (const p of PROFILES) {
     const addressKey = normalizeAddressKey(p.siteAddress);
     await db.insert(propertyProfilesTable).values({
+      companyId,
       addressKey,
       siteAddress: p.siteAddress,
       clientName: p.clientName,
@@ -71,6 +74,7 @@ async function main() {
 
     for (const n of p.notes) {
       await db.insert(propertyNotesTable).values({
+        companyId,
         addressKey,
         note: n.note,
         zone: n.zone ?? null,

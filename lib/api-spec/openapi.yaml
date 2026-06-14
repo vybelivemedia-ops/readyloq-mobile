@@ -577,6 +577,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/BrandingProfile"
 
+  /branding/company:
+    get:
+      operationId: getCompanyBranding
+      tags: [branding]
+      summary: Get the caller company's active branding profile (authenticated)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
   /branding/profiles:
     get:
       operationId: listBrandingProfiles

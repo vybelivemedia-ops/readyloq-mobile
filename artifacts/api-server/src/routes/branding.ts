@@ -2,12 +2,14 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
   brandingProfilesTable,
+  companiesTable,
   insertBrandingProfileSchema,
   READYLOQ_DEFAULT_PROFILE,
   type BrandingProfile,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
-import { requireAuth, requireRole } from "../middleware/require-auth";
+import { and, eq } from "drizzle-orm";
+import { requireAuth, requireRole, requireCompany } from "../middleware/require-auth";
+import { getCompanyId } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -35,46 +37,81 @@ function firstInvalidColor(d: {
   return null;
 }
 
-/** Ensure at least the protected ReadyLoq Default profile exists. */
-async function ensureSeeded(): Promise<BrandingProfile[]> {
-  const rows = await db.select().from(brandingProfilesTable);
+// The reserved "platform" company owns the ReadyLoq default brand served to
+// anyone before they sign in. Cache its id so the public endpoint stays cheap.
+let platformCompanyIdCache: number | null = null;
+async function getPlatformCompanyId(): Promise<number | null> {
+  if (platformCompanyIdCache != null) return platformCompanyIdCache;
+  const [row] = await db
+    .select()
+    .from(companiesTable)
+    .where(eq(companiesTable.slug, "platform"));
+  platformCompanyIdCache = row?.id ?? null;
+  return platformCompanyIdCache;
+}
+
+/** Ensure the given company has at least a default branding profile. */
+async function ensureSeeded(companyId: number): Promise<BrandingProfile[]> {
+  const rows = await db
+    .select()
+    .from(brandingProfilesTable)
+    .where(eq(brandingProfilesTable.companyId, companyId));
   if (rows.length > 0) return rows;
   const [row] = await db
     .insert(brandingProfilesTable)
-    .values({ ...READYLOQ_DEFAULT_PROFILE, isDefault: true, isActive: true })
+    .values({ ...READYLOQ_DEFAULT_PROFILE, companyId, isDefault: true, isActive: true })
     .returning();
   return [row];
 }
 
-async function getActiveProfile(): Promise<BrandingProfile> {
-  const rows = await ensureSeeded();
+async function getActiveProfile(companyId: number): Promise<BrandingProfile> {
+  const rows = await ensureSeeded(companyId);
   return rows.find((r) => r.isActive) ?? rows.find((r) => r.isDefault) ?? rows[0];
 }
 
-// ── PUBLIC: active profile (for login/landing branding before sign-in) ─────────
+// ── PUBLIC: platform active profile (login/landing branding before sign-in) ───
 router.get("/active", async (_req, res) => {
   try {
-    return res.json(serialize(await getActiveProfile()));
+    const platformId = await getPlatformCompanyId();
+    if (platformId == null) {
+      return res.status(500).json({ error: "Platform branding unavailable" });
+    }
+    return res.json(serialize(await getActiveProfile(platformId)));
   } catch {
     return res.status(500).json({ error: "Failed to get active branding" });
   }
 });
 
-// Backward-compatible alias used by report PDF data hook.
+// Backward-compatible alias used by the report PDF data hook (pre-login brand).
 router.get("/", async (_req, res) => {
   try {
-    return res.json(serialize(await getActiveProfile()));
+    const platformId = await getPlatformCompanyId();
+    if (platformId == null) {
+      return res.status(500).json({ error: "Platform branding unavailable" });
+    }
+    return res.json(serialize(await getActiveProfile(platformId)));
   } catch {
     return res.status(500).json({ error: "Failed to get branding" });
   }
 });
 
-// ── Everything below is manager-only ──────────────────────────────────────────
-router.use(requireAuth, requireRole("manager"));
-
-router.get("/profiles", async (_req, res) => {
+// ── AUTHED: the caller's own company active profile (post-login brand) ─────────
+router.get("/company", requireAuth, requireCompany, async (req, res) => {
   try {
-    const rows = await ensureSeeded();
+    const companyId = getCompanyId(req);
+    return res.json(serialize(await getActiveProfile(companyId)));
+  } catch {
+    return res.status(500).json({ error: "Failed to get company branding" });
+  }
+});
+
+// ── Everything below is manager-only and scoped to the caller's company ───────
+router.use(requireAuth, requireCompany, requireRole("manager"));
+
+router.get("/profiles", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const rows = await ensureSeeded(companyId);
     rows.sort((a, b) => a.id - b.id);
     return res.json(rows.map(serialize));
   } catch {
@@ -84,13 +121,15 @@ router.get("/profiles", async (_req, res) => {
 
 router.post("/profiles", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const validation = insertBrandingProfileSchema.safeParse(req.body);
     if (!validation.success) {
       return res
         .status(400)
         .json({ error: "Invalid request body", issues: validation.error.issues });
     }
-    // New profiles can never be the protected default or auto-activate.
+    // New profiles can never be the protected default or auto-activate, and are
+    // always stamped with the caller's company.
     const { isDefault, isActive, ...data } = validation.data;
     const badColor = firstInvalidColor(data);
     if (badColor) {
@@ -100,7 +139,7 @@ router.post("/profiles", async (req, res) => {
     }
     const [row] = await db
       .insert(brandingProfilesTable)
-      .values({ ...data, isDefault: false, isActive: false })
+      .values({ ...data, companyId, isDefault: false, isActive: false })
       .returning();
     return res.status(201).json(serialize(row));
   } catch {
@@ -110,11 +149,14 @@ router.post("/profiles", async (req, res) => {
 
 router.get("/profiles/:id", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     const [row] = await db
       .select()
       .from(brandingProfilesTable)
-      .where(eq(brandingProfilesTable.id, id));
+      .where(
+        and(eq(brandingProfilesTable.id, id), eq(brandingProfilesTable.companyId, companyId)),
+      );
     if (!row) return res.status(404).json({ error: "Profile not found" });
     return res.json(serialize(row));
   } catch {
@@ -124,6 +166,7 @@ router.get("/profiles/:id", async (req, res) => {
 
 router.patch("/profiles/:id", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     const validation = insertBrandingProfileSchema.partial().safeParse(req.body);
     if (!validation.success) {
@@ -134,10 +177,13 @@ router.patch("/profiles/:id", async (req, res) => {
     const [existing] = await db
       .select()
       .from(brandingProfilesTable)
-      .where(eq(brandingProfilesTable.id, id));
+      .where(
+        and(eq(brandingProfilesTable.id, id), eq(brandingProfilesTable.companyId, companyId)),
+      );
     if (!existing) return res.status(404).json({ error: "Profile not found" });
 
-    // isDefault / isActive are managed via dedicated endpoints, not direct edits.
+    // isDefault / isActive are managed via dedicated endpoints, never direct edits;
+    // companyId is fixed by the tenant boundary.
     const { isDefault, isActive, ...data } = validation.data;
     const badColor = firstInvalidColor(data);
     if (badColor) {
@@ -148,7 +194,9 @@ router.patch("/profiles/:id", async (req, res) => {
     const [updated] = await db
       .update(brandingProfilesTable)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(brandingProfilesTable.id, id))
+      .where(
+        and(eq(brandingProfilesTable.id, id), eq(brandingProfilesTable.companyId, companyId)),
+      )
       .returning();
     return res.json(serialize(updated));
   } catch {
@@ -158,11 +206,14 @@ router.patch("/profiles/:id", async (req, res) => {
 
 router.post("/profiles/:id/duplicate", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     const [source] = await db
       .select()
       .from(brandingProfilesTable)
-      .where(eq(brandingProfilesTable.id, id));
+      .where(
+        and(eq(brandingProfilesTable.id, id), eq(brandingProfilesTable.companyId, companyId)),
+      );
     if (!source) return res.status(404).json({ error: "Profile not found" });
 
     const { id: _id, createdAt, updatedAt, ...rest } = source;
@@ -178,24 +229,36 @@ router.post("/profiles/:id/duplicate", async (req, res) => {
 
 router.delete("/profiles/:id", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     const [existing] = await db
       .select()
       .from(brandingProfilesTable)
-      .where(eq(brandingProfilesTable.id, id));
+      .where(
+        and(eq(brandingProfilesTable.id, id), eq(brandingProfilesTable.companyId, companyId)),
+      );
     if (!existing) return res.status(404).json({ error: "Profile not found" });
     if (existing.isDefault) {
-      return res.status(400).json({ error: "The default ReadyLoq profile cannot be deleted" });
+      return res.status(400).json({ error: "The default profile cannot be deleted" });
     }
 
     await db.transaction(async (tx) => {
-      await tx.delete(brandingProfilesTable).where(eq(brandingProfilesTable.id, id));
-      // If we removed the active profile, fall back to the default.
+      await tx
+        .delete(brandingProfilesTable)
+        .where(
+          and(eq(brandingProfilesTable.id, id), eq(brandingProfilesTable.companyId, companyId)),
+        );
+      // If we removed the active profile, fall back to the company default.
       if (existing.isActive) {
         const [def] = await tx
           .select()
           .from(brandingProfilesTable)
-          .where(eq(brandingProfilesTable.isDefault, true));
+          .where(
+            and(
+              eq(brandingProfilesTable.companyId, companyId),
+              eq(brandingProfilesTable.isDefault, true),
+            ),
+          );
         if (def) {
           await tx
             .update(brandingProfilesTable)
@@ -212,19 +275,28 @@ router.delete("/profiles/:id", async (req, res) => {
 
 router.post("/profiles/:id/activate", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     const [target] = await db
       .select()
       .from(brandingProfilesTable)
-      .where(eq(brandingProfilesTable.id, id));
+      .where(
+        and(eq(brandingProfilesTable.id, id), eq(brandingProfilesTable.companyId, companyId)),
+      );
     if (!target) return res.status(404).json({ error: "Profile not found" });
 
     const [updated] = await db.transaction(async (tx) => {
-      await tx.update(brandingProfilesTable).set({ isActive: false });
+      // Only deactivate within the caller's company so other tenants are untouched.
+      await tx
+        .update(brandingProfilesTable)
+        .set({ isActive: false })
+        .where(eq(brandingProfilesTable.companyId, companyId));
       return tx
         .update(brandingProfilesTable)
         .set({ isActive: true, updatedAt: new Date() })
-        .where(eq(brandingProfilesTable.id, id))
+        .where(
+          and(eq(brandingProfilesTable.id, id), eq(brandingProfilesTable.companyId, companyId)),
+        )
         .returning();
     });
     return res.json(serialize(updated));
@@ -233,21 +305,30 @@ router.post("/profiles/:id/activate", async (req, res) => {
   }
 });
 
-router.post("/restore-defaults", async (_req, res) => {
+router.post("/restore-defaults", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const updated = await db.transaction(async (tx) => {
-      await ensureSeeded();
+      await ensureSeeded(companyId);
       const [def] = await tx
         .select()
         .from(brandingProfilesTable)
-        .where(eq(brandingProfilesTable.isDefault, true));
+        .where(
+          and(
+            eq(brandingProfilesTable.companyId, companyId),
+            eq(brandingProfilesTable.isDefault, true),
+          ),
+        );
       // Reset the protected default to canonical ReadyLoq values...
       await tx
         .update(brandingProfilesTable)
         .set({ ...READYLOQ_DEFAULT_PROFILE, isDefault: true, updatedAt: new Date() })
         .where(eq(brandingProfilesTable.id, def.id));
-      // ...and make it the active profile.
-      await tx.update(brandingProfilesTable).set({ isActive: false });
+      // ...and make it the active profile (within this company only).
+      await tx
+        .update(brandingProfilesTable)
+        .set({ isActive: false })
+        .where(eq(brandingProfilesTable.companyId, companyId));
       const [active] = await tx
         .update(brandingProfilesTable)
         .set({ isActive: true })

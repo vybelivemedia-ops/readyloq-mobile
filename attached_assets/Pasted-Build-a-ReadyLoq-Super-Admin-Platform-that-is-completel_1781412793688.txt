@@ -1,0 +1,214 @@
+Build a ReadyLoq Super Admin Platform that is completely separate from company-level dashboards.
+
+Purpose:
+The Super Admin Platform is used only by ReadyLoq staff to operate the SaaS business. Company owners, managers, and technicians must never see or access these screens.
+
+Architecture Requirements
+
+Add a new role:
+
+- super_admin
+- owner
+- manager
+- technician
+
+Only super_admin users can access the ReadyLoq HQ dashboard.
+
+Create a dedicated admin area:
+
+- admin.readyloq.com (or /hq initially)
+- Separate navigation from company users
+- Separate route protection
+- Separate layouts and permissions
+
+Super Admin Dashboard Modules
+
+1. Company Management
+
+Create, edit, suspend, archive, and reactivate companies.
+
+Display:
+
+- Company name
+- Active status
+- Plan tier
+- Number of users
+- Number of inspections
+- Storage usage
+- Date created
+- Last activity
+
+Actions:
+
+- Create company
+- Suspend company
+- Restore company
+- Impersonate company owner
+- View company details
+
+2. Subscription & Billing Management
+
+Create billing infrastructure ready for Stripe integration.
+
+Display:
+
+- Starter plan
+- Professional plan
+- Enterprise plan
+
+Track:
+
+- Subscription status
+- Trial status
+- Renewal dates
+- Monthly recurring revenue
+- Annual recurring revenue
+- Churn metrics
+
+Design the data model so Stripe can be connected later without major refactoring.
+
+3. White Label Management
+
+Connect directly to the branding_profiles system.
+
+Allow:
+
+- Create branding profile
+- Edit branding profile
+- Clone branding profile
+- Activate branding profile
+- Archive branding profile
+
+Display previews for:
+
+- Login page
+- Mobile app
+- PDF reports
+- Web dashboard
+
+4. User Management
+
+View all users across all companies.
+
+Display:
+
+- Name
+- Email
+- Company
+- Role
+- Last login
+- Status
+
+Actions:
+
+- Disable user
+- Reset access
+- Change role
+- Transfer company ownership
+
+5. Integration Management
+
+Create a section dedicated to third-party integrations.
+
+Track:
+
+- PestPac
+- FieldRoutes
+- Stripe
+- QuickBooks
+- Google Workspace
+- Microsoft 365
+
+Display:
+
+- Connected companies
+- API status
+- Sync status
+- Last sync time
+- Error logs
+
+6. Platform Analytics
+
+Create executive-level SaaS metrics.
+
+Display:
+
+- Total companies
+- Active companies
+- Total users
+- Active users
+- Total inspections
+- Reports generated
+- Storage consumed
+- Revenue metrics
+- Growth trends
+
+7. Support Center
+
+Allow ReadyLoq staff to support customers.
+
+Features:
+
+- Search company
+- Search user
+- View activity logs
+- View audit logs
+- Impersonate company admin
+- View integration errors
+- View billing history
+
+8. Security Center
+
+Display:
+
+- Failed login attempts
+- Suspicious activity
+- Cross-tenant access violations
+- Audit trail events
+- User lockouts
+- Permission changes
+
+9. System Health
+
+Display:
+
+- API health
+- Database health
+- Storage health
+- Queue health
+- Webhook health
+- Background job status
+
+Include alerting for failures.
+
+Permissions
+
+Super Admin:
+- Full access to every company and every system area.
+
+Owner:
+- Only their company's data.
+
+Manager:
+- Only their company's management functions.
+
+Technician:
+- Only field operations.
+
+Non-Goals
+
+Do not expose any Super Admin features to company users.
+
+Do not allow company owners to see other companies.
+
+Do not bypass multi-tenant isolation except through controlled super_admin tools.
+
+Success Criteria
+
+ReadyLoq can operate as a true SaaS platform where:
+
+- Multiple pest-control companies coexist safely.
+- Each company sees only its own data.
+- ReadyLoq administrators can manage the entire platform from a dedicated HQ dashboard.
+- Billing, branding, integrations, support, analytics, and security are managed centrally.
+- Architecture is scalable to hundreds of companies without redesign.
