@@ -28,6 +28,9 @@ if (!basePath) {
 
 export default defineConfig({
   base: basePath,
+  define: {
+    global: "globalThis",
+  },
   plugins: [
     react(),
     tailwindcss({ optimize: false }),

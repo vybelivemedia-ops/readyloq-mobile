@@ -120,6 +120,14 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Pre-inspection lookup: `GET /properties/lookup?siteAddress=` returns matchStatus exact|possible|none (possible = prefix or ≥50% token Jaccard on the slug). Frontend `PreInspectionIntel` (debounced 400ms, ≥4 chars) in components/property-intel.tsx, injected into inspections/new.tsx setup step.
 - Seed: `seed-properties.ts` (count-guarded, idempotent) attaches profiles to the Riverside/Oak addresses that already have analyses so derived sections populate.
 
+## PDF Report Generation (@react-pdf/renderer)
+- `@react-pdf/renderer` installed in `@workspace/readyloq` (runtime dep). Vite requires `define: { global: 'globalThis' }` in vite.config.ts — do not remove this.
+- Two modes: `'customer'` (Cover, Summary, Findings, Photos, Recommendations, Technician Observations, Signatures) and `'internal'` (everything + Property Intelligence, Service History, Management Insights).
+- Component: `src/components/report-pdf.tsx`. Data hook: `src/hooks/use-report-pdf-data.ts`. Address normalization: `src/lib/normalize-address-key.ts`.
+- Mode selector + Preview (PDFViewer in Dialog) + Download (pdf().toBlob()) are wired in `src/pages/reports/detail.tsx`.
+- GET /inspections/:id returns `media[]` inline — use `mediaType === 'photo'` for evidence, `mediaType === 'voice'` for voice notes in Technician Observations.
+- No Tailwind in PDF components — use `StyleSheet.create` with camelCase React-Native-style properties only.
+
 ## V2 Intelligence Model — Phase 1 (technician copilot)
 - **Report Confidence model** = every finding shows three things: Confidence (existing `finding.confidence`), Evidence Quality, Verified status. Shared util `lib/finding-confidence.ts` (derive fns + label/class maps) + chip components in `components/finding-confidence-chips.tsx`. Rendered in analysis/detail + reports/detail.
 - **Store evidenceQuality, DERIVE verificationStatus.** `evidenceQuality?: "excellent"|"good"|"fair"` is an optional jsonb field on the Finding interface (reused by analysis_results AND reports) — added to schema + openapi, regenerated clients, NO migration (jsonb). verificationStatus is ALWAYS derived (`deriveVerificationStatus` from analysis `feedbackStatus` or report `status`) — there is no per-finding write path, so deriving avoids a dual source of truth.

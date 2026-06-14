@@ -4,9 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, FileText, MapPin, User, Calendar, AlertTriangle, CheckCircle2, ShieldCheck, Lightbulb, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowLeft, FileText, MapPin, User, Calendar, AlertTriangle, CheckCircle2, ShieldCheck, Lightbulb, Download, Eye, Lock, Users } from "lucide-react";
 import { Link } from "wouter";
 import { FindingConfidenceRow } from "@/components/finding-confidence-chips";
+import { useState, useCallback } from "react";
+import { pdf } from "@react-pdf/renderer";
+import { PDFViewer } from "@react-pdf/renderer";
+import { ReportPDF, type ReportMode } from "@/components/report-pdf";
+import { useReportPdfData } from "@/hooks/use-report-pdf-data";
 
 function FindingSeverityDot({ severity }: { severity: string }) {
   const colors: Record<string, string> = { critical: "bg-red-500", high: "bg-orange-500", medium: "bg-amber-500", low: "bg-slate-500" };
@@ -17,6 +23,38 @@ export default function ReportDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id);
   const { data: report, isLoading } = useGetReport(id, { query: { enabled: !!id } });
+
+  const [mode, setMode] = useState<ReportMode>("customer");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const { report: pdfReport, inspection, branding, propertyFeed, isReady } = useReportPdfData(
+    isLoading ? null : id,
+  );
+
+  const handleDownload = useCallback(async () => {
+    if (!isReady || !pdfReport || !inspection || !branding) return;
+    setGenerating(true);
+    try {
+      const blob = await pdf(
+        <ReportPDF
+          report={pdfReport}
+          inspection={inspection}
+          branding={branding}
+          propertyFeed={propertyFeed}
+          mode={mode}
+        />,
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${pdfReport.title ?? "inspection-report"}-${mode}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setGenerating(false);
+    }
+  }, [isReady, pdfReport, inspection, branding, propertyFeed, mode]);
 
   if (isLoading) return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -41,10 +79,64 @@ export default function ReportDetail() {
           <h1 className="text-xl font-bold">{report.title}</h1>
           <p className="text-muted-foreground text-sm">Report #{report.id}</p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Download className="h-4 w-4" /> Export PDF
-        </Button>
+
+        {/* Mode selector + PDF actions */}
+        <div className="flex items-center gap-2">
+          {/* Mode toggle */}
+          <div className="flex items-center rounded-lg border border-border/60 bg-card overflow-hidden">
+            <button
+              onClick={() => setMode("customer")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                mode === "customer"
+                  ? "bg-primary text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Users className="h-3 w-3" />
+              Customer
+            </button>
+            <button
+              onClick={() => setMode("internal")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                mode === "internal"
+                  ? "bg-amber-500 text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Lock className="h-3 w-3" />
+              Internal
+            </button>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setPreviewOpen(true)}
+            disabled={!isReady}
+          >
+            <Eye className="h-4 w-4" /> Preview
+          </Button>
+
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={handleDownload}
+            disabled={!isReady || generating}
+          >
+            <Download className="h-4 w-4" />
+            {generating ? "Generating…" : "Download PDF"}
+          </Button>
+        </div>
       </div>
+
+      {/* Mode hint */}
+      {mode === "internal" && (
+        <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-400">
+          <Lock className="h-3.5 w-3.5 shrink-0" />
+          Internal report includes property intelligence, service history, hotspots, recurring issues, and management insights.
+        </div>
+      )}
 
       {/* Report Header */}
       <Card className="bg-card border-border">
@@ -55,18 +147,16 @@ export default function ReportDetail() {
               <div className="flex items-center gap-2 mt-1">
                 {report.severity && (
                   <span className={`text-xs px-2 py-0.5 rounded border font-medium ${
-                    report.severity === 'critical' ? 'bg-red-500/15 text-red-400 border-red-500/30' :
-                    report.severity === 'high' ? 'bg-orange-500/15 text-orange-400 border-orange-500/30' :
-                    'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                    report.severity === "critical" ? "bg-red-500/15 text-red-400 border-red-500/30" :
+                    report.severity === "high" ? "bg-orange-500/15 text-orange-400 border-orange-500/30" :
+                    "bg-amber-500/15 text-amber-400 border-amber-500/30"
                   }`}>{report.severity} severity</span>
                 )}
                 <span className="text-xs bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30 font-medium">{report.status}</span>
               </div>
             </div>
-            <div className="text-right">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-primary" />
-              </div>
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FileText className="h-6 w-6 text-primary" />
             </div>
           </div>
           <Separator />
@@ -98,7 +188,7 @@ export default function ReportDetail() {
               <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
               <div>
                 <p className="text-xs text-muted-foreground">Inspection Date</p>
-                <p className="font-medium">{new Date(report.inspectionDate).toLocaleDateString()}</p>
+                <p className="font-medium">{report.inspectionDate ? new Date(report.inspectionDate).toLocaleDateString() : "—"}</p>
               </div>
             </div>
           </div>
@@ -120,7 +210,7 @@ export default function ReportDetail() {
                 <div className="flex-1 space-y-1.5">
                   <div>
                     <span className="font-medium">{f.category}</span>
-                    {f.location && <span className="text-muted-foreground"> • {f.location}</span>}
+                    {f.location && <span className="text-muted-foreground"> · {f.location}</span>}
                     <p className="text-muted-foreground mt-0.5">{f.description}</p>
                   </div>
                   <FindingConfidenceRow finding={f} reportStatus={report.status} />
@@ -152,12 +242,12 @@ export default function ReportDetail() {
         </Card>
       )}
 
-      {/* Treatment Notes */}
+      {/* Treatment Notes / Technician Observations */}
       {report.treatmentNotes && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-amber-400" /> Treatment Notes
+              <Lightbulb className="h-4 w-4 text-amber-400" /> Technician Observations
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -199,11 +289,50 @@ export default function ReportDetail() {
             <div>
               <p className="text-xs text-muted-foreground mb-6">Client Signature</p>
               <div className="border-b border-border" />
-              <p className="text-xs text-muted-foreground mt-1">Date: {new Date(report.inspectionDate).toLocaleDateString()}</p>
+              <p className="text-xs text-muted-foreground mt-1">Date: {report.inspectionDate ? new Date(report.inspectionDate).toLocaleDateString() : "—"}</p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* PDF Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b border-border shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-base">
+                PDF Preview — {mode === "customer" ? "Customer Report" : "Internal Report"}
+              </DialogTitle>
+              <Button
+                size="sm"
+                className="gap-2 mr-8"
+                onClick={() => { handleDownload(); setPreviewOpen(false); }}
+                disabled={generating}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {generating ? "Generating…" : "Download"}
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {isReady && pdfReport && inspection && branding && previewOpen ? (
+              <PDFViewer width="100%" height="100%" showToolbar={false} style={{ border: "none" }}>
+                <ReportPDF
+                  report={pdfReport}
+                  inspection={inspection}
+                  branding={branding}
+                  propertyFeed={propertyFeed}
+                  mode={mode}
+                />
+              </PDFViewer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                Loading report data…
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
