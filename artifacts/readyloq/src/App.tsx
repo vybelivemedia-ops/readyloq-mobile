@@ -9,7 +9,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Layout } from "@/components/layout";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { Scan } from "lucide-react";
 import Dashboard from "@/pages/dashboard";
 import InspectionsList from "@/pages/inspections/index";
 import NewInspection from "@/pages/inspections/new";
@@ -59,7 +58,7 @@ const clerkAppearance = {
   options: {
     logoPlacement: "inside" as const,
     logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+    logoImageUrl: `${window.location.origin}${basePath}/logo.png`,
   },
   variables: {
     colorPrimary: "#0ea5e9",
@@ -125,9 +124,11 @@ function WelcomePage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-background gap-8 px-6">
       <div className="text-center space-y-4">
-        <div className="w-20 h-20 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto border border-primary/20">
-          <Scan className="h-10 w-10 text-primary" />
-        </div>
+        <img
+          src={`${basePath}/logo.png`}
+          alt="ReadyLoq"
+          className="w-20 h-20 rounded-2xl mx-auto"
+        />
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
             Ready<span className="text-primary">Loq</span>

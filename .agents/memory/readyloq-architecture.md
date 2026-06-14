@@ -120,6 +120,11 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Pre-inspection lookup: `GET /properties/lookup?siteAddress=` returns matchStatus exact|possible|none (possible = prefix or ≥50% token Jaccard on the slug). Frontend `PreInspectionIntel` (debounced 400ms, ≥4 chars) in components/property-intel.tsx, injected into inspections/new.tsx setup step.
 - Seed: `seed-properties.ts` (count-guarded, idempotent) attaches profiles to the Riverside/Oak addresses that already have analyses so derived sections populate.
 
+## Brand assets / logo
+- Single brand mark for the whole app lives at `artifacts/readyloq/public/logo.png` (transparent-corner blue rounded-square "R"). Used by: favicon + apple-touch-icon (index.html via `%BASE_URL%logo.png`), in-app header marks (layout.tsx `logoSrc`), WelcomePage + Clerk `logoImageUrl` (App.tsx), and PDF cover `DEFAULT_LOGO` fallback (report-pdf.tsx).
+- **Do NOT use the AI background-removal tool on clean geometric/icon art** — it mangled the rounded-square edges (jagged blobs). For a logo that is a solid shape on a flat background, process geometrically with ImageMagick instead: `-trim` the margin, then composite a white `roundrectangle` mask with `-compose DstIn` (output `PNG32:` to force the alpha channel) for crisp transparent corners.
+- BASE_PATH for readyloq dev is `/` (so asset URLs resolve at root). Vite dev server runs on `$PORT` (was 20257); `%BASE_URL%` in index.html is replaced by Vite at serve time.
+
 ## PDF Report Generation (@react-pdf/renderer)
 - `@react-pdf/renderer` installed in `@workspace/readyloq` (runtime dep). Vite requires `define: { global: 'globalThis' }` in vite.config.ts — do not remove this.
 - Two modes: `'customer'` (Cover, Summary, Findings, Photos, Recommendations, Technician Observations, Signatures) and `'internal'` (everything + Property Intelligence, Service History, Management Insights).

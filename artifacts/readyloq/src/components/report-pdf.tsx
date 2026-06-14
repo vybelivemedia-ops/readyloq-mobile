@@ -20,6 +20,8 @@ const WHITE = "#ffffff";
 const AMBER = "#f59e0b";
 const AMBER_BG = "#fef3c7";
 
+const DEFAULT_LOGO = `${window.location.origin}${import.meta.env.BASE_URL}logo.png`;
+
 const SEV_COLOR: Record<string, string> = {
   critical: "#ef4444",
   high: "#f97316",
@@ -192,9 +194,7 @@ function CoverPage({ report, branding, dateStr, reportNum, mode }: any) {
       <View style={S.coverTopBar} />
       <View style={S.coverBody}>
         <View style={S.coverLogoBox}>
-          {branding.logoUrl ? (
-            <Image src={branding.logoUrl} style={S.coverLogo} />
-          ) : null}
+          <Image src={branding.logoUrl || DEFAULT_LOGO} style={S.coverLogo} />
           <Text style={S.coverCompany}>{branding.companyName ?? "ReadyLoq"}</Text>
           {branding.tagline ? <Text style={S.coverTagline}>{branding.tagline}</Text> : null}
         </View>

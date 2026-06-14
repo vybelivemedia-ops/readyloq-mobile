@@ -7,7 +7,6 @@ import {
   GraduationCap,
   Settings,
   Menu,
-  Scan,
   Crosshair,
   Building2,
   LogOut,
@@ -20,6 +19,7 @@ import { useClerk, useUser } from "@clerk/react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+const logoSrc = `${basePath}/logo.png`;
 
 const baseNavItems = [
   { href: "/", label: "Scout", icon: Home },
@@ -95,9 +95,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border/60 bg-card/50 backdrop-blur-sm">
         <div className="p-5 pb-3">
           <div className="flex items-center gap-2.5 font-bold text-lg tracking-tight">
-            <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
-              <Scan className="h-4 w-4 text-primary" />
-            </div>
+            <img src={logoSrc} alt="ReadyLoq" className="w-7 h-7 rounded-lg" />
             <span className="text-foreground">Ready<span className="text-primary">Loq</span></span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1 pl-9">Inspection Copilot</p>
@@ -133,9 +131,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}
       >
         <div className="flex items-center gap-2 font-bold text-base">
-          <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center">
-            <Scan className="h-3.5 w-3.5 text-primary" />
-          </div>
+          <img src={logoSrc} alt="ReadyLoq" className="w-6 h-6 rounded-md" />
           <span>Ready<span className="text-primary">Loq</span></span>
         </div>
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
@@ -147,7 +143,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <SheetContent side="right" className="w-64 p-0 bg-card border-l border-border/60">
             <div className="p-5 border-b border-border/60">
               <div className="flex items-center gap-2 font-bold text-lg">
-                <Scan className="h-5 w-5 text-primary" />
+                <img src={logoSrc} alt="ReadyLoq" className="w-6 h-6 rounded-md" />
                 <span>Ready<span className="text-primary">Loq</span></span>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">Inspection Copilot</p>
