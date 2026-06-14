@@ -1,0 +1,233 @@
+# ReadyLoq Phase 1 – White Label Manager
+
+## Objective
+
+Make ReadyLoq fully re-brandable without code changes.
+
+A new pest-control company (for example, Suburban Pest Control) should be able to become a fully branded version of the platform within minutes.
+
+This project is branding-only.
+
+Do NOT implement:
+
+- Multi-company data isolation
+- Tenant architecture
+- Billing
+- Subscription management
+- Company-scoped inspections/properties/reports
+
+Those will be handled in a future phase.
+
+---
+
+# Success Criteria
+
+A manager can:
+
+1. Create a branding profile
+2. Upload logos and icons
+3. Configure company information
+4. Preview changes
+5. Publish changes
+6. Instantly switch branding profiles
+
+without touching code.
+
+---
+
+# New Admin Section
+
+Create:
+
+Settings → White Label Manager
+
+Manager/Super Admin only.
+
+---
+
+# Company Branding Profile
+
+Each profile contains:
+
+## Company Information
+
+- Company Name
+- Company Tagline
+- Company Address
+- Company Phone
+- Company Email
+- Company Website
+- License Number
+
+## Visual Branding
+
+- Company Logo Upload
+- App Icon Upload
+- Primary Color
+- Secondary Color
+- Accent Color
+
+## Customer Report Settings
+
+- Report Footer Text
+- Support Information
+- Signature Disclaimer
+
+## Email Branding
+
+- Sender Name
+- Reply-To Email
+- Email Footer
+
+---
+
+# Branding Profiles
+
+Support multiple saved profiles.
+
+Examples:
+
+- ReadyLoq
+- Suburban Pest Control
+- ABC Pest Control
+- Demo Company
+
+Required actions:
+
+- Create Profile
+- Edit Profile
+- Duplicate Profile
+- Delete Profile
+- Export Profile
+- Import Profile
+- Set Active Profile
+
+---
+
+# Runtime Branding
+
+The active profile must immediately update:
+
+## Application
+
+- Landing Page
+- Login Screen
+- Sidebar
+- Mobile Navigation
+- Header
+- Browser Title
+- Favicon
+- Loading Screens
+
+## Reports
+
+- Customer PDF Reports
+- Internal PDF Reports
+- Report Cover Pages
+- Report Footers
+
+## Communication
+
+- Email Templates
+- Delivery Emails
+- Report Notifications
+
+---
+
+# Preview Before Publish
+
+Changes should not immediately affect production branding.
+
+Implement:
+
+Draft Mode
+→ Preview
+→ Publish
+
+Requirements:
+
+- Side-by-side preview
+- Mobile preview
+- PDF preview
+- Revert changes
+
+---
+
+# Reset Capability
+
+Add:
+
+"Restore ReadyLoq Defaults"
+
+This restores:
+
+- ReadyLoq logo
+- ReadyLoq icon
+- ReadyLoq colors
+- ReadyLoq contact information
+
+without affecting inspections, reports, or user data.
+
+---
+
+# Storage
+
+Logos and app icons must be uploaded and stored using the existing storage infrastructure.
+
+Do not require manual URLs.
+
+Users should:
+
+- Upload image
+- Crop if needed
+- Save
+
+System stores and serves the asset automatically.
+
+---
+
+# Permissions
+
+Only:
+
+- Manager
+- Super Admin
+
+can access White Label Manager.
+
+Technicians cannot view or modify branding.
+
+---
+
+# Out of Scope
+
+Do NOT build:
+
+- Company data isolation
+- Billing
+- Self-service signup
+- Subscription plans
+- Tenant databases
+- Company-scoped inspections
+
+Those belong to Phase 2 and later.
+
+---
+
+# Final Goal
+
+A manager should be able to:
+
+1. Open White Label Manager
+2. Select "Suburban Pest Control"
+3. Activate profile
+
+and within seconds see:
+
+- Suburban logo
+- Suburban colors
+- Suburban PDFs
+- Suburban login screen
+- Suburban branding
+
+throughout the entire platform with no code changes.
