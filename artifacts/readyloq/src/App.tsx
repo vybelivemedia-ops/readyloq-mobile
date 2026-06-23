@@ -26,6 +26,10 @@ import ReportDetail from "@/pages/reports/detail";
 import TrainingCenter from "@/pages/training/index";
 import QuizPage from "@/pages/training/quiz";
 import Leaderboard from "@/pages/training/leaderboard";
+import IntelligenceBrowse from "@/pages/intelligence/index";
+import IntelligenceContribute from "@/pages/intelligence/contribute";
+import IntelligenceReview from "@/pages/intelligence/review";
+import IntelligenceAnalytics from "@/pages/intelligence/analytics";
 import AnalyticsDashboard from "@/pages/analytics";
 import CommandCenter from "@/pages/command";
 import SettingsPage from "@/pages/settings";
@@ -212,6 +216,10 @@ function ProtectedRoutes() {
         <Route path="/training" component={TrainingCenter} />
         <Route path="/training/leaderboard" component={Leaderboard} />
         <Route path="/training/:id" component={QuizPage} />
+        <Route path="/intelligence" component={IntelligenceBrowse} />
+        <Route path="/intelligence/contribute" component={IntelligenceContribute} />
+        <Route path="/intelligence/review" component={IntelligenceReview} />
+        <Route path="/intelligence/analytics" component={IntelligenceAnalytics} />
         <Route path="/analytics" component={AnalyticsDashboard} />
         {isManager && <Route path="/command" component={CommandCenter} />}
         <Route path="/settings" component={SettingsPage} />

@@ -335,6 +335,492 @@ export const ListDatasetCategoriesResponse = zod.array(ListDatasetCategoriesResp
 
 
 /**
+ * @summary Taxonomy groups + subcategories with per-company counts
+ */
+export const ListIntelligenceCategoriesResponseItem = zod.object({
+  "slug": zod.string(),
+  "label": zod.string(),
+  "description": zod.string(),
+  "count": zod.number(),
+  "subcategories": zod.array(zod.object({
+  "slug": zod.string(),
+  "label": zod.string(),
+  "count": zod.number()
+}))
+})
+export const ListIntelligenceCategoriesResponse = zod.array(ListIntelligenceCategoriesResponseItem)
+
+
+/**
+ * @summary Get the company's intelligence sharing participation setting
+ */
+export const GetIntelligenceSettingsResponse = zod.object({
+  "sharingEnabled": zod.boolean()
+})
+
+
+/**
+ * @summary Update the company's sharing participation (manager+)
+ */
+export const UpdateIntelligenceSettingsBody = zod.object({
+  "sharingEnabled": zod.boolean()
+})
+
+export const UpdateIntelligenceSettingsResponse = zod.object({
+  "sharingEnabled": zod.boolean()
+})
+
+
+/**
+ * @summary Per-company intelligence dataset analytics
+ */
+export const GetIntelligenceAnalyticsResponse = zod.object({
+  "totalRecords": zod.number(),
+  "approvedRecords": zod.number(),
+  "approvedForTraining": zod.number(),
+  "pendingReview": zod.number(),
+  "aiAccuracyRate": zod.number(),
+  "aiVsTechnicianAgreementRate": zod.number(),
+  "technicianCorrectionRate": zod.number(),
+  "managerApprovalRate": zod.number(),
+  "sharingEnabled": zod.boolean(),
+  "mostSubmittedCategories": zod.array(zod.object({
+  "slug": zod.string(),
+  "label": zod.string(),
+  "count": zod.number()
+})),
+  "mostVerifiedCategories": zod.array(zod.object({
+  "slug": zod.string(),
+  "label": zod.string(),
+  "count": zod.number()
+})),
+  "byVerificationLevel": zod.array(zod.object({
+  "level": zod.number(),
+  "count": zod.number()
+})),
+  "datasetGrowth": zod.array(zod.object({
+  "date": zod.string(),
+  "total": zod.number(),
+  "approved": zod.number()
+})),
+  "topContributors": zod.array(zod.object({
+  "userId": zod.number(),
+  "contributions": zod.number(),
+  "approved": zod.number()
+}))
+})
+
+
+/**
+ * @summary List intelligence records for the caller's company
+ */
+export const listIntelligenceRecordsQueryPageDefault = 1;
+export const listIntelligenceRecordsQueryLimitDefault = 20;
+
+export const ListIntelligenceRecordsQueryParams = zod.object({
+  "category": zod.coerce.string().nullish(),
+  "subcategory": zod.coerce.string().nullish(),
+  "status": zod.coerce.string().nullish(),
+  "verificationLevel": zod.coerce.number().nullish(),
+  "mine": zod.coerce.boolean().nullish(),
+  "search": zod.coerce.string().nullish(),
+  "page": zod.coerce.number().default(listIntelligenceRecordsQueryPageDefault),
+  "limit": zod.coerce.number().default(listIntelligenceRecordsQueryLimitDefault)
+})
+
+export const ListIntelligenceRecordsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "imageUrl": zod.string(),
+  "thumbnailUrl": zod.string().nullish(),
+  "aiPrediction": zod.object({
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "confidence": zod.number(),
+  "tags": zod.array(zod.string()),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "suggestedCorrectiveAction": zod.string().nullish(),
+  "rationale": zod.string().nullish()
+}),
+  "aiConfidence": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "correctiveAction": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "whatIsShown": zod.string().nullish(),
+  "whyItMatters": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "treatmentOutcome": zod.string().nullish(),
+  "daysUntilFollowup": zod.number().nullish(),
+  "verificationLevel": zod.number(),
+  "status": zod.string(),
+  "approvedForTraining": zod.boolean(),
+  "aiCorrected": zod.boolean().nullish(),
+  "createdBy": zod.number(),
+  "confirmedBy": zod.number().nullish(),
+  "reviewedBy": zod.number().nullish(),
+  "tags": zod.array(zod.object({
+  "tag": zod.string(),
+  "source": zod.string()
+})),
+  "confirmVotes": zod.number(),
+  "disputeVotes": zod.number(),
+  "myVote": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "confirmedAt": zod.string().nullish(),
+  "reviewedAt": zod.string().nullish()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Create a record from an uploaded image (runs the AI suggestion)
+ */
+
+
+
+export const CreateIntelligenceRecordBody = zod.object({
+  "imageUrl": zod.string().min(1),
+  "thumbnailUrl": zod.string().optional()
+})
+
+
+/**
+ * @summary Get a single intelligence record
+ */
+export const GetIntelligenceRecordParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetIntelligenceRecordResponse = zod.object({
+  "id": zod.number(),
+  "imageUrl": zod.string(),
+  "thumbnailUrl": zod.string().nullish(),
+  "aiPrediction": zod.object({
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "confidence": zod.number(),
+  "tags": zod.array(zod.string()),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "suggestedCorrectiveAction": zod.string().nullish(),
+  "rationale": zod.string().nullish()
+}),
+  "aiConfidence": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "correctiveAction": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "whatIsShown": zod.string().nullish(),
+  "whyItMatters": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "treatmentOutcome": zod.string().nullish(),
+  "daysUntilFollowup": zod.number().nullish(),
+  "verificationLevel": zod.number(),
+  "status": zod.string(),
+  "approvedForTraining": zod.boolean(),
+  "aiCorrected": zod.boolean().nullish(),
+  "createdBy": zod.number(),
+  "confirmedBy": zod.number().nullish(),
+  "reviewedBy": zod.number().nullish(),
+  "tags": zod.array(zod.object({
+  "tag": zod.string(),
+  "source": zod.string()
+})),
+  "confirmVotes": zod.number(),
+  "disputeVotes": zod.number(),
+  "myVote": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "confirmedAt": zod.string().nullish(),
+  "reviewedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Technician confirms/corrects the AI suggestion + adds detail
+ */
+export const ConfirmIntelligenceRecordParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const confirmIntelligenceRecordBodyDaysUntilFollowupMin = 0;
+
+
+
+export const ConfirmIntelligenceRecordBody = zod.object({
+  "category": zod.string().min(1),
+  "subcategory": zod.string().optional(),
+  "possiblePest": zod.string().optional(),
+  "possibleConduciveCondition": zod.string().optional(),
+  "possibleEntryPoint": zod.string().optional(),
+  "correctiveAction": zod.string().optional(),
+  "severity": zod.enum(['low', 'moderate', 'high', 'critical']).optional(),
+  "whatIsShown": zod.string().optional(),
+  "whyItMatters": zod.string().optional(),
+  "notes": zod.string().optional(),
+  "treatmentOutcome": zod.enum(['resolved', 'improved', 'unchanged', 'worsened', 'pending', 'not_applicable']).optional(),
+  "daysUntilFollowup": zod.number().min(confirmIntelligenceRecordBodyDaysUntilFollowupMin).optional(),
+  "tags": zod.array(zod.string()).optional()
+})
+
+export const ConfirmIntelligenceRecordResponse = zod.object({
+  "id": zod.number(),
+  "imageUrl": zod.string(),
+  "thumbnailUrl": zod.string().nullish(),
+  "aiPrediction": zod.object({
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "confidence": zod.number(),
+  "tags": zod.array(zod.string()),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "suggestedCorrectiveAction": zod.string().nullish(),
+  "rationale": zod.string().nullish()
+}),
+  "aiConfidence": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "correctiveAction": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "whatIsShown": zod.string().nullish(),
+  "whyItMatters": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "treatmentOutcome": zod.string().nullish(),
+  "daysUntilFollowup": zod.number().nullish(),
+  "verificationLevel": zod.number(),
+  "status": zod.string(),
+  "approvedForTraining": zod.boolean(),
+  "aiCorrected": zod.boolean().nullish(),
+  "createdBy": zod.number(),
+  "confirmedBy": zod.number().nullish(),
+  "reviewedBy": zod.number().nullish(),
+  "tags": zod.array(zod.object({
+  "tag": zod.string(),
+  "source": zod.string()
+})),
+  "confirmVotes": zod.number(),
+  "disputeVotes": zod.number(),
+  "myVote": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "confirmedAt": zod.string().nullish(),
+  "reviewedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Skip a record (retained, excluded from the dataset)
+ */
+export const SkipIntelligenceRecordParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SkipIntelligenceRecordResponse = zod.object({
+  "id": zod.number(),
+  "imageUrl": zod.string(),
+  "thumbnailUrl": zod.string().nullish(),
+  "aiPrediction": zod.object({
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "confidence": zod.number(),
+  "tags": zod.array(zod.string()),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "suggestedCorrectiveAction": zod.string().nullish(),
+  "rationale": zod.string().nullish()
+}),
+  "aiConfidence": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "correctiveAction": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "whatIsShown": zod.string().nullish(),
+  "whyItMatters": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "treatmentOutcome": zod.string().nullish(),
+  "daysUntilFollowup": zod.number().nullish(),
+  "verificationLevel": zod.number(),
+  "status": zod.string(),
+  "approvedForTraining": zod.boolean(),
+  "aiCorrected": zod.boolean().nullish(),
+  "createdBy": zod.number(),
+  "confirmedBy": zod.number().nullish(),
+  "reviewedBy": zod.number().nullish(),
+  "tags": zod.array(zod.object({
+  "tag": zod.string(),
+  "source": zod.string()
+})),
+  "confirmVotes": zod.number(),
+  "disputeVotes": zod.number(),
+  "myVote": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "confirmedAt": zod.string().nullish(),
+  "reviewedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Cast a confirm/dispute vote (drives multi-technician verification)
+ */
+export const VoteIntelligenceRecordParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const VoteIntelligenceRecordBody = zod.object({
+  "vote": zod.enum(['confirm', 'dispute'])
+})
+
+export const VoteIntelligenceRecordResponse = zod.object({
+  "id": zod.number(),
+  "imageUrl": zod.string(),
+  "thumbnailUrl": zod.string().nullish(),
+  "aiPrediction": zod.object({
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "confidence": zod.number(),
+  "tags": zod.array(zod.string()),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "suggestedCorrectiveAction": zod.string().nullish(),
+  "rationale": zod.string().nullish()
+}),
+  "aiConfidence": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "correctiveAction": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "whatIsShown": zod.string().nullish(),
+  "whyItMatters": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "treatmentOutcome": zod.string().nullish(),
+  "daysUntilFollowup": zod.number().nullish(),
+  "verificationLevel": zod.number(),
+  "status": zod.string(),
+  "approvedForTraining": zod.boolean(),
+  "aiCorrected": zod.boolean().nullish(),
+  "createdBy": zod.number(),
+  "confirmedBy": zod.number().nullish(),
+  "reviewedBy": zod.number().nullish(),
+  "tags": zod.array(zod.object({
+  "tag": zod.string(),
+  "source": zod.string()
+})),
+  "confirmVotes": zod.number(),
+  "disputeVotes": zod.number(),
+  "myVote": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "confirmedAt": zod.string().nullish(),
+  "reviewedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Manager review — approve / reject / edit / expert-verify
+ */
+export const ReviewIntelligenceRecordParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const reviewIntelligenceRecordBodyDaysUntilFollowupMin = 0;
+
+
+
+export const ReviewIntelligenceRecordBody = zod.object({
+  "action": zod.enum(['approve', 'reject', 'edit', 'expert_verify']),
+  "comment": zod.string().optional(),
+  "category": zod.string().optional(),
+  "subcategory": zod.string().optional(),
+  "possiblePest": zod.string().optional(),
+  "possibleConduciveCondition": zod.string().optional(),
+  "possibleEntryPoint": zod.string().optional(),
+  "correctiveAction": zod.string().optional(),
+  "severity": zod.enum(['low', 'moderate', 'high', 'critical']).optional(),
+  "whatIsShown": zod.string().optional(),
+  "whyItMatters": zod.string().optional(),
+  "notes": zod.string().optional(),
+  "treatmentOutcome": zod.enum(['resolved', 'improved', 'unchanged', 'worsened', 'pending', 'not_applicable']).optional(),
+  "daysUntilFollowup": zod.number().min(reviewIntelligenceRecordBodyDaysUntilFollowupMin).optional()
+})
+
+export const ReviewIntelligenceRecordResponse = zod.object({
+  "id": zod.number(),
+  "imageUrl": zod.string(),
+  "thumbnailUrl": zod.string().nullish(),
+  "aiPrediction": zod.object({
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "confidence": zod.number(),
+  "tags": zod.array(zod.string()),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "suggestedCorrectiveAction": zod.string().nullish(),
+  "rationale": zod.string().nullish()
+}),
+  "aiConfidence": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "subcategory": zod.string().nullish(),
+  "possiblePest": zod.string().nullish(),
+  "possibleConduciveCondition": zod.string().nullish(),
+  "possibleEntryPoint": zod.string().nullish(),
+  "correctiveAction": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "whatIsShown": zod.string().nullish(),
+  "whyItMatters": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "treatmentOutcome": zod.string().nullish(),
+  "daysUntilFollowup": zod.number().nullish(),
+  "verificationLevel": zod.number(),
+  "status": zod.string(),
+  "approvedForTraining": zod.boolean(),
+  "aiCorrected": zod.boolean().nullish(),
+  "createdBy": zod.number(),
+  "confirmedBy": zod.number().nullish(),
+  "reviewedBy": zod.number().nullish(),
+  "tags": zod.array(zod.object({
+  "tag": zod.string(),
+  "source": zod.string()
+})),
+  "confirmVotes": zod.number(),
+  "disputeVotes": zod.number(),
+  "myVote": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "confirmedAt": zod.string().nullish(),
+  "reviewedAt": zod.string().nullish()
+})
+
+
+/**
  * @summary List generated reports
  */
 export const ListReportsResponseItem = zod.object({

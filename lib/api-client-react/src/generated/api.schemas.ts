@@ -227,6 +227,262 @@ export interface DatasetCategory {
   icon?: string | null;
 }
 
+export interface AiPrediction {
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  subcategory?: string | null;
+  confidence: number;
+  tags: string[];
+  /** @nullable */
+  possiblePest?: string | null;
+  /** @nullable */
+  possibleConduciveCondition?: string | null;
+  /** @nullable */
+  possibleEntryPoint?: string | null;
+  /** @nullable */
+  suggestedCorrectiveAction?: string | null;
+  /** @nullable */
+  rationale?: string | null;
+}
+
+export interface IntelligenceTag {
+  tag: string;
+  source: string;
+}
+
+export interface IntelligenceRecord {
+  id: number;
+  imageUrl: string;
+  /** @nullable */
+  thumbnailUrl?: string | null;
+  aiPrediction: AiPrediction;
+  /** @nullable */
+  aiConfidence?: number | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  subcategory?: string | null;
+  /** @nullable */
+  possiblePest?: string | null;
+  /** @nullable */
+  possibleConduciveCondition?: string | null;
+  /** @nullable */
+  possibleEntryPoint?: string | null;
+  /** @nullable */
+  correctiveAction?: string | null;
+  /** @nullable */
+  severity?: string | null;
+  /** @nullable */
+  whatIsShown?: string | null;
+  /** @nullable */
+  whyItMatters?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  treatmentOutcome?: string | null;
+  /** @nullable */
+  daysUntilFollowup?: number | null;
+  verificationLevel: number;
+  status: string;
+  approvedForTraining: boolean;
+  /** @nullable */
+  aiCorrected?: boolean | null;
+  createdBy: number;
+  /** @nullable */
+  confirmedBy?: number | null;
+  /** @nullable */
+  reviewedBy?: number | null;
+  tags: IntelligenceTag[];
+  confirmVotes: number;
+  disputeVotes: number;
+  /** @nullable */
+  myVote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  confirmedAt?: string | null;
+  /** @nullable */
+  reviewedAt?: string | null;
+}
+
+export interface IntelligenceRecordPage {
+  items: IntelligenceRecord[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface IntelligenceSubcategory {
+  slug: string;
+  label: string;
+  count: number;
+}
+
+export interface IntelligenceCategory {
+  slug: string;
+  label: string;
+  description: string;
+  count: number;
+  subcategories: IntelligenceSubcategory[];
+}
+
+export interface IntelligenceSettings {
+  sharingEnabled: boolean;
+}
+
+export interface IntelligenceSettingsInput {
+  sharingEnabled: boolean;
+}
+
+export interface IntelligenceRecordInput {
+  /** @minLength 1 */
+  imageUrl: string;
+  thumbnailUrl?: string;
+}
+
+export type IntelligenceConfirmInputSeverity = typeof IntelligenceConfirmInputSeverity[keyof typeof IntelligenceConfirmInputSeverity];
+
+
+export const IntelligenceConfirmInputSeverity = {
+  low: 'low',
+  moderate: 'moderate',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export type IntelligenceConfirmInputTreatmentOutcome = typeof IntelligenceConfirmInputTreatmentOutcome[keyof typeof IntelligenceConfirmInputTreatmentOutcome];
+
+
+export const IntelligenceConfirmInputTreatmentOutcome = {
+  resolved: 'resolved',
+  improved: 'improved',
+  unchanged: 'unchanged',
+  worsened: 'worsened',
+  pending: 'pending',
+  not_applicable: 'not_applicable',
+} as const;
+
+export interface IntelligenceConfirmInput {
+  /** @minLength 1 */
+  category: string;
+  subcategory?: string;
+  possiblePest?: string;
+  possibleConduciveCondition?: string;
+  possibleEntryPoint?: string;
+  correctiveAction?: string;
+  severity?: IntelligenceConfirmInputSeverity;
+  whatIsShown?: string;
+  whyItMatters?: string;
+  notes?: string;
+  treatmentOutcome?: IntelligenceConfirmInputTreatmentOutcome;
+  /** @minimum 0 */
+  daysUntilFollowup?: number;
+  tags?: string[];
+}
+
+export type IntelligenceVoteInputVote = typeof IntelligenceVoteInputVote[keyof typeof IntelligenceVoteInputVote];
+
+
+export const IntelligenceVoteInputVote = {
+  confirm: 'confirm',
+  dispute: 'dispute',
+} as const;
+
+export interface IntelligenceVoteInput {
+  vote: IntelligenceVoteInputVote;
+}
+
+export type IntelligenceReviewInputAction = typeof IntelligenceReviewInputAction[keyof typeof IntelligenceReviewInputAction];
+
+
+export const IntelligenceReviewInputAction = {
+  approve: 'approve',
+  reject: 'reject',
+  edit: 'edit',
+  expert_verify: 'expert_verify',
+} as const;
+
+export type IntelligenceReviewInputSeverity = typeof IntelligenceReviewInputSeverity[keyof typeof IntelligenceReviewInputSeverity];
+
+
+export const IntelligenceReviewInputSeverity = {
+  low: 'low',
+  moderate: 'moderate',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export type IntelligenceReviewInputTreatmentOutcome = typeof IntelligenceReviewInputTreatmentOutcome[keyof typeof IntelligenceReviewInputTreatmentOutcome];
+
+
+export const IntelligenceReviewInputTreatmentOutcome = {
+  resolved: 'resolved',
+  improved: 'improved',
+  unchanged: 'unchanged',
+  worsened: 'worsened',
+  pending: 'pending',
+  not_applicable: 'not_applicable',
+} as const;
+
+export interface IntelligenceReviewInput {
+  action: IntelligenceReviewInputAction;
+  comment?: string;
+  category?: string;
+  subcategory?: string;
+  possiblePest?: string;
+  possibleConduciveCondition?: string;
+  possibleEntryPoint?: string;
+  correctiveAction?: string;
+  severity?: IntelligenceReviewInputSeverity;
+  whatIsShown?: string;
+  whyItMatters?: string;
+  notes?: string;
+  treatmentOutcome?: IntelligenceReviewInputTreatmentOutcome;
+  /** @minimum 0 */
+  daysUntilFollowup?: number;
+}
+
+export interface IntelligenceCategoryStat {
+  slug: string;
+  label: string;
+  count: number;
+}
+
+export interface IntelligenceLevelStat {
+  level: number;
+  count: number;
+}
+
+export interface IntelligenceGrowthPoint {
+  date: string;
+  total: number;
+  approved: number;
+}
+
+export interface IntelligenceContributor {
+  userId: number;
+  contributions: number;
+  approved: number;
+}
+
+export interface IntelligenceAnalytics {
+  totalRecords: number;
+  approvedRecords: number;
+  approvedForTraining: number;
+  pendingReview: number;
+  aiAccuracyRate: number;
+  aiVsTechnicianAgreementRate: number;
+  technicianCorrectionRate: number;
+  managerApprovalRate: number;
+  sharingEnabled: boolean;
+  mostSubmittedCategories: IntelligenceCategoryStat[];
+  mostVerifiedCategories: IntelligenceCategoryStat[];
+  byVerificationLevel: IntelligenceLevelStat[];
+  datasetGrowth: IntelligenceGrowthPoint[];
+  topContributors: IntelligenceContributor[];
+}
+
 export interface Report {
   id: number;
   inspectionId: number;
@@ -774,6 +1030,35 @@ category?: string | null;
  * @nullable
  */
 pestType?: string | null;
+/**
+ * @nullable
+ */
+search?: string | null;
+page?: number;
+limit?: number;
+};
+
+export type ListIntelligenceRecordsParams = {
+/**
+ * @nullable
+ */
+category?: string | null;
+/**
+ * @nullable
+ */
+subcategory?: string | null;
+/**
+ * @nullable
+ */
+status?: string | null;
+/**
+ * @nullable
+ */
+verificationLevel?: number | null;
+/**
+ * @nullable
+ */
+mine?: boolean | null;
 /**
  * @nullable
  */

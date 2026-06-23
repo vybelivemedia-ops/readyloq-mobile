@@ -10,6 +10,7 @@ import {
   Crosshair,
   Building2,
   LogOut,
+  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -27,6 +28,7 @@ const baseNavItems = [
   { href: "/inspections", label: "Stops", icon: ClipboardList },
   { href: "/properties", label: "Sites", icon: Building2 },
   { href: "/analysis", label: "Evidence", icon: Camera },
+  { href: "/intelligence", label: "Intelligence", icon: Brain },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/training", label: "Learn", icon: GraduationCap },
 ];
@@ -38,7 +40,7 @@ const mobileNavItems = [
   { href: "/", label: "Scout", icon: Home },
   { href: "/inspections", label: "Stops", icon: ClipboardList },
   { href: "/properties", label: "Sites", icon: Building2 },
-  { href: "/analysis", label: "Evidence", icon: Camera },
+  { href: "/intelligence", label: "Intelligence", icon: Brain },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/training", label: "Learn", icon: GraduationCap },
 ];

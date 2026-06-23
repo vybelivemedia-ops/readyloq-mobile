@@ -163,3 +163,13 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 **Why (Battery-first):** Technicians run 8–10 hour routes; battery drain is a real field complaint. Mode selection is a first-class product decision, not a settings toggle.
 **Why (cookie auth, no setAuthTokenGetter):** Web apps share origin with the API via Replit proxy — cookies are automatic. setAuthTokenGetter is only for Expo/mobile where there's no shared cookie jar.
 **Why (JIT user provisioning):** Users table only stores clerkUserId + role. Email/name come from Clerk directly (useUser() hook). JIT creates the DB row on first API call with default "technician" role. Manager role must be set via direct DB update for the pilot.
+
+## Generated hooks: queryKey is mandatory (frontend typecheck gotcha)
+- orval generates the query option as `query?: UseQueryOptions<...>` (the FULL type), which under @tanstack/react-query v5 REQUIRES `queryKey`. So `{ query: { enabled: x } }` fails `tsc` with "Property 'queryKey' is missing".
+- The readyloq frontend has a PRE-EXISTING baseline of these errors across many pages (dataset, analysis, inspections, reports, training, etc.) — they never surface at runtime because Vite/esbuild does not typecheck. `pnpm --filter @workspace/readyloq run typecheck` is therefore not green at baseline.
+- **Convention when adding/using a generated query hook:** always pass `queryKey`, e.g. `useListThing(params, { query: { enabled, queryKey: getListThingQueryKey(params) } })`. **Why:** keeps your new code tsc-clean and cache keys correct without having to fix the whole pre-existing baseline.
+
+## Object-storage path: display URL vs canonical path (scope-checked endpoints)
+- The upload helpers (branding-upload.ts, intelligence-upload.ts) return a DISPLAY url `/api/storage/objects/companies/{id}/uploads/...` so the browser `<img src>` resolves through the `/api/storage` mount.
+- But `objectPathCompanyScope()` and `ObjectStorageService.getObjectEntityFile()` require the CANONICAL path `/objects/...` (they strip/expect a leading `/objects/`). Passing the display url straight in makes the tenant scope check read "legacy" and reject, and the byte-fetch throw.
+- **Rule:** any endpoint that runs a company scope-check or reads object bytes from a client-supplied image URL must strip the `/api/storage` prefix first (see `toStoragePath()` in routes/intelligence-dataset.ts). Store the display url for rendering; normalize for scope/AI.

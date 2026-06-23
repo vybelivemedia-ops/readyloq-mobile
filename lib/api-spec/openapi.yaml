@@ -15,6 +15,8 @@ tags:
     description: AI analysis
   - name: dataset
     description: Dataset library
+  - name: intelligence-dataset
+    description: Intelligence dataset & AI learning center
   - name: reports
     description: Report generation
   - name: training
@@ -293,6 +295,226 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/DatasetCategory"
+
+  # ── INTELLIGENCE DATASET ─────────────────────────────────────────────────────
+  /intelligence-dataset/categories:
+    get:
+      operationId: listIntelligenceCategories
+      tags: [intelligence-dataset]
+      summary: Taxonomy groups + subcategories with per-company counts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntelligenceCategory"
+
+  /intelligence-dataset/settings:
+    get:
+      operationId: getIntelligenceSettings
+      tags: [intelligence-dataset]
+      summary: Get the company's intelligence sharing participation setting
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceSettings"
+    patch:
+      operationId: updateIntelligenceSettings
+      tags: [intelligence-dataset]
+      summary: Update the company's sharing participation (manager+)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceSettingsInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceSettings"
+
+  /intelligence-dataset/analytics:
+    get:
+      operationId: getIntelligenceAnalytics
+      tags: [intelligence-dataset]
+      summary: Per-company intelligence dataset analytics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceAnalytics"
+
+  /intelligence-dataset/records:
+    get:
+      operationId: listIntelligenceRecords
+      tags: [intelligence-dataset]
+      summary: List intelligence records for the caller's company
+      parameters:
+        - name: category
+          in: query
+          schema: { type: ["string", "null"] }
+        - name: subcategory
+          in: query
+          schema: { type: ["string", "null"] }
+        - name: status
+          in: query
+          schema: { type: ["string", "null"] }
+        - name: verificationLevel
+          in: query
+          schema: { type: ["integer", "null"] }
+        - name: mine
+          in: query
+          schema: { type: ["boolean", "null"] }
+        - name: search
+          in: query
+          schema: { type: ["string", "null"] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecordPage"
+    post:
+      operationId: createIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Create a record from an uploaded image (runs the AI suggestion)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceRecordInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+
+  /intelligence-dataset/records/{id}:
+    get:
+      operationId: getIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Get a single intelligence record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+    patch:
+      operationId: confirmIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Technician confirms/corrects the AI suggestion + adds detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceConfirmInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+
+  /intelligence-dataset/records/{id}/skip:
+    post:
+      operationId: skipIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Skip a record (retained, excluded from the dataset)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+
+  /intelligence-dataset/records/{id}/vote:
+    post:
+      operationId: voteIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Cast a confirm/dispute vote (drives multi-technician verification)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceVoteInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+
+  /intelligence-dataset/records/{id}/review:
+    post:
+      operationId: reviewIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Manager review — approve / reject / edit / expert-verify
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceReviewInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
 
   # ── REPORTS ──────────────────────────────────────────────────────────────────
   /reports:
@@ -1068,6 +1290,232 @@ components:
         slug:  { type: string }
         count: { type: integer }
         icon:  { type: ["string", "null"] }
+
+    # ── INTELLIGENCE DATASET SCHEMAS ────────────────────────────────────────────
+    AiPrediction:
+      type: object
+      required: [confidence, tags]
+      properties:
+        category:                   { type: ["string", "null"] }
+        subcategory:                { type: ["string", "null"] }
+        confidence:                 { type: number }
+        tags:
+          type: array
+          items: { type: string }
+        possiblePest:               { type: ["string", "null"] }
+        possibleConduciveCondition: { type: ["string", "null"] }
+        possibleEntryPoint:         { type: ["string", "null"] }
+        suggestedCorrectiveAction:  { type: ["string", "null"] }
+        rationale:                  { type: ["string", "null"] }
+
+    IntelligenceTag:
+      type: object
+      required: [tag, source]
+      properties:
+        tag:    { type: string }
+        source: { type: string }
+
+    IntelligenceRecord:
+      type: object
+      required:
+        [id, imageUrl, aiPrediction, verificationLevel, status,
+         approvedForTraining, createdBy, tags, confirmVotes, disputeVotes,
+         createdAt, updatedAt]
+      properties:
+        id:                         { type: integer }
+        imageUrl:                   { type: string }
+        thumbnailUrl:               { type: ["string", "null"] }
+        aiPrediction:
+          $ref: "#/components/schemas/AiPrediction"
+        aiConfidence:               { type: ["number", "null"] }
+        category:                   { type: ["string", "null"] }
+        subcategory:                { type: ["string", "null"] }
+        possiblePest:               { type: ["string", "null"] }
+        possibleConduciveCondition: { type: ["string", "null"] }
+        possibleEntryPoint:         { type: ["string", "null"] }
+        correctiveAction:           { type: ["string", "null"] }
+        severity:                   { type: ["string", "null"] }
+        whatIsShown:                { type: ["string", "null"] }
+        whyItMatters:               { type: ["string", "null"] }
+        notes:                      { type: ["string", "null"] }
+        treatmentOutcome:           { type: ["string", "null"] }
+        daysUntilFollowup:          { type: ["integer", "null"] }
+        verificationLevel:          { type: integer }
+        status:                     { type: string }
+        approvedForTraining:        { type: boolean }
+        aiCorrected:                { type: ["boolean", "null"] }
+        createdBy:                  { type: integer }
+        confirmedBy:                { type: ["integer", "null"] }
+        reviewedBy:                 { type: ["integer", "null"] }
+        tags:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceTag" }
+        confirmVotes:               { type: integer }
+        disputeVotes:               { type: integer }
+        myVote:                     { type: ["string", "null"] }
+        createdAt:                  { type: string }
+        updatedAt:                  { type: string }
+        confirmedAt:                { type: ["string", "null"] }
+        reviewedAt:                 { type: ["string", "null"] }
+
+    IntelligenceRecordPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceRecord" }
+        total: { type: integer }
+        page:  { type: integer }
+        limit: { type: integer }
+
+    IntelligenceSubcategory:
+      type: object
+      required: [slug, label, count]
+      properties:
+        slug:  { type: string }
+        label: { type: string }
+        count: { type: integer }
+
+    IntelligenceCategory:
+      type: object
+      required: [slug, label, description, count, subcategories]
+      properties:
+        slug:        { type: string }
+        label:       { type: string }
+        description: { type: string }
+        count:       { type: integer }
+        subcategories:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceSubcategory" }
+
+    IntelligenceSettings:
+      type: object
+      required: [sharingEnabled]
+      properties:
+        sharingEnabled: { type: boolean }
+
+    IntelligenceSettingsInput:
+      type: object
+      required: [sharingEnabled]
+      properties:
+        sharingEnabled: { type: boolean }
+
+    IntelligenceRecordInput:
+      type: object
+      required: [imageUrl]
+      properties:
+        imageUrl:     { type: string, minLength: 1 }
+        thumbnailUrl: { type: string }
+
+    IntelligenceConfirmInput:
+      type: object
+      required: [category]
+      properties:
+        category:                   { type: string, minLength: 1 }
+        subcategory:                { type: string }
+        possiblePest:               { type: string }
+        possibleConduciveCondition: { type: string }
+        possibleEntryPoint:         { type: string }
+        correctiveAction:           { type: string }
+        severity:                   { type: string, enum: [low, moderate, high, critical] }
+        whatIsShown:                { type: string }
+        whyItMatters:               { type: string }
+        notes:                      { type: string }
+        treatmentOutcome:           { type: string, enum: [resolved, improved, unchanged, worsened, pending, not_applicable] }
+        daysUntilFollowup:          { type: integer, minimum: 0 }
+        tags:
+          type: array
+          items: { type: string }
+
+    IntelligenceVoteInput:
+      type: object
+      required: [vote]
+      properties:
+        vote: { type: string, enum: [confirm, dispute] }
+
+    IntelligenceReviewInput:
+      type: object
+      required: [action]
+      properties:
+        action:                     { type: string, enum: [approve, reject, edit, expert_verify] }
+        comment:                    { type: string }
+        category:                   { type: string }
+        subcategory:                { type: string }
+        possiblePest:               { type: string }
+        possibleConduciveCondition: { type: string }
+        possibleEntryPoint:         { type: string }
+        correctiveAction:           { type: string }
+        severity:                   { type: string, enum: [low, moderate, high, critical] }
+        whatIsShown:                { type: string }
+        whyItMatters:               { type: string }
+        notes:                      { type: string }
+        treatmentOutcome:           { type: string, enum: [resolved, improved, unchanged, worsened, pending, not_applicable] }
+        daysUntilFollowup:          { type: integer, minimum: 0 }
+
+    IntelligenceCategoryStat:
+      type: object
+      required: [slug, label, count]
+      properties:
+        slug:  { type: string }
+        label: { type: string }
+        count: { type: integer }
+
+    IntelligenceLevelStat:
+      type: object
+      required: [level, count]
+      properties:
+        level: { type: integer }
+        count: { type: integer }
+
+    IntelligenceGrowthPoint:
+      type: object
+      required: [date, total, approved]
+      properties:
+        date:     { type: string }
+        total:    { type: integer }
+        approved: { type: integer }
+
+    IntelligenceContributor:
+      type: object
+      required: [userId, contributions, approved]
+      properties:
+        userId:        { type: integer }
+        contributions: { type: integer }
+        approved:      { type: integer }
+
+    IntelligenceAnalytics:
+      type: object
+      required:
+        [totalRecords, approvedRecords, approvedForTraining, pendingReview,
+         aiAccuracyRate, aiVsTechnicianAgreementRate, technicianCorrectionRate,
+         managerApprovalRate, mostSubmittedCategories, mostVerifiedCategories,
+         byVerificationLevel, datasetGrowth, topContributors, sharingEnabled]
+      properties:
+        totalRecords:                { type: integer }
+        approvedRecords:             { type: integer }
+        approvedForTraining:         { type: integer }
+        pendingReview:               { type: integer }
+        aiAccuracyRate:              { type: number }
+        aiVsTechnicianAgreementRate: { type: number }
+        technicianCorrectionRate:    { type: number }
+        managerApprovalRate:         { type: number }
+        sharingEnabled:              { type: boolean }
+        mostSubmittedCategories:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceCategoryStat" }
+        mostVerifiedCategories:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceCategoryStat" }
+        byVerificationLevel:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceLevelStat" }
+        datasetGrowth:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceGrowthPoint" }
+        topContributors:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceContributor" }
 
     # ── REPORT SCHEMAS ──────────────────────────────────────────────────────────
     Report:

@@ -3,6 +3,9 @@ import {
   inspectionsTable, inspectionMediaTable, analysisResultsTable,
   datasetImagesTable, reportsTable, quizzesTable, trainingScoresTable,
   brandingProfilesTable, READYLOQ_DEFAULT_PROFILE,
+  usersTable,
+  intelligenceRecordsTable, intelligenceTagsTable,
+  intelligenceReviewsTable, intelligenceVotesTable,
 } from "@workspace/db";
 import { getSeedCompanyId } from "./lib/seed-company";
 
@@ -375,6 +378,244 @@ async function seed() {
         poweredByVisible: false,
       },
     ]));
+  }
+
+  // ── Intelligence Dataset (idempotent) ──────────────────────────────────────
+  // Only seed when the company has no intelligence records yet, so re-running the
+  // script never duplicates the demo dataset.
+  const existingIntel = await db
+    .select()
+    .from(intelligenceRecordsTable)
+    .where(eq(intelligenceRecordsTable.companyId, companyId));
+
+  if (existingIntel.length === 0) {
+    // Intelligence records reference real users (numeric ids, never names).
+    // Resolve/create two synthetic seed users in the legacy company.
+    async function getSeedUser(clerkUserId: string, role: "owner" | "technician") {
+      const [found] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.clerkUserId, clerkUserId));
+      if (found) return found.id;
+      const [created] = await db
+        .insert(usersTable)
+        .values({ clerkUserId, role, companyId })
+        .returning();
+      return created.id;
+    }
+    const managerId = await getSeedUser("seed-intel-manager", "owner");
+    const techId = await getSeedUser("seed-intel-tech", "technician");
+
+    const day = (offset: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - offset);
+      return d;
+    };
+    const img = (s: string) => `https://picsum.photos/seed/${s}/800/600`;
+    const thumb = (s: string) => `https://picsum.photos/seed/${s}/400/300`;
+
+    type AiPred = NonNullable<typeof intelligenceRecordsTable.$inferInsert.aiPrediction>;
+    const pred = (p: Partial<AiPred> & { confidence: number }): AiPred => ({
+      category: null,
+      subcategory: null,
+      tags: [],
+      possiblePest: null,
+      possibleConduciveCondition: null,
+      possibleEntryPoint: null,
+      suggestedCorrectiveAction: null,
+      rationale: null,
+      ...p,
+    });
+
+    const intelRecords = await db
+      .insert(intelligenceRecordsTable)
+      .values([
+        // 1) Expert-verified (L5) — AI agreed, resolved outcome
+        {
+          companyId,
+          imageUrl: img("intel-roach"),
+          thumbnailUrl: thumb("intel-roach"),
+          aiPrediction: pred({
+            category: "pest",
+            subcategory: "cockroach",
+            confidence: 0.93,
+            tags: ["german-cockroach", "kitchen"],
+            possiblePest: "German cockroach",
+            suggestedCorrectiveAction: "Apply gel bait to harborage points",
+            rationale: "Live adult roach with characteristic pronotal stripes",
+          }),
+          aiConfidence: 0.93,
+          category: "pest",
+          subcategory: "cockroach",
+          possiblePest: "German cockroach",
+          correctiveAction: "Apply gel bait; address moisture under sink",
+          severity: "high",
+          whatIsShown: "Adult German cockroach near a kitchen baseboard",
+          whyItMatters: "Indicates an active, breeding indoor population",
+          treatmentOutcome: "resolved",
+          daysUntilFollowup: 7,
+          verificationLevel: 5,
+          status: "approved",
+          approvedForTraining: true,
+          aiCorrected: false,
+          createdBy: techId,
+          confirmedBy: techId,
+          reviewedBy: managerId,
+          createdAt: day(12),
+          confirmedAt: day(11),
+          reviewedAt: day(10),
+        },
+        // 2) Approved (L4) — technician corrected the AI category
+        {
+          companyId,
+          imageUrl: img("intel-gap"),
+          thumbnailUrl: thumb("intel-gap"),
+          aiPrediction: pred({
+            category: "structural_deficiency",
+            subcategory: "wall_crack",
+            confidence: 0.61,
+            tags: ["gap", "foundation"],
+            possibleEntryPoint: "Foundation gap",
+            rationale: "Opening visible at pipe penetration",
+          }),
+          aiConfidence: 0.61,
+          category: "entry_point",
+          subcategory: "pipe_penetration",
+          possibleEntryPoint: "Unsealed pipe penetration",
+          correctiveAction: "Seal with copper mesh and caulk",
+          severity: "moderate",
+          whatIsShown: "Gap around a water pipe entering the foundation",
+          whyItMatters: "Primary rodent entry route into the structure",
+          treatmentOutcome: "improved",
+          daysUntilFollowup: 14,
+          verificationLevel: 4,
+          status: "approved",
+          approvedForTraining: true,
+          aiCorrected: true,
+          createdBy: techId,
+          confirmedBy: techId,
+          reviewedBy: managerId,
+          createdAt: day(9),
+          confirmedAt: day(8),
+          reviewedAt: day(7),
+        },
+        // 3) Multi-tech confirmed (L3) — awaiting manager review
+        {
+          companyId,
+          imageUrl: img("intel-mudtube"),
+          thumbnailUrl: thumb("intel-mudtube"),
+          aiPrediction: pred({
+            category: "pest_evidence",
+            subcategory: "termite_mud_tube",
+            confidence: 0.88,
+            tags: ["termite", "mud-tube"],
+            possiblePest: "Subterranean termite",
+            rationale: "Earthen tube along the foundation wall",
+          }),
+          aiConfidence: 0.88,
+          category: "pest_evidence",
+          subcategory: "termite_mud_tube",
+          possiblePest: "Subterranean termite",
+          severity: "high",
+          whatIsShown: "Subterranean termite mud tube on a foundation wall",
+          whyItMatters: "Evidence of active wood-destroying organism activity",
+          treatmentOutcome: "pending",
+          daysUntilFollowup: 30,
+          verificationLevel: 3,
+          status: "confirmed",
+          approvedForTraining: false,
+          aiCorrected: false,
+          createdBy: techId,
+          confirmedBy: techId,
+          createdAt: day(5),
+          confirmedAt: day(4),
+        },
+        // 4) Confirmed (L2)
+        {
+          companyId,
+          imageUrl: img("intel-moisture"),
+          thumbnailUrl: thumb("intel-moisture"),
+          aiPrediction: pred({
+            category: "conducive_condition",
+            subcategory: "moisture",
+            confidence: 0.74,
+            tags: ["moisture", "leak"],
+            possibleConduciveCondition: "Persistent leak under sink",
+            rationale: "Water staining and damp cabinet base",
+          }),
+          aiConfidence: 0.74,
+          category: "conducive_condition",
+          subcategory: "moisture",
+          possibleConduciveCondition: "Leak creating harborage moisture",
+          severity: "moderate",
+          whatIsShown: "Water damage under a kitchen sink cabinet",
+          treatmentOutcome: "unchanged",
+          daysUntilFollowup: 21,
+          verificationLevel: 2,
+          status: "confirmed",
+          approvedForTraining: false,
+          aiCorrected: false,
+          createdBy: techId,
+          confirmedBy: techId,
+          createdAt: day(3),
+          confirmedAt: day(2),
+        },
+        // 5) Pending (L1) — AI suggestion only, awaiting technician review
+        {
+          companyId,
+          imageUrl: img("intel-ant"),
+          thumbnailUrl: thumb("intel-ant"),
+          aiPrediction: pred({
+            category: "pest",
+            subcategory: "ant",
+            confidence: 0.69,
+            tags: ["ant", "trail"],
+            possiblePest: "Pavement ant",
+            suggestedCorrectiveAction: "Bait along the foraging trail",
+            rationale: "Foraging trail following the baseboard",
+          }),
+          aiConfidence: 0.69,
+          verificationLevel: 1,
+          status: "pending",
+          createdBy: techId,
+          createdAt: day(1),
+        },
+      ])
+      .returning();
+
+    // Tags: AI-sourced for every record, plus technician tags on confirmed rows.
+    const tagRows: (typeof intelligenceTagsTable.$inferInsert)[] = [];
+    for (const r of intelRecords) {
+      for (const tag of r.aiPrediction?.tags ?? []) {
+        tagRows.push({ companyId, recordId: r.id, tag, source: "ai" });
+      }
+    }
+    tagRows.push(
+      { companyId, recordId: intelRecords[0].id, tag: "verified", source: "technician" },
+      { companyId, recordId: intelRecords[1].id, tag: "exclusion", source: "technician" },
+      { companyId, recordId: intelRecords[2].id, tag: "wdo", source: "technician" },
+    );
+    await db.insert(intelligenceTagsTable).values(tagRows);
+
+    // Votes: implicit confirm from the confirmer on confirmed rows; record 3 has a
+    // second technician (manager) confirm vote that promoted it to L3.
+    await db.insert(intelligenceVotesTable).values([
+      { companyId, recordId: intelRecords[0].id, userId: techId, vote: "confirm" },
+      { companyId, recordId: intelRecords[1].id, userId: techId, vote: "confirm" },
+      { companyId, recordId: intelRecords[2].id, userId: techId, vote: "confirm" },
+      { companyId, recordId: intelRecords[2].id, userId: managerId, vote: "confirm" },
+      { companyId, recordId: intelRecords[3].id, userId: techId, vote: "confirm" },
+    ]);
+
+    // Reviews: manager actions on the approved/expert-verified rows.
+    await db.insert(intelligenceReviewsTable).values([
+      { companyId, recordId: intelRecords[0].id, reviewerId: managerId, action: "expert_verify", comment: "Textbook example — added to training set" },
+      { companyId, recordId: intelRecords[1].id, reviewerId: managerId, action: "approve", comment: "Good catch on the corrected category" },
+    ]);
+
+    console.log(`Created ${intelRecords.length} intelligence records`);
+  } else {
+    console.log("Intelligence records already present — skipping");
   }
 
   console.log("Seed complete!");

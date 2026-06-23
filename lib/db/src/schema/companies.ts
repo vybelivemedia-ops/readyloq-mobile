@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import type { UserRole } from "./users";
@@ -12,6 +12,12 @@ export const companiesTable = pgTable(
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    // Opt-IN (default OFF) to the Phase 2 shared, anonymized intelligence network.
+    // When false, this company's verified records are never eligible for the
+    // platform-wide training dataset. Phase 1 keeps everything company-private.
+    intelligenceSharingEnabled: boolean("intelligence_sharing_enabled")
+      .notNull()
+      .default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({

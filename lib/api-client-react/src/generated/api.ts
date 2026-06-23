@@ -37,12 +37,23 @@ import type {
   InspectionInput,
   InspectionMedia,
   InspectionUpdate,
+  IntelligenceAnalytics,
+  IntelligenceCategory,
+  IntelligenceConfirmInput,
+  IntelligenceRecord,
+  IntelligenceRecordInput,
+  IntelligenceRecordPage,
+  IntelligenceReviewInput,
+  IntelligenceSettings,
+  IntelligenceSettingsInput,
+  IntelligenceVoteInput,
   Lead,
   LeadInput,
   LeaderboardEntry,
   ListAnalysisResultsParams,
   ListDatasetImagesParams,
   ListInspectionsParams,
+  ListIntelligenceRecordsParams,
   LookupPropertyParams,
   MediaInput,
   OpportunityIntelligence,
@@ -1068,6 +1079,826 @@ export function useListDatasetCategories<TData = Awaited<ReturnType<typeof listD
 
 
 
+
+export const getListIntelligenceCategoriesUrl = () => {
+
+
+
+
+  return `/api/intelligence-dataset/categories`
+}
+
+/**
+ * @summary Taxonomy groups + subcategories with per-company counts
+ */
+export const listIntelligenceCategories = async ( options?: RequestInit): Promise<IntelligenceCategory[]> => {
+
+  return customFetch<IntelligenceCategory[]>(getListIntelligenceCategoriesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListIntelligenceCategoriesQueryKey = () => {
+    return [
+    `/api/intelligence-dataset/categories`
+    ] as const;
+    }
+
+
+export const getListIntelligenceCategoriesQueryOptions = <TData = Awaited<ReturnType<typeof listIntelligenceCategories>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIntelligenceCategories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListIntelligenceCategoriesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listIntelligenceCategories>>> = ({ signal }) => listIntelligenceCategories({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listIntelligenceCategories>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListIntelligenceCategoriesQueryResult = NonNullable<Awaited<ReturnType<typeof listIntelligenceCategories>>>
+export type ListIntelligenceCategoriesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Taxonomy groups + subcategories with per-company counts
+ */
+
+export function useListIntelligenceCategories<TData = Awaited<ReturnType<typeof listIntelligenceCategories>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIntelligenceCategories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListIntelligenceCategoriesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetIntelligenceSettingsUrl = () => {
+
+
+
+
+  return `/api/intelligence-dataset/settings`
+}
+
+/**
+ * @summary Get the company's intelligence sharing participation setting
+ */
+export const getIntelligenceSettings = async ( options?: RequestInit): Promise<IntelligenceSettings> => {
+
+  return customFetch<IntelligenceSettings>(getGetIntelligenceSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIntelligenceSettingsQueryKey = () => {
+    return [
+    `/api/intelligence-dataset/settings`
+    ] as const;
+    }
+
+
+export const getGetIntelligenceSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getIntelligenceSettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntelligenceSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIntelligenceSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntelligenceSettings>>> = ({ signal }) => getIntelligenceSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntelligenceSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIntelligenceSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getIntelligenceSettings>>>
+export type GetIntelligenceSettingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the company's intelligence sharing participation setting
+ */
+
+export function useGetIntelligenceSettings<TData = Awaited<ReturnType<typeof getIntelligenceSettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntelligenceSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIntelligenceSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateIntelligenceSettingsUrl = () => {
+
+
+
+
+  return `/api/intelligence-dataset/settings`
+}
+
+/**
+ * @summary Update the company's sharing participation (manager+)
+ */
+export const updateIntelligenceSettings = async (intelligenceSettingsInput: IntelligenceSettingsInput, options?: RequestInit): Promise<IntelligenceSettings> => {
+
+  return customFetch<IntelligenceSettings>(getUpdateIntelligenceSettingsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      intelligenceSettingsInput,)
+  }
+);}
+
+
+
+
+export const getUpdateIntelligenceSettingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateIntelligenceSettings>>, TError,{data: BodyType<IntelligenceSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateIntelligenceSettings>>, TError,{data: BodyType<IntelligenceSettingsInput>}, TContext> => {
+
+const mutationKey = ['updateIntelligenceSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateIntelligenceSettings>>, {data: BodyType<IntelligenceSettingsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateIntelligenceSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateIntelligenceSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateIntelligenceSettings>>>
+    export type UpdateIntelligenceSettingsMutationBody = BodyType<IntelligenceSettingsInput>
+    export type UpdateIntelligenceSettingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update the company's sharing participation (manager+)
+ */
+export const useUpdateIntelligenceSettings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateIntelligenceSettings>>, TError,{data: BodyType<IntelligenceSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateIntelligenceSettings>>,
+        TError,
+        {data: BodyType<IntelligenceSettingsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateIntelligenceSettingsMutationOptions(options));
+    }
+
+export const getGetIntelligenceAnalyticsUrl = () => {
+
+
+
+
+  return `/api/intelligence-dataset/analytics`
+}
+
+/**
+ * @summary Per-company intelligence dataset analytics
+ */
+export const getIntelligenceAnalytics = async ( options?: RequestInit): Promise<IntelligenceAnalytics> => {
+
+  return customFetch<IntelligenceAnalytics>(getGetIntelligenceAnalyticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIntelligenceAnalyticsQueryKey = () => {
+    return [
+    `/api/intelligence-dataset/analytics`
+    ] as const;
+    }
+
+
+export const getGetIntelligenceAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getIntelligenceAnalytics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntelligenceAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIntelligenceAnalyticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntelligenceAnalytics>>> = ({ signal }) => getIntelligenceAnalytics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntelligenceAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIntelligenceAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getIntelligenceAnalytics>>>
+export type GetIntelligenceAnalyticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Per-company intelligence dataset analytics
+ */
+
+export function useGetIntelligenceAnalytics<TData = Awaited<ReturnType<typeof getIntelligenceAnalytics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntelligenceAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIntelligenceAnalyticsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListIntelligenceRecordsUrl = (params?: ListIntelligenceRecordsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/intelligence-dataset/records?${stringifiedParams}` : `/api/intelligence-dataset/records`
+}
+
+/**
+ * @summary List intelligence records for the caller's company
+ */
+export const listIntelligenceRecords = async (params?: ListIntelligenceRecordsParams, options?: RequestInit): Promise<IntelligenceRecordPage> => {
+
+  return customFetch<IntelligenceRecordPage>(getListIntelligenceRecordsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListIntelligenceRecordsQueryKey = (params?: ListIntelligenceRecordsParams,) => {
+    return [
+    `/api/intelligence-dataset/records`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListIntelligenceRecordsQueryOptions = <TData = Awaited<ReturnType<typeof listIntelligenceRecords>>, TError = ErrorType<unknown>>(params?: ListIntelligenceRecordsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIntelligenceRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListIntelligenceRecordsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listIntelligenceRecords>>> = ({ signal }) => listIntelligenceRecords(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listIntelligenceRecords>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListIntelligenceRecordsQueryResult = NonNullable<Awaited<ReturnType<typeof listIntelligenceRecords>>>
+export type ListIntelligenceRecordsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List intelligence records for the caller's company
+ */
+
+export function useListIntelligenceRecords<TData = Awaited<ReturnType<typeof listIntelligenceRecords>>, TError = ErrorType<unknown>>(
+ params?: ListIntelligenceRecordsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listIntelligenceRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListIntelligenceRecordsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateIntelligenceRecordUrl = () => {
+
+
+
+
+  return `/api/intelligence-dataset/records`
+}
+
+/**
+ * @summary Create a record from an uploaded image (runs the AI suggestion)
+ */
+export const createIntelligenceRecord = async (intelligenceRecordInput: IntelligenceRecordInput, options?: RequestInit): Promise<IntelligenceRecord> => {
+
+  return customFetch<IntelligenceRecord>(getCreateIntelligenceRecordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      intelligenceRecordInput,)
+  }
+);}
+
+
+
+
+export const getCreateIntelligenceRecordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createIntelligenceRecord>>, TError,{data: BodyType<IntelligenceRecordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createIntelligenceRecord>>, TError,{data: BodyType<IntelligenceRecordInput>}, TContext> => {
+
+const mutationKey = ['createIntelligenceRecord'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createIntelligenceRecord>>, {data: BodyType<IntelligenceRecordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createIntelligenceRecord(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateIntelligenceRecordMutationResult = NonNullable<Awaited<ReturnType<typeof createIntelligenceRecord>>>
+    export type CreateIntelligenceRecordMutationBody = BodyType<IntelligenceRecordInput>
+    export type CreateIntelligenceRecordMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a record from an uploaded image (runs the AI suggestion)
+ */
+export const useCreateIntelligenceRecord = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createIntelligenceRecord>>, TError,{data: BodyType<IntelligenceRecordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createIntelligenceRecord>>,
+        TError,
+        {data: BodyType<IntelligenceRecordInput>},
+        TContext
+      > => {
+      return useMutation(getCreateIntelligenceRecordMutationOptions(options));
+    }
+
+export const getGetIntelligenceRecordUrl = (id: number,) => {
+
+
+
+
+  return `/api/intelligence-dataset/records/${id}`
+}
+
+/**
+ * @summary Get a single intelligence record
+ */
+export const getIntelligenceRecord = async (id: number, options?: RequestInit): Promise<IntelligenceRecord> => {
+
+  return customFetch<IntelligenceRecord>(getGetIntelligenceRecordUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIntelligenceRecordQueryKey = (id: number,) => {
+    return [
+    `/api/intelligence-dataset/records/${id}`
+    ] as const;
+    }
+
+
+export const getGetIntelligenceRecordQueryOptions = <TData = Awaited<ReturnType<typeof getIntelligenceRecord>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntelligenceRecord>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIntelligenceRecordQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIntelligenceRecord>>> = ({ signal }) => getIntelligenceRecord(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIntelligenceRecord>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIntelligenceRecordQueryResult = NonNullable<Awaited<ReturnType<typeof getIntelligenceRecord>>>
+export type GetIntelligenceRecordQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a single intelligence record
+ */
+
+export function useGetIntelligenceRecord<TData = Awaited<ReturnType<typeof getIntelligenceRecord>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIntelligenceRecord>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIntelligenceRecordQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getConfirmIntelligenceRecordUrl = (id: number,) => {
+
+
+
+
+  return `/api/intelligence-dataset/records/${id}`
+}
+
+/**
+ * @summary Technician confirms/corrects the AI suggestion + adds detail
+ */
+export const confirmIntelligenceRecord = async (id: number,
+    intelligenceConfirmInput: IntelligenceConfirmInput, options?: RequestInit): Promise<IntelligenceRecord> => {
+
+  return customFetch<IntelligenceRecord>(getConfirmIntelligenceRecordUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      intelligenceConfirmInput,)
+  }
+);}
+
+
+
+
+export const getConfirmIntelligenceRecordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmIntelligenceRecord>>, TError,{id: number;data: BodyType<IntelligenceConfirmInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmIntelligenceRecord>>, TError,{id: number;data: BodyType<IntelligenceConfirmInput>}, TContext> => {
+
+const mutationKey = ['confirmIntelligenceRecord'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmIntelligenceRecord>>, {id: number;data: BodyType<IntelligenceConfirmInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  confirmIntelligenceRecord(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmIntelligenceRecordMutationResult = NonNullable<Awaited<ReturnType<typeof confirmIntelligenceRecord>>>
+    export type ConfirmIntelligenceRecordMutationBody = BodyType<IntelligenceConfirmInput>
+    export type ConfirmIntelligenceRecordMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Technician confirms/corrects the AI suggestion + adds detail
+ */
+export const useConfirmIntelligenceRecord = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmIntelligenceRecord>>, TError,{id: number;data: BodyType<IntelligenceConfirmInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmIntelligenceRecord>>,
+        TError,
+        {id: number;data: BodyType<IntelligenceConfirmInput>},
+        TContext
+      > => {
+      return useMutation(getConfirmIntelligenceRecordMutationOptions(options));
+    }
+
+export const getSkipIntelligenceRecordUrl = (id: number,) => {
+
+
+
+
+  return `/api/intelligence-dataset/records/${id}/skip`
+}
+
+/**
+ * @summary Skip a record (retained, excluded from the dataset)
+ */
+export const skipIntelligenceRecord = async (id: number, options?: RequestInit): Promise<IntelligenceRecord> => {
+
+  return customFetch<IntelligenceRecord>(getSkipIntelligenceRecordUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSkipIntelligenceRecordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof skipIntelligenceRecord>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof skipIntelligenceRecord>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['skipIntelligenceRecord'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof skipIntelligenceRecord>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  skipIntelligenceRecord(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SkipIntelligenceRecordMutationResult = NonNullable<Awaited<ReturnType<typeof skipIntelligenceRecord>>>
+
+    export type SkipIntelligenceRecordMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Skip a record (retained, excluded from the dataset)
+ */
+export const useSkipIntelligenceRecord = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof skipIntelligenceRecord>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof skipIntelligenceRecord>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSkipIntelligenceRecordMutationOptions(options));
+    }
+
+export const getVoteIntelligenceRecordUrl = (id: number,) => {
+
+
+
+
+  return `/api/intelligence-dataset/records/${id}/vote`
+}
+
+/**
+ * @summary Cast a confirm/dispute vote (drives multi-technician verification)
+ */
+export const voteIntelligenceRecord = async (id: number,
+    intelligenceVoteInput: IntelligenceVoteInput, options?: RequestInit): Promise<IntelligenceRecord> => {
+
+  return customFetch<IntelligenceRecord>(getVoteIntelligenceRecordUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      intelligenceVoteInput,)
+  }
+);}
+
+
+
+
+export const getVoteIntelligenceRecordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voteIntelligenceRecord>>, TError,{id: number;data: BodyType<IntelligenceVoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof voteIntelligenceRecord>>, TError,{id: number;data: BodyType<IntelligenceVoteInput>}, TContext> => {
+
+const mutationKey = ['voteIntelligenceRecord'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof voteIntelligenceRecord>>, {id: number;data: BodyType<IntelligenceVoteInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  voteIntelligenceRecord(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VoteIntelligenceRecordMutationResult = NonNullable<Awaited<ReturnType<typeof voteIntelligenceRecord>>>
+    export type VoteIntelligenceRecordMutationBody = BodyType<IntelligenceVoteInput>
+    export type VoteIntelligenceRecordMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Cast a confirm/dispute vote (drives multi-technician verification)
+ */
+export const useVoteIntelligenceRecord = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voteIntelligenceRecord>>, TError,{id: number;data: BodyType<IntelligenceVoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof voteIntelligenceRecord>>,
+        TError,
+        {id: number;data: BodyType<IntelligenceVoteInput>},
+        TContext
+      > => {
+      return useMutation(getVoteIntelligenceRecordMutationOptions(options));
+    }
+
+export const getReviewIntelligenceRecordUrl = (id: number,) => {
+
+
+
+
+  return `/api/intelligence-dataset/records/${id}/review`
+}
+
+/**
+ * @summary Manager review — approve / reject / edit / expert-verify
+ */
+export const reviewIntelligenceRecord = async (id: number,
+    intelligenceReviewInput: IntelligenceReviewInput, options?: RequestInit): Promise<IntelligenceRecord> => {
+
+  return customFetch<IntelligenceRecord>(getReviewIntelligenceRecordUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      intelligenceReviewInput,)
+  }
+);}
+
+
+
+
+export const getReviewIntelligenceRecordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewIntelligenceRecord>>, TError,{id: number;data: BodyType<IntelligenceReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewIntelligenceRecord>>, TError,{id: number;data: BodyType<IntelligenceReviewInput>}, TContext> => {
+
+const mutationKey = ['reviewIntelligenceRecord'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewIntelligenceRecord>>, {id: number;data: BodyType<IntelligenceReviewInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reviewIntelligenceRecord(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewIntelligenceRecordMutationResult = NonNullable<Awaited<ReturnType<typeof reviewIntelligenceRecord>>>
+    export type ReviewIntelligenceRecordMutationBody = BodyType<IntelligenceReviewInput>
+    export type ReviewIntelligenceRecordMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Manager review — approve / reject / edit / expert-verify
+ */
+export const useReviewIntelligenceRecord = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewIntelligenceRecord>>, TError,{id: number;data: BodyType<IntelligenceReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewIntelligenceRecord>>,
+        TError,
+        {id: number;data: BodyType<IntelligenceReviewInput>},
+        TContext
+      > => {
+      return useMutation(getReviewIntelligenceRecordMutationOptions(options));
+    }
 
 export const getListReportsUrl = () => {
 

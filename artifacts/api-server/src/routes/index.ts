@@ -13,6 +13,7 @@ import reportsRouter from "./reports";
 import trainingRouter from "./training";
 import analyticsRouter from "./analytics";
 import intelligenceRouter from "./intelligence";
+import intelligenceDatasetRouter from "./intelligence-dataset";
 import brandingRouter from "./branding";
 import propertiesRouter from "./properties";
 import storageRouter from "./storage";
@@ -38,6 +39,15 @@ router.use(
   requireCompany,
   requireRole("manager"),
   intelligenceRouter,
+);
+// Intelligence Dataset & AI Learning Center: company-private contribution →
+// technician review → manager verification. Manager-only actions are guarded
+// per-route inside the router (requireRole("manager")).
+router.use(
+  "/intelligence-dataset",
+  requireAuth,
+  requireCompany,
+  intelligenceDatasetRouter,
 );
 router.use("/branding", brandingRouter);
 router.use("/properties", requireAuth, requireCompany, propertiesRouter);
