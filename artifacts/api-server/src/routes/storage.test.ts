@@ -29,11 +29,19 @@ vi.mock("../lib/objectStorage", () => {
 });
 
 import app from "../app";
-import { db, usersTable, companiesTable } from "@workspace/db";
+import {
+  db,
+  usersTable,
+  companiesTable,
+  intelligenceRecordsTable,
+} from "@workspace/db";
 
 const TECH_ID = "test_storage_tech_clerk_id";
 
 beforeAll(async () => {
+  // intelligence_records FK to users (cascades to its tags/reviews/votes); clear
+  // them before deleting users so shared-DB reruns don't hit the FK constraint.
+  await db.delete(intelligenceRecordsTable);
   await db.delete(usersTable);
   const [company] = await db
     .insert(companiesTable)

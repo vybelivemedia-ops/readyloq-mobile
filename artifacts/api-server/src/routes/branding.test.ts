@@ -23,6 +23,7 @@ import {
   usersTable,
   brandingProfilesTable,
   companiesTable,
+  intelligenceRecordsTable,
   READYLOQ_DEFAULT_PROFILE,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -52,6 +53,9 @@ beforeAll(async () => {
   // an ordinary tenant whose managers manage their own branding.
   platformCompanyId = await findOrCreateCompany("ReadyLoq Platform", "platform");
   testCompanyId = await findOrCreateCompany("Branding Test Co", "branding-test-co");
+  // intelligence_records FK to users (cascades to its tags/reviews/votes); clear
+  // them before deleting users so shared-DB reruns don't hit the FK constraint.
+  await db.delete(intelligenceRecordsTable);
   await db.delete(usersTable);
   await db.insert(usersTable).values([
     { clerkUserId: MANAGER_ID, role: "manager", companyId: testCompanyId },
