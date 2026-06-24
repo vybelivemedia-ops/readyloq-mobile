@@ -24,12 +24,18 @@ import type {
   AnalysisSummary,
   AnalyticsDashboard,
   AnalyzeInspectionInput,
+  BetaFeedback,
   BrandingProfile,
   BrandingProfileInput,
   CallbackIntelligence,
+  ChecklistResponse,
+  ChecklistToggleResult,
+  ClientErrorInput,
+  CreateInviteInput,
   DatasetCategory,
   DatasetPage,
   Error,
+  ErrorEventList,
   FeedbackInput,
   GetAnalyticsTrendsParams,
   HealthStatus,
@@ -48,14 +54,17 @@ import type {
   IntelligenceSettings,
   IntelligenceSettingsInput,
   IntelligenceVoteInput,
+  Invite,
   Lead,
   LeadInput,
   ListAnalysisResultsParams,
   ListDatasetImagesParams,
+  ListFeedbackParams,
   ListInspectionsParams,
   ListIntelligenceRecordsParams,
   LookupPropertyParams,
   MediaInput,
+  OkResponse,
   OpportunityIntelligence,
   PropertyFeed,
   PropertyLookupResult,
@@ -66,8 +75,14 @@ import type {
   PropertySummary,
   Report,
   ReportInput,
+  SubmitFeedbackInput,
   TechnicianPerformance,
-  TrendDataPoint
+  Tester,
+  TesterAccessResult,
+  ToggleAccessInput,
+  ToggleChecklistInput,
+  TrendDataPoint,
+  UpdateFeedbackInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -4138,4 +4153,825 @@ export const useCreateLead = <TError = ErrorType<Error>,
       > => {
       return useMutation(getCreateLeadMutationOptions(options));
     }
+
+export const getSubmitFeedbackUrl = () => {
+
+
+
+
+  return `/api/beta/feedback`
+}
+
+/**
+ * @summary Submit beta feedback (any company member)
+ */
+export const submitFeedback = async (submitFeedbackInput: SubmitFeedbackInput, options?: RequestInit): Promise<BetaFeedback> => {
+
+  return customFetch<BetaFeedback>(getSubmitFeedbackUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      submitFeedbackInput,)
+  }
+);}
+
+
+
+
+export const getSubmitFeedbackMutationOptions = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitFeedback>>, TError,{data: BodyType<SubmitFeedbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitFeedback>>, TError,{data: BodyType<SubmitFeedbackInput>}, TContext> => {
+
+const mutationKey = ['submitFeedback'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitFeedback>>, {data: BodyType<SubmitFeedbackInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitFeedback(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof submitFeedback>>>
+    export type SubmitFeedbackMutationBody = BodyType<SubmitFeedbackInput>
+    export type SubmitFeedbackMutationError = ErrorType<Error>
+
+    /**
+ * @summary Submit beta feedback (any company member)
+ */
+export const useSubmitFeedback = <TError = ErrorType<Error>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitFeedback>>, TError,{data: BodyType<SubmitFeedbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitFeedback>>,
+        TError,
+        {data: BodyType<SubmitFeedbackInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitFeedbackMutationOptions(options));
+    }
+
+export const getListFeedbackUrl = (params?: ListFeedbackParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/beta/feedback?${stringifiedParams}` : `/api/beta/feedback`
+}
+
+/**
+ * @summary List beta feedback (manager+)
+ */
+export const listFeedback = async (params?: ListFeedbackParams, options?: RequestInit): Promise<BetaFeedback[]> => {
+
+  return customFetch<BetaFeedback[]>(getListFeedbackUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFeedbackQueryKey = (params?: ListFeedbackParams,) => {
+    return [
+    `/api/beta/feedback`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFeedbackQueryOptions = <TData = Awaited<ReturnType<typeof listFeedback>>, TError = ErrorType<unknown>>(params?: ListFeedbackParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFeedback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFeedbackQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFeedback>>> = ({ signal }) => listFeedback(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFeedback>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFeedbackQueryResult = NonNullable<Awaited<ReturnType<typeof listFeedback>>>
+export type ListFeedbackQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List beta feedback (manager+)
+ */
+
+export function useListFeedback<TData = Awaited<ReturnType<typeof listFeedback>>, TError = ErrorType<unknown>>(
+ params?: ListFeedbackParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFeedback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFeedbackQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateFeedbackUrl = (id: number,) => {
+
+
+
+
+  return `/api/beta/feedback/${id}`
+}
+
+/**
+ * @summary Update feedback status/severity (manager+)
+ */
+export const updateFeedback = async (id: number,
+    updateFeedbackInput: UpdateFeedbackInput, options?: RequestInit): Promise<BetaFeedback> => {
+
+  return customFetch<BetaFeedback>(getUpdateFeedbackUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateFeedbackInput,)
+  }
+);}
+
+
+
+
+export const getUpdateFeedbackMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFeedback>>, TError,{id: number;data: BodyType<UpdateFeedbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateFeedback>>, TError,{id: number;data: BodyType<UpdateFeedbackInput>}, TContext> => {
+
+const mutationKey = ['updateFeedback'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateFeedback>>, {id: number;data: BodyType<UpdateFeedbackInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateFeedback(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof updateFeedback>>>
+    export type UpdateFeedbackMutationBody = BodyType<UpdateFeedbackInput>
+    export type UpdateFeedbackMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update feedback status/severity (manager+)
+ */
+export const useUpdateFeedback = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFeedback>>, TError,{id: number;data: BodyType<UpdateFeedbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateFeedback>>,
+        TError,
+        {id: number;data: BodyType<UpdateFeedbackInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateFeedbackMutationOptions(options));
+    }
+
+export const getReportClientErrorUrl = () => {
+
+
+
+
+  return `/api/beta/errors`
+}
+
+/**
+ * @summary Report a client-side failure (any company member)
+ */
+export const reportClientError = async (clientErrorInput: ClientErrorInput, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getReportClientErrorUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      clientErrorInput,)
+  }
+);}
+
+
+
+
+export const getReportClientErrorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportClientError>>, TError,{data: BodyType<ClientErrorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportClientError>>, TError,{data: BodyType<ClientErrorInput>}, TContext> => {
+
+const mutationKey = ['reportClientError'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportClientError>>, {data: BodyType<ClientErrorInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  reportClientError(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportClientErrorMutationResult = NonNullable<Awaited<ReturnType<typeof reportClientError>>>
+    export type ReportClientErrorMutationBody = BodyType<ClientErrorInput>
+    export type ReportClientErrorMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Report a client-side failure (any company member)
+ */
+export const useReportClientError = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportClientError>>, TError,{data: BodyType<ClientErrorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportClientError>>,
+        TError,
+        {data: BodyType<ClientErrorInput>},
+        TContext
+      > => {
+      return useMutation(getReportClientErrorMutationOptions(options));
+    }
+
+export const getListErrorEventsUrl = () => {
+
+
+
+
+  return `/api/beta/errors`
+}
+
+/**
+ * @summary List error events with summary (manager+)
+ */
+export const listErrorEvents = async ( options?: RequestInit): Promise<ErrorEventList> => {
+
+  return customFetch<ErrorEventList>(getListErrorEventsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListErrorEventsQueryKey = () => {
+    return [
+    `/api/beta/errors`
+    ] as const;
+    }
+
+
+export const getListErrorEventsQueryOptions = <TData = Awaited<ReturnType<typeof listErrorEvents>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listErrorEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListErrorEventsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listErrorEvents>>> = ({ signal }) => listErrorEvents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listErrorEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListErrorEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listErrorEvents>>>
+export type ListErrorEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List error events with summary (manager+)
+ */
+
+export function useListErrorEvents<TData = Awaited<ReturnType<typeof listErrorEvents>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listErrorEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListErrorEventsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetChecklistUrl = () => {
+
+
+
+
+  return `/api/beta/checklist`
+}
+
+/**
+ * @summary Get the closed-beta checklist with company state (manager+)
+ */
+export const getChecklist = async ( options?: RequestInit): Promise<ChecklistResponse> => {
+
+  return customFetch<ChecklistResponse>(getGetChecklistUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChecklistQueryKey = () => {
+    return [
+    `/api/beta/checklist`
+    ] as const;
+    }
+
+
+export const getGetChecklistQueryOptions = <TData = Awaited<ReturnType<typeof getChecklist>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChecklist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChecklistQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChecklist>>> = ({ signal }) => getChecklist({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChecklist>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChecklistQueryResult = NonNullable<Awaited<ReturnType<typeof getChecklist>>>
+export type GetChecklistQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the closed-beta checklist with company state (manager+)
+ */
+
+export function useGetChecklist<TData = Awaited<ReturnType<typeof getChecklist>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChecklist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChecklistQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getToggleChecklistItemUrl = (itemKey: string,) => {
+
+
+
+
+  return `/api/beta/checklist/${itemKey}`
+}
+
+/**
+ * @summary Toggle a checklist item (manager+)
+ */
+export const toggleChecklistItem = async (itemKey: string,
+    toggleChecklistInput: ToggleChecklistInput, options?: RequestInit): Promise<ChecklistToggleResult> => {
+
+  return customFetch<ChecklistToggleResult>(getToggleChecklistItemUrl(itemKey),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      toggleChecklistInput,)
+  }
+);}
+
+
+
+
+export const getToggleChecklistItemMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleChecklistItem>>, TError,{itemKey: string;data: BodyType<ToggleChecklistInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleChecklistItem>>, TError,{itemKey: string;data: BodyType<ToggleChecklistInput>}, TContext> => {
+
+const mutationKey = ['toggleChecklistItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleChecklistItem>>, {itemKey: string;data: BodyType<ToggleChecklistInput>}> = (props) => {
+          const {itemKey,data} = props ?? {};
+
+          return  toggleChecklistItem(itemKey,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleChecklistItemMutationResult = NonNullable<Awaited<ReturnType<typeof toggleChecklistItem>>>
+    export type ToggleChecklistItemMutationBody = BodyType<ToggleChecklistInput>
+    export type ToggleChecklistItemMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Toggle a checklist item (manager+)
+ */
+export const useToggleChecklistItem = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleChecklistItem>>, TError,{itemKey: string;data: BodyType<ToggleChecklistInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof toggleChecklistItem>>,
+        TError,
+        {itemKey: string;data: BodyType<ToggleChecklistInput>},
+        TContext
+      > => {
+      return useMutation(getToggleChecklistItemMutationOptions(options));
+    }
+
+export const getListTestersUrl = () => {
+
+
+
+
+  return `/api/beta/testers`
+}
+
+/**
+ * @summary List beta testers with activity (manager+)
+ */
+export const listTesters = async ( options?: RequestInit): Promise<Tester[]> => {
+
+  return customFetch<Tester[]>(getListTestersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTestersQueryKey = () => {
+    return [
+    `/api/beta/testers`
+    ] as const;
+    }
+
+
+export const getListTestersQueryOptions = <TData = Awaited<ReturnType<typeof listTesters>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTesters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTestersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTesters>>> = ({ signal }) => listTesters({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTesters>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTestersQueryResult = NonNullable<Awaited<ReturnType<typeof listTesters>>>
+export type ListTestersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List beta testers with activity (manager+)
+ */
+
+export function useListTesters<TData = Awaited<ReturnType<typeof listTesters>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTesters>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTestersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateTesterAccessUrl = (userId: number,) => {
+
+
+
+
+  return `/api/beta/testers/${userId}/access`
+}
+
+/**
+ * @summary Pause or restore a technician's beta access (manager+)
+ */
+export const updateTesterAccess = async (userId: number,
+    toggleAccessInput: ToggleAccessInput, options?: RequestInit): Promise<TesterAccessResult> => {
+
+  return customFetch<TesterAccessResult>(getUpdateTesterAccessUrl(userId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      toggleAccessInput,)
+  }
+);}
+
+
+
+
+export const getUpdateTesterAccessMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTesterAccess>>, TError,{userId: number;data: BodyType<ToggleAccessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTesterAccess>>, TError,{userId: number;data: BodyType<ToggleAccessInput>}, TContext> => {
+
+const mutationKey = ['updateTesterAccess'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTesterAccess>>, {userId: number;data: BodyType<ToggleAccessInput>}> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  updateTesterAccess(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTesterAccessMutationResult = NonNullable<Awaited<ReturnType<typeof updateTesterAccess>>>
+    export type UpdateTesterAccessMutationBody = BodyType<ToggleAccessInput>
+    export type UpdateTesterAccessMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Pause or restore a technician's beta access (manager+)
+ */
+export const useUpdateTesterAccess = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTesterAccess>>, TError,{userId: number;data: BodyType<ToggleAccessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTesterAccess>>,
+        TError,
+        {userId: number;data: BodyType<ToggleAccessInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateTesterAccessMutationOptions(options));
+    }
+
+export const getCreateInviteUrl = () => {
+
+
+
+
+  return `/api/auth/invites`
+}
+
+/**
+ * @summary Create a company invite (manager+)
+ */
+export const createInvite = async (createInviteInput: CreateInviteInput, options?: RequestInit): Promise<Invite> => {
+
+  return customFetch<Invite>(getCreateInviteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createInviteInput,)
+  }
+);}
+
+
+
+
+export const getCreateInviteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInvite>>, TError,{data: BodyType<CreateInviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createInvite>>, TError,{data: BodyType<CreateInviteInput>}, TContext> => {
+
+const mutationKey = ['createInvite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInvite>>, {data: BodyType<CreateInviteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createInvite(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateInviteMutationResult = NonNullable<Awaited<ReturnType<typeof createInvite>>>
+    export type CreateInviteMutationBody = BodyType<CreateInviteInput>
+    export type CreateInviteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a company invite (manager+)
+ */
+export const useCreateInvite = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInvite>>, TError,{data: BodyType<CreateInviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createInvite>>,
+        TError,
+        {data: BodyType<CreateInviteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateInviteMutationOptions(options));
+    }
+
+export const getListInvitesUrl = () => {
+
+
+
+
+  return `/api/auth/invites`
+}
+
+/**
+ * @summary List company invites (manager+)
+ */
+export const listInvites = async ( options?: RequestInit): Promise<Invite[]> => {
+
+  return customFetch<Invite[]>(getListInvitesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInvitesQueryKey = () => {
+    return [
+    `/api/auth/invites`
+    ] as const;
+    }
+
+
+export const getListInvitesQueryOptions = <TData = Awaited<ReturnType<typeof listInvites>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInvites>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInvitesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInvites>>> = ({ signal }) => listInvites({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInvites>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInvitesQueryResult = NonNullable<Awaited<ReturnType<typeof listInvites>>>
+export type ListInvitesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List company invites (manager+)
+ */
+
+export function useListInvites<TData = Awaited<ReturnType<typeof listInvites>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInvites>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInvitesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 

@@ -16,6 +16,9 @@ export interface AnalyticsDashboard {
   openInspections: number;
   avgFindingsPerInspection: number;
   totalReports?: number;
+  photosCaptured?: number;
+  videosCaptured?: number;
+  aiAnalysesCompleted?: number;
   avgAiConfidence?: number;
   topPestTypes: AnalyticsDashboardTopPestTypesItem[];
   recentActivity: ActivityItem[];

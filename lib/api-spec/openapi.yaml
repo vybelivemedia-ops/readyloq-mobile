@@ -27,6 +27,8 @@ tags:
     description: Property intelligence feed
   - name: leads
     description: Marketing site lead capture
+  - name: beta
+    description: Closed-beta center (feedback, errors, checklist, testers, invites)
 
 paths:
   /healthz:
@@ -1010,8 +1012,387 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  # ── BETA CENTER ──────────────────────────────────────────────────────────────
+  /beta/feedback:
+    post:
+      operationId: submitFeedback
+      tags: [beta]
+      summary: Submit beta feedback (any company member)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitFeedbackInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BetaFeedback"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      operationId: listFeedback
+      tags: [beta]
+      summary: List beta feedback (manager+)
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BetaFeedback"
+
+  /beta/feedback/{id}:
+    patch:
+      operationId: updateFeedback
+      tags: [beta]
+      summary: Update feedback status/severity (manager+)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFeedbackInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BetaFeedback"
+
+  /beta/errors:
+    post:
+      operationId: reportClientError
+      tags: [beta]
+      summary: Report a client-side failure (any company member)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientErrorInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+    get:
+      operationId: listErrorEvents
+      tags: [beta]
+      summary: List error events with summary (manager+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEventList"
+
+  /beta/checklist:
+    get:
+      operationId: getChecklist
+      tags: [beta]
+      summary: Get the closed-beta checklist with company state (manager+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistResponse"
+
+  /beta/checklist/{itemKey}:
+    patch:
+      operationId: toggleChecklistItem
+      tags: [beta]
+      summary: Toggle a checklist item (manager+)
+      parameters:
+        - name: itemKey
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleChecklistInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistToggleResult"
+
+  /beta/testers:
+    get:
+      operationId: listTesters
+      tags: [beta]
+      summary: List beta testers with activity (manager+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tester"
+
+  /beta/testers/{userId}/access:
+    patch:
+      operationId: updateTesterAccess
+      tags: [beta]
+      summary: Pause or restore a technician's beta access (manager+)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleAccessInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TesterAccessResult"
+
+  # ── AUTH INVITES (manager+) ──────────────────────────────────────────────────
+  /auth/invites:
+    post:
+      operationId: createInvite
+      tags: [beta]
+      summary: Create a company invite (manager+)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInviteInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+    get:
+      operationId: listInvites
+      tags: [beta]
+      summary: List company invites (manager+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invite"
+
 components:
   schemas:
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    SubmitFeedbackInput:
+      type: object
+      required: [type, title, description]
+      properties:
+        type:         { type: string, enum: [bug, feature, ai_accuracy] }
+        title:        { type: string }
+        description:  { type: string }
+        severity:     { type: string, enum: [low, medium, high] }
+        inspectionId: { type: integer }
+        analysisId:   { type: integer }
+        reportId:     { type: integer }
+
+    UpdateFeedbackInput:
+      type: object
+      properties:
+        status:   { type: string, enum: [open, triaged, resolved] }
+        severity: { type: string, enum: [low, medium, high] }
+
+    BetaFeedback:
+      type: object
+      required: [id, type, title, description, status, createdAt, updatedAt]
+      properties:
+        id:           { type: integer }
+        type:         { type: string }
+        title:        { type: string }
+        description:  { type: string }
+        severity:     { type: ["string", "null"] }
+        status:       { type: string }
+        userId:       { type: ["integer", "null"] }
+        inspectionId: { type: ["integer", "null"] }
+        analysisId:   { type: ["integer", "null"] }
+        reportId:     { type: ["integer", "null"] }
+        createdAt:    { type: string }
+        updatedAt:    { type: string }
+
+    ClientErrorInput:
+      type: object
+      required: [category, message]
+      properties:
+        category:     { type: string, enum: [upload, ai, report, auth] }
+        message:      { type: string }
+        context:      { type: object, additionalProperties: true }
+        inspectionId: { type: integer }
+        reportId:     { type: integer }
+
+    ErrorEvent:
+      type: object
+      required: [id, category, message, source, createdAt]
+      properties:
+        id:           { type: integer }
+        category:     { type: string }
+        message:      { type: string }
+        context:      { type: ["object", "null"], additionalProperties: true }
+        userId:       { type: ["integer", "null"] }
+        inspectionId: { type: ["integer", "null"] }
+        reportId:     { type: ["integer", "null"] }
+        source:       { type: string }
+        createdAt:    { type: string }
+
+    ErrorEventList:
+      type: object
+      required: [summary, events]
+      properties:
+        summary:
+          type: object
+          required: [upload, ai, report, auth, total]
+          properties:
+            upload: { type: integer }
+            ai:     { type: integer }
+            report: { type: integer }
+            auth:   { type: integer }
+            total:  { type: integer }
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorEvent"
+
+    ChecklistItem:
+      type: object
+      required: [key, category, label, done]
+      properties:
+        key:      { type: string }
+        category: { type: string }
+        label:    { type: string }
+        detail:   { type: ["string", "null"] }
+        done:     { type: boolean }
+        doneAt:   { type: ["string", "null"] }
+
+    ChecklistResponse:
+      type: object
+      required: [items, completed, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistItem"
+        completed: { type: integer }
+        total:     { type: integer }
+
+    ToggleChecklistInput:
+      type: object
+      required: [done]
+      properties:
+        done: { type: boolean }
+
+    ChecklistToggleResult:
+      type: object
+      required: [key, done]
+      properties:
+        key:  { type: string }
+        done: { type: boolean }
+
+    Tester:
+      type: object
+      required: [id, clerkUserId, role, betaAccess, joinedAt, inspectionCount, feedbackCount]
+      properties:
+        id:              { type: integer }
+        clerkUserId:     { type: string }
+        role:            { type: string }
+        betaAccess:      { type: boolean }
+        lastSeenAt:      { type: ["string", "null"] }
+        joinedAt:        { type: string }
+        inspectionCount: { type: integer }
+        feedbackCount:   { type: integer }
+
+    ToggleAccessInput:
+      type: object
+      required: [betaAccess]
+      properties:
+        betaAccess: { type: boolean }
+
+    TesterAccessResult:
+      type: object
+      required: [id, betaAccess]
+      properties:
+        id:         { type: integer }
+        betaAccess: { type: boolean }
+
+    CreateInviteInput:
+      type: object
+      properties:
+        role:  { type: string, enum: [manager, technician] }
+        email: { type: ["string", "null"] }
+
+    Invite:
+      type: object
+      required: [id, companyId, token, role, createdAt]
+      properties:
+        id:               { type: integer }
+        companyId:        { type: integer }
+        token:            { type: string }
+        email:            { type: ["string", "null"] }
+        role:             { type: string }
+        createdByUserId:  { type: ["integer", "null"] }
+        acceptedByUserId: { type: ["integer", "null"] }
+        expiresAt:        { type: ["string", "null"] }
+        acceptedAt:       { type: ["string", "null"] }
+        createdAt:        { type: string }
+
     HealthStatus:
       type: object
       properties:
@@ -1574,6 +1955,9 @@ components:
         openInspections:           { type: integer }
         avgFindingsPerInspection:  { type: number }
         totalReports:              { type: integer }
+        photosCaptured:            { type: integer }
+        videosCaptured:            { type: integer }
+        aiAnalysesCompleted:       { type: integer }
         avgAiConfidence:           { type: number }
         topPestTypes:
           type: array

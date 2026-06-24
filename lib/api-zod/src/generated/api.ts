@@ -1059,6 +1059,9 @@ export const GetAnalyticsDashboardResponse = zod.object({
   "openInspections": zod.number(),
   "avgFindingsPerInspection": zod.number(),
   "totalReports": zod.number().optional(),
+  "photosCaptured": zod.number().optional(),
+  "videosCaptured": zod.number().optional(),
+  "aiAnalysesCompleted": zod.number().optional(),
   "avgAiConfidence": zod.number().optional(),
   "topPestTypes": zod.array(zod.object({
   "pestType": zod.string(),
@@ -1855,5 +1858,203 @@ export const CreateLeadBody = zod.object({
   "message": zod.string().max(createLeadBodyMessageMax).optional(),
   "source": zod.string().max(createLeadBodySourceMax).optional()
 })
+
+
+/**
+ * @summary Submit beta feedback (any company member)
+ */
+export const SubmitFeedbackBody = zod.object({
+  "type": zod.enum(['bug', 'feature', 'ai_accuracy']),
+  "title": zod.string(),
+  "description": zod.string(),
+  "severity": zod.enum(['low', 'medium', 'high']).optional(),
+  "inspectionId": zod.number().optional(),
+  "analysisId": zod.number().optional(),
+  "reportId": zod.number().optional()
+})
+
+
+/**
+ * @summary List beta feedback (manager+)
+ */
+export const ListFeedbackQueryParams = zod.object({
+  "type": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional()
+})
+
+export const ListFeedbackResponseItem = zod.object({
+  "id": zod.number(),
+  "type": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "severity": zod.string().nullish(),
+  "status": zod.string(),
+  "userId": zod.number().nullish(),
+  "inspectionId": zod.number().nullish(),
+  "analysisId": zod.number().nullish(),
+  "reportId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListFeedbackResponse = zod.array(ListFeedbackResponseItem)
+
+
+/**
+ * @summary Update feedback status/severity (manager+)
+ */
+export const UpdateFeedbackParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateFeedbackBody = zod.object({
+  "status": zod.enum(['open', 'triaged', 'resolved']).optional(),
+  "severity": zod.enum(['low', 'medium', 'high']).optional()
+})
+
+export const UpdateFeedbackResponse = zod.object({
+  "id": zod.number(),
+  "type": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "severity": zod.string().nullish(),
+  "status": zod.string(),
+  "userId": zod.number().nullish(),
+  "inspectionId": zod.number().nullish(),
+  "analysisId": zod.number().nullish(),
+  "reportId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Report a client-side failure (any company member)
+ */
+export const ReportClientErrorBody = zod.object({
+  "category": zod.enum(['upload', 'ai', 'report', 'auth']),
+  "message": zod.string(),
+  "context": zod.record(zod.string(), zod.unknown()).optional(),
+  "inspectionId": zod.number().optional(),
+  "reportId": zod.number().optional()
+})
+
+
+/**
+ * @summary List error events with summary (manager+)
+ */
+export const ListErrorEventsResponse = zod.object({
+  "summary": zod.object({
+  "upload": zod.number(),
+  "ai": zod.number(),
+  "report": zod.number(),
+  "auth": zod.number(),
+  "total": zod.number()
+}),
+  "events": zod.array(zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "message": zod.string(),
+  "context": zod.record(zod.string(), zod.unknown()).nullish(),
+  "userId": zod.number().nullish(),
+  "inspectionId": zod.number().nullish(),
+  "reportId": zod.number().nullish(),
+  "source": zod.string(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Get the closed-beta checklist with company state (manager+)
+ */
+export const GetChecklistResponse = zod.object({
+  "items": zod.array(zod.object({
+  "key": zod.string(),
+  "category": zod.string(),
+  "label": zod.string(),
+  "detail": zod.string().nullish(),
+  "done": zod.boolean(),
+  "doneAt": zod.string().nullish()
+})),
+  "completed": zod.number(),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Toggle a checklist item (manager+)
+ */
+export const ToggleChecklistItemParams = zod.object({
+  "itemKey": zod.coerce.string()
+})
+
+export const ToggleChecklistItemBody = zod.object({
+  "done": zod.boolean()
+})
+
+export const ToggleChecklistItemResponse = zod.object({
+  "key": zod.string(),
+  "done": zod.boolean()
+})
+
+
+/**
+ * @summary List beta testers with activity (manager+)
+ */
+export const ListTestersResponseItem = zod.object({
+  "id": zod.number(),
+  "clerkUserId": zod.string(),
+  "role": zod.string(),
+  "betaAccess": zod.boolean(),
+  "lastSeenAt": zod.string().nullish(),
+  "joinedAt": zod.string(),
+  "inspectionCount": zod.number(),
+  "feedbackCount": zod.number()
+})
+export const ListTestersResponse = zod.array(ListTestersResponseItem)
+
+
+/**
+ * @summary Pause or restore a technician's beta access (manager+)
+ */
+export const UpdateTesterAccessParams = zod.object({
+  "userId": zod.coerce.number()
+})
+
+export const UpdateTesterAccessBody = zod.object({
+  "betaAccess": zod.boolean()
+})
+
+export const UpdateTesterAccessResponse = zod.object({
+  "id": zod.number(),
+  "betaAccess": zod.boolean()
+})
+
+
+/**
+ * @summary Create a company invite (manager+)
+ */
+export const CreateInviteBody = zod.object({
+  "role": zod.enum(['manager', 'technician']).optional(),
+  "email": zod.string().nullish()
+})
+
+
+/**
+ * @summary List company invites (manager+)
+ */
+export const ListInvitesResponseItem = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "token": zod.string(),
+  "email": zod.string().nullish(),
+  "role": zod.string(),
+  "createdByUserId": zod.number().nullish(),
+  "acceptedByUserId": zod.number().nullish(),
+  "expiresAt": zod.string().nullish(),
+  "acceptedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListInvitesResponse = zod.array(ListInvitesResponseItem)
 
 

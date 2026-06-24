@@ -11,6 +11,8 @@ import {
   Building2,
   LogOut,
   Brain,
+  Rocket,
+  MessageSquarePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -20,6 +22,7 @@ import { useClerk, useUser } from "@clerk/react";
 import { useCurrentUser, isManagerRole } from "@/hooks/use-current-user";
 import { useBranding } from "@/components/branding-provider";
 import { brandLogoSrc } from "@/lib/branding";
+import { FeedbackDialog } from "@/components/feedback-dialog";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -34,6 +37,7 @@ const baseNavItems = [
 ];
 
 const commandNavItem = { href: "/command", label: "Command", icon: Crosshair };
+const betaNavItem = { href: "/beta", label: "Beta Center", icon: Rocket };
 const settingsNavItem = { href: "/settings", label: "Settings", icon: Settings };
 
 const mobileNavItems = [
@@ -61,9 +65,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const companyName = branding.companyName;
   const isManager = isManagerRole(currentUser?.role);
 
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
   const navItems = [
     ...baseNavItems,
-    ...(isManager ? [commandNavItem] : []),
+    ...(isManager ? [commandNavItem, betaNavItem] : []),
     settingsNavItem,
   ];
 
@@ -120,6 +126,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-start gap-2 h-8 px-2 rounded-lg"
+            onClick={() => setFeedbackOpen(true)}
+          >
+            <MessageSquarePlus className="h-3.5 w-3.5" />
+            <span className="text-xs">Send feedback</span>
+          </Button>
+          <Button
             variant="ghost"
             size="sm"
             className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-8 px-2 rounded-lg"
@@ -167,6 +182,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <p className="text-[10px] text-muted-foreground">{roleLabel}</p>
                 </div>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start gap-2 h-8 px-2 rounded-lg"
+                onClick={() => { setIsMobileMenuOpen(false); setFeedbackOpen(true); }}
+              >
+                <MessageSquarePlus className="h-3.5 w-3.5" />
+                <span className="text-xs">Send feedback</span>
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -219,6 +243,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
+
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>
   );
 }

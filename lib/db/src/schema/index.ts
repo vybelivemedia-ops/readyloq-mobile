@@ -10,3 +10,4 @@ export * from "./properties";
 export * from "./companies";
 export * from "./leads";
 export * from "./intelligence-dataset";
+export * from "./beta";

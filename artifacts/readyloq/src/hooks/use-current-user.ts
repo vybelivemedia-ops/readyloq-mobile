@@ -8,6 +8,7 @@ export type CurrentUser = {
   clerkUserId: string;
   role: UserRole;
   companyId: number | null;
+  betaAccess: boolean;
   company: { id: number; name: string; slug: string } | null;
 };
 

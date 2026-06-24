@@ -5,6 +5,214 @@
  * ReadyLoq - AI-powered inspection intelligence platform
  * OpenAPI spec version: 0.1.0
  */
+export interface OkResponse {
+  ok: boolean;
+}
+
+export type SubmitFeedbackInputType = typeof SubmitFeedbackInputType[keyof typeof SubmitFeedbackInputType];
+
+
+export const SubmitFeedbackInputType = {
+  bug: 'bug',
+  feature: 'feature',
+  ai_accuracy: 'ai_accuracy',
+} as const;
+
+export type SubmitFeedbackInputSeverity = typeof SubmitFeedbackInputSeverity[keyof typeof SubmitFeedbackInputSeverity];
+
+
+export const SubmitFeedbackInputSeverity = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export interface SubmitFeedbackInput {
+  type: SubmitFeedbackInputType;
+  title: string;
+  description: string;
+  severity?: SubmitFeedbackInputSeverity;
+  inspectionId?: number;
+  analysisId?: number;
+  reportId?: number;
+}
+
+export type UpdateFeedbackInputStatus = typeof UpdateFeedbackInputStatus[keyof typeof UpdateFeedbackInputStatus];
+
+
+export const UpdateFeedbackInputStatus = {
+  open: 'open',
+  triaged: 'triaged',
+  resolved: 'resolved',
+} as const;
+
+export type UpdateFeedbackInputSeverity = typeof UpdateFeedbackInputSeverity[keyof typeof UpdateFeedbackInputSeverity];
+
+
+export const UpdateFeedbackInputSeverity = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export interface UpdateFeedbackInput {
+  status?: UpdateFeedbackInputStatus;
+  severity?: UpdateFeedbackInputSeverity;
+}
+
+export interface BetaFeedback {
+  id: number;
+  type: string;
+  title: string;
+  description: string;
+  /** @nullable */
+  severity?: string | null;
+  status: string;
+  /** @nullable */
+  userId?: number | null;
+  /** @nullable */
+  inspectionId?: number | null;
+  /** @nullable */
+  analysisId?: number | null;
+  /** @nullable */
+  reportId?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ClientErrorInputCategory = typeof ClientErrorInputCategory[keyof typeof ClientErrorInputCategory];
+
+
+export const ClientErrorInputCategory = {
+  upload: 'upload',
+  ai: 'ai',
+  report: 'report',
+  auth: 'auth',
+} as const;
+
+export type ClientErrorInputContext = { [key: string]: unknown };
+
+export interface ClientErrorInput {
+  category: ClientErrorInputCategory;
+  message: string;
+  context?: ClientErrorInputContext;
+  inspectionId?: number;
+  reportId?: number;
+}
+
+/**
+ * @nullable
+ */
+export type ErrorEventContext = { [key: string]: unknown } | null;
+
+export interface ErrorEvent {
+  id: number;
+  category: string;
+  message: string;
+  /** @nullable */
+  context?: ErrorEventContext;
+  /** @nullable */
+  userId?: number | null;
+  /** @nullable */
+  inspectionId?: number | null;
+  /** @nullable */
+  reportId?: number | null;
+  source: string;
+  createdAt: string;
+}
+
+export type ErrorEventListSummary = {
+  upload: number;
+  ai: number;
+  report: number;
+  auth: number;
+  total: number;
+};
+
+export interface ErrorEventList {
+  summary: ErrorEventListSummary;
+  events: ErrorEvent[];
+}
+
+export interface ChecklistItem {
+  key: string;
+  category: string;
+  label: string;
+  /** @nullable */
+  detail?: string | null;
+  done: boolean;
+  /** @nullable */
+  doneAt?: string | null;
+}
+
+export interface ChecklistResponse {
+  items: ChecklistItem[];
+  completed: number;
+  total: number;
+}
+
+export interface ToggleChecklistInput {
+  done: boolean;
+}
+
+export interface ChecklistToggleResult {
+  key: string;
+  done: boolean;
+}
+
+export interface Tester {
+  id: number;
+  clerkUserId: string;
+  role: string;
+  betaAccess: boolean;
+  /** @nullable */
+  lastSeenAt?: string | null;
+  joinedAt: string;
+  inspectionCount: number;
+  feedbackCount: number;
+}
+
+export interface ToggleAccessInput {
+  betaAccess: boolean;
+}
+
+export interface TesterAccessResult {
+  id: number;
+  betaAccess: boolean;
+}
+
+export type CreateInviteInputRole = typeof CreateInviteInputRole[keyof typeof CreateInviteInputRole];
+
+
+export const CreateInviteInputRole = {
+  manager: 'manager',
+  technician: 'technician',
+} as const;
+
+export interface CreateInviteInput {
+  role?: CreateInviteInputRole;
+  /** @nullable */
+  email?: string | null;
+}
+
+export interface Invite {
+  id: number;
+  companyId: number;
+  token: string;
+  /** @nullable */
+  email?: string | null;
+  role: string;
+  /** @nullable */
+  createdByUserId?: number | null;
+  /** @nullable */
+  acceptedByUserId?: number | null;
+  /** @nullable */
+  expiresAt?: string | null;
+  /** @nullable */
+  acceptedAt?: string | null;
+  createdAt: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -603,6 +811,9 @@ export interface AnalyticsDashboard {
   openInspections: number;
   avgFindingsPerInspection: number;
   totalReports?: number;
+  photosCaptured?: number;
+  videosCaptured?: number;
+  aiAnalysesCompleted?: number;
   avgAiConfidence?: number;
   topPestTypes: AnalyticsDashboardTopPestTypesItem[];
   recentActivity: ActivityItem[];
@@ -1053,5 +1264,10 @@ period?: string;
 
 export type LookupPropertyParams = {
 siteAddress: string;
+};
+
+export type ListFeedbackParams = {
+type?: string;
+status?: string;
 };
 

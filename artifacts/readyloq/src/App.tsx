@@ -33,6 +33,8 @@ import CommandCenter from "@/pages/command";
 import SettingsPage from "@/pages/settings";
 import CapabilityCenter from "@/pages/capability";
 import Onboarding from "@/pages/onboarding";
+import BetaCenter from "@/pages/beta/index";
+import { BetaPaused } from "@/components/beta-paused";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -195,6 +197,9 @@ function ProtectedRoutes() {
   if (!isSignedIn) return <Redirect to="/sign-in" />;
   if (!currentUser) return null;
   if (currentUser.companyId == null) return <Onboarding />;
+  if (currentUser.role === "technician" && currentUser.betaAccess === false) {
+    return <BetaPaused />;
+  }
 
   const isManager = isManagerRole(currentUser.role);
 
@@ -219,6 +224,7 @@ function ProtectedRoutes() {
         <Route path="/intelligence/analytics" component={IntelligenceAnalytics} />
         <Route path="/analytics" component={AnalyticsDashboard} />
         {isManager && <Route path="/command" component={CommandCenter} />}
+        {isManager && <Route path="/beta" component={BetaCenter} />}
         <Route path="/settings" component={SettingsPage} />
         <Route path="/capability" component={CapabilityCenter} />
         <Route path="/" component={Dashboard} />

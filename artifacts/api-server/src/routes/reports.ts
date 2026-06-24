@@ -12,6 +12,7 @@ import {
   generateReportNarrative,
   derivePropertyType,
 } from "../lib/report-narrative-ai";
+import { logErrorEvent } from "../lib/error-events";
 
 const router = Router();
 
@@ -101,6 +102,12 @@ router.post("/", async (req, res) => {
 
     return res.status(201).json(serializeReport(row));
   } catch (err) {
+    void logErrorEvent("report", {
+      companyId: req.user?.companyId ?? 0,
+      userId: req.user?.id,
+      message: "Failed to generate report",
+      context: { stage: "create_report" },
+    });
     return res.status(500).json({ error: "Failed to generate report" });
   }
 });
@@ -213,6 +220,12 @@ router.post("/:id/generate-narrative", async (req, res) => {
 
     return res.json(serializeReport(updated));
   } catch (err) {
+    void logErrorEvent("report", {
+      companyId: req.user?.companyId ?? 0,
+      userId: req.user?.id,
+      message: "Failed to generate AI report narrative",
+      context: { stage: "generate_narrative" },
+    });
     return res.status(502).json({ error: "Failed to generate AI report" });
   }
 });

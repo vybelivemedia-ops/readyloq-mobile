@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   inspectionsTable,
+  inspectionMediaTable,
   analysisResultsTable,
   reportsTable,
 } from "@workspace/db";
@@ -27,8 +28,14 @@ router.get("/dashboard", async (req, res) => {
       .select()
       .from(reportsTable)
       .where(eq(reportsTable.companyId, companyId));
+    const media = await db
+      .select()
+      .from(inspectionMediaTable)
+      .where(eq(inspectionMediaTable.companyId, companyId));
 
     const total = inspections.length;
+    const photosCaptured = media.filter((m) => m.mediaType === "photo").length;
+    const videosCaptured = media.filter((m) => m.mediaType === "video").length;
     const completed = inspections.filter((i) => i.status === "completed").length;
     const open = inspections.filter((i) => i.status !== "completed").length;
 
@@ -92,6 +99,9 @@ router.get("/dashboard", async (req, res) => {
       openInspections: open,
       avgFindingsPerInspection: Math.round(avgFindings * 10) / 10,
       totalReports: reports.length,
+      photosCaptured,
+      videosCaptured,
+      aiAnalysesCompleted: completedAnalyses.length,
       avgAiConfidence: Math.round(avgConfidence * 10) / 10,
       topPestTypes,
       recentActivity,

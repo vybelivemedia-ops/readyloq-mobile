@@ -11,6 +11,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { analyzePhoto } from "../lib/intelligence-ai";
 import { objectPathCompanyScope } from "../lib/objectStorage";
+import { logErrorEvent } from "../lib/error-events";
 
 const router = Router();
 
@@ -275,6 +276,18 @@ router.post("/analyze", async (req, res) => {
       });
     }
 
+    // Surface per-photo vision failures to the Beta Center error monitor so we
+    // can spot model/storage flakiness during the closed beta (best-effort).
+    if (analysisErrors > 0) {
+      void logErrorEvent("ai", {
+        companyId,
+        userId: req.user?.id,
+        message: `AI photo analysis failed for ${analysisErrors} photo(s)`,
+        inspectionId,
+        context: { failedPhotos: analysisErrors, stage: "vision_model" },
+      });
+    }
+
     // Merge technician voice findings (renumbered after AI findings).
     const mergedFindings: Finding[] = [
       ...aiFindings,
@@ -312,6 +325,12 @@ router.post("/analyze", async (req, res) => {
 
     return res.status(201).json({ ...serializeResult(row), analysisErrors });
   } catch (err) {
+    void logErrorEvent("ai", {
+      companyId: req.user?.companyId ?? 0,
+      userId: req.user?.id,
+      message: "Inspection analysis request failed",
+      context: { stage: "analyze_route" },
+    });
     return res.status(500).json({ error: "Failed to analyze inspection" });
   }
 });

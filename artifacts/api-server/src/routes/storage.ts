@@ -9,8 +9,9 @@ import {
   ObjectNotFoundError,
   objectPathCompanyScope,
 } from "../lib/objectStorage";
-import { requireAuth, requireCompany } from "../middleware/require-auth";
+import { requireAuth, requireCompany, requireBetaAccess } from "../middleware/require-auth";
 import { getCompanyId } from "../lib/tenant";
+import { logErrorEvent } from "../lib/error-events";
 
 // Objects uploaded before multi-tenancy carry no company segment and belong to
 // the reserved "legacy" company. Cache its id so serve-time checks stay cheap.
@@ -53,6 +54,7 @@ router.post(
   "/storage/uploads/request-url",
   requireAuth,
   requireCompany,
+  requireBetaAccess,
   async (req: Request, res: Response) => {
     const parsed = RequestUploadUrlBody.safeParse(req.body);
     if (!parsed.success) {
@@ -76,6 +78,12 @@ router.post(
       );
     } catch (error) {
       req.log.error({ err: error }, "Error generating upload URL");
+      void logErrorEvent("upload", {
+        companyId: req.user?.companyId ?? 0,
+        userId: req.user?.id,
+        message: "Failed to generate upload URL",
+        context: { code: "request_url_failed" },
+      });
       res.status(500).json({ error: "Failed to generate upload URL" });
     }
   },
@@ -131,6 +139,7 @@ router.get(
   "/storage/objects/*path",
   requireAuth,
   requireCompany,
+  requireBetaAccess,
   async (req: Request, res: Response) => {
     try {
       const raw = req.params.path;

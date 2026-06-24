@@ -75,6 +75,7 @@ router.get("/me", requireAuth, async (req, res) => {
       clerkUserId: user.clerkUserId,
       role: user.role,
       companyId: user.companyId,
+      betaAccess: user.betaAccess,
       company,
     });
   } catch {
