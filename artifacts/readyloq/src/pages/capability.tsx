@@ -9,7 +9,6 @@ import {
   FileText,
   ClipboardList,
   Eye,
-  Lightbulb,
   BarChart2,
   Crosshair,
   TrendingUp,
@@ -18,11 +17,9 @@ import {
   Building2,
   Shield,
   BrainCircuit,
-  Sparkles,
   Target,
   CheckCircle2,
   Cpu,
-  Zap,
   Lock,
   UserCheck,
   Clock,
@@ -31,9 +28,6 @@ import {
   Key,
   BookOpen,
   GraduationCap,
-  Trophy,
-  Users,
-  Star,
   Phone,
   Globe,
   Download,
@@ -66,7 +60,7 @@ interface FeatureGroup {
   features: Feature[];
 }
 
-const LAST_UPDATED = "June 12, 2026";
+const LAST_UPDATED = "June 24, 2026";
 const TOTAL_API_ENDPOINTS = 32;
 const TOTAL_DB_TABLES = 10;
 const TOTAL_USER_ROLES = 2;
@@ -86,8 +80,8 @@ const featureGroups: FeatureGroup[] = [
         icon: ClipboardList,
       },
       {
-        name: "AI Camera Pipeline",
-        description: "Intelligent zoom, macro focus, low-light detection, and stabilization before capture.",
+        name: "Photo Capture",
+        description: "Manual high-resolution photo capture saved as real inspection evidence.",
         status: "live",
         icon: Camera,
       },
@@ -98,14 +92,14 @@ const featureGroups: FeatureGroup[] = [
         icon: Mic,
       },
       {
-        name: "Adaptive Inspection Modes",
-        description: "Low Power / Standard / Enhanced modes with auto-downgrade at 20% battery.",
+        name: "Adaptive Capture Modes",
+        description: "Battery Saver / Standard / Enhanced photo resolution with battery-aware suggestions.",
         status: "live",
         icon: Battery,
       },
       {
-        name: "Real-Time Pest Detection",
-        description: "Live AI frame scanning with animated bounding-box overlay and category classification.",
+        name: "AI Evidence Analysis",
+        description: "Captured photos analyzed by a real vision model on completion to suggest findings.",
         status: "beta",
         icon: Scan,
       },
@@ -116,22 +110,10 @@ const featureGroups: FeatureGroup[] = [
         icon: FileText,
       },
       {
-        name: "Evidence Quality Scoring",
-        description: "Captures graded Excellent / Good / Fair based on lighting, stability, and confidence.",
-        status: "beta",
-        icon: BarChart2,
-      },
-      {
         name: "Verification Suggestions",
         description: "Category-aware field verification prompts shown per finding after analysis.",
         status: "beta",
         icon: Eye,
-      },
-      {
-        name: "Capture Coaching",
-        description: "Contextual photo improvement tips for lighting, angle, and distance at capture.",
-        status: "beta",
-        icon: Lightbulb,
       },
       {
         name: "Dataset Library",
@@ -200,20 +182,14 @@ const featureGroups: FeatureGroup[] = [
     accentBg: "bg-violet-500/10 border-violet-500/20",
     features: [
       {
-        name: "Pest Detection Engine",
-        description: "Real-time frame analysis with species and category classification during capture.",
+        name: "Vision Analysis Engine",
+        description: "Real multimodal model analyzes captured inspection photos on completion to suggest findings.",
         status: "beta",
         icon: BrainCircuit,
       },
       {
-        name: "Evidence Quality Grader",
-        description: "Multi-signal heuristic: confidence × lighting × stabilization → Excellent / Good / Fair.",
-        status: "beta",
-        icon: Sparkles,
-      },
-      {
         name: "Report Confidence Model",
-        description: "Three-axis finding quality: AI Confidence + Evidence Quality + Verification Status.",
+        description: "Finding quality from AI Confidence combined with technician Verification Status.",
         status: "beta",
         icon: Target,
       },
@@ -234,12 +210,6 @@ const featureGroups: FeatureGroup[] = [
         description: "Derives per-property risk scores from cross-inspection finding patterns over time.",
         status: "live",
         icon: Activity,
-      },
-      {
-        name: "Capture Quality Coach",
-        description: "Coaching tips generated from capture conditions — gated by user preference setting.",
-        status: "beta",
-        icon: Zap,
       },
     ],
   },
@@ -295,41 +265,47 @@ const featureGroups: FeatureGroup[] = [
     ],
   },
   {
-    id: "training",
-    label: "Training Features",
+    id: "knowledge",
+    label: "Knowledge Center",
     icon: GraduationCap,
     accent: "text-amber-400",
     accentBg: "bg-amber-500/10 border-amber-500/20",
     features: [
       {
-        name: "Training Center",
-        description: "Structured course library with pest control learning modules by category.",
+        name: "Knowledge Center",
+        description: "Curated pest-control field reference built into the app — no external course platform.",
         status: "live",
         icon: BookOpen,
       },
       {
-        name: "Quiz Engine",
-        description: "Multiple-choice quizzes with instant grading and correct-answer feedback.",
+        name: "Pest Identification Guides",
+        description: "Signs, what to look for, and common look-alikes for rodents, roaches, termites, and more.",
         status: "live",
-        icon: GraduationCap,
+        icon: Microscope,
       },
       {
-        name: "Technician Leaderboard",
-        description: "Team score rankings with per-technician category performance breakdown.",
+        name: "Treatment Best Practices",
+        description: "IPM-aligned, label-compliant treatment and rodent-control guidance.",
         status: "live",
-        icon: Trophy,
+        icon: CheckCircle2,
       },
       {
-        name: "Multi-Category Modules",
-        description: "Rodents, cockroaches, termites, carpenter ants, exclusion, and safety tracks.",
+        name: "Exclusion & Structural Deficiencies",
+        description: "Conducive-condition flags and exclusion techniques that make treatment last.",
         status: "live",
-        icon: Users,
+        icon: Shield,
       },
       {
-        name: "Progress Tracking",
-        description: "Individual score history, completion rates, and category-level performance stats.",
+        name: "Inspection Checklists",
+        description: "Area-by-area walkthrough prompts so nothing gets missed on site.",
         status: "live",
-        icon: Star,
+        icon: ClipboardList,
+      },
+      {
+        name: "Field Vocabulary",
+        description: "50+ terms with casual field phrasing and English / Spanish / Portuguese translations.",
+        status: "live",
+        icon: Globe,
       },
     ],
   },

@@ -6,9 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type QuizResultFeedbackItem = {
-  questionId: number;
-  correct: boolean;
+export type AnalyzeInspectionInputImagesItem = {
+  imageUrl: string;
   /** @nullable */
-  explanation: string | null;
+  label?: string | null;
 };

@@ -176,6 +176,18 @@ export interface FeedbackInput {
   technicianFeedback?: string;
 }
 
+export type AnalyzeInspectionInputImagesItem = {
+  imageUrl: string;
+  /** @nullable */
+  label?: string | null;
+};
+
+export interface AnalyzeInspectionInput {
+  inspectionId: number;
+  images?: AnalyzeInspectionInputImagesItem[];
+  technicianFindings?: Finding[];
+}
+
 export type AnalysisSummaryTopFindingsItem = {
   category: string;
   count: number;
@@ -513,79 +525,6 @@ export interface ReportInput {
   includeAiFindings?: boolean;
 }
 
-export interface QuizQuestion {
-  id: number;
-  imageUrl: string;
-  question: string;
-  options: string[];
-  correctOption: number;
-  /** @nullable */
-  explanation?: string | null;
-}
-
-export interface Quiz {
-  id: number;
-  title: string;
-  /** @nullable */
-  description?: string | null;
-  category: string;
-  difficulty: string;
-  questionCount: number;
-  passingScore?: number;
-  questions?: QuizQuestion[];
-  /** @nullable */
-  averageScore?: number | null;
-  completedCount?: number;
-}
-
-export type QuizSubmissionAnswersItem = {
-  questionId: number;
-  selectedOption: number;
-};
-
-export interface QuizSubmission {
-  answers: QuizSubmissionAnswersItem[];
-}
-
-export type QuizResultFeedbackItem = {
-  questionId: number;
-  correct: boolean;
-  /** @nullable */
-  explanation: string | null;
-};
-
-export interface QuizResult {
-  quizId: number;
-  score: number;
-  passed: boolean;
-  totalQuestions: number;
-  correctAnswers: number;
-  feedback?: QuizResultFeedbackItem[];
-}
-
-export interface TrainingScore {
-  id: number;
-  technicianName: string;
-  /** @nullable */
-  technicianId?: string | null;
-  quizId: number;
-  quizTitle: string;
-  score: number;
-  passed: boolean;
-  completedAt: string;
-}
-
-export interface LeaderboardEntry {
-  rank: number;
-  technicianName: string;
-  /** @nullable */
-  technicianId?: string | null;
-  avgScore: number;
-  totalQuizzes: number;
-  passRate?: number;
-  badge: string;
-}
-
 export type AnalyticsDashboardTopPestTypesItem = {
   pestType: string;
   count: number;
@@ -636,8 +575,6 @@ export interface TechnicianPerformance {
   avgFindingsPerInspection: number;
   avgAiConfidence: number;
   completionRate: number;
-  /** @nullable */
-  trainingScore?: number | null;
   /** @nullable */
   badge?: string | null;
 }

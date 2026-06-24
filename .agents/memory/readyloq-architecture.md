@@ -44,28 +44,11 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Rounded-2xl cards, large touch targets, one-handed mobile UX
 - Battery efficiency is a CORE product requirement — see Inspection Modes below
 
-## Intelligent Camera System (inspections/new.tsx)
-- `useCamera()` hook manages: getUserMedia, ImageCapture API, applyConstraints (zoom/focus), canvas overlay
-- Camera permission states: pending / granted / denied / unavailable — gracefully falls back to simulation
-- `performIntelligentCapture(detection)` async pipeline: confirm → focus → zoom → low-light → stabilize → best-frame → capture → reset
-- `performSimpleCapture(detection)` — lightweight version for Standard mode: no zoom/focus, just capture
-- Real frame capture: ImageCapture.takePhoto() → Blob URL, falls back to canvas.toDataURL() from video element, falls back to picsum placeholder
-- Hardware zoom via `track.applyConstraints({ advanced: [{ zoom }] })` + CSS `transform: scale()` for smooth animation
-- Hardware focus via `applyConstraints({ advanced: [{ focusMode }] })` + ImageCapture.setFocusDistance for macro
-- Canvas overlay on `<canvas ref={overlayRef}>` draws animated detection bounding box with corner brackets + crosshair using requestAnimationFrame
-- HUD badges: zoom level (monospace), focus mode (CONTINUOUS/MACRO), LOW LIGHT+ (amber), STABILIZED (blue)
-
-## Inspection Modes (Battery-First Design)
-- `InspectionMode = "low-power" | "standard" | "enhanced"` — defined in new.tsx
-- `MODE_CONFIG` record maps each mode to: detection intervals, cameraAdjustments flag, colors
-- **Low Power**: no AI detection loop, voice + manual capture only — safest for <30% battery
-- **Standard**: AI detections every ~28–42s, `performSimpleCapture` (no zoom/focus pipeline)
-- **Enhanced**: current full behavior, detections every ~9–16s, full camera adjustment pipeline
-- `useBatteryStatus()` hook in `src/hooks/use-battery-status.ts` — Battery Status API with graceful fallback
-- `suggestModeFromBattery()` — auto-selects mode on setup screen from live battery level
-- Auto-downgrade effect: drops to Low Power with toast when battery < 20% during recording
-- `inspectionModeRef` ref kept in sync with state — read inside async detection callbacks to avoid stale closure
-- Recording top bar shows: timer | mode badge (changes with mode) | battery % (BatteryWarning animates when low)
+## Camera + Capture (inspections/new.tsx) — REAL manual capture only
+- **BETA has NO simulation / auto-detection / mock data.** An inspection = real manual photo capture + real voice notes + real batched AI on completion. There is NO auto-detection loop, NO fake detection chips/bounding boxes, NO picsum fallback. Any older note describing `DETECTIONS`/`performIntelligentCapture`/`performSimpleCapture`/picsum is OBSOLETE (removed in the beta cleanup).
+- `useCamera()` still manages REAL capture: getUserMedia, ImageCapture API, applyConstraints (hardware zoom/focus), manual shutter → ImageCapture.takePhoto()/canvas frame → Blob URL → uploadToStorage.
+- On camera/storage failure: show an EXPLICIT error state — NEVER substitute a fake/placeholder image.
+- `InspectionMode`/`MODE_CONFIG`/`useBatteryStatus()`/`suggestModeFromBattery()`/`inspectionModeRef` still exist for battery-aware UX, but they NO LONGER drive any AI detection loop (the loop and its detection intervals were removed).
 
 ## Voice Intelligence (voice-intelligence.ts + use-voice-recognition.ts)
 - Full vocabulary DB: rodents/cockroaches/termites/carpenter_ants/exclusion/conducive in EN/ES/PT
@@ -89,18 +72,14 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Upload flow: `POST /api/storage/uploads/request-url {name,size,contentType}` → `{uploadURL,objectPath}`; PUT uploadURL with bytes; serving URL = `/api/storage${objectPath}`
 - `uploadToStorage(url, filename)` helper in new.tsx: converts blob:/data: URLs to permanent GCS paths (gracefully falls back to original URL on error)
 
-## Analysis Creation (POST /analysis)
-- `POST /api/analysis` added to analysis.ts BEFORE `GET /:id` (avoid route conflict). Protected by requireAuth.
-- Body: `{inspectionId, findings[], recommendations[], overallConfidence?}` — computes avgConfidence from findings if not provided
-- Called automatically in `handleComplete()` after evidence uploads but before media records
-- `DETECTION_CATEGORY_MAP` (id→category) and `generateRecommendations(findings)` helpers in new.tsx
+## Analysis Creation — REAL batched AI
+- **`overallConfidence` canonical scale is 0–1** (column is `real`); ALL UI + analytics consumers multiply by 100 for display, so NEVER store 0–100. Both `POST /analysis` and `POST /analysis/analyze` store 0–1. **Why:** detail/report UI and analytics already assume 0–1; storing 0–100 produced "8700%" and made `/analytics/risk` (`100 - avgConf*100`) always critical.
+- `POST /analysis/analyze` (requireAuth + company) is the REAL batched-AI endpoint: it ONLY analyzes photos already persisted as `inspection_media` for that inspection+company, enforces `objectPathCompanyScope(path)===companyId`, and caps real AI calls at `MAX_ANALYZE_IMAGES=40`. **Client (new.tsx handleComplete) MUST persist media BEFORE calling analyze.**
+- `POST /api/analysis` (manual create) is still registered BEFORE `GET /:id` (route-conflict). Both live in analysis.ts.
 
-## Seed Data
-- **`tsx` is NOT installed — `npx tsx` fails ("tsx: not found"). Run seed scripts with `pnpm dlx tsx artifacts/api-server/src/<seed>.ts` from repo root.** (`pnpm --filter ... exec tsx` also fails.)
-- Seed script: `artifacts/api-server/src/seed.ts`
-- 8 inspections, 3 analysis results, 18 dataset images, 2 reports, 4 quizzes, 11 training scores seeded
-- Analyses exist only on inspections Riverside Apts (Multifamily), Oak Park Restaurant, Maple Ridge HOA
-- **The main seed.ts is NOT idempotent — do not re-run it on a populated DB (it duplicates).** Newer seeds (e.g. seed-callbacks.ts) are count-guarded and safe to re-run.
+## Seed Data — REMOVED
+- **All seed scripts were DELETED in the beta cleanup** (seed.ts, seed-branding.ts, seed-callbacks.ts, seed-properties.ts, seed-finding-quality.ts, lib/seed-company.ts). Existing seeded DB rows were LEFT intact (tenant-scoped to the legacy company). Any older note referencing a `seed-*.ts` file is obsolete.
+- (Env note, still true if a one-off script is ever needed: `tsx` is not installed; `npx tsx`/`pnpm exec tsx` fail — use `pnpm dlx tsx <file>`.)
 
 ## ReadyLoq Command (management-only intelligence module)
 - API: `artifacts/api-server/src/routes/intelligence.ts` → GET /intelligence/{opportunities,callbacks,property-risk}
@@ -149,17 +128,13 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 ## V2 Intelligence Model — Phase 1 (technician copilot)
 - **Report Confidence model** = every finding shows three things: Confidence (existing `finding.confidence`), Evidence Quality, Verified status. Shared util `lib/finding-confidence.ts` (derive fns + label/class maps) + chip components in `components/finding-confidence-chips.tsx`. Rendered in analysis/detail + reports/detail.
 - **Store evidenceQuality, DERIVE verificationStatus.** `evidenceQuality?: "excellent"|"good"|"fair"` is an optional jsonb field on the Finding interface (reused by analysis_results AND reports) — added to schema + openapi, regenerated clients, NO migration (jsonb). verificationStatus is ALWAYS derived (`deriveVerificationStatus` from analysis `feedbackStatus` or report `status`) — there is no per-finding write path, so deriving avoids a dual source of truth.
-- **Always-shown vs coaching-gated split (a HARD product rule):** documentation-quality surfaces (the capture score badge + the Confidence/Evidence/Verified chip rows) are ALWAYS shown. Coaching surfaces (capture tips, per-finding verification suggestions, the Retake button) are OPTIONAL, gated by `coachingEnabled`. Hook `hooks/use-coaching.ts` mirrors use-role.ts (useSyncExternalStore over localStorage "readyloq-coaching", default ON); toggle in settings.tsx.
+- **Coaching split (still a product rule):** the Confidence/Evidence/Verified chip rows are ALWAYS shown; coaching surfaces (per-finding verification suggestions) are OPTIONAL, gated by `coachingEnabled` (`hooks/use-coaching.ts`, localStorage "readyloq-coaching", default ON; toggle in settings.tsx). **OBSOLETE after beta cleanup:** the capture-quality score badge, capture tips, and `lib/capture-quality.ts` (`gradeCaptureQuality`) were REMOVED — the settings coaching toggle now ONLY gates verification-kb suggestions (relabeled "Verification Suggestions").
 - **Verification suggestions** = static frontend KB (`lib/verification-kb.ts`, category→string[] checks, case-insensitive+substring lookup, generic fallback). No storage/API.
-- **Evidence quality at capture** = pure heuristic `lib/capture-quality.ts` `gradeCaptureQuality({confidence,lowLight,stabilized,intelligent})`. Computed inside performIntelligentCapture/performSimpleCapture (they now return `{url,quality,tips}`). Inline score badge always shown during recording; tips+Retake gated. Retake works ONLY during recording (camera live; stops at review) — review shows a read-only chip. `adjustingRef` guards BOTH retake and the auto-detection timer callback so capture pipelines never overlap.
-- **Capture grade persistence:** live inspections create media only (never findings), so the grade is persisted into the media `caption` as `"<label> · evidence:<quality>"`. Write-only for now; Phase 2 needs a parser/structured field if media-level grades must be read back.
-- **Backfill:** `artifacts/api-server/src/seed-finding-quality.ts` — idempotent (skip-if-present), deterministic hash of category+description, INTENTIONALLY decorrelated from confidence (high confidence + only "fair" evidence is the exact story the model surfaces). Run once with tsx; never re-run seed.ts.
 - Phase 2 (probabilistic pest ID, multi-evidence confidence) is LATER — these surfaces were designed to extend, not rebuilt.
 
 **Why (dark default):** Field techs use ReadyLoq on phones in varied lighting — dark mode is required for the product vision.
 **Why (Wouter base):** Strip trailing slash from BASE_URL to avoid double-slash routing bugs.
-**Why (camera fallbacks):** Web camera APIs have inconsistent browser support; ImageCapture → canvas → picsum ensures the app always works.
-**Why (inspectionModeRef):** The AI detection loop is a recursive async setTimeout closure — React state is stale inside it. Always read `inspectionModeRef.current`, not the `inspectionMode` state, from inside that loop.
+**Why (camera fallbacks):** Web camera APIs have inconsistent browser support; real capture falls back ImageCapture → canvas frame. On total failure show an explicit error — NO fake/placeholder image (beta has no simulation).
 **Why (Battery-first):** Technicians run 8–10 hour routes; battery drain is a real field complaint. Mode selection is a first-class product decision, not a settings toggle.
 **Why (cookie auth, no setAuthTokenGetter):** Web apps share origin with the API via Replit proxy — cookies are automatic. setAuthTokenGetter is only for Expo/mobile where there's no shared cookie jar.
 **Why (JIT user provisioning):** Users table only stores clerkUserId + role. Email/name come from Clerk directly (useUser() hook). JIT creates the DB row on first API call with default "technician" role. Manager role must be set via direct DB update for the pilot.

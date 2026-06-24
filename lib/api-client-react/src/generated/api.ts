@@ -23,6 +23,7 @@ import type {
   AnalysisResult,
   AnalysisSummary,
   AnalyticsDashboard,
+  AnalyzeInspectionInput,
   BrandingProfile,
   BrandingProfileInput,
   CallbackIntelligence,
@@ -49,7 +50,6 @@ import type {
   IntelligenceVoteInput,
   Lead,
   LeadInput,
-  LeaderboardEntry,
   ListAnalysisResultsParams,
   ListDatasetImagesParams,
   ListInspectionsParams,
@@ -64,13 +64,9 @@ import type {
   PropertyProfileUpdate,
   PropertyRiskInsights,
   PropertySummary,
-  Quiz,
-  QuizResult,
-  QuizSubmission,
   Report,
   ReportInput,
   TechnicianPerformance,
-  TrainingScore,
   TrendDataPoint
 } from './api.schemas';
 
@@ -692,6 +688,77 @@ export function useListAnalysisResults<TData = Awaited<ReturnType<typeof listAna
 
 
 
+
+export const getAnalyzeInspectionUrl = () => {
+
+
+
+
+  return `/api/analysis/analyze`
+}
+
+/**
+ * @summary Run real AI vision analysis on captured inspection photos
+ */
+export const analyzeInspection = async (analyzeInspectionInput: AnalyzeInspectionInput, options?: RequestInit): Promise<AnalysisResult> => {
+
+  return customFetch<AnalysisResult>(getAnalyzeInspectionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      analyzeInspectionInput,)
+  }
+);}
+
+
+
+
+export const getAnalyzeInspectionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeInspection>>, TError,{data: BodyType<AnalyzeInspectionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeInspection>>, TError,{data: BodyType<AnalyzeInspectionInput>}, TContext> => {
+
+const mutationKey = ['analyzeInspection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeInspection>>, {data: BodyType<AnalyzeInspectionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  analyzeInspection(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeInspectionMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeInspection>>>
+    export type AnalyzeInspectionMutationBody = BodyType<AnalyzeInspectionInput>
+    export type AnalyzeInspectionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Run real AI vision analysis on captured inspection photos
+ */
+export const useAnalyzeInspection = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeInspection>>, TError,{data: BodyType<AnalyzeInspectionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeInspection>>,
+        TError,
+        {data: BodyType<AnalyzeInspectionInput>},
+        TContext
+      > => {
+      return useMutation(getAnalyzeInspectionMutationOptions(options));
+    }
 
 export const getGetAnalysisResultUrl = (id: number,) => {
 
@@ -2194,386 +2261,6 @@ export const useDeleteReport = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeleteReportMutationOptions(options));
     }
-
-export const getListQuizzesUrl = () => {
-
-
-
-
-  return `/api/training/quizzes`
-}
-
-/**
- * @summary List all training quizzes
- */
-export const listQuizzes = async ( options?: RequestInit): Promise<Quiz[]> => {
-
-  return customFetch<Quiz[]>(getListQuizzesUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListQuizzesQueryKey = () => {
-    return [
-    `/api/training/quizzes`
-    ] as const;
-    }
-
-
-export const getListQuizzesQueryOptions = <TData = Awaited<ReturnType<typeof listQuizzes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuizzes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListQuizzesQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listQuizzes>>> = ({ signal }) => listQuizzes({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listQuizzes>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListQuizzesQueryResult = NonNullable<Awaited<ReturnType<typeof listQuizzes>>>
-export type ListQuizzesQueryError = ErrorType<unknown>
-
-
-/**
- * @summary List all training quizzes
- */
-
-export function useListQuizzes<TData = Awaited<ReturnType<typeof listQuizzes>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuizzes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListQuizzesQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-export const getGetQuizUrl = (id: number,) => {
-
-
-
-
-  return `/api/training/quizzes/${id}`
-}
-
-/**
- * @summary Get quiz with questions
- */
-export const getQuiz = async (id: number, options?: RequestInit): Promise<Quiz> => {
-
-  return customFetch<Quiz>(getGetQuizUrl(id),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetQuizQueryKey = (id: number,) => {
-    return [
-    `/api/training/quizzes/${id}`
-    ] as const;
-    }
-
-
-export const getGetQuizQueryOptions = <TData = Awaited<ReturnType<typeof getQuiz>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuiz>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetQuizQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQuiz>>> = ({ signal }) => getQuiz(id, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQuiz>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetQuizQueryResult = NonNullable<Awaited<ReturnType<typeof getQuiz>>>
-export type GetQuizQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get quiz with questions
- */
-
-export function useGetQuiz<TData = Awaited<ReturnType<typeof getQuiz>>, TError = ErrorType<unknown>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuiz>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetQuizQueryOptions(id,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-export const getSubmitQuizUrl = (id: number,) => {
-
-
-
-
-  return `/api/training/quizzes/${id}/submit`
-}
-
-/**
- * @summary Submit quiz answers
- */
-export const submitQuiz = async (id: number,
-    quizSubmission: QuizSubmission, options?: RequestInit): Promise<QuizResult> => {
-
-  return customFetch<QuizResult>(getSubmitQuizUrl(id),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      quizSubmission,)
-  }
-);}
-
-
-
-
-export const getSubmitQuizMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitQuiz>>, TError,{id: number;data: BodyType<QuizSubmission>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof submitQuiz>>, TError,{id: number;data: BodyType<QuizSubmission>}, TContext> => {
-
-const mutationKey = ['submitQuiz'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitQuiz>>, {id: number;data: BodyType<QuizSubmission>}> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  submitQuiz(id,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type SubmitQuizMutationResult = NonNullable<Awaited<ReturnType<typeof submitQuiz>>>
-    export type SubmitQuizMutationBody = BodyType<QuizSubmission>
-    export type SubmitQuizMutationError = ErrorType<unknown>
-
-    /**
- * @summary Submit quiz answers
- */
-export const useSubmitQuiz = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitQuiz>>, TError,{id: number;data: BodyType<QuizSubmission>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof submitQuiz>>,
-        TError,
-        {id: number;data: BodyType<QuizSubmission>},
-        TContext
-      > => {
-      return useMutation(getSubmitQuizMutationOptions(options));
-    }
-
-export const getListTrainingScoresUrl = () => {
-
-
-
-
-  return `/api/training/scores`
-}
-
-/**
- * @summary List technician training scores
- */
-export const listTrainingScores = async ( options?: RequestInit): Promise<TrainingScore[]> => {
-
-  return customFetch<TrainingScore[]>(getListTrainingScoresUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListTrainingScoresQueryKey = () => {
-    return [
-    `/api/training/scores`
-    ] as const;
-    }
-
-
-export const getListTrainingScoresQueryOptions = <TData = Awaited<ReturnType<typeof listTrainingScores>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainingScores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListTrainingScoresQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTrainingScores>>> = ({ signal }) => listTrainingScores({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTrainingScores>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListTrainingScoresQueryResult = NonNullable<Awaited<ReturnType<typeof listTrainingScores>>>
-export type ListTrainingScoresQueryError = ErrorType<unknown>
-
-
-/**
- * @summary List technician training scores
- */
-
-export function useListTrainingScores<TData = Awaited<ReturnType<typeof listTrainingScores>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrainingScores>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListTrainingScoresQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-export const getGetTrainingLeaderboardUrl = () => {
-
-
-
-
-  return `/api/training/leaderboard`
-}
-
-/**
- * @summary Get training leaderboard
- */
-export const getTrainingLeaderboard = async ( options?: RequestInit): Promise<LeaderboardEntry[]> => {
-
-  return customFetch<LeaderboardEntry[]>(getGetTrainingLeaderboardUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetTrainingLeaderboardQueryKey = () => {
-    return [
-    `/api/training/leaderboard`
-    ] as const;
-    }
-
-
-export const getGetTrainingLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getTrainingLeaderboard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTrainingLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTrainingLeaderboardQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTrainingLeaderboard>>> = ({ signal }) => getTrainingLeaderboard({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTrainingLeaderboard>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetTrainingLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getTrainingLeaderboard>>>
-export type GetTrainingLeaderboardQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get training leaderboard
- */
-
-export function useGetTrainingLeaderboard<TData = Awaited<ReturnType<typeof getTrainingLeaderboard>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTrainingLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetTrainingLeaderboardQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
 
 export const getGetAnalyticsDashboardUrl = () => {
 

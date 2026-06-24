@@ -23,9 +23,7 @@ import AnalysisDetail from "@/pages/analysis/detail";
 import DatasetLibrary from "@/pages/dataset";
 import ReportsList from "@/pages/reports/index";
 import ReportDetail from "@/pages/reports/detail";
-import TrainingCenter from "@/pages/training/index";
-import QuizPage from "@/pages/training/quiz";
-import Leaderboard from "@/pages/training/leaderboard";
+import KnowledgeCenter from "@/pages/training/index";
 import IntelligenceBrowse from "@/pages/intelligence/index";
 import IntelligenceContribute from "@/pages/intelligence/contribute";
 import IntelligenceReview from "@/pages/intelligence/review";
@@ -213,9 +211,7 @@ function ProtectedRoutes() {
         <Route path="/dataset" component={DatasetLibrary} />
         <Route path="/reports" component={ReportsList} />
         <Route path="/reports/:id" component={ReportDetail} />
-        <Route path="/training" component={TrainingCenter} />
-        <Route path="/training/leaderboard" component={Leaderboard} />
-        <Route path="/training/:id" component={QuizPage} />
+        <Route path="/training" component={KnowledgeCenter} />
         <Route path="/intelligence" component={IntelligenceBrowse} />
         <Route path="/intelligence/contribute" component={IntelligenceContribute} />
         <Route path="/intelligence/review" component={IntelligenceReview} />

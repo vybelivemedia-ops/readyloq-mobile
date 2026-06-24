@@ -19,8 +19,6 @@ tags:
     description: Intelligence dataset & AI learning center
   - name: reports
     description: Report generation
-  - name: training
-    description: Training center
   - name: analytics
     description: Analytics dashboard
   - name: branding
@@ -186,6 +184,25 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AnalysisResult"
+
+  /analysis/analyze:
+    post:
+      operationId: analyzeInspection
+      tags: [analysis]
+      summary: Run real AI vision analysis on captured inspection photos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeInspectionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
 
   /analysis/{id}:
     get:
@@ -580,96 +597,6 @@ paths:
       responses:
         "204":
           description: Deleted
-
-  # ── TRAINING CENTER ───────────────────────────────────────────────────────────
-  /training/quizzes:
-    get:
-      operationId: listQuizzes
-      tags: [training]
-      summary: List all training quizzes
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Quiz"
-
-  /training/quizzes/{id}:
-    get:
-      operationId: getQuiz
-      tags: [training]
-      summary: Get quiz with questions
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Quiz"
-
-  /training/quizzes/{id}/submit:
-    post:
-      operationId: submitQuiz
-      tags: [training]
-      summary: Submit quiz answers
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/QuizSubmission"
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/QuizResult"
-
-  /training/scores:
-    get:
-      operationId: listTrainingScores
-      tags: [training]
-      summary: List technician training scores
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TrainingScore"
-
-  /training/leaderboard:
-    get:
-      operationId: getTrainingLeaderboard
-      tags: [training]
-      summary: Get training leaderboard
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LeaderboardEntry"
 
   # ── ANALYTICS ────────────────────────────────────────────────────────────────
   /analytics/dashboard:
@@ -1227,6 +1154,24 @@ components:
         feedbackStatus: { type: string }
         technicianFeedback: { type: string }
 
+    AnalyzeInspectionInput:
+      type: object
+      required: [inspectionId]
+      properties:
+        inspectionId: { type: integer }
+        images:
+          type: array
+          items:
+            type: object
+            required: [imageUrl]
+            properties:
+              imageUrl: { type: string }
+              label:    { type: ["string", "null"] }
+        technicianFindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+
     AnalysisSummary:
       type: object
       required: [totalAnalyses, avgConfidence, topFindings, findingsByCategory]
@@ -1555,95 +1500,6 @@ components:
         includePhotos:  { type: boolean }
         includeAiFindings: { type: boolean }
 
-    # ── TRAINING SCHEMAS ────────────────────────────────────────────────────────
-    Quiz:
-      type: object
-      required: [id, title, category, difficulty, questionCount]
-      properties:
-        id:            { type: integer }
-        title:         { type: string }
-        description:   { type: ["string", "null"] }
-        category:      { type: string }
-        difficulty:    { type: string }
-        questionCount: { type: integer }
-        passingScore:  { type: integer }
-        questions:
-          type: array
-          items:
-            $ref: "#/components/schemas/QuizQuestion"
-        averageScore:  { type: ["number", "null"] }
-        completedCount: { type: integer }
-
-    QuizQuestion:
-      type: object
-      required: [id, imageUrl, question, options, correctOption]
-      properties:
-        id:            { type: integer }
-        imageUrl:      { type: string }
-        question:      { type: string }
-        options:
-          type: array
-          items: { type: string }
-        correctOption: { type: integer }
-        explanation:   { type: ["string", "null"] }
-
-    QuizSubmission:
-      type: object
-      required: [answers]
-      properties:
-        answers:
-          type: array
-          items:
-            type: object
-            required: [questionId, selectedOption]
-            properties:
-              questionId:     { type: integer }
-              selectedOption: { type: integer }
-
-    QuizResult:
-      type: object
-      required: [quizId, score, passed, totalQuestions, correctAnswers]
-      properties:
-        quizId:         { type: integer }
-        score:          { type: number }
-        passed:         { type: boolean }
-        totalQuestions: { type: integer }
-        correctAnswers: { type: integer }
-        feedback:
-          type: array
-          items:
-            type: object
-            required: [questionId, correct, explanation]
-            properties:
-              questionId:  { type: integer }
-              correct:     { type: boolean }
-              explanation: { type: ["string", "null"] }
-
-    TrainingScore:
-      type: object
-      required: [id, technicianName, quizId, quizTitle, score, passed, completedAt]
-      properties:
-        id:             { type: integer }
-        technicianName: { type: string }
-        technicianId:   { type: ["string", "null"] }
-        quizId:         { type: integer }
-        quizTitle:      { type: string }
-        score:          { type: number }
-        passed:         { type: boolean }
-        completedAt:    { type: string }
-
-    LeaderboardEntry:
-      type: object
-      required: [rank, technicianName, avgScore, totalQuizzes, badge]
-      properties:
-        rank:           { type: integer }
-        technicianName: { type: string }
-        technicianId:   { type: ["string", "null"] }
-        avgScore:       { type: number }
-        totalQuizzes:   { type: integer }
-        passRate:       { type: number }
-        badge:          { type: string }
-
     # ── ANALYTICS SCHEMAS ───────────────────────────────────────────────────────
     AnalyticsDashboard:
       type: object
@@ -1710,7 +1566,6 @@ components:
         avgFindingsPerInspection:   { type: number }
         avgAiConfidence:            { type: number }
         completionRate:             { type: number }
-        trainingScore:              { type: ["number", "null"] }
         badge:                      { type: ["string", "null"] }
 
     InfestationRisk:

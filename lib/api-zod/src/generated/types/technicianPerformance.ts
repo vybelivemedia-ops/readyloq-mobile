@@ -15,7 +15,5 @@ export interface TechnicianPerformance {
   avgAiConfidence: number;
   completionRate: number;
   /** @nullable */
-  trainingScore?: number | null;
-  /** @nullable */
   badge?: string | null;
 }

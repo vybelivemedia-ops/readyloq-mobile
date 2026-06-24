@@ -1,70 +1,130 @@
-import { useListQuizzes, useGetTrainingLeaderboard } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { GraduationCap, Trophy, ChevronRight, Star, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
-import { Link } from "wouter";
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Bug,
+  ShieldCheck,
+  Wrench,
+  AlertTriangle,
+  ListChecks,
+} from "lucide-react";
 import { useState } from "react";
 import { VOCABULARY, CATEGORY_LABELS, type Category } from "@/lib/voice-intelligence";
-import { cn } from "@/lib/utils";
+import {
+  PEST_GUIDES,
+  TREATMENT_BEST_PRACTICES,
+  STRUCTURAL_DEFICIENCIES,
+  EXCLUSION_TECHNIQUES,
+  INSPECTION_CHECKLISTS,
+} from "@/lib/knowledge";
 
-function difficultyBadge(difficulty: string) {
-  const colors: Record<string, string> = {
-    easy:   "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-    medium: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-    hard:   "bg-red-500/15 text-red-400 border-red-500/30",
-  };
+function Section({
+  icon: Icon,
+  title,
+  subtitle,
+  children,
+}: {
+  icon: typeof BookOpen;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${colors[difficulty] ?? colors.medium}`}>
-      {difficulty}
-    </span>
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className="h-4 w-4 text-primary" />
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {title}
+        </h2>
+      </div>
+      {subtitle && <p className="text-xs text-muted-foreground mb-3">{subtitle}</p>}
+      <div className={subtitle ? "space-y-2" : "space-y-2 mt-3"}>{children}</div>
+    </div>
   );
 }
 
-function badgeIcon(badge: string) {
-  const colors: Record<string, string> = {
-    Gold:      "text-yellow-400",
-    Silver:    "text-slate-300",
-    Bronze:    "text-amber-600",
-    Certified: "text-primary",
-    Trainee:   "text-muted-foreground",
-  };
-  return <Trophy className={`h-4 w-4 ${colors[badge] ?? "text-muted-foreground"}`} />;
+function Collapsible({
+  title,
+  meta,
+  badge,
+  children,
+}: {
+  title: string;
+  meta?: string;
+  badge?: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3.5 text-left"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          {meta && <span className="text-xl shrink-0">{meta}</span>}
+          <p className="text-sm font-semibold truncate">{title}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {badge && (
+            <span className="text-[10px] text-muted-foreground font-medium">{badge}</span>
+          )}
+          {open ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+      </button>
+      {open && <div className="border-t border-border/40 px-4 py-3.5">{children}</div>}
+    </div>
+  );
 }
 
 function VocabCategory({ category }: { category: Category }) {
   const [open, setOpen] = useState(false);
   const meta = CATEGORY_LABELS[category];
-  const terms = VOCABULARY.filter(t => t.category === category);
+  const terms = VOCABULARY.filter((t) => t.category === category);
 
   return (
     <div className="bg-card border border-border/60 rounded-2xl overflow-hidden">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-4 py-3.5 text-left"
       >
         <div className="flex items-center gap-2.5">
           <span className="text-xl">{meta.icon}</span>
           <div>
             <p className="text-sm font-semibold">{meta.en}</p>
-            <p className="text-[10px] text-muted-foreground">{meta.es} · {meta.pt}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {meta.es} · {meta.pt}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] text-muted-foreground font-medium">{terms.length} terms</span>
-          {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          <span className="text-[10px] text-muted-foreground font-medium">
+            {terms.length} terms
+          </span>
+          {open ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
         </div>
       </button>
 
       {open && (
         <div className="border-t border-border/40 divide-y divide-border/30">
-          {terms.map(term => (
+          {terms.map((term) => (
             <div key={term.professional} className="px-4 py-3 space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-base">{term.icon}</span>
                 <p className="text-sm font-semibold">{term.professional}</p>
               </div>
               <div className="ml-6 space-y-1">
-                <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-semibold">Technicians may say</p>
+                <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-semibold">
+                  Technicians may say
+                </p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {term.casual.en.slice(0, 3).join(", ")}
                 </p>
@@ -82,102 +142,151 @@ function VocabCategory({ category }: { category: Category }) {
   );
 }
 
-export default function TrainingCenter() {
-  const { data: quizzes, isLoading } = useListQuizzes();
-  const { data: leaderboard } = useGetTrainingLeaderboard();
-  const topThree = (leaderboard ?? []).slice(0, 3);
-
-  const categories: Category[] = ["rodents", "cockroaches", "termites", "carpenter_ants", "exclusion", "conducive"];
+export default function KnowledgeCenter() {
+  const categories: Category[] = [
+    "rodents",
+    "cockroaches",
+    "termites",
+    "carpenter_ants",
+    "exclusion",
+    "conducive",
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Learn</h1>
-          <p className="text-muted-foreground text-sm mt-1">Build skills with real inspection examples</p>
-        </div>
-        <Link href="/training/leaderboard">
-          <Button variant="outline" size="sm" className="gap-2 rounded-xl">
-            <Trophy className="h-4 w-4" /> Leaderboard
-          </Button>
-        </Link>
-      </div>
-
-      {/* Top performers mini-board */}
-      {topThree.length > 0 && (
-        <div className="grid grid-cols-3 gap-2.5">
-          {topThree.map((entry, i) => (
-            <div key={entry.technicianName}
-              className={cn("bg-card border rounded-2xl p-3 text-center", i === 0 ? "border-yellow-500/30" : "border-border/60")}>
-              <div className="flex justify-center mb-1">{badgeIcon(entry.badge)}</div>
-              <p className="text-xs font-semibold truncate">{entry.technicianName.split(" ")[0]}</p>
-              <p className="text-lg font-bold text-primary">{entry.avgScore}%</p>
-              <p className="text-[10px] text-muted-foreground">{entry.totalQuizzes} quizzes</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Quiz Grid */}
       <div>
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Available Quizzes</h2>
-        {isLoading ? (
-          <div className="space-y-2.5">
-            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}
-          </div>
-        ) : (quizzes ?? []).length === 0 ? (
-          <div className="bg-card border border-border/60 rounded-2xl p-10 text-center text-muted-foreground">
-            <GraduationCap className="h-8 w-8 mx-auto mb-2 opacity-20" />
-            <p className="text-sm">No quizzes available yet</p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {(quizzes ?? []).map(quiz => (
-              <Link key={quiz.id} href={`/training/${quiz.id}`}>
-                <div className="bg-card border border-border/60 rounded-2xl px-4 py-3.5 active:bg-primary/5 transition-all cursor-pointer">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        {difficultyBadge(quiz.difficulty)}
-                        <span className="text-xs text-muted-foreground">{quiz.category}</span>
-                      </div>
-                      <h3 className="text-sm font-semibold leading-tight">{quiz.title}</h3>
-                      {quiz.description && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{quiz.description}</p>
-                      )}
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
-                  </div>
-                  <div className="flex items-center gap-4 mt-2.5 text-xs text-muted-foreground">
-                    <span>{quiz.questionCount} questions</span>
-                    <span>Pass: {quiz.passingScore}%</span>
-                    {quiz.averageScore !== null && quiz.averageScore !== undefined && (
-                      <span className="flex items-center gap-1">
-                        <Star className="h-3 w-3 text-amber-400" /> Avg: {quiz.averageScore}%
-                      </span>
-                    )}
-                    {quiz.completedCount > 0 && <span>{quiz.completedCount} taken</span>}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Field Vocabulary Reference ─────────────────────────────────────── */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <BookOpen className="h-4 w-4 text-primary" />
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Field Vocabulary</h2>
-        </div>
-        <p className="text-xs text-muted-foreground mb-3 -mt-1">
-          Tap any category to see professional terminology, casual field descriptions, and translations in English, Spanish, and Portuguese.
+        <h1 className="text-2xl font-bold">Knowledge Center</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Field reference for pest identification, treatment, exclusion, and inspections
         </p>
-        <div className="space-y-2">
-          {categories.map(cat => <VocabCategory key={cat} category={cat} />)}
-        </div>
       </div>
+
+      {/* Pest Identification Guides */}
+      <Section
+        icon={Bug}
+        title="Pest Identification"
+        subtitle="Tap a pest for the signs to look for and what it's commonly confused with."
+      >
+        {PEST_GUIDES.map((pest) => (
+          <Collapsible key={pest.name} title={pest.name} meta={pest.icon}>
+            <div className="space-y-3">
+              <div>
+                <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-semibold mb-1">
+                  Signs
+                </p>
+                <ul className="space-y-1">
+                  {pest.signs.map((s) => (
+                    <li key={s} className="text-[12px] text-muted-foreground leading-relaxed flex gap-2">
+                      <span className="text-primary/60 shrink-0">•</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-semibold mb-1">
+                  Look for
+                </p>
+                <p className="text-[12px] text-muted-foreground leading-relaxed">{pest.lookFor}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-amber-400/70 uppercase tracking-wider font-semibold mb-1">
+                  Confused with
+                </p>
+                <p className="text-[12px] text-muted-foreground leading-relaxed">
+                  {pest.confusedWith}
+                </p>
+              </div>
+            </div>
+          </Collapsible>
+        ))}
+      </Section>
+
+      {/* Treatment Best Practices */}
+      <Section
+        icon={Wrench}
+        title="Treatment Best Practices"
+        subtitle="IPM-aligned guidance for durable, label-compliant results."
+      >
+        {TREATMENT_BEST_PRACTICES.map((topic) => (
+          <Collapsible key={topic.title} title={topic.title}>
+            <ul className="space-y-1.5">
+              {topic.points.map((p) => (
+                <li key={p} className="text-[12px] text-muted-foreground leading-relaxed flex gap-2">
+                  <span className="text-primary/60 shrink-0">•</span>
+                  <span>{p}</span>
+                </li>
+              ))}
+            </ul>
+          </Collapsible>
+        ))}
+      </Section>
+
+      {/* Structural Deficiencies / Conducive Conditions */}
+      <Section
+        icon={AlertTriangle}
+        title="Structural Deficiencies"
+        subtitle="Conducive conditions to flag — fixing these makes treatment last."
+      >
+        {STRUCTURAL_DEFICIENCIES.map((c) => (
+          <div key={c.title} className="bg-card border border-border/60 rounded-2xl px-4 py-3.5">
+            <p className="text-sm font-semibold mb-1">{c.title}</p>
+            <p className="text-[12px] text-muted-foreground leading-relaxed">{c.description}</p>
+            <p className="text-[11px] text-amber-400/80 leading-relaxed mt-1.5">
+              <span className="font-semibold">Why it matters: </span>
+              {c.why}
+            </p>
+          </div>
+        ))}
+      </Section>
+
+      {/* Exclusion Techniques */}
+      <Section
+        icon={ShieldCheck}
+        title="Exclusion Techniques"
+        subtitle="Keep pests out by removing access — the most durable control."
+      >
+        {EXCLUSION_TECHNIQUES.map((t) => (
+          <div key={t.title} className="bg-card border border-border/60 rounded-2xl px-4 py-3.5">
+            <p className="text-sm font-semibold mb-1">{t.title}</p>
+            <p className="text-[12px] text-muted-foreground leading-relaxed">{t.description}</p>
+          </div>
+        ))}
+      </Section>
+
+      {/* Inspection Checklists */}
+      <Section
+        icon={ListChecks}
+        title="Inspection Checklists"
+        subtitle="Area-by-area prompts so nothing gets missed on a walkthrough."
+      >
+        {INSPECTION_CHECKLISTS.map((area) => (
+          <Collapsible key={area.area} title={area.area} badge={`${area.items.length} checks`}>
+            <ul className="space-y-1.5">
+              {area.items.map((item) => (
+                <li
+                  key={item}
+                  className="text-[12px] text-muted-foreground leading-relaxed flex gap-2"
+                >
+                  <span className="text-primary/60 shrink-0">•</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </Collapsible>
+        ))}
+      </Section>
+
+      {/* Field Vocabulary Reference */}
+      <Section
+        icon={BookOpen}
+        title="Field Vocabulary"
+        subtitle="Tap any category for professional terminology, casual field descriptions, and translations in English, Spanish, and Portuguese."
+      >
+        {categories.map((cat) => (
+          <VocabCategory key={cat} category={cat} />
+        ))}
+      </Section>
     </div>
   );
 }

@@ -133,7 +133,7 @@ export default function Dashboard() {
         {[
           { href: "/analysis", icon: Camera, label: "Evidence", color: "text-primary" },
           { href: "/reports", icon: CheckCircle2, label: "Reports", color: "text-emerald-400" },
-          { href: "/training", icon: Zap, label: "Learn", color: "text-amber-400" },
+          { href: "/training", icon: Zap, label: "Knowledge", color: "text-amber-400" },
           { href: "/analytics", icon: AlertTriangle, label: "Risk", color: "text-orange-400" },
         ].map(a => (
           <Link key={a.href} href={a.href}>

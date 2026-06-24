@@ -211,7 +211,6 @@ export default function AnalyticsDashboard() {
                     <th className="text-right pb-2 text-xs text-muted-foreground font-medium">Inspections</th>
                     <th className="text-right pb-2 text-xs text-muted-foreground font-medium">Completion</th>
                     <th className="text-right pb-2 text-xs text-muted-foreground font-medium">AI Conf.</th>
-                    <th className="text-right pb-2 text-xs text-muted-foreground font-medium">Training</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
@@ -232,12 +231,9 @@ export default function AnalyticsDashboard() {
                         </span>
                       </td>
                       <td className="text-right py-2.5">
-                        <span className={`text-xs font-medium ${t.avgAiConfidence >= 80 ? "text-emerald-400" : t.avgAiConfidence >= 60 ? "text-amber-400" : "text-muted-foreground"}`}>
+                        <span className={`text-xs font-medium ${t.avgAiConfidence >= 0.8 ? "text-emerald-400" : t.avgAiConfidence >= 0.6 ? "text-amber-400" : "text-muted-foreground"}`}>
                           {t.avgAiConfidence > 0 ? `${Math.round(t.avgAiConfidence * 100)}%` : "—"}
                         </span>
-                      </td>
-                      <td className="text-right py-2.5 text-xs text-muted-foreground">
-                        {t.trainingScore !== null && t.trainingScore !== undefined ? `${t.trainingScore}%` : "—"}
                       </td>
                     </tr>
                   ))}

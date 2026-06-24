@@ -32,15 +32,15 @@ export default function SettingsPage() {
         </Link>
       </div>
 
-      {/* Capture coaching — available to everyone */}
+      {/* Verification suggestions — available to everyone */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Lightbulb className="h-4 w-4" /> Capture Coaching
+            <Lightbulb className="h-4 w-4" /> Verification Suggestions
           </CardTitle>
           <CardDescription>
-            Shows photo-quality tips at capture and verification suggestions per finding. Documentation
-            quality — evidence scores and report confidence — is always shown regardless of this setting.
+            Shows category-specific verification suggestions under each finding. Report confidence and
+            verification status are always shown regardless of this setting.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -50,9 +50,9 @@ export default function SettingsPage() {
                 <Lightbulb className={`h-4 w-4 ${coachingEnabled ? "text-primary" : "text-muted-foreground"}`} />
               </div>
               <div>
-                <p className="text-sm font-medium">{coachingEnabled ? "Coaching on" : "Coaching off"}</p>
+                <p className="text-sm font-medium">{coachingEnabled ? "Suggestions on" : "Suggestions off"}</p>
                 <p className="text-xs text-muted-foreground">
-                  {coachingEnabled ? "Capture tips & verification suggestions shown" : "Hands-off — tips & suggestions hidden"}
+                  {coachingEnabled ? "Verification suggestions shown per finding" : "Hands-off — suggestions hidden"}
                 </p>
               </div>
             </div>

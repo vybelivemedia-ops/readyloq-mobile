@@ -202,6 +202,30 @@ export const ListAnalysisResultsResponse = zod.array(ListAnalysisResultsResponse
 
 
 /**
+ * @summary Run real AI vision analysis on captured inspection photos
+ */
+export const AnalyzeInspectionBody = zod.object({
+  "inspectionId": zod.number(),
+  "images": zod.array(zod.object({
+  "imageUrl": zod.string(),
+  "label": zod.string().nullish()
+})).optional(),
+  "technicianFindings": zod.array(zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "confidence": zod.number(),
+  "severity": zod.string().optional(),
+  "location": zod.string().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "treatment": zod.string().nullish(),
+  "exclusionOpportunity": zod.boolean().nullish(),
+  "evidenceQuality": zod.string().nullish()
+})).optional()
+})
+
+
+/**
  * @summary Get analysis result
  */
 export const GetAnalysisResultParams = zod.object({
@@ -912,118 +936,6 @@ export const DeleteReportParams = zod.object({
 
 
 /**
- * @summary List all training quizzes
- */
-export const ListQuizzesResponseItem = zod.object({
-  "id": zod.number(),
-  "title": zod.string(),
-  "description": zod.string().nullish(),
-  "category": zod.string(),
-  "difficulty": zod.string(),
-  "questionCount": zod.number(),
-  "passingScore": zod.number().optional(),
-  "questions": zod.array(zod.object({
-  "id": zod.number(),
-  "imageUrl": zod.string(),
-  "question": zod.string(),
-  "options": zod.array(zod.string()),
-  "correctOption": zod.number(),
-  "explanation": zod.string().nullish()
-})).optional(),
-  "averageScore": zod.number().nullish(),
-  "completedCount": zod.number().optional()
-})
-export const ListQuizzesResponse = zod.array(ListQuizzesResponseItem)
-
-
-/**
- * @summary Get quiz with questions
- */
-export const GetQuizParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const GetQuizResponse = zod.object({
-  "id": zod.number(),
-  "title": zod.string(),
-  "description": zod.string().nullish(),
-  "category": zod.string(),
-  "difficulty": zod.string(),
-  "questionCount": zod.number(),
-  "passingScore": zod.number().optional(),
-  "questions": zod.array(zod.object({
-  "id": zod.number(),
-  "imageUrl": zod.string(),
-  "question": zod.string(),
-  "options": zod.array(zod.string()),
-  "correctOption": zod.number(),
-  "explanation": zod.string().nullish()
-})).optional(),
-  "averageScore": zod.number().nullish(),
-  "completedCount": zod.number().optional()
-})
-
-
-/**
- * @summary Submit quiz answers
- */
-export const SubmitQuizParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const SubmitQuizBody = zod.object({
-  "answers": zod.array(zod.object({
-  "questionId": zod.number(),
-  "selectedOption": zod.number()
-}))
-})
-
-export const SubmitQuizResponse = zod.object({
-  "quizId": zod.number(),
-  "score": zod.number(),
-  "passed": zod.boolean(),
-  "totalQuestions": zod.number(),
-  "correctAnswers": zod.number(),
-  "feedback": zod.array(zod.object({
-  "questionId": zod.number(),
-  "correct": zod.boolean(),
-  "explanation": zod.string().nullable()
-})).optional()
-})
-
-
-/**
- * @summary List technician training scores
- */
-export const ListTrainingScoresResponseItem = zod.object({
-  "id": zod.number(),
-  "technicianName": zod.string(),
-  "technicianId": zod.string().nullish(),
-  "quizId": zod.number(),
-  "quizTitle": zod.string(),
-  "score": zod.number(),
-  "passed": zod.boolean(),
-  "completedAt": zod.string()
-})
-export const ListTrainingScoresResponse = zod.array(ListTrainingScoresResponseItem)
-
-
-/**
- * @summary Get training leaderboard
- */
-export const GetTrainingLeaderboardResponseItem = zod.object({
-  "rank": zod.number(),
-  "technicianName": zod.string(),
-  "technicianId": zod.string().nullish(),
-  "avgScore": zod.number(),
-  "totalQuizzes": zod.number(),
-  "passRate": zod.number().optional(),
-  "badge": zod.string()
-})
-export const GetTrainingLeaderboardResponse = zod.array(GetTrainingLeaderboardResponseItem)
-
-
-/**
  * @summary Get full analytics dashboard data
  */
 export const GetAnalyticsDashboardResponse = zod.object({
@@ -1086,7 +998,6 @@ export const GetTechnicianPerformanceResponseItem = zod.object({
   "avgFindingsPerInspection": zod.number(),
   "avgAiConfidence": zod.number(),
   "completionRate": zod.number(),
-  "trainingScore": zod.number().nullish(),
   "badge": zod.string().nullish()
 })
 export const GetTechnicianPerformanceResponse = zod.array(GetTechnicianPerformanceResponseItem)

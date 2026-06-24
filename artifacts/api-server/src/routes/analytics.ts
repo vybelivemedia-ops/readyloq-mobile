@@ -4,7 +4,6 @@ import {
   inspectionsTable,
   analysisResultsTable,
   reportsTable,
-  trainingScoresTable,
 } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
@@ -152,10 +151,6 @@ router.get("/technicians", async (req, res) => {
       .select()
       .from(analysisResultsTable)
       .where(eq(analysisResultsTable.companyId, companyId));
-    const scores = await db
-      .select()
-      .from(trainingScoresTable)
-      .where(eq(trainingScoresTable.companyId, companyId));
 
     const techMap: Record<
       string,
@@ -196,15 +191,10 @@ router.get("/technicians", async (req, res) => {
           t.confidences.length > 0
             ? t.confidences.reduce((a, b) => a + b, 0) / t.confidences.length
             : 0;
-        const techScores = scores.filter((s) => s.technicianName === t.name);
-        const avgTraining =
-          techScores.length > 0
-            ? techScores.reduce((s, r) => s + r.score, 0) / techScores.length
-            : null;
 
         let badge = null;
-        if (avgConf >= 85) badge = "Expert";
-        else if (avgConf >= 70) badge = "Senior";
+        if (avgConf >= 0.85) badge = "Expert";
+        else if (avgConf >= 0.7) badge = "Senior";
         else if (total >= 5) badge = "Field Tech";
 
         return {
@@ -212,9 +202,8 @@ router.get("/technicians", async (req, res) => {
           technicianId: t.id,
           inspectionCount: total,
           avgFindingsPerInspection: Math.round(avgFindings * 10) / 10,
-          avgAiConfidence: Math.round(avgConf * 10) / 10,
+          avgAiConfidence: Math.round(avgConf * 100) / 100,
           completionRate: total > 0 ? Math.round((completed / total) * 100) / 100 : 0,
-          trainingScore: avgTraining !== null ? Math.round(avgTraining * 10) / 10 : null,
           badge,
         };
       })
@@ -248,7 +237,11 @@ router.get("/risk", async (req, res) => {
 
     const criticalCount = inspections.filter((i) => i.severity === "critical").length;
     const highCount = inspections.filter((i) => i.severity === "high").length;
-    const riskScore = Math.min(100, criticalCount * 15 + highCount * 8 + (100 - avgConf));
+    // avgConf is 0–1; convert to percentage so lower confidence adds up to +100 risk.
+    const riskScore = Math.min(
+      100,
+      criticalCount * 15 + highCount * 8 + (100 - avgConf * 100),
+    );
 
     let overallRisk = "low";
     if (riskScore >= 60) overallRisk = "critical";
