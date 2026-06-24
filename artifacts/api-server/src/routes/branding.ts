@@ -7,7 +7,7 @@ import {
   READYLOQ_DEFAULT_PROFILE,
   type BrandingProfile,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { requireAuth, requireRole, requireCompany } from "../middleware/require-auth";
 import { getCompanyId } from "../lib/tenant";
 
@@ -38,17 +38,42 @@ function firstInvalidColor(d: {
 }
 
 // The reserved "platform" company owns the ReadyLoq default brand served to
-// anyone before they sign in. Cache its id so the public endpoint stays cheap.
+// anyone before they sign in. It is self-healing: if the row is missing (e.g. a
+// freshly published database that was never seeded), it is created on demand so
+// the public pre-login brand endpoint never hard-fails. Cache the resolved id so
+// the public endpoint stays cheap.
 let platformCompanyIdCache: number | null = null;
-async function getPlatformCompanyId(): Promise<number | null> {
+async function ensurePlatformCompanyId(): Promise<number> {
   if (platformCompanyIdCache != null) return platformCompanyIdCache;
+  const [existing] = await db
+    .select()
+    .from(companiesTable)
+    .where(eq(companiesTable.slug, "platform"));
+  if (existing) {
+    platformCompanyIdCache = existing.id;
+    return existing.id;
+  }
+  // Create the reserved company on demand, tolerating a concurrent creator via
+  // the unique slug constraint, then read back the canonical row.
+  await db
+    .insert(companiesTable)
+    .values({ name: "ReadyLoq Platform", slug: "platform" })
+    .onConflictDoNothing({ target: companiesTable.slug });
   const [row] = await db
     .select()
     .from(companiesTable)
     .where(eq(companiesTable.slug, "platform"));
-  platformCompanyIdCache = row?.id ?? null;
-  return platformCompanyIdCache;
+  if (!row) {
+    // The insert+reselect should always yield a row; if not, the DB is in an
+    // unexpected state — surface it explicitly rather than caching a bad value.
+    throw new Error("Failed to bootstrap reserved platform company");
+  }
+  platformCompanyIdCache = row.id;
+  return row.id;
 }
+
+// Advisory-lock namespace for serializing first-time per-company branding seeds.
+const BRANDING_SEED_LOCK_NAMESPACE = 42891;
 
 /** Ensure the given company has at least a default branding profile. */
 async function ensureSeeded(companyId: number): Promise<BrandingProfile[]> {
@@ -57,11 +82,25 @@ async function ensureSeeded(companyId: number): Promise<BrandingProfile[]> {
     .from(brandingProfilesTable)
     .where(eq(brandingProfilesTable.companyId, companyId));
   if (rows.length > 0) return rows;
-  const [row] = await db
-    .insert(brandingProfilesTable)
-    .values({ ...READYLOQ_DEFAULT_PROFILE, companyId, isDefault: true, isActive: true })
-    .returning();
-  return [row];
+  // First-time bootstrap: take a transaction-scoped advisory lock keyed by the
+  // company so two concurrent first requests can't each insert a default/active
+  // profile (which would violate the "one active default" invariant). The lock
+  // is released automatically when the transaction ends.
+  return await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(${BRANDING_SEED_LOCK_NAMESPACE}, ${companyId})`,
+    );
+    const existing = await tx
+      .select()
+      .from(brandingProfilesTable)
+      .where(eq(brandingProfilesTable.companyId, companyId));
+    if (existing.length > 0) return existing;
+    const [row] = await tx
+      .insert(brandingProfilesTable)
+      .values({ ...READYLOQ_DEFAULT_PROFILE, companyId, isDefault: true, isActive: true })
+      .returning();
+    return [row];
+  });
 }
 
 async function getActiveProfile(companyId: number): Promise<BrandingProfile> {
@@ -72,10 +111,7 @@ async function getActiveProfile(companyId: number): Promise<BrandingProfile> {
 // ── PUBLIC: platform active profile (login/landing branding before sign-in) ───
 router.get("/active", async (_req, res) => {
   try {
-    const platformId = await getPlatformCompanyId();
-    if (platformId == null) {
-      return res.status(500).json({ error: "Platform branding unavailable" });
-    }
+    const platformId = await ensurePlatformCompanyId();
     return res.json(serialize(await getActiveProfile(platformId)));
   } catch {
     return res.status(500).json({ error: "Failed to get active branding" });
@@ -85,10 +121,7 @@ router.get("/active", async (_req, res) => {
 // Backward-compatible alias used by the report PDF data hook (pre-login brand).
 router.get("/", async (_req, res) => {
   try {
-    const platformId = await getPlatformCompanyId();
-    if (platformId == null) {
-      return res.status(500).json({ error: "Platform branding unavailable" });
-    }
+    const platformId = await ensurePlatformCompanyId();
     return res.json(serialize(await getActiveProfile(platformId)));
   } catch {
     return res.status(500).json({ error: "Failed to get branding" });

@@ -111,6 +111,47 @@ describe("GET /api/branding/company (authed, caller's brand)", () => {
   });
 });
 
+describe("first-seed bootstrap is concurrency-safe", () => {
+  it("creates exactly one default/active profile under concurrent first requests", async () => {
+    // A brand-new tenant with no branding profiles yet: the first authed read
+    // triggers ensureSeeded(). The global beforeEach only seeds platform + the
+    // test company, so this company stays empty until a request bootstraps it.
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const [company] = await db
+      .insert(companiesTable)
+      .values({ name: "Concurrency Co", slug: `concurrency-co-${suffix}` })
+      .returning();
+    const clerkId = `concurrency_manager_${suffix}`;
+    await db
+      .insert(usersTable)
+      .values({ clerkUserId: clerkId, role: "manager", companyId: company.id });
+    // Defensive against shared-DB reruns: guarantee a truly empty starting state.
+    await db
+      .delete(brandingProfilesTable)
+      .where(eq(brandingProfilesTable.companyId, company.id));
+
+    asUser(clerkId);
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () => request(app).get("/api/branding/company")),
+    );
+    asUser(null);
+
+    for (const res of results) {
+      expect(res.status).toBe(200);
+      expect(res.body.isActive).toBe(true);
+    }
+    // The advisory-locked bootstrap must yield exactly one profile, with a single
+    // active and a single default — never duplicates from the concurrent races.
+    const profiles = await db
+      .select()
+      .from(brandingProfilesTable)
+      .where(eq(brandingProfilesTable.companyId, company.id));
+    expect(profiles).toHaveLength(1);
+    expect(profiles.filter((p) => p.isActive)).toHaveLength(1);
+    expect(profiles.filter((p) => p.isDefault)).toHaveLength(1);
+  });
+});
+
 describe("manager-only access control", () => {
   it("returns 401 when listing profiles unauthenticated", async () => {
     const res = await request(app).get("/api/branding/profiles");
