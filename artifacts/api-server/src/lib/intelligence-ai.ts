@@ -94,12 +94,12 @@ function asStringOrNull(value: unknown): string | null {
     : trimmed;
 }
 
-function parsePrediction(raw: string): AiPrediction {
+function parsePrediction(raw: string): AiPrediction | null {
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    return fallbackPrediction();
+    return null;
   }
 
   let category = asStringOrNull(parsed.category);
@@ -144,11 +144,18 @@ function parsePrediction(raw: string): AiPrediction {
 
 /**
  * Run the vision model against a stored object path (e.g.
- * `/objects/companies/5/uploads/abc`). Always resolves to a valid AiPrediction.
+ * `/objects/companies/5/uploads/abc`).
+ *
+ * Returns `null` when the analysis genuinely FAILED — a storage/model/parse
+ * error or an empty model response. A successfully parsed result (even a
+ * conservative, low-/zero-confidence one) is returned as-is. Callers that must
+ * distinguish "analysis failed" from "analysis found nothing notable" should
+ * use this directly; callers that just want a well-formed suggestion should use
+ * {@link generateAiPrediction}.
  */
-export async function generateAiPrediction(
+export async function analyzePhoto(
   objectPath: string,
-): Promise<AiPrediction> {
+): Promise<AiPrediction | null> {
   try {
     const dataUrl = await objectToDataUrl(objectPath);
     const completion = await openai.chat.completions.create({
@@ -167,9 +174,21 @@ export async function generateAiPrediction(
       ],
     });
     const raw = completion.choices[0]?.message?.content;
-    if (!raw) return fallbackPrediction();
+    if (!raw) return null;
     return parsePrediction(raw);
   } catch {
-    return fallbackPrediction();
+    return null;
   }
+}
+
+/**
+ * Never-failing wrapper around {@link analyzePhoto}: any failure yields
+ * `fallbackPrediction()` (confidence 0, empty labels) so the Intelligence
+ * Dataset contribution flow always gets a well-formed, clearly-low-confidence
+ * suggestion to hand to the technician.
+ */
+export async function generateAiPrediction(
+  objectPath: string,
+): Promise<AiPrediction> {
+  return (await analyzePhoto(objectPath)) ?? fallbackPrediction();
 }

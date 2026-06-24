@@ -9,6 +9,7 @@ import {
   Aperture, BrainCircuit,
   Camera, MapPin, ChevronDown, ChevronUp, X, Languages,
   Battery, BatteryCharging, BatteryLow, BatteryWarning, Gauge,
+  AlertTriangle,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -99,23 +100,31 @@ const VOICE_SEVERITY: Record<Category, string> = {
   conducive: "medium",
 };
 
+/**
+ * Upload a captured blob/data URL to permanent object storage and return its
+ * canonical `/api/storage/...` path. Throws loudly on any failure — we never
+ * silently substitute the ephemeral blob URL, which would let an inspection
+ * "complete" with evidence that vanishes on reload and can't be AI-analyzed.
+ */
 async function uploadToStorage(url: string, filename: string): Promise<string> {
   if (!url.startsWith("blob:") && !url.startsWith("data:")) return url;
-  try {
-    const resp = await fetch(url);
-    const blob = await resp.blob();
-    const urlRes = await fetch("/api/storage/uploads/request-url", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: filename, size: blob.size, contentType: blob.type || "image/jpeg" }),
-    });
-    if (!urlRes.ok) return url;
-    const { uploadURL, objectPath } = await urlRes.json();
-    await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": blob.type || "image/jpeg" }, body: blob });
-    return `/api/storage${objectPath}`;
-  } catch {
-    return url;
-  }
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error("Could not read the captured photo for upload.");
+  const blob = await resp.blob();
+  const urlRes = await fetch("/api/storage/uploads/request-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: filename, size: blob.size, contentType: blob.type || "image/jpeg" }),
+  });
+  if (!urlRes.ok) throw new Error(`Upload could not start (${urlRes.status}).`);
+  const { uploadURL, objectPath } = await urlRes.json();
+  const putRes = await fetch(uploadURL, {
+    method: "PUT",
+    headers: { "Content-Type": blob.type || "image/jpeg" },
+    body: blob,
+  });
+  if (!putRes.ok) throw new Error(`Photo upload failed (${putRes.status}).`);
+  return `/api/storage${objectPath}`;
 }
 
 const VOICE_COMMANDS = [
@@ -299,6 +308,7 @@ export default function NewInspection() {
   const [siteAddress, setSiteAddress] = useState("");
   const [technicianName, setTechnicianName] = useState("");
   const [completing, setCompleting] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.fullName && !technicianName) {
@@ -326,6 +336,12 @@ export default function NewInspection() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const adjustingRef = useRef(false);
   const captureNoticeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Retry bookkeeping so a failed completion resumes incrementally instead of
+  // re-uploading photos, duplicating media rows, or re-running AI analysis.
+  const uploadedRef = useRef<Record<string, string>>({});
+  const persistedRef = useRef<Set<string>>(new Set());
+  const analyzedRef = useRef(false);
 
   const camera = useCamera();
 
@@ -512,16 +528,59 @@ export default function NewInspection() {
 
   async function handleComplete() {
     setCompleting(true);
+    setUploadError(null);
+    const photoItems = captured.filter(i => i.type === "photo");
+
     try {
-      // Step 1: Upload all blob/data URLs to permanent object storage
-      const permanentUrls: Record<string, string> = {};
-      const photoItems = captured.filter(i => i.type === "photo");
+      // Step 1: Upload every captured photo to permanent object storage.
+      // Failures throw loudly (no silent blob fallback): we keep the technician
+      // on this screen with a Retry button instead of saving broken evidence.
+      // Already-uploaded photos are cached so Retry only resumes what failed.
       for (const item of photoItems) {
-        const permanent = await uploadToStorage(item.url, `inspection-${createdId}-${item.id}.jpg`);
-        permanentUrls[item.id] = permanent;
+        if (uploadedRef.current[item.id]) continue;
+        uploadedRef.current[item.id] = await uploadToStorage(
+          item.url,
+          `inspection-${createdId}-${item.id}.jpg`,
+        );
       }
 
-      // Step 2: Build real findings from technician voice notes
+      // Step 2: Persist all media records (incrementally) BEFORE analysis so the
+      // server can verify each analyzed photo is a real media row for this
+      // inspection. Failures here are also loud + retryable; the per-item guard
+      // prevents duplicate rows on retry.
+      if (createdId) {
+        for (const item of captured) {
+          if (persistedRef.current.has(item.id)) continue;
+          await addMedia.mutateAsync({
+            id: createdId,
+            data: {
+              mediaType: item.type,
+              url: item.type === "photo" ? (uploadedRef.current[item.id] ?? item.url) : item.url,
+              filename: item.label,
+              caption: item.note ? `${item.note.professionalTerm} · ${item.note.reportPhrase}` : "",
+            },
+          });
+          persistedRef.current.add(item.id);
+        }
+      }
+    } catch (err) {
+      // Evidence (upload/persist) is data-integrity critical — surface the
+      // failure and let the technician retry rather than completing with
+      // missing evidence.
+      setUploadError(
+        err instanceof Error
+          ? err.message
+          : "We couldn't save your evidence. Check your connection and try again.",
+      );
+      setCompleting(false);
+      return;
+    }
+
+    // Step 3: Run REAL AI analysis on the persisted photos + merge with voice
+    // findings. This is supplementary, so a failure here does NOT trap the
+    // technician — the inspection + evidence are already saved. We surface any
+    // photos the AI could not analyze instead of silently fabricating findings.
+    if (createdId && !analyzedRef.current) {
       const technicianFindings = captured
         .filter(i => i.type === "voice" && i.note)
         .map((item, idx) => {
@@ -540,42 +599,36 @@ export default function NewInspection() {
           };
         });
 
-      // Step 3: Persist all media records with permanent URLs BEFORE analysis, so the
-      // server can verify each analyzed photo is a real media row for this inspection.
-      if (createdId && captured.length > 0) {
-        for (const item of captured) {
-          try {
-            await addMedia.mutateAsync({
-              id: createdId,
-              data: {
-                mediaType: item.type,
-                url: permanentUrls[item.id] ?? item.url,
-                filename: item.label,
-                caption: item.note ? `${item.note.professionalTerm} · ${item.note.reportPhrase}` : "",
-              },
-            });
-          } catch {}
-        }
-      }
-
-      // Step 4: Run REAL AI analysis on the persisted photos + merge with voice findings.
-      // The server runs vision analysis per saved image and stores a single analysis result.
       const images = photoItems
-        .map(item => ({ imageUrl: permanentUrls[item.id] ?? item.url, label: item.label }))
+        .map(item => ({ imageUrl: uploadedRef.current[item.id] ?? item.url, label: item.label }))
         .filter(img => img.imageUrl.startsWith("/api/storage"));
 
-      if (createdId && (images.length > 0 || technicianFindings.length > 0)) {
+      if (images.length > 0 || technicianFindings.length > 0) {
         try {
-          await analyzeInspection.mutateAsync({
+          const result = await analyzeInspection.mutateAsync({
             data: { inspectionId: createdId, images, technicianFindings },
           });
+          analyzedRef.current = true;
+          const failed = (result as { analysisErrors?: number | null })?.analysisErrors ?? 0;
+          if (failed > 0) {
+            toast({
+              title: "Some photos couldn't be analyzed",
+              description: `AI analysis failed for ${failed} photo${failed > 1 ? "s" : ""}. Your evidence is saved — you can re-run analysis from the inspection.`,
+              variant: "destructive",
+            });
+          }
         } catch {
-          // Analysis is best-effort; the inspection record and media are already saved.
+          toast({
+            title: "AI analysis didn't run",
+            description: "Your inspection and evidence were saved. You can re-run AI analysis from the inspection page.",
+            variant: "destructive",
+          });
         }
       }
-    } finally {
-      navigate(createdId ? `/inspections/${createdId}` : "/inspections");
     }
+
+    setCompleting(false);
+    navigate(createdId ? `/inspections/${createdId}` : "/inspections");
   }
 
   // ── STEP 1: SETUP ─────────────────────────────────────────────────────────────
@@ -1181,13 +1234,23 @@ export default function NewInspection() {
         </div>
       )}
 
+      {uploadError && (
+        <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-4 flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-destructive">Couldn't save evidence</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{uploadError} Your captures are still here — tap Retry.</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3 pt-2">
         <Button variant="outline" className="flex-1 rounded-xl h-12" onClick={() => navigate("/inspections")}>
           Save Only
         </Button>
         <Button className="flex-1 rounded-xl h-12 font-semibold shadow-lg shadow-primary/20" onClick={handleComplete} disabled={completing}>
           <Zap className="mr-2 h-4 w-4" />
-          {completing ? "Saving evidence…" : "Save & Review"}
+          {completing ? "Saving evidence…" : uploadError ? "Retry upload" : "Save & Review"}
         </Button>
       </div>
     </div>

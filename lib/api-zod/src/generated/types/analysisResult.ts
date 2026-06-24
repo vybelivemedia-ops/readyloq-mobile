@@ -21,5 +21,7 @@ export interface AnalysisResult {
   technicianFeedback?: string | null;
   /** @nullable */
   feedbackStatus?: string | null;
+  /** @nullable */
+  analysisErrors?: number | null;
   createdAt: string;
 }

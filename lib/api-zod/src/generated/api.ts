@@ -196,6 +196,7 @@ export const ListAnalysisResultsResponseItem = zod.object({
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
   "feedbackStatus": zod.string().nullish(),
+  "analysisErrors": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const ListAnalysisResultsResponse = zod.array(ListAnalysisResultsResponseItem)
@@ -253,6 +254,7 @@ export const GetAnalysisResultResponse = zod.object({
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
   "feedbackStatus": zod.string().nullish(),
+  "analysisErrors": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -290,6 +292,7 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
   "feedbackStatus": zod.string().nullish(),
+  "analysisErrors": zod.number().nullish(),
   "createdAt": zod.string()
 })
 

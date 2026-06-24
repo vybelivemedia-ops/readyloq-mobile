@@ -1149,6 +1149,7 @@ components:
         riskLevel:    { type: ["string", "null"] }
         technicianFeedback: { type: ["string", "null"] }
         feedbackStatus: { type: ["string", "null"] }
+        analysisErrors: { type: ["integer", "null"] }
         createdAt:    { type: string }
 
     Finding:

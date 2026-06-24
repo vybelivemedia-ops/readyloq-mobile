@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
-import { generateAiPrediction } from "../lib/intelligence-ai";
+import { analyzePhoto } from "../lib/intelligence-ai";
 import { objectPathCompanyScope } from "../lib/objectStorage";
 
 const router = Router();
@@ -182,8 +182,13 @@ router.post("/analyze", async (req, res) => {
     const MAX_ANALYZE_IMAGES = 40;
 
     // Run the real vision model on each company-scoped, persisted photo.
+    // We NEVER fabricate a placeholder finding: a photo only becomes a finding
+    // when the model returns a genuine, content-bearing assessment. Photos whose
+    // analysis FAILED (storage/model/parse error) are counted in `analysisErrors`
+    // and surfaced to the technician instead of being saved as empty findings.
     const aiFindings: Finding[] = [];
     let nextId = 1;
+    let analysisErrors = 0;
     for (const image of images.slice(0, MAX_ANALYZE_IMAGES)) {
       if (!image?.imageUrl) continue;
       const storagePath = toStoragePath(image.imageUrl);
@@ -192,7 +197,27 @@ router.post("/analyze", async (req, res) => {
       if (objectPathCompanyScope(storagePath) !== companyId) continue;
       if (!savedPaths.has(storagePath)) continue;
 
-      const prediction = await generateAiPrediction(storagePath);
+      const prediction = await analyzePhoto(storagePath);
+      if (prediction === null) {
+        // Analysis failed for this photo — do NOT persist a placeholder finding.
+        analysisErrors++;
+        continue;
+      }
+      // A successful-but-empty assessment (a clean photo with nothing notable)
+      // should not create a finding. The prompt makes the model ALWAYS emit a
+      // rationale + tags, so those are NOT evidence of a real finding — only a
+      // concrete classification (taxonomy category, pest, conducive condition,
+      // entry point, or corrective action) counts. A clean photo returns all of
+      // these null and is skipped instead of producing an "observation" placeholder.
+      const hasContent = !!(
+        prediction.category ||
+        prediction.possiblePest ||
+        prediction.possibleConduciveCondition ||
+        prediction.possibleEntryPoint ||
+        prediction.suggestedCorrectiveAction
+      );
+      if (!hasContent) continue;
+
       const severity =
         prediction.confidence >= 0.7 ? "high" : prediction.confidence >= 0.4 ? "medium" : "low";
       const description =
@@ -249,7 +274,7 @@ router.post("/analyze", async (req, res) => {
       })
       .returning();
 
-    return res.status(201).json(serializeResult(row));
+    return res.status(201).json({ ...serializeResult(row), analysisErrors });
   } catch (err) {
     return res.status(500).json({ error: "Failed to analyze inspection" });
   }
