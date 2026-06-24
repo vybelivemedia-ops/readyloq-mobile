@@ -211,7 +211,8 @@ function ProtectedRoutes() {
         <Route path="/dataset" component={DatasetLibrary} />
         <Route path="/reports" component={ReportsList} />
         <Route path="/reports/:id" component={ReportDetail} />
-        <Route path="/training" component={KnowledgeCenter} />
+        <Route path="/knowledge" component={KnowledgeCenter} />
+        <Route path="/training"><Redirect to="/knowledge" /></Route>
         <Route path="/intelligence" component={IntelligenceBrowse} />
         <Route path="/intelligence/contribute" component={IntelligenceContribute} />
         <Route path="/intelligence/review" component={IntelligenceReview} />

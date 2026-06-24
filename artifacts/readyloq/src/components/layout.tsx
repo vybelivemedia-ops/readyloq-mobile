@@ -30,7 +30,7 @@ const baseNavItems = [
   { href: "/analysis", label: "Evidence", icon: Camera },
   { href: "/intelligence", label: "Intelligence", icon: Brain },
   { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/training", label: "Knowledge", icon: GraduationCap },
+  { href: "/knowledge", label: "Knowledge", icon: GraduationCap },
 ];
 
 const commandNavItem = { href: "/command", label: "Command", icon: Crosshair };
@@ -42,7 +42,7 @@ const mobileNavItems = [
   { href: "/properties", label: "Sites", icon: Building2 },
   { href: "/intelligence", label: "Intelligence", icon: Brain },
   { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/training", label: "Knowledge", icon: GraduationCap },
+  { href: "/knowledge", label: "Knowledge", icon: GraduationCap },
 ];
 
 function isActive(location: string, href: string) {
