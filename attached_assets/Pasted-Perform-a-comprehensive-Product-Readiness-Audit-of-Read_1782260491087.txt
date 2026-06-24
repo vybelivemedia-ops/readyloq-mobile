@@ -1,0 +1,145 @@
+Perform a comprehensive Product Readiness Audit of ReadyLoq.
+
+Evaluate the current application as if you were a CTO, SaaS founder, enterprise software buyer, pest-control company owner, security auditor, and investor.
+
+Do not assume features exist. Verify them from the actual codebase, routes, database schema, tests, UI, APIs, workflows, integrations, and deployment configuration.
+
+Score each category from 0–100%.
+
+Areas to evaluate:
+
+1. Core Inspection Workflow
+- Property creation
+- Inspection creation
+- Findings capture
+- Photo capture
+- Treatment notes
+- Inspection completion
+- Technician usability
+
+2. Property Intelligence
+- Historical property insights
+- Recurring issue detection
+- Callback analysis
+- Risk indicators
+- Knowledge retention
+
+3. Reporting
+- PDF generation
+- White-label reports
+- Customer-facing reports
+- Report reliability
+- Report scalability
+
+4. Multi-Tenancy & Security
+- Company isolation
+- Access control
+- Role enforcement
+- Data privacy
+- File storage security
+- Cross-tenant protection
+
+5. White Label Platform
+- Branding
+- Logos
+- Colors
+- PDFs
+- Multi-company support
+- Customer onboarding readiness
+
+6. Intelligence Dataset
+- AI image analysis
+- Technician confirmation workflow
+- Manager verification workflow
+- Dataset quality
+- Future AI training value
+- Privacy model
+
+7. Analytics & Intelligence
+- Dashboard usefulness
+- Management visibility
+- Operational insights
+- Opportunity detection
+- Performance tracking
+
+8. Training Center
+- Quizzes
+- Knowledge retention
+- Technician development
+- Multilingual support
+
+9. Company Management
+- Invites
+- Team management
+- Roles
+- Onboarding
+
+10. Platform Operations
+- Super Admin tools
+- Platform analytics
+- Company administration
+- Support tooling
+
+11. Billing & Revenue
+- Stripe integration
+- Subscriptions
+- Trial management
+- Usage limits
+- Payment enforcement
+
+12. Communication
+- Email delivery
+- Notifications
+- Invite emails
+- Follow-up workflows
+
+13. Integrations
+- PestPac readiness
+- API architecture
+- Import/export capabilities
+- Third-party integrations
+
+14. Offline Reliability
+- Offline inspections
+- Sync queues
+- Field usability
+- Poor signal environments
+
+15. Mobile App Readiness
+- Android readiness
+- iOS readiness
+- App Store readiness
+- Google Play readiness
+
+16. Customer Readiness
+- Ready for internal use
+- Ready for pilot customer
+- Ready for first paying customer
+- Ready for multiple paying customers
+- Ready for enterprise rollout
+
+For every category provide:
+- Score
+- What's working
+- What's missing
+- Risks
+- Recommended next steps
+
+Then provide:
+
+A. Overall Readiness Percentage
+
+B. Top 10 blockers preventing revenue growth
+
+C. Top 10 highest ROI features to build next
+
+D. Estimated value if sold as a SaaS product today
+
+E. Estimated development replacement cost if built by a professional software agency
+
+F. Recommended roadmap for:
+- First paying customer
+- First 10 customers
+- First 100 customers
+
+Be brutally honest. Do not inflate scores. Base conclusions on actual implementation, not intentions or future plans.
