@@ -598,6 +598,25 @@ paths:
         "204":
           description: Deleted
 
+  /reports/{id}/generate-narrative:
+    post:
+      operationId: generateReportNarrative
+      tags: [reports]
+      summary: Generate or regenerate the AI narrative report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
   # ── ANALYTICS ────────────────────────────────────────────────────────────────
   /analytics/dashboard:
     get:
@@ -1488,7 +1507,30 @@ components:
         inspectionDate:  { type: string }
         severity:        { type: ["string", "null"] }
         pdfUrl:          { type: ["string", "null"] }
+        aiNarrative:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/AiReportNarrative"
         createdAt:       { type: string }
+
+    AiReportNarrative:
+      type: object
+      required: [executiveSummary, inspectionFindings, evidenceObserved, pestActivityAssessment, structuralDeficiencies, sanitationConcerns, recommendedCorrectiveActions, monitoringRecommendations, followUpSchedule, technicianNotes, managerReviewNotes, propertyType, model, generatedAt]
+      properties:
+        executiveSummary:             { type: string }
+        inspectionFindings:           { type: string }
+        evidenceObserved:             { type: string }
+        pestActivityAssessment:       { type: string }
+        structuralDeficiencies:       { type: string }
+        sanitationConcerns:           { type: string }
+        recommendedCorrectiveActions: { type: array, items: { type: string } }
+        monitoringRecommendations:    { type: array, items: { type: string } }
+        followUpSchedule:             { type: string }
+        technicianNotes:              { type: string }
+        managerReviewNotes:           { type: string }
+        propertyType:                 { type: string }
+        model:                        { type: string }
+        generatedAt:                  { type: string }
 
     ReportInput:
       type: object

@@ -495,6 +495,23 @@ export interface IntelligenceAnalytics {
   topContributors: IntelligenceContributor[];
 }
 
+export interface AiReportNarrative {
+  executiveSummary: string;
+  inspectionFindings: string;
+  evidenceObserved: string;
+  pestActivityAssessment: string;
+  structuralDeficiencies: string;
+  sanitationConcerns: string;
+  recommendedCorrectiveActions: string[];
+  monitoringRecommendations: string[];
+  followUpSchedule: string;
+  technicianNotes: string;
+  managerReviewNotes: string;
+  propertyType: string;
+  model: string;
+  generatedAt: string;
+}
+
 export interface Report {
   id: number;
   inspectionId: number;
@@ -514,6 +531,7 @@ export interface Report {
   severity?: string | null;
   /** @nullable */
   pdfUrl?: string | null;
+  aiNarrative?: null | AiReportNarrative;
   createdAt: string;
 }
 

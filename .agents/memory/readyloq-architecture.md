@@ -35,6 +35,12 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Role from server replaces localStorage use-role.ts toggle. View Mode card removed from settings.tsx.
 - Layout.tsx uses useUser() (Clerk) for display name and useCurrentUser() for role. Sign-out via useClerk().signOut().
 
+## Multi-Tenancy (company-scoped isolation) — CURRENT MODEL, supersedes older notes
+- ReadyLoq IS multi-tenant: a `companyId` column scopes nearly every table (reports, inspections, analysis, properties, branding, callbacks, training, dataset(s), intelligence-dataset, users, companies). **Any older note calling the app "single-tenant/shared by design" or "no tenant column anywhere" is OBSOLETE — do NOT remove company scoping; cross-tenant access is a security bug, not a feature.**
+- **Every authenticated route scopes reads AND writes by companyId** (`requireAuth + requireCompany`, `getCompanyId(req)`). Never trust a foreign key (e.g. `report.inspectionId`) alone — re-fetch the referenced row constrained by companyId before using it, and fail loudly if it's missing.
+- Object storage is tenant-scoped: `GET /storage/objects/*` enforces `objectPathCompanyScope(path)===companyId`; uploads are keyed under `companies/{id}/`.
+- Isolation is guarded by tests: `routes/isolation.test.ts`, `storage.test.ts`, `branding.test.ts`. Keep them green.
+
 ## Design Philosophy (per product vision)
 - Dark mode is the DEFAULT — `:root` holds dark vars; `.light` is opt-in. `main.tsx` adds `dark` class to `document.documentElement`
 - Home screen = one large "START INSPECTION" pulsing orb — NOT a stats dashboard
@@ -67,7 +73,7 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 ## Object Storage (GCS via Replit)
 - Bucket: `replit-objstore-e989ae13-7af0-4fc5-942e-57b60a6fd134`; env vars: `DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR`
 - Deps: `@google-cloud/storage` + `google-auth-library` in @workspace/api-server
-- Route: `artifacts/api-server/src/routes/storage.ts` — mounted in index.ts as `router.use(storageRouter)`. `POST /uploads/request-url` is `requireAuth` (shared by technician photo + manager branding uploads). `GET /public-objects/*` stays public (logos render on the pre-sign-in login page). `GET /objects/*` is now `requireAuth` (private inspection photos/voice notes; cookie auth means same-origin <img>/fetch work for signed-in users). No per-object ACL check: objects carry no ACL policy metadata so canAccessObjectEntity would reject everything, and the app is single-tenant/shared by design — auth IS the boundary.
+- Route: `artifacts/api-server/src/routes/storage.ts` — mounted in index.ts as `router.use(storageRouter)`. `POST /uploads/request-url` is `requireAuth` (shared by technician photo + manager branding uploads). `GET /public-objects/*` stays public (logos render on the pre-sign-in login page). `GET /objects/*` is now `requireAuth` (private inspection photos/voice notes; cookie auth means same-origin <img>/fetch work for signed-in users). No per-object ACL check: objects carry no ACL policy metadata so canAccessObjectEntity would reject everything; tenant isolation is enforced separately by `objectPathCompanyScope(path)===companyId` (see Multi-Tenancy), NOT by a shared-data model.
 - Storage.ts uses inline zod instead of `@workspace/api-zod` imports (api-zod doesn't have those types)
 - Upload flow: `POST /api/storage/uploads/request-url {name,size,contentType}` → `{uploadURL,objectPath}`; PUT uploadURL with bytes; serving URL = `/api/storage${objectPath}`
 - `uploadToStorage(url, filename)` helper in new.tsx: converts blob:/data: URLs to permanent GCS paths (gracefully falls back to original URL on error)
@@ -95,7 +101,7 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Shared helper `artifacts/api-server/src/lib/property-intelligence.ts` (normalizeAddressKey/propertyTypeFor/severityRank/deriveRecurringIssues) reused by intelligence.ts AND routes/properties.ts.
 - **Invariant (enforced in PATCH):** a profile's stored `siteAddress` must normalize back to its `addressKey`. PATCH rejects a body siteAddress that normalizes to a different key — otherwise address lookups would miss the profile. **Why:** the feature's whole value is matching by address before a visit.
 - Hotspot severity is strictly `low|medium|high` everywhere (zod enum + OpenAPI `Hotspot.severity` enum). Frontend dropdown and defaults use these only; the generated `Hotspot` type is a union so Select onValueChange needs `v as Hotspot["severity"]`.
-- **Data is single-tenant/shared by design** — like ALL ReadyLoq routes, property routes are behind requireAuth only, with NO per-user/org scoping (no tenant column anywhere). An architect may flag "no per-tenant auth" — that is the app's intentional shared-data model, NOT a bug to fix.
+- **Property routes are company-scoped** (requireAuth + requireCompany; reads/writes filter by companyId) — see Multi-Tenancy. Any older "single-tenant/shared by design" note here is OBSOLETE.
 - Pre-inspection lookup: `GET /properties/lookup?siteAddress=` returns matchStatus exact|possible|none (possible = prefix or ≥50% token Jaccard on the slug). Frontend `PreInspectionIntel` (debounced 400ms, ≥4 chars) in components/property-intel.tsx, injected into inspections/new.tsx setup step.
 - Seed: `seed-properties.ts` (count-guarded, idempotent) attaches profiles to the Riverside/Oak addresses that already have analyses so derived sections populate.
 
@@ -109,7 +115,7 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - API (routes/branding.ts) is mounted WITHOUT a global auth guard: `GET /active` + `GET /` (PDF alias) are PUBLIC (login/landing must brand before sign-in); everything below `router.use(requireAuth, requireRole("manager"))` is manager-only CRUD (list/create/get/patch/duplicate/delete/activate + `POST /restore-defaults`). `isDefault`/`isActive` are stripped from create/patch bodies and only change via the dedicated activate/restore endpoints. Color fields validated against hex (`firstInvalidColor` → 400).
 - **Runtime theming is centralized in `components/branding-provider.tsx` — it is the SINGLE place that calls `applyBrandingToDocument` (CSS vars/title/favicon), applying `effective = preview ?? active`. NEVER call applyBrandingToDocument from anywhere else — it races with the provider's active-profile refetch and gets clobbered.** Live preview goes through the `useBrandingPreview()` setter; `useBranding()` returns the effective profile so React-rendered logo/name live-update too.
 - White Label Manager UI lives in `components/white-label/*` (white-label-manager, profile-editor, brand-preview, image-cropper, profile-draft). Gated in settings.tsx behind `useCurrentUser().role === "manager"` (UX only; the server enforces requireRole). PDF branding flows through `useReportPdfData` → active profile, separate from live preview.
-- **Why public GET /active:** the unauthenticated login/landing/loading screens must show the active brand, so the active-profile read cannot require auth. Phase 1 is branding only — NO multi-company data tenancy.
+- **Why public GET /active:** the unauthenticated login/landing/loading screens must show the active brand, so the active-profile read cannot require auth. Branding's public-read surface is the exception; data routes are company-scoped — see Multi-Tenancy.
 
 ## ReadyLoq Marketing Site (artifacts/readyloq-marketing)
 - SEPARATE public marketing artifact from the app (artifacts/readyloq). Positioned as a **Property Intelligence & Operational Knowledge platform — NOT an AI pest-ID app.** Dev base path is `/site/`; in prod it deploys to ReadyLoq.com root while the app + API live at app.readyloq.com.
@@ -124,6 +130,11 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Mode selector + Preview (PDFViewer in Dialog) + Download (pdf().toBlob()) are wired in `src/pages/reports/detail.tsx`.
 - GET /inspections/:id returns `media[]` inline — use `mediaType === 'photo'` for evidence, `mediaType === 'voice'` for voice notes in Technician Observations.
 - No Tailwind in PDF components — use `StyleSheet.create` with camelCase React-Native-style properties only.
+
+## AI Report Narrative (generate-narrative)
+- `POST /reports/:id/generate-narrative` builds a bounded prompt from the report + its company-scoped inspection + latest analysis + media (voice captions as transcripts, photo filenames/captions as evidence refs — **NO image bytes resent**, for cost/latency), does ONE json_object LLM call, and stores the result in the additive nullable `aiNarrative` jsonb column (no migration — mirrors the evidenceQuality jsonb pattern).
+- **No silent fallback:** if the company-scoped inspection can't be loaded the route returns 409 and does NOT call the model or write `aiNarrative`. **Why:** the narrative must come from a real existing report+inspection — generating from partial/empty data would emit a misleading professional report.
+- PDF (`report-pdf.tsx`) branches on `aiNarrative`: when present, narrative pages REPLACE the structured summary/findings/recommendations/observations pages; photo evidence + internal pages + signature always render; managerReviewNotes is internal-mode only.
 
 ## V2 Intelligence Model — Phase 1 (technician copilot)
 - **Report Confidence model** = every finding shows three things: Confidence (existing `finding.confidence`), Evidence Quality, Verified status. Shared util `lib/finding-confidence.ts` (derive fns + label/class maps) + chip components in `components/finding-confidence-chips.tsx`. Rendered in analysis/detail + reports/detail.

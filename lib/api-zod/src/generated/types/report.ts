@@ -5,6 +5,7 @@
  * ReadyLoq - AI-powered inspection intelligence platform
  * OpenAPI spec version: 0.1.0
  */
+import type { AiReportNarrative } from './aiReportNarrative';
 import type { Finding } from './finding';
 
 export interface Report {
@@ -26,5 +27,6 @@ export interface Report {
   severity?: string | null;
   /** @nullable */
   pdfUrl?: string | null;
+  aiNarrative?: null | AiReportNarrative;
   createdAt: string;
 }

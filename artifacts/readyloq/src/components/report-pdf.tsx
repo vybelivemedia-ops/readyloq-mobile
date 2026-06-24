@@ -717,6 +717,85 @@ function SignaturePage({ report, branding, dateStr, TEAL, S }: any) {
   );
 }
 
+function AiNarrativePages({ report, narrative, branding, mode, TEAL, S }: any) {
+  const company = branding.companyName ?? "ReadyLoq";
+  const reportNum = `RPT-${String(report.id).padStart(4, "0")}`;
+  const prose: Array<[string, string]> = [
+    ["Executive Summary", narrative.executiveSummary],
+    ["Inspection Findings", narrative.inspectionFindings],
+    ["Evidence Observed", narrative.evidenceObserved],
+    ["Pest Activity Assessment", narrative.pestActivityAssessment],
+    ["Structural Deficiencies", narrative.structuralDeficiencies],
+    ["Sanitation Concerns", narrative.sanitationConcerns],
+  ];
+  const corrective = (narrative.recommendedCorrectiveActions ?? []) as string[];
+  const monitoring = (narrative.monitoringRecommendations ?? []) as string[];
+  const subParts = [narrative.propertyType, report.siteAddress].filter(Boolean);
+  return (
+    <Page size="LETTER" style={S.page}>
+      <SectionHeader title="Inspection Report" sub={subParts.join("  ·  ")} S={S} />
+
+      {prose.map(([title, text]) =>
+        text ? (
+          <View key={title} style={{ marginBottom: 14 }}>
+            <Text style={[S.label, { fontSize: 8, color: TEAL, marginBottom: 4 }]}>{title.toUpperCase()}</Text>
+            <Text style={S.bodyText}>{text}</Text>
+          </View>
+        ) : null,
+      )}
+
+      {corrective.length > 0 ? (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={[S.label, { fontSize: 8, color: TEAL, marginBottom: 8 }]}>RECOMMENDED CORRECTIVE ACTIONS</Text>
+          {corrective.map((rec: string, i: number) => (
+            <View key={i} style={S.recItem} wrap={false}>
+              <View style={S.recBullet}>
+                <Text style={S.recBulletText}>{i + 1}</Text>
+              </View>
+              <Text style={S.recText}>{rec}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {monitoring.length > 0 ? (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={[S.label, { fontSize: 8, color: TEAL, marginBottom: 6 }]}>MONITORING RECOMMENDATIONS</Text>
+          {monitoring.map((m: string, i: number) => (
+            <View key={i} style={{ flexDirection: "row", marginBottom: 5 }} wrap={false}>
+              <Text style={{ fontSize: 9, color: TEAL, marginRight: 6 }}>•</Text>
+              <Text style={S.bodyText}>{m}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {narrative.followUpSchedule ? (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={[S.label, { fontSize: 8, color: TEAL, marginBottom: 4 }]}>FOLLOW-UP SCHEDULE</Text>
+          <Text style={S.bodyText}>{narrative.followUpSchedule}</Text>
+        </View>
+      ) : null}
+
+      {narrative.technicianNotes ? (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={[S.label, { fontSize: 8, color: TEAL, marginBottom: 4 }]}>TECHNICIAN NOTES</Text>
+          <Text style={S.bodyText}>{narrative.technicianNotes}</Text>
+        </View>
+      ) : null}
+
+      {mode === "internal" && narrative.managerReviewNotes ? (
+        <View style={[S.obsBox, { backgroundColor: AMBER_BG, borderWidth: 1, borderColor: AMBER }]}>
+          <Text style={[S.obsBoxLabel, { color: "#92400e" }]}>MANAGER REVIEW NOTES — INTERNAL USE ONLY</Text>
+          <Text style={S.obsBoxText}>{narrative.managerReviewNotes}</Text>
+        </View>
+      ) : null}
+
+      <PageFooter company={company} reportNum={reportNum} footerText={footerTextOf(branding)} S={S} />
+    </Page>
+  );
+}
+
 export interface ReportPDFProps {
   report: any;
   inspection: any;
@@ -730,6 +809,7 @@ export function ReportPDF({ report, inspection, branding, propertyFeed, mode }: 
   const recommendations = (report.recommendations ?? []) as string[];
   const exclusionOpps = (report.exclusionOpportunities ?? []) as string[];
   const photos = ((inspection?.media ?? []) as any[]).filter((m: any) => m.mediaType === "photo");
+  const narrative = report.aiNarrative;
   const dateStr = fmtDate(report.inspectionDate);
   const reportNum = `RPT-${String(report.id).padStart(4, "0")}`;
   const company = branding.companyName ?? "ReadyLoq";
@@ -745,33 +825,44 @@ export function ReportPDF({ report, inspection, branding, propertyFeed, mode }: 
     >
       <CoverPage report={report} branding={branding} dateStr={dateStr} reportNum={reportNum} mode={mode} S={S} />
 
-      <ExecutiveSummaryPage
-        report={report}
-        findings={findings}
-        recommendations={recommendations}
-        inspection={inspection}
-        branding={branding}
-        S={S}
-      />
+      {narrative ? (
+        <>
+          <AiNarrativePages report={report} narrative={narrative} branding={branding} mode={mode} TEAL={TEAL} S={S} />
+          {photos.length > 0 && (
+            <PhotoEvidencePage photos={photos} branding={branding} S={S} />
+          )}
+        </>
+      ) : (
+        <>
+          <ExecutiveSummaryPage
+            report={report}
+            findings={findings}
+            recommendations={recommendations}
+            inspection={inspection}
+            branding={branding}
+            S={S}
+          />
 
-      {findings.length > 0 && (
-        <FindingsPage findings={findings} branding={branding} TEAL={TEAL} S={S} />
+          {findings.length > 0 && (
+            <FindingsPage findings={findings} branding={branding} TEAL={TEAL} S={S} />
+          )}
+
+          {photos.length > 0 && (
+            <PhotoEvidencePage photos={photos} branding={branding} S={S} />
+          )}
+
+          {recommendations.length > 0 && (
+            <RecommendationsPage
+              recommendations={recommendations}
+              exclusionOpps={exclusionOpps}
+              branding={branding}
+              S={S}
+            />
+          )}
+
+          <TechnicianObservationsPage report={report} inspection={inspection} branding={branding} S={S} />
+        </>
       )}
-
-      {photos.length > 0 && (
-        <PhotoEvidencePage photos={photos} branding={branding} S={S} />
-      )}
-
-      {recommendations.length > 0 && (
-        <RecommendationsPage
-          recommendations={recommendations}
-          exclusionOpps={exclusionOpps}
-          branding={branding}
-          S={S}
-        />
-      )}
-
-      <TechnicianObservationsPage report={report} inspection={inspection} branding={branding} S={S} />
 
       {mode === "internal" && (
         <>

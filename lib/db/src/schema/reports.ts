@@ -5,6 +5,30 @@ import { inspectionsTable } from "./inspections";
 import { companiesTable } from "./companies";
 import type { Finding } from "./analysis";
 
+/**
+ * AI-generated narrative report. Produced on demand from an inspection's data
+ * (findings, voice transcripts, photo labels, property metadata) by a single
+ * text-model call and snapshotted onto the report so it stays stable. Every
+ * field is always present after a successful generation (server normalizes
+ * defaults), so PDF/UI rendering never has to guard for partial output.
+ */
+export interface AiReportNarrative {
+  executiveSummary: string;
+  inspectionFindings: string;
+  evidenceObserved: string;
+  pestActivityAssessment: string;
+  structuralDeficiencies: string;
+  sanitationConcerns: string;
+  recommendedCorrectiveActions: string[];
+  monitoringRecommendations: string[];
+  followUpSchedule: string;
+  technicianNotes: string;
+  managerReviewNotes: string;
+  propertyType: string;
+  model: string;
+  generatedAt: string;
+}
+
 export const reportsTable = pgTable("reports", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull().references(() => companiesTable.id),
@@ -21,6 +45,7 @@ export const reportsTable = pgTable("reports", {
   inspectionDate: text("inspection_date").notNull(),
   severity: text("severity"),
   pdfUrl: text("pdf_url"),
+  aiNarrative: jsonb("ai_narrative").$type<AiReportNarrative>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

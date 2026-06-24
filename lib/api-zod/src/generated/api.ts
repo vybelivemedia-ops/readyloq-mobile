@@ -873,6 +873,22 @@ export const ListReportsResponseItem = zod.object({
   "inspectionDate": zod.string().optional(),
   "severity": zod.string().nullish(),
   "pdfUrl": zod.string().nullish(),
+  "aiNarrative": zod.union([zod.null(),zod.object({
+  "executiveSummary": zod.string(),
+  "inspectionFindings": zod.string(),
+  "evidenceObserved": zod.string(),
+  "pestActivityAssessment": zod.string(),
+  "structuralDeficiencies": zod.string(),
+  "sanitationConcerns": zod.string(),
+  "recommendedCorrectiveActions": zod.array(zod.string()),
+  "monitoringRecommendations": zod.array(zod.string()),
+  "followUpSchedule": zod.string(),
+  "technicianNotes": zod.string(),
+  "managerReviewNotes": zod.string(),
+  "propertyType": zod.string(),
+  "model": zod.string(),
+  "generatedAt": zod.string()
+})]).optional(),
   "createdAt": zod.string()
 })
 export const ListReportsResponse = zod.array(ListReportsResponseItem)
@@ -923,6 +939,22 @@ export const GetReportResponse = zod.object({
   "inspectionDate": zod.string().optional(),
   "severity": zod.string().nullish(),
   "pdfUrl": zod.string().nullish(),
+  "aiNarrative": zod.union([zod.null(),zod.object({
+  "executiveSummary": zod.string(),
+  "inspectionFindings": zod.string(),
+  "evidenceObserved": zod.string(),
+  "pestActivityAssessment": zod.string(),
+  "structuralDeficiencies": zod.string(),
+  "sanitationConcerns": zod.string(),
+  "recommendedCorrectiveActions": zod.array(zod.string()),
+  "monitoringRecommendations": zod.array(zod.string()),
+  "followUpSchedule": zod.string(),
+  "technicianNotes": zod.string(),
+  "managerReviewNotes": zod.string(),
+  "propertyType": zod.string(),
+  "model": zod.string(),
+  "generatedAt": zod.string()
+})]).optional(),
   "createdAt": zod.string()
 })
 
@@ -932,6 +964,59 @@ export const GetReportResponse = zod.object({
  */
 export const DeleteReportParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Generate or regenerate the AI narrative report
+ */
+export const GenerateReportNarrativeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GenerateReportNarrativeResponse = zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "title": zod.string(),
+  "clientName": zod.string().nullish(),
+  "siteAddress": zod.string().optional(),
+  "status": zod.string(),
+  "findings": zod.array(zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "confidence": zod.number(),
+  "severity": zod.string().optional(),
+  "location": zod.string().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "treatment": zod.string().nullish(),
+  "exclusionOpportunity": zod.boolean().nullish(),
+  "evidenceQuality": zod.string().nullish()
+})).optional(),
+  "recommendations": zod.array(zod.string()).optional(),
+  "treatmentNotes": zod.string().nullish(),
+  "exclusionOpportunities": zod.array(zod.string()).optional(),
+  "technicianName": zod.string().optional(),
+  "inspectionDate": zod.string().optional(),
+  "severity": zod.string().nullish(),
+  "pdfUrl": zod.string().nullish(),
+  "aiNarrative": zod.union([zod.null(),zod.object({
+  "executiveSummary": zod.string(),
+  "inspectionFindings": zod.string(),
+  "evidenceObserved": zod.string(),
+  "pestActivityAssessment": zod.string(),
+  "structuralDeficiencies": zod.string(),
+  "sanitationConcerns": zod.string(),
+  "recommendedCorrectiveActions": zod.array(zod.string()),
+  "monitoringRecommendations": zod.array(zod.string()),
+  "followUpSchedule": zod.string(),
+  "technicianNotes": zod.string(),
+  "managerReviewNotes": zod.string(),
+  "propertyType": zod.string(),
+  "model": zod.string(),
+  "generatedAt": zod.string()
+})]).optional(),
+  "createdAt": zod.string()
 })
 
 

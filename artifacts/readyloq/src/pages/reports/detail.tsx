@@ -1,14 +1,16 @@
 import { useParams } from "wouter";
-import { useGetReport } from "@workspace/api-client-react";
+import { useGetReport, useGenerateReportNarrative, getGetReportQueryKey, type AiReportNarrative } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, FileText, MapPin, User, Calendar, AlertTriangle, CheckCircle2, ShieldCheck, Lightbulb, Download, Eye, Lock, Users } from "lucide-react";
+import { ArrowLeft, FileText, MapPin, User, Calendar, AlertTriangle, CheckCircle2, ShieldCheck, Lightbulb, Download, Eye, Lock, Users, Sparkles, RefreshCw, ClipboardCheck } from "lucide-react";
 import { Link } from "wouter";
 import { FindingConfidenceRow } from "@/components/finding-confidence-chips";
 import { useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { pdf } from "@react-pdf/renderer";
 import { PDFViewer } from "@react-pdf/renderer";
 import { ReportPDF, type ReportMode } from "@/components/report-pdf";
@@ -17,6 +19,96 @@ import { useReportPdfData } from "@/hooks/use-report-pdf-data";
 function FindingSeverityDot({ severity }: { severity: string }) {
   const colors: Record<string, string> = { critical: "bg-red-500", high: "bg-orange-500", medium: "bg-amber-500", low: "bg-slate-500" };
   return <span className={`inline-block w-2 h-2 rounded-full ${colors[severity] ?? colors.low} shrink-0 mt-1.5`} />;
+}
+
+function ProseSection({ icon: Icon, title, text }: { icon: typeof FileText; title: string; text: string }) {
+  if (!text) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Icon className="h-4 w-4 text-primary" /> {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{text}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ListSection({ icon: Icon, title, items }: { icon: typeof FileText; title: string; items: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Icon className="h-4 w-4 text-primary" /> {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {items.map((it, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm">
+              <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <span className="text-muted-foreground">{it}</span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AiNarrativeView({ narrative }: { narrative: AiReportNarrative }) {
+  return (
+    <div className="space-y-5">
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" /> AI-Generated Report
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {narrative.propertyType && (
+              <span className="px-2 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary font-medium">{narrative.propertyType}</span>
+            )}
+            {narrative.generatedAt && (
+              <span className="text-muted-foreground">Generated {new Date(narrative.generatedAt).toLocaleString()}</span>
+            )}
+          </div>
+          {narrative.executiveSummary && (
+            <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{narrative.executiveSummary}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <ProseSection icon={FileText} title="Inspection Findings" text={narrative.inspectionFindings} />
+      <ProseSection icon={Eye} title="Evidence Observed" text={narrative.evidenceObserved} />
+      <ProseSection icon={AlertTriangle} title="Pest Activity Assessment" text={narrative.pestActivityAssessment} />
+      <ProseSection icon={ShieldCheck} title="Structural Deficiencies" text={narrative.structuralDeficiencies} />
+      <ProseSection icon={Lightbulb} title="Sanitation Concerns" text={narrative.sanitationConcerns} />
+      <ListSection icon={CheckCircle2} title="Recommended Corrective Actions" items={narrative.recommendedCorrectiveActions} />
+      <ListSection icon={ShieldCheck} title="Monitoring Recommendations" items={narrative.monitoringRecommendations} />
+      <ProseSection icon={Calendar} title="Follow-Up Schedule" text={narrative.followUpSchedule} />
+      <ProseSection icon={User} title="Technician Notes" text={narrative.technicianNotes} />
+
+      {narrative.managerReviewNotes && (
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-amber-400">
+              <ClipboardCheck className="h-4 w-4" /> Manager Review Notes
+              <span className="ml-1 text-[10px] uppercase tracking-wide font-semibold text-amber-500/80">Internal</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{narrative.managerReviewNotes}</p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
 }
 
 export default function ReportDetail() {
@@ -31,6 +123,21 @@ export default function ReportDetail() {
   const { report: pdfReport, inspection, branding, propertyFeed, isReady } = useReportPdfData(
     isLoading ? null : id,
   );
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const generateNarrative = useGenerateReportNarrative();
+
+  const handleGenerateNarrative = useCallback(async () => {
+    const wasRegenerate = !!report?.aiNarrative;
+    try {
+      await generateNarrative.mutateAsync({ id });
+      await queryClient.invalidateQueries({ queryKey: getGetReportQueryKey(id) });
+      toast({ title: wasRegenerate ? "Report regenerated" : "AI report generated" });
+    } catch {
+      toast({ title: "Error", description: "Failed to generate AI report.", variant: "destructive" });
+    }
+  }, [generateNarrative, id, queryClient, report?.aiNarrative, toast]);
 
   const handleDownload = useCallback(async () => {
     if (!isReady || !pdfReport || !inspection || !branding) return;
@@ -107,6 +214,19 @@ export default function ReportDetail() {
               Internal
             </button>
           </div>
+
+          {report.aiNarrative && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleGenerateNarrative}
+              disabled={generateNarrative.isPending}
+            >
+              <RefreshCw className={`h-4 w-4 ${generateNarrative.isPending ? "animate-spin" : ""}`} />
+              {generateNarrative.isPending ? "Regenerating…" : "Regenerate"}
+            </Button>
+          )}
 
           <Button
             variant="outline"
@@ -194,6 +314,29 @@ export default function ReportDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {/* AI-Generated Narrative Report */}
+      {report.aiNarrative ? (
+        <AiNarrativeView narrative={report.aiNarrative} />
+      ) : (
+        <Card className="border-dashed border-primary/30 bg-primary/5">
+          <CardContent className="py-8 text-center space-y-3">
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mx-auto">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold">Generate AI Report</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                Turn this inspection's findings, photos, and field notes into a professional, multi-section narrative report.
+              </p>
+            </div>
+            <Button onClick={handleGenerateNarrative} disabled={generateNarrative.isPending} className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              {generateNarrative.isPending ? "Generating…" : "Generate AI Report"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Findings */}
       {findings.length > 0 && (

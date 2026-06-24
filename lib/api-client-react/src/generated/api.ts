@@ -2262,6 +2262,76 @@ export const useDeleteReport = <TError = ErrorType<unknown>,
       return useMutation(getDeleteReportMutationOptions(options));
     }
 
+export const getGenerateReportNarrativeUrl = (id: number,) => {
+
+
+
+
+  return `/api/reports/${id}/generate-narrative`
+}
+
+/**
+ * @summary Generate or regenerate the AI narrative report
+ */
+export const generateReportNarrative = async (id: number, options?: RequestInit): Promise<Report> => {
+
+  return customFetch<Report>(getGenerateReportNarrativeUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getGenerateReportNarrativeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportNarrative>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateReportNarrative>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['generateReportNarrative'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateReportNarrative>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  generateReportNarrative(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateReportNarrativeMutationResult = NonNullable<Awaited<ReturnType<typeof generateReportNarrative>>>
+
+    export type GenerateReportNarrativeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Generate or regenerate the AI narrative report
+ */
+export const useGenerateReportNarrative = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportNarrative>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateReportNarrative>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getGenerateReportNarrativeMutationOptions(options));
+    }
+
 export const getGetAnalyticsDashboardUrl = () => {
 
 

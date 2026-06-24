@@ -8,6 +8,7 @@
 
 export * from './activityItem';
 export * from './aiPrediction';
+export * from './aiReportNarrative';
 export * from './analysisResult';
 export * from './analysisSummary';
 export * from './analysisSummaryFindingsByCategoryItem';
