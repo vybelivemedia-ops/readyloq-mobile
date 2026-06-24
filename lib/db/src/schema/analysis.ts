@@ -11,6 +11,11 @@ export const analysisResultsTable = pgTable("analysis_results", {
   status: text("status").notNull().default("pending"), // "pending" | "complete" | "failed"
   findings: jsonb("findings").$type<Finding[]>().default([]),
   recommendations: jsonb("recommendations").$type<string[]>().default([]),
+  // Video evidence attached to the inspection. We record video metadata here so
+  // the analysis result is an honest, complete picture of the evidence reviewed,
+  // but we DELIBERATELY do not derive findings from video yet. `frameAnalysisStatus`
+  // is the forward hook for future per-frame video analysis.
+  videoEvidence: jsonb("video_evidence").$type<VideoEvidence[]>().default([]),
   overallConfidence: real("overall_confidence"),
   riskLevel: text("risk_level"),
   technicianFeedback: text("technician_feedback"),
@@ -29,6 +34,19 @@ export interface Finding {
   treatment: string | null;
   exclusionOpportunity: boolean | null;
   evidenceQuality?: "excellent" | "good" | "fair" | null;
+}
+
+/**
+ * Metadata about a video attached to an inspection, recorded on the analysis
+ * result as reviewed evidence. Videos are NOT analyzed into findings — see
+ * `frameAnalysisStatus`, the forward hook for future per-frame analysis.
+ */
+export interface VideoEvidence {
+  url: string;
+  filename: string | null;
+  durationSec: number | null;
+  label: string | null;
+  frameAnalysisStatus: "pending";
 }
 
 export const insertAnalysisResultSchema = createInsertSchema(analysisResultsTable).omit({ id: true, createdAt: true, companyId: true });

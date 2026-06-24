@@ -14,6 +14,13 @@ function statusColor(status: string) {
   return "bg-blue-500/15 text-blue-400 border-blue-500/30";
 }
 
+/** Format a duration in seconds as m:ss for video playback timestamps. */
+function formatClock(totalSeconds: number) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = Math.floor(totalSeconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function severityColor(severity: string | null) {
   if (severity === "critical") return "bg-red-500/15 text-red-400 border-red-500/30";
   if (severity === "high") return "bg-orange-500/15 text-orange-400 border-orange-500/30";
@@ -161,10 +168,24 @@ export default function InspectionDetail() {
                   <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
                     <Video className="h-3 w-3" /> Videos ({videos.length})
                   </p>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {videos.map(m => (
-                      <div key={m.id} className="aspect-square rounded-md bg-slate-800 flex items-center justify-center">
-                        <Video className="h-8 w-8 text-amber-400" />
+                      <div key={m.id} className="rounded-md overflow-hidden bg-card border border-border/60">
+                        <video
+                          src={m.url}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="w-full max-h-64 bg-black"
+                        />
+                        <div className="flex items-center justify-between gap-2 p-2.5">
+                          <span className="text-xs truncate">{m.filename ?? m.caption ?? "Inspection video"}</span>
+                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                            {m.durationSec ? formatClock(m.durationSec) : null}
+                            {m.durationSec ? " · " : ""}
+                            {new Date(m.createdAt).toLocaleString()}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -5,6 +5,7 @@
  * ReadyLoq - AI-powered inspection intelligence platform
  * OpenAPI spec version: 0.1.0
  */
+import type { AnalysisResultVideoEvidenceItem } from './analysisResultVideoEvidenceItem';
 import type { Finding } from './finding';
 
 export interface AnalysisResult {
@@ -13,6 +14,7 @@ export interface AnalysisResult {
   status: string;
   findings?: Finding[];
   recommendations?: string[];
+  videoEvidence?: AnalysisResultVideoEvidenceItem[];
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */

@@ -136,6 +136,17 @@ export interface MediaInput {
   durationSec?: number;
 }
 
+export type AnalysisResultVideoEvidenceItem = {
+  url: string;
+  /** @nullable */
+  filename?: string | null;
+  /** @nullable */
+  durationSec?: number | null;
+  /** @nullable */
+  label?: string | null;
+  frameAnalysisStatus: string;
+};
+
 export interface Finding {
   id: number;
   category: string;
@@ -160,6 +171,7 @@ export interface AnalysisResult {
   status: string;
   findings?: Finding[];
   recommendations?: string[];
+  videoEvidence?: AnalysisResultVideoEvidenceItem[];
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */
@@ -184,10 +196,21 @@ export type AnalyzeInspectionInputImagesItem = {
   label?: string | null;
 };
 
+export type AnalyzeInspectionInputVideosItem = {
+  url: string;
+  /** @nullable */
+  filename?: string | null;
+  /** @nullable */
+  durationSec?: number | null;
+  /** @nullable */
+  label?: string | null;
+};
+
 export interface AnalyzeInspectionInput {
   inspectionId: number;
   images?: AnalyzeInspectionInputImagesItem[];
   technicianFindings?: Finding[];
+  videos?: AnalyzeInspectionInputVideosItem[];
 }
 
 export type AnalysisSummaryTopFindingsItem = {

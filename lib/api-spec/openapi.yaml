@@ -1145,6 +1145,17 @@ components:
         recommendations:
           type: array
           items: { type: string }
+        videoEvidence:
+          type: array
+          items:
+            type: object
+            required: [url, frameAnalysisStatus]
+            properties:
+              url:         { type: string }
+              filename:    { type: ["string", "null"] }
+              durationSec: { type: ["integer", "null"] }
+              label:       { type: ["string", "null"] }
+              frameAnalysisStatus: { type: string }
         overallConfidence: { type: ["number", "null"] }
         riskLevel:    { type: ["string", "null"] }
         technicianFeedback: { type: ["string", "null"] }
@@ -1191,6 +1202,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Finding"
+        videos:
+          type: array
+          items:
+            type: object
+            required: [url]
+            properties:
+              url:         { type: string }
+              filename:    { type: ["string", "null"] }
+              durationSec: { type: ["integer", "null"] }
+              label:       { type: ["string", "null"] }
 
     AnalysisSummary:
       type: object

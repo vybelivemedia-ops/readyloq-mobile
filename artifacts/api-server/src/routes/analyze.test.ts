@@ -238,3 +238,94 @@ describe("POST /analysis/analyze does not fabricate findings", () => {
     expect(res.body.findings[0].imageUrl).toBe(imageUrl2);
   });
 });
+
+describe("POST /analysis/analyze records video as evidence but never as findings", () => {
+  /** Persist a company-scoped video media row and return its storage URL. */
+  async function addVideo(inspectionId: number, suffix: string) {
+    asUser(OWNER_ID);
+    const url = `/api/storage/objects/companies/${companyId}/uploads/video-${suffix}`;
+    const media = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "video", url, filename: `clip-${suffix}.webm`, durationSec: 12 });
+    expect(media.status).toBe(201);
+    return url;
+  }
+
+  it("records a video-only inspection as videoEvidence with zero findings", async () => {
+    const { inspectionId } = await createInspectionWithPhoto("vidonly");
+    const videoUrl = await addVideo(inspectionId, "vidonly");
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({
+        inspectionId,
+        images: [],
+        videos: [{ url: videoUrl, filename: "clip-vidonly.webm", durationSec: 12, label: "Kitchen walkthrough" }],
+      });
+
+    expect(res.status).toBe(201);
+    // analyzePhoto must never be invoked for video.
+    expect(analyzePhotoMock).not.toHaveBeenCalled();
+    expect(res.body.findings).toEqual([]);
+    expect(res.body.videoEvidence).toHaveLength(1);
+    expect(res.body.videoEvidence[0].url).toBe(videoUrl);
+    expect(res.body.videoEvidence[0].durationSec).toBe(12);
+    expect(res.body.videoEvidence[0].frameAnalysisStatus).toBe("pending");
+  });
+
+  it("keeps findings from photos only while still recording the video as evidence", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("vidmix");
+    const videoUrl = await addVideo(inspectionId, "vidmix");
+    analyzePhotoMock.mockResolvedValueOnce(pestPrediction());
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({
+        inspectionId,
+        images: [{ imageUrl }],
+        videos: [{ url: videoUrl, durationSec: 8 }],
+      });
+
+    expect(res.status).toBe(201);
+    // Exactly one finding, and it came from the photo — never the video.
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(1);
+    expect(res.body.findings).toHaveLength(1);
+    expect(res.body.findings[0].imageUrl).toBe(imageUrl);
+    expect(res.body.videoEvidence).toHaveLength(1);
+    expect(res.body.videoEvidence[0].url).toBe(videoUrl);
+  });
+
+  it("ignores video metadata that is not a persisted, company-scoped media row", async () => {
+    const { inspectionId } = await createInspectionWithPhoto("vidspoof");
+    const spoofedUrl = `/api/storage/objects/companies/${companyId}/uploads/video-never-saved`;
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [], videos: [{ url: spoofedUrl, durationSec: 5 }] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.findings).toEqual([]);
+    // Not persisted as media -> excluded from evidence (same guard as photos).
+    expect(res.body.videoEvidence).toEqual([]);
+  });
+
+  it("does not record a persisted PHOTO url as video evidence", async () => {
+    // A photo media row exists for this inspection, but submitting its URL under
+    // videos[] must NOT be accepted as video evidence — evidence integrity.
+    const { imageUrl, inspectionId } = await createInspectionWithPhoto("vidasphoto");
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [], videos: [{ url: imageUrl, durationSec: 5 }] });
+
+    expect(res.status).toBe(201);
+    // analyzePhoto must never run for a videos[] entry, even a spoofed photo one.
+    expect(analyzePhotoMock).not.toHaveBeenCalled();
+    expect(res.body.findings).toEqual([]);
+    expect(res.body.videoEvidence).toEqual([]);
+  });
+});

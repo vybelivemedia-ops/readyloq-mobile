@@ -6,10 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AnalyzeInspectionInputImagesItem } from './analyzeInspectionInputImagesItem';
+import type { AnalyzeInspectionInputVideosItem } from './analyzeInspectionInputVideosItem';
 import type { Finding } from './finding';
 
 export interface AnalyzeInspectionInput {
   inspectionId: number;
   images?: AnalyzeInspectionInputImagesItem[];
   technicianFindings?: Finding[];
+  videos?: AnalyzeInspectionInputVideosItem[];
 }

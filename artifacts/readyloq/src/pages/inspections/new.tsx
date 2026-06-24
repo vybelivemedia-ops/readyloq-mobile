@@ -9,7 +9,7 @@ import {
   Aperture, BrainCircuit,
   Camera, MapPin, ChevronDown, ChevronUp, X, Languages,
   Battery, BatteryCharging, BatteryLow, BatteryWarning, Gauge,
-  AlertTriangle,
+  AlertTriangle, Video, SwitchCamera, Trash2, Play,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -105,25 +105,32 @@ const VOICE_SEVERITY: Record<Category, string> = {
  * canonical `/api/storage/...` path. Throws loudly on any failure — we never
  * silently substitute the ephemeral blob URL, which would let an inspection
  * "complete" with evidence that vanishes on reload and can't be AI-analyzed.
+ * `fallbackContentType` is used only when the blob itself reports no MIME type
+ * (e.g. "image/jpeg" for photos, "video/webm" for recorded clips).
  */
-async function uploadToStorage(url: string, filename: string): Promise<string> {
+async function uploadToStorage(
+  url: string,
+  filename: string,
+  fallbackContentType = "image/jpeg",
+): Promise<string> {
   if (!url.startsWith("blob:") && !url.startsWith("data:")) return url;
   const resp = await fetch(url);
-  if (!resp.ok) throw new Error("Could not read the captured photo for upload.");
+  if (!resp.ok) throw new Error("Could not read the captured evidence for upload.");
   const blob = await resp.blob();
+  const contentType = blob.type || fallbackContentType;
   const urlRes = await fetch("/api/storage/uploads/request-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: filename, size: blob.size, contentType: blob.type || "image/jpeg" }),
+    body: JSON.stringify({ name: filename, size: blob.size, contentType }),
   });
   if (!urlRes.ok) throw new Error(`Upload could not start (${urlRes.status}).`);
   const { uploadURL, objectPath } = await urlRes.json();
   const putRes = await fetch(uploadURL, {
     method: "PUT",
-    headers: { "Content-Type": blob.type || "image/jpeg" },
+    headers: { "Content-Type": contentType },
     body: blob,
   });
-  if (!putRes.ok) throw new Error(`Photo upload failed (${putRes.status}).`);
+  if (!putRes.ok) throw new Error(`Evidence upload failed (${putRes.status}).`);
   return `/api/storage${objectPath}`;
 }
 
@@ -146,15 +153,42 @@ type FocusMode = "continuous" | "macro" | "auto";
 type CameraPermission = "pending" | "granted" | "denied" | "unavailable";
 
 interface CapturedItem {
-  id: string; type: "photo" | "voice";
+  id: string; type: "photo" | "voice" | "video";
   label: string; url: string; ts: number;
   note?: StructuredNote;
+  durationSec?: number;
+  mimeType?: string;
 }
 
 interface CameraCapabilities {
   supportsZoom: boolean; minZoom: number; maxZoom: number;
   supportsFocusMode: boolean; availableFocusModes: string[];
   supportsTorch: boolean;
+}
+
+type FacingMode = "environment" | "user";
+
+/**
+ * Pick the best-supported MediaRecorder container/codec for video capture.
+ * Chromium prefers WebM (VP9/VP8 + Opus); Safari only offers MP4. Returns
+ * undefined to let the browser choose its own default when none match.
+ */
+function pickVideoMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  const candidates = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
+    "video/mp4",
+  ];
+  return candidates.find(t => {
+    try { return MediaRecorder.isTypeSupported(t); } catch { return false; }
+  });
+}
+
+/** Map a recording MIME type to a sensible file extension for upload. */
+function mimeToExt(mimeType?: string): string {
+  return mimeType && mimeType.includes("mp4") ? "mp4" : "webm";
 }
 
 // ─── Camera hook ──────────────────────────────────────────────────────────────
@@ -166,6 +200,11 @@ function useCamera() {
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const imageCaptureRef = useRef<ImageCapture | null>(null);
   const animFrameRef = useRef<number>(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const videoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const videoStartRef = useRef<number>(0);
+  const facingModeRef = useRef<FacingMode>("environment");
 
   const [permission, setPermission] = useState<CameraPermission>("pending");
   const [capabilities, setCapabilities] = useState<CameraCapabilities>({
@@ -179,42 +218,136 @@ function useCamera() {
   const [focusMode, setFocusMode] = useState<FocusMode>("continuous");
   const [lowLightActive, setLowLightActive] = useState(false);
   const [adjustmentPhase, setAdjustmentPhase] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<FacingMode>("environment");
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
+  const [videoElapsed, setVideoElapsed] = useState(0);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+
+  // Open a camera stream for the given facing direction. We request audio so
+  // recorded video carries sound, but gracefully fall back to a silent
+  // (video-only) stream on devices without a usable microphone so that photo
+  // capture keeps working. Permission denial is re-thrown for startCamera to map.
+  const openStream = useCallback(async (facing: FacingMode) => {
+    let stream: MediaStream;
+    let withAudio = true;
+    const videoConstraints = { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } };
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: true });
+    } catch {
+      // Audio+video failed (often a denied/absent microphone). Fall back to a
+      // silent video-only stream so photo capture keeps working. Only if the
+      // video-only request ALSO fails do we treat it as a true camera-permission
+      // denial and let startCamera map it.
+      withAudio = false;
+      stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+    }
+    streamRef.current = stream;
+    facingModeRef.current = facing;
+    setFacingMode(facing);
+    setAudioEnabled(withAudio);
+    const track = stream.getVideoTracks()[0] as MediaStreamTrack;
+    trackRef.current = track;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play().catch(() => {});
+    }
+    const caps = (track.getCapabilities?.() as any) ?? {};
+    setCapabilities({
+      supportsZoom: !!(caps.zoom),
+      minZoom: caps.zoom?.min ?? 1,
+      maxZoom: caps.zoom?.max ?? 5,
+      supportsFocusMode: !!(caps.focusMode),
+      availableFocusModes: (caps.focusMode as string[]) ?? [],
+      supportsTorch: !!(caps.torch),
+    });
+    imageCaptureRef.current =
+      typeof ImageCapture !== "undefined" ? new ImageCapture(track) : null;
+  }, []);
 
   const startCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      const track = stream.getVideoTracks()[0] as MediaStreamTrack;
-      trackRef.current = track;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
-      const caps = track.getCapabilities() as any;
-      setCapabilities({
-        supportsZoom: !!(caps.zoom),
-        minZoom: caps.zoom?.min ?? 1,
-        maxZoom: caps.zoom?.max ?? 5,
-        supportsFocusMode: !!(caps.focusMode),
-        availableFocusModes: (caps.focusMode as string[]) ?? [],
-        supportsTorch: !!(caps.torch),
-      });
-      if (typeof ImageCapture !== "undefined") imageCaptureRef.current = new ImageCapture(track);
+      await openStream(facingModeRef.current);
       setPermission("granted");
     } catch (err: any) {
       if (err.name === "NotAllowedError") setPermission("denied");
       else if (err.name === "NotFoundError") setPermission("unavailable");
       else setPermission("denied");
     }
-  }, []);
+  }, [openStream]);
 
   const stopCamera = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
+    if (videoTimerRef.current) { clearInterval(videoTimerRef.current); videoTimerRef.current = null; }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
+    mediaRecorderRef.current = null;
+    recordedChunksRef.current = [];
+    setIsRecordingVideo(false);
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null; trackRef.current = null; imageCaptureRef.current = null;
+  }, []);
+
+  // Flip between rear/front cameras by restarting the stream. Disabled while a
+  // clip is recording (swapping the source track mid-recording is unreliable).
+  const switchCamera = useCallback(async () => {
+    if (isRecordingVideo) return;
+    const prev = facingModeRef.current;
+    const next: FacingMode = prev === "environment" ? "user" : "environment";
+    cancelAnimationFrame(animFrameRef.current);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null; trackRef.current = null; imageCaptureRef.current = null;
+    try {
+      await openStream(next);
+      setCssZoom(1); setCurrentZoom(1);
+    } catch {
+      try { await openStream(prev); } catch {}
+    }
+  }, [isRecordingVideo, openStream]);
+
+  // Begin recording the live stream to an in-memory video blob.
+  const startVideo = useCallback((): boolean => {
+    const stream = streamRef.current;
+    if (!stream || isRecordingVideo || typeof MediaRecorder === "undefined") return false;
+    const mimeType = pickVideoMimeType();
+    let recorder: MediaRecorder;
+    try {
+      recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    } catch {
+      try { recorder = new MediaRecorder(stream); } catch { return false; }
+    }
+    recordedChunksRef.current = [];
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data); };
+    recorder.start();
+    mediaRecorderRef.current = recorder;
+    videoStartRef.current = Date.now();
+    setIsRecordingVideo(true);
+    setVideoElapsed(0);
+    videoTimerRef.current = setInterval(() => {
+      setVideoElapsed(Math.floor((Date.now() - videoStartRef.current) / 1000));
+    }, 250);
+    return true;
+  }, [isRecordingVideo]);
+
+  // Stop recording and resolve the captured clip (blob URL + duration + MIME).
+  // Resolves null if nothing usable was recorded.
+  const stopVideo = useCallback((): Promise<{ url: string; durationSec: number; mimeType: string } | null> => {
+    return new Promise((resolve) => {
+      const recorder = mediaRecorderRef.current;
+      if (!recorder || recorder.state === "inactive") { resolve(null); return; }
+      if (videoTimerRef.current) { clearInterval(videoTimerRef.current); videoTimerRef.current = null; }
+      const durationSec = Math.max(1, Math.round((Date.now() - videoStartRef.current) / 1000));
+      recorder.onstop = () => {
+        const type = recorder.mimeType || pickVideoMimeType() || "video/webm";
+        const blob = new Blob(recordedChunksRef.current, { type });
+        recordedChunksRef.current = [];
+        mediaRecorderRef.current = null;
+        setIsRecordingVideo(false);
+        if (blob.size === 0) { resolve(null); return; }
+        resolve({ url: URL.createObjectURL(blob), durationSec, mimeType: type });
+      };
+      try { recorder.stop(); } catch { setIsRecordingVideo(false); resolve(null); }
+    });
   }, []);
 
   const applyZoom = useCallback(async (targetZoom: number) => {
@@ -284,8 +417,10 @@ function useCamera() {
     permission, capabilities,
     cssZoom, currentZoom, focusMode, lowLightActive,
     adjustmentPhase,
+    facingMode, isRecordingVideo, videoElapsed, audioEnabled,
     setLowLightActive, setAdjustmentPhase,
     startCamera, stopCamera, applyZoom, smoothZoom, applyFocusMode, captureFrame,
+    switchCamera, startVideo, stopVideo,
   };
 }
 
@@ -443,6 +578,73 @@ export default function NewInspection() {
     }
   }, [camera, activeZone, toast]);
 
+  // ── Record / stop a video clip ───────────────────────────────────────────────
+  // Video is captured as standalone evidence: it never blocks photo/voice and is
+  // uploaded + attached on completion, but is NEVER turned into AI findings.
+  async function toggleVideo() {
+    if (camera.permission !== "granted") {
+      toast({ title: "Camera unavailable", description: "Grant camera access to record video.", variant: "destructive" });
+      return;
+    }
+    if (camera.isRecordingVideo) {
+      const clip = await camera.stopVideo();
+      if (!clip) {
+        toast({ title: "Recording failed", description: "No video was captured. Please try again.", variant: "destructive" });
+        return;
+      }
+      const item: CapturedItem = {
+        id: `video-${Date.now()}`, type: "video",
+        label: activeZone ? `Video · ${activeZone}` : "Inspection video",
+        url: clip.url, ts: Date.now(),
+        durationSec: clip.durationSec, mimeType: clip.mimeType,
+      };
+      setCaptured(prev => [...prev, item]);
+      camera.setAdjustmentPhase("Video saved ✓");
+      window.setTimeout(() => camera.setAdjustmentPhase(null), 1200);
+      showCaptureNotice(item);
+    } else {
+      // Free the microphone first — speech recognition and the recorder contend
+      // for the mic on many devices.
+      if (voice.state === "listening") voice.stop();
+      const ok = camera.startVideo();
+      if (!ok) {
+        toast({ title: "Can't record video", description: "Video recording isn't supported on this device or browser.", variant: "destructive" });
+      }
+    }
+  }
+
+  // Remove a captured item (review screen). Revokes the in-memory blob URL and
+  // clears any staged upload/persist caches so a re-captured item is treated as
+  // brand-new evidence.
+  function removeCaptured(id: string) {
+    setCaptured(prev => {
+      const item = prev.find(i => i.id === id);
+      if (item && (item.type === "photo" || item.type === "video") && item.url.startsWith("blob:")) {
+        URL.revokeObjectURL(item.url);
+      }
+      return prev.filter(i => i.id !== id);
+    });
+    delete uploadedRef.current[id];
+    persistedRef.current.delete(id);
+  }
+
+  // Return to the live camera to capture more evidence without resetting the
+  // running inspection timer.
+  async function resumeCapture() {
+    setStep("recording");
+    await camera.startCamera();
+    if (!timerRef.current) {
+      setIsRecording(true);
+      timerRef.current = setInterval(() => setTimer(t => t + 1), 1000);
+    }
+  }
+
+  // Recapture a clip: drop it and jump back to the camera to record again.
+  async function recaptureVideo(id: string) {
+    removeCaptured(id);
+    await resumeCapture();
+  }
+
   // ── Start Recording ────────────────────────────────────────────────────────
   function startRecording() {
     setIsRecording(true);
@@ -530,12 +732,14 @@ export default function NewInspection() {
     setCompleting(true);
     setUploadError(null);
     const photoItems = captured.filter(i => i.type === "photo");
+    const videoItems = captured.filter(i => i.type === "video");
 
     try {
-      // Step 1: Upload every captured photo to permanent object storage.
-      // Failures throw loudly (no silent blob fallback): we keep the technician
-      // on this screen with a Retry button instead of saving broken evidence.
-      // Already-uploaded photos are cached so Retry only resumes what failed.
+      // Step 1: Upload every captured photo AND video to permanent object
+      // storage. Failures throw loudly (no silent blob fallback): we keep the
+      // technician on this screen with a Retry button instead of saving broken
+      // evidence. Already-uploaded items are cached so Retry only resumes what
+      // failed.
       for (const item of photoItems) {
         if (uploadedRef.current[item.id]) continue;
         uploadedRef.current[item.id] = await uploadToStorage(
@@ -543,11 +747,20 @@ export default function NewInspection() {
           `inspection-${createdId}-${item.id}.jpg`,
         );
       }
+      for (const item of videoItems) {
+        if (uploadedRef.current[item.id]) continue;
+        uploadedRef.current[item.id] = await uploadToStorage(
+          item.url,
+          `inspection-${createdId}-${item.id}.${mimeToExt(item.mimeType)}`,
+          item.mimeType || "video/webm",
+        );
+      }
 
       // Step 2: Persist all media records (incrementally) BEFORE analysis so the
       // server can verify each analyzed photo is a real media row for this
       // inspection. Failures here are also loud + retryable; the per-item guard
-      // prevents duplicate rows on retry.
+      // prevents duplicate rows on retry. Voice notes carry no uploaded blob;
+      // photos and videos use their permanent storage path.
       if (createdId) {
         for (const item of captured) {
           if (persistedRef.current.has(item.id)) continue;
@@ -555,9 +768,10 @@ export default function NewInspection() {
             id: createdId,
             data: {
               mediaType: item.type,
-              url: item.type === "photo" ? (uploadedRef.current[item.id] ?? item.url) : item.url,
+              url: item.type === "voice" ? item.url : (uploadedRef.current[item.id] ?? item.url),
               filename: item.label,
               caption: item.note ? `${item.note.professionalTerm} · ${item.note.reportPhrase}` : "",
+              ...(item.type === "video" && item.durationSec ? { durationSec: item.durationSec } : {}),
             },
           });
           persistedRef.current.add(item.id);
@@ -603,10 +817,23 @@ export default function NewInspection() {
         .map(item => ({ imageUrl: uploadedRef.current[item.id] ?? item.url, label: item.label }))
         .filter(img => img.imageUrl.startsWith("/api/storage"));
 
-      if (images.length > 0 || technicianFindings.length > 0) {
+      // Video is recorded as evidence only — its metadata is sent to the
+      // analyzer to attach to the report, but findings are NEVER generated from
+      // video (that's a future video-frame analysis hook on the server). Keep
+      // videos strictly OUT of `images`.
+      const videos = videoItems
+        .map(item => ({
+          url: uploadedRef.current[item.id] ?? item.url,
+          filename: item.label,
+          durationSec: item.durationSec,
+          label: item.label,
+        }))
+        .filter(v => v.url.startsWith("/api/storage"));
+
+      if (images.length > 0 || videos.length > 0 || technicianFindings.length > 0) {
         try {
           const result = await analyzeInspection.mutateAsync({
-            data: { inspectionId: createdId, images, technicianFindings },
+            data: { inspectionId: createdId, images, videos, technicianFindings },
           });
           analyzedRef.current = true;
           const failed = (result as { analysisErrors?: number | null })?.analysisErrors ?? 0;
@@ -883,10 +1110,17 @@ export default function NewInspection() {
         {/* Top bar */}
         <div className="relative z-10 flex items-center justify-between px-5 pb-2"
           style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))' }}>
-          <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-white font-mono text-sm font-semibold">{formatTime(timer)}</span>
-          </div>
+          {camera.isRecordingVideo ? (
+            <div className="flex items-center gap-2 bg-red-600/90 rounded-full px-3 py-1.5">
+              <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              <span className="text-white font-mono text-sm font-bold tracking-wider">REC {formatTime(camera.videoElapsed)}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-white font-mono text-sm font-semibold">{formatTime(timer)}</span>
+            </div>
+          )}
 
           <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -1030,19 +1264,44 @@ export default function NewInspection() {
           <div className="text-center mb-5">
             <p className="text-white/25 text-xs">Say {VOICE_COMMANDS[voiceHint]}</p>
           </div>
+          {/* Secondary controls: video record/stop + front/rear camera switch */}
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <button onClick={toggleVideo}
+              disabled={camera.permission !== "granted"}
+              className={cn(
+                "flex items-center gap-2 rounded-full px-4 py-2 border text-sm font-semibold transition-all active:scale-95 disabled:opacity-40",
+                camera.isRecordingVideo
+                  ? "border-red-500 bg-red-500/25 text-red-100"
+                  : "border-white/25 bg-black/40 text-white/80 hover:bg-white/10"
+              )}>
+              {camera.isRecordingVideo ? (
+                <><span className="w-2.5 h-2.5 rounded-sm bg-red-400" /> Stop · {formatTime(camera.videoElapsed)}</>
+              ) : (
+                <><Video className="h-4 w-4" /> Record video</>
+              )}
+            </button>
+            <button onClick={() => camera.switchCamera()}
+              disabled={camera.isRecordingVideo || camera.permission !== "granted"}
+              className="flex items-center gap-2 rounded-full px-4 py-2 border border-white/25 bg-black/40 text-white/80 text-sm font-semibold hover:bg-white/10 transition-all active:scale-95 disabled:opacity-40">
+              <SwitchCamera className="h-4 w-4" /> {camera.facingMode === "environment" ? "Front" : "Rear"}
+            </button>
+          </div>
+
           <div className="flex items-center justify-between gap-4">
             <button onClick={stopRecording}
-              className="w-14 h-14 rounded-full border-2 border-red-500/50 bg-red-500/20 flex items-center justify-center transition-all active:scale-95">
+              disabled={camera.isRecordingVideo}
+              className="w-14 h-14 rounded-full border-2 border-red-500/50 bg-red-500/20 flex items-center justify-center transition-all active:scale-95 disabled:opacity-30">
               <div className="w-5 h-5 rounded bg-red-500" />
             </button>
 
             <button onClick={manualCapture}
-              className="w-20 h-20 rounded-full border-4 border-white/80 flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all active:scale-95">
+              disabled={camera.isRecordingVideo}
+              className="w-20 h-20 rounded-full border-4 border-white/80 flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all active:scale-95 disabled:opacity-40">
               <Camera className="h-8 w-8 text-white" />
             </button>
 
             <button onClick={addVoiceNote}
-              disabled={voice.state === "processing" || !!voiceSuggestion}
+              disabled={voice.state === "processing" || !!voiceSuggestion || camera.isRecordingVideo}
               className={cn(
                 "w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all active:scale-95 disabled:opacity-40",
                 voice.state === "listening"
@@ -1052,7 +1311,9 @@ export default function NewInspection() {
               <Mic className="h-6 w-6 text-primary" />
             </button>
           </div>
-          <p className="text-center text-white/25 text-xs mt-4">Tap stop when inspection is complete</p>
+          <p className="text-center text-white/25 text-xs mt-4">
+            {camera.isRecordingVideo ? "Recording video — tap Stop to save the clip" : "Tap stop when inspection is complete"}
+          </p>
         </div>
       </div>
     );
@@ -1074,10 +1335,14 @@ export default function NewInspection() {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <div className="bg-card border border-border/60 rounded-2xl p-3 text-center">
           <p className="text-xl font-bold text-primary">{captured.filter(c => c.type === "photo").length}</p>
           <p className="text-[10px] text-muted-foreground">Photos</p>
+        </div>
+        <div className="bg-card border border-border/60 rounded-2xl p-3 text-center">
+          <p className="text-xl font-bold text-rose-400">{captured.filter(c => c.type === "video").length}</p>
+          <p className="text-[10px] text-muted-foreground">Videos</p>
         </div>
         <div className="bg-card border border-border/60 rounded-2xl p-3 text-center">
           <p className="text-xl font-bold text-emerald-400">{captured.filter(c => c.type === "voice").length}</p>
@@ -1165,6 +1430,7 @@ export default function NewInspection() {
         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
           {[
             { label: "Photos", value: captured.filter(c => c.type === "photo").length },
+            { label: "Videos", value: captured.filter(c => c.type === "video").length },
             { label: "Voice notes", value: captured.filter(c => c.type === "voice").length },
             { label: "Zones visited", value: allSelectedZones.length },
             { label: "Duration", value: formatTime(timer) },
@@ -1205,6 +1471,44 @@ export default function NewInspection() {
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Captured videos — playback, delete, recapture */}
+      {captured.filter(c => c.type === "video").length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Video className="h-3.5 w-3.5 text-rose-400" /> Captured Videos
+          </p>
+          <div className="space-y-3">
+            {captured.filter(c => c.type === "video").map(item => (
+              <div key={item.id} className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+                <video
+                  src={item.url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full max-h-56 bg-black"
+                />
+                <div className="flex items-center gap-2 p-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{item.label}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {item.durationSec ? formatTime(item.durationSec) : "0:00"} · recorded {new Date(item.ts).toLocaleTimeString()}
+                    </p>
+                  </div>
+                  <button onClick={() => recaptureVideo(item.id)}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground border border-border/60 rounded-full px-2.5 py-1.5 transition-colors">
+                    <Video className="h-3.5 w-3.5" /> Recapture
+                  </button>
+                  <button onClick={() => removeCaptured(item.id)}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-rose-400 hover:text-rose-300 border border-rose-500/30 rounded-full px-2.5 py-1.5 transition-colors">
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

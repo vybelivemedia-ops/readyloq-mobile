@@ -5,6 +5,7 @@ import {
   inspectionsTable,
   inspectionMediaTable,
   type Finding,
+  type VideoEvidence,
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
@@ -26,6 +27,7 @@ function serializeResult(row: typeof analysisResultsTable.$inferSelect) {
     ...row,
     findings: row.findings ?? [],
     recommendations: row.recommendations ?? [],
+    videoEvidence: row.videoEvidence ?? [],
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -149,10 +151,17 @@ router.post("/analyze", async (req, res) => {
       inspectionId,
       images = [],
       technicianFindings = [],
+      videos = [],
     } = req.body as {
       inspectionId?: number;
       images?: Array<{ imageUrl: string; label?: string | null }>;
       technicianFindings?: Finding[];
+      videos?: Array<{
+        url: string;
+        filename?: string | null;
+        durationSec?: number | null;
+        label?: string | null;
+      }>;
     };
     if (!inspectionId) return res.status(400).json({ error: "inspectionId is required" });
 
@@ -177,6 +186,32 @@ router.post("/analyze", async (req, res) => {
         ),
       );
     const savedPaths = new Set(savedMedia.map((m) => toStoragePath(m.url)));
+    // Video evidence must correspond to a persisted row that was actually saved
+    // as a video — never accept a photo (or voice) URL submitted under videos[].
+    const savedVideoPaths = new Set(
+      savedMedia.filter((m) => m.mediaType === "video").map((m) => toStoragePath(m.url)),
+    );
+
+    // Video evidence: record metadata for any persisted, company-scoped video so
+    // the analysis result reflects the FULL set of evidence reviewed. We do NOT
+    // run vision analysis on video and NEVER derive findings from it — each entry
+    // is marked `frameAnalysisStatus: "pending"`, the forward hook for future
+    // per-frame video analysis. Same tenant guards as photos: the object must be
+    // under the caller's company AND a persisted media row for this inspection.
+    const videoEvidence: VideoEvidence[] = [];
+    for (const v of videos) {
+      if (!v?.url) continue;
+      const storagePath = toStoragePath(v.url);
+      if (objectPathCompanyScope(storagePath) !== companyId) continue;
+      if (!savedVideoPaths.has(storagePath)) continue;
+      videoEvidence.push({
+        url: v.url,
+        filename: v.filename ?? null,
+        durationSec: v.durationSec ?? null,
+        label: v.label ?? null,
+        frameAnalysisStatus: "pending",
+      });
+    }
 
     // Bound the number of real AI calls per request to avoid cost/DoS amplification.
     const MAX_ANALYZE_IMAGES = 40;
@@ -270,6 +305,7 @@ router.post("/analyze", async (req, res) => {
         status: "complete",
         findings: mergedFindings,
         recommendations,
+        videoEvidence,
         overallConfidence,
       })
       .returning();

@@ -192,6 +192,13 @@ export const ListAnalysisResultsResponseItem = zod.object({
   "evidenceQuality": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
+  "videoEvidence": zod.array(zod.object({
+  "url": zod.string(),
+  "filename": zod.string().nullish(),
+  "durationSec": zod.number().nullish(),
+  "label": zod.string().nullish(),
+  "frameAnalysisStatus": zod.string()
+})).optional(),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -222,6 +229,12 @@ export const AnalyzeInspectionBody = zod.object({
   "treatment": zod.string().nullish(),
   "exclusionOpportunity": zod.boolean().nullish(),
   "evidenceQuality": zod.string().nullish()
+})).optional(),
+  "videos": zod.array(zod.object({
+  "url": zod.string(),
+  "filename": zod.string().nullish(),
+  "durationSec": zod.number().nullish(),
+  "label": zod.string().nullish()
 })).optional()
 })
 
@@ -250,6 +263,13 @@ export const GetAnalysisResultResponse = zod.object({
   "evidenceQuality": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
+  "videoEvidence": zod.array(zod.object({
+  "url": zod.string(),
+  "filename": zod.string().nullish(),
+  "durationSec": zod.number().nullish(),
+  "label": zod.string().nullish(),
+  "frameAnalysisStatus": zod.string()
+})).optional(),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -288,6 +308,13 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
   "evidenceQuality": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
+  "videoEvidence": zod.array(zod.object({
+  "url": zod.string(),
+  "filename": zod.string().nullish(),
+  "durationSec": zod.number().nullish(),
+  "label": zod.string().nullish(),
+  "frameAnalysisStatus": zod.string()
+})).optional(),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),

@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "OoVBpmERVPj2GcynjwLmR"
@@ -36,3 +35,9 @@ id = "T7K1AI2YLLOumCt3TQONJ"
 uri = "file://artifacts/readyloq-marketing/public/favicon.png"
 type = "image"
 title = "Favicon Icon"
+
+[[outputs]]
+id = "i6CwXwoiNjRQh1-d1y2oH"
+uri = "file://closed-beta-readiness-audit.md"
+type = "text"
+title = "ReadyLoq — Closed Beta Readiness Audit"
