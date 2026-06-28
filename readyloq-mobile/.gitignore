@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local test sandbox (not a production EAS project)
+test-sdk54/
