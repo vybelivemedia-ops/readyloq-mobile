@@ -53,3 +53,9 @@ id = "t9tTpfKdxDG6okr-6iIdv"
 uri = "file://readyloq-source.tar.gz"
 type = "unspecified"
 title = "ReadyLoq — Full Source Code"
+
+[[outputs]]
+id = "tmqSGHG8r3mvrB8imrBWU"
+uri = "file://readyloq-native-app.zip"
+type = "unspecified"
+title = "ReadyLoq Native App (Expo SDK 54) — complete source"
