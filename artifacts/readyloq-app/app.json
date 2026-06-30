@@ -52,6 +52,18 @@
         {
           "locationWhenInUsePermission": "ReadyLoq records the inspection site location to tag your reports."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "packagingOptions": {
+              "exclude": [
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+              ]
+            }
+          }
+        }
       ]
     ],
     "experiments": {
