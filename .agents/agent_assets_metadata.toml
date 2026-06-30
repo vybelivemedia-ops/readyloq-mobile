@@ -41,3 +41,9 @@ id = "i6CwXwoiNjRQh1-d1y2oH"
 uri = "file://closed-beta-readiness-audit.md"
 type = "text"
 title = "ReadyLoq — Closed Beta Readiness Audit"
+
+[[outputs]]
+id = "t9tTpfKdxDG6okr-6iIdv"
+uri = "file://readyloq-source.tar.gz"
+type = "unspecified"
+title = "ReadyLoq — Full Source Code"
