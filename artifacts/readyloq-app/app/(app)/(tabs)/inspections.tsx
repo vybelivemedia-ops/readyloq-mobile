@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { getListInspectionsQueryOptions } from "@workspace/api-client-react";
-import type { Inspection } from "@workspace/api-client-react";
+import { getListInspectionsQueryOptions } from "@/lib/api-client";
+import type { Inspection } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";

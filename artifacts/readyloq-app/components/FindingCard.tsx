@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { Finding } from "@workspace/api-client-react";
+import type { Finding } from "@/lib/api-client";
 import React from "react";
 import { Text, View } from "react-native";
 

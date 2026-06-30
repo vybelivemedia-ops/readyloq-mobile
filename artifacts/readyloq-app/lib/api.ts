@@ -1,6 +1,6 @@
 /**
  * Thin fetch helpers for the few backend endpoints that are NOT part of the
- * generated `@workspace/api-client-react` client (auth bootstrap + object
+ * generated `@/lib/api-client` client (auth bootstrap + object
  * storage upload URLs). All inspection / analysis / report data goes through
  * the generated React Query hooks instead — see those imports in the screens.
  *

@@ -63,7 +63,7 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - Language selector (EN/ES/PT pills) in setup step; `inspectionLang` drives speech recognition lang
 
 ## Conventions
-- All hooks: import from `@workspace/api-client-react`, never relative
+- All hooks: import from `@workspace/api-client-react`, never relative (WEB app only; the mobile app uses its vendored `@/lib/api-client` — see Native Mobile App)
 - Hook query options pattern: `useGetThing(id, { query: { enabled: !!id } })`
 - API routes registered in `artifacts/api-server/src/routes/index.ts`
 - QueryClientProvider + TooltipProvider + Toaster all live in App.tsx (not main.tsx)
@@ -126,7 +126,8 @@ description: Key architecture decisions and conventions for the ReadyLoq inspect
 - **Leads are platform-level: `leads` table has NO company_id** (prospects aren't tenants yet; type = demo|contact). `POST /api/leads` is mounted PUBLIC in routes/index.ts (before the requireAuth block) with its OWN tighter rate limiter (15/15min) and validates against generated `CreateLeadBody`. This is the one intentional public write path — it only writes `leadsTable`.
 
 ## Native Mobile App (artifacts/readyloq-app, Expo SDK 54)
-- Native technician app (Expo Router) that REUSES the same backend as the web app via `@workspace/api-client-react` generated hooks. Mobile-only transport: `setBaseUrl` (from `EXPO_PUBLIC_DOMAIN`) at module load + `setAuthTokenGetter(() => getToken())` in the authed layout so the bearer token is attached (no cookie jar on native). Never duplicate backend logic here.
+- **The mobile app is intentionally STANDALONE / portable — it must `npm install`/`pnpm install` and build in isolation, with NO monorepo coupling.** Its package.json uses only pinned npm versions (no `workspace:`/`catalog:`), tsconfig has no project `references`, and the generated orval client is VENDORED at `lib/api-client/` (imported as `@/lib/api-client`), a copy of `lib/api-client-react/src/`. **Why:** users clone/export just this folder. **How to apply:** if `lib/api-client-react` changes, re-vendor into `lib/api-client`; keep all deps as concrete versions; never reintroduce `@workspace/*` imports here. The package name stays `@workspace/readyloq-app` only so the Replit workflow/`.replit-artifact` filter keeps working (a private scope; harmless for standalone installs).
+- REUSES the same backend as the web app via the vendored generated hooks. Mobile-only transport: `setBaseUrl` (from `EXPO_PUBLIC_DOMAIN`) at module load + `setAuthTokenGetter(() => getToken())` in the authed layout so the bearer token is attached (no cookie jar on native). Never duplicate backend logic here.
 - **Clerk `proxyUrl` is INTENTIONALLY undefined in Expo dev** — `proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined`; the var is empty in dev (Clerk hits its direct Frontend API) and only populated for prod builds by `scripts/build.js` (from `CLERK_PROXY_URL` + domain). **Do NOT add `EXPO_PUBLIC_CLERK_PROXY_URL` to the dev/start script** — the clerk-auth skill says dev has no proxy by design. A reviewer flagging this as "missing" is a false positive.
 - **AI vision analysis must filter media by `mediaType === "photo"`** (never `!== "video"`) before sending `images[]` to `/analysis/analyze` — voice/other media URLs would otherwise be sent to the vision model. Same photo-only rule as the web app.
 - new-inspection submit is resumable: it stores the created inspection id + uploaded URLs in refs so a retry after a mid-flight failure does not create a duplicate inspection or re-upload, and it surfaces `AnalysisResult.analysisErrors` (partial-failure Alert) instead of silently succeeding.

@@ -4,7 +4,7 @@ import {
   useAddInspectionMedia,
   useAnalyzeInspection,
   useCreateInspection,
-} from "@workspace/api-client-react";
+} from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { type Href, useRouter } from "expo-router";

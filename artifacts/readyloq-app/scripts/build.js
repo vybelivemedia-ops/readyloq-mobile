@@ -16,7 +16,9 @@ function findWorkspaceRoot(startDir) {
     }
     dir = path.dirname(dir);
   }
-  throw new Error("Could not find workspace root (no pnpm-workspace.yaml found)");
+  // Standalone (non-monorepo) checkout: there is no pnpm-workspace.yaml, so the
+  // project root itself is the root.
+  return startDir;
 }
 
 const workspaceRoot = findWorkspaceRoot(projectRoot);
@@ -152,9 +154,8 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
   }
 
   metroProcess = spawn(
-    "pnpm",
+    "npx",
     [
-      "exec",
       "expo",
       "start",
       "--no-dev",

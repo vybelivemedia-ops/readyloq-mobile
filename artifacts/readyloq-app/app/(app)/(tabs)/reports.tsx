@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { getListReportsQueryOptions } from "@workspace/api-client-react";
-import type { Report } from "@workspace/api-client-react";
+import { getListReportsQueryOptions } from "@/lib/api-client";
+import type { Report } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React from "react";

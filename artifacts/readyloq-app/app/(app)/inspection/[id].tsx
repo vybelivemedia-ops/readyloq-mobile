@@ -4,7 +4,7 @@ import {
   getListAnalysisResultsQueryOptions,
   useAnalyzeInspection,
   useGenerateReport,
-} from "@workspace/api-client-react";
+} from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";

@@ -2,8 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   getGetReportQueryOptions,
   useGenerateReportNarrative,
-} from "@workspace/api-client-react";
-import type { AiReportNarrative } from "@workspace/api-client-react";
+} from "@/lib/api-client";
+import type { AiReportNarrative } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";

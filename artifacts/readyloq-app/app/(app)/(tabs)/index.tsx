@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   getGetAnalyticsDashboardQueryOptions,
   getListInspectionsQueryOptions,
-} from "@workspace/api-client-react";
+} from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React from "react";
