@@ -1,0 +1,67 @@
+{
+  "expo": {
+    "name": "ReadyLoq",
+    "slug": "readyloq-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "readyloq-app",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0d1117"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.hgwashingllc.readyloqmobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ReadyLoq uses the camera to capture inspection photos of pest activity and conducive conditions for AI analysis.",
+        "NSPhotoLibraryUsageDescription": "ReadyLoq saves and attaches inspection photos to your reports.",
+        "NSLocationWhenInUseUsageDescription": "ReadyLoq records the inspection site location to tag your reports.",
+        "NSMicrophoneUsageDescription": "ReadyLoq may use the microphone when recording inspection video evidence."
+      }
+    },
+    "android": {
+      "package": "com.hgwashingllc.readyloqmobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "ReadyLoq uses the camera to capture inspection photos for AI analysis.",
+          "microphonePermission": "ReadyLoq may use the microphone when recording inspection video evidence.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "ReadyLoq records the inspection site location to tag your reports."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

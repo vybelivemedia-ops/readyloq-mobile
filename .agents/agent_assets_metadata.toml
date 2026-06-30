@@ -36,6 +36,12 @@ uri = "file://artifacts/readyloq-marketing/public/favicon.png"
 type = "image"
 title = "Favicon Icon"
 
+[[generated]]
+id = "34l7_JzCW0iaoVE1C4W6o"
+uri = "file://artifacts/readyloq-app/assets/images/icon.png"
+type = "image"
+title = "readyloq app icon"
+
 [[outputs]]
 id = "i6CwXwoiNjRQh1-d1y2oH"
 uri = "file://closed-beta-readiness-audit.md"
