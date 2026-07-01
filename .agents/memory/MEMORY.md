@@ -2,3 +2,4 @@
 - [ReadyLoq multi-tenancy](readyloq-multitenancy.md) — per-company isolation rules (new tables/queries/child writes), reserved platform/legacy companies, storage scoping, vitest harness, frontend typecheck gotcha
 - [API Server Testing](api-server-testing.md) — vitest + isolated `<db>_test` DB + Clerk getAuth mock; pre-existing TS7030 typecheck failures are baseline
 - [EAS Monorepo Setup](eas-monorepo.md) — root-level app.json causes "expo package not found" even when eas.json is in a subdirectory; readyloq-mobile/ is the Expo root
+- [ReadyLoq native Windows/EAS build](readyloq-native-windows-build.md) — "build.ninja still dirty" is a Windows toolchain issue not a repo bug; EAS cloud build bypasses it; standalone eas.json setup
