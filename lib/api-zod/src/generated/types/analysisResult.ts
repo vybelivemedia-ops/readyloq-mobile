@@ -15,6 +15,7 @@ export interface AnalysisResult {
   findings?: Finding[];
   recommendations?: string[];
   videoEvidence?: AnalysisResultVideoEvidenceItem[];
+  analyzedImagePaths?: string[];
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */

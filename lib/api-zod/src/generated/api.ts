@@ -189,7 +189,13 @@ export const ListAnalysisResultsResponseItem = zod.object({
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
   "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish()
+  "evidenceQuality": zod.string().nullish(),
+  "species": zod.string().nullish(),
+  "lifeStage": zod.string().nullish(),
+  "conduciveCondition": zod.string().nullish(),
+  "harborage": zod.string().nullish(),
+  "moisture": zod.string().nullish(),
+  "structuralIssue": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "videoEvidence": zod.array(zod.object({
@@ -199,6 +205,7 @@ export const ListAnalysisResultsResponseItem = zod.object({
   "label": zod.string().nullish(),
   "frameAnalysisStatus": zod.string()
 })).optional(),
+  "analyzedImagePaths": zod.array(zod.string()).optional(),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -228,7 +235,13 @@ export const AnalyzeInspectionBody = zod.object({
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
   "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish()
+  "evidenceQuality": zod.string().nullish(),
+  "species": zod.string().nullish(),
+  "lifeStage": zod.string().nullish(),
+  "conduciveCondition": zod.string().nullish(),
+  "harborage": zod.string().nullish(),
+  "moisture": zod.string().nullish(),
+  "structuralIssue": zod.string().nullish()
 })).optional(),
   "videos": zod.array(zod.object({
   "url": zod.string(),
@@ -260,7 +273,13 @@ export const GetAnalysisResultResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
   "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish()
+  "evidenceQuality": zod.string().nullish(),
+  "species": zod.string().nullish(),
+  "lifeStage": zod.string().nullish(),
+  "conduciveCondition": zod.string().nullish(),
+  "harborage": zod.string().nullish(),
+  "moisture": zod.string().nullish(),
+  "structuralIssue": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "videoEvidence": zod.array(zod.object({
@@ -270,6 +289,7 @@ export const GetAnalysisResultResponse = zod.object({
   "label": zod.string().nullish(),
   "frameAnalysisStatus": zod.string()
 })).optional(),
+  "analyzedImagePaths": zod.array(zod.string()).optional(),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -305,7 +325,13 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
   "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish()
+  "evidenceQuality": zod.string().nullish(),
+  "species": zod.string().nullish(),
+  "lifeStage": zod.string().nullish(),
+  "conduciveCondition": zod.string().nullish(),
+  "harborage": zod.string().nullish(),
+  "moisture": zod.string().nullish(),
+  "structuralIssue": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "videoEvidence": zod.array(zod.object({
@@ -315,6 +341,7 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
   "label": zod.string().nullish(),
   "frameAnalysisStatus": zod.string()
 })).optional(),
+  "analyzedImagePaths": zod.array(zod.string()).optional(),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -894,7 +921,13 @@ export const ListReportsResponseItem = zod.object({
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
   "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish()
+  "evidenceQuality": zod.string().nullish(),
+  "species": zod.string().nullish(),
+  "lifeStage": zod.string().nullish(),
+  "conduciveCondition": zod.string().nullish(),
+  "harborage": zod.string().nullish(),
+  "moisture": zod.string().nullish(),
+  "structuralIssue": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "treatmentNotes": zod.string().nullish(),
@@ -962,7 +995,13 @@ export const GetReportResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
   "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish()
+  "evidenceQuality": zod.string().nullish(),
+  "species": zod.string().nullish(),
+  "lifeStage": zod.string().nullish(),
+  "conduciveCondition": zod.string().nullish(),
+  "harborage": zod.string().nullish(),
+  "moisture": zod.string().nullish(),
+  "structuralIssue": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "treatmentNotes": zod.string().nullish(),
@@ -1029,7 +1068,13 @@ export const GenerateReportNarrativeResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "treatment": zod.string().nullish(),
   "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish()
+  "evidenceQuality": zod.string().nullish(),
+  "species": zod.string().nullish(),
+  "lifeStage": zod.string().nullish(),
+  "conduciveCondition": zod.string().nullish(),
+  "harborage": zod.string().nullish(),
+  "moisture": zod.string().nullish(),
+  "structuralIssue": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "treatmentNotes": zod.string().nullish(),

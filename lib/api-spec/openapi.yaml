@@ -1543,6 +1543,9 @@ components:
               durationSec: { type: ["integer", "null"] }
               label:       { type: ["string", "null"] }
               frameAnalysisStatus: { type: string }
+        analyzedImagePaths:
+          type: array
+          items: { type: string }
         overallConfidence: { type: ["number", "null"] }
         riskLevel:    { type: ["string", "null"] }
         technicianFeedback: { type: ["string", "null"] }
@@ -1564,6 +1567,12 @@ components:
         treatment:     { type: ["string", "null"] }
         exclusionOpportunity: { type: ["boolean", "null"] }
         evidenceQuality: { type: ["string", "null"] }
+        species:       { type: ["string", "null"] }
+        lifeStage:     { type: ["string", "null"] }
+        conduciveCondition: { type: ["string", "null"] }
+        harborage:     { type: ["string", "null"] }
+        moisture:      { type: ["string", "null"] }
+        structuralIssue: { type: ["string", "null"] }
 
     FeedbackInput:
       type: object

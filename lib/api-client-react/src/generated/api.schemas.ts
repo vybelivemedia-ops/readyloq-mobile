@@ -371,6 +371,18 @@ export interface Finding {
   exclusionOpportunity?: boolean | null;
   /** @nullable */
   evidenceQuality?: string | null;
+  /** @nullable */
+  species?: string | null;
+  /** @nullable */
+  lifeStage?: string | null;
+  /** @nullable */
+  conduciveCondition?: string | null;
+  /** @nullable */
+  harborage?: string | null;
+  /** @nullable */
+  moisture?: string | null;
+  /** @nullable */
+  structuralIssue?: string | null;
 }
 
 export interface AnalysisResult {
@@ -380,6 +392,7 @@ export interface AnalysisResult {
   findings?: Finding[];
   recommendations?: string[];
   videoEvidence?: AnalysisResultVideoEvidenceItem[];
+  analyzedImagePaths?: string[];
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */

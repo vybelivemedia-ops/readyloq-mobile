@@ -217,12 +217,38 @@ router.post("/analyze", async (req, res) => {
     // Bound the number of real AI calls per request to avoid cost/DoS amplification.
     const MAX_ANALYZE_IMAGES = 40;
 
+    // Live-inspection reuse: the workspace re-runs analysis after every few
+    // captures, so we carry over the previous run's verified per-photo results
+    // instead of re-sending already-assessed photos to the model. Findings are
+    // copied VERBATIM (real prior detections, never regenerated) and clean
+    // photos recorded in `analyzedImagePaths` are skipped entirely. Only photos
+    // the model has never successfully assessed trigger a new vision call.
+    const [previousRun] = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(
+        and(
+          eq(analysisResultsTable.companyId, companyId),
+          eq(analysisResultsTable.inspectionId, inspectionId),
+        ),
+      )
+      .orderBy(desc(analysisResultsTable.createdAt))
+      .limit(1);
+    const previouslyAnalyzed = new Set(
+      ((previousRun?.analyzedImagePaths ?? []) as string[]).map(toStoragePath),
+    );
+    const previousFindingByPath = new Map<string, Finding>();
+    for (const f of (previousRun?.findings ?? []) as Finding[]) {
+      if (f.imageUrl) previousFindingByPath.set(toStoragePath(f.imageUrl), f);
+    }
+
     // Run the real vision model on each company-scoped, persisted photo.
     // We NEVER fabricate a placeholder finding: a photo only becomes a finding
     // when the model returns a genuine, content-bearing assessment. Photos whose
     // analysis FAILED (storage/model/parse error) are counted in `analysisErrors`
     // and surfaced to the technician instead of being saved as empty findings.
     const aiFindings: Finding[] = [];
+    const analyzedImagePaths: string[] = [];
     let nextId = 1;
     let analysisErrors = 0;
     for (const image of images.slice(0, MAX_ANALYZE_IMAGES)) {
@@ -233,12 +259,22 @@ router.post("/analyze", async (req, res) => {
       if (objectPathCompanyScope(storagePath) !== companyId) continue;
       if (!savedPaths.has(storagePath)) continue;
 
+      // Already assessed in a previous run: carry the verified result over.
+      if (previouslyAnalyzed.has(storagePath)) {
+        analyzedImagePaths.push(storagePath);
+        const prior = previousFindingByPath.get(storagePath);
+        if (prior) aiFindings.push({ ...prior, id: nextId++ });
+        continue;
+      }
+
       const prediction = await analyzePhoto(storagePath);
       if (prediction === null) {
-        // Analysis failed for this photo — do NOT persist a placeholder finding.
+        // Analysis failed for this photo — do NOT persist a placeholder finding
+        // and do NOT mark it analyzed, so the next run retries it.
         analysisErrors++;
         continue;
       }
+      analyzedImagePaths.push(storagePath);
       // A successful-but-empty assessment (a clean photo with nothing notable)
       // should not create a finding. The prompt makes the model ALWAYS emit a
       // rationale + tags, so those are NOT evidence of a real finding — only a
@@ -250,7 +286,11 @@ router.post("/analyze", async (req, res) => {
         prediction.possiblePest ||
         prediction.possibleConduciveCondition ||
         prediction.possibleEntryPoint ||
-        prediction.suggestedCorrectiveAction
+        prediction.suggestedCorrectiveAction ||
+        prediction.possibleLifeStage ||
+        prediction.possibleHarborage ||
+        prediction.possibleMoistureIssue ||
+        prediction.possibleStructuralIssue
       );
       if (!hasContent) continue;
 
@@ -273,6 +313,13 @@ router.post("/analyze", async (req, res) => {
         treatment: prediction.suggestedCorrectiveAction ?? null,
         exclusionOpportunity: !!prediction.possibleEntryPoint,
         evidenceQuality: null,
+        species: prediction.possiblePest ?? null,
+        lifeStage: prediction.possibleLifeStage ?? null,
+        conduciveCondition: prediction.possibleConduciveCondition ?? null,
+        harborage: prediction.possibleHarborage ?? null,
+        moisture: prediction.possibleMoistureIssue ?? null,
+        structuralIssue:
+          prediction.possibleStructuralIssue ?? prediction.possibleEntryPoint ?? null,
       });
     }
 
@@ -310,6 +357,17 @@ router.post("/analyze", async (req, res) => {
           mergedFindings.length
         : 0;
 
+    // Risk level is DERIVED deterministically from finding severities (which
+    // are themselves derived from model confidence) — never invented: the
+    // worst severity across all findings sets the level; no findings, no risk.
+    const riskLevel = mergedFindings.some((f) => f.severity === "high")
+      ? "high"
+      : mergedFindings.some((f) => f.severity === "medium")
+        ? "medium"
+        : mergedFindings.length > 0
+          ? "low"
+          : null;
+
     const [row] = await db
       .insert(analysisResultsTable)
       .values({
@@ -319,7 +377,9 @@ router.post("/analyze", async (req, res) => {
         findings: mergedFindings,
         recommendations,
         videoEvidence,
+        analyzedImagePaths,
         overallConfidence,
+        riskLevel,
       })
       .returning();
 

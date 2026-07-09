@@ -16,6 +16,12 @@ export const analysisResultsTable = pgTable("analysis_results", {
   // but we DELIBERATELY do not derive findings from video yet. `frameAnalysisStatus`
   // is the forward hook for future per-frame video analysis.
   videoEvidence: jsonb("video_evidence").$type<VideoEvidence[]>().default([]),
+  // Storage paths of photos the vision model has ALREADY assessed in this run
+  // (including clean photos that produced no finding). Lets the live-inspection
+  // flow re-run analysis cheaply: previously-assessed photos are carried over
+  // instead of re-sent to the model. Failed photos are NOT recorded so they
+  // retry on the next run.
+  analyzedImagePaths: jsonb("analyzed_image_paths").$type<string[]>().default([]),
   overallConfidence: real("overall_confidence"),
   riskLevel: text("risk_level"),
   technicianFeedback: text("technician_feedback"),
@@ -34,6 +40,16 @@ export interface Finding {
   treatment: string | null;
   exclusionOpportunity: boolean | null;
   evidenceQuality?: "excellent" | "good" | "fair" | null;
+  // Structured detection detail for the live AI Inspection Panel. All fields
+  // come straight from the vision model's assessment of a real photo — null /
+  // absent means that photo showed no such evidence. Optional so findings
+  // stored before these fields existed remain valid.
+  species?: string | null;
+  lifeStage?: string | null;
+  conduciveCondition?: string | null;
+  harborage?: string | null;
+  moisture?: string | null;
+  structuralIssue?: string | null;
 }
 
 /**

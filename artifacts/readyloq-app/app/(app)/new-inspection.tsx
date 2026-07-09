@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { type Href, useRouter } from "expo-router";
 import { Image } from "expo-image";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -116,7 +116,11 @@ export default function NewInspectionScreen() {
     try {
       setCapturing(true);
       const pic = await cameraRef.current.takePictureAsync({ quality: 0.6 });
-      if (pic?.uri) setPhotos((prev) => [...prev, { uri: pic.uri }]);
+      if (pic?.uri) {
+        setPhotos((prev) => [...prev, { uri: pic.uri }]);
+        // A fresh capture re-arms auto-run analysis after a prior failure.
+        setWsError(null);
+      }
     } catch {
       setError("Couldn't capture photo. Please try again.");
     } finally {
@@ -181,6 +185,23 @@ export default function NewInspectionScreen() {
       setWsAnalyzing(false);
     }
   };
+
+  // Auto-run: while the camera is open, analysis kicks off shortly after each
+  // new photo so the AI Inspection Panel updates live — no button press
+  // needed. The short delay batches rapid captures into one run; when a run
+  // finishes and more photos arrived meanwhile, this re-fires for the rest.
+  // After a failure (wsError set) auto-run pauses — a new capture or the
+  // manual "Run analysis" button clears the error and re-arms it, so a
+  // persistent failure never becomes an infinite retry loop.
+  useEffect(() => {
+    if (step !== "capture" || submitting || wsAnalyzing || wsError) return;
+    if (photos.length === 0 || photos.length <= analyzedCount.current) return;
+    const timer = setTimeout(() => {
+      void runWorkspaceAnalysis();
+    }, 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, submitting, wsAnalyzing, wsError, photos.length]);
 
   // Builds (or rebuilds) the live service report from the latest verified
   // data. Creates the report once, then regenerates its AI narrative with a

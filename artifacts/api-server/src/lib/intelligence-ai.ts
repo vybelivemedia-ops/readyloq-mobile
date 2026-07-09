@@ -34,6 +34,10 @@ export function fallbackPrediction(): AiPrediction {
     possibleEntryPoint: null,
     suggestedCorrectiveAction: null,
     rationale: null,
+    possibleLifeStage: null,
+    possibleHarborage: null,
+    possibleMoistureIssue: null,
+    possibleStructuralIssue: null,
   };
 }
 
@@ -71,10 +75,18 @@ function userPrompt(): string {
     '- "confidence": a number from 0 to 1 (your confidence in the category)',
     '- "tags": array of 1-6 short lowercase keyword strings describing the image',
     '- "possiblePest": likely pest species/common name if any, else null',
+    '- "possibleLifeStage": pest life stage VISIBLE in the image (e.g. egg, larva, nymph, pupa, adult, juvenile), else null',
     '- "possibleConduciveCondition": conducive condition observed, else null',
+    '- "possibleHarborage": harborage (nesting/shelter site) observed, else null',
+    '- "possibleMoistureIssue": moisture problem observed (leak, standing water, damp material, condensation), else null',
+    '- "possibleStructuralIssue": structural deficiency observed (gap, crack, hole, damaged material, failed seal), else null',
     '- "possibleEntryPoint": entry point observed, else null',
     '- "suggestedCorrectiveAction": one concise recommended corrective action, else null',
     '- "rationale": one short sentence explaining the classification',
+    "",
+    "Only report what is actually visible in THIS image. Every field must be",
+    "grounded in visible evidence — when the image shows no such evidence,",
+    "return null for that field rather than guessing.",
   ].join("\n");
 }
 
@@ -139,6 +151,10 @@ function parsePrediction(raw: string): AiPrediction | null {
     possibleEntryPoint: asStringOrNull(parsed.possibleEntryPoint),
     suggestedCorrectiveAction: asStringOrNull(parsed.suggestedCorrectiveAction),
     rationale: asStringOrNull(parsed.rationale),
+    possibleLifeStage: asStringOrNull(parsed.possibleLifeStage),
+    possibleHarborage: asStringOrNull(parsed.possibleHarborage),
+    possibleMoistureIssue: asStringOrNull(parsed.possibleMoistureIssue),
+    possibleStructuralIssue: asStringOrNull(parsed.possibleStructuralIssue),
   };
 }
 

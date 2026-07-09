@@ -68,6 +68,37 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Case-insensitive dedupe of non-empty detection strings, keeping first casing. */
+function dedupeDetections(values: (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of values) {
+    if (!v) continue;
+    const trimmed = v.trim();
+    const key = trimmed.toLowerCase();
+    if (!trimmed || seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+/** Unique species with the best (max) confidence the model assigned each one. */
+function speciesWithConfidence(findings: Finding[]): { name: string; confidence: number }[] {
+  const out: { name: string; confidence: number }[] = [];
+  for (const f of findings) {
+    const name = (f.species ?? "").trim();
+    if (!name) continue;
+    const existing = out.find((e) => e.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      existing.confidence = Math.max(existing.confidence, f.confidence ?? 0);
+    } else {
+      out.push({ name, confidence: f.confidence ?? 0 });
+    }
+  }
+  return out;
+}
+
 export function AiInsightsPanel({
   siteAddress,
   propertyType,
@@ -88,6 +119,60 @@ export function AiInsightsPanel({
   const findings = analysis?.findings ?? [];
   const grouped = groupFindings(findings);
   const narrative = report?.aiNarrative ?? null;
+
+  // Live AI Inspection Panel — every value is aggregated straight from the
+  // model's per-photo detections. Nothing is inferred client-side; a row is
+  // empty until a real detection populates it.
+  const species = speciesWithConfidence(findings);
+  const detectionRows: {
+    key: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    values: string[];
+  }[] = [
+    {
+      key: "species",
+      icon: "bug-outline",
+      label: "Species detected",
+      values: species.map((s) => `${s.name} · ${Math.round(s.confidence * 100)}% confidence`),
+    },
+    {
+      key: "lifeStage",
+      icon: "git-branch-outline",
+      label: "Life stage",
+      values: dedupeDetections(findings.map((f) => f.lifeStage)),
+    },
+    {
+      key: "conducive",
+      icon: "warning-outline",
+      label: "Conducive conditions",
+      values: dedupeDetections(findings.map((f) => f.conduciveCondition)),
+    },
+    {
+      key: "harborage",
+      icon: "home-outline",
+      label: "Harborage",
+      values: dedupeDetections(findings.map((f) => f.harborage)),
+    },
+    {
+      key: "moisture",
+      icon: "water-outline",
+      label: "Moisture",
+      values: dedupeDetections(findings.map((f) => f.moisture)),
+    },
+    {
+      key: "structural",
+      icon: "construct-outline",
+      label: "Structural issues",
+      values: dedupeDetections(findings.map((f) => f.structuralIssue)),
+    },
+    {
+      key: "treatment",
+      icon: "medkit-outline",
+      label: "Recommended treatment",
+      values: analysis?.recommendations ?? [],
+    },
+  ];
 
   // Live report sections — every value comes from the server-generated
   // narrative, which is grounded in real detections and inspection data.
@@ -192,6 +277,110 @@ export function AiInsightsPanel({
 
         {tab === "insights" ? (
           <>
+            {/* AI Inspection Panel — live detection board. The technician's job
+                is to verify these, not to manually describe what the camera
+                already sees. Every value comes from real model detections. */}
+            <Card style={{ gap: 12 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="scan-outline" size={16} color={colors.primary} />
+                <Text
+                  style={{
+                    color: colors.foreground,
+                    fontFamily: "Inter_700Bold",
+                    fontSize: 15,
+                    flex: 1,
+                  }}
+                >
+                  AI Inspection Panel
+                </Text>
+                {analyzing ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                      Updating
+                    </Text>
+                  </View>
+                ) : (
+                  <Badge label={analysis ? "Live" : "Standby"} tone={analysis ? "success" : "default"} />
+                )}
+              </View>
+
+              {/* Risk level + confidence */}
+              <View style={{ flexDirection: "row", gap: 16 }}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                    Risk level
+                  </Text>
+                  {analysis?.riskLevel ? (
+                    <Badge label={formatStatus(analysis.riskLevel)} tone={severityTone(analysis.riskLevel)} />
+                  ) : (
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                      {analysis ? "No risk detected yet" : "—"}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                    Confidence
+                  </Text>
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 17 }}>
+                    {analysis ? confidencePct(analysis.overallConfidence) : "—"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Detection rows */}
+              {detectionRows.map((row) => (
+                <View
+                  key={row.key}
+                  style={{
+                    gap: 4,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.border,
+                    paddingTop: 10,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name={row.icon} size={14} color={colors.primary} />
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                      {row.label}
+                    </Text>
+                  </View>
+                  {row.values.length > 0 ? (
+                    row.values.map((v, i) => (
+                      <Text
+                        key={i}
+                        style={{
+                          color: colors.foreground,
+                          fontFamily: "Inter_400Regular",
+                          fontSize: 13,
+                          lineHeight: 19,
+                        }}
+                      >
+                        {v}
+                      </Text>
+                    ))
+                  ) : (
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                      {analysis ? "None detected" : "—"}
+                    </Text>
+                  )}
+                </View>
+              ))}
+
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 11,
+                  lineHeight: 16,
+                }}
+              >
+                Detections update automatically as you capture. Your job is to verify — not to
+                describe what the camera already sees.
+              </Text>
+            </Card>
+
             {/* Inspection context */}
             <Card style={{ gap: 8 }}>
               <Text
@@ -253,26 +442,6 @@ export function AiInsightsPanel({
             {/* Results */}
             {analysis ? (
               <>
-                <Card style={{ flexDirection: "row", gap: 16 }}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
-                      Risk level
-                    </Text>
-                    <Badge
-                      label={formatStatus(analysis.riskLevel ?? "—")}
-                      tone={severityTone(analysis.riskLevel)}
-                    />
-                  </View>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
-                      Overall confidence
-                    </Text>
-                    <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 18 }}>
-                      {confidencePct(analysis.overallConfidence)}
-                    </Text>
-                  </View>
-                </Card>
-
                 {grouped.length === 0 ? (
                   <Card>
                     <Text

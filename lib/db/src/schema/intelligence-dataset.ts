@@ -172,6 +172,13 @@ export type AiPrediction = {
   possibleEntryPoint: string | null;
   suggestedCorrectiveAction: string | null;
   rationale: string | null;
+  // Structured field-detection detail for the live AI Inspection Panel.
+  // Optional so older stored predictions (and loosely-typed test doubles)
+  // remain valid; each is null when the image shows no such evidence.
+  possibleLifeStage?: string | null;
+  possibleHarborage?: string | null;
+  possibleMoistureIssue?: string | null;
+  possibleStructuralIssue?: string | null;
 };
 
 // ── Tables ───────────────────────────────────────────────────────────────────
