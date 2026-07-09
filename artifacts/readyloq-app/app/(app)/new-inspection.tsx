@@ -1,11 +1,13 @@
 import { useAuth, useUser } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  getListAnalysisResultsQueryOptions,
   useAddInspectionMedia,
   useAnalyzeInspection,
   useCreateInspection,
+  useUpdateInspection,
 } from "@/lib/api-client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { type Href, useRouter } from "expo-router";
 import { Image } from "expo-image";
@@ -19,6 +21,7 @@ import {
   View,
 } from "react-native";
 
+import { AiInsightsPanel } from "@/components/AiInsightsPanel";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
@@ -31,9 +34,15 @@ import { uploadPhoto } from "@/lib/upload";
 type Step = "setup" | "capture" | "review";
 type Photo = { uri: string };
 
+const ZOOM_LEVELS = [
+  { label: "1×", value: 0 },
+  { label: "2×", value: 0.25 },
+  { label: "4×", value: 0.5 },
+] as const;
+
 export default function NewInspectionScreen() {
   const colors = useColors();
-  const { isLandscape } = useWindowSizeClass();
+  const { isLandscape, isExpanded } = useWindowSizeClass();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
@@ -42,6 +51,7 @@ export default function NewInspectionScreen() {
   const createInspection = useCreateInspection();
   const addMedia = useAddInspectionMedia();
   const analyze = useAnalyzeInspection();
+  const updateInspection = useUpdateInspection();
 
   const [step, setStep] = useState<Step>("setup");
   const [siteAddress, setSiteAddress] = useState("");
@@ -59,11 +69,27 @@ export default function NewInspectionScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [capturing, setCapturing] = useState(false);
+  const [zoom, setZoom] = useState(0);
+  const [flash, setFlash] = useState<"off" | "on" | "auto">("off");
+
+  // Expanded-workspace analysis state. Reuses the exact same APIs as submit —
+  // photos are uploaded once and never re-uploaded or re-analyzed at submit.
+  const [wsInspectionId, setWsInspectionId] = useState<number | null>(null);
+  const [wsAnalyzing, setWsAnalyzing] = useState(false);
+  const [wsError, setWsError] = useState<string | null>(null);
+  const [uploadedCount, setUploadedCount] = useState(0);
+  const analyzedCount = useRef(0);
 
   // Resume state so a retry after a mid-flight failure does not create a
   // duplicate inspection or re-upload photos that already succeeded.
   const createdInspectionId = useRef<number | null>(null);
   const uploadedUrls = useRef<string[]>([]);
+
+  const wsAnalysisQ = useQuery({
+    ...getListAnalysisResultsQueryOptions({ inspectionId: wsInspectionId ?? 0 }),
+    enabled: wsInspectionId != null,
+  });
+  const wsAnalysis = wsInspectionId != null ? wsAnalysisQ.data?.[0] : undefined;
 
   const canContinueSetup = siteAddress.trim().length > 0 && technicianName.trim().length > 0;
 
@@ -83,7 +109,65 @@ export default function NewInspectionScreen() {
     }
   };
 
+  // Runs analysis from the expanded workspace while the camera stays live.
+  // Creates the inspection once and uploads only new photos; submit() later
+  // skips whatever this already did (same resume refs).
+  const runWorkspaceAnalysis = async () => {
+    if (wsAnalyzing || photos.length === 0) return;
+    setWsError(null);
+    setWsAnalyzing(true);
+    try {
+      const token = await getToken();
+      const composedNotes = [`Property type: ${propertyType}`, notes.trim()]
+        .filter(Boolean)
+        .join("\n\n");
+
+      let id = createdInspectionId.current;
+      if (id == null) {
+        const inspection = await createInspection.mutateAsync({
+          data: {
+            siteAddress: siteAddress.trim(),
+            clientName: clientName.trim() || undefined,
+            technicianName: technicianName.trim(),
+            notes: composedNotes || undefined,
+            pestTypes: pestTypes.length ? pestTypes : undefined,
+          },
+        });
+        id = inspection.id;
+        createdInspectionId.current = id;
+      }
+      setWsInspectionId(id);
+
+      for (let i = uploadedUrls.current.length; i < photos.length; i++) {
+        const path = await uploadPhoto(
+          token,
+          photos[i].uri,
+          `inspection-${id}-${Date.now()}-${i}.jpg`,
+        );
+        await addMedia.mutateAsync({ id, data: { mediaType: "photo", url: path } });
+        uploadedUrls.current.push(path);
+        setUploadedCount(uploadedUrls.current.length);
+      }
+
+      await analyze.mutateAsync({
+        data: {
+          inspectionId: id,
+          images: uploadedUrls.current.map((u) => ({ imageUrl: u })),
+        },
+      });
+      analyzedCount.current = uploadedUrls.current.length;
+      await queryClient.invalidateQueries();
+    } catch (e) {
+      setWsError(e instanceof ApiError ? e.message : (e as Error).message);
+    } finally {
+      setWsAnalyzing(false);
+    }
+  };
+
   const submit = async () => {
+    // Never run concurrently with a workspace analysis — both loops share the
+    // same resume refs and would double-upload photos.
+    if (wsAnalyzing) return;
     setError(null);
     setSubmitting(true);
     try {
@@ -92,8 +176,8 @@ export default function NewInspectionScreen() {
         .filter(Boolean)
         .join("\n\n");
 
-      // Reuse an inspection created on a prior (failed) attempt instead of
-      // creating a duplicate.
+      // Reuse an inspection created on a prior (failed) attempt or by the
+      // expanded workspace instead of creating a duplicate.
       let id = createdInspectionId.current;
       if (id == null) {
         setProgress("Creating inspection…");
@@ -108,6 +192,17 @@ export default function NewInspectionScreen() {
         });
         id = inspection.id;
         createdInspectionId.current = id;
+      } else {
+        // The inspection already exists — sync fields the API supports
+        // updating in case they were edited after it was created.
+        setProgress("Updating inspection…");
+        await updateInspection.mutateAsync({
+          id,
+          data: {
+            notes: composedNotes || undefined,
+            pestTypes: pestTypes.length ? pestTypes : undefined,
+          },
+        });
       }
 
       // Resume uploads from where a prior attempt left off.
@@ -120,10 +215,12 @@ export default function NewInspectionScreen() {
         );
         await addMedia.mutateAsync({ id, data: { mediaType: "photo", url: path } });
         uploadedUrls.current.push(path);
+        setUploadedCount(uploadedUrls.current.length);
       }
 
       let analysisWarning: string | null = null;
-      if (uploadedUrls.current.length) {
+      // Skip re-analysis when the workspace already analyzed this exact photo set.
+      if (uploadedUrls.current.length && analyzedCount.current !== uploadedUrls.current.length) {
         setProgress("Running AI analysis…");
         const result = await analyze.mutateAsync({
           data: {
@@ -143,6 +240,9 @@ export default function NewInspectionScreen() {
       const targetId = id;
       createdInspectionId.current = null;
       uploadedUrls.current = [];
+      analyzedCount.current = 0;
+      setUploadedCount(0);
+      setWsInspectionId(null);
 
       if (analysisWarning) {
         setSubmitting(false);
@@ -220,33 +320,37 @@ export default function NewInspectionScreen() {
       );
     }
 
+    const isPhoneLandscape = isLandscape && !isExpanded;
+
     const thumbs =
       photos.length > 0 ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={isLandscape ? { position: "absolute", bottom: 16, left: 0, right: 116 } : undefined}
+          style={isPhoneLandscape ? { position: "absolute", bottom: 16, left: 0, right: 116 } : undefined}
           contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
         >
           {photos.map((p, i) => (
             <View key={`${p.uri}-${i}`}>
               <Image source={{ uri: p.uri }} style={{ width: 56, height: 56, borderRadius: 8 }} />
-              <Pressable
-                onPress={() => setPhotos((prev) => prev.filter((_, idx) => idx !== i))}
-                style={{
-                  position: "absolute",
-                  top: -6,
-                  right: -6,
-                  backgroundColor: colors.destructive,
-                  borderRadius: 10,
-                  width: 20,
-                  height: 20,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Ionicons name="close" size={13} color="#fff" />
-              </Pressable>
+              {i >= uploadedCount ? (
+                <Pressable
+                  onPress={() => setPhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                  style={{
+                    position: "absolute",
+                    top: -6,
+                    right: -6,
+                    backgroundColor: colors.destructive,
+                    borderRadius: 10,
+                    width: 20,
+                    height: 20,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="close" size={13} color="#fff" />
+                </Pressable>
+              ) : null}
             </View>
           ))}
         </ScrollView>
@@ -281,9 +385,141 @@ export default function NewInspectionScreen() {
       </Pressable>
     );
 
+    const flashButton = (
+      <Pressable
+        onPress={() => setFlash((f) => (f === "off" ? "auto" : f === "auto" ? "on" : "off"))}
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: "rgba(0,0,0,0.5)",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Ionicons
+          name={flash === "off" ? "flash-off" : flash === "auto" ? "flash-outline" : "flash"}
+          size={20}
+          color="#fff"
+        />
+      </Pressable>
+    );
+
+    const zoomChips = (
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        {ZOOM_LEVELS.map((z) => (
+          <Pressable
+            key={z.label}
+            onPress={() => setZoom(z.value)}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 999,
+              backgroundColor: zoom === z.value ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.5)",
+            }}
+          >
+            <Text
+              style={{
+                color: zoom === z.value ? "#000" : "#fff",
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 13,
+              }}
+            >
+              {z.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    );
+
+    // ─── Expanded: AI Inspection Workspace (camera + live insights) ──────────
+    if (isExpanded) {
+      return (
+        <Screen edges={["top", "bottom"]}>
+          <View style={{ flex: 1, flexDirection: "row" }}>
+            {/* Left: live camera pane — stays mounted while AI results update */}
+            <View style={{ flex: 1.2, backgroundColor: "#000" }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: 16,
+                }}
+              >
+                <Pressable
+                  onPress={() => setStep("setup")}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: "rgba(255,255,255,0.12)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="chevron-back" size={24} color="#fff" />
+                </Pressable>
+                <View
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.12)",
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 999,
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold" }}>
+                    {photos.length} captured
+                  </Text>
+                </View>
+              </View>
+
+              {/* Aspect-fitted preview: letterboxed, never stretched or cropped */}
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 12 }}>
+                <CameraView
+                  ref={cameraRef}
+                  style={{ width: "100%", maxHeight: "100%", aspectRatio: isLandscape ? 4 / 3 : 3 / 4 }}
+                  facing="back"
+                  ratio="4:3"
+                  zoom={zoom}
+                  flash={flash}
+                />
+              </View>
+
+              <View style={{ padding: 16, gap: 14, alignItems: "center" }}>
+                {zoomChips}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 28 }}>
+                  {flashButton}
+                  {captureButton}
+                  {doneButton}
+                </View>
+                {thumbs}
+              </View>
+            </View>
+
+            {/* Right: live AI insights panel */}
+            <View style={{ flex: 1, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: colors.border }}>
+              <AiInsightsPanel
+                siteAddress={siteAddress}
+                propertyType={propertyType}
+                pestTypes={pestTypes}
+                photosCount={photos.length}
+                pendingCount={Math.max(0, photos.length - analyzedCount.current)}
+                analysis={wsAnalysis}
+                analyzing={wsAnalyzing}
+                error={wsError}
+                onRunAnalysis={runWorkspaceAnalysis}
+                onReview={() => setStep("review")}
+              />
+            </View>
+          </View>
+        </Screen>
+      );
+    }
+
     return (
       <View style={{ flex: 1, backgroundColor: "#000" }}>
-        <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
+        <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" zoom={zoom} flash={flash} />
         <View style={{ position: "absolute", top: 0, left: 0, right: isLandscape ? 116 : 0 }}>
           <Screen edges={["top"]} style={{ backgroundColor: "transparent" }}>
             <View
@@ -339,8 +575,20 @@ export default function NewInspectionScreen() {
                 gap: 28,
               }}
             >
+              {flashButton}
               {captureButton}
               {doneButton}
+            </View>
+            <View
+              style={{
+                position: "absolute",
+                bottom: photos.length > 0 ? 88 : 24,
+                left: 0,
+                right: 132,
+                alignItems: "center",
+              }}
+            >
+              {zoomChips}
             </View>
             {thumbs}
           </>
@@ -358,6 +606,7 @@ export default function NewInspectionScreen() {
             }}
           >
             {thumbs}
+            <View style={{ alignItems: "center" }}>{zoomChips}</View>
             <View
               style={{
                 flexDirection: "row",
@@ -366,7 +615,7 @@ export default function NewInspectionScreen() {
                 paddingHorizontal: 28,
               }}
             >
-              <View style={{ width: 64 }} />
+              <View style={{ width: 64, alignItems: "center" }}>{flashButton}</View>
               {captureButton}
               {doneButton}
             </View>
@@ -448,23 +697,42 @@ export default function NewInspectionScreen() {
         }}
         keyboardShouldPersistTaps="handled"
       >
+        {wsInspectionId != null ? (
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontFamily: "Inter_400Regular",
+              fontSize: 13,
+              lineHeight: 19,
+            }}
+          >
+            AI analysis has started for this inspection, so site, client, and technician are
+            locked. Notes and suspected pests can still be updated.
+          </Text>
+        ) : null}
         <TextField
           label="Site address *"
           placeholder="123 Main St, Suite 200"
           value={siteAddress}
           onChangeText={setSiteAddress}
+          editable={wsInspectionId == null}
+          style={wsInspectionId != null ? { opacity: 0.5 } : undefined}
         />
         <TextField
           label="Client name"
           placeholder="Acme Restaurant Group"
           value={clientName}
           onChangeText={setClientName}
+          editable={wsInspectionId == null}
+          style={wsInspectionId != null ? { opacity: 0.5 } : undefined}
         />
         <TextField
           label="Technician *"
           placeholder="Your name"
           value={technicianName}
           onChangeText={setTechnicianName}
+          editable={wsInspectionId == null}
+          style={wsInspectionId != null ? { opacity: 0.5 } : undefined}
         />
 
         <View style={{ gap: 8 }}>

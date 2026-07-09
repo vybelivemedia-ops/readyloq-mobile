@@ -21,3 +21,6 @@ description: How automated tests run for the Express api-server (vitest + isolat
 
 ## Pre-existing typecheck failures (do NOT think tests broke them)
 - `pnpm --filter @workspace/api-server run typecheck` already fails on baseline with many `TS7030: Not all code paths return a value` errors in existing route/middleware files (express handlers that `return res.json(...)` in some branches, `next()`/nothing in others). These predate the test work and are unrelated. The added test files introduce zero new typecheck errors. `pnpm build` (esbuild) does not typecheck, so it passes.
+
+## E2E limitation
+The Playwright testing subagent's Clerk override (`testClerkAuth: true`) cannot establish a session on the Expo dev domain (`*.expo.spock.replit.dev`) — it works only for apps served through the standard localhost proxy. Authenticated e2e/screenshots of the Expo app on web are not feasible; verify auth-gated mobile flows on a real device instead.
