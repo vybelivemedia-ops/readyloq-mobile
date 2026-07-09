@@ -2,7 +2,7 @@
   "expo": {
     "name": "ReadyLoq",
     "slug": "readyloq-app",
-    "version": "1.0.0",
+    "version": "0.9.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "readyloq-app",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hgwashingllc.readyloqmobile",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSCameraUsageDescription": "ReadyLoq uses the camera to capture inspection photos of pest activity and conducive conditions for AI analysis.",
         "NSPhotoLibraryUsageDescription": "ReadyLoq saves and attaches inspection photos to your reports.",
@@ -26,7 +26,7 @@
     },
     "android": {
       "package": "com.hgwashingllc.readyloqmobile",
-      "versionCode": 6,
+      "versionCode": 7,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -71,6 +71,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7927cf86-2cbd-4c14-9bd5-d43f2beabec8"
+      }
+    },
+    "owner": "hgwashingllc"
   }
 }

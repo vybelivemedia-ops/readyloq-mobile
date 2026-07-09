@@ -1,0 +1,41 @@
+# Changelog
+
+## ReadyLoq Beta 0.9.0 — "Opportunity Intelligence" (Closed Beta)
+
+Android versionCode 7 · iOS buildNumber 2
+
+### Major Features
+
+- Fold 7 and large-screen optimization
+- Responsive tablet and foldable layouts
+- AI Inspection Workspace
+- Live Report Builder
+- AI Inspection Panel
+- Opportunity Intelligence
+- Inspection Scorecards
+- Customer Property Summaries
+- Sales Proposal Builder
+- Management Intelligence Dashboard
+- Background AI processing
+- Role-based intelligence views
+- Evidence-grounded AI recommendations
+- Anti-fabrication safeguards
+- Secure customer share links
+- Opportunity notes and audit history
+
+### Performance
+
+- Improved stability
+- Background processing improvements
+- SDK 54 alignment
+- Updated package versions
+- Improved build reliability
+
+### Known Upcoming Features
+
+- Company Learning Engine
+- Company Playbooks
+- Property Memory
+- Executive Intelligence Dashboard
+- PestPac Integration
+- FieldRoutes Integration

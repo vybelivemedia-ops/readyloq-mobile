@@ -77,6 +77,22 @@ export default function DashboardScreen() {
             ) : null}
           </View>
           <Pressable
+            onPress={() => router.push("/about" as Href)}
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 21,
+              backgroundColor: colors.card,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 8,
+            }}
+          >
+            <Ionicons name="information-circle-outline" size={20} color={colors.mutedForeground} />
+          </Pressable>
+          <Pressable
             onPress={() => signOut()}
             style={{
               width: 42,

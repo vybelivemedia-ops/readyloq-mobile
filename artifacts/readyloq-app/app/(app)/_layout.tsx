@@ -67,6 +67,7 @@ function Gate() {
       />
       <Stack.Screen name="inspection/[id]" />
       <Stack.Screen name="report/[id]" />
+      <Stack.Screen name="about" />
     </Stack>
   );
 }
