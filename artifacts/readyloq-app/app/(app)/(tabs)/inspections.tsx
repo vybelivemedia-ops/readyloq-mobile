@@ -6,12 +6,14 @@ import { type Href, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 
+import { InspectionDetail } from "@/components/InspectionDetail";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FullScreenLoader } from "@/components/ui/Loader";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
+import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import {
   formatDate,
   formatStatus,
@@ -29,7 +31,9 @@ const FILTERS = [
 export default function InspectionsScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { sizeClass, isExpanded } = useWindowSizeClass();
   const [filter, setFilter] = useState<string>("all");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const { data, isLoading, isRefetching, refetch } = useQuery(
     getListInspectionsQueryOptions(),
@@ -46,8 +50,23 @@ export default function InspectionsScreen() {
     });
   }, [data, filter]);
 
+  // Expanded uses a narrow list pane beside the detail → keep 1 column there.
+  const numColumns = sizeClass === "medium" ? 2 : 1;
+
+  const openItem = (item: Inspection) => {
+    if (isExpanded) setSelectedId(item.id);
+    else router.push(`/inspection/${item.id}` as Href);
+  };
+
   const renderItem = ({ item }: { item: Inspection }) => (
-    <Card onPress={() => router.push(`/inspection/${item.id}` as Href)} style={{ gap: 10 }}>
+    <Card
+      onPress={() => openItem(item)}
+      style={[
+        { gap: 10 },
+        numColumns > 1 && { flex: 1 },
+        isExpanded && selectedId === item.id && { borderColor: colors.primary },
+      ]}
+    >
       <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
         <Text
           numberOfLines={1}
@@ -73,8 +92,8 @@ export default function InspectionsScreen() {
     </Card>
   );
 
-  return (
-    <Screen>
+  const listPane = (
+    <View style={{ flex: 1 }}>
       <View
         style={{
           flexDirection: "row",
@@ -103,13 +122,16 @@ export default function InspectionsScreen() {
         </Pressable>
       </View>
 
-      <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingBottom: 12 }}>
+      <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexWrap: "wrap" }}>
         {FILTERS.map((f) => {
           const active = filter === f.value;
           return (
             <Pressable
               key={f.value}
-              onPress={() => setFilter(f.value)}
+              onPress={() => {
+                setFilter(f.value);
+                setSelectedId(null);
+              }}
               style={{
                 paddingHorizontal: 14,
                 paddingVertical: 8,
@@ -137,9 +159,12 @@ export default function InspectionsScreen() {
         <FullScreenLoader />
       ) : (
         <FlatList
+          key={`cols-${numColumns}`}
           data={items}
           keyExtractor={(i) => String(i.id)}
           renderItem={renderItem}
+          numColumns={numColumns}
+          columnWrapperStyle={numColumns > 1 ? { gap: 12 } : undefined}
           contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 12, flexGrow: 1 }}
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
@@ -155,8 +180,34 @@ export default function InspectionsScreen() {
           }
         />
       )}
-    </Screen>
+    </View>
   );
+
+  if (isExpanded) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, flexDirection: "row" }}>
+          <View style={{ width: 400, borderRightWidth: 1, borderRightColor: colors.border }}>
+            {listPane}
+          </View>
+          <View style={{ flex: 1 }}>
+            {selectedId != null ? (
+              <InspectionDetail key={selectedId} id={selectedId} embedded />
+            ) : (
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 }}>
+                <Ionicons name="clipboard-outline" size={40} color={colors.mutedForeground} />
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 15 }}>
+                  Select an inspection to view details
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Screen>
+    );
+  }
+
+  return <Screen>{listPane}</Screen>;
 }
 
 function Meta({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {

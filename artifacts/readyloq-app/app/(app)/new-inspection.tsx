@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
 import { useColors } from "@/hooks/useColors";
+import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { PEST_TYPES, PROPERTY_TYPES } from "@/constants/inspection";
 import { ApiError } from "@/lib/api";
 import { uploadPhoto } from "@/lib/upload";
@@ -32,6 +33,7 @@ type Photo = { uri: string };
 
 export default function NewInspectionScreen() {
   const colors = useColors();
+  const { isLandscape } = useWindowSizeClass();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
@@ -218,10 +220,71 @@ export default function NewInspectionScreen() {
       );
     }
 
+    const thumbs =
+      photos.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={isLandscape ? { position: "absolute", bottom: 16, left: 0, right: 116 } : undefined}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
+        >
+          {photos.map((p, i) => (
+            <View key={`${p.uri}-${i}`}>
+              <Image source={{ uri: p.uri }} style={{ width: 56, height: 56, borderRadius: 8 }} />
+              <Pressable
+                onPress={() => setPhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                style={{
+                  position: "absolute",
+                  top: -6,
+                  right: -6,
+                  backgroundColor: colors.destructive,
+                  borderRadius: 10,
+                  width: 20,
+                  height: 20,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="close" size={13} color="#fff" />
+              </Pressable>
+            </View>
+          ))}
+        </ScrollView>
+      ) : null;
+
+    const captureButton = (
+      <Pressable
+        onPress={takePhoto}
+        disabled={capturing}
+        style={{
+          width: 76,
+          height: 76,
+          borderRadius: 38,
+          backgroundColor: "rgba(255,255,255,0.25)",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <View style={{ width: 62, height: 62, borderRadius: 31, backgroundColor: "#fff" }} />
+      </Pressable>
+    );
+
+    const doneButton = (
+      <Pressable
+        onPress={() => setStep("review")}
+        disabled={photos.length === 0}
+        style={{ width: 64, alignItems: "center", opacity: photos.length === 0 ? 0.4 : 1 }}
+      >
+        <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 16 }}>
+          Done
+        </Text>
+      </Pressable>
+    );
+
     return (
       <View style={{ flex: 1, backgroundColor: "#000" }}>
         <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" />
-        <View style={{ position: "absolute", top: 0, left: 0, right: 0 }}>
+        <View style={{ position: "absolute", top: 0, left: 0, right: isLandscape ? 116 : 0 }}>
           <Screen edges={["top"]} style={{ backgroundColor: "transparent" }}>
             <View
               style={{
@@ -260,82 +323,55 @@ export default function NewInspectionScreen() {
           </Screen>
         </View>
 
-        <View
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            paddingBottom: 36,
-            paddingTop: 16,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            gap: 16,
-          }}
-        >
-          {photos.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
-            >
-              {photos.map((p, i) => (
-                <View key={`${p.uri}-${i}`}>
-                  <Image source={{ uri: p.uri }} style={{ width: 56, height: 56, borderRadius: 8 }} />
-                  <Pressable
-                    onPress={() => setPhotos((prev) => prev.filter((_, idx) => idx !== i))}
-                    style={{
-                      position: "absolute",
-                      top: -6,
-                      right: -6,
-                      backgroundColor: colors.destructive,
-                      borderRadius: 10,
-                      width: 20,
-                      height: 20,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Ionicons name="close" size={13} color="#fff" />
-                  </Pressable>
-                </View>
-              ))}
-            </ScrollView>
-          ) : null}
-
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingHorizontal: 28,
-            }}
-          >
-            <View style={{ width: 64 }} />
-            <Pressable
-              onPress={takePhoto}
-              disabled={capturing}
+        {isLandscape ? (
+          <>
+            {/* Right-edge control rail: capture stays under the thumb in landscape */}
+            <View
               style={{
-                width: 76,
-                height: 76,
-                borderRadius: 38,
-                backgroundColor: "rgba(255,255,255,0.25)",
+                position: "absolute",
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: 116,
+                backgroundColor: "rgba(0,0,0,0.4)",
                 alignItems: "center",
                 justifyContent: "center",
+                gap: 28,
               }}
             >
-              <View style={{ width: 62, height: 62, borderRadius: 31, backgroundColor: "#fff" }} />
-            </Pressable>
-            <Pressable
-              onPress={() => setStep("review")}
-              disabled={photos.length === 0}
-              style={{ width: 64, alignItems: "center", opacity: photos.length === 0 ? 0.4 : 1 }}
+              {captureButton}
+              {doneButton}
+            </View>
+            {thumbs}
+          </>
+        ) : (
+          <View
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              paddingBottom: 36,
+              paddingTop: 16,
+              backgroundColor: "rgba(0,0,0,0.4)",
+              gap: 16,
+            }}
+          >
+            {thumbs}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingHorizontal: 28,
+              }}
             >
-              <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 16 }}>
-                Done
-              </Text>
-            </Pressable>
+              <View style={{ width: 64 }} />
+              {captureButton}
+              {doneButton}
+            </View>
           </View>
-        </View>
+        )}
       </View>
     );
   }
@@ -345,7 +381,16 @@ export default function NewInspectionScreen() {
     return (
       <Screen edges={["top", "bottom"]} padded>
         <Header title="Review & submit" onClose={() => setStep("capture")} colors={colors} />
-        <ScrollView contentContainerStyle={{ gap: 18, paddingVertical: 12, paddingBottom: 32 }}>
+        <ScrollView
+          contentContainerStyle={{
+            gap: 18,
+            paddingVertical: 12,
+            paddingBottom: 32,
+            width: "100%",
+            maxWidth: 640,
+            alignSelf: "center",
+          }}
+        >
           <SummaryRow label="Site address" value={siteAddress} colors={colors} />
           {clientName ? <SummaryRow label="Client" value={clientName} colors={colors} /> : null}
           <SummaryRow label="Technician" value={technicianName} colors={colors} />
@@ -375,7 +420,7 @@ export default function NewInspectionScreen() {
           ) : null}
         </ScrollView>
 
-        <View style={{ gap: 10, paddingBottom: 8 }}>
+        <View style={{ gap: 10, paddingBottom: 8, width: "100%", maxWidth: 640, alignSelf: "center" }}>
           <Button
             title={photos.length ? "Submit & run AI analysis" : "Submit inspection"}
             size="lg"
@@ -393,7 +438,14 @@ export default function NewInspectionScreen() {
     <Screen edges={["top", "bottom"]} padded>
       <Header title="New inspection" onClose={() => router.back()} colors={colors} />
       <ScrollView
-        contentContainerStyle={{ gap: 16, paddingVertical: 12, paddingBottom: 32 }}
+        contentContainerStyle={{
+          gap: 16,
+          paddingVertical: 12,
+          paddingBottom: 32,
+          width: "100%",
+          maxWidth: 640,
+          alignSelf: "center",
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <TextField
@@ -446,7 +498,7 @@ export default function NewInspectionScreen() {
         />
       </ScrollView>
 
-      <View style={{ paddingBottom: 8 }}>
+      <View style={{ paddingBottom: 8, width: "100%", maxWidth: 640, alignSelf: "center" }}>
         <Button
           title="Continue to camera"
           size="lg"

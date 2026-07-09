@@ -3,7 +3,7 @@
     "name": "ReadyLoq",
     "slug": "readyloq-app",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "readyloq-app",
     "userInterfaceStyle": "dark",
@@ -14,7 +14,7 @@
       "backgroundColor": "#0d1117"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.hgwashingllc.readyloqmobile",
       "buildNumber": "1",
       "infoPlist": {
@@ -26,7 +26,7 @@
     },
     "android": {
       "package": "com.hgwashingllc.readyloqmobile",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",

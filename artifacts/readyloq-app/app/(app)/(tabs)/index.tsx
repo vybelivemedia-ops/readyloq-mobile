@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { formatRelative } from "@/constants/inspection";
 
 export default function DashboardScreen() {
@@ -21,6 +22,7 @@ export default function DashboardScreen() {
   const { user: clerkUser } = useUser();
   const { signOut } = useAuth();
   const { user } = useCurrentUser();
+  const { isCompact } = useWindowSizeClass();
 
   const dash = useQuery(getGetAnalyticsDashboardQueryOptions());
   const recent = useQuery(getListInspectionsQueryOptions());
@@ -48,7 +50,14 @@ export default function DashboardScreen() {
   return (
     <Screen>
       <ScrollView
-        contentContainerStyle={{ padding: 16, gap: 18, paddingBottom: 32 }}
+        contentContainerStyle={{
+          padding: 16,
+          gap: 18,
+          paddingBottom: 32,
+          width: "100%",
+          maxWidth: 900,
+          alignSelf: "center",
+        }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
@@ -123,7 +132,7 @@ export default function DashboardScreen() {
         {/* Stats grid */}
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           {stats.map((s) => (
-            <Card key={s.label} style={{ width: "47.5%", gap: 8 }}>
+            <Card key={s.label} style={{ width: isCompact ? "47.5%" : "23%", gap: 8 }}>
               <Ionicons name={s.icon as keyof typeof Ionicons.glyphMap} size={22} color={s.tone} />
               <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 26 }}>
                 {s.value}

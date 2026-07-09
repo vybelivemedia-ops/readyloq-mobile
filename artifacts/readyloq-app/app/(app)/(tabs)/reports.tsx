@@ -3,25 +3,44 @@ import { getListReportsQueryOptions } from "@/lib/api-client";
 import type { Report } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { FlatList, RefreshControl, Text, View } from "react-native";
 
+import { ReportDetail } from "@/components/ReportDetail";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FullScreenLoader } from "@/components/ui/Loader";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
+import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { formatDate, formatStatus, severityTone, statusTone } from "@/constants/inspection";
 
 export default function ReportsScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { sizeClass, isExpanded } = useWindowSizeClass();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const { data, isLoading, isRefetching, refetch } = useQuery(getListReportsQueryOptions());
 
+  // Expanded uses a narrow list pane beside the detail → keep 1 column there.
+  const numColumns = sizeClass === "medium" ? 2 : 1;
+
+  const openItem = (item: Report) => {
+    if (isExpanded) setSelectedId(item.id);
+    else router.push(`/report/${item.id}` as Href);
+  };
+
   const renderItem = ({ item }: { item: Report }) => (
-    <Card onPress={() => router.push(`/report/${item.id}` as Href)} style={{ gap: 10 }}>
+    <Card
+      onPress={() => openItem(item)}
+      style={[
+        { gap: 10 },
+        numColumns > 1 && { flex: 1 },
+        isExpanded && selectedId === item.id && { borderColor: colors.primary },
+      ]}
+    >
       <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
         <Text
           numberOfLines={2}
@@ -54,8 +73,8 @@ export default function ReportsScreen() {
     </Card>
   );
 
-  return (
-    <Screen>
+  const listPane = (
+    <View style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 }}>
         <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 24 }}>
           Reports
@@ -66,9 +85,12 @@ export default function ReportsScreen() {
         <FullScreenLoader />
       ) : (
         <FlatList
+          key={`cols-${numColumns}`}
           data={data ?? []}
           keyExtractor={(i) => String(i.id)}
           renderItem={renderItem}
+          numColumns={numColumns}
+          columnWrapperStyle={numColumns > 1 ? { gap: 12 } : undefined}
           contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 12, flexGrow: 1 }}
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
@@ -82,6 +104,32 @@ export default function ReportsScreen() {
           }
         />
       )}
-    </Screen>
+    </View>
   );
+
+  if (isExpanded) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, flexDirection: "row" }}>
+          <View style={{ width: 400, borderRightWidth: 1, borderRightColor: colors.border }}>
+            {listPane}
+          </View>
+          <View style={{ flex: 1 }}>
+            {selectedId != null ? (
+              <ReportDetail key={selectedId} id={selectedId} embedded />
+            ) : (
+              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 }}>
+                <Ionicons name="document-text-outline" size={40} color={colors.mutedForeground} />
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 15 }}>
+                  Select a report to view details
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Screen>
+    );
+  }
+
+  return <Screen>{listPane}</Screen>;
 }
