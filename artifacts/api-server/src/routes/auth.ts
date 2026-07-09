@@ -17,7 +17,7 @@ const router: IRouter = Router();
 
 // Roles a manager/owner is allowed to grant via an invite. Owner is never
 // invitable (a company has exactly one owner: whoever created it).
-const INVITABLE_ROLES: UserRole[] = ["manager", "technician"];
+const INVITABLE_ROLES: UserRole[] = ["manager", "sales", "technician"];
 
 function slugify(name: string): string {
   const base = name

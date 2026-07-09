@@ -2113,3 +2113,147 @@ export const ListInvitesResponseItem = zod.object({
 export const ListInvitesResponse = zod.array(ListInvitesResponseItem)
 
 
+/**
+ * @summary List the company's opportunity log (sales, manager, owner)
+ */
+export const ListSalesOpportunitiesQueryParams = zod.object({
+  "status": zod.coerce.string().optional(),
+  "category": zod.coerce.string().optional()
+})
+
+export const ListSalesOpportunitiesResponseItem = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "propertyAddress": zod.string(),
+  "category": zod.enum(['revenue', 'additional_service', 'structural', 'conducive_condition', 'property_risk', 'pest_trend', 'preventative']),
+  "title": zod.string(),
+  "rationale": zod.string(),
+  "fingerprint": zod.string(),
+  "evidenceFindingIds": zod.array(zod.number()),
+  "evidenceImagePaths": zod.array(zod.string()),
+  "estimatedValueTier": zod.enum(['low', 'medium', 'high']),
+  "confidence": zod.number(),
+  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed']),
+  "assignedToUserId": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListSalesOpportunitiesResponse = zod.array(ListSalesOpportunitiesResponseItem)
+
+
+/**
+ * @summary Deterministic aggregates over the opportunity log
+ */
+export const GetSalesOpportunityTrendsResponse = zod.object({
+  "total": zod.number(),
+  "byCategory": zod.record(zod.string(), zod.number()),
+  "byStatus": zod.record(zod.string(), zod.number()),
+  "byTier": zod.record(zod.string(), zod.number()),
+  "topProperties": zod.array(zod.object({
+  "propertyAddress": zod.string(),
+  "count": zod.number()
+}))
+})
+
+
+/**
+ * @summary Get opportunity mining settings (owner only)
+ */
+export const GetOpportunitySettingsResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "enabled": zod.boolean(),
+  "minConfidence": zod.number(),
+  "enabledCategories": zod.array(zod.string()).nullable(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Update opportunity mining settings (owner only)
+ */
+export const UpdateOpportunitySettingsBody = zod.object({
+  "enabled": zod.boolean().optional(),
+  "minConfidence": zod.number().optional(),
+  "enabledCategories": zod.array(zod.string()).nullish()
+})
+
+export const UpdateOpportunitySettingsResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "enabled": zod.boolean(),
+  "minConfidence": zod.number(),
+  "enabledCategories": zod.array(zod.string()).nullable(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Get one opportunity with its audit trail (logs a viewed event)
+ */
+export const GetSalesOpportunityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetSalesOpportunityResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "propertyAddress": zod.string(),
+  "category": zod.enum(['revenue', 'additional_service', 'structural', 'conducive_condition', 'property_risk', 'pest_trend', 'preventative']),
+  "title": zod.string(),
+  "rationale": zod.string(),
+  "fingerprint": zod.string(),
+  "evidenceFindingIds": zod.array(zod.number()),
+  "evidenceImagePaths": zod.array(zod.string()),
+  "estimatedValueTier": zod.enum(['low', 'medium', 'high']),
+  "confidence": zod.number(),
+  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed']),
+  "assignedToUserId": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}).and(zod.object({
+  "events": zod.array(zod.object({
+  "id": zod.number(),
+  "opportunityId": zod.number(),
+  "userId": zod.number().nullish(),
+  "action": zod.enum(['created', 'strengthened', 'viewed', 'status_changed', 'assigned']),
+  "detail": zod.record(zod.string(), zod.unknown()).nullish(),
+  "createdAt": zod.string()
+}))
+}))
+
+
+/**
+ * @summary Update status or assignment (dismiss requires manager+)
+ */
+export const UpdateSalesOpportunityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSalesOpportunityBody = zod.object({
+  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed']).optional(),
+  "assignedToUserId": zod.number().nullish()
+})
+
+export const UpdateSalesOpportunityResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "propertyAddress": zod.string(),
+  "category": zod.enum(['revenue', 'additional_service', 'structural', 'conducive_condition', 'property_risk', 'pest_trend', 'preventative']),
+  "title": zod.string(),
+  "rationale": zod.string(),
+  "fingerprint": zod.string(),
+  "evidenceFindingIds": zod.array(zod.number()),
+  "evidenceImagePaths": zod.array(zod.string()),
+  "estimatedValueTier": zod.enum(['low', 'medium', 'high']),
+  "confidence": zod.number(),
+  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed']),
+  "assignedToUserId": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+

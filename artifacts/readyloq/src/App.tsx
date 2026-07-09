@@ -11,7 +11,7 @@ import { Layout } from "@/components/layout";
 import { BrandingProvider, useBranding } from "@/components/branding-provider";
 import { brandLogoSrc, absoluteUrl } from "@/lib/branding";
 import type { BrandingProfile } from "@workspace/api-client-react";
-import { useCurrentUser, isManagerRole } from "@/hooks/use-current-user";
+import { useCurrentUser, isManagerRole, isSalesRole } from "@/hooks/use-current-user";
 import Dashboard from "@/pages/dashboard";
 import InspectionsList from "@/pages/inspections/index";
 import NewInspection from "@/pages/inspections/new";
@@ -34,6 +34,7 @@ import SettingsPage from "@/pages/settings";
 import CapabilityCenter from "@/pages/capability";
 import Onboarding from "@/pages/onboarding";
 import BetaCenter from "@/pages/beta/index";
+import OpportunitiesPage from "@/pages/opportunities";
 import { BetaPaused } from "@/components/beta-paused";
 
 const queryClient = new QueryClient({
@@ -202,6 +203,7 @@ function ProtectedRoutes() {
   }
 
   const isManager = isManagerRole(currentUser.role);
+  const isSales = isSalesRole(currentUser.role);
 
   return (
     <Layout>
@@ -223,6 +225,7 @@ function ProtectedRoutes() {
         <Route path="/intelligence/review" component={IntelligenceReview} />
         <Route path="/intelligence/analytics" component={IntelligenceAnalytics} />
         <Route path="/analytics" component={AnalyticsDashboard} />
+        {isSales && <Route path="/opportunities" component={OpportunitiesPage} />}
         {isManager && <Route path="/command" component={CommandCenter} />}
         {isManager && <Route path="/beta" component={BetaCenter} />}
         <Route path="/settings" component={SettingsPage} />

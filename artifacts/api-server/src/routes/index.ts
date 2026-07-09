@@ -19,6 +19,7 @@ import propertiesRouter from "./properties";
 import storageRouter from "./storage";
 import leadsRouter from "./leads";
 import betaRouter from "./beta";
+import opportunitiesRouter from "./opportunities";
 
 const router: IRouter = Router();
 
@@ -58,5 +59,16 @@ router.use("/properties", requireAuth, requireCompany, requireBetaAccess, proper
 // Beta Center + all-user feedback. NOT behind requireBetaAccess so a paused
 // technician can still submit feedback and report client-side errors.
 router.use("/beta", requireAuth, requireCompany, betaRouter);
+// Opportunity Intelligence — the hidden Opportunity Log. Technicians are
+// excluded at the API layer: requireRole("sales") means sales, manager, and
+// owner only. Dismiss/settings are gated higher inside the router.
+router.use(
+  "/opportunities",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("sales"),
+  opportunitiesRouter,
+);
 
 export default router;

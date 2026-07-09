@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/react";
 
-export type UserRole = "technician" | "manager" | "owner";
+export type UserRole = "technician" | "sales" | "manager" | "owner";
 
 export type CurrentUser = {
   id: number;
@@ -19,6 +19,16 @@ export type CurrentUser = {
  */
 export function isManagerRole(role: UserRole | null | undefined): boolean {
   return role === "manager" || role === "owner";
+}
+
+/**
+ * Opportunity Intelligence gate: sales, managers, and owners can see the
+ * Opportunity Log. Technicians never can — mirrors the server's
+ * requireRole("sales") mount so the nav item and route stay consistent
+ * with the API-layer 403.
+ */
+export function isSalesRole(role: UserRole | null | undefined): boolean {
+  return role === "sales" || role === "manager" || role === "owner";
 }
 
 export function useCurrentUser() {

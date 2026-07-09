@@ -1232,6 +1232,114 @@ paths:
                 items:
                   $ref: "#/components/schemas/Invite"
 
+  # ── OPPORTUNITY INTELLIGENCE (hidden log, sales+ only) ──────────────────────
+  /opportunities:
+    get:
+      operationId: listSalesOpportunities
+      tags: [opportunities]
+      summary: List the company's opportunity log (sales, manager, owner)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+        - name: category
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalesOpportunity"
+
+  /opportunities/trends:
+    get:
+      operationId: getSalesOpportunityTrends
+      tags: [opportunities]
+      summary: Deterministic aggregates over the opportunity log
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOpportunityTrends"
+
+  /opportunities/settings:
+    get:
+      operationId: getOpportunitySettings
+      tags: [opportunities]
+      summary: Get opportunity mining settings (owner only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunitySettings"
+    patch:
+      operationId: updateOpportunitySettings
+      tags: [opportunities]
+      summary: Update opportunity mining settings (owner only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpportunitySettingsUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunitySettings"
+
+  /opportunities/{id}:
+    get:
+      operationId: getSalesOpportunity
+      tags: [opportunities]
+      summary: Get one opportunity with its audit trail (logs a viewed event)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOpportunityDetail"
+    patch:
+      operationId: updateSalesOpportunity
+      tags: [opportunities]
+      summary: Update status or assignment (dismiss requires manager+)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalesOpportunityUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOpportunity"
+
 components:
   schemas:
     OkResponse:
@@ -2445,3 +2553,101 @@ components:
         zone:       { type: string }
         category:   { type: string }
         authorName: { type: string }
+
+    SalesOpportunity:
+      type: object
+      required: [id, companyId, inspectionId, propertyAddress, category, title, rationale, fingerprint, evidenceFindingIds, evidenceImagePaths, estimatedValueTier, confidence, status, assignedToUserId, createdAt, updatedAt]
+      properties:
+        id:                 { type: integer }
+        companyId:          { type: integer }
+        inspectionId:       { type: integer }
+        propertyAddress:    { type: string }
+        category:           { type: string, enum: [revenue, additional_service, structural, conducive_condition, property_risk, pest_trend, preventative] }
+        title:              { type: string }
+        rationale:          { type: string }
+        fingerprint:        { type: string }
+        evidenceFindingIds:
+          type: array
+          items: { type: integer }
+        evidenceImagePaths:
+          type: array
+          items: { type: string }
+        estimatedValueTier: { type: string, enum: [low, medium, high] }
+        confidence:         { type: number }
+        status:             { type: string, enum: [new, reviewed, quoted, won, dismissed] }
+        assignedToUserId:   { type: ["integer", "null"] }
+        createdAt:          { type: string }
+        updatedAt:          { type: string }
+
+    SalesOpportunityEvent:
+      type: object
+      required: [id, opportunityId, action, createdAt]
+      properties:
+        id:            { type: integer }
+        opportunityId: { type: integer }
+        userId:        { type: ["integer", "null"] }
+        action:        { type: string, enum: [created, strengthened, viewed, status_changed, assigned] }
+        detail:        { type: ["object", "null"], additionalProperties: true }
+        createdAt:     { type: string }
+
+    SalesOpportunityDetail:
+      allOf:
+        - $ref: "#/components/schemas/SalesOpportunity"
+        - type: object
+          required: [events]
+          properties:
+            events:
+              type: array
+              items:
+                $ref: "#/components/schemas/SalesOpportunityEvent"
+
+    SalesOpportunityUpdate:
+      type: object
+      properties:
+        status:           { type: string, enum: [new, reviewed, quoted, won, dismissed] }
+        assignedToUserId: { type: ["integer", "null"] }
+
+    SalesOpportunityTrends:
+      type: object
+      required: [total, byCategory, byStatus, byTier, topProperties]
+      properties:
+        total: { type: integer }
+        byCategory:
+          type: object
+          additionalProperties: { type: integer }
+        byStatus:
+          type: object
+          additionalProperties: { type: integer }
+        byTier:
+          type: object
+          additionalProperties: { type: integer }
+        topProperties:
+          type: array
+          items:
+            type: object
+            required: [propertyAddress, count]
+            properties:
+              propertyAddress: { type: string }
+              count:           { type: integer }
+
+    OpportunitySettings:
+      type: object
+      required: [id, companyId, enabled, minConfidence, enabledCategories, updatedAt]
+      properties:
+        id:            { type: integer }
+        companyId:     { type: integer }
+        enabled:       { type: boolean }
+        minConfidence: { type: number }
+        enabledCategories:
+          type: ["array", "null"]
+          items: { type: string }
+        updatedAt:     { type: string }
+
+    OpportunitySettingsUpdate:
+      type: object
+      properties:
+        enabled:       { type: boolean }
+        minConfidence: { type: number }
+        enabledCategories:
+          type: ["array", "null"]
+          items: { type: string }

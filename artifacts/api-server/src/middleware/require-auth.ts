@@ -52,10 +52,14 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 
 // Role hierarchy: an owner satisfies any manager-or-below check, a manager
 // satisfies technician checks, etc. Higher rank ⇒ more authority.
+// `sales` sits between technician and manager: it unlocks the Opportunity
+// Intelligence routes (requireRole("sales")) while every existing
+// requireRole("manager") gate still excludes it.
 const ROLE_RANK: Record<UserRole, number> = {
   technician: 0,
-  manager: 1,
-  owner: 2,
+  sales: 1,
+  manager: 2,
+  owner: 3,
 };
 
 export const requireRole =

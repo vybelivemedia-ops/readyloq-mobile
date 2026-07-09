@@ -13,13 +13,14 @@ import {
   Brain,
   Rocket,
   MessageSquarePlus,
+  Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useClerk, useUser } from "@clerk/react";
-import { useCurrentUser, isManagerRole } from "@/hooks/use-current-user";
+import { useCurrentUser, isManagerRole, isSalesRole } from "@/hooks/use-current-user";
 import { useBranding } from "@/components/branding-provider";
 import { brandLogoSrc } from "@/lib/branding";
 import { FeedbackDialog } from "@/components/feedback-dialog";
@@ -38,6 +39,7 @@ const baseNavItems = [
 
 const commandNavItem = { href: "/command", label: "Command", icon: Crosshair };
 const betaNavItem = { href: "/beta", label: "Beta Center", icon: Rocket };
+const opportunitiesNavItem = { href: "/opportunities", label: "Opportunities", icon: Lightbulb };
 const settingsNavItem = { href: "/settings", label: "Settings", icon: Settings };
 
 const mobileNavItems = [
@@ -64,18 +66,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const logoSrc = brandLogoSrc(branding);
   const companyName = branding.companyName;
   const isManager = isManagerRole(currentUser?.role);
+  const isSales = isSalesRole(currentUser?.role);
 
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const navItems = [
     ...baseNavItems,
+    ...(isSales ? [opportunitiesNavItem] : []),
     ...(isManager ? [commandNavItem, betaNavItem] : []),
     settingsNavItem,
   ];
 
   const displayName = user?.fullName || user?.emailAddresses?.[0]?.emailAddress || "User";
   const initials = displayName[0]?.toUpperCase() ?? "U";
-  const roleLabel = currentUser?.role === "manager" ? "Manager" : "Technician";
+  const roleLabel =
+    currentUser?.role === "owner"
+      ? "Owner"
+      : currentUser?.role === "manager"
+        ? "Manager"
+        : currentUser?.role === "sales"
+          ? "Sales"
+          : "Technician";
 
   const NavLinks = ({ onClick }: { onClick?: () => void }) => (
     <>

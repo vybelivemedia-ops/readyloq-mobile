@@ -1,7 +1,10 @@
 import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { companiesTable } from "./companies";
 
-export type UserRole = "owner" | "manager" | "technician";
+// Rank order (see api-server require-auth ROLE_RANK):
+// technician < sales < manager < owner. `sales` exists for Opportunity
+// Intelligence: it can see the Opportunity Log but gains NO manager powers.
+export type UserRole = "owner" | "manager" | "sales" | "technician";
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),

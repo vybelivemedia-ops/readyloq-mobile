@@ -10,6 +10,7 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { analyzePhoto } from "../lib/intelligence-ai";
+import { runOpportunitySynthesis } from "../lib/opportunity-ai";
 import { objectPathCompanyScope } from "../lib/objectStorage";
 import { logErrorEvent } from "../lib/error-events";
 
@@ -382,6 +383,15 @@ router.post("/analyze", async (req, res) => {
         riskLevel,
       })
       .returning();
+
+    // Opportunity Intelligence: mine the verified findings for business
+    // opportunities in the background. Fire-and-forget — the technician's
+    // response is never delayed or widened by it, and failures only log.
+    void runOpportunitySynthesis({
+      companyId,
+      inspectionId,
+      findings: mergedFindings,
+    });
 
     return res.status(201).json({ ...serializeResult(row), analysisErrors });
   } catch (err) {

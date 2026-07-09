@@ -1217,6 +1217,143 @@ export interface PropertyNoteInput {
   authorName?: string;
 }
 
+export type SalesOpportunityCategory = typeof SalesOpportunityCategory[keyof typeof SalesOpportunityCategory];
+
+
+export const SalesOpportunityCategory = {
+  revenue: 'revenue',
+  additional_service: 'additional_service',
+  structural: 'structural',
+  conducive_condition: 'conducive_condition',
+  property_risk: 'property_risk',
+  pest_trend: 'pest_trend',
+  preventative: 'preventative',
+} as const;
+
+export type SalesOpportunityEstimatedValueTier = typeof SalesOpportunityEstimatedValueTier[keyof typeof SalesOpportunityEstimatedValueTier];
+
+
+export const SalesOpportunityEstimatedValueTier = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export type SalesOpportunityStatus = typeof SalesOpportunityStatus[keyof typeof SalesOpportunityStatus];
+
+
+export const SalesOpportunityStatus = {
+  new: 'new',
+  reviewed: 'reviewed',
+  quoted: 'quoted',
+  won: 'won',
+  dismissed: 'dismissed',
+} as const;
+
+export interface SalesOpportunity {
+  id: number;
+  companyId: number;
+  inspectionId: number;
+  propertyAddress: string;
+  category: SalesOpportunityCategory;
+  title: string;
+  rationale: string;
+  fingerprint: string;
+  evidenceFindingIds: number[];
+  evidenceImagePaths: string[];
+  estimatedValueTier: SalesOpportunityEstimatedValueTier;
+  confidence: number;
+  status: SalesOpportunityStatus;
+  /** @nullable */
+  assignedToUserId: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SalesOpportunityEventAction = typeof SalesOpportunityEventAction[keyof typeof SalesOpportunityEventAction];
+
+
+export const SalesOpportunityEventAction = {
+  created: 'created',
+  strengthened: 'strengthened',
+  viewed: 'viewed',
+  status_changed: 'status_changed',
+  assigned: 'assigned',
+} as const;
+
+/**
+ * @nullable
+ */
+export type SalesOpportunityEventDetail = { [key: string]: unknown } | null;
+
+export interface SalesOpportunityEvent {
+  id: number;
+  opportunityId: number;
+  /** @nullable */
+  userId?: number | null;
+  action: SalesOpportunityEventAction;
+  /** @nullable */
+  detail?: SalesOpportunityEventDetail;
+  createdAt: string;
+}
+
+export type SalesOpportunityDetail = SalesOpportunity & {
+  events: SalesOpportunityEvent[];
+};
+
+export type SalesOpportunityUpdateStatus = typeof SalesOpportunityUpdateStatus[keyof typeof SalesOpportunityUpdateStatus];
+
+
+export const SalesOpportunityUpdateStatus = {
+  new: 'new',
+  reviewed: 'reviewed',
+  quoted: 'quoted',
+  won: 'won',
+  dismissed: 'dismissed',
+} as const;
+
+export interface SalesOpportunityUpdate {
+  status?: SalesOpportunityUpdateStatus;
+  /** @nullable */
+  assignedToUserId?: number | null;
+}
+
+export type SalesOpportunityTrendsByCategory = {[key: string]: number};
+
+export type SalesOpportunityTrendsByStatus = {[key: string]: number};
+
+export type SalesOpportunityTrendsByTier = {[key: string]: number};
+
+export type SalesOpportunityTrendsTopPropertiesItem = {
+  propertyAddress: string;
+  count: number;
+};
+
+export interface SalesOpportunityTrends {
+  total: number;
+  byCategory: SalesOpportunityTrendsByCategory;
+  byStatus: SalesOpportunityTrendsByStatus;
+  byTier: SalesOpportunityTrendsByTier;
+  topProperties: SalesOpportunityTrendsTopPropertiesItem[];
+}
+
+export interface OpportunitySettings {
+  id: number;
+  companyId: number;
+  enabled: boolean;
+  minConfidence: number;
+  /** @nullable */
+  enabledCategories: string[] | null;
+  updatedAt: string;
+}
+
+export interface OpportunitySettingsUpdate {
+  enabled?: boolean;
+  minConfidence?: number;
+  /** @nullable */
+  enabledCategories?: string[] | null;
+}
+
 export type ListInspectionsParams = {
 status?: string;
 /**
@@ -1289,5 +1426,10 @@ siteAddress: string;
 export type ListFeedbackParams = {
 type?: string;
 status?: string;
+};
+
+export type ListSalesOpportunitiesParams = {
+status?: string;
+category?: string;
 };
 
