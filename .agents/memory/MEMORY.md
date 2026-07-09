@@ -1,5 +1,5 @@
 - [ReadyLoq Architecture](readyloq-architecture.md) — stack, conventions, API routes, real-capture/no-simulation beta model (0–1 confidence, batched AI), Wouter base path fix
 - [ReadyLoq multi-tenancy](readyloq-multitenancy.md) — per-company isolation rules, reserved platform/legacy companies, storage scoping, vitest harness, frontend typecheck gotcha
 - [API Server Testing](api-server-testing.md) — vitest + isolated `<db>_test` DB + Clerk getAuth mock; pre-existing TS7030 typecheck failures are baseline
-- [EAS Monorepo Setup](eas-monorepo.md) — root-level app.json causes "expo package not found" even when eas.json is in a subdirectory; readyloq-mobile/ is the Expo root
+- [EAS build setup](eas-monorepo.md) — artifacts/readyloq-app is the REAL app (readyloq-mobile/ is a decoy skeleton); build with EAS_NO_VCS=1 + node pinned in eas.json
 - [ReadyLoq native Windows/EAS build](readyloq-native-windows-build.md) — "build.ninja still dirty" is a Windows toolchain issue not a repo bug; EAS cloud build bypasses it; standalone eas.json setup

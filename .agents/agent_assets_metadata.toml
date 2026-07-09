@@ -59,3 +59,9 @@ id = "tmqSGHG8r3mvrB8imrBWU"
 uri = "file://readyloq-native-app.zip"
 type = "unspecified"
 title = "ReadyLoq native app (versionCode 6) — EAS build package"
+
+[[outputs]]
+id = "sn1Casd3UQhTpnKL4qsOG"
+uri = "file://exports/readyloq-beta-0.9.0-apk-qr.png"
+type = "image"
+title = "ReadyLoq Beta 0.9.0 — APK Download QR Code"

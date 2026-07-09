@@ -1,18 +1,22 @@
 ---
-name: EAS Monorepo Setup
-description: Non-obvious EAS/Expo configuration for the readyloq-mobile subdirectory in a pnpm monorepo
+name: EAS build setup for ReadyLoq
+description: Which Expo project is the real buildable app, how EAS cloud builds run from the pnpm monorepo, and the non-obvious failure modes
 ---
 
-## Rule
-Never allow a root-level `app.json` to exist when the Expo app lives in a subdirectory (`readyloq-mobile/`). EAS cloud build workers scan the git root first; if they find an `app.json` there, they treat the repo root as the Expo project and fail with "The expo package was not found" because `expo` is not in the root `package.json`.
+## The real app is artifacts/readyloq-app — NOT readyloq-mobile/
+`readyloq-mobile/` at git-root level is a bare create-expo-app skeleton ("Open up App.tsx…") that only holds an old EAS projectId (f7de276e…). Never build it. The canonical app is `artifacts/readyloq-app` (expo-router, Clerk, camera), linked to its own EAS project (projectId lives in its app.json `extra.eas.projectId`; created via `eas init --non-interactive --force`).
 
-**Why:** EAS Cloud Build clones the full git repo at the git root. A root `app.json` overrides subdirectory project detection. Root `package.json` is the pnpm workspace root (no expo dep) + has a preinstall hook that rejects npm/yarn, making any EAS install attempt at root doubly fatal.
+**Why:** Both dirs contain app.json + eas.json; a naive agent will build the skeleton. The GitHub origin remote is even named readyloq-mobile.git, adding to the confusion.
 
-**How to apply:** If EAS builds fail with "expo package not found" during Prebuild, check for a stale `app.json` at the git root before anything else.
+## Proven EAS cloud build recipe (from this monorepo)
+- Run from `artifacts/readyloq-app` with `EAS_NO_VCS=1` — this packs ONLY the app dir (~800 KB, no workspace root, no lockfile) and sidesteps the dirty-git-tree block (agent cannot git commit).
+- No lockfile ⇒ EAS runs `yarn install` with fresh resolution every build. Transitive deps can drift: `@wallet-standard/app` began requiring Node ≥22 while the EAS image default was Node 20 ⇒ Install-dependencies phase failure. **Fix:** pin `"node": "22.14.0"` in every eas.json build profile.
+- `eas build --non-interactive --no-wait --json` then poll `eas build:view <id> --json`. Submission (upload+fingerprint) can exceed a 2-min shell timeout — run it with nohup in the background; add `EAS_SKIP_AUTO_FINGERPRINT=1` to speed it up.
+- Fetch failed-build logs via GraphQL: POST api.expo.dev/graphql with `Authorization: Bearer $EXPO_TOKEN`, query `{ builds { byId(buildId:"…") { logFiles } } }`; download with `curl --compressed` (files are gzip NDJSON).
+- The "custom metro.config.js does not extend @expo/metro-config" warning is a false positive when the config is `getDefaultConfig(__dirname)` from expo/metro-config.
 
-## readyloq-mobile layout (correct state)
-- `readyloq-mobile/` — Expo project root, EAS project ID `f7de276e-8765-4a57-9b97-1218c90b6ed7`
-- `readyloq-mobile/eas.json` — EAS build profiles, intentionally inside the subdirectory
-- `readyloq-mobile/package-lock.json` — npm lockfile for `npm ci` on EAS cloud (NOT pnpm)
-- `readyloq-mobile/` is intentionally excluded from `pnpm-workspace.yaml` (manages own deps via npm)
-- `android/` and `ios/` are gitignored — EAS cloud regenerates them via `expo prebuild`
+## Rule that still holds
+Never allow a root-level `app.json` at the git root — EAS workers treat the repo root as the Expo project and fail with "expo package not found". Env vars (EXPO_PUBLIC_*) must live in per-profile `env` blocks of eas.json, not .env (gitignored ⇒ excluded from upload). Bump android.versionCode every release so APKs install over old ones.
+
+## GitHub push
+No GitHub connector/credentials exist in the workspace shell — `git push origin main` fails with auth error. User must push via the Replit Git pane or connect GitHub.
