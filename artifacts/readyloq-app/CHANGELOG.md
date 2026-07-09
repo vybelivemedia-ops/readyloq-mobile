@@ -1,5 +1,13 @@
 # Changelog
 
+## ReadyLoq Beta 0.9.0 (build 9) — hotfix
+
+Android versionCode 9 · iOS buildNumber 2
+
+### Fixes
+
+- App now signs in against the production authentication system (same accounts as readyloq.com) instead of the development one — fixes "workspace won't load" (401) after signing in
+
 ## ReadyLoq Beta 0.9.0 (build 8) — hotfix
 
 Android versionCode 8 · iOS buildNumber 2
