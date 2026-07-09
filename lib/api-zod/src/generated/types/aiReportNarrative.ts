@@ -21,4 +21,6 @@ export interface AiReportNarrative {
   propertyType: string;
   model: string;
   generatedAt: string;
+  conduciveConditions?: string;
+  customerRecommendations?: string[];
 }

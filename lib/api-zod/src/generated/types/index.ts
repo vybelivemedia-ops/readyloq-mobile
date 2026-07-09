@@ -50,6 +50,7 @@ export * from './errorEventList';
 export * from './errorEventListSummary';
 export * from './feedbackInput';
 export * from './finding';
+export * from './generateNarrativeInput';
 export * from './getAnalyticsTrendsParams';
 export * from './healthStatus';
 export * from './highRiskProperty';

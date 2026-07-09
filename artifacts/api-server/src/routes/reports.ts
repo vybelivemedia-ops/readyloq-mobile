@@ -69,8 +69,10 @@ router.post("/", async (req, res) => {
             eq(analysisResultsTable.companyId, companyId),
             eq(analysisResultsTable.inspectionId, inspectionId),
           ),
-        );
-      const latest = analyses[analyses.length - 1];
+        )
+        .orderBy(desc(analysisResultsTable.createdAt))
+        .limit(1);
+      const latest = analyses[0];
       if (latest) {
         findings = (latest.findings ?? []) as any[];
         recommendations = (latest.recommendations ?? []) as string[];
@@ -189,8 +191,33 @@ router.post("/:id/generate-narrative", async (req, res) => {
           eq(analysisResultsTable.companyId, companyId),
           eq(analysisResultsTable.inspectionId, report.inspectionId),
         ),
-      );
-    const riskLevel: string | null = analyses[analyses.length - 1]?.riskLevel ?? null;
+      )
+      .orderBy(desc(analysisResultsTable.createdAt))
+      .limit(1);
+    const latestAnalysis = analyses[0];
+    const riskLevel: string | null = latestAnalysis?.riskLevel ?? null;
+
+    // Live report builder: re-snapshot findings/recommendations from the
+    // inspection's latest AI analysis so the narrative always reflects the
+    // most recent detections instead of the snapshot taken at report creation.
+    let reportFindings = report.findings ?? [];
+    let reportRecommendations = report.recommendations ?? [];
+    if (req.body?.refreshFindings === true && latestAnalysis) {
+      reportFindings = latestAnalysis.findings ?? [];
+      reportRecommendations = latestAnalysis.recommendations ?? [];
+      const exclusionOpportunities = reportFindings
+        .filter((f) => f.exclusionOpportunity)
+        .map((f) => `${f.category}: ${f.description}`);
+      await db
+        .update(reportsTable)
+        .set({
+          findings: reportFindings,
+          recommendations: reportRecommendations,
+          exclusionOpportunities,
+          severity: inspection.severity ?? report.severity ?? null,
+        })
+        .where(and(eq(reportsTable.id, id), eq(reportsTable.companyId, companyId)));
+    }
 
     const narrative = await generateReportNarrative({
       title: report.title,
@@ -198,14 +225,17 @@ router.post("/:id/generate-narrative", async (req, res) => {
       clientName: report.clientName ?? null,
       technicianName: report.technicianName,
       inspectionDate: report.inspectionDate,
-      severity: report.severity ?? null,
+      severity:
+        req.body?.refreshFindings === true
+          ? (inspection.severity ?? report.severity ?? null)
+          : (report.severity ?? null),
       propertyType: derivePropertyType(inspection.notes),
       inspectionType: null,
       pestTypes: (inspection.pestTypes ?? []) as string[],
       fieldNotes: inspection.notes ?? null,
       treatmentNotes: report.treatmentNotes ?? null,
-      findings: report.findings ?? [],
-      recommendations: report.recommendations ?? [],
+      findings: reportFindings,
+      recommendations: reportRecommendations,
       voiceTranscripts,
       photoLabels,
       photoCount: photoMedia.length,

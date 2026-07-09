@@ -37,6 +37,7 @@ import type {
   Error,
   ErrorEventList,
   FeedbackInput,
+  GenerateNarrativeInput,
   GetAnalyticsTrendsParams,
   HealthStatus,
   InfestationRisk,
@@ -2288,14 +2289,16 @@ export const getGenerateReportNarrativeUrl = (id: number,) => {
 /**
  * @summary Generate or regenerate the AI narrative report
  */
-export const generateReportNarrative = async (id: number, options?: RequestInit): Promise<Report> => {
+export const generateReportNarrative = async (id: number,
+    generateNarrativeInput?: GenerateNarrativeInput, options?: RequestInit): Promise<Report> => {
 
   return customFetch<Report>(getGenerateReportNarrativeUrl(id),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generateNarrativeInput,)
   }
 );}
 
@@ -2303,8 +2306,8 @@ export const generateReportNarrative = async (id: number, options?: RequestInit)
 
 
 export const getGenerateReportNarrativeMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportNarrative>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof generateReportNarrative>>, TError,{id: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportNarrative>>, TError,{id: number;data?: BodyType<GenerateNarrativeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateReportNarrative>>, TError,{id: number;data?: BodyType<GenerateNarrativeInput>}, TContext> => {
 
 const mutationKey = ['generateReportNarrative'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -2316,10 +2319,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateReportNarrative>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateReportNarrative>>, {id: number;data?: BodyType<GenerateNarrativeInput>}> = (props) => {
+          const {id,data} = props ?? {};
 
-          return  generateReportNarrative(id,requestOptions)
+          return  generateReportNarrative(id,data,requestOptions)
         }
 
 
@@ -2330,18 +2333,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type GenerateReportNarrativeMutationResult = NonNullable<Awaited<ReturnType<typeof generateReportNarrative>>>
-
+    export type GenerateReportNarrativeMutationBody = BodyType<GenerateNarrativeInput> | undefined
     export type GenerateReportNarrativeMutationError = ErrorType<unknown>
 
     /**
  * @summary Generate or regenerate the AI narrative report
  */
 export const useGenerateReportNarrative = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportNarrative>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateReportNarrative>>, TError,{id: number;data?: BodyType<GenerateNarrativeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof generateReportNarrative>>,
         TError,
-        {id: number},
+        {id: number;data?: BodyType<GenerateNarrativeInput>},
         TContext
       > => {
       return useMutation(getGenerateReportNarrativeMutationOptions(options));

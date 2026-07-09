@@ -88,8 +88,10 @@ function AiNarrativeView({ narrative }: { narrative: AiReportNarrative }) {
       <ProseSection icon={Eye} title="Evidence Observed" text={narrative.evidenceObserved} />
       <ProseSection icon={AlertTriangle} title="Pest Activity Assessment" text={narrative.pestActivityAssessment} />
       <ProseSection icon={ShieldCheck} title="Structural Deficiencies" text={narrative.structuralDeficiencies} />
+      <ProseSection icon={AlertTriangle} title="Conducive Conditions" text={narrative.conduciveConditions ?? ""} />
       <ProseSection icon={Lightbulb} title="Sanitation Concerns" text={narrative.sanitationConcerns} />
       <ListSection icon={CheckCircle2} title="Recommended Corrective Actions" items={narrative.recommendedCorrectiveActions} />
+      <ListSection icon={User} title="Customer Recommendations" items={narrative.customerRecommendations ?? []} />
       <ListSection icon={ShieldCheck} title="Monitoring Recommendations" items={narrative.monitoringRecommendations} />
       <ProseSection icon={Calendar} title="Follow-Up Schedule" text={narrative.followUpSchedule} />
       <ProseSection icon={User} title="Technician Notes" text={narrative.technicianNotes} />

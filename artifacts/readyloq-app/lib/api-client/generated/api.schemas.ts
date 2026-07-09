@@ -743,6 +743,8 @@ export interface AiReportNarrative {
   propertyType: string;
   model: string;
   generatedAt: string;
+  conduciveConditions?: string;
+  customerRecommendations?: string[];
 }
 
 export interface Report {
@@ -766,6 +768,11 @@ export interface Report {
   pdfUrl?: string | null;
   aiNarrative?: null | AiReportNarrative;
   createdAt: string;
+}
+
+export interface GenerateNarrativeInput {
+  /** When true, re-snapshot the report's findings and recommendations from the inspection's latest AI analysis before generating the narrative (used by the live report builder). */
+  refreshFindings?: boolean;
 }
 
 export interface ReportInput {

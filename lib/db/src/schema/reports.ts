@@ -27,6 +27,12 @@ export interface AiReportNarrative {
   propertyType: string;
   model: string;
   generatedAt: string;
+  /**
+   * Optional for backward compatibility with narratives generated before
+   * these sections existed; always present on new generations.
+   */
+  conduciveConditions?: string;
+  customerRecommendations?: string[];
 }
 
 export const reportsTable = pgTable("reports", {

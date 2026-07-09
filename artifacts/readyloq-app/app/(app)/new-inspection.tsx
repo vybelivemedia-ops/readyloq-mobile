@@ -5,7 +5,10 @@ import {
   useAddInspectionMedia,
   useAnalyzeInspection,
   useCreateInspection,
+  useGenerateReport,
+  useGenerateReportNarrative,
   useUpdateInspection,
+  type Report,
 } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -52,6 +55,8 @@ export default function NewInspectionScreen() {
   const addMedia = useAddInspectionMedia();
   const analyze = useAnalyzeInspection();
   const updateInspection = useUpdateInspection();
+  const generateReport = useGenerateReport();
+  const generateNarrative = useGenerateReportNarrative();
 
   const [step, setStep] = useState<Step>("setup");
   const [siteAddress, setSiteAddress] = useState("");
@@ -84,6 +89,16 @@ export default function NewInspectionScreen() {
   // duplicate inspection or re-upload photos that already succeeded.
   const createdInspectionId = useRef<number | null>(null);
   const uploadedUrls = useRef<string[]>([]);
+
+  // Live report builder state. The report is created once per inspection and
+  // its AI narrative regenerated (with a fresh findings snapshot) after every
+  // analysis run, so the draft always reflects the latest real detections.
+  const [wsReport, setWsReport] = useState<Report | null>(null);
+  const [wsReportBuilding, setWsReportBuilding] = useState(false);
+  const [wsReportError, setWsReportError] = useState<string | null>(null);
+  const wsReportId = useRef<number | null>(null);
+  const wsReportRunning = useRef(false);
+  const wsReportStale = useRef(false);
 
   const wsAnalysisQ = useQuery({
     ...getListAnalysisResultsQueryOptions({ inspectionId: wsInspectionId ?? 0 }),
@@ -157,6 +172,9 @@ export default function NewInspectionScreen() {
       });
       analyzedCount.current = uploadedUrls.current.length;
       await queryClient.invalidateQueries();
+      // New verified detections exist — rebuild the live report in the
+      // background while the technician keeps capturing.
+      void buildLiveReport(id);
     } catch (e) {
       setWsError(e instanceof ApiError ? e.message : (e as Error).message);
     } finally {
@@ -164,10 +182,56 @@ export default function NewInspectionScreen() {
     }
   };
 
+  // Builds (or rebuilds) the live service report from the latest verified
+  // data. Creates the report once, then regenerates its AI narrative with a
+  // refreshed findings snapshot. If an analysis finishes while a build is in
+  // flight, the stale flag queues exactly one more rebuild so the draft never
+  // lags behind the newest detections.
+  const buildLiveReport = async (inspectionId: number) => {
+    if (wsReportRunning.current) {
+      wsReportStale.current = true;
+      return;
+    }
+    wsReportRunning.current = true;
+    setWsReportBuilding(true);
+    setWsReportError(null);
+    try {
+      do {
+        wsReportStale.current = false;
+        let reportId = wsReportId.current;
+        if (reportId == null) {
+          const created = await generateReport.mutateAsync({
+            data: {
+              inspectionId,
+              title: `Service report — ${siteAddress.trim()}`,
+              includeAiFindings: true,
+            },
+          });
+          reportId = created.id;
+          wsReportId.current = reportId;
+          setWsReport(created);
+        }
+        const updated = await generateNarrative.mutateAsync({
+          id: reportId,
+          data: { refreshFindings: true },
+        });
+        setWsReport(updated);
+      } while (wsReportStale.current);
+      await queryClient.invalidateQueries();
+    } catch (e) {
+      setWsReportError(
+        e instanceof ApiError ? e.message : (e as Error).message,
+      );
+    } finally {
+      wsReportRunning.current = false;
+      setWsReportBuilding(false);
+    }
+  };
+
   const submit = async () => {
     // Never run concurrently with a workspace analysis — both loops share the
     // same resume refs and would double-upload photos.
-    if (wsAnalyzing) return;
+    if (wsAnalyzing || wsReportRunning.current) return;
     setError(null);
     setSubmitting(true);
     try {
@@ -219,6 +283,7 @@ export default function NewInspectionScreen() {
       }
 
       let analysisWarning: string | null = null;
+      let ranNewAnalysis = false;
       // Skip re-analysis when the workspace already analyzed this exact photo set.
       if (uploadedUrls.current.length && analyzedCount.current !== uploadedUrls.current.length) {
         setProgress("Running AI analysis…");
@@ -228,9 +293,29 @@ export default function NewInspectionScreen() {
             images: uploadedUrls.current.map((u) => ({ imageUrl: u })),
           },
         });
+        ranNewAnalysis = true;
         if (result?.analysisErrors && result.analysisErrors > 0) {
           const n = result.analysisErrors;
           analysisWarning = `${n} photo${n > 1 ? "s" : ""} couldn't be analyzed.`;
+        }
+      }
+
+      // If the live report was built earlier but new photos were analyzed at
+      // submit, refresh its narrative so the report matches the final data.
+      if (wsReportId.current != null && ranNewAnalysis) {
+        setProgress("Updating service report…");
+        try {
+          await generateNarrative.mutateAsync({
+            id: wsReportId.current,
+            data: { refreshFindings: true },
+          });
+        } catch {
+          analysisWarning = [
+            analysisWarning,
+            "The live report couldn't be refreshed — regenerate it from the report screen.",
+          ]
+            .filter(Boolean)
+            .join(" ");
         }
       }
 
@@ -243,6 +328,9 @@ export default function NewInspectionScreen() {
       analyzedCount.current = 0;
       setUploadedCount(0);
       setWsInspectionId(null);
+      wsReportId.current = null;
+      setWsReport(null);
+      setWsReportError(null);
 
       if (analysisWarning) {
         setSubmitting(false);
@@ -508,6 +596,9 @@ export default function NewInspectionScreen() {
                 analysis={wsAnalysis}
                 analyzing={wsAnalyzing}
                 error={wsError}
+                report={wsReport}
+                reportBuilding={wsReportBuilding}
+                reportError={wsReportError}
                 onRunAnalysis={runWorkspaceAnalysis}
                 onReview={() => setStep("review")}
               />

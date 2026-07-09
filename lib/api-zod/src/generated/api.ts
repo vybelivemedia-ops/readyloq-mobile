@@ -917,7 +917,9 @@ export const ListReportsResponseItem = zod.object({
   "managerReviewNotes": zod.string(),
   "propertyType": zod.string(),
   "model": zod.string(),
-  "generatedAt": zod.string()
+  "generatedAt": zod.string(),
+  "conduciveConditions": zod.string().optional(),
+  "customerRecommendations": zod.array(zod.string()).optional()
 })]).optional(),
   "createdAt": zod.string()
 })
@@ -983,7 +985,9 @@ export const GetReportResponse = zod.object({
   "managerReviewNotes": zod.string(),
   "propertyType": zod.string(),
   "model": zod.string(),
-  "generatedAt": zod.string()
+  "generatedAt": zod.string(),
+  "conduciveConditions": zod.string().optional(),
+  "customerRecommendations": zod.array(zod.string()).optional()
 })]).optional(),
   "createdAt": zod.string()
 })
@@ -1002,6 +1006,10 @@ export const DeleteReportParams = zod.object({
  */
 export const GenerateReportNarrativeParams = zod.object({
   "id": zod.coerce.number()
+})
+
+export const GenerateReportNarrativeBody = zod.object({
+  "refreshFindings": zod.boolean().optional().describe('When true, re-snapshot the report\'s findings and recommendations from the inspection\'s latest AI analysis before generating the narrative (used by the live report builder).')
 })
 
 export const GenerateReportNarrativeResponse = zod.object({
@@ -1044,7 +1052,9 @@ export const GenerateReportNarrativeResponse = zod.object({
   "managerReviewNotes": zod.string(),
   "propertyType": zod.string(),
   "model": zod.string(),
-  "generatedAt": zod.string()
+  "generatedAt": zod.string(),
+  "conduciveConditions": zod.string().optional(),
+  "customerRecommendations": zod.array(zod.string()).optional()
 })]).optional(),
   "createdAt": zod.string()
 })

@@ -611,6 +611,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateNarrativeInput"
       responses:
         "200":
           description: OK
@@ -1934,6 +1940,20 @@ components:
         propertyType:                 { type: string }
         model:                        { type: string }
         generatedAt:                  { type: string }
+        # Optional for backward compatibility with narratives generated before
+        # these sections existed; always present on new generations.
+        conduciveConditions:          { type: string }
+        customerRecommendations:      { type: array, items: { type: string } }
+
+    GenerateNarrativeInput:
+      type: object
+      properties:
+        refreshFindings:
+          type: boolean
+          description: >-
+            When true, re-snapshot the report's findings and recommendations
+            from the inspection's latest AI analysis before generating the
+            narrative (used by the live report builder).
 
     ReportInput:
       type: object

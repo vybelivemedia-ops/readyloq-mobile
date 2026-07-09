@@ -72,23 +72,26 @@ const SECTION_KEYS = [
   "pestActivityAssessment",
   "structuralDeficiencies",
   "sanitationConcerns",
+  "conduciveConditions",
   "followUpSchedule",
   "technicianNotes",
   "managerReviewNotes",
 ] as const;
 
 const SYSTEM_PROMPT =
-  "You are a senior pest-control inspector writing the formal written report for a " +
-  "completed field inspection. Write in professional, objective, client-ready prose " +
-  "using correct pest-control industry terminology (e.g. harborage, conducive " +
-  "conditions, exclusion, sanitation deficiencies, IPM, monitoring devices, " +
-  "structural exclusion). Tailor language and recommendations to the property type " +
-  "(multi-family housing, commercial facility, or food-service/restaurant — including " +
-  "relevant health-code and food-safety considerations for restaurants). Ground every " +
-  "statement strictly in the supplied data: never invent findings, pests, locations, or " +
-  "evidence that are not present in the inputs. If a section has no supporting data, say " +
-  "so plainly and professionally rather than fabricating detail. Respond with a single " +
-  "JSON object only.";
+  "You are a senior pest-control inspector with more than 20 years of field " +
+  "experience writing the formal written report for a field inspection. Write in " +
+  "professional, objective, client-ready prose with the measured confidence of a " +
+  "veteran technician, using correct pest-control industry terminology (e.g. " +
+  "harborage, conducive conditions, exclusion, sanitation deficiencies, IPM, " +
+  "monitoring devices, structural exclusion). Tailor language and recommendations " +
+  "to the property type (multi-family housing, commercial facility, or " +
+  "food-service/restaurant — including relevant health-code and food-safety " +
+  "considerations for restaurants). Ground every statement strictly in the supplied " +
+  "data: never invent findings, pests, locations, measurements, or evidence that " +
+  "are not present in the inputs. If a section has no supporting data, say so " +
+  "plainly and professionally rather than fabricating detail. Respond with a " +
+  "single JSON object only.";
 
 function buildUserPrompt(input: NarrativeInput): string {
   const findings = input.findings.slice(0, MAX_FINDINGS).map((f, i) => {
@@ -161,8 +164,10 @@ function buildUserPrompt(input: NarrativeInput): string {
     '- "evidenceObserved": describe the physical evidence observed (droppings, gnaw marks, live/dead specimens, photos), grounded only in the supplied findings/photos/voice notes',
     '- "pestActivityAssessment": assessment of pest activity by type and severity, with industry terminology',
     '- "structuralDeficiencies": structural/exclusion deficiencies (entry points, gaps, door sweeps); state if none were noted',
-    '- "sanitationConcerns": sanitation/conducive conditions (moisture, clutter, food debris); for restaurants include food-safety relevance; state if none were noted',
-    '- "recommendedCorrectiveActions": ARRAY of concise, actionable corrective-action strings (most important first)',
+    '- "sanitationConcerns": sanitation deficiencies specifically (food debris, waste handling, clutter); for restaurants include food-safety relevance; state if none were noted',
+    '- "conduciveConditions": narrative of ALL conditions conducive to pest activity observed in the data (moisture, harborage, vegetation, sanitation, structural gaps) and why each sustains or attracts pests; state if none were noted',
+    '- "recommendedCorrectiveActions": ARRAY of concise, actionable treatment/corrective-action strings for the service team (most important first)',
+    '- "customerRecommendations": ARRAY of plain-language recommendation strings for the customer/client to act on themselves (housekeeping, storage, moisture control, preparing for exclusion work); only include actions supported by the data',
     '- "monitoringRecommendations": ARRAY of ongoing monitoring/IPM recommendation strings (e.g. device placement, inspection cadence)',
     '- "followUpSchedule": recommended follow-up timing and what the next visit should verify',
     '- "technicianNotes": a clean, professional synthesis of the technician\'s field and voice notes',
@@ -184,6 +189,7 @@ function normalize(
     ...sections,
     recommendedCorrectiveActions: asStringArray(parsed.recommendedCorrectiveActions),
     monitoringRecommendations: asStringArray(parsed.monitoringRecommendations),
+    customerRecommendations: asStringArray(parsed.customerRecommendations),
     propertyType: input.propertyType,
     model: MODEL,
     generatedAt: new Date().toISOString(),
