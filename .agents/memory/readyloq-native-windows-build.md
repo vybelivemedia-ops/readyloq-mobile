@@ -23,7 +23,7 @@ EAS Build compiles on Expo's Linux builders, bypassing the entire Windows toolch
 
 ## EAS APK crash at startup = missing EXPO_PUBLIC_* env
 The dev workflow injects EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY / EXPO_PUBLIC_DOMAIN at `expo start`; an EAS cloud build gets NONE of these → ClerkProvider throws before the ErrorBoundary (it sits inside the provider) → insta-crash on splash. **Fix:** env values must live in per-profile `env` blocks in eas.json — NOT a `.env` file, because `.gitignore` excludes `.env` and EAS respects .gitignore on upload. Publishable key + domain are public by design, safe to commit. `_layout.tsx` now renders an explicit config-error screen instead of crashing when the key is absent.
-**Limitation to restate to the user:** the APK targets the Replit DEV domain — backend only reachable while the workspace runs. A store/production build needs a deployed backend domain + pk_live key in the production profile, then rebuild.
+**Domains per profile (current):** development → Replit dev domain (dev-client pairs with local Metro); preview + production → readyloq.com (deployed autoscale backend, verified `/api/auth/me` → 401 route-exists). Clerk stays on the same pk_test instance the production website uses. Bump `android.versionCode` whenever regenerating so new APKs install over old ones.
 
 ## Deliverable zip
 `readyloq-native-app.zip` = curated standalone file set. The `zip` CLI is NOT installed in this Replit env — build the archive with Python `zipfile` from an explicit file list. Exclude `.replit-artifact/artifact.toml` (Replit coupling) plus node_modules/android/ios/.expo.
