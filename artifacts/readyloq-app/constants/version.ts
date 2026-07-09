@@ -7,7 +7,7 @@ export const APP_VERSION = "0.9.0";
 export const VERSION_NAME = "ReadyLoq Beta 0.9.0";
 export const CODENAME = "Opportunity Intelligence";
 export const RELEASE_TYPE = "Closed Beta";
-export const ANDROID_VERSION_CODE = 7;
+export const ANDROID_VERSION_CODE = 8;
 
 export const RELEASE_NOTES: { title: string; items: string[] }[] = [
   {

@@ -34,9 +34,16 @@ export function GoogleAuthButton({
   const onPress = useCallback(async () => {
     try {
       setLoading(true);
-      const { createdSessionId, setActive } = await startSSOFlow({
+      const { createdSessionId, setActive, signUp } = await startSSOFlow({
         strategy: "oauth_google",
-        redirectUrl: AuthSession.makeRedirectUri(),
+        // In a standalone (release) build the redirect must carry the app's
+        // custom scheme explicitly — a bare makeRedirectUri() produces a
+        // scheme-only URI that Android can hand to the wrong app (e.g. an
+        // email client) instead of returning here.
+        redirectUrl: AuthSession.makeRedirectUri({
+          scheme: "readyloq-app",
+          path: "sso-callback",
+        }),
       });
 
       if (createdSessionId && setActive) {
@@ -47,6 +54,12 @@ export function GoogleAuthButton({
             router.replace(decorateUrl("/") as Href);
           },
         });
+      } else if (signUp?.status === "missing_requirements") {
+        onError?.(
+          "Your Google account needs additional information to finish signing up. Please sign up with email and password instead.",
+        );
+      } else {
+        onError?.("Google sign-in didn't complete. Please try again.");
       }
     } catch (err) {
       onError?.(clerkErrorMessage(err));

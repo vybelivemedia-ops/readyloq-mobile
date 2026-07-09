@@ -3,3 +3,4 @@
 - [API Server Testing](api-server-testing.md) — vitest + isolated `<db>_test` DB + Clerk getAuth mock; pre-existing TS7030 typecheck failures are baseline
 - [EAS build setup](eas-monorepo.md) — artifacts/readyloq-app is the REAL app (readyloq-mobile/ is a decoy skeleton); build with EAS_NO_VCS=1 + node pinned in eas.json
 - [ReadyLoq native Windows/EAS build](readyloq-native-windows-build.md) — "build.ninja still dirty" is a Windows toolchain issue not a repo bug; EAS cloud build bypasses it; standalone eas.json setup
+- [Clerk Expo SSO redirect](clerk-expo-sso-redirect.md) — release APKs need makeRedirectUri({scheme, path}) + a callback route; bare makeRedirectUri() misroutes the OAuth return (opens email app)

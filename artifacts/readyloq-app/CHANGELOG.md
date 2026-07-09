@@ -1,5 +1,15 @@
 # Changelog
 
+## ReadyLoq Beta 0.9.0 (build 8) — hotfix
+
+Android versionCode 8 · iOS buildNumber 2
+
+### Fixes
+
+- Google sign-in no longer hands off to the wrong app (e.g. email compose) after authentication — the OAuth redirect now uses an explicit `readyloq-app://sso-callback` deep link
+- Added an in-app landing screen for the sign-in callback
+- Clear error messages when Google sign-in can't be completed
+
 ## ReadyLoq Beta 0.9.0 — "Opportunity Intelligence" (Closed Beta)
 
 Android versionCode 7 · iOS buildNumber 2

@@ -65,3 +65,9 @@ id = "sn1Casd3UQhTpnKL4qsOG"
 uri = "file://exports/readyloq-beta-0.9.0-apk-qr.png"
 type = "image"
 title = "ReadyLoq Beta 0.9.0 — APK Download QR Code"
+
+[[outputs]]
+id = "g-sSxtm_NYzgzhsvtd2Pi"
+uri = "file://exports/readyloq-beta-0.9.0-build8-apk-qr.png"
+type = "image"
+title = "ReadyLoq Beta 0.9.0 (build 8) — fixed APK download QR"
