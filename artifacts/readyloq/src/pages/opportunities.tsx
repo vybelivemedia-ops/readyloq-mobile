@@ -11,6 +11,9 @@ import {
   useGetOpportunitySettings,
   getGetOpportunitySettingsQueryKey,
   useUpdateOpportunitySettings,
+  useListOpportunityNotes,
+  getListOpportunityNotesQueryKey,
+  useAddOpportunityNote,
   type SalesOpportunity,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +40,9 @@ import {
   Settings2,
   Eye,
   CircleDollarSign,
+  AlertTriangle,
+  MessageSquare,
+  Flame,
 } from "lucide-react";
 
 /**
@@ -42,11 +50,13 @@ import {
  *
  * Every opportunity shown here is grounded in verified inspection findings
  * (the API rejects candidates without real evidence IDs). Value is a tier,
- * never a fabricated dollar figure. Technicians never see this page: the nav
- * item and route are role-gated, and the API returns 403 regardless.
+ * never a fabricated dollar figure — the only dollar amount on this page is
+ * `estimatedAnnualValue`, which is HUMAN-entered by sales/management and
+ * clearly labeled as their own estimate. Technicians never see this page:
+ * the nav item and route are role-gated, and the API returns 403 regardless.
  */
 
-const STATUSES = ["new", "reviewed", "quoted", "won", "dismissed"] as const;
+const STATUSES = ["new", "reviewed", "quoted", "won", "lost", "dismissed"] as const;
 
 const CATEGORY_LABELS: Record<string, string> = {
   revenue: "Revenue",
@@ -63,6 +73,7 @@ const STATUS_STYLES: Record<string, string> = {
   reviewed: "bg-blue-500/15 text-blue-500",
   quoted: "bg-amber-500/15 text-amber-500",
   won: "bg-emerald-500/15 text-emerald-500",
+  lost: "bg-red-500/15 text-red-400",
   dismissed: "bg-muted text-muted-foreground",
 };
 
@@ -70,6 +81,13 @@ const TIER_STYLES: Record<string, string> = {
   low: "bg-muted text-muted-foreground",
   medium: "bg-amber-500/15 text-amber-500",
   high: "bg-emerald-500/15 text-emerald-500",
+};
+
+const RISK_STYLES: Record<string, string> = {
+  low: "bg-slate-500/15 text-slate-400",
+  medium: "bg-amber-500/15 text-amber-400",
+  high: "bg-orange-500/15 text-orange-400",
+  critical: "bg-red-500/15 text-red-400",
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -89,6 +107,101 @@ function TierBadge({ tier }: { tier: string }) {
   );
 }
 
+function PriorityBadge({ priority }: { priority: number | undefined }) {
+  if (priority == null) return null;
+  const style =
+    priority >= 70
+      ? "bg-red-500/15 text-red-400"
+      : priority >= 40
+        ? "bg-amber-500/15 text-amber-400"
+        : "bg-muted text-muted-foreground";
+  return (
+    <Badge variant="secondary" className={style}>
+      <Flame className="h-3 w-3 mr-1" />
+      P{priority}
+    </Badge>
+  );
+}
+
+function RiskBadge({ riskLevel }: { riskLevel: string | null | undefined }) {
+  if (!riskLevel) return null;
+  return (
+    <Badge variant="secondary" className={RISK_STYLES[riskLevel] ?? ""}>
+      <AlertTriangle className="h-3 w-3 mr-1" />
+      {riskLevel} risk
+    </Badge>
+  );
+}
+
+function formatDollars(value: number) {
+  return `$${value.toLocaleString()}`;
+}
+
+/** Immutable notes thread — corrections are new notes, nothing is edited. */
+function NotesThread({ opportunityId }: { opportunityId: number }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [draft, setDraft] = useState("");
+
+  const { data: notes, isLoading } = useListOpportunityNotes(opportunityId, {
+    query: { queryKey: getListOpportunityNotesQueryKey(opportunityId) },
+  });
+  const addNote = useAddOpportunityNote({
+    mutation: {
+      onSuccess: () => {
+        setDraft("");
+        queryClient.invalidateQueries({
+          queryKey: getListOpportunityNotesQueryKey(opportunityId),
+        });
+      },
+      onError: () => toast({ title: "Failed to add note", variant: "destructive" }),
+    },
+  });
+
+  return (
+    <div className="border-t pt-3 mt-1">
+      <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+        <MessageSquare className="h-3.5 w-3.5" /> Notes
+        <span className="font-normal">(permanent — corrections are new notes)</span>
+      </p>
+      {isLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : (
+        <div className="space-y-2 max-h-40 overflow-y-auto mb-2">
+          {(notes ?? []).length === 0 ? (
+            <p className="text-xs text-muted-foreground">No notes yet.</p>
+          ) : (
+            (notes ?? []).map((note) => (
+              <div key={note.id} className="rounded-md bg-muted/40 px-2.5 py-1.5">
+                <p className="text-sm whitespace-pre-wrap">{note.body}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">
+                  {note.authorRole} · {new Date(note.createdAt).toLocaleString()}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Add a note…"
+          rows={1}
+          className="min-h-9 text-sm"
+        />
+        <Button
+          size="sm"
+          disabled={addNote.isPending || draft.trim().length === 0}
+          onClick={() => addNote.mutate({ id: opportunityId, data: { body: draft.trim() } })}
+        >
+          Add
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function OpportunityDetailDialog({
   opportunityId,
   canDismiss,
@@ -100,6 +213,7 @@ function OpportunityDetailDialog({
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [valueDraft, setValueDraft] = useState<string | null>(null);
   const { data, isLoading } = useGetSalesOpportunity(opportunityId, {
     query: { queryKey: getGetSalesOpportunityQueryKey(opportunityId) },
   });
@@ -111,10 +225,15 @@ function OpportunityDetailDialog({
         queryClient.invalidateQueries({
           queryKey: getGetSalesOpportunityQueryKey(opportunityId),
         });
+        setValueDraft(null);
         toast({ title: "Opportunity updated" });
       },
-      onError: () => {
-        toast({ title: "Update failed", variant: "destructive" });
+      onError: (error) => {
+        toast({
+          title: "Update failed",
+          description: error instanceof Error ? error.message : undefined,
+          variant: "destructive",
+        });
       },
     },
   });
@@ -122,16 +241,32 @@ function OpportunityDetailDialog({
   const setStatus = (status: (typeof STATUSES)[number]) =>
     update.mutate({ id: opportunityId, data: { status } });
 
+  const saveValue = () => {
+    if (valueDraft === null) return;
+    const trimmed = valueDraft.trim();
+    if (trimmed === "") {
+      update.mutate({ id: opportunityId, data: { estimatedAnnualValue: null } });
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      toast({ title: "Enter a whole dollar amount", variant: "destructive" });
+      return;
+    }
+    update.mutate({ id: opportunityId, data: { estimatedAnnualValue: parsed } });
+  };
+
   const nextActions: { label: string; status: (typeof STATUSES)[number] }[] = [];
   if (data) {
     if (data.status === "new") nextActions.push({ label: "Mark reviewed", status: "reviewed" });
     if (data.status === "reviewed") nextActions.push({ label: "Mark quoted", status: "quoted" });
     if (data.status === "quoted") nextActions.push({ label: "Mark won", status: "won" });
   }
+  const isClosed = data?.status === "dismissed" || data?.status === "won" || data?.status === "lost";
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         {isLoading || !data ? (
           <div className="space-y-3 py-4">
             <Skeleton className="h-6 w-2/3" />
@@ -145,6 +280,8 @@ function OpportunityDetailDialog({
             </DialogHeader>
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={data.status} />
+              <PriorityBadge priority={data.priority} />
+              <RiskBadge riskLevel={data.riskLevel} />
               <TierBadge tier={data.estimatedValueTier} />
               <Badge variant="outline">{CATEGORY_LABELS[data.category] ?? data.category}</Badge>
               <Badge variant="outline">
@@ -170,6 +307,48 @@ function OpportunityDetailDialog({
                 ))}
               </div>
             )}
+
+            <div className="border-t pt-3">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">
+                Estimated annual value
+                <span className="font-normal"> (your estimate — never AI-generated)</span>
+              </p>
+              {valueDraft === null ? (
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">
+                    {data.estimatedAnnualValue != null
+                      ? `${formatDollars(data.estimatedAnnualValue)}/yr`
+                      : "Not set"}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setValueDraft(data.estimatedAnnualValue?.toString() ?? "")}
+                  >
+                    {data.estimatedAnnualValue != null ? "Edit" : "Set value"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={valueDraft}
+                    onChange={(e) => setValueDraft(e.target.value)}
+                    placeholder="Whole dollars, blank to clear"
+                    className="h-8 text-sm"
+                  />
+                  <Button size="sm" disabled={update.isPending} onClick={saveValue}>
+                    Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setValueDraft(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-wrap gap-2 pt-1">
               {nextActions.map((action) => (
                 <Button
@@ -181,7 +360,18 @@ function OpportunityDetailDialog({
                   {action.label}
                 </Button>
               ))}
-              {canDismiss && data.status !== "dismissed" && data.status !== "won" && (
+              {canDismiss && data.status === "quoted" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-400 hover:text-red-400"
+                  disabled={update.isPending}
+                  onClick={() => setStatus("lost")}
+                >
+                  Mark lost
+                </Button>
+              )}
+              {canDismiss && !isClosed && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -192,6 +382,9 @@ function OpportunityDetailDialog({
                 </Button>
               )}
             </div>
+
+            <NotesThread opportunityId={opportunityId} />
+
             {data.events.length > 0 && (
               <div className="border-t pt-3 mt-1">
                 <p className="text-xs font-semibold text-muted-foreground mb-2">Activity</p>
@@ -201,7 +394,7 @@ function OpportunityDetailDialog({
                       key={event.id}
                       className="flex items-center justify-between text-xs text-muted-foreground"
                     >
-                      <span className="capitalize">{event.action.replace("_", " ")}</span>
+                      <span className="capitalize">{event.action.replace(/_/g, " ")}</span>
                       <span>{new Date(event.createdAt).toLocaleString()}</span>
                     </div>
                   ))}
@@ -436,6 +629,8 @@ export default function OpportunitiesPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <PriorityBadge priority={opp.priority} />
+                    <RiskBadge riskLevel={opp.riskLevel} />
                     <Badge variant="outline">
                       {CATEGORY_LABELS[opp.category] ?? opp.category}
                     </Badge>
@@ -453,6 +648,12 @@ export default function OpportunitiesPage() {
                     <Eye className="h-3 w-3" />
                     {Math.round(opp.confidence * 100)}% confidence
                   </span>
+                  {opp.estimatedAnnualValue != null && (
+                    <span className="flex items-center gap-1 text-emerald-500 font-medium">
+                      <CircleDollarSign className="h-3 w-3" />
+                      {formatDollars(opp.estimatedAnnualValue)}/yr
+                    </span>
+                  )}
                   <span>{new Date(opp.updatedAt).toLocaleDateString()}</span>
                 </div>
               </CardContent>

@@ -4,64 +4,17 @@ import { inspectionsTable, analysisResultsTable, callbacksTable, type Finding } 
 import { eq } from "drizzle-orm";
 import { propertyTypeFor } from "../lib/property-intelligence";
 import { getCompanyId } from "../lib/tenant";
+// Finding → service mapping lives in lib/finding-mapping so the scorecard
+// engine uses the exact same deterministic logic.
+import {
+  type OppType,
+  OPP_LABEL,
+  OPP_RECOMMENDATION,
+  deriveOppType,
+  isDocumented,
+} from "../lib/finding-mapping";
 
 const router = Router();
-
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
-type OppType = "exclusion" | "structural" | "sanitation" | "moisture" | "follow_up";
-
-const OPP_LABEL: Record<OppType, string> = {
-  exclusion: "Exclusion",
-  structural: "Structural Repair",
-  sanitation: "Sanitation",
-  moisture: "Moisture Correction",
-  follow_up: "Follow-Up Inspection",
-};
-
-const OPP_RECOMMENDATION: Record<OppType, string> = {
-  exclusion: "Exclusion Assessment Recommended",
-  structural: "Door Sweep / Structural Repair Recommended",
-  sanitation: "Sanitation Improvement Recommended",
-  moisture: "Moisture Correction Recommended",
-  follow_up: "Follow-Up Inspection Recommended",
-};
-
-// Keywords that, if present in the documented recommendations, mean the
-// opportunity was already reported. Intentionally specific to avoid false
-// "documented" matches (e.g. generic "repair" is excluded).
-const OPP_KEYWORDS: Record<OppType, string[]> = {
-  exclusion: ["seal", "exclusion", "exclude", "copper mesh", "steel wool", "entry point", "escutcheon", "hardware cloth"],
-  structural: ["door sweep", "structural", "replace", "soffit", "fascia"],
-  moisture: ["moisture", "leak", "dehumidif", "drain", "standing water", "water damage", "dry out", "ventilation"],
-  sanitation: ["sanitation", "sanitize", "degreas", "food storage", "harborage removal", "waste"],
-  follow_up: ["follow-up", "follow up", "re-inspect", "reinspect", "inspect all", "monitoring", "monitor", "preventive"],
-};
-
-// Explicit category -> opportunity type map (no keyword fuzzing on category).
-const CATEGORY_OPP: Record<string, OppType> = {
-  "Structural Deficiency": "structural",
-  "Moisture Condition": "moisture",
-  "Sanitation Concern": "sanitation",
-  "Rodent Activity": "follow_up",
-  "Cockroach Infestation": "follow_up",
-  "Bed Bug Activity": "follow_up",
-};
-
-function deriveOppType(f: Finding): OppType | null {
-  const text = `${f.description ?? ""} ${f.treatment ?? ""}`.toLowerCase();
-  if (f.exclusionOpportunity) return "exclusion";
-  if (text.includes("door sweep")) return "structural";
-  if (/(moisture|leak|standing water|water damage)/.test(text)) return "moisture";
-  return CATEGORY_OPP[f.category] ?? null;
-}
-
-function isDocumented(type: OppType, recommendations: string[]): boolean {
-  const recs = recommendations.map((r) => r.toLowerCase());
-  return OPP_KEYWORDS[type].some((k) => recs.some((r) => r.includes(k)));
-}
 
 // Property-risk condition detection (per finding)
 function conditionsForFinding(f: Finding): string[] {

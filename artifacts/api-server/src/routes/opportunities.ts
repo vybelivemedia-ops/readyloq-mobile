@@ -3,6 +3,7 @@ import {
   db,
   opportunitiesTable,
   opportunityEventsTable,
+  opportunityNotesTable,
   opportunitySettingsTable,
   usersTable,
   OPPORTUNITY_CATEGORIES,
@@ -235,16 +236,51 @@ router.patch("/:id", async (req, res) => {
     if (!existing) return res.status(404).json({ error: "Opportunity not found" });
 
     const updates: Partial<typeof opportunitiesTable.$inferInsert> = {};
-    const events: { action: "status_changed" | "assigned"; detail: Record<string, unknown> }[] =
-      [];
+    const events: {
+      action: "status_changed" | "assigned" | "value_set";
+      detail: Record<string, unknown>;
+    }[] = [];
+
+    // HUMAN-ONLY dollars: estimatedAnnualValue is entered by sales/management
+    // when they actually price the work. The AI has no write path to this
+    // field (synthesis/strengthen never touch it).
+    if (body.estimatedAnnualValue !== undefined) {
+      if (body.estimatedAnnualValue === null) {
+        updates.estimatedAnnualValue = null;
+        events.push({ action: "value_set", detail: { estimatedAnnualValue: null } });
+      } else if (
+        typeof body.estimatedAnnualValue === "number" &&
+        Number.isInteger(body.estimatedAnnualValue) &&
+        body.estimatedAnnualValue >= 0 &&
+        body.estimatedAnnualValue <= 10_000_000
+      ) {
+        updates.estimatedAnnualValue = body.estimatedAnnualValue;
+        events.push({
+          action: "value_set",
+          detail: { estimatedAnnualValue: body.estimatedAnnualValue },
+        });
+      } else {
+        return res
+          .status(400)
+          .json({ error: "estimatedAnnualValue must be a whole dollar amount or null" });
+      }
+    }
 
     if (body.status !== undefined) {
       const status = body.status as OpportunityStatus;
       if (!OPPORTUNITY_STATUSES.includes(status)) {
         return res.status(400).json({ error: "Invalid status" });
       }
-      if (status === "dismissed" && req.user!.role !== "manager" && req.user!.role !== "owner") {
-        return res.status(403).json({ error: "Only managers can dismiss opportunities" });
+      // Closing an opportunity negatively (dismissed / lost) is a manager+
+      // decision — sales moves the pipeline forward, management closes it.
+      if (
+        (status === "dismissed" || status === "lost") &&
+        req.user!.role !== "manager" &&
+        req.user!.role !== "owner"
+      ) {
+        return res
+          .status(403)
+          .json({ error: "Only managers can dismiss or mark opportunities lost" });
       }
       if (status !== existing.status) {
         updates.status = status;
@@ -303,6 +339,81 @@ router.patch("/:id", async (req, res) => {
     return res.json(serializeOpportunity(row));
   } catch {
     return res.status(500).json({ error: "Failed to update opportunity" });
+  }
+});
+
+// GET /opportunities/:id/notes — the immutable notes thread (oldest first).
+router.get("/:id/notes", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [opportunity] = await db
+      .select({ id: opportunitiesTable.id })
+      .from(opportunitiesTable)
+      .where(and(eq(opportunitiesTable.id, id), eq(opportunitiesTable.companyId, companyId)))
+      .limit(1);
+    if (!opportunity) return res.status(404).json({ error: "Opportunity not found" });
+
+    // Note: users have no display-name column (identity lives in Clerk), so
+    // the thread shows the author's role + stable user id.
+    const rows = await db
+      .select()
+      .from(opportunityNotesTable)
+      .where(
+        and(
+          eq(opportunityNotesTable.opportunityId, id),
+          eq(opportunityNotesTable.companyId, companyId),
+        ),
+      )
+      .orderBy(opportunityNotesTable.createdAt);
+    return res.json(rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })));
+  } catch {
+    return res.status(500).json({ error: "Failed to load notes" });
+  }
+});
+
+// POST /opportunities/:id/notes — append-only: corrections are new notes,
+// never edits, so the thread stays an accountable record.
+router.post("/:id/notes", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+    if (!body) return res.status(400).json({ error: "Note body is required" });
+    if (body.length > 4000) return res.status(400).json({ error: "Note too long" });
+
+    const [opportunity] = await db
+      .select({ id: opportunitiesTable.id })
+      .from(opportunitiesTable)
+      .where(and(eq(opportunitiesTable.id, id), eq(opportunitiesTable.companyId, companyId)))
+      .limit(1);
+    if (!opportunity) return res.status(404).json({ error: "Opportunity not found" });
+
+    const [note] = await db
+      .insert(opportunityNotesTable)
+      .values({
+        companyId,
+        opportunityId: id,
+        authorUserId: req.user!.id,
+        authorRole: req.user!.role,
+        body,
+      })
+      .returning();
+
+    await db.insert(opportunityEventsTable).values({
+      companyId,
+      opportunityId: id,
+      userId: req.user!.id,
+      action: "note_added",
+      detail: { noteId: note.id },
+    });
+
+    return res.status(201).json({ ...note, createdAt: note.createdAt.toISOString() });
+  } catch {
+    return res.status(500).json({ error: "Failed to add note" });
   }
 });
 

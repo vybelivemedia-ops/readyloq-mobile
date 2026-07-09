@@ -35,6 +35,9 @@ import CapabilityCenter from "@/pages/capability";
 import Onboarding from "@/pages/onboarding";
 import BetaCenter from "@/pages/beta/index";
 import OpportunitiesPage from "@/pages/opportunities";
+import ProposalsPage from "@/pages/proposals";
+import IntelligenceDashboard from "@/pages/intelligence-dashboard";
+import ShareSummaryPage from "@/pages/share-summary";
 import { BetaPaused } from "@/components/beta-paused";
 
 const queryClient = new QueryClient({
@@ -226,6 +229,8 @@ function ProtectedRoutes() {
         <Route path="/intelligence/analytics" component={IntelligenceAnalytics} />
         <Route path="/analytics" component={AnalyticsDashboard} />
         {isSales && <Route path="/opportunities" component={OpportunitiesPage} />}
+        {isSales && <Route path="/proposals" component={ProposalsPage} />}
+        {isManager && <Route path="/performance" component={IntelligenceDashboard} />}
         {isManager && <Route path="/command" component={CommandCenter} />}
         {isManager && <Route path="/beta" component={BetaCenter} />}
         <Route path="/settings" component={SettingsPage} />
@@ -248,6 +253,8 @@ function AppRoutes() {
       <Route path="/" component={HomeRoute} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
+      {/* PUBLIC: customer-facing share links — no sign-in required. */}
+      <Route path="/share/summary/:token" component={ShareSummaryPage} />
       <Route component={ProtectedRoutes} />
     </Switch>
   );

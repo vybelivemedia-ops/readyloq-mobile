@@ -1248,6 +1248,20 @@ export const SalesOpportunityStatus = {
   quoted: 'quoted',
   won: 'won',
   dismissed: 'dismissed',
+  lost: 'lost',
+} as const;
+
+/**
+ * @nullable
+ */
+export type SalesOpportunityRiskLevel = typeof SalesOpportunityRiskLevel[keyof typeof SalesOpportunityRiskLevel] | null;
+
+
+export const SalesOpportunityRiskLevel = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
 } as const;
 
 export interface SalesOpportunity {
@@ -1264,6 +1278,11 @@ export interface SalesOpportunity {
   estimatedValueTier: SalesOpportunityEstimatedValueTier;
   confidence: number;
   status: SalesOpportunityStatus;
+  priority?: number;
+  /** @nullable */
+  riskLevel?: SalesOpportunityRiskLevel;
+  /** @nullable */
+  estimatedAnnualValue?: number | null;
   /** @nullable */
   assignedToUserId: number | null;
   createdAt: string;
@@ -1279,6 +1298,8 @@ export const SalesOpportunityEventAction = {
   viewed: 'viewed',
   status_changed: 'status_changed',
   assigned: 'assigned',
+  note_added: 'note_added',
+  value_set: 'value_set',
 } as const;
 
 /**
@@ -1310,12 +1331,15 @@ export const SalesOpportunityUpdateStatus = {
   quoted: 'quoted',
   won: 'won',
   dismissed: 'dismissed',
+  lost: 'lost',
 } as const;
 
 export interface SalesOpportunityUpdate {
   status?: SalesOpportunityUpdateStatus;
   /** @nullable */
   assignedToUserId?: number | null;
+  /** @nullable */
+  estimatedAnnualValue?: number | null;
 }
 
 export type SalesOpportunityTrendsByCategory = {[key: string]: number};
@@ -1352,6 +1376,195 @@ export interface OpportunitySettingsUpdate {
   minConfidence?: number;
   /** @nullable */
   enabledCategories?: string[] | null;
+}
+
+export interface OpportunityNote {
+  id: number;
+  companyId?: number;
+  opportunityId: number;
+  authorUserId: number;
+  authorRole: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface OpportunityNoteCreate {
+  body: string;
+}
+
+export interface CustomerSummaryUpdate {
+  body: string;
+}
+
+export interface CustomerSummaryApprove {
+  /**
+     * @minimum 1
+     * @maximum 90
+     */
+  expiresInDays?: number;
+}
+
+export interface ScorecardComponents {
+  photoCoverage: number;
+  evidenceQuality: number;
+  avgConfidence: number;
+  recommendationCoverage: number;
+}
+
+export interface MissedOpportunity {
+  findingId: number;
+  serviceType: string;
+  description: string;
+  severity: string;
+}
+
+export type InspectionScorecardRiskLevel = typeof InspectionScorecardRiskLevel[keyof typeof InspectionScorecardRiskLevel];
+
+
+export const InspectionScorecardRiskLevel = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export interface InspectionScorecard {
+  id: number;
+  companyId: number;
+  inspectionId: number;
+  technicianName: string;
+  qualityScore: number;
+  components: ScorecardComponents;
+  missedOpportunities: MissedOpportunity[];
+  riskScore: number;
+  riskLevel: InspectionScorecardRiskLevel;
+  findingsCount: number;
+  photosAnalyzed: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type InspectionScorecardListItem = InspectionScorecard & {
+  siteAddress: string;
+  inspectionDate: string;
+};
+
+export type ScorecardSummaryRiskDistribution = {[key: string]: number};
+
+export type ScorecardSummaryTechniciansItem = {
+  technicianName: string;
+  inspections: number;
+  avgQuality: number;
+  missedOpportunities: number;
+};
+
+export type ScorecardSummaryMissedByService = {[key: string]: number};
+
+export type ScorecardSummaryTopConduciveConditionsItem = {
+  label: string;
+  occurrences: number;
+};
+
+export type ScorecardSummaryTopRecommendedServicesItem = {
+  label: string;
+  occurrences: number;
+};
+
+export interface ScorecardSummary {
+  totalScorecards: number;
+  avgQuality: number;
+  avgRisk: number;
+  riskDistribution: ScorecardSummaryRiskDistribution;
+  technicians: ScorecardSummaryTechniciansItem[];
+  missedByService: ScorecardSummaryMissedByService;
+  topConduciveConditions: ScorecardSummaryTopConduciveConditionsItem[];
+  topRecommendedServices: ScorecardSummaryTopRecommendedServicesItem[];
+}
+
+export type CustomerSummaryStatus = typeof CustomerSummaryStatus[keyof typeof CustomerSummaryStatus];
+
+
+export const CustomerSummaryStatus = {
+  draft: 'draft',
+  approved: 'approved',
+} as const;
+
+export interface CustomerSummary {
+  id: number;
+  companyId: number;
+  inspectionId: number;
+  body: string;
+  status: CustomerSummaryStatus;
+  /** @nullable */
+  approvedByUserId: number | null;
+  /** @nullable */
+  approvedAt: string | null;
+  /** @nullable */
+  shareToken: string | null;
+  /** @nullable */
+  shareExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SalesProposalStatus = typeof SalesProposalStatus[keyof typeof SalesProposalStatus];
+
+
+export const SalesProposalStatus = {
+  draft: 'draft',
+  sent: 'sent',
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export interface SalesProposal {
+  id: number;
+  companyId: number;
+  propertyAddress: string;
+  title: string;
+  status: SalesProposalStatus;
+  opportunityIds: number[];
+  /** @nullable */
+  intro: string | null;
+  /** @nullable */
+  notes: string | null;
+  createdByUserId: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SalesProposalDetail = SalesProposal & {
+  opportunities: SalesOpportunity[];
+};
+
+export interface SalesProposalCreate {
+  title: string;
+  propertyAddress: string;
+  opportunityIds: number[];
+  /** @nullable */
+  intro?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export type SalesProposalUpdateStatus = typeof SalesProposalUpdateStatus[keyof typeof SalesProposalUpdateStatus];
+
+
+export const SalesProposalUpdateStatus = {
+  draft: 'draft',
+  sent: 'sent',
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export interface SalesProposalUpdate {
+  title?: string;
+  /** @nullable */
+  intro?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  status?: SalesProposalUpdateStatus;
+  opportunityIds?: number[];
 }
 
 export type ListInspectionsParams = {
@@ -1431,5 +1644,13 @@ status?: string;
 export type ListSalesOpportunitiesParams = {
 status?: string;
 category?: string;
+};
+
+export type ListScorecardsParams = {
+technician?: string;
+};
+
+export type ListProposalsParams = {
+status?: string;
 };
 

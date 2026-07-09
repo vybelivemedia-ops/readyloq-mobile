@@ -2134,7 +2134,10 @@ export const ListSalesOpportunitiesResponseItem = zod.object({
   "evidenceImagePaths": zod.array(zod.string()),
   "estimatedValueTier": zod.enum(['low', 'medium', 'high']),
   "confidence": zod.number(),
-  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed']),
+  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed', 'lost']),
+  "priority": zod.number().optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "estimatedAnnualValue": zod.number().nullish(),
   "assignedToUserId": zod.number().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -2209,7 +2212,10 @@ export const GetSalesOpportunityResponse = zod.object({
   "evidenceImagePaths": zod.array(zod.string()),
   "estimatedValueTier": zod.enum(['low', 'medium', 'high']),
   "confidence": zod.number(),
-  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed']),
+  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed', 'lost']),
+  "priority": zod.number().optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "estimatedAnnualValue": zod.number().nullish(),
   "assignedToUserId": zod.number().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -2218,7 +2224,7 @@ export const GetSalesOpportunityResponse = zod.object({
   "id": zod.number(),
   "opportunityId": zod.number(),
   "userId": zod.number().nullish(),
-  "action": zod.enum(['created', 'strengthened', 'viewed', 'status_changed', 'assigned']),
+  "action": zod.enum(['created', 'strengthened', 'viewed', 'status_changed', 'assigned', 'note_added', 'value_set']),
   "detail": zod.record(zod.string(), zod.unknown()).nullish(),
   "createdAt": zod.string()
 }))
@@ -2233,8 +2239,9 @@ export const UpdateSalesOpportunityParams = zod.object({
 })
 
 export const UpdateSalesOpportunityBody = zod.object({
-  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed']).optional(),
-  "assignedToUserId": zod.number().nullish()
+  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed', 'lost']).optional(),
+  "assignedToUserId": zod.number().nullish(),
+  "estimatedAnnualValue": zod.number().nullish()
 })
 
 export const UpdateSalesOpportunityResponse = zod.object({
@@ -2250,10 +2257,381 @@ export const UpdateSalesOpportunityResponse = zod.object({
   "evidenceImagePaths": zod.array(zod.string()),
   "estimatedValueTier": zod.enum(['low', 'medium', 'high']),
   "confidence": zod.number(),
-  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed']),
+  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed', 'lost']),
+  "priority": zod.number().optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "estimatedAnnualValue": zod.number().nullish(),
   "assignedToUserId": zod.number().nullable(),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Immutable notes thread, oldest first (sales, manager, owner)
+ */
+export const ListOpportunityNotesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListOpportunityNotesResponseItem = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number().optional(),
+  "opportunityId": zod.number(),
+  "authorUserId": zod.number(),
+  "authorRole": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListOpportunityNotesResponse = zod.array(ListOpportunityNotesResponseItem)
+
+
+/**
+ * @summary Append a note (append-only — corrections are new notes)
+ */
+export const AddOpportunityNoteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AddOpportunityNoteBody = zod.object({
+  "body": zod.string()
+})
+
+
+/**
+ * @summary List inspection scorecards, newest first (manager, owner)
+ */
+export const ListScorecardsQueryParams = zod.object({
+  "technician": zod.coerce.string().optional()
+})
+
+export const ListScorecardsResponseItem = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "technicianName": zod.string(),
+  "qualityScore": zod.number(),
+  "components": zod.object({
+  "photoCoverage": zod.number(),
+  "evidenceQuality": zod.number(),
+  "avgConfidence": zod.number(),
+  "recommendationCoverage": zod.number()
+}),
+  "missedOpportunities": zod.array(zod.object({
+  "findingId": zod.number(),
+  "serviceType": zod.string(),
+  "description": zod.string(),
+  "severity": zod.string()
+})),
+  "riskScore": zod.number(),
+  "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']),
+  "findingsCount": zod.number(),
+  "photosAnalyzed": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}).and(zod.object({
+  "siteAddress": zod.string(),
+  "inspectionDate": zod.string()
+}))
+export const ListScorecardsResponse = zod.array(ListScorecardsResponseItem)
+
+
+/**
+ * @summary Deterministic management-intelligence aggregates (manager, owner)
+ */
+export const GetScorecardSummaryResponse = zod.object({
+  "totalScorecards": zod.number(),
+  "avgQuality": zod.number(),
+  "avgRisk": zod.number(),
+  "riskDistribution": zod.record(zod.string(), zod.number()),
+  "technicians": zod.array(zod.object({
+  "technicianName": zod.string(),
+  "inspections": zod.number(),
+  "avgQuality": zod.number(),
+  "missedOpportunities": zod.number()
+})),
+  "missedByService": zod.record(zod.string(), zod.number()),
+  "topConduciveConditions": zod.array(zod.object({
+  "label": zod.string(),
+  "occurrences": zod.number()
+})),
+  "topRecommendedServices": zod.array(zod.object({
+  "label": zod.string(),
+  "occurrences": zod.number()
+}))
+})
+
+
+/**
+ * @summary Get one inspection's scorecard (manager, owner)
+ */
+export const GetInspectionScorecardParams = zod.object({
+  "inspectionId": zod.coerce.number()
+})
+
+export const GetInspectionScorecardResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "technicianName": zod.string(),
+  "qualityScore": zod.number(),
+  "components": zod.object({
+  "photoCoverage": zod.number(),
+  "evidenceQuality": zod.number(),
+  "avgConfidence": zod.number(),
+  "recommendationCoverage": zod.number()
+}),
+  "missedOpportunities": zod.array(zod.object({
+  "findingId": zod.number(),
+  "serviceType": zod.string(),
+  "description": zod.string(),
+  "severity": zod.string()
+})),
+  "riskScore": zod.number(),
+  "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']),
+  "findingsCount": zod.number(),
+  "photosAnalyzed": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Get the inspection's customer summary (manager, owner)
+ */
+export const GetCustomerSummaryForInspectionParams = zod.object({
+  "inspectionId": zod.coerce.number()
+})
+
+export const GetCustomerSummaryForInspectionResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "body": zod.string(),
+  "status": zod.enum(['draft', 'approved']),
+  "approvedByUserId": zod.number().nullable(),
+  "approvedAt": zod.string().nullable(),
+  "shareToken": zod.string().nullable(),
+  "shareExpiresAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Generate/regenerate the draft from the latest analysis (manager, owner)
+ */
+export const GenerateCustomerSummaryParams = zod.object({
+  "inspectionId": zod.coerce.number()
+})
+
+export const GenerateCustomerSummaryResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "body": zod.string(),
+  "status": zod.enum(['draft', 'approved']),
+  "approvedByUserId": zod.number().nullable(),
+  "approvedAt": zod.string().nullable(),
+  "shareToken": zod.string().nullable(),
+  "shareExpiresAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Edit the draft body (drafts only — approved summaries are frozen)
+ */
+export const UpdateCustomerSummaryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCustomerSummaryBody = zod.object({
+  "body": zod.string()
+})
+
+export const UpdateCustomerSummaryResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "body": zod.string(),
+  "status": zod.enum(['draft', 'approved']),
+  "approvedByUserId": zod.number().nullable(),
+  "approvedAt": zod.string().nullable(),
+  "shareToken": zod.string().nullable(),
+  "shareExpiresAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Approve — freezes the body and mints the expiring share token
+ */
+export const ApproveCustomerSummaryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const approveCustomerSummaryBodyExpiresInDaysMax = 90;
+
+
+
+export const ApproveCustomerSummaryBody = zod.object({
+  "expiresInDays": zod.number().min(1).max(approveCustomerSummaryBodyExpiresInDaysMax).optional()
+})
+
+export const ApproveCustomerSummaryResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "body": zod.string(),
+  "status": zod.enum(['draft', 'approved']),
+  "approvedByUserId": zod.number().nullable(),
+  "approvedAt": zod.string().nullable(),
+  "shareToken": zod.string().nullable(),
+  "shareExpiresAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Revoke the public share link immediately
+ */
+export const RevokeCustomerSummaryShareParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RevokeCustomerSummaryShareResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "body": zod.string(),
+  "status": zod.enum(['draft', 'approved']),
+  "approvedByUserId": zod.number().nullable(),
+  "approvedAt": zod.string().nullable(),
+  "shareToken": zod.string().nullable(),
+  "shareExpiresAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary List proposals, newest first (sales, manager, owner)
+ */
+export const ListProposalsQueryParams = zod.object({
+  "status": zod.coerce.string().optional()
+})
+
+export const ListProposalsResponseItem = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "propertyAddress": zod.string(),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
+  "opportunityIds": zod.array(zod.number()),
+  "intro": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListProposalsResponse = zod.array(ListProposalsResponseItem)
+
+
+/**
+ * @summary Assemble a proposal from same-company opportunity IDs
+ */
+export const CreateProposalBody = zod.object({
+  "title": zod.string(),
+  "propertyAddress": zod.string(),
+  "opportunityIds": zod.array(zod.number()),
+  "intro": zod.string().nullish(),
+  "notes": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get one proposal with its resolved opportunities
+ */
+export const GetProposalParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetProposalResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "propertyAddress": zod.string(),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
+  "opportunityIds": zod.array(zod.number()),
+  "intro": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}).and(zod.object({
+  "opportunities": zod.array(zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "propertyAddress": zod.string(),
+  "category": zod.enum(['revenue', 'additional_service', 'structural', 'conducive_condition', 'property_risk', 'pest_trend', 'preventative']),
+  "title": zod.string(),
+  "rationale": zod.string(),
+  "fingerprint": zod.string(),
+  "evidenceFindingIds": zod.array(zod.number()),
+  "evidenceImagePaths": zod.array(zod.string()),
+  "estimatedValueTier": zod.enum(['low', 'medium', 'high']),
+  "confidence": zod.number(),
+  "status": zod.enum(['new', 'reviewed', 'quoted', 'won', 'dismissed', 'lost']),
+  "priority": zod.number().optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "estimatedAnnualValue": zod.number().nullish(),
+  "assignedToUserId": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+}))
+
+
+/**
+ * @summary Edit content or move the paperwork status
+ */
+export const UpdateProposalParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateProposalBody = zod.object({
+  "title": zod.string().optional(),
+  "intro": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['draft', 'sent', 'accepted', 'declined']).optional(),
+  "opportunityIds": zod.array(zod.number()).optional()
+})
+
+export const UpdateProposalResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "propertyAddress": zod.string(),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
+  "opportunityIds": zod.array(zod.number()),
+  "intro": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "createdByUserId": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a draft proposal (sent/decided proposals are records)
+ */
+export const DeleteProposalParams = zod.object({
+  "id": zod.coerce.number()
 })
 
 

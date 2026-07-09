@@ -14,6 +14,8 @@ import {
   Rocket,
   MessageSquarePlus,
   Lightbulb,
+  FileSignature,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -40,6 +42,8 @@ const baseNavItems = [
 const commandNavItem = { href: "/command", label: "Command", icon: Crosshair };
 const betaNavItem = { href: "/beta", label: "Beta Center", icon: Rocket };
 const opportunitiesNavItem = { href: "/opportunities", label: "Opportunities", icon: Lightbulb };
+const proposalsNavItem = { href: "/proposals", label: "Proposals", icon: FileSignature };
+const performanceNavItem = { href: "/performance", label: "Performance", icon: Gauge };
 const settingsNavItem = { href: "/settings", label: "Settings", icon: Settings };
 
 const mobileNavItems = [
@@ -72,8 +76,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     ...baseNavItems,
-    ...(isSales ? [opportunitiesNavItem] : []),
-    ...(isManager ? [commandNavItem, betaNavItem] : []),
+    ...(isSales ? [opportunitiesNavItem, proposalsNavItem] : []),
+    ...(isManager ? [performanceNavItem, commandNavItem, betaNavItem] : []),
     settingsNavItem,
   ];
 

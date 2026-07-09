@@ -48,17 +48,20 @@ export const OPPORTUNITY_CATEGORIES: OpportunityCategory[] = [
   "preventative",
 ];
 
-export type OpportunityStatus = "new" | "reviewed" | "quoted" | "won" | "dismissed";
+export type OpportunityStatus = "new" | "reviewed" | "quoted" | "won" | "lost" | "dismissed";
 
 export const OPPORTUNITY_STATUSES: OpportunityStatus[] = [
   "new",
   "reviewed",
   "quoted",
   "won",
+  "lost",
   "dismissed",
 ];
 
 export type OpportunityValueTier = "low" | "medium" | "high";
+
+export type OpportunityRiskLevel = "low" | "medium" | "high" | "critical";
 
 export const opportunitiesTable = pgTable(
   "opportunities",
@@ -89,6 +92,15 @@ export const opportunitiesTable = pgTable(
     // would be fabricated. Owners can map tiers onto their own price book.
     estimatedValueTier: text("estimated_value_tier").$type<OpportunityValueTier>().notNull(),
     confidence: real("confidence").notNull(),
+    // Computed (pure math, never AI): worst severity among the CURRENTLY
+    // cited findings. Nullable so pre-existing rows stay valid.
+    riskLevel: text("risk_level").$type<OpportunityRiskLevel>(),
+    // Computed priority 0–100 (severity 35% / confidence 25% / tier 25% /
+    // recurrence 15%) — recomputed on strengthen. The AI never ranks itself.
+    priority: integer("priority").notNull().default(0),
+    // HUMAN-ONLY dollars (whole dollars). Sales/manager enters this when they
+    // actually price the work; synthesis/strengthen never touches it.
+    estimatedAnnualValue: integer("estimated_annual_value"),
     status: text("status").$type<OpportunityStatus>().notNull().default("new"),
     assignedToUserId: integer("assigned_to_user_id").references(() => usersTable.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -119,7 +131,9 @@ export type OpportunityEventAction =
   | "strengthened"
   | "viewed"
   | "status_changed"
-  | "assigned";
+  | "assigned"
+  | "note_added"
+  | "value_set";
 
 export const opportunityEventsTable = pgTable(
   "opportunity_events",
@@ -159,6 +173,35 @@ export const opportunitySettingsTable = pgTable("opportunity_settings", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+/**
+ * Manager/sales notes on an opportunity — an immutable, accountable thread
+ * (corrections are new notes, never edits). Replaces a single overwritable
+ * "manager notes" field.
+ */
+export const opportunityNotesTable = pgTable(
+  "opportunity_notes",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companiesTable.id),
+    opportunityId: integer("opportunity_id")
+      .notNull()
+      .references(() => opportunitiesTable.id, { onDelete: "cascade" }),
+    authorUserId: integer("author_user_id")
+      .notNull()
+      .references(() => usersTable.id),
+    // Role AT THE TIME OF WRITING — kept even if the author's role changes.
+    authorRole: text("author_role").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    companyOppIdx: index("opportunity_notes_company_opp_idx").on(t.companyId, t.opportunityId),
+  }),
+);
+
 export type Opportunity = typeof opportunitiesTable.$inferSelect;
 export type OpportunityEvent = typeof opportunityEventsTable.$inferSelect;
 export type OpportunitySettings = typeof opportunitySettingsTable.$inferSelect;
+export type OpportunityNote = typeof opportunityNotesTable.$inferSelect;

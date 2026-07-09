@@ -7,6 +7,7 @@
  */
 import type { SalesOpportunityCategory } from './salesOpportunityCategory';
 import type { SalesOpportunityEstimatedValueTier } from './salesOpportunityEstimatedValueTier';
+import type { SalesOpportunityRiskLevel } from './salesOpportunityRiskLevel';
 import type { SalesOpportunityStatus } from './salesOpportunityStatus';
 
 export interface SalesOpportunity {
@@ -23,6 +24,11 @@ export interface SalesOpportunity {
   estimatedValueTier: SalesOpportunityEstimatedValueTier;
   confidence: number;
   status: SalesOpportunityStatus;
+  priority?: number;
+  /** @nullable */
+  riskLevel?: SalesOpportunityRiskLevel;
+  /** @nullable */
+  estimatedAnnualValue?: number | null;
   /** @nullable */
   assignedToUserId: number | null;
   createdAt: string;

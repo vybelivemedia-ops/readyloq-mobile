@@ -53,6 +53,12 @@ import {
   opportunitiesTable,
   opportunityEventsTable,
   opportunitySettingsTable,
+  quizzesTable,
+  propertyProfilesTable,
+  propertyNotesTable,
+  datasetImagesTable,
+  intelligenceRecordsTable,
+  brandingProfilesTable,
   type Finding,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -121,6 +127,14 @@ beforeAll(async () => {
   await db.delete(opportunitiesTable);
   await db.delete(opportunitySettingsTable);
   await db.delete(inspectionsTable);
+  // Order-independent cleanup: other suites (e.g. isolation tests) may leave
+  // rows referencing users; clear them before users or the FK blocks the reset.
+  await db.delete(quizzesTable);
+  await db.delete(propertyProfilesTable);
+  await db.delete(propertyNotesTable);
+  await db.delete(datasetImagesTable);
+  await db.delete(intelligenceRecordsTable);
+  await db.delete(brandingProfilesTable);
   await db.delete(usersTable);
 
   const users = await db

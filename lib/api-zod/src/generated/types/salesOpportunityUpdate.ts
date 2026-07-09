@@ -11,4 +11,6 @@ export interface SalesOpportunityUpdate {
   status?: SalesOpportunityUpdateStatus;
   /** @nullable */
   assignedToUserId?: number | null;
+  /** @nullable */
+  estimatedAnnualValue?: number | null;
 }

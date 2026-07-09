@@ -12,3 +12,6 @@ export * from "./leads";
 export * from "./intelligence-dataset";
 export * from "./beta";
 export * from "./opportunities";
+export * from "./scorecards";
+export * from "./customer-summaries";
+export * from "./proposals";

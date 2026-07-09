@@ -15,4 +15,6 @@ export const SalesOpportunityEventAction = {
   viewed: 'viewed',
   status_changed: 'status_changed',
   assigned: 'assigned',
+  note_added: 'note_added',
+  value_set: 'value_set',
 } as const;

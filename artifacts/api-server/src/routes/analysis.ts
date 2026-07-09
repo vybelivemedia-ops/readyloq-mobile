@@ -11,6 +11,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { analyzePhoto } from "../lib/intelligence-ai";
 import { runOpportunitySynthesis } from "../lib/opportunity-ai";
+import { runScorecardComputation } from "../lib/scorecard";
 import { objectPathCompanyScope } from "../lib/objectStorage";
 import { logErrorEvent } from "../lib/error-events";
 
@@ -391,6 +392,16 @@ router.post("/analyze", async (req, res) => {
       companyId,
       inspectionId,
       findings: mergedFindings,
+    });
+
+    // Inspection Scorecard: deterministic quality/missed-opportunity/risk
+    // snapshot for management. Same fire-and-forget contract.
+    void runScorecardComputation({
+      companyId,
+      inspectionId,
+      findings: mergedFindings,
+      recommendations,
+      photosAnalyzed: analyzedImagePaths.length,
     });
 
     return res.status(201).json({ ...serializeResult(row), analysisErrors });

@@ -15,4 +15,5 @@ export const SalesOpportunityUpdateStatus = {
   quoted: 'quoted',
   won: 'won',
   dismissed: 'dismissed',
+  lost: 'lost',
 } as const;

@@ -1340,6 +1340,296 @@ paths:
               schema:
                 $ref: "#/components/schemas/SalesOpportunity"
 
+  /opportunities/{id}/notes:
+    get:
+      operationId: listOpportunityNotes
+      tags: [opportunities]
+      summary: Immutable notes thread, oldest first (sales, manager, owner)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpportunityNote"
+    post:
+      operationId: addOpportunityNote
+      tags: [opportunities]
+      summary: Append a note (append-only — corrections are new notes)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpportunityNoteCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunityNote"
+
+  /scorecards:
+    get:
+      operationId: listScorecards
+      tags: [scorecards]
+      summary: List inspection scorecards, newest first (manager, owner)
+      parameters:
+        - name: technician
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InspectionScorecardListItem"
+
+  /scorecards/summary:
+    get:
+      operationId: getScorecardSummary
+      tags: [scorecards]
+      summary: Deterministic management-intelligence aggregates (manager, owner)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScorecardSummary"
+
+  /scorecards/inspection/{inspectionId}:
+    get:
+      operationId: getInspectionScorecard
+      tags: [scorecards]
+      summary: Get one inspection's scorecard (manager, owner)
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectionScorecard"
+
+  /customer-summaries/inspection/{inspectionId}:
+    get:
+      operationId: getCustomerSummaryForInspection
+      tags: [customer-summaries]
+      summary: Get the inspection's customer summary (manager, owner)
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /customer-summaries/inspection/{inspectionId}/generate:
+    post:
+      operationId: generateCustomerSummary
+      tags: [customer-summaries]
+      summary: Generate/regenerate the draft from the latest analysis (manager, owner)
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Regenerated existing draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /customer-summaries/{id}:
+    patch:
+      operationId: updateCustomerSummary
+      tags: [customer-summaries]
+      summary: Edit the draft body (drafts only — approved summaries are frozen)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerSummaryUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /customer-summaries/{id}/approve:
+    post:
+      operationId: approveCustomerSummary
+      tags: [customer-summaries]
+      summary: Approve — freezes the body and mints the expiring share token
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerSummaryApprove"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /customer-summaries/{id}/revoke:
+    post:
+      operationId: revokeCustomerSummaryShare
+      tags: [customer-summaries]
+      summary: Revoke the public share link immediately
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /proposals:
+    get:
+      operationId: listProposals
+      tags: [proposals]
+      summary: List proposals, newest first (sales, manager, owner)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalesProposal"
+    post:
+      operationId: createProposal
+      tags: [proposals]
+      summary: Assemble a proposal from same-company opportunity IDs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalesProposalCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesProposal"
+
+  /proposals/{id}:
+    get:
+      operationId: getProposal
+      tags: [proposals]
+      summary: Get one proposal with its resolved opportunities
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesProposalDetail"
+    patch:
+      operationId: updateProposal
+      tags: [proposals]
+      summary: Edit content or move the paperwork status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalesProposalUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesProposal"
+    delete:
+      operationId: deleteProposal
+      tags: [proposals]
+      summary: Delete a draft proposal (sent/decided proposals are records)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
 components:
   schemas:
     OkResponse:
@@ -2574,7 +2864,10 @@ components:
           items: { type: string }
         estimatedValueTier: { type: string, enum: [low, medium, high] }
         confidence:         { type: number }
-        status:             { type: string, enum: [new, reviewed, quoted, won, dismissed] }
+        status:             { type: string, enum: [new, reviewed, quoted, won, dismissed, lost] }
+        priority:           { type: integer }
+        riskLevel:          { type: ["string", "null"], enum: [low, medium, high, critical, null] }
+        estimatedAnnualValue: { type: ["integer", "null"] }
         assignedToUserId:   { type: ["integer", "null"] }
         createdAt:          { type: string }
         updatedAt:          { type: string }
@@ -2586,7 +2879,7 @@ components:
         id:            { type: integer }
         opportunityId: { type: integer }
         userId:        { type: ["integer", "null"] }
-        action:        { type: string, enum: [created, strengthened, viewed, status_changed, assigned] }
+        action:        { type: string, enum: [created, strengthened, viewed, status_changed, assigned, note_added, value_set] }
         detail:        { type: ["object", "null"], additionalProperties: true }
         createdAt:     { type: string }
 
@@ -2604,8 +2897,9 @@ components:
     SalesOpportunityUpdate:
       type: object
       properties:
-        status:           { type: string, enum: [new, reviewed, quoted, won, dismissed] }
+        status:           { type: string, enum: [new, reviewed, quoted, won, dismissed, lost] }
         assignedToUserId: { type: ["integer", "null"] }
+        estimatedAnnualValue: { type: ["integer", "null"] }
 
     SalesOpportunityTrends:
       type: object
@@ -2651,3 +2945,189 @@ components:
         enabledCategories:
           type: ["array", "null"]
           items: { type: string }
+
+    OpportunityNote:
+      type: object
+      required: [id, opportunityId, authorUserId, authorRole, body, createdAt]
+      properties:
+        id:            { type: integer }
+        companyId:     { type: integer }
+        opportunityId: { type: integer }
+        authorUserId:  { type: integer }
+        authorRole:    { type: string }
+        body:          { type: string }
+        createdAt:     { type: string }
+
+    OpportunityNoteCreate:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+
+    CustomerSummaryUpdate:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+
+    CustomerSummaryApprove:
+      type: object
+      properties:
+        expiresInDays: { type: integer, minimum: 1, maximum: 90 }
+
+    ScorecardComponents:
+      type: object
+      required: [photoCoverage, evidenceQuality, avgConfidence, recommendationCoverage]
+      properties:
+        photoCoverage:          { type: integer }
+        evidenceQuality:        { type: integer }
+        avgConfidence:          { type: integer }
+        recommendationCoverage: { type: integer }
+
+    MissedOpportunity:
+      type: object
+      required: [findingId, serviceType, description, severity]
+      properties:
+        findingId:   { type: integer }
+        serviceType: { type: string }
+        description: { type: string }
+        severity:    { type: string }
+
+    InspectionScorecard:
+      type: object
+      required: [id, companyId, inspectionId, technicianName, qualityScore, components, missedOpportunities, riskScore, riskLevel, findingsCount, photosAnalyzed, createdAt, updatedAt]
+      properties:
+        id:             { type: integer }
+        companyId:      { type: integer }
+        inspectionId:   { type: integer }
+        technicianName: { type: string }
+        qualityScore:   { type: integer }
+        components:
+          $ref: "#/components/schemas/ScorecardComponents"
+        missedOpportunities:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissedOpportunity"
+        riskScore:      { type: integer }
+        riskLevel:      { type: string, enum: [low, medium, high, critical] }
+        findingsCount:  { type: integer }
+        photosAnalyzed: { type: integer }
+        createdAt:      { type: string }
+        updatedAt:      { type: string }
+
+    InspectionScorecardListItem:
+      allOf:
+        - $ref: "#/components/schemas/InspectionScorecard"
+        - type: object
+          required: [siteAddress, inspectionDate]
+          properties:
+            siteAddress:    { type: string }
+            inspectionDate: { type: string }
+
+    ScorecardSummary:
+      type: object
+      required: [totalScorecards, avgQuality, avgRisk, riskDistribution, technicians, missedByService, topConduciveConditions, topRecommendedServices]
+      properties:
+        totalScorecards: { type: integer }
+        avgQuality:      { type: integer }
+        avgRisk:         { type: integer }
+        riskDistribution:
+          type: object
+          additionalProperties: { type: integer }
+        technicians:
+          type: array
+          items:
+            type: object
+            required: [technicianName, inspections, avgQuality, missedOpportunities]
+            properties:
+              technicianName:      { type: string }
+              inspections:         { type: integer }
+              avgQuality:          { type: integer }
+              missedOpportunities: { type: integer }
+        missedByService:
+          type: object
+          additionalProperties: { type: integer }
+        topConduciveConditions:
+          type: array
+          items:
+            type: object
+            required: [label, occurrences]
+            properties:
+              label:       { type: string }
+              occurrences: { type: integer }
+        topRecommendedServices:
+          type: array
+          items:
+            type: object
+            required: [label, occurrences]
+            properties:
+              label:       { type: string }
+              occurrences: { type: integer }
+
+    CustomerSummary:
+      type: object
+      required: [id, companyId, inspectionId, body, status, approvedByUserId, approvedAt, shareToken, shareExpiresAt, createdAt, updatedAt]
+      properties:
+        id:               { type: integer }
+        companyId:        { type: integer }
+        inspectionId:     { type: integer }
+        body:             { type: string }
+        status:           { type: string, enum: [draft, approved] }
+        approvedByUserId: { type: ["integer", "null"] }
+        approvedAt:       { type: ["string", "null"] }
+        shareToken:       { type: ["string", "null"] }
+        shareExpiresAt:   { type: ["string", "null"] }
+        createdAt:        { type: string }
+        updatedAt:        { type: string }
+
+    SalesProposal:
+      type: object
+      required: [id, companyId, propertyAddress, title, status, opportunityIds, intro, notes, createdByUserId, createdAt, updatedAt]
+      properties:
+        id:              { type: integer }
+        companyId:       { type: integer }
+        propertyAddress: { type: string }
+        title:           { type: string }
+        status:          { type: string, enum: [draft, sent, accepted, declined] }
+        opportunityIds:
+          type: array
+          items: { type: integer }
+        intro:           { type: ["string", "null"] }
+        notes:           { type: ["string", "null"] }
+        createdByUserId: { type: integer }
+        createdAt:       { type: string }
+        updatedAt:       { type: string }
+
+    SalesProposalDetail:
+      allOf:
+        - $ref: "#/components/schemas/SalesProposal"
+        - type: object
+          required: [opportunities]
+          properties:
+            opportunities:
+              type: array
+              items:
+                $ref: "#/components/schemas/SalesOpportunity"
+
+    SalesProposalCreate:
+      type: object
+      required: [title, propertyAddress, opportunityIds]
+      properties:
+        title:           { type: string }
+        propertyAddress: { type: string }
+        opportunityIds:
+          type: array
+          items: { type: integer }
+        intro: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+
+    SalesProposalUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        intro: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        status: { type: string, enum: [draft, sent, accepted, declined] }
+        opportunityIds:
+          type: array
+          items: { type: integer }

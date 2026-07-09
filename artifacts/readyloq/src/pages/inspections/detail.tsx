@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Camera, Mic, Video, BrainCircuit, FileText, MapPin, User, Calendar, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUser, isManagerRole } from "@/hooks/use-current-user";
+import { CustomerSummaryCard } from "@/components/customer-summary-card";
 
 function statusColor(status: string) {
   if (status === "completed") return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
@@ -36,6 +38,8 @@ export default function InspectionDetail() {
 
   const { data: inspection, isLoading } = useGetInspection(id, { query: { enabled: !!id } });
   const { data: analyses } = useListAnalysisResults({ inspectionId: id }, { query: { enabled: !!id } });
+  const { data: currentUser } = useCurrentUser();
+  const isManager = isManagerRole(currentUser?.role);
 
   const updateInspection = useUpdateInspection();
 
@@ -253,6 +257,9 @@ export default function InspectionDetail() {
           </CardContent>
         </Card>
       )}
+
+      {/* Customer Summary workflow — manager+ only, needs a completed analysis */}
+      {isManager && latestAnalysis && <CustomerSummaryCard inspectionId={id} />}
 
       {/* Actions */}
       <div className="flex gap-3">

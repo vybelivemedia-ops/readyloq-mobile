@@ -13,8 +13,9 @@ import {
   type OpportunitySettings,
   type OpportunityValueTier,
 } from "@workspace/db";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { logErrorEvent } from "./error-events";
+import type { OpportunityRiskLevel } from "@workspace/db";
 
 /**
  * Opportunity Intelligence — background synthesis engine.
@@ -58,6 +59,52 @@ interface CandidateOpportunity {
   evidenceFindingIds: number[];
   estimatedValueTier: OpportunityValueTier;
   confidence: number;
+}
+
+/**
+ * Deterministic risk level from the CURRENTLY cited findings (pure math, the
+ * AI never sets risk): worst severity wins; 2+ high-severity findings =
+ * critical.
+ */
+export function computeOpportunityRisk(cited: Finding[]): OpportunityRiskLevel {
+  const highs = cited.filter((f) => f.severity === "high").length;
+  if (highs >= 2) return "critical";
+  if (highs === 1) return "high";
+  if (cited.some((f) => f.severity === "medium")) return "medium";
+  return "low";
+}
+
+const SEVERITY_PRIORITY_WEIGHT: Record<string, number> = {
+  high: 1,
+  medium: 0.6,
+  low: 0.3,
+};
+
+/**
+ * Deterministic management priority 0–100. The AI never ranks its own output
+ * — that would let it promote its weakest ideas. Weights: severity 35% /
+ * confidence 25% / value tier 25% / recurrence 15% (full recurrence weight
+ * once the opportunity has evidence from 2+ analysis runs).
+ */
+export function computeOpportunityPriority(input: {
+  cited: Finding[];
+  confidence: number;
+  tier: OpportunityValueTier;
+  occurrences: number;
+}): number {
+  const severity = input.cited.reduce(
+    (max, f) => Math.max(max, SEVERITY_PRIORITY_WEIGHT[f.severity] ?? 0),
+    0,
+  );
+  const tierWeight = input.tier === "high" ? 1 : input.tier === "medium" ? 2 / 3 : 1 / 3;
+  const recurrence = input.occurrences >= 2 ? 1 : 0;
+  const score =
+    100 *
+    (0.35 * severity +
+      0.25 * clampConfidence(input.confidence) +
+      0.25 * tierWeight +
+      0.15 * recurrence);
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 export function opportunityFingerprint(category: string, title: string): string {
@@ -336,6 +383,9 @@ export async function runOpportunitySynthesis(input: {
             .filter((u): u is string => typeof u === "string" && u.length > 0),
         ),
       );
+      const citedFindings = candidate.evidenceFindingIds
+        .map((id) => findingById.get(id))
+        .filter((f): f is Finding => f !== undefined);
       const strengthen = async (existing: Opportunity) => {
         // Strengthen: the row's evidence is REPLACED with this run's findings
         // so evidenceFindingIds always resolves against the row's (updated)
@@ -346,13 +396,37 @@ export async function runOpportunitySynthesis(input: {
         const mergedPaths = Array.from(
           new Set([...existing.evidenceImagePaths, ...evidenceImagePaths]),
         );
+        // Recurrence for priority: 1 (original run) + prior strengthens + this
+        // one — deterministic count over the immutable event history.
+        const [strengthenCount] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(opportunityEventsTable)
+          .where(
+            and(
+              eq(opportunityEventsTable.companyId, companyId),
+              eq(opportunityEventsTable.opportunityId, existing.id),
+              eq(opportunityEventsTable.action, "strengthened"),
+            ),
+          );
+        const occurrences = 2 + (strengthenCount?.count ?? 0);
+        const newConfidence = Math.max(existing.confidence, candidate.confidence);
         const [updated] = await db
           .update(opportunitiesTable)
           .set({
             evidenceFindingIds: candidate.evidenceFindingIds,
             evidenceImagePaths: mergedPaths,
-            confidence: Math.max(existing.confidence, candidate.confidence),
+            confidence: newConfidence,
             rationale: candidate.rationale,
+            // Recomputed from the NEW run's cited findings (old IDs are
+            // run-local and unresolvable). Tier is never updated on
+            // strengthen, so the tier weight stays at the original tier.
+            riskLevel: computeOpportunityRisk(citedFindings),
+            priority: computeOpportunityPriority({
+              cited: citedFindings,
+              confidence: newConfidence,
+              tier: existing.estimatedValueTier,
+              occurrences,
+            }),
             inspectionId,
             updatedAt: new Date(),
           })
@@ -396,6 +470,13 @@ export async function runOpportunitySynthesis(input: {
             evidenceImagePaths,
             estimatedValueTier: candidate.estimatedValueTier,
             confidence: candidate.confidence,
+            riskLevel: computeOpportunityRisk(citedFindings),
+            priority: computeOpportunityPriority({
+              cited: citedFindings,
+              confidence: candidate.confidence,
+              tier: candidate.estimatedValueTier,
+              occurrences: 1,
+            }),
             status: "new",
           })
           .returning();

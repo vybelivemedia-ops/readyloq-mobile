@@ -20,6 +20,10 @@ import storageRouter from "./storage";
 import leadsRouter from "./leads";
 import betaRouter from "./beta";
 import opportunitiesRouter from "./opportunities";
+import scorecardsRouter from "./scorecards";
+import customerSummariesRouter from "./customer-summaries";
+import proposalsRouter from "./proposals";
+import shareRouter from "./share";
 
 const router: IRouter = Router();
 
@@ -28,6 +32,9 @@ router.use("/auth", authRouter);
 router.use(storageRouter);
 // PUBLIC: marketing-site lead capture (no auth — prospects aren't users yet).
 router.use("/leads", leadsRouter);
+// PUBLIC: customer-summary share links (no auth — the unguessable expiring
+// token IS the credential; uniform 404 for anything invalid; never photos).
+router.use("/share", shareRouter);
 
 // Tenant data routes are additionally gated by requireBetaAccess: a technician
 // whose beta access was paused is blocked here (owners/managers always pass).
@@ -69,6 +76,35 @@ router.use(
   requireBetaAccess,
   requireRole("sales"),
   opportunitiesRouter,
+);
+// Inspection Scorecards — management coaching data. Manager+ ONLY: quality
+// scoring never reaches technicians (or sales).
+router.use(
+  "/scorecards",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  scorecardsRouter,
+);
+// Customer Summaries — manager+ ONLY: generating, editing, and (critically)
+// approving what a customer may see is a management decision.
+router.use(
+  "/customer-summaries",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  customerSummariesRouter,
+);
+// Sales Proposals — same sales+ audience as the Opportunity Log they bundle.
+router.use(
+  "/proposals",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("sales"),
+  proposalsRouter,
 );
 
 export default router;
