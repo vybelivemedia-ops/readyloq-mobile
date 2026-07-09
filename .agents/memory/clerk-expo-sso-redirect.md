@@ -11,7 +11,15 @@ Rule: when calling Clerk `useSSO().startSSOFlow()` in an Expo app that ships as 
 
 **How to apply:** Any Expo SSO/OAuth button headed for an EAS build. Also handle `createdSessionId == null` (Google sign-up can return `signUp.status === "missing_requirements"`, which otherwise silently no-ops). Redirect fixes are native-config-adjacent: they require a full rebuild + reinstall to test — bump `android.versionCode` so the new APK installs over the old one.
 
-Residual suspects if this ever recurs: Clerk-managed native redirect allowlist (needs Auth pane/support, not code).
+# Live Clerk enforces a native redirect allowlist — server self-registers it
+
+Rule: live (pk_live) Clerk instances reject native OAuth with 400 "Redirect url mismatch" (code resource_missmatch) unless the app scheme URL (e.g. `readyloq-app://sso-callback`) is on the instance's authorized redirect list. Dev instances allow everything, so this only surfaces in production APKs.
+
+**Why:** Replit-managed Clerk has no dashboard, and the live secret key exists only inside the production deployment — so the API server registers the URL itself at startup (fire-and-forget, idempotent list-then-POST against `api.clerk.com/v1/redirect_urls` with its own CLERK_SECRET_KEY). Requires a republish to take effect; no new APK.
+
+**How to apply:** Adding any new native OAuth redirect scheme/path → add it to the server's native-redirect list module. Verify after republish without the APK: `curl -X POST 'https://<domain>/api/__clerk/v1/client/sign_ins?_is_native=1' -d 'strategy=oauth_google&redirect_url=<scheme>://<path>'` — mismatch gone = fixed. Also: live login strategies can differ from dev (e.g. password disabled on live, Google+email_code only); check `GET <domain>/api/__clerk/v1/environment` user_settings before assuming the mobile sign-in form matches. Password enablement for Production = user action in Auth pane (Configure → SSO providers → Production).
+
+Residual suspects if OAuth ever regresses again: Google-side credentials (unlikely — website Google sign-in shares them).
 
 # Standalone builds targeting the published backend need LIVE Clerk config
 

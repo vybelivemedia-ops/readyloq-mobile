@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { ensureClerkNativeRedirectUrls } from "./lib/clerk-redirect-urls";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,9 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Fire-and-forget: register native OAuth redirect URLs with Clerk so
+  // Google sign-in works in the standalone mobile app (production
+  // instances enforce a redirect allowlist; dev instances do not).
+  void ensureClerkNativeRedirectUrls();
 });
