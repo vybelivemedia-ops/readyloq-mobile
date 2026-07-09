@@ -13,6 +13,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
+import { Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -24,7 +25,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
 if (domain) setBaseUrl(`https://${domain}`);
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -64,6 +65,33 @@ export default function RootLayout() {
   }, [fontsLoaded, fontError]);
 
   if (!fontsLoaded && !fontError) return null;
+
+  if (!publishableKey) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          backgroundColor: "#101418",
+        }}
+      >
+        <Text
+          style={{
+            color: "#ffffff",
+            fontSize: 16,
+            textAlign: "center",
+            lineHeight: 24,
+          }}
+        >
+          Configuration error: this build is missing its sign-in key
+          (EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY).{"\n\n"}
+          Rebuild the app with the env values defined in eas.json.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ClerkProvider
