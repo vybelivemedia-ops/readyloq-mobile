@@ -239,6 +239,63 @@ describe("POST /analysis/analyze does not fabricate findings", () => {
   });
 });
 
+describe("POST /analysis/analyze carries over late-flagged duplicates", () => {
+  // The mobile pixel-dedupe pass is async: a photo analyzed in run N can be
+  // flagged `duplicateOf` afterwards and dropped from run N+1's submitted
+  // images[]. Its already-verified finding and per-photo zone must survive,
+  // or completeness/coverage would silently regress.
+  it("preserves a prior finding + zone when the photo drops out of a later run", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("carry");
+    const storagePath = imageUrl.replace(/^\/api\/storage/, "");
+    analyzePhotoMock.mockResolvedValueOnce({ ...pestPrediction(), zone: "kitchen" });
+
+    asUser(OWNER_ID);
+    const run1 = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }] });
+    expect(run1.status).toBe(201);
+    expect(run1.body.findings).toHaveLength(1);
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(1);
+
+    // Run 2: photo flagged duplicate client-side and omitted from images[], but
+    // it is still a saved media row -> carry its verified result over verbatim.
+    const run2 = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [] });
+    expect(run2.status).toBe(201);
+    // No new model call — the result is reused, never regenerated.
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(1);
+    expect(run2.body.findings).toHaveLength(1);
+    expect(run2.body.findings[0].imageUrl).toBe(imageUrl);
+    expect(run2.body.analyzedImagePaths).toContain(storagePath);
+    expect(run2.body.photoZones[storagePath]).toBe("kitchen");
+  });
+
+  it("drops a prior result when the media row no longer exists", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("carrydel");
+    const ghostPath = imageUrl.replace(/^\/api\/storage/, "");
+    analyzePhotoMock.mockResolvedValueOnce({ ...pestPrediction(), zone: "kitchen" });
+
+    asUser(OWNER_ID);
+    const run1 = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }] });
+    expect(run1.status).toBe(201);
+    expect(run1.body.findings).toHaveLength(1);
+
+    // Simulate the photo being deleted between runs: remove its media row. The
+    // carry-over must NOT resurrect a finding for a path that is no longer saved.
+    await db.delete(inspectionMediaTable).where(eq(inspectionMediaTable.inspectionId, inspectionId));
+
+    const run2 = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [] });
+    expect(run2.status).toBe(201);
+    expect(run2.body.findings).toEqual([]);
+    expect(run2.body.analyzedImagePaths).not.toContain(ghostPath);
+  });
+});
+
 describe("POST /analysis/analyze records video as evidence but never as findings", () => {
   /** Persist a company-scoped video media row and return its storage URL. */
   async function addVideo(inspectionId: number, suffix: string) {

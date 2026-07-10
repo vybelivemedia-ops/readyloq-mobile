@@ -34,4 +34,6 @@ export interface Finding {
   moisture?: string | null;
   /** @nullable */
   structuralIssue?: string | null;
+  /** @nullable */
+  zone?: string | null;
 }

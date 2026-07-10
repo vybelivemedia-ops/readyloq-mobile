@@ -5,6 +5,7 @@ import {
   type AiPrediction,
 } from "@workspace/db";
 import { ObjectStorageService } from "./objectStorage";
+import { ZONE_SLUGS, normalizeZone } from "./zone-coverage";
 
 /**
  * Real vision-model suggestion step for the Intelligence Dataset.
@@ -38,6 +39,7 @@ export function fallbackPrediction(): AiPrediction {
     possibleHarborage: null,
     possibleMoistureIssue: null,
     possibleStructuralIssue: null,
+    zone: null,
   };
 }
 
@@ -83,6 +85,7 @@ function userPrompt(): string {
     '- "possibleEntryPoint": entry point observed, else null',
     '- "suggestedCorrectiveAction": one concise recommended corrective action, else null',
     '- "rationale": one short sentence explaining the classification',
+    `- "zone": the single inspection zone this photo depicts, one of: ${ZONE_SLUGS.join(", ")}; or null if the scene is unclear`,
     "",
     "Only report what is actually visible in THIS image. Every field must be",
     "grounded in visible evidence — when the image shows no such evidence,",
@@ -155,6 +158,7 @@ function parsePrediction(raw: string): AiPrediction | null {
     possibleHarborage: asStringOrNull(parsed.possibleHarborage),
     possibleMoistureIssue: asStringOrNull(parsed.possibleMoistureIssue),
     possibleStructuralIssue: asStringOrNull(parsed.possibleStructuralIssue),
+    zone: normalizeZone(parsed.zone),
   };
 }
 

@@ -251,14 +251,21 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     // `draft: true` — Opportunity Intelligence and the scorecard wait for
     // the explicit completion step.
     if (rec.photos.length > 0 && rec.analyzedCount < rec.photos.length) {
-      const analyzed = rec.photos.filter((p) => p.storagePath);
-      await analyzeInspection({
-        inspectionId: serverId,
-        images: analyzed.map((p) => ({ imageUrl: p.storagePath as string })),
-        draft: true,
-      });
+      const uploaded = rec.photos.filter((p) => p.storagePath);
+      // Near-duplicate photos are still uploaded and kept as evidence, but
+      // excluded from AI analysis to avoid redundant detections and cost.
+      // They still count toward analyzedCount so the pending-work invariant
+      // (photos.length > analyzedCount) can settle.
+      const toAnalyze = uploaded.filter((p) => !p.duplicateOf);
+      if (toAnalyze.length > 0) {
+        await analyzeInspection({
+          inspectionId: serverId,
+          images: toAnalyze.map((p) => ({ imageUrl: p.storagePath as string })),
+          draft: true,
+        });
+      }
       await merge((r) => {
-        r.analyzedCount = Math.max(r.analyzedCount, analyzed.length);
+        r.analyzedCount = Math.max(r.analyzedCount, uploaded.length);
       });
     }
 

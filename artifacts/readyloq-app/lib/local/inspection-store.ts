@@ -27,6 +27,10 @@ export type LocalPhoto = {
   captureSource?: string;
   /** 0–100 score from the on-device quality gate (absent = ungated). */
   qualityScore?: number;
+  /** 64-bit perceptual (dHash) hex — computed off the capture path. */
+  perceptualHash?: string;
+  /** localUri of an earlier near-identical photo when this is a likely dup. */
+  duplicateOf?: string;
   /** Provider/EXIF context, passed through to the server verbatim. */
   captureMetadata?: Record<string, unknown>;
 };

@@ -42,8 +42,11 @@ import {
 import { requestSync, syncNow } from "@/lib/sync/engine";
 import {
   assessEvidence,
+  computeDHash,
   createMediaImportProvider,
   createNativeCameraProvider,
+  findNearDuplicate,
+  loadGrayscaleImage,
   type EvidenceItem,
 } from "@/lib/vision";
 
@@ -275,7 +278,10 @@ export default function NewInspectionScreen() {
   const ingestEvidence = async (items: EvidenceItem[]) => {
     const rec = recordRef.current;
     if (!rec || items.length === 0) return;
+    // Fast pass: persist each file and add it with the INSTANT metadata score
+    // so the thumbnail appears immediately — the camera never waits on a decode.
     const warnings: string[] = [];
+    const added: { localUri: string; item: EvidenceItem }[] = [];
     for (const item of items) {
       const durableUri = await persistPhoto(rec.localId, item.uri);
       const quality = assessEvidence(item);
@@ -298,10 +304,49 @@ export default function NewInspectionScreen() {
         recordRef.current = updated;
         setPhotos(updated.photos.map((p) => ({ uri: p.localUri })));
       }
+      added.push({ localUri: durableUri, item });
     }
     setQualityNotice(warnings.length > 0 ? warnings[0] : null);
     // A fresh capture re-arms auto-run analysis after a prior failure.
     setWsError(null);
+    // Deferred pass: decode pixels OFF the capture path to compute a perceptual
+    // hash (duplicate detection) and a Laplacian sharpness score.
+    void analyzeEvidencePixels(rec.localId, added);
+  };
+
+  // Sequential (one decode at a time, to bound memory) background pixel pass:
+  // perceptual-hash de-duplication + sharpness refinement. Runs after the
+  // thumbnails are already on screen. Each result patches its photo in place;
+  // a detected duplicate or blur surfaces a gentle, non-blocking notice.
+  // Advisory only — a failed/undecodable frame simply keeps its metadata score.
+  const analyzeEvidencePixels = async (
+    localId: string,
+    added: { localUri: string; item: EvidenceItem }[],
+  ) => {
+    for (const { localUri, item } of added) {
+      const pixels = await loadGrayscaleImage(localUri);
+      if (!pixels) continue;
+      const hash = computeDHash(pixels);
+      const refined = assessEvidence(item, pixels);
+      let duplicateOf: string | null = null;
+      const updated = await updateLocalInspection(localId, (r) => {
+        const photo = r.photos.find((p) => p.localUri === localUri);
+        if (!photo) return;
+        duplicateOf = findNearDuplicate(
+          hash,
+          r.photos.filter((p) => p.localUri !== localUri),
+        );
+        photo.perceptualHash = hash;
+        if (duplicateOf) photo.duplicateOf = duplicateOf;
+        photo.qualityScore = refined.score;
+      });
+      if (updated) recordRef.current = updated;
+      if (duplicateOf) {
+        setQualityNotice("This looks like a duplicate of an earlier photo");
+      } else if (!refined.acceptable && refined.reasons.length > 0) {
+        setQualityNotice(refined.reasons[0]);
+      }
+    }
   };
 
   const takePhoto = async () => {
@@ -447,7 +492,11 @@ export default function NewInspectionScreen() {
       await queryClient.invalidateQueries();
     } catch (e) {
       setWsReportError(
-        e instanceof ApiError ? e.message : (e as Error).message,
+        isOfflineError(e)
+          ? "You're offline — the draft is saved on this device and the report will finalize automatically when you're back online."
+          : e instanceof ApiError
+            ? e.message
+            : (e as Error).message,
       );
     } finally {
       wsReportRunning.current = false;

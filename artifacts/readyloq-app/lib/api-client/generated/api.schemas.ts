@@ -395,6 +395,8 @@ export type AnalysisResultVideoEvidenceItem = {
   frameAnalysisStatus: string;
 };
 
+export type AnalysisResultPhotoZones = {[key: string]: string};
+
 export interface Finding {
   id: number;
   category: string;
@@ -423,6 +425,22 @@ export interface Finding {
   moisture?: string | null;
   /** @nullable */
   structuralIssue?: string | null;
+  /** @nullable */
+  zone?: string | null;
+}
+
+export interface CoverageZone {
+  slug: string;
+  label: string;
+}
+
+export interface CoverageSnapshot {
+  propertyType: string;
+  completenessPct: number;
+  requiredZones: CoverageZone[];
+  coveredRequired: CoverageZone[];
+  uncoveredRequired: CoverageZone[];
+  suggested: CoverageZone[];
 }
 
 export interface AnalysisResult {
@@ -433,6 +451,8 @@ export interface AnalysisResult {
   recommendations?: string[];
   videoEvidence?: AnalysisResultVideoEvidenceItem[];
   analyzedImagePaths?: string[];
+  photoZones?: AnalysisResultPhotoZones;
+  coverage?: CoverageSnapshot | null;
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */

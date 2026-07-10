@@ -2014,12 +2014,45 @@ components:
         analyzedImagePaths:
           type: array
           items: { type: string }
+        photoZones:
+          type: object
+          additionalProperties: { type: string }
+        coverage:
+          oneOf:
+            - $ref: "#/components/schemas/CoverageSnapshot"
+            - type: "null"
         overallConfidence: { type: ["number", "null"] }
         riskLevel:    { type: ["string", "null"] }
         technicianFeedback: { type: ["string", "null"] }
         feedbackStatus: { type: ["string", "null"] }
         analysisErrors: { type: ["integer", "null"] }
         createdAt:    { type: string }
+
+    CoverageZone:
+      type: object
+      required: [slug, label]
+      properties:
+        slug:  { type: string }
+        label: { type: string }
+
+    CoverageSnapshot:
+      type: object
+      required: [propertyType, completenessPct, requiredZones, coveredRequired, uncoveredRequired, suggested]
+      properties:
+        propertyType:    { type: string }
+        completenessPct: { type: number }
+        requiredZones:
+          type: array
+          items: { $ref: "#/components/schemas/CoverageZone" }
+        coveredRequired:
+          type: array
+          items: { $ref: "#/components/schemas/CoverageZone" }
+        uncoveredRequired:
+          type: array
+          items: { $ref: "#/components/schemas/CoverageZone" }
+        suggested:
+          type: array
+          items: { $ref: "#/components/schemas/CoverageZone" }
 
     Finding:
       type: object
@@ -2041,6 +2074,7 @@ components:
         harborage:     { type: ["string", "null"] }
         moisture:      { type: ["string", "null"] }
         structuralIssue: { type: ["string", "null"] }
+        zone:          { type: ["string", "null"] }
 
     FeedbackInput:
       type: object

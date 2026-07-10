@@ -22,6 +22,14 @@ export const analysisResultsTable = pgTable("analysis_results", {
   // instead of re-sent to the model. Failed photos are NOT recorded so they
   // retry on the next run.
   analyzedImagePaths: jsonb("analyzed_image_paths").$type<string[]>().default([]),
+  // Per-photo zone classification (storage path -> zone slug) from the vision
+  // model's scene detection. Carried forward across live re-runs like findings,
+  // so clean photos (which produce no finding) still count toward zone coverage.
+  photoZones: jsonb("photo_zones").$type<Record<string, string>>().default({}),
+  // Live inspection completeness snapshot: covered zones vs. the property-type +
+  // pest-overlay required set. Recomputed on every analyze and at finalization.
+  // Null until the first analysis runs.
+  coverage: jsonb("coverage").$type<CoverageSnapshot | null>(),
   overallConfidence: real("overall_confidence"),
   riskLevel: text("risk_level"),
   technicianFeedback: text("technician_feedback"),
@@ -50,6 +58,35 @@ export interface Finding {
   harborage?: string | null;
   moisture?: string | null;
   structuralIssue?: string | null;
+  // Inspection zone this finding belongs to (slug from the zone-coverage
+  // taxonomy), when the vision model could place it. Null / absent when the
+  // scene was unclear — it simply doesn't count toward completeness.
+  zone?: string | null;
+}
+
+/** A single inspection zone in a coverage snapshot. */
+export interface CoverageZone {
+  slug: string;
+  label: string;
+}
+
+/**
+ * Live inspection completeness snapshot. Computed server-side from the set of
+ * covered zones (per-photo AI scene detection + attribute-derived zones from
+ * findings) against the required zone set for the property type, promoted by
+ * pest-specific overlays. ONLY required zones drive `completenessPct`;
+ * recommended zones surface as softer `suggested` hints.
+ */
+export interface CoverageSnapshot {
+  /** Normalized property type used to select the requirement matrix. */
+  propertyType: string;
+  /** 0-100, share of required zones that have at least one covering photo. */
+  completenessPct: number;
+  requiredZones: CoverageZone[];
+  coveredRequired: CoverageZone[];
+  uncoveredRequired: CoverageZone[];
+  /** Recommended (not required) zones still uncovered — softer prompts. */
+  suggested: CoverageZone[];
 }
 
 /**

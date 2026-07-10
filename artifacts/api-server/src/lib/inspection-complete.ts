@@ -12,6 +12,7 @@ import { generateReportNarrative, derivePropertyType } from "./report-narrative-
 import { generateCustomerSummaryBody, SummaryFidelityError } from "./customer-summary-ai";
 import { runOpportunitySynthesis } from "./opportunity-ai";
 import { runScorecardComputation } from "./scorecard";
+import { computeCoverage, zonesFromFinding } from "./zone-coverage";
 import { logErrorEvent } from "./error-events";
 
 /**
@@ -129,6 +130,43 @@ export async function runInspectionFinalization(input: {
     .limit(1);
   const findings = (latestAnalysis?.findings ?? []) as Finding[];
   const recommendations = (latestAnalysis?.recommendations ?? []) as string[];
+
+  // 0. Coverage — recompute the authoritative completeness snapshot from the
+  // latest run's per-photo zones + current pest types / property type. This
+  // catches the case where the technician edited pest types or the property
+  // type after the last live analyze; inputs are otherwise identical, so the
+  // value the technician saw live matches the finalized value.
+  if (latestAnalysis) {
+    try {
+      const photoZones = (latestAnalysis.photoZones ?? {}) as Record<string, string>;
+      const coveredZoneSlugs = [
+        ...Object.values(photoZones),
+        ...findings.flatMap((f) => zonesFromFinding(f)),
+      ];
+      const coverage = computeCoverage({
+        propertyType: derivePropertyType(inspection.notes),
+        pestTypes: (inspection.pestTypes ?? []) as string[],
+        coveredZoneSlugs,
+      });
+      await db
+        .update(analysisResultsTable)
+        .set({ coverage })
+        .where(
+          and(
+            eq(analysisResultsTable.id, latestAnalysis.id),
+            eq(analysisResultsTable.companyId, companyId),
+          ),
+        );
+    } catch {
+      void logErrorEvent("ai", {
+        companyId,
+        userId,
+        message: "Complete-inspection: coverage recompute failed",
+        inspectionId,
+        context: { stage: "complete_coverage" },
+      });
+    }
+  }
 
   // 1. Report narrative — refresh the report snapshot from the final analysis
   // first so the narrative reflects everything captured, then generate prose.

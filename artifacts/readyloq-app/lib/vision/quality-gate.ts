@@ -1,18 +1,20 @@
 /**
- * On-device evidence quality gate (Tier 1: metadata heuristics).
+ * On-device evidence quality gate.
  *
  * Runs after every capture/import and scores the evidence 0–100. The gate is
  * ADVISORY: poor evidence is kept (a blurry photo of a real infestation beats
  * no photo) but the technician gets an immediate warning so they can retake
  * while still on site.
  *
- * Tier 1 deliberately uses only metadata the providers already have
- * (dimensions + file size). True pixel-level checks (blur/Laplacian,
- * luminance histogram) require a JPEG decode path that is not economical in
- * pure JS at full resolution; the `analyzers` seam below is where a
- * pixel-based analyzer plugs in once a native image pipeline is approved.
+ * Two tiers feed one score:
+ *  - metadata heuristics (dimensions + file size) run instantly at capture;
+ *  - an optional pixel-level sharpness check (Laplacian variance) folds in
+ *    when a decoded bitmap is supplied (see `lib/vision/pixels.ts`). The
+ *    pixel decode is deferred off the capture path, so `assessEvidence` works
+ *    with or without it.
  */
 
+import type { GrayscaleImage } from "./pixels";
 import type { EvidenceItem, QualityAssessment } from "./types";
 
 /** Below this on the short edge, AI detection recall drops off sharply. */
@@ -55,14 +57,81 @@ const detailAnalyzer: Analyzer = (item) => {
   return { penalty: 0 };
 };
 
-/** Ordered analyzers; future pixel-level checks append here. */
+/** Ordered metadata analyzers (instant — no pixel decode required). */
 const ANALYZERS: Analyzer[] = [resolutionAnalyzer, detailAnalyzer];
 
-export function assessEvidence(item: EvidenceItem): QualityAssessment {
+/**
+ * Laplacian-variance sharpness gate (pixel-level).
+ *
+ * The Laplacian (a 4-neighbour second derivative) responds to edges; the
+ * variance of the Laplacian across the frame collapses toward zero as a photo
+ * goes out of focus or smears with motion blur. Thresholds are tuned against a
+ * 512px working bitmap (0–255 luminance) and kept conservative so a merely
+ * low-texture-but-in-focus frame is not flagged. Advisory only.
+ */
+const SHARP_VARIANCE = 140; // at/above → crisp, no penalty
+const BLUR_VARIANCE = 12; // at/below → clearly soft/featureless
+const MAX_SHARP_PENALTY = 30;
+
+function laplacianVariance(img: GrayscaleImage): number | null {
+  const { width: w, height: h, data } = img;
+  if (w < 3 || h < 3) return null;
+  const n = (w - 2) * (h - 2);
+  const lap = new Float64Array(n);
+  let mean = 0;
+  let k = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const c = data[y * w + x];
+      const v =
+        data[(y - 1) * w + x] +
+        data[(y + 1) * w + x] +
+        data[y * w + x - 1] +
+        data[y * w + x + 1] -
+        4 * c;
+      lap[k++] = v;
+      mean += v;
+    }
+  }
+  mean /= n;
+  let s = 0;
+  for (let i = 0; i < n; i++) {
+    const d = lap[i] - mean;
+    s += d * d;
+  }
+  return s / n;
+}
+
+function sharpnessAnalyzer(img: GrayscaleImage): { penalty: number; reason?: string } {
+  const v = laplacianVariance(img);
+  if (v == null || v >= SHARP_VARIANCE) return { penalty: 0 };
+  if (v <= BLUR_VARIANCE) {
+    return {
+      penalty: MAX_SHARP_PENALTY,
+      reason: "Photo looks out of focus or blurry — retake for reliable AI analysis",
+    };
+  }
+  const t = (SHARP_VARIANCE - v) / (SHARP_VARIANCE - BLUR_VARIANCE);
+  return { penalty: Math.round(MAX_SHARP_PENALTY * t) };
+}
+
+/**
+ * Score evidence 0–100. Pass a decoded `pixels` bitmap to include the
+ * pixel-level sharpness check; omit it for the instant, metadata-only gate.
+ */
+export function assessEvidence(
+  item: EvidenceItem,
+  pixels?: GrayscaleImage | null,
+): QualityAssessment {
   let score = 100;
   const reasons: string[] = [];
   for (const analyzer of ANALYZERS) {
     const { penalty, reason } = analyzer(item);
+    score -= penalty;
+    if (reason) reasons.push(reason);
+  }
+  if (pixels) {
+    const { penalty, reason } = sharpnessAnalyzer(pixels);
     score -= penalty;
     if (reason) reasons.push(reason);
   }

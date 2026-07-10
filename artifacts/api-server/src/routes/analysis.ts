@@ -14,6 +14,8 @@ import { runOpportunitySynthesis } from "../lib/opportunity-ai";
 import { runScorecardComputation } from "../lib/scorecard";
 import { objectPathCompanyScope } from "../lib/objectStorage";
 import { logErrorEvent } from "../lib/error-events";
+import { computeCoverage, zonesFromFinding } from "../lib/zone-coverage";
+import { derivePropertyType } from "../lib/report-narrative-ai";
 
 const router = Router();
 
@@ -31,6 +33,8 @@ function serializeResult(row: typeof analysisResultsTable.$inferSelect) {
     findings: row.findings ?? [],
     recommendations: row.recommendations ?? [],
     videoEvidence: row.videoEvidence ?? [],
+    photoZones: row.photoZones ?? {},
+    coverage: row.coverage ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -245,6 +249,9 @@ router.post("/analyze", async (req, res) => {
     for (const f of (previousRun?.findings ?? []) as Finding[]) {
       if (f.imageUrl) previousFindingByPath.set(toStoragePath(f.imageUrl), f);
     }
+    // Per-photo zone classifications carried over for already-assessed photos,
+    // so clean photos (which produce no finding) keep counting toward coverage.
+    const previousPhotoZones = (previousRun?.photoZones ?? {}) as Record<string, string>;
 
     // Run the real vision model on each company-scoped, persisted photo.
     // We NEVER fabricate a placeholder finding: a photo only becomes a finding
@@ -253,6 +260,7 @@ router.post("/analyze", async (req, res) => {
     // and surfaced to the technician instead of being saved as empty findings.
     const aiFindings: Finding[] = [];
     const analyzedImagePaths: string[] = [];
+    const photoZones: Record<string, string> = {};
     let nextId = 1;
     let analysisErrors = 0;
     for (const image of images.slice(0, MAX_ANALYZE_IMAGES)) {
@@ -266,6 +274,8 @@ router.post("/analyze", async (req, res) => {
       // Already assessed in a previous run: carry the verified result over.
       if (previouslyAnalyzed.has(storagePath)) {
         analyzedImagePaths.push(storagePath);
+        const priorZone = previousPhotoZones[storagePath];
+        if (priorZone) photoZones[storagePath] = priorZone;
         const prior = previousFindingByPath.get(storagePath);
         if (prior) aiFindings.push({ ...prior, id: nextId++ });
         continue;
@@ -279,6 +289,10 @@ router.post("/analyze", async (req, res) => {
         continue;
       }
       analyzedImagePaths.push(storagePath);
+      // Record the zone BEFORE the clean-photo skip below: a clean photo still
+      // covers its zone even though it never becomes a finding. `prediction.zone`
+      // is already validated against the taxonomy (or null) by parsePrediction.
+      if (prediction.zone) photoZones[storagePath] = prediction.zone;
       // A successful-but-empty assessment (a clean photo with nothing notable)
       // should not create a finding. The prompt makes the model ALWAYS emit a
       // rationale + tags, so those are NOT evidence of a real finding — only a
@@ -324,7 +338,29 @@ router.post("/analyze", async (req, res) => {
         moisture: prediction.possibleMoistureIssue ?? null,
         structuralIssue:
           prediction.possibleStructuralIssue ?? prediction.possibleEntryPoint ?? null,
+        zone: prediction.zone ?? null,
       });
+    }
+
+    // Late-flagged duplicate safety: the mobile pixel-dedupe pass runs
+    // asynchronously, so a photo analyzed in a prior run can be flagged
+    // `duplicateOf` AFTER that run and then dropped from this run's submitted
+    // `images[]`. Without carrying it forward, its already-verified finding and
+    // per-photo zone would silently vanish and coverage could regress. Carry
+    // over every previously-analyzed photo that is still a saved,
+    // company-scoped media row but wasn't resubmitted this run.
+    const handledPaths = new Set(analyzedImagePaths);
+    for (const rawPath of (previousRun?.analyzedImagePaths ?? []) as string[]) {
+      const storagePath = toStoragePath(rawPath);
+      if (handledPaths.has(storagePath)) continue;
+      if (!savedPaths.has(storagePath)) continue;
+      if (objectPathCompanyScope(storagePath) !== companyId) continue;
+      handledPaths.add(storagePath);
+      analyzedImagePaths.push(storagePath);
+      const priorZone = previousPhotoZones[storagePath];
+      if (priorZone) photoZones[storagePath] = priorZone;
+      const prior = previousFindingByPath.get(storagePath);
+      if (prior) aiFindings.push({ ...prior, id: nextId++ });
     }
 
     // Surface per-photo vision failures to the Beta Center error monitor so we
@@ -372,6 +408,21 @@ router.post("/analyze", async (req, res) => {
           ? "low"
           : null;
 
+    // Live completeness: union the per-photo AI zones (incl. clean photos) with
+    // the attribute-derived zones from every finding, then score against the
+    // property-type + pest-overlay required set. Property type comes from the
+    // inspection notes (same source finalization uses); pest overlays from the
+    // inspection's declared pest types.
+    const coveredZoneSlugs = [
+      ...Object.values(photoZones),
+      ...mergedFindings.flatMap((f) => zonesFromFinding(f)),
+    ];
+    const coverage = computeCoverage({
+      propertyType: derivePropertyType(inspection.notes),
+      pestTypes: (inspection.pestTypes ?? []) as string[],
+      coveredZoneSlugs,
+    });
+
     const [row] = await db
       .insert(analysisResultsTable)
       .values({
@@ -382,6 +433,8 @@ router.post("/analyze", async (req, res) => {
         recommendations,
         videoEvidence,
         analyzedImagePaths,
+        photoZones,
+        coverage,
         overallConfidence,
         riskLevel,
       })

@@ -179,6 +179,9 @@ export type AiPrediction = {
   possibleHarborage?: string | null;
   possibleMoistureIssue?: string | null;
   possibleStructuralIssue?: string | null;
+  // Inspection zone (scene) the photo depicts, as a zone-coverage taxonomy
+  // slug, or null when the scene is unclear. Drives live completeness scoring.
+  zone?: string | null;
 };
 
 // ── Tables ───────────────────────────────────────────────────────────────────

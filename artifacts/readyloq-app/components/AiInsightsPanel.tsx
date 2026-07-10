@@ -119,6 +119,15 @@ export function AiInsightsPanel({
   const findings = analysis?.findings ?? [];
   const grouped = groupFindings(findings);
   const narrative = report?.aiNarrative ?? null;
+  const coverage = analysis?.coverage ?? null;
+  // Incremental progress copy — while a run is in flight we show how many of
+  // the captured photos it is working through, so the technician sees the
+  // batch advancing rather than a bare spinner.
+  const analyzingCount = pendingCount > 0 ? pendingCount : photosCount;
+  const analyzingLabel =
+    analyzing && analyzingCount > 0
+      ? `Analyzing ${analyzingCount} of ${photosCount}`
+      : "Analyzing";
 
   // Live AI Inspection Panel — every value is aggregated straight from the
   // model's per-photo detections. Nothing is inferred client-side; a row is
@@ -297,7 +306,7 @@ export function AiInsightsPanel({
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <ActivityIndicator size="small" color={colors.primary} />
                     <Text style={{ color: colors.primary, fontFamily: "Inter_500Medium", fontSize: 12 }}>
-                      Updating
+                      {analyzingLabel}
                     </Text>
                   </View>
                 ) : (
@@ -381,6 +390,96 @@ export function AiInsightsPanel({
               </Text>
             </Card>
 
+            {/* Inspection coverage — required-zone completeness. Suggested zones
+                are informational and deliberately kept out of the treatment
+                recommendations, which are grounded only in real detections. */}
+            {coverage ? (
+              <Card style={{ gap: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="map-outline" size={16} color={colors.primary} />
+                  <Text
+                    style={{
+                      color: colors.foreground,
+                      fontFamily: "Inter_700Bold",
+                      fontSize: 15,
+                      flex: 1,
+                    }}
+                  >
+                    Inspection coverage
+                  </Text>
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 17 }}>
+                    {coverage.completenessPct}%
+                  </Text>
+                </View>
+
+                <View
+                  style={{
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: colors.muted,
+                    overflow: "hidden",
+                  }}
+                >
+                  <View
+                    style={{
+                      height: 8,
+                      borderRadius: 4,
+                      width: `${Math.max(0, Math.min(100, coverage.completenessPct))}%`,
+                      backgroundColor:
+                        coverage.completenessPct >= 100
+                          ? colors.success ?? colors.primary
+                          : colors.primary,
+                    }}
+                  />
+                </View>
+
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                  {coverage.coveredRequired.length} of {coverage.requiredZones.length} required zone
+                  {coverage.requiredZones.length === 1 ? "" : "s"} captured
+                </Text>
+
+                {coverage.uncoveredRequired.length > 0 ? (
+                  <View style={{ gap: 6 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="alert-circle-outline" size={14} color={colors.primary} />
+                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                        Still to capture
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      {coverage.uncoveredRequired.map((z) => (
+                        <Badge key={z.slug} label={z.label} tone="warning" />
+                      ))}
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons
+                      name="checkmark-circle-outline"
+                      size={14}
+                      color={colors.success ?? colors.primary}
+                    />
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                      All required zones captured.
+                    </Text>
+                  </View>
+                )}
+
+                {coverage.suggested.length > 0 ? (
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                      Also suggested
+                    </Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      {coverage.suggested.map((z) => (
+                        <Badge key={z.slug} label={z.label} tone="default" />
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+              </Card>
+            ) : null}
+
             {/* Inspection context */}
             <Card style={{ gap: 8 }}>
               <Text
@@ -397,7 +496,11 @@ export function AiInsightsPanel({
               </View>
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
                 {photosCount} photo{photosCount === 1 ? "" : "s"} captured
-                {analysis && pendingCount > 0 ? ` · ${pendingCount} not yet analyzed` : ""}
+                {analyzing && analyzingCount > 0
+                  ? ` · analyzing ${analyzingCount} of ${photosCount}`
+                  : analysis && pendingCount > 0
+                    ? ` · ${pendingCount} not yet analyzed`
+                    : ""}
               </Text>
             </Card>
 
