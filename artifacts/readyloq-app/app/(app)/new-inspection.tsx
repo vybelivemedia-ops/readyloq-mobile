@@ -11,7 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { type Href, useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,6 +40,12 @@ import {
   type LocalInspection,
 } from "@/lib/local/inspection-store";
 import { requestSync, syncNow } from "@/lib/sync/engine";
+import {
+  assessEvidence,
+  createMediaImportProvider,
+  createNativeCameraProvider,
+  type EvidenceItem,
+} from "@/lib/vision";
 
 /** True when an error smells like a connectivity failure (not a server rejection). */
 function isOfflineError(e: unknown): boolean {
@@ -86,6 +92,15 @@ export default function NewInspectionScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [capturing, setCapturing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  // Advisory warning from the on-device quality gate — auto-clears; never
+  // blocks capture (poor evidence of a real problem beats no evidence).
+  const [qualityNotice, setQualityNotice] = useState<string | null>(null);
+  // Vision Platform providers: every evidence source (live camera, imported
+  // GoPro/glasses footage, future streams) funnels through the same
+  // EvidenceItem contract into the same persist → sync → analyze pipeline.
+  const cameraProvider = useMemo(() => createNativeCameraProvider(cameraRef), []);
+  const importProvider = useMemo(() => createMediaImportProvider(), []);
   const [zoom, setZoom] = useState(0);
   const [flash, setFlash] = useState<"off" | "on" | "auto">("off");
 
@@ -253,32 +268,76 @@ export default function NewInspectionScreen() {
   const togglePest = (p: string) =>
     setPestTypes((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
 
+  // Shared ingest path for ALL vision providers: copy each file out of any
+  // cache dir IMMEDIATELY (the OS can purge caches at any time — evidence must
+  // survive an app restart), score it with the quality gate, and append it to
+  // the local record with full provenance.
+  const ingestEvidence = async (items: EvidenceItem[]) => {
+    const rec = recordRef.current;
+    if (!rec || items.length === 0) return;
+    const warnings: string[] = [];
+    for (const item of items) {
+      const durableUri = await persistPhoto(rec.localId, item.uri);
+      const quality = assessEvidence(item);
+      if (!quality.acceptable && quality.reasons.length > 0) warnings.push(quality.reasons[0]);
+      const updated = await updateLocalInspection(rec.localId, (r) => {
+        r.photos.push({
+          localUri: durableUri,
+          capturedAt: item.capturedAt,
+          captureSource: item.source,
+          qualityScore: quality.score,
+          captureMetadata: {
+            ...item.metadata,
+            width: item.width,
+            height: item.height,
+            fileSize: item.fileSize,
+          },
+        });
+      });
+      if (updated) {
+        recordRef.current = updated;
+        setPhotos(updated.photos.map((p) => ({ uri: p.localUri })));
+      }
+    }
+    setQualityNotice(warnings.length > 0 ? warnings[0] : null);
+    // A fresh capture re-arms auto-run analysis after a prior failure.
+    setWsError(null);
+  };
+
   const takePhoto = async () => {
     const rec = recordRef.current;
-    if (!cameraRef.current || capturing || !rec) return;
+    if (!cameraRef.current || capturing || importing || !rec) return;
     try {
       setCapturing(true);
-      const pic = await cameraRef.current.takePictureAsync({ quality: 0.6 });
-      if (pic?.uri) {
-        // Copy out of the camera cache IMMEDIATELY — the OS can purge cache
-        // files at any time, and evidence must survive an app restart.
-        const durableUri = await persistPhoto(rec.localId, pic.uri);
-        const updated = await updateLocalInspection(rec.localId, (r) => {
-          r.photos.push({ localUri: durableUri, capturedAt: new Date().toISOString() });
-        });
-        if (updated) {
-          recordRef.current = updated;
-          setPhotos(updated.photos.map((p) => ({ uri: p.localUri })));
-        }
-        // A fresh capture re-arms auto-run analysis after a prior failure.
-        setWsError(null);
-      }
+      await ingestEvidence(await cameraProvider.capture());
     } catch {
       setError("Couldn't capture photo. Please try again.");
     } finally {
       setCapturing(false);
     }
   };
+
+  // Import existing footage (GoPro / smart-glasses / drone shots synced to the
+  // camera roll) into this inspection — same pipeline as live captures.
+  const importPhotos = async () => {
+    const rec = recordRef.current;
+    if (importing || capturing || !rec) return;
+    try {
+      setImporting(true);
+      await ingestEvidence(await importProvider.capture());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't import photos. Please try again.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Quality warnings are transient nudges, not persistent errors.
+  useEffect(() => {
+    if (!qualityNotice) return;
+    const timer = setTimeout(() => setQualityNotice(null), 6000);
+    return () => clearTimeout(timer);
+  }, [qualityNotice]);
 
   // Remove a not-yet-uploaded photo from both screen state and the record.
   const removePhoto = async (index: number) => {
@@ -589,6 +648,52 @@ export default function NewInspectionScreen() {
       </Pressable>
     );
 
+    // Vision Platform: pull GoPro / smart-glasses / drone footage off the
+    // camera roll straight into this inspection.
+    const importButton = (
+      <Pressable
+        onPress={() => void importPhotos()}
+        disabled={importing || capturing}
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: "rgba(0,0,0,0.5)",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: importing ? 0.5 : 1,
+        }}
+      >
+        {importing ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Ionicons name="images-outline" size={20} color="#fff" />
+        )}
+      </Pressable>
+    );
+
+    const qualityBanner = qualityNotice ? (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          backgroundColor: "rgba(202,138,4,0.92)",
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 10,
+          maxWidth: 420,
+        }}
+      >
+        <Ionicons name="warning-outline" size={16} color="#fff" />
+        <Text
+          style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 12, flexShrink: 1 }}
+        >
+          {qualityNotice} — photo kept, consider retaking
+        </Text>
+      </View>
+    ) : null;
+
     const zoomChips = (
       <View style={{ flexDirection: "row", gap: 8 }}>
         {ZOOM_LEVELS.map((z) => (
@@ -671,9 +776,11 @@ export default function NewInspectionScreen() {
               </View>
 
               <View style={{ padding: 16, gap: 14, alignItems: "center" }}>
+                {qualityBanner}
                 {zoomChips}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 28 }}>
                   {flashButton}
+                  {importButton}
                   {captureButton}
                   {doneButton}
                 </View>
@@ -791,6 +898,7 @@ export default function NewInspectionScreen() {
               }}
             >
               {flashButton}
+              {importButton}
               {captureButton}
               {doneButton}
             </View>
@@ -801,8 +909,10 @@ export default function NewInspectionScreen() {
                 left: 0,
                 right: 132,
                 alignItems: "center",
+                gap: 10,
               }}
             >
+              {qualityBanner}
               {zoomChips}
             </View>
             {thumbs}
@@ -821,6 +931,9 @@ export default function NewInspectionScreen() {
             }}
           >
             {thumbs}
+            {qualityBanner ? (
+              <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{qualityBanner}</View>
+            ) : null}
             <View style={{ alignItems: "center" }}>{zoomChips}</View>
             <View
               style={{
@@ -830,7 +943,10 @@ export default function NewInspectionScreen() {
                 paddingHorizontal: 28,
               }}
             >
-              <View style={{ width: 64, alignItems: "center" }}>{flashButton}</View>
+              <View style={{ width: 64, alignItems: "center", gap: 12 }}>
+                {flashButton}
+                {importButton}
+              </View>
               {captureButton}
               {doneButton}
             </View>

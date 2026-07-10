@@ -2,6 +2,7 @@ import { useAuth, useUser } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
   getGetAnalyticsDashboardQueryOptions,
+  getGetBriefingQueryOptions,
   getListInspectionsQueryOptions,
 } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +10,7 @@ import { type Href, useRouter } from "expo-router";
 import React from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
+import { RoleBriefingView } from "@/components/briefing/RoleBriefingView";
 import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
@@ -24,11 +26,17 @@ export default function DashboardScreen() {
   const { user } = useCurrentUser();
   const { isCompact } = useWindowSizeClass();
 
+  // Role-shaped briefing: the server decides the caller's role and returns
+  // exactly the section that role needs. The old role-agnostic dashboard
+  // queries stay as a fallback while the briefing loads (or if it errors) so
+  // the home tab never regresses to a blank screen.
+  const briefing = useQuery(getGetBriefingQueryOptions());
   const dash = useQuery(getGetAnalyticsDashboardQueryOptions());
   const recent = useQuery(getListInspectionsQueryOptions());
 
-  const refreshing = dash.isRefetching || recent.isRefetching;
+  const refreshing = briefing.isRefetching || dash.isRefetching || recent.isRefetching;
   const onRefresh = () => {
+    briefing.refetch();
     dash.refetch();
     recent.refetch();
   };
@@ -145,74 +153,81 @@ export default function DashboardScreen() {
           <Ionicons name="arrow-forward" size={22} color={colors.primaryForeground} />
         </Pressable>
 
-        {/* Stats grid */}
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-          {stats.map((s) => (
-            <Card key={s.label} style={{ width: isCompact ? "47.5%" : "23%", gap: 8 }}>
-              <Ionicons name={s.icon as keyof typeof Ionicons.glyphMap} size={22} color={s.tone} />
-              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 26 }}>
-                {s.value}
-              </Text>
-              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }}>
-                {s.label}
-              </Text>
-            </Card>
-          ))}
-        </View>
-
-        {/* Recent activity */}
-        <View style={{ gap: 12 }}>
-          <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 17 }}>
-            Recent activity
-          </Text>
-          {dash.data?.recentActivity?.length ? (
-            <Card padded={false}>
-              {dash.data.recentActivity.slice(0, 6).map((a, i) => (
-                <View
-                  key={a.id}
-                  style={{
-                    flexDirection: "row",
-                    gap: 12,
-                    padding: 14,
-                    borderTopWidth: i === 0 ? 0 : 1,
-                    borderTopColor: colors.border,
-                    alignItems: "center",
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      backgroundColor: colors.accent,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Ionicons name="pulse-outline" size={18} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      numberOfLines={1}
-                      style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}
-                    >
-                      {a.description}
-                    </Text>
-                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-                      {a.technicianName} · {formatRelative(a.createdAt)}
-                    </Text>
-                  </View>
-                </View>
+        {briefing.data ? (
+          /* Role-adaptive briefing: technician, sales, manager, or owner view */
+          <RoleBriefingView briefing={briefing.data} />
+        ) : (
+          <>
+            {/* Fallback (briefing loading or unavailable): legacy stats grid */}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+              {stats.map((s) => (
+                <Card key={s.label} style={{ width: isCompact ? "47.5%" : "23%", gap: 8 }}>
+                  <Ionicons name={s.icon as keyof typeof Ionicons.glyphMap} size={22} color={s.tone} />
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 26 }}>
+                    {s.value}
+                  </Text>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }}>
+                    {s.label}
+                  </Text>
+                </Card>
               ))}
-            </Card>
-          ) : (
-            <Card>
-              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", textAlign: "center" }}>
-                No activity yet. Start your first inspection above.
+            </View>
+
+            {/* Recent activity */}
+            <View style={{ gap: 12 }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 17 }}>
+                Recent activity
               </Text>
-            </Card>
-          )}
-        </View>
+              {dash.data?.recentActivity?.length ? (
+                <Card padded={false}>
+                  {dash.data.recentActivity.slice(0, 6).map((a, i) => (
+                    <View
+                      key={a.id}
+                      style={{
+                        flexDirection: "row",
+                        gap: 12,
+                        padding: 14,
+                        borderTopWidth: i === 0 ? 0 : 1,
+                        borderTopColor: colors.border,
+                        alignItems: "center",
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: colors.accent,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Ionicons name="pulse-outline" size={18} color={colors.primary} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          numberOfLines={1}
+                          style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}
+                        >
+                          {a.description}
+                        </Text>
+                        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                          {a.technicianName} · {formatRelative(a.createdAt)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </Card>
+              ) : (
+                <Card>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", textAlign: "center" }}>
+                    No activity yet. Start your first inspection above.
+                  </Text>
+                </Card>
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
     </Screen>
   );

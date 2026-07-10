@@ -696,6 +696,19 @@ export default function NewInspection() {
 
   function addVoiceNote() {
     if (voice.state === "listening") { voice.stop(); return; }
+    // Regression guard: the Web Speech API is browser-provided (Chrome, Edge,
+    // Safari). In browsers without it — notably Samsung Internet, the default
+    // on Galaxy devices — start() used to no-op silently, making voice look
+    // "removed". Tell the technician exactly what to do instead.
+    if (!voice.isSupported) {
+      toast({
+        title: "Voice notes aren't supported in this browser",
+        description:
+          "This browser doesn't offer speech recognition. Open ReadyLoq in Chrome (or Edge/Safari) to use voice notes.",
+        variant: "destructive",
+      });
+      return;
+    }
     voice.start();
   }
 

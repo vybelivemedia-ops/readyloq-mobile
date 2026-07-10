@@ -191,3 +191,12 @@ Rule: when a user reports a feature missing from a mobile build, verify git hist
 - Open-opportunity dedupe is enforced at the DB level: partial unique index on (company_id, property_address, fingerprint) WHERE status IN ('new','reviewed','quoted'). Synthesis catches 23505 and strengthens the winner. App-level read-then-insert alone races under concurrent analyze runs.
 - Anti-fabrication is layered: evidence grounding (reject candidates whose IDs don't resolve), tier-not-dollars (server-side regex REJECTS candidates with $ figures in title/rationale — don't strip), deterministic trend math fed to the model, per-company minConfidence/category gates.
 - `sales` role (rank 1) sees the opportunity log but has NO manager powers; dismiss = manager+, settings = owner. requireBetaAccess bypass is rank ≥ manager only, so a sales user with betaAccess=false is fail-closed blocked.
+
+## Vision Platform Tier 1 (mobile evidence capture)
+- ALL evidence sources (live camera, camera-roll import of GoPro/glasses/drone footage) funnel through one `EvidenceItem` contract (`lib/vision/` in the app) into one `ingestEvidence` path: persist out of cache FIRST, then score, then append to local record with provenance (captureSource/qualityScore/captureMetadata).
+- The quality gate is ADVISORY ONLY — it must never block or drop a capture. **Why:** poor evidence of a real problem beats no evidence; scoring is heuristic (metadata-based, no pixel decode) so false negatives are expected. Warnings render as a transient auto-clearing banner.
+- New evidence sources should be added as new providers implementing the same contract, not new capture paths in new-inspection.tsx.
+
+## Role-Based Intelligence briefing
+- `GET /briefing`: the SERVER decides the caller's role and returns exactly one populated section (technician/sales/manager/owner). The mobile `RoleBriefingView` just switches on the returned role — never add client-side role mapping. **Why:** single source of truth for RBAC; client role logic would drift from server gates.
+- Home tab keeps the legacy role-agnostic stats grid as a fallback while the briefing loads or errors, so the dashboard never blanks.
