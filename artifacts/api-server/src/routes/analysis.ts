@@ -15,6 +15,7 @@ import { runScorecardComputation } from "../lib/scorecard";
 import { objectPathCompanyScope } from "../lib/objectStorage";
 import { logErrorEvent } from "../lib/error-events";
 import { computeCoverage, zonesFromFinding } from "../lib/zone-coverage";
+import { computeEvidenceSummary } from "../lib/evidence-summary";
 import { derivePropertyType } from "../lib/report-narrative-ai";
 
 const router = Router();
@@ -35,6 +36,9 @@ function serializeResult(row: typeof analysisResultsTable.$inferSelect) {
     videoEvidence: row.videoEvidence ?? [],
     photoZones: row.photoZones ?? {},
     coverage: row.coverage ?? null,
+    // Live evidence tally for the AI Inspection Engine — derived on read from
+    // this row's own findings + videos, so it is always fresh and never stale.
+    evidence: computeEvidenceSummary(row.findings, row.videoEvidence),
     createdAt: row.createdAt.toISOString(),
   };
 }

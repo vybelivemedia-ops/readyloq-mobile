@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { AnalysisResult, Finding, Report } from "@/lib/api-client";
+import type { AnalysisResult, CoverageSnapshot, EvidenceSummary, Finding, Report } from "@/lib/api-client";
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -99,6 +99,48 @@ function speciesWithConfidence(findings: Finding[]): { name: string; confidence:
   return out;
 }
 
+interface RoomStatus {
+  slug: string;
+  label: string;
+  covered: boolean;
+}
+
+/** Full room checklist: every required zone with its ✓ covered / Missing state. */
+function roomChecklist(coverage: CoverageSnapshot | null | undefined): RoomStatus[] {
+  if (!coverage) return [];
+  const covered = new Set(coverage.coveredRequired.map((z) => z.slug));
+  return coverage.requiredZones.map((z) => ({
+    slug: z.slug,
+    label: z.label,
+    covered: covered.has(z.slug),
+  }));
+}
+
+interface EvidenceChip {
+  key: string;
+  label: string;
+  count: number;
+}
+
+/**
+ * Flatten the evidence summary into count chips for the live board. Pest species
+ * and structural defects surface per-label ("5 Rodent", "1 Pipe gap"); moisture
+ * and exclusion surface as a single group total ("3 Moisture") since their free
+ * text is usually all-unique. Group totals are independent — never summed.
+ */
+function evidenceChips(evidence: EvidenceSummary | null | undefined): EvidenceChip[] {
+  if (!evidence) return [];
+  const chips: EvidenceChip[] = [];
+  for (const g of evidence.groups) {
+    if (g.key === "pests" || g.key === "structural") {
+      for (const it of g.items) chips.push({ key: `${g.key}:${it.key}`, label: it.label, count: it.count });
+    } else {
+      chips.push({ key: g.key, label: g.label, count: g.total });
+    }
+  }
+  return chips;
+}
+
 export function AiInsightsPanel({
   siteAddress,
   propertyType,
@@ -120,6 +162,9 @@ export function AiInsightsPanel({
   const grouped = groupFindings(findings);
   const narrative = report?.aiNarrative ?? null;
   const coverage = analysis?.coverage ?? null;
+  const evidence = analysis?.evidence ?? null;
+  const rooms = roomChecklist(coverage);
+  const chips = evidenceChips(evidence);
   // Incremental progress copy — while a run is in flight we show how many of
   // the captured photos it is working through, so the technician sees the
   // batch advancing rather than a bare spinner.
@@ -286,6 +331,213 @@ export function AiInsightsPanel({
 
         {tab === "insights" ? (
           <>
+            {/* AI Inspection Engine — the consolidated, real-time state of the
+                live inspection. Progress, room classification and the evidence
+                tally all update automatically as photos are analyzed; nothing
+                here is entered by hand. */}
+            <Card style={{ gap: 14 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="pulse" size={16} color={colors.primary} />
+                <Text
+                  style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 15, flex: 1 }}
+                >
+                  AI Inspection Engine
+                </Text>
+                {analyzing ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                      Live
+                    </Text>
+                  </View>
+                ) : (
+                  <Badge label={analysis ? "Live" : "Standby"} tone={analysis ? "success" : "default"} />
+                )}
+              </View>
+
+              {/* Inspection progress */}
+              <View style={{ gap: 6 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-end",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text
+                    style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}
+                  >
+                    Inspection Progress
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.foreground,
+                      fontFamily: "Inter_700Bold",
+                      fontSize: 34,
+                      lineHeight: 38,
+                    }}
+                  >
+                    {coverage ? `${coverage.completenessPct}%` : "—"}
+                  </Text>
+                </View>
+                <View
+                  style={{ height: 8, borderRadius: 4, backgroundColor: colors.muted, overflow: "hidden" }}
+                >
+                  <View
+                    style={{
+                      height: 8,
+                      borderRadius: 4,
+                      width: `${coverage ? Math.max(0, Math.min(100, coverage.completenessPct)) : 0}%`,
+                      backgroundColor:
+                        coverage && coverage.completenessPct >= 100
+                          ? colors.success ?? colors.primary
+                          : colors.primary,
+                    }}
+                  />
+                </View>
+                {coverage ? (
+                  <Text
+                    style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}
+                  >
+                    {coverage.coveredRequired.length} of {coverage.requiredZones.length} required zone
+                    {coverage.requiredZones.length === 1 ? "" : "s"} captured
+                  </Text>
+                ) : (
+                  <Text
+                    style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}
+                  >
+                    Run AI analysis to start the live engine.
+                  </Text>
+                )}
+              </View>
+
+              {/* Room classification checklist */}
+              {rooms.length > 0 ? (
+                <View
+                  style={{ gap: 8, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 }}
+                >
+                  <Text
+                    style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}
+                  >
+                    Room classification
+                  </Text>
+                  <View style={{ gap: 6 }}>
+                    {rooms.map((r) => (
+                      <View
+                        key={r.slug}
+                        style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                      >
+                        <Ionicons
+                          name={r.covered ? "checkmark-circle" : "ellipse-outline"}
+                          size={16}
+                          color={r.covered ? colors.success ?? colors.primary : colors.mutedForeground}
+                        />
+                        <Text
+                          style={{
+                            color: colors.foreground,
+                            fontFamily: "Inter_400Regular",
+                            fontSize: 13,
+                            flex: 1,
+                          }}
+                        >
+                          {r.label}
+                        </Text>
+                        <Text
+                          style={{
+                            color: r.covered ? colors.success ?? colors.primary : colors.mutedForeground,
+                            fontFamily: "Inter_600SemiBold",
+                            fontSize: 12,
+                          }}
+                        >
+                          {r.covered ? "Captured" : "Missing"}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                  {coverage && coverage.suggested.length > 0 ? (
+                    <View style={{ gap: 6 }}>
+                      <Text
+                        style={{
+                          color: colors.mutedForeground,
+                          fontFamily: "Inter_500Medium",
+                          fontSize: 12,
+                        }}
+                      >
+                        Also suggested
+                      </Text>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                        {coverage.suggested.map((z) => (
+                          <Badge key={z.slug} label={z.label} tone="default" />
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* Evidence tally */}
+              <View style={{ gap: 8, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text
+                    style={{
+                      color: colors.mutedForeground,
+                      fontFamily: "Inter_500Medium",
+                      fontSize: 12,
+                      flex: 1,
+                    }}
+                  >
+                    Evidence tally
+                  </Text>
+                  {evidence ? (
+                    <Text
+                      style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}
+                    >
+                      {evidence.totalEvidence} item{evidence.totalEvidence === 1 ? "" : "s"}
+                    </Text>
+                  ) : null}
+                </View>
+                {chips.length > 0 ? (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {chips.map((c) => (
+                      <View
+                        key={c.key}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                          backgroundColor: colors.muted,
+                          borderRadius: 999,
+                          paddingVertical: 5,
+                          paddingHorizontal: 10,
+                        }}
+                      >
+                        <Text
+                          style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 13 }}
+                        >
+                          {c.count}
+                        </Text>
+                        <Text
+                          style={{
+                            color: colors.mutedForeground,
+                            fontFamily: "Inter_500Medium",
+                            fontSize: 12,
+                          }}
+                        >
+                          {c.label}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text
+                    style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}
+                  >
+                    {analysis ? "No evidence detected yet." : "—"}
+                  </Text>
+                )}
+              </View>
+            </Card>
+
             {/* AI Inspection Panel — live detection board. The technician's job
                 is to verify these, not to manually describe what the camera
                 already sees. Every value comes from real model detections. */}
@@ -389,96 +641,6 @@ export function AiInsightsPanel({
                 describe what the camera already sees.
               </Text>
             </Card>
-
-            {/* Inspection coverage — required-zone completeness. Suggested zones
-                are informational and deliberately kept out of the treatment
-                recommendations, which are grounded only in real detections. */}
-            {coverage ? (
-              <Card style={{ gap: 12 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Ionicons name="map-outline" size={16} color={colors.primary} />
-                  <Text
-                    style={{
-                      color: colors.foreground,
-                      fontFamily: "Inter_700Bold",
-                      fontSize: 15,
-                      flex: 1,
-                    }}
-                  >
-                    Inspection coverage
-                  </Text>
-                  <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 17 }}>
-                    {coverage.completenessPct}%
-                  </Text>
-                </View>
-
-                <View
-                  style={{
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: colors.muted,
-                    overflow: "hidden",
-                  }}
-                >
-                  <View
-                    style={{
-                      height: 8,
-                      borderRadius: 4,
-                      width: `${Math.max(0, Math.min(100, coverage.completenessPct))}%`,
-                      backgroundColor:
-                        coverage.completenessPct >= 100
-                          ? colors.success ?? colors.primary
-                          : colors.primary,
-                    }}
-                  />
-                </View>
-
-                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-                  {coverage.coveredRequired.length} of {coverage.requiredZones.length} required zone
-                  {coverage.requiredZones.length === 1 ? "" : "s"} captured
-                </Text>
-
-                {coverage.uncoveredRequired.length > 0 ? (
-                  <View style={{ gap: 6 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <Ionicons name="alert-circle-outline" size={14} color={colors.primary} />
-                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
-                        Still to capture
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                      {coverage.uncoveredRequired.map((z) => (
-                        <Badge key={z.slug} label={z.label} tone="warning" />
-                      ))}
-                    </View>
-                  </View>
-                ) : (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons
-                      name="checkmark-circle-outline"
-                      size={14}
-                      color={colors.success ?? colors.primary}
-                    />
-                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-                      All required zones captured.
-                    </Text>
-                  </View>
-                )}
-
-                {coverage.suggested.length > 0 ? (
-                  <View style={{ gap: 6 }}>
-                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
-                      Also suggested
-                    </Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                      {coverage.suggested.map((z) => (
-                        <Badge key={z.slug} label={z.label} tone="default" />
-                      ))}
-                    </View>
-                  </View>
-                ) : null}
-              </Card>
-            ) : null}
 
             {/* Inspection context */}
             <Card style={{ gap: 8 }}>

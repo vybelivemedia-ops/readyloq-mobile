@@ -89,6 +89,47 @@ export interface CoverageSnapshot {
   suggested: CoverageZone[];
 }
 
+/** A single counted evidence label within an evidence group. */
+export interface EvidenceCount {
+  /** Stable key (lower-cased label) for React lists. */
+  key: string;
+  /** Display label, straight from the model's detection (first casing kept). */
+  label: string;
+  count: number;
+}
+
+/**
+ * One category in the live evidence tally. `total` is the count of findings that
+ * carry this category's attribute and is the PRIMARY display number ("3 Moisture").
+ * `items` is a per-label breakdown — meaningful for pest species; for structural /
+ * moisture the model's free text tends to be all-unique, so treat items as
+ * secondary detail, not a sum.
+ */
+export interface EvidenceGroup {
+  key: "pests" | "structural" | "moisture" | "exclusion";
+  label: string;
+  total: number;
+  items: EvidenceCount[];
+}
+
+/**
+ * Real-time evidence tally for the live AI Inspection Engine. DERIVED on read
+ * from the analysis row's `findings` + `videoEvidence` — never persisted, so it
+ * can never be stale. A single finding may contribute to multiple groups (a photo
+ * can show a pest AND moisture AND an entry point), so the group totals are
+ * independent and MUST NOT be summed to reach `totalEvidence`.
+ */
+export interface EvidenceSummary {
+  /** Distinct evidence items reviewed: photo findings + attached videos. */
+  totalEvidence: number;
+  /** Photo-derived findings count. */
+  photoEvidence: number;
+  /** Attached video count (videos are reviewed evidence, not analyzed findings). */
+  videoEvidence: number;
+  /** Non-empty groups only, in a stable display order. */
+  groups: EvidenceGroup[];
+}
+
 /**
  * Metadata about a video attached to an inspection, recorded on the analysis
  * result as reviewed evidence. Videos are NOT analyzed into findings — see

@@ -285,6 +285,21 @@ export const ListAnalysisResultsResponseItem = zod.object({
   "label": zod.string()
 }))
 }),zod.null()]).optional(),
+  "evidence": zod.object({
+  "totalEvidence": zod.number(),
+  "photoEvidence": zod.number(),
+  "videoEvidence": zod.number(),
+  "groups": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "total": zod.number(),
+  "items": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "count": zod.number()
+}))
+}))
+}).optional(),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -393,6 +408,21 @@ export const GetAnalysisResultResponse = zod.object({
   "label": zod.string()
 }))
 }),zod.null()]).optional(),
+  "evidence": zod.object({
+  "totalEvidence": zod.number(),
+  "photoEvidence": zod.number(),
+  "videoEvidence": zod.number(),
+  "groups": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "total": zod.number(),
+  "items": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "count": zod.number()
+}))
+}))
+}).optional(),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -467,6 +497,21 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
   "label": zod.string()
 }))
 }),zod.null()]).optional(),
+  "evidence": zod.object({
+  "totalEvidence": zod.number(),
+  "photoEvidence": zod.number(),
+  "videoEvidence": zod.number(),
+  "groups": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "total": zod.number(),
+  "items": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "count": zod.number()
+}))
+}))
+}).optional(),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),

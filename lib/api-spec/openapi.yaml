@@ -2021,6 +2021,8 @@ components:
           oneOf:
             - $ref: "#/components/schemas/CoverageSnapshot"
             - type: "null"
+        evidence:
+          $ref: "#/components/schemas/EvidenceSummary"
         overallConfidence: { type: ["number", "null"] }
         riskLevel:    { type: ["string", "null"] }
         technicianFeedback: { type: ["string", "null"] }
@@ -2053,6 +2055,36 @@ components:
         suggested:
           type: array
           items: { $ref: "#/components/schemas/CoverageZone" }
+
+    EvidenceCount:
+      type: object
+      required: [key, label, count]
+      properties:
+        key:   { type: string }
+        label: { type: string }
+        count: { type: integer }
+
+    EvidenceGroup:
+      type: object
+      required: [key, label, total, items]
+      properties:
+        key:   { type: string }
+        label: { type: string }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/EvidenceCount" }
+
+    EvidenceSummary:
+      type: object
+      required: [totalEvidence, photoEvidence, videoEvidence, groups]
+      properties:
+        totalEvidence: { type: integer }
+        photoEvidence: { type: integer }
+        videoEvidence: { type: integer }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/EvidenceGroup" }
 
     Finding:
       type: object

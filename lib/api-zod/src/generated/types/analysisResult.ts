@@ -8,6 +8,7 @@
 import type { AnalysisResultPhotoZones } from './analysisResultPhotoZones';
 import type { AnalysisResultVideoEvidenceItem } from './analysisResultVideoEvidenceItem';
 import type { CoverageSnapshot } from './coverageSnapshot';
+import type { EvidenceSummary } from './evidenceSummary';
 import type { Finding } from './finding';
 
 export interface AnalysisResult {
@@ -20,6 +21,7 @@ export interface AnalysisResult {
   analyzedImagePaths?: string[];
   photoZones?: AnalysisResultPhotoZones;
   coverage?: CoverageSnapshot | null;
+  evidence?: EvidenceSummary;
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */

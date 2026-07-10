@@ -214,6 +214,14 @@ describe("POST /analysis/analyze does not fabricate findings", () => {
     expect(res.body.findings).toHaveLength(1);
     expect(res.body.findings[0].category).toBe("pest");
     expect(res.body.findings[0].imageUrl).toBe(imageUrl);
+
+    // The live evidence tally is derived on read and rides on every response.
+    expect(res.body.evidence).toBeTruthy();
+    expect(res.body.evidence.totalEvidence).toBe(1);
+    expect(res.body.evidence.photoEvidence).toBe(1);
+    const pests = res.body.evidence.groups.find((g: { key: string }) => g.key === "pests");
+    expect(pests?.total).toBe(1);
+    expect(pests?.items[0].label).toBe("German cockroach");
   });
 
   it("mixes a failure and a real finding in one request", async () => {

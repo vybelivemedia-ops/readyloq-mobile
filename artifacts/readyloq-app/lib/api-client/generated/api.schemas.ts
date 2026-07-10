@@ -443,6 +443,26 @@ export interface CoverageSnapshot {
   suggested: CoverageZone[];
 }
 
+export interface EvidenceCount {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface EvidenceGroup {
+  key: string;
+  label: string;
+  total: number;
+  items: EvidenceCount[];
+}
+
+export interface EvidenceSummary {
+  totalEvidence: number;
+  photoEvidence: number;
+  videoEvidence: number;
+  groups: EvidenceGroup[];
+}
+
 export interface AnalysisResult {
   id: number;
   inspectionId: number;
@@ -453,6 +473,7 @@ export interface AnalysisResult {
   analyzedImagePaths?: string[];
   photoZones?: AnalysisResultPhotoZones;
   coverage?: CoverageSnapshot | null;
+  evidence?: EvidenceSummary;
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */
