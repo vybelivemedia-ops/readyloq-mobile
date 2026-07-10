@@ -141,6 +141,28 @@ paths:
         "204":
           description: Deleted
 
+  /inspections/{id}/complete:
+    post:
+      operationId: completeInspection
+      tags: [inspections]
+      summary: >
+        Explicitly complete an in-progress inspection and trigger the
+        finalization pipeline (report, AI narrative, customer summary draft,
+        Opportunity Intelligence, scorecard). Idempotent.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Completed (or already completed — safe no-op)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteInspectionResult"
+
   /inspections/{id}/media:
     post:
       operationId: addInspectionMedia
@@ -1868,6 +1890,24 @@ components:
         createdAt:   { type: string }
         completedAt: { type: ["string", "null"] }
 
+    CompleteInspectionResult:
+      type: object
+      required: [inspection, alreadyCompleted, finalization]
+      properties:
+        inspection:
+          $ref: "#/components/schemas/Inspection"
+        reportId: { type: ["integer", "null"] }
+        alreadyCompleted:
+          type: boolean
+          description: True when the inspection was already completed (safe no-op).
+        finalization:
+          type: string
+          enum: [started, skipped]
+          description: >
+            "started" when the background finalization pipeline (AI narrative,
+            customer summary draft, Opportunity Intelligence, scorecard) was
+            kicked off by this call.
+
     InspectionInput:
       type: object
       required: [siteAddress, technicianName]
@@ -2006,6 +2046,12 @@ components:
               filename:    { type: ["string", "null"] }
               durationSec: { type: ["integer", "null"] }
               label:       { type: ["string", "null"] }
+        draft:
+          type: boolean
+          description: >
+            Live-capture mode: analyze photos but defer Opportunity
+            Intelligence and scorecard computation until the technician
+            explicitly completes the inspection. Defaults to false.
 
     AnalysisSummary:
       type: object

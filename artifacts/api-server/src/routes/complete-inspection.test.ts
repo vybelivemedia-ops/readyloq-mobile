@@ -1,0 +1,351 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import request from "supertest";
+
+/**
+ * Inspection lifecycle tests: explicit "Complete Inspection".
+ *
+ * Pins the redesigned lifecycle guarantees:
+ *   1. `draft: true` on /analysis/analyze DEFERS Opportunity Intelligence and
+ *      scorecard computation (live-capture mode); default behavior unchanged.
+ *   2. POST /inspections/:id/complete is the ONLY finalization trigger: it
+ *      marks the inspection completed, guarantees a report, and kicks off the
+ *      narrative + customer-summary-draft + opportunities + scorecard pipeline.
+ *   3. Completion is idempotent — a retry/double-tap never re-runs the pipeline.
+ *   4. Cross-tenant completion is impossible (404).
+ */
+
+const { authState } = vi.hoisted(() => ({
+  authState: { userId: null as string | null },
+}));
+
+vi.mock("@clerk/express", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@clerk/express")>();
+  return {
+    ...actual,
+    getAuth: () => authState,
+    clerkMiddleware: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  };
+});
+
+vi.mock("../lib/objectStorage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/objectStorage")>();
+  class ObjectStorageService {
+    async getObjectEntityUploadURL(companyId: number) {
+      return `https://signed.example.com/companies/${companyId}/uploads/obj`;
+    }
+    normalizeObjectEntityPath(url: string) {
+      return url;
+    }
+    async getObjectEntityFile(_path: string) {
+      return {} as never;
+    }
+    async downloadObject() {
+      return new Response("file-bytes");
+    }
+  }
+  return { ...actual, ObjectStorageService };
+});
+
+const { analyzePhotoMock } = vi.hoisted(() => ({ analyzePhotoMock: vi.fn() }));
+vi.mock("../lib/intelligence-ai", () => {
+  const empty = {
+    category: null,
+    subcategory: null,
+    confidence: 0,
+    tags: [] as string[],
+    possiblePest: null,
+    possibleConduciveCondition: null,
+    possibleEntryPoint: null,
+    suggestedCorrectiveAction: null,
+    rationale: null,
+  };
+  return {
+    analyzePhoto: analyzePhotoMock,
+    generateAiPrediction: vi.fn(async () => ({ ...empty })),
+    fallbackPrediction: () => ({ ...empty }),
+  };
+});
+
+// The intelligence outputs the lifecycle gates. Mocked so tests can assert
+// exactly WHEN each one runs without paying for a model call.
+const { opportunityMock, scorecardMock, narrativeMock, summaryMock } = vi.hoisted(() => ({
+  opportunityMock: vi.fn(async () => {}),
+  scorecardMock: vi.fn(async () => {}),
+  narrativeMock: vi.fn(async () => "AI narrative body generated at completion."),
+  summaryMock: vi.fn(
+    async () =>
+      "Thank you for having us inspect your property. Our technician documented the findings below.",
+  ),
+}));
+vi.mock("../lib/opportunity-ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/opportunity-ai")>();
+  return { ...actual, runOpportunitySynthesis: opportunityMock };
+});
+vi.mock("../lib/scorecard", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/scorecard")>();
+  return { ...actual, runScorecardComputation: scorecardMock };
+});
+vi.mock("../lib/report-narrative-ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/report-narrative-ai")>();
+  return { ...actual, generateReportNarrative: narrativeMock };
+});
+vi.mock("../lib/customer-summary-ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/customer-summary-ai")>();
+  return { ...actual, generateCustomerSummaryBody: summaryMock };
+});
+
+import app from "../app";
+import {
+  db,
+  usersTable,
+  companiesTable,
+  inspectionsTable,
+  reportsTable,
+  customerSummariesTable,
+} from "@workspace/db";
+import { eq, and } from "drizzle-orm";
+
+const OWNER_ID = "complete_owner_clerk_id";
+const OUTSIDER_ID = "complete_outsider_clerk_id";
+let companyId: number;
+let otherCompanyId: number;
+
+function asUser(id: string | null) {
+  authState.userId = id;
+}
+
+function pestPrediction() {
+  return {
+    category: "pest",
+    subcategory: "cockroach",
+    confidence: 0.82,
+    tags: ["roach", "kitchen"],
+    possiblePest: "German cockroach",
+    possibleConduciveCondition: null,
+    possibleEntryPoint: null,
+    suggestedCorrectiveAction: "Apply gel bait near harborage",
+    rationale: "Visible roach near harborage",
+  };
+}
+
+async function createInspectionWithPhoto(suffix: string) {
+  asUser(OWNER_ID);
+  const created = await request(app)
+    .post("/api/inspections")
+    .send({ siteAddress: `${suffix} Complete St`, technicianName: "Tech", clientName: "Client" });
+  expect(created.status).toBe(201);
+  const inspectionId = created.body.id as number;
+
+  const imageUrl = `/api/storage/objects/companies/${companyId}/uploads/photo-${suffix}`;
+  const media = await request(app)
+    .post(`/api/inspections/${inspectionId}/media`)
+    .send({ mediaType: "photo", url: imageUrl });
+  expect(media.status).toBe(201);
+
+  asUser(null);
+  return { inspectionId, imageUrl };
+}
+
+beforeAll(async () => {
+  for (const [slug, name] of [
+    ["complete-co", "Complete Co"],
+    ["complete-other-co", "Complete Other Co"],
+  ] as const) {
+    const [existing] = await db
+      .select()
+      .from(companiesTable)
+      .where(eq(companiesTable.slug, slug));
+    const id = existing
+      ? existing.id
+      : (await db.insert(companiesTable).values({ name, slug }).returning())[0].id;
+    if (slug === "complete-co") companyId = id;
+    else otherCompanyId = id;
+  }
+
+  await db.delete(usersTable).where(eq(usersTable.clerkUserId, OWNER_ID));
+  await db.insert(usersTable).values({ clerkUserId: OWNER_ID, role: "owner", companyId });
+  await db.delete(usersTable).where(eq(usersTable.clerkUserId, OUTSIDER_ID));
+  await db
+    .insert(usersTable)
+    .values({ clerkUserId: OUTSIDER_ID, role: "owner", companyId: otherCompanyId });
+});
+
+beforeEach(() => {
+  asUser(null);
+  analyzePhotoMock.mockReset();
+  opportunityMock.mockClear();
+  scorecardMock.mockClear();
+  narrativeMock.mockClear();
+  summaryMock.mockClear();
+});
+
+describe("draft analysis defers intelligence outputs", () => {
+  it("skips opportunity synthesis and scorecard when draft: true", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("draftmode");
+    analyzePhotoMock.mockResolvedValueOnce(pestPrediction());
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }], draft: true });
+
+    expect(res.status).toBe(201);
+    expect(res.body.findings).toHaveLength(1);
+    expect(opportunityMock).not.toHaveBeenCalled();
+    expect(scorecardMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the original behavior when the flag is absent (web app unchanged)", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("nodraft");
+    analyzePhotoMock.mockResolvedValueOnce(pestPrediction());
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }] });
+
+    expect(res.status).toBe(201);
+    await vi.waitFor(() => {
+      expect(opportunityMock).toHaveBeenCalledTimes(1);
+      expect(scorecardMock).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("POST /inspections/:id/complete", () => {
+  it("completes the inspection and triggers the full finalization pipeline", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("finalize");
+    analyzePhotoMock.mockResolvedValueOnce(pestPrediction());
+
+    asUser(OWNER_ID);
+    const analyzed = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }], draft: true });
+    expect(analyzed.status).toBe(201);
+    expect(opportunityMock).not.toHaveBeenCalled();
+
+    const res = await request(app).post(`/api/inspections/${inspectionId}/complete`).send();
+    expect(res.status).toBe(200);
+    expect(res.body.alreadyCompleted).toBe(false);
+    expect(res.body.finalization).toBe("started");
+    expect(res.body.inspection.status).toBe("completed");
+    expect(res.body.inspection.completedAt).toBeTruthy();
+    expect(res.body.reportId).toBeTypeOf("number");
+
+    // Report snapshot exists with the verified findings.
+    const [report] = await db
+      .select()
+      .from(reportsTable)
+      .where(and(eq(reportsTable.id, res.body.reportId), eq(reportsTable.companyId, companyId)));
+    expect(report).toBeTruthy();
+    expect(report.inspectionId).toBe(inspectionId);
+
+    // Background pipeline: narrative, customer summary draft, opportunities,
+    // scorecard all fire exactly once from the explicit completion.
+    await vi.waitFor(() => {
+      expect(narrativeMock).toHaveBeenCalledTimes(1);
+      expect(summaryMock).toHaveBeenCalledTimes(1);
+      expect(opportunityMock).toHaveBeenCalledTimes(1);
+      expect(scorecardMock).toHaveBeenCalledTimes(1);
+    });
+    expect(opportunityMock.mock.calls[0][0]).toMatchObject({ companyId, inspectionId });
+    expect(scorecardMock.mock.calls[0][0]).toMatchObject({ companyId, inspectionId });
+
+    await vi.waitFor(async () => {
+      const [summary] = await db
+        .select()
+        .from(customerSummariesTable)
+        .where(
+          and(
+            eq(customerSummariesTable.inspectionId, inspectionId),
+            eq(customerSummariesTable.companyId, companyId),
+          ),
+        );
+      expect(summary).toBeTruthy();
+      expect(summary.status).toBe("draft");
+
+      const [finalReport] = await db
+        .select()
+        .from(reportsTable)
+        .where(eq(reportsTable.id, res.body.reportId));
+      expect(finalReport.aiNarrative).toBeTruthy();
+    });
+  });
+
+  it("is idempotent — a second complete is a safe no-op that never re-runs the pipeline", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("idem");
+    analyzePhotoMock.mockResolvedValueOnce(pestPrediction());
+
+    asUser(OWNER_ID);
+    await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }], draft: true });
+
+    const first = await request(app).post(`/api/inspections/${inspectionId}/complete`).send();
+    expect(first.status).toBe(200);
+    expect(first.body.alreadyCompleted).toBe(false);
+
+    await vi.waitFor(() => expect(opportunityMock).toHaveBeenCalledTimes(1));
+
+    const second = await request(app).post(`/api/inspections/${inspectionId}/complete`).send();
+    expect(second.status).toBe(200);
+    expect(second.body.alreadyCompleted).toBe(true);
+    expect(second.body.finalization).toBe("skipped");
+    expect(second.body.reportId).toBe(first.body.reportId);
+
+    // Give any (wrongly) re-triggered pipeline a beat, then confirm it never ran.
+    await new Promise((r) => setTimeout(r, 150));
+    expect(opportunityMock).toHaveBeenCalledTimes(1);
+    expect(scorecardMock).toHaveBeenCalledTimes(1);
+    expect(narrativeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("completes an inspection with no analysis (all-clear) — report yes, summary no", async () => {
+    asUser(OWNER_ID);
+    const created = await request(app)
+      .post("/api/inspections")
+      .send({ siteAddress: "No Analysis Ave", technicianName: "Tech" });
+    expect(created.status).toBe(201);
+    const inspectionId = created.body.id as number;
+
+    const res = await request(app).post(`/api/inspections/${inspectionId}/complete`).send();
+    expect(res.status).toBe(200);
+    expect(res.body.inspection.status).toBe("completed");
+    expect(res.body.reportId).toBeTypeOf("number");
+
+    await vi.waitFor(() => {
+      // Opportunities/scorecard still run (with empty findings)…
+      expect(opportunityMock).toHaveBeenCalledTimes(1);
+      expect(scorecardMock).toHaveBeenCalledTimes(1);
+    });
+    // …but a customer summary is NEVER generated without a verified analysis.
+    expect(summaryMock).not.toHaveBeenCalled();
+    const [summary] = await db
+      .select()
+      .from(customerSummariesTable)
+      .where(eq(customerSummariesTable.inspectionId, inspectionId));
+    expect(summary).toBeUndefined();
+  });
+
+  it("cannot complete another company's inspection (404, no state change)", async () => {
+    const { inspectionId } = await createInspectionWithPhoto("tenant");
+
+    asUser(OUTSIDER_ID);
+    const res = await request(app).post(`/api/inspections/${inspectionId}/complete`).send();
+    expect(res.status).toBe(404);
+
+    const [row] = await db
+      .select()
+      .from(inspectionsTable)
+      .where(eq(inspectionsTable.id, inspectionId));
+    expect(row.status).toBe("pending");
+    expect(opportunityMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated completion", async () => {
+    const { inspectionId } = await createInspectionWithPhoto("anon");
+    asUser(null);
+    const res = await request(app).post(`/api/inspections/${inspectionId}/complete`).send();
+    expect(res.status).toBe(401);
+  });
+});

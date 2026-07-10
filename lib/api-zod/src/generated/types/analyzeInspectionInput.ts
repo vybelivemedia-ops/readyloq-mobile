@@ -14,4 +14,7 @@ export interface AnalyzeInspectionInput {
   images?: AnalyzeInspectionInputImagesItem[];
   technicianFindings?: Finding[];
   videos?: AnalyzeInspectionInputVideosItem[];
+  /** Live-capture mode: analyze photos but defer Opportunity Intelligence and scorecard computation until the technician explicitly completes the inspection. Defaults to false.
+   */
+  draft?: boolean;
 }

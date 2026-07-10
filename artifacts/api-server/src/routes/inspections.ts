@@ -1,8 +1,13 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { inspectionsTable, inspectionMediaTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { inspectionsTable, inspectionMediaTable, reportsTable } from "@workspace/db";
+import { eq, and, desc, ne } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
+import {
+  ensureReportForInspection,
+  runInspectionFinalization,
+} from "../lib/inspection-complete";
+import { logErrorEvent } from "../lib/error-events";
 
 const router = Router();
 
@@ -147,6 +152,124 @@ router.patch("/:id", async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ error: "Failed to update inspection" });
+  }
+});
+
+// POST /inspections/:id/complete — the technician's explicit "Complete
+// Inspection". This is the ONLY transition that ends an in-progress
+// inspection: it marks the record completed, guarantees a service report
+// exists, and kicks off the background finalization pipeline (AI narrative,
+// customer summary draft, Opportunity Intelligence, scorecard). Idempotent —
+// a repeat call (retry, double-tap, second device) is a safe no-op.
+router.post("/:id/complete", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [inspection] = await db
+      .select()
+      .from(inspectionsTable)
+      .where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+    if (!inspection) return res.status(404).json({ error: "Not found" });
+
+    const serializeWithMedia = async (row: typeof inspectionsTable.$inferSelect) => {
+      const media = await db
+        .select()
+        .from(inspectionMediaTable)
+        .where(
+          and(
+            eq(inspectionMediaTable.companyId, companyId),
+            eq(inspectionMediaTable.inspectionId, id),
+          ),
+        );
+      return {
+        ...row,
+        pestTypes: row.pestTypes ?? [],
+        media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        createdAt: row.createdAt.toISOString(),
+        completedAt: row.completedAt?.toISOString() ?? null,
+      };
+    };
+
+    const latestReportId = async () => {
+      const [report] = await db
+        .select()
+        .from(reportsTable)
+        .where(
+          and(eq(reportsTable.companyId, companyId), eq(reportsTable.inspectionId, id)),
+        )
+        .orderBy(desc(reportsTable.createdAt))
+        .limit(1);
+      return report?.id ?? null;
+    };
+
+    if (inspection.status === "completed") {
+      return res.json({
+        inspection: await serializeWithMedia(inspection),
+        reportId: await latestReportId(),
+        alreadyCompleted: true,
+        finalization: "skipped",
+      });
+    }
+
+    // Atomic transition guard: only ONE caller wins the pending → completed
+    // transition, so concurrent completes (double-tap, retry after a network
+    // blip) can never run the finalization pipeline twice.
+    const [updated] = await db
+      .update(inspectionsTable)
+      .set({ status: "completed", completedAt: new Date() })
+      .where(
+        and(
+          eq(inspectionsTable.id, id),
+          eq(inspectionsTable.companyId, companyId),
+          ne(inspectionsTable.status, "completed"),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      // Lost the race — another request already completed it.
+      const [current] = await db
+        .select()
+        .from(inspectionsTable)
+        .where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+      return res.json({
+        inspection: await serializeWithMedia(current ?? inspection),
+        reportId: await latestReportId(),
+        alreadyCompleted: true,
+        finalization: "skipped",
+      });
+    }
+
+    // Guarantee the service report exists before responding (DB-only, fast).
+    const report = await ensureReportForInspection({ companyId, inspectionId: id });
+
+    // AI narrative, customer summary draft, opportunities, scorecard run in
+    // the background — completion never blocks on AI latency, and per-step
+    // failures log to the error monitor instead of un-completing anything.
+    void runInspectionFinalization({
+      companyId,
+      inspectionId: id,
+      reportId: report?.id ?? null,
+      userId: req.user?.id,
+    }).catch(() => {
+      void logErrorEvent("ai", {
+        companyId,
+        userId: req.user?.id,
+        message: "Inspection finalization pipeline crashed",
+        inspectionId: id,
+        context: { stage: "complete_pipeline" },
+      });
+    });
+
+    return res.json({
+      inspection: await serializeWithMedia(updated),
+      reportId: report?.id ?? null,
+      alreadyCompleted: false,
+      finalization: "started",
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to complete inspection" });
   }
 });
 

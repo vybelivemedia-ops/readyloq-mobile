@@ -319,6 +319,29 @@ export interface Inspection {
   completedAt?: string | null;
 }
 
+/**
+ * "started" when the background finalization pipeline (AI narrative, customer summary draft, Opportunity Intelligence, scorecard) was kicked off by this call.
+
+ */
+export type CompleteInspectionResultFinalization = typeof CompleteInspectionResultFinalization[keyof typeof CompleteInspectionResultFinalization];
+
+
+export const CompleteInspectionResultFinalization = {
+  started: 'started',
+  skipped: 'skipped',
+} as const;
+
+export interface CompleteInspectionResult {
+  inspection: Inspection;
+  /** @nullable */
+  reportId?: number | null;
+  /** True when the inspection was already completed (safe no-op). */
+  alreadyCompleted: boolean;
+  /** "started" when the background finalization pipeline (AI narrative, customer summary draft, Opportunity Intelligence, scorecard) was kicked off by this call.
+   */
+  finalization: CompleteInspectionResultFinalization;
+}
+
 export interface InspectionInput {
   siteAddress: string;
   clientName?: string;
@@ -432,6 +455,9 @@ export interface AnalyzeInspectionInput {
   images?: AnalyzeInspectionInputImagesItem[];
   technicianFindings?: Finding[];
   videos?: AnalyzeInspectionInputVideosItem[];
+  /** Live-capture mode: analyze photos but defer Opportunity Intelligence and scorecard computation until the technician explicitly completes the inspection. Defaults to false.
+   */
+  draft?: boolean;
 }
 
 export type AnalysisSummaryTopFindingsItem = {

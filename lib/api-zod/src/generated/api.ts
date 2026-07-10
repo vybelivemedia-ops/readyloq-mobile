@@ -153,6 +153,47 @@ export const DeleteInspectionParams = zod.object({
 
 
 /**
+ * @summary Explicitly complete an in-progress inspection and trigger the finalization pipeline (report, AI narrative, customer summary draft, Opportunity Intelligence, scorecard). Idempotent.
+
+ */
+export const CompleteInspectionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CompleteInspectionResponse = zod.object({
+  "inspection": zod.object({
+  "id": zod.number(),
+  "siteAddress": zod.string(),
+  "clientName": zod.string().nullish(),
+  "technicianName": zod.string(),
+  "technicianId": zod.string().nullish(),
+  "status": zod.string(),
+  "pestTypes": zod.array(zod.string()).optional(),
+  "severity": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "mediaCount": zod.number().optional(),
+  "findingsCount": zod.number().optional(),
+  "media": zod.array(zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "mediaType": zod.string(),
+  "url": zod.string(),
+  "filename": zod.string().nullish(),
+  "caption": zod.string().nullish(),
+  "durationSec": zod.number().nullish(),
+  "createdAt": zod.string()
+})).optional(),
+  "aiAnalysisId": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().nullish()
+}),
+  "reportId": zod.number().nullish(),
+  "alreadyCompleted": zod.boolean().describe('True when the inspection was already completed (safe no-op).'),
+  "finalization": zod.enum(['started', 'skipped']).describe('\"started\" when the background finalization pipeline (AI narrative, customer summary draft, Opportunity Intelligence, scorecard) was kicked off by this call.\n')
+})
+
+
+/**
  * @summary Add media to inspection
  */
 export const AddInspectionMediaParams = zod.object({
@@ -248,7 +289,8 @@ export const AnalyzeInspectionBody = zod.object({
   "filename": zod.string().nullish(),
   "durationSec": zod.number().nullish(),
   "label": zod.string().nullish()
-})).optional()
+})).optional(),
+  "draft": zod.boolean().optional().describe('Live-capture mode: analyze photos but defer Opportunity Intelligence and scorecard computation until the technician explicitly completes the inspection. Defaults to false.\n')
 })
 
 

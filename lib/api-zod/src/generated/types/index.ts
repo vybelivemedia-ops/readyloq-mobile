@@ -38,6 +38,8 @@ export * from './checklistToggleResult';
 export * from './clientErrorInput';
 export * from './clientErrorInputCategory';
 export * from './clientErrorInputContext';
+export * from './completeInspectionResult';
+export * from './completeInspectionResultFinalization';
 export * from './createInviteInput';
 export * from './createInviteInputRole';
 export * from './customerSummary';

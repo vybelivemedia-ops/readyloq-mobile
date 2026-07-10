@@ -31,6 +31,7 @@ import type {
   ChecklistResponse,
   ChecklistToggleResult,
   ClientErrorInput,
+  CompleteInspectionResult,
   CreateInviteInput,
   CustomerSummary,
   CustomerSummaryApprove,
@@ -568,6 +569,78 @@ export const useDeleteInspection = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteInspectionMutationOptions(options));
+    }
+
+export const getCompleteInspectionUrl = (id: number,) => {
+
+
+
+
+  return `/api/inspections/${id}/complete`
+}
+
+/**
+ * @summary Explicitly complete an in-progress inspection and trigger the finalization pipeline (report, AI narrative, customer summary draft, Opportunity Intelligence, scorecard). Idempotent.
+
+ */
+export const completeInspection = async (id: number, options?: RequestInit): Promise<CompleteInspectionResult> => {
+
+  return customFetch<CompleteInspectionResult>(getCompleteInspectionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCompleteInspectionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeInspection>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeInspection>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['completeInspection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeInspection>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  completeInspection(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteInspectionMutationResult = NonNullable<Awaited<ReturnType<typeof completeInspection>>>
+
+    export type CompleteInspectionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Explicitly complete an in-progress inspection and trigger the finalization pipeline (report, AI narrative, customer summary draft, Opportunity Intelligence, scorecard). Idempotent.
+
+ */
+export const useCompleteInspection = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeInspection>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeInspection>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCompleteInspectionMutationOptions(options));
     }
 
 export const getAddInspectionMediaUrl = (id: number,) => {
