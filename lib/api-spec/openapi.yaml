@@ -1652,6 +1652,20 @@ paths:
         "204":
           description: Deleted
 
+  # ── ROLE BRIEFING (role-adaptive dashboard read model) ──────────────────────
+  /briefing:
+    get:
+      operationId: getBriefing
+      tags: [briefing]
+      summary: Get the caller's role-shaped intelligence briefing
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleBriefing"
+
 components:
   schemas:
     OkResponse:
@@ -1949,6 +1963,11 @@ components:
         filename:     { type: ["string", "null"] }
         caption:      { type: ["string", "null"] }
         durationSec:  { type: ["integer", "null"] }
+        captureSource:   { type: string }
+        qualityScore:    { type: ["integer", "null"] }
+        captureMetadata:
+          type: ["object", "null"]
+          additionalProperties: true
         createdAt:    { type: string }
 
     MediaInput:
@@ -1960,6 +1979,11 @@ components:
         filename:    { type: string }
         caption:     { type: string }
         durationSec: { type: integer }
+        captureSource: { type: string }
+        qualityScore:  { type: integer }
+        captureMetadata:
+          type: object
+          additionalProperties: true
 
     # ── ANALYSIS SCHEMAS ────────────────────────────────────────────────────────
     AnalysisResult:
@@ -3183,3 +3207,168 @@ components:
         opportunityIds:
           type: array
           items: { type: integer }
+
+    # ── ROLE BRIEFING SCHEMAS ────────────────────────────────────────────────────
+    BriefingRecentInspection:
+      type: object
+      required: [id, siteAddress, status, findingsCount, createdAt]
+      properties:
+        id:            { type: integer }
+        siteAddress:   { type: string }
+        status:        { type: string }
+        findingsCount: { type: integer }
+        createdAt:     { type: string }
+
+    TechnicianBriefing:
+      type: object
+      required:
+        [totalInspections, completedInspections, openInspections, completedThisWeek, recentInspections]
+      properties:
+        totalInspections:     { type: integer }
+        completedInspections: { type: integer }
+        openInspections:      { type: integer }
+        completedThisWeek:    { type: integer }
+        recentInspections:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingRecentInspection" }
+
+    BriefingTopOpportunity:
+      type: object
+      required:
+        [id, inspectionId, title, category, propertyAddress, priority, estimatedValueTier, status, createdAt]
+      properties:
+        id:                 { type: integer }
+        inspectionId:       { type: integer }
+        title:              { type: string }
+        category:           { type: string }
+        propertyAddress:    { type: string }
+        priority:           { type: integer }
+        estimatedValueTier: { type: string }
+        riskLevel:          { type: ["string", "null"] }
+        status:             { type: string }
+        createdAt:          { type: string }
+
+    SalesBriefing:
+      type: object
+      required: [pipeline, openCount, pipelineValue, staleCount, topOpportunities, proposals]
+      properties:
+        pipeline:
+          type: object
+          required: [new, reviewed, quoted, won, lost, dismissed]
+          properties:
+            new:       { type: integer }
+            reviewed:  { type: integer }
+            quoted:    { type: integer }
+            won:       { type: integer }
+            lost:      { type: integer }
+            dismissed: { type: integer }
+        openCount:     { type: integer }
+        pipelineValue: { type: integer }
+        staleCount:    { type: integer }
+        topOpportunities:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingTopOpportunity" }
+        proposals:
+          type: object
+          required: [draft, sent, accepted, declined]
+          properties:
+            draft:    { type: integer }
+            sent:     { type: integer }
+            accepted: { type: integer }
+            declined: { type: integer }
+
+    BriefingApprovalItem:
+      type: object
+      required: [id, inspectionId, siteAddress, createdAt, ageDays]
+      properties:
+        id:           { type: integer }
+        inspectionId: { type: integer }
+        siteAddress:  { type: string }
+        createdAt:    { type: string }
+        ageDays:      { type: integer }
+
+    BriefingTechnicianStat:
+      type: object
+      required: [technicianName, scorecards, avgQuality]
+      properties:
+        technicianName: { type: string }
+        scorecards:     { type: integer }
+        avgQuality:     { type: integer }
+
+    BriefingCompletion:
+      type: object
+      required: [id, siteAddress, technicianName, findingsCount]
+      properties:
+        id:             { type: integer }
+        siteAddress:    { type: string }
+        technicianName: { type: string }
+        completedAt:    { type: ["string", "null"] }
+        findingsCount:  { type: integer }
+
+    ManagerBriefing:
+      type: object
+      required: [pendingApprovals, approvalsQueue, team, recentCompletions]
+      properties:
+        pendingApprovals: { type: integer }
+        approvalsQueue:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingApprovalItem" }
+        team:
+          type: object
+          required: [scorecardCount30d, highRisk30d, missedOpportunities30d, technicians]
+          properties:
+            scorecardCount30d:      { type: integer }
+            avgQualityScore30d:     { type: ["integer", "null"] }
+            highRisk30d:            { type: integer }
+            missedOpportunities30d: { type: integer }
+            technicians:
+              type: array
+              items: { $ref: "#/components/schemas/BriefingTechnicianStat" }
+        recentCompletions:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingCompletion" }
+
+    BriefingAlert:
+      type: object
+      required: [type, severity, message, count]
+      properties:
+        type:
+          type: string
+          enum: [approvals_aging, quality_low, high_risk, stale_pipeline, share_links_expiring]
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        message: { type: string }
+        count:   { type: integer }
+
+    OwnerBriefing:
+      type: object
+      required: [kpis, alerts]
+      properties:
+        kpis:
+          type: object
+          required:
+            [completions7d, completions30d, openOpportunities, pipelineValue, approvedSummaries30d]
+          properties:
+            completions7d:        { type: integer }
+            completions30d:       { type: integer }
+            openOpportunities:    { type: integer }
+            pipelineValue:        { type: integer }
+            avgQualityScore30d:   { type: ["integer", "null"] }
+            approvedSummaries30d: { type: integer }
+        alerts:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingAlert" }
+
+    RoleBriefing:
+      type: object
+      required: [role, generatedAt]
+      properties:
+        role:
+          type: string
+          enum: [technician, sales, manager, owner]
+        generatedAt: { type: string }
+        technician:  { $ref: "#/components/schemas/TechnicianBriefing" }
+        sales:       { $ref: "#/components/schemas/SalesBriefing" }
+        manager:     { $ref: "#/components/schemas/ManagerBriefing" }
+        owner:       { $ref: "#/components/schemas/OwnerBriefing" }

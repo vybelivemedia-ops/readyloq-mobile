@@ -5,6 +5,7 @@
  * ReadyLoq - AI-powered inspection intelligence platform
  * OpenAPI spec version: 0.1.0
  */
+import type { InspectionMediaCaptureMetadata } from './inspectionMediaCaptureMetadata';
 
 export interface InspectionMedia {
   id: number;
@@ -17,5 +18,10 @@ export interface InspectionMedia {
   caption?: string | null;
   /** @nullable */
   durationSec?: number | null;
+  captureSource?: string;
+  /** @nullable */
+  qualityScore?: number | null;
+  /** @nullable */
+  captureMetadata?: InspectionMediaCaptureMetadata;
   createdAt: string;
 }

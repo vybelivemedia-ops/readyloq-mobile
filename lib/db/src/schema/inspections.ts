@@ -46,6 +46,14 @@ export const inspectionMediaTable = pgTable("inspection_media", {
   filename: text("filename"),
   caption: text("caption"),
   durationSec: integer("duration_sec"),
+  // Universal Vision Platform: which provider produced this evidence. The AI
+  // pipeline never reads this — it exists for provenance (live capture vs.
+  // imported footage) and per-source analytics. Defaults keep old rows valid.
+  captureSource: text("capture_source").notNull().default("phone_camera"),
+  // 0–100 capture-time quality score from the on-device gate (null = ungated).
+  qualityScore: integer("quality_score"),
+  // Device/EXIF context (dimensions, file size, provider id, device model…).
+  captureMetadata: jsonb("capture_metadata").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

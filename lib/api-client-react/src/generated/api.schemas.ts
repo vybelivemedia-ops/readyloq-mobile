@@ -281,6 +281,11 @@ export interface LeadInput {
   source?: string;
 }
 
+/**
+ * @nullable
+ */
+export type InspectionMediaCaptureMetadata = { [key: string]: unknown } | null;
+
 export interface InspectionMedia {
   id: number;
   inspectionId: number;
@@ -292,6 +297,11 @@ export interface InspectionMedia {
   caption?: string | null;
   /** @nullable */
   durationSec?: number | null;
+  captureSource?: string;
+  /** @nullable */
+  qualityScore?: number | null;
+  /** @nullable */
+  captureMetadata?: InspectionMediaCaptureMetadata;
   createdAt: string;
 }
 
@@ -361,12 +371,17 @@ export interface InspectionUpdate {
   completedAt?: string;
 }
 
+export type MediaInputCaptureMetadata = { [key: string]: unknown };
+
 export interface MediaInput {
   mediaType: string;
   url: string;
   filename?: string;
   caption?: string;
   durationSec?: number;
+  captureSource?: string;
+  qualityScore?: number;
+  captureMetadata?: MediaInputCaptureMetadata;
 }
 
 export type AnalysisResultVideoEvidenceItem = {
@@ -1593,6 +1608,161 @@ export interface SalesProposalUpdate {
   notes?: string | null;
   status?: SalesProposalUpdateStatus;
   opportunityIds?: number[];
+}
+
+export interface BriefingRecentInspection {
+  id: number;
+  siteAddress: string;
+  status: string;
+  findingsCount: number;
+  createdAt: string;
+}
+
+export interface TechnicianBriefing {
+  totalInspections: number;
+  completedInspections: number;
+  openInspections: number;
+  completedThisWeek: number;
+  recentInspections: BriefingRecentInspection[];
+}
+
+export interface BriefingTopOpportunity {
+  id: number;
+  inspectionId: number;
+  title: string;
+  category: string;
+  propertyAddress: string;
+  priority: number;
+  estimatedValueTier: string;
+  /** @nullable */
+  riskLevel?: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export type SalesBriefingPipeline = {
+  new: number;
+  reviewed: number;
+  quoted: number;
+  won: number;
+  lost: number;
+  dismissed: number;
+};
+
+export type SalesBriefingProposals = {
+  draft: number;
+  sent: number;
+  accepted: number;
+  declined: number;
+};
+
+export interface SalesBriefing {
+  pipeline: SalesBriefingPipeline;
+  openCount: number;
+  pipelineValue: number;
+  staleCount: number;
+  topOpportunities: BriefingTopOpportunity[];
+  proposals: SalesBriefingProposals;
+}
+
+export interface BriefingApprovalItem {
+  id: number;
+  inspectionId: number;
+  siteAddress: string;
+  createdAt: string;
+  ageDays: number;
+}
+
+export interface BriefingTechnicianStat {
+  technicianName: string;
+  scorecards: number;
+  avgQuality: number;
+}
+
+export interface BriefingCompletion {
+  id: number;
+  siteAddress: string;
+  technicianName: string;
+  /** @nullable */
+  completedAt?: string | null;
+  findingsCount: number;
+}
+
+export type ManagerBriefingTeam = {
+  scorecardCount30d: number;
+  /** @nullable */
+  avgQualityScore30d?: number | null;
+  highRisk30d: number;
+  missedOpportunities30d: number;
+  technicians: BriefingTechnicianStat[];
+};
+
+export interface ManagerBriefing {
+  pendingApprovals: number;
+  approvalsQueue: BriefingApprovalItem[];
+  team: ManagerBriefingTeam;
+  recentCompletions: BriefingCompletion[];
+}
+
+export type BriefingAlertType = typeof BriefingAlertType[keyof typeof BriefingAlertType];
+
+
+export const BriefingAlertType = {
+  approvals_aging: 'approvals_aging',
+  quality_low: 'quality_low',
+  high_risk: 'high_risk',
+  stale_pipeline: 'stale_pipeline',
+  share_links_expiring: 'share_links_expiring',
+} as const;
+
+export type BriefingAlertSeverity = typeof BriefingAlertSeverity[keyof typeof BriefingAlertSeverity];
+
+
+export const BriefingAlertSeverity = {
+  info: 'info',
+  warning: 'warning',
+  critical: 'critical',
+} as const;
+
+export interface BriefingAlert {
+  type: BriefingAlertType;
+  severity: BriefingAlertSeverity;
+  message: string;
+  count: number;
+}
+
+export type OwnerBriefingKpis = {
+  completions7d: number;
+  completions30d: number;
+  openOpportunities: number;
+  pipelineValue: number;
+  /** @nullable */
+  avgQualityScore30d?: number | null;
+  approvedSummaries30d: number;
+};
+
+export interface OwnerBriefing {
+  kpis: OwnerBriefingKpis;
+  alerts: BriefingAlert[];
+}
+
+export type RoleBriefingRole = typeof RoleBriefingRole[keyof typeof RoleBriefingRole];
+
+
+export const RoleBriefingRole = {
+  technician: 'technician',
+  sales: 'sales',
+  manager: 'manager',
+  owner: 'owner',
+} as const;
+
+export interface RoleBriefing {
+  role: RoleBriefingRole;
+  generatedAt: string;
+  technician?: TechnicianBriefing;
+  sales?: SalesBriefing;
+  manager?: ManagerBriefing;
+  owner?: OwnerBriefing;
 }
 
 export type ListInspectionsParams = {

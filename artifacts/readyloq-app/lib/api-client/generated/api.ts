@@ -89,6 +89,7 @@ import type {
   PropertySummary,
   Report,
   ReportInput,
+  RoleBriefing,
   SalesOpportunity,
   SalesOpportunityDetail,
   SalesOpportunityTrends,
@@ -6651,4 +6652,81 @@ export const useDeleteProposal = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeleteProposalMutationOptions(options));
     }
+
+export const getGetBriefingUrl = () => {
+
+
+
+
+  return `/api/briefing`
+}
+
+/**
+ * @summary Get the caller's role-shaped intelligence briefing
+ */
+export const getBriefing = async ( options?: RequestInit): Promise<RoleBriefing> => {
+
+  return customFetch<RoleBriefing>(getGetBriefingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBriefingQueryKey = () => {
+    return [
+    `/api/briefing`
+    ] as const;
+    }
+
+
+export const getGetBriefingQueryOptions = <TData = Awaited<ReturnType<typeof getBriefing>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBriefing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBriefingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBriefing>>> = ({ signal }) => getBriefing({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBriefing>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBriefingQueryResult = NonNullable<Awaited<ReturnType<typeof getBriefing>>>
+export type GetBriefingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the caller's role-shaped intelligence briefing
+ */
+
+export function useGetBriefing<TData = Awaited<ReturnType<typeof getBriefing>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBriefing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBriefingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 

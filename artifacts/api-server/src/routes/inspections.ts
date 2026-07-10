@@ -341,7 +341,7 @@ router.post("/:id/media", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const inspectionId = parseInt(req.params.id);
-    const { mediaType, url, filename, caption, durationSec } = req.body;
+    const { mediaType, url, filename, caption, durationSec, captureSource, qualityScore, captureMetadata } = req.body;
     if (!mediaType || !url)
       return res.status(400).json({ error: "mediaType and url are required" });
     // Child write: the parent inspection must belong to the caller's company.
@@ -362,6 +362,16 @@ router.post("/:id/media", async (req, res) => {
         filename: filename ?? null,
         caption: caption ?? null,
         durationSec: durationSec ?? null,
+        // Vision Platform provenance (optional; validated to safe shapes).
+        captureSource: typeof captureSource === "string" ? captureSource : "phone_camera",
+        qualityScore:
+          typeof qualityScore === "number" && Number.isFinite(qualityScore)
+            ? Math.max(0, Math.min(100, Math.round(qualityScore)))
+            : null,
+        captureMetadata:
+          captureMetadata && typeof captureMetadata === "object" && !Array.isArray(captureMetadata)
+            ? (captureMetadata as Record<string, unknown>)
+            : null,
       })
       .returning();
     // update media count (scoped to the caller's company)

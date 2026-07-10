@@ -23,6 +23,12 @@ export type LocalPhoto = {
   storagePath?: string;
   /** Server media row id once registered (sync step 3). */
   mediaRowId?: number;
+  /** Vision Platform provenance: which provider produced this evidence. */
+  captureSource?: string;
+  /** 0–100 score from the on-device quality gate (absent = ungated). */
+  qualityScore?: number;
+  /** Provider/EXIF context, passed through to the server verbatim. */
+  captureMetadata?: Record<string, unknown>;
 };
 
 export type LocalSyncPhase =

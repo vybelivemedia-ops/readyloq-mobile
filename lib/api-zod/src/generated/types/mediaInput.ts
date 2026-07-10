@@ -5,6 +5,7 @@
  * ReadyLoq - AI-powered inspection intelligence platform
  * OpenAPI spec version: 0.1.0
  */
+import type { MediaInputCaptureMetadata } from './mediaInputCaptureMetadata';
 
 export interface MediaInput {
   mediaType: string;
@@ -12,4 +13,7 @@ export interface MediaInput {
   filename?: string;
   caption?: string;
   durationSec?: number;
+  captureSource?: string;
+  qualityScore?: number;
+  captureMetadata?: MediaInputCaptureMetadata;
 }

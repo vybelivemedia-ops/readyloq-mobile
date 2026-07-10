@@ -44,6 +44,9 @@ export const ListInspectionsResponseItem = zod.object({
   "filename": zod.string().nullish(),
   "caption": zod.string().nullish(),
   "durationSec": zod.number().nullish(),
+  "captureSource": zod.string().optional(),
+  "qualityScore": zod.number().nullish(),
+  "captureMetadata": zod.record(zod.string(), zod.unknown()).nullish(),
   "createdAt": zod.string()
 })).optional(),
   "aiAnalysisId": zod.number().nullish(),
@@ -94,6 +97,9 @@ export const GetInspectionResponse = zod.object({
   "filename": zod.string().nullish(),
   "caption": zod.string().nullish(),
   "durationSec": zod.number().nullish(),
+  "captureSource": zod.string().optional(),
+  "qualityScore": zod.number().nullish(),
+  "captureMetadata": zod.record(zod.string(), zod.unknown()).nullish(),
   "createdAt": zod.string()
 })).optional(),
   "aiAnalysisId": zod.number().nullish(),
@@ -137,6 +143,9 @@ export const UpdateInspectionResponse = zod.object({
   "filename": zod.string().nullish(),
   "caption": zod.string().nullish(),
   "durationSec": zod.number().nullish(),
+  "captureSource": zod.string().optional(),
+  "qualityScore": zod.number().nullish(),
+  "captureMetadata": zod.record(zod.string(), zod.unknown()).nullish(),
   "createdAt": zod.string()
 })).optional(),
   "aiAnalysisId": zod.number().nullish(),
@@ -182,6 +191,9 @@ export const CompleteInspectionResponse = zod.object({
   "filename": zod.string().nullish(),
   "caption": zod.string().nullish(),
   "durationSec": zod.number().nullish(),
+  "captureSource": zod.string().optional(),
+  "qualityScore": zod.number().nullish(),
+  "captureMetadata": zod.record(zod.string(), zod.unknown()).nullish(),
   "createdAt": zod.string()
 })).optional(),
   "aiAnalysisId": zod.number().nullish(),
@@ -206,7 +218,10 @@ export const AddInspectionMediaBody = zod.object({
   "url": zod.string(),
   "filename": zod.string().optional(),
   "caption": zod.string().optional(),
-  "durationSec": zod.number().optional()
+  "durationSec": zod.number().optional(),
+  "captureSource": zod.string().optional(),
+  "qualityScore": zod.number().optional(),
+  "captureMetadata": zod.record(zod.string(), zod.unknown()).optional()
 })
 
 
@@ -2675,6 +2690,103 @@ export const UpdateProposalResponse = zod.object({
  */
 export const DeleteProposalParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Get the caller's role-shaped intelligence briefing
+ */
+export const GetBriefingResponse = zod.object({
+  "role": zod.enum(['technician', 'sales', 'manager', 'owner']),
+  "generatedAt": zod.string(),
+  "technician": zod.object({
+  "totalInspections": zod.number(),
+  "completedInspections": zod.number(),
+  "openInspections": zod.number(),
+  "completedThisWeek": zod.number(),
+  "recentInspections": zod.array(zod.object({
+  "id": zod.number(),
+  "siteAddress": zod.string(),
+  "status": zod.string(),
+  "findingsCount": zod.number(),
+  "createdAt": zod.string()
+}))
+}).optional(),
+  "sales": zod.object({
+  "pipeline": zod.object({
+  "new": zod.number(),
+  "reviewed": zod.number(),
+  "quoted": zod.number(),
+  "won": zod.number(),
+  "lost": zod.number(),
+  "dismissed": zod.number()
+}),
+  "openCount": zod.number(),
+  "pipelineValue": zod.number(),
+  "staleCount": zod.number(),
+  "topOpportunities": zod.array(zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "title": zod.string(),
+  "category": zod.string(),
+  "propertyAddress": zod.string(),
+  "priority": zod.number(),
+  "estimatedValueTier": zod.string(),
+  "riskLevel": zod.string().nullish(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})),
+  "proposals": zod.object({
+  "draft": zod.number(),
+  "sent": zod.number(),
+  "accepted": zod.number(),
+  "declined": zod.number()
+})
+}).optional(),
+  "manager": zod.object({
+  "pendingApprovals": zod.number(),
+  "approvalsQueue": zod.array(zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "siteAddress": zod.string(),
+  "createdAt": zod.string(),
+  "ageDays": zod.number()
+})),
+  "team": zod.object({
+  "scorecardCount30d": zod.number(),
+  "avgQualityScore30d": zod.number().nullish(),
+  "highRisk30d": zod.number(),
+  "missedOpportunities30d": zod.number(),
+  "technicians": zod.array(zod.object({
+  "technicianName": zod.string(),
+  "scorecards": zod.number(),
+  "avgQuality": zod.number()
+}))
+}),
+  "recentCompletions": zod.array(zod.object({
+  "id": zod.number(),
+  "siteAddress": zod.string(),
+  "technicianName": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "findingsCount": zod.number()
+}))
+}).optional(),
+  "owner": zod.object({
+  "kpis": zod.object({
+  "completions7d": zod.number(),
+  "completions30d": zod.number(),
+  "openOpportunities": zod.number(),
+  "pipelineValue": zod.number(),
+  "avgQualityScore30d": zod.number().nullish(),
+  "approvedSummaries30d": zod.number()
+}),
+  "alerts": zod.array(zod.object({
+  "type": zod.enum(['approvals_aging', 'quality_low', 'high_risk', 'stale_pipeline', 'share_links_expiring']),
+  "severity": zod.enum(['info', 'warning', 'critical']),
+  "message": zod.string(),
+  "count": zod.number()
+}))
+}).optional()
 })
 
 

@@ -234,6 +234,11 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
         const media = await addInspectionMedia(serverId, {
           mediaType: "photo",
           url: photo.storagePath,
+          // Vision Platform provenance — where the evidence came from and how
+          // the on-device quality gate scored it.
+          captureSource: photo.captureSource,
+          qualityScore: photo.qualityScore,
+          captureMetadata: photo.captureMetadata,
         });
         await merge((r) => {
           const p = r.photos.find((x) => x.localUri === localUri);
