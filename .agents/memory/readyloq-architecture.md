@@ -3,6 +3,14 @@ name: ReadyLoq Architecture
 description: Key architecture decisions and conventions for the ReadyLoq inspection platform
 ---
 
+# "Feature missing from APK" — check window-size-class gating first
+
+Rule: when a user reports a feature missing from a mobile build, verify git history (was it committed before the build?) AND search for `isExpanded`/`sizeClass` conditionals before assuming a stale build. The AI Inspection Workspace shipped inside build 9 but was invisible on phones because it only rendered at width ≥ 840dp (tablet/unfolded-foldable layout) with no compact entry point.
+
+**Why:** Foldable-first layouts added during Fold 7 optimization gated whole workflows behind `isExpanded` — the code was in the APK the whole time; the bug was UI reachability, not build staleness.
+
+**How to apply:** Any feature that renders only in an expanded/side-panel layout needs an explicit compact-screen entry point (e.g. a toggle button opening it as a full-screen overlay, keeping underlying camera/state mounted).
+
 ## Stack
 - React + Vite (artifacts/readyloq), port 20257, previewPath "/"
 - Express API server (artifacts/api-server), port 8080

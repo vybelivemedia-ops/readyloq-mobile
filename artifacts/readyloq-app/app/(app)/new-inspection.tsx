@@ -77,6 +77,12 @@ export default function NewInspectionScreen() {
   const [zoom, setZoom] = useState(0);
   const [flash, setFlash] = useState<"off" | "on" | "auto">("off");
 
+  // Phone-size AI Inspection entry point. On expanded windows (tablets,
+  // unfolded foldables) the AI panel renders side-by-side with the camera;
+  // on compact/medium windows it opens as a full-screen overlay instead —
+  // without this, phones have no way to reach the AI Inspection workflow.
+  const [showInsights, setShowInsights] = useState(false);
+
   // Expanded-workspace analysis state. Reuses the exact same APIs as submit —
   // photos are uploaded once and never re-uploaded or re-analyzed at submit.
   const [wsInspectionId, setWsInspectionId] = useState<number | null>(null);
@@ -655,17 +661,45 @@ export default function NewInspectionScreen() {
               >
                 <Ionicons name="chevron-back" size={24} color="#fff" />
               </Pressable>
-              <View
-                style={{
-                  backgroundColor: "rgba(0,0,0,0.5)",
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 999,
-                }}
-              >
-                <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold" }}>
-                  {photos.length} captured
-                </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View
+                  style={{
+                    backgroundColor: "rgba(0,0,0,0.5)",
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 999,
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold" }}>
+                    {photos.length} captured
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setShowInsights(true)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    backgroundColor: "rgba(0,0,0,0.5)",
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: "rgba(255,255,255,0.35)",
+                  }}
+                >
+                  {wsAnalyzing ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="sparkles" size={15} color="#fff" />
+                  )}
+                  <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+                    AI Insights
+                    {(wsAnalysis?.findings?.length ?? 0) > 0
+                      ? ` (${wsAnalysis?.findings?.length})`
+                      : ""}
+                  </Text>
+                </Pressable>
               </View>
             </View>
           </Screen>
@@ -733,6 +767,92 @@ export default function NewInspectionScreen() {
             </View>
           </View>
         )}
+
+        {/* Full-screen AI Inspection overlay for compact/medium windows. The
+            camera underneath stays mounted, so uploads and auto-run analysis
+            continue while the technician reviews live insights. */}
+        {showInsights ? (
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: colors.background,
+            }}
+          >
+            <Screen edges={["top", "bottom"]}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.border,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="sparkles" size={18} color={colors.primary} />
+                  <Text
+                    style={{
+                      color: colors.foreground,
+                      fontFamily: "Inter_700Bold",
+                      fontSize: 18,
+                    }}
+                  >
+                    AI Inspection
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setShowInsights(false)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 999,
+                    backgroundColor: colors.card,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Ionicons name="camera-outline" size={16} color={colors.foreground} />
+                  <Text
+                    style={{
+                      color: colors.foreground,
+                      fontFamily: "Inter_600SemiBold",
+                      fontSize: 13,
+                    }}
+                  >
+                    Back to camera
+                  </Text>
+                </Pressable>
+              </View>
+              <AiInsightsPanel
+                siteAddress={siteAddress}
+                propertyType={propertyType}
+                pestTypes={pestTypes}
+                photosCount={photos.length}
+                pendingCount={Math.max(0, photos.length - analyzedCount.current)}
+                analysis={wsAnalysis}
+                analyzing={wsAnalyzing}
+                error={wsError}
+                report={wsReport}
+                reportBuilding={wsReportBuilding}
+                reportError={wsReportError}
+                onRunAnalysis={runWorkspaceAnalysis}
+                onReview={() => {
+                  setShowInsights(false);
+                  setStep("review");
+                }}
+              />
+            </Screen>
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -878,7 +998,19 @@ export default function NewInspectionScreen() {
         />
       </ScrollView>
 
-      <View style={{ paddingBottom: 8, width: "100%", maxWidth: 640, alignSelf: "center" }}>
+      <View style={{ gap: 8, paddingBottom: 8, width: "100%", maxWidth: 640, alignSelf: "center" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <Ionicons name="sparkles" size={13} color={colors.primary} />
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontFamily: "Inter_400Regular",
+              fontSize: 12,
+            }}
+          >
+            AI Inspection runs live as you capture — open AI Insights from the camera.
+          </Text>
+        </View>
         <Button
           title="Continue to camera"
           size="lg"

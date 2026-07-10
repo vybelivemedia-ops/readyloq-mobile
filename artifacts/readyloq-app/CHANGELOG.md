@@ -1,5 +1,14 @@
 # Changelog
 
+## ReadyLoq Beta 0.9.0 (build 10) — hotfix
+
+Android versionCode 10 · iOS buildNumber 2
+
+### Fixes
+
+- AI Inspection is now accessible on phones: a new "AI Insights" button in the camera view opens the live AI Inspection panel (detections, live report) as a full-screen overlay. Previously the AI Inspection Workspace only rendered on screens ≥ 840dp wide (tablets / unfolded foldables in landscape), leaving no entry point on phones
+- The New Inspection screen now notes that AI Inspection runs live during capture
+
 ## ReadyLoq Beta 0.9.0 (build 9) — hotfix
 
 Android versionCode 9 · iOS buildNumber 2
