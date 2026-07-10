@@ -62,7 +62,8 @@ export const CreateInspectionBody = zod.object({
   "technicianName": zod.string(),
   "technicianId": zod.string().optional(),
   "notes": zod.string().optional(),
-  "pestTypes": zod.array(zod.string()).optional()
+  "pestTypes": zod.array(zod.string()).optional(),
+  "clientKey": zod.string().optional().describe('Client-generated idempotency key (UUID). Retrying a create with the same key returns the previously created inspection (200) instead of duplicating it — required for offline-first sync retries.')
 })
 
 

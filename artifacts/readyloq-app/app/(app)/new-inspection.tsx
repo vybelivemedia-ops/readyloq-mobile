@@ -1,23 +1,21 @@
-import { useAuth, useUser } from "@clerk/expo";
+import { useUser } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  deleteInspection,
   getListAnalysisResultsQueryOptions,
-  useAddInspectionMedia,
-  useAnalyzeInspection,
-  useCreateInspection,
   useGenerateReport,
   useGenerateReportNarrative,
-  useUpdateInspection,
   type Report,
 } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { type Href, useRouter } from "expo-router";
+import { type Href, useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Pressable,
   ScrollView,
   Text,
@@ -32,7 +30,25 @@ import { useColors } from "@/hooks/useColors";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { PEST_TYPES, PROPERTY_TYPES } from "@/constants/inspection";
 import { ApiError } from "@/lib/api";
-import { uploadPhoto } from "@/lib/upload";
+import {
+  deleteLocalInspection,
+  getLocalInspection,
+  newLocalInspection,
+  persistPhoto,
+  saveLocalInspection,
+  updateLocalInspection,
+  type LocalInspection,
+} from "@/lib/local/inspection-store";
+import { requestSync, syncNow } from "@/lib/sync/engine";
+
+/** True when an error smells like a connectivity failure (not a server rejection). */
+function isOfflineError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /network request failed|network error|failed to fetch|timeout|abort/i.test(msg);
+}
+
+const OFFLINE_NOTICE =
+  "You're offline — everything is saved on this device and will sync automatically when you're back online.";
 
 type Step = "setup" | "capture" | "review";
 type Photo = { uri: string };
@@ -48,13 +64,9 @@ export default function NewInspectionScreen() {
   const { isLandscape, isExpanded } = useWindowSizeClass();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { getToken } = useAuth();
   const { user: clerkUser } = useUser();
+  const params = useLocalSearchParams<{ resume?: string }>();
 
-  const createInspection = useCreateInspection();
-  const addMedia = useAddInspectionMedia();
-  const analyze = useAnalyzeInspection();
-  const updateInspection = useUpdateInspection();
   const generateReport = useGenerateReport();
   const generateNarrative = useGenerateReportNarrative();
 
@@ -91,10 +103,134 @@ export default function NewInspectionScreen() {
   const [uploadedCount, setUploadedCount] = useState(0);
   const analyzedCount = useRef(0);
 
-  // Resume state so a retry after a mid-flight failure does not create a
-  // duplicate inspection or re-upload photos that already succeeded.
-  const createdInspectionId = useRef<number | null>(null);
-  const uploadedUrls = useRef<string[]>([]);
+  // Local-first record: the single durable source of truth for this
+  // inspection. Every capture and field edit is persisted to device storage
+  // immediately, so a crash, fold, or dead zone never loses work. The sync
+  // engine pushes it to the server whenever connectivity allows.
+  const recordRef = useRef<LocalInspection | null>(null);
+  const [hydrated, setHydrated] = useState(params.resume == null);
+
+  // Resuming a draft after an app restart: rebuild all screen state from the
+  // persisted record, including photos (durable file:// URIs) and how far the
+  // server sync already got.
+  useEffect(() => {
+    const resumeId = params.resume;
+    if (!resumeId || recordRef.current) return;
+    void (async () => {
+      const rec = await getLocalInspection(resumeId);
+      if (rec) {
+        recordRef.current = rec;
+        setSiteAddress(rec.siteAddress);
+        setClientName(rec.clientName);
+        setTechnicianName(rec.technicianName || (clerkUser?.fullName ?? ""));
+        setPropertyType(rec.propertyType || PROPERTY_TYPES[0]);
+        setPestTypes(rec.pestTypes);
+        setNotes(rec.notes);
+        setPhotos(rec.photos.map((p) => ({ uri: p.localUri })));
+        setUploadedCount(rec.photos.filter((p) => p.storagePath).length);
+        analyzedCount.current = rec.analyzedCount;
+        if (rec.serverId != null) setWsInspectionId(rec.serverId);
+        setStep(rec.photos.length > 0 ? "capture" : "setup");
+      }
+      setHydrated(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.resume]);
+
+  // Write-through persistence for field edits (debounced). The record itself
+  // is created when the technician continues to the camera.
+  useEffect(() => {
+    if (!recordRef.current) return;
+    const t = setTimeout(() => void persistDraft(), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteAddress, clientName, technicianName, propertyType, pestTypes, notes]);
+
+  const persistDraft = async () => {
+    const rec = recordRef.current;
+    if (!rec) return;
+    // Atomic merge — never clobbers fields the sync engine wrote mid-flight.
+    const updated = await updateLocalInspection(rec.localId, (r) => {
+      r.siteAddress = siteAddress;
+      r.clientName = clientName;
+      r.technicianName = technicianName;
+      r.propertyType = propertyType;
+      r.pestTypes = pestTypes;
+      r.notes = notes;
+    });
+    if (updated) recordRef.current = updated;
+  };
+
+  // Entering the camera creates the durable local record (idempotent).
+  const goToCapture = async () => {
+    if (!recordRef.current) {
+      recordRef.current = newLocalInspection({
+        siteAddress,
+        clientName,
+        technicianName,
+        propertyType,
+        pestTypes,
+        notes,
+      });
+      await saveLocalInspection(recordRef.current);
+    }
+    setStep("capture");
+  };
+
+  // Leaving mid-inspection: the draft is already persisted, so keeping it is
+  // free — the resume prompt offers it again next time. Discarding removes
+  // local files and best-effort deletes any partially synced server row.
+  const confirmExit = () => {
+    const rec = recordRef.current;
+    if (!rec || (photos.length === 0 && rec.serverId == null)) {
+      if (rec) void deleteLocalInspection(rec.localId);
+      router.back();
+      return;
+    }
+    Alert.alert(
+      "Leave inspection?",
+      "Your photos and details are saved on this device. You can resume this inspection later.",
+      [
+        { text: "Keep working", style: "cancel" },
+        {
+          text: "Discard",
+          style: "destructive",
+          onPress: () => {
+            const serverId = rec.serverId;
+            if (serverId != null) void deleteInspection(serverId).catch(() => {});
+            void deleteLocalInspection(rec.localId);
+            router.back();
+          },
+        },
+        { text: "Save draft & exit", onPress: () => router.back() },
+      ],
+    );
+  };
+
+  // Android hardware back: never silently destroys an in-progress inspection.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (step === "review") {
+        setStep("capture");
+        return true;
+      }
+      if (step === "capture") {
+        if (photos.length > 0) {
+          confirmExit();
+        } else {
+          setStep("setup");
+        }
+        return true;
+      }
+      if (recordRef.current) {
+        confirmExit();
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, photos.length]);
 
   // Live report builder state. The report is created once per inspection and
   // its AI narrative regenerated (with a fresh findings snapshot) after every
@@ -118,12 +254,22 @@ export default function NewInspectionScreen() {
     setPestTypes((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
 
   const takePhoto = async () => {
-    if (!cameraRef.current || capturing) return;
+    const rec = recordRef.current;
+    if (!cameraRef.current || capturing || !rec) return;
     try {
       setCapturing(true);
       const pic = await cameraRef.current.takePictureAsync({ quality: 0.6 });
       if (pic?.uri) {
-        setPhotos((prev) => [...prev, { uri: pic.uri }]);
+        // Copy out of the camera cache IMMEDIATELY — the OS can purge cache
+        // files at any time, and evidence must survive an app restart.
+        const durableUri = await persistPhoto(rec.localId, pic.uri);
+        const updated = await updateLocalInspection(rec.localId, (r) => {
+          r.photos.push({ localUri: durableUri, capturedAt: new Date().toISOString() });
+        });
+        if (updated) {
+          recordRef.current = updated;
+          setPhotos(updated.photos.map((p) => ({ uri: p.localUri })));
+        }
         // A fresh capture re-arms auto-run analysis after a prior failure.
         setWsError(null);
       }
@@ -134,59 +280,54 @@ export default function NewInspectionScreen() {
     }
   };
 
-  // Runs analysis from the expanded workspace while the camera stays live.
-  // Creates the inspection once and uploads only new photos; submit() later
-  // skips whatever this already did (same resume refs).
+  // Remove a not-yet-uploaded photo from both screen state and the record.
+  const removePhoto = async (index: number) => {
+    const rec = recordRef.current;
+    const target = rec?.photos[index];
+    if (!rec || !target || target.storagePath) return;
+    const updated = await updateLocalInspection(rec.localId, (r) => {
+      const i = r.photos.findIndex((p) => p.localUri === target.localUri);
+      // Re-check against the fresh copy — the engine may have started
+      // uploading this photo since the guard above.
+      if (i !== -1 && !r.photos[i].storagePath) r.photos.splice(i, 1);
+    });
+    if (updated) {
+      recordRef.current = updated;
+      setPhotos(updated.photos.map((p) => ({ uri: p.localUri })));
+    }
+  };
+
+  // Runs the sync pipeline from the workspace while the camera stays live:
+  // create (idempotent) → upload photos → draft AI analysis. All progress is
+  // checkpointed on the local record, so a drop mid-run resumes exactly where
+  // it left off. Offline, this is a no-op with a friendly notice — photos are
+  // already safe on the device.
   const runWorkspaceAnalysis = async () => {
-    if (wsAnalyzing || photos.length === 0) return;
+    const rec = recordRef.current;
+    if (wsAnalyzing || !rec || rec.photos.length === 0) return;
     setWsError(null);
     setWsAnalyzing(true);
     try {
-      const token = await getToken();
-      const composedNotes = [`Property type: ${propertyType}`, notes.trim()]
-        .filter(Boolean)
-        .join("\n\n");
-
-      let id = createdInspectionId.current;
-      if (id == null) {
-        const inspection = await createInspection.mutateAsync({
-          data: {
-            siteAddress: siteAddress.trim(),
-            clientName: clientName.trim() || undefined,
-            technicianName: technicianName.trim(),
-            notes: composedNotes || undefined,
-            pestTypes: pestTypes.length ? pestTypes : undefined,
-          },
-        });
-        id = inspection.id;
-        createdInspectionId.current = id;
+      await persistDraft();
+      const updated = await syncNow(rec.localId);
+      if (updated) {
+        recordRef.current = updated;
+        if (updated.serverId != null) setWsInspectionId(updated.serverId);
+        setUploadedCount(updated.photos.filter((p) => p.storagePath).length);
+        analyzedCount.current = updated.analyzedCount;
+        await queryClient.invalidateQueries();
+        // New verified detections exist — rebuild the live report in the
+        // background while the technician keeps capturing.
+        if (updated.serverId != null) void buildLiveReport(updated.serverId);
       }
-      setWsInspectionId(id);
-
-      for (let i = uploadedUrls.current.length; i < photos.length; i++) {
-        const path = await uploadPhoto(
-          token,
-          photos[i].uri,
-          `inspection-${id}-${Date.now()}-${i}.jpg`,
-        );
-        await addMedia.mutateAsync({ id, data: { mediaType: "photo", url: path } });
-        uploadedUrls.current.push(path);
-        setUploadedCount(uploadedUrls.current.length);
-      }
-
-      await analyze.mutateAsync({
-        data: {
-          inspectionId: id,
-          images: uploadedUrls.current.map((u) => ({ imageUrl: u })),
-        },
-      });
-      analyzedCount.current = uploadedUrls.current.length;
-      await queryClient.invalidateQueries();
-      // New verified detections exist — rebuild the live report in the
-      // background while the technician keeps capturing.
-      void buildLiveReport(id);
     } catch (e) {
-      setWsError(e instanceof ApiError ? e.message : (e as Error).message);
+      setWsError(
+        isOfflineError(e)
+          ? OFFLINE_NOTICE
+          : e instanceof ApiError
+            ? e.message
+            : (e as Error).message,
+      );
     } finally {
       setWsAnalyzing(false);
     }
@@ -255,125 +396,53 @@ export default function NewInspectionScreen() {
     }
   };
 
-  const submit = async () => {
-    // Never run concurrently with a workspace analysis — both loops share the
-    // same resume refs and would double-upload photos.
-    if (wsAnalyzing || wsReportRunning.current) return;
+  // Complete Inspection — the explicit end of the capture lifecycle.
+  // Marks the local record complete (durable even if the app dies right
+  // after), then attempts an immediate sync: create → upload photos → draft
+  // analysis → server-side completion (report, narrative, summary,
+  // opportunities, scorecard). Offline, completion still succeeds locally
+  // and the engine finishes the push automatically when connectivity
+  // returns — the summary screen shows live sync status either way.
+  const completeNow = async () => {
+    const rec = recordRef.current;
+    if (!rec || submitting) return;
     setError(null);
     setSubmitting(true);
+    setProgress("Saving inspection…");
     try {
-      const token = await getToken();
-      const composedNotes = [`Property type: ${propertyType}`, notes.trim()]
-        .filter(Boolean)
-        .join("\n\n");
+      const updated = await updateLocalInspection(rec.localId, (r) => {
+        r.siteAddress = siteAddress;
+        r.clientName = clientName;
+        r.technicianName = technicianName;
+        r.propertyType = propertyType;
+        r.pestTypes = pestTypes;
+        r.notes = notes;
+        r.completed = true;
+        r.completedAt = new Date().toISOString();
+      });
+      if (updated) recordRef.current = updated;
 
-      // Reuse an inspection created on a prior (failed) attempt or by the
-      // expanded workspace instead of creating a duplicate.
-      let id = createdInspectionId.current;
-      if (id == null) {
-        setProgress("Creating inspection…");
-        const inspection = await createInspection.mutateAsync({
-          data: {
-            siteAddress: siteAddress.trim(),
-            clientName: clientName.trim() || undefined,
-            technicianName: technicianName.trim(),
-            notes: composedNotes || undefined,
-            pestTypes: pestTypes.length ? pestTypes : undefined,
-          },
-        });
-        id = inspection.id;
-        createdInspectionId.current = id;
-      } else {
-        // The inspection already exists — sync fields the API supports
-        // updating in case they were edited after it was created.
-        setProgress("Updating inspection…");
-        await updateInspection.mutateAsync({
-          id,
-          data: {
-            notes: composedNotes || undefined,
-            pestTypes: pestTypes.length ? pestTypes : undefined,
-          },
-        });
+      setProgress("Syncing evidence & running AI analysis…");
+      try {
+        await syncNow(rec.localId);
+      } catch {
+        // Offline or server hiccup — the record is safe on-device and the
+        // sync engine retries automatically. Completion is NOT blocked.
+        requestSync(0);
       }
-
-      // Resume uploads from where a prior attempt left off.
-      for (let i = uploadedUrls.current.length; i < photos.length; i++) {
-        setProgress(`Uploading photo ${i + 1} of ${photos.length}…`);
-        const path = await uploadPhoto(
-          token,
-          photos[i].uri,
-          `inspection-${id}-${Date.now()}-${i}.jpg`,
-        );
-        await addMedia.mutateAsync({ id, data: { mediaType: "photo", url: path } });
-        uploadedUrls.current.push(path);
-        setUploadedCount(uploadedUrls.current.length);
-      }
-
-      let analysisWarning: string | null = null;
-      let ranNewAnalysis = false;
-      // Skip re-analysis when the workspace already analyzed this exact photo set.
-      if (uploadedUrls.current.length && analyzedCount.current !== uploadedUrls.current.length) {
-        setProgress("Running AI analysis…");
-        const result = await analyze.mutateAsync({
-          data: {
-            inspectionId: id,
-            images: uploadedUrls.current.map((u) => ({ imageUrl: u })),
-          },
-        });
-        ranNewAnalysis = true;
-        if (result?.analysisErrors && result.analysisErrors > 0) {
-          const n = result.analysisErrors;
-          analysisWarning = `${n} photo${n > 1 ? "s" : ""} couldn't be analyzed.`;
-        }
-      }
-
-      // If the live report was built earlier but new photos were analyzed at
-      // submit, refresh its narrative so the report matches the final data.
-      if (wsReportId.current != null && ranNewAnalysis) {
-        setProgress("Updating service report…");
-        try {
-          await generateNarrative.mutateAsync({
-            id: wsReportId.current,
-            data: { refreshFindings: true },
-          });
-        } catch {
-          analysisWarning = [
-            analysisWarning,
-            "The live report couldn't be refreshed — regenerate it from the report screen.",
-          ]
-            .filter(Boolean)
-            .join(" ");
-        }
-      }
-
       await queryClient.invalidateQueries();
-
-      // Success — clear resume state so the next inspection starts fresh.
-      const targetId = id;
-      createdInspectionId.current = null;
-      uploadedUrls.current = [];
-      analyzedCount.current = 0;
-      setUploadedCount(0);
-      setWsInspectionId(null);
-      wsReportId.current = null;
-      setWsReport(null);
-      setWsReportError(null);
-
-      if (analysisWarning) {
-        setSubmitting(false);
-        Alert.alert(
-          "Analysis partially complete",
-          `${analysisWarning} You can re-run AI analysis from the inspection.`,
-          [{ text: "View inspection", onPress: () => router.replace(`/inspection/${targetId}` as Href) }],
-        );
-      } else {
-        router.replace(`/inspection/${targetId}` as Href);
-      }
+      router.replace(`/inspection-summary/${rec.localId}` as Href);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : (e as Error).message);
       setSubmitting(false);
     }
   };
+
+  // Wait for draft hydration when resuming, so we never render (or create)
+  // fresh state on top of a half-loaded record.
+  if (!hydrated) {
+    return <Screen edges={["top", "bottom"]} />;
+  }
 
   // ─── Submitting overlay ─────────────────────────────────────────────────────
   if (submitting) {
@@ -450,7 +519,7 @@ export default function NewInspectionScreen() {
               <Image source={{ uri: p.uri }} style={{ width: 56, height: 56, borderRadius: 8 }} />
               {i >= uploadedCount ? (
                 <Pressable
-                  onPress={() => setPhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                  onPress={() => void removePhoto(i)}
                   style={{
                     position: "absolute",
                     top: -6,
@@ -902,11 +971,22 @@ export default function NewInspectionScreen() {
         </ScrollView>
 
         <View style={{ gap: 10, paddingBottom: 8, width: "100%", maxWidth: 640, alignSelf: "center" }}>
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontFamily: "Inter_400Regular",
+              fontSize: 12,
+              textAlign: "center",
+            }}
+          >
+            Completing locks in your evidence and generates the report, summary, and
+            insights. Works offline — everything syncs automatically.
+          </Text>
           <Button
-            title={photos.length ? "Submit & run AI analysis" : "Submit inspection"}
+            title="Complete Inspection"
             size="lg"
-            icon="sparkles"
-            onPress={submit}
+            icon="checkmark-circle"
+            onPress={completeNow}
           />
           <Button title="Add more photos" variant="ghost" onPress={() => setStep("capture")} />
         </View>
@@ -917,7 +997,11 @@ export default function NewInspectionScreen() {
   // ─── Setup step ─────────────────────────────────────────────────────────────
   return (
     <Screen edges={["top", "bottom"]} padded>
-      <Header title="New inspection" onClose={() => router.back()} colors={colors} />
+      <Header
+        title="New inspection"
+        onClose={() => (recordRef.current ? confirmExit() : router.back())}
+        colors={colors}
+      />
       <ScrollView
         contentContainerStyle={{
           gap: 16,
@@ -1016,7 +1100,7 @@ export default function NewInspectionScreen() {
           size="lg"
           icon="camera"
           disabled={!canContinueSetup}
-          onPress={() => setStep("capture")}
+          onPress={() => void goToCapture()}
         />
       </View>
     </Screen>

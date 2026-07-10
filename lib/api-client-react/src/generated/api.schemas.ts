@@ -349,6 +349,8 @@ export interface InspectionInput {
   technicianId?: string;
   notes?: string;
   pestTypes?: string[];
+  /** Client-generated idempotency key (UUID). Retrying a create with the same key returns the previously created inspection (200) instead of duplicating it — required for offline-first sync retries. */
+  clientKey?: string;
 }
 
 export interface InspectionUpdate {

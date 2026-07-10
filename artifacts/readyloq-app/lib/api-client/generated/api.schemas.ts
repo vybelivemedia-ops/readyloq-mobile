@@ -319,6 +319,29 @@ export interface Inspection {
   completedAt?: string | null;
 }
 
+/**
+ * "started" when the background finalization pipeline (AI narrative, customer summary draft, Opportunity Intelligence, scorecard) was kicked off by this call.
+
+ */
+export type CompleteInspectionResultFinalization = typeof CompleteInspectionResultFinalization[keyof typeof CompleteInspectionResultFinalization];
+
+
+export const CompleteInspectionResultFinalization = {
+  started: 'started',
+  skipped: 'skipped',
+} as const;
+
+export interface CompleteInspectionResult {
+  inspection: Inspection;
+  /** @nullable */
+  reportId?: number | null;
+  /** True when the inspection was already completed (safe no-op). */
+  alreadyCompleted: boolean;
+  /** "started" when the background finalization pipeline (AI narrative, customer summary draft, Opportunity Intelligence, scorecard) was kicked off by this call.
+   */
+  finalization: CompleteInspectionResultFinalization;
+}
+
 export interface InspectionInput {
   siteAddress: string;
   clientName?: string;
@@ -326,6 +349,8 @@ export interface InspectionInput {
   technicianId?: string;
   notes?: string;
   pestTypes?: string[];
+  /** Client-generated idempotency key (UUID). Retrying a create with the same key returns the previously created inspection (200) instead of duplicating it — required for offline-first sync retries. */
+  clientKey?: string;
 }
 
 export interface InspectionUpdate {
@@ -432,6 +457,9 @@ export interface AnalyzeInspectionInput {
   images?: AnalyzeInspectionInputImagesItem[];
   technicianFindings?: Finding[];
   videos?: AnalyzeInspectionInputVideosItem[];
+  /** Live-capture mode: analyze photos but defer Opportunity Intelligence and scorecard computation until the technician explicitly completes the inspection. Defaults to false.
+   */
+  draft?: boolean;
 }
 
 export type AnalysisSummaryTopFindingsItem = {
@@ -1217,6 +1245,356 @@ export interface PropertyNoteInput {
   authorName?: string;
 }
 
+export type SalesOpportunityCategory = typeof SalesOpportunityCategory[keyof typeof SalesOpportunityCategory];
+
+
+export const SalesOpportunityCategory = {
+  revenue: 'revenue',
+  additional_service: 'additional_service',
+  structural: 'structural',
+  conducive_condition: 'conducive_condition',
+  property_risk: 'property_risk',
+  pest_trend: 'pest_trend',
+  preventative: 'preventative',
+} as const;
+
+export type SalesOpportunityEstimatedValueTier = typeof SalesOpportunityEstimatedValueTier[keyof typeof SalesOpportunityEstimatedValueTier];
+
+
+export const SalesOpportunityEstimatedValueTier = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
+export type SalesOpportunityStatus = typeof SalesOpportunityStatus[keyof typeof SalesOpportunityStatus];
+
+
+export const SalesOpportunityStatus = {
+  new: 'new',
+  reviewed: 'reviewed',
+  quoted: 'quoted',
+  won: 'won',
+  dismissed: 'dismissed',
+  lost: 'lost',
+} as const;
+
+/**
+ * @nullable
+ */
+export type SalesOpportunityRiskLevel = typeof SalesOpportunityRiskLevel[keyof typeof SalesOpportunityRiskLevel] | null;
+
+
+export const SalesOpportunityRiskLevel = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export interface SalesOpportunity {
+  id: number;
+  companyId: number;
+  inspectionId: number;
+  propertyAddress: string;
+  category: SalesOpportunityCategory;
+  title: string;
+  rationale: string;
+  fingerprint: string;
+  evidenceFindingIds: number[];
+  evidenceImagePaths: string[];
+  estimatedValueTier: SalesOpportunityEstimatedValueTier;
+  confidence: number;
+  status: SalesOpportunityStatus;
+  priority?: number;
+  /** @nullable */
+  riskLevel?: SalesOpportunityRiskLevel;
+  /** @nullable */
+  estimatedAnnualValue?: number | null;
+  /** @nullable */
+  assignedToUserId: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SalesOpportunityEventAction = typeof SalesOpportunityEventAction[keyof typeof SalesOpportunityEventAction];
+
+
+export const SalesOpportunityEventAction = {
+  created: 'created',
+  strengthened: 'strengthened',
+  viewed: 'viewed',
+  status_changed: 'status_changed',
+  assigned: 'assigned',
+  note_added: 'note_added',
+  value_set: 'value_set',
+} as const;
+
+/**
+ * @nullable
+ */
+export type SalesOpportunityEventDetail = { [key: string]: unknown } | null;
+
+export interface SalesOpportunityEvent {
+  id: number;
+  opportunityId: number;
+  /** @nullable */
+  userId?: number | null;
+  action: SalesOpportunityEventAction;
+  /** @nullable */
+  detail?: SalesOpportunityEventDetail;
+  createdAt: string;
+}
+
+export type SalesOpportunityDetail = SalesOpportunity & {
+  events: SalesOpportunityEvent[];
+};
+
+export type SalesOpportunityUpdateStatus = typeof SalesOpportunityUpdateStatus[keyof typeof SalesOpportunityUpdateStatus];
+
+
+export const SalesOpportunityUpdateStatus = {
+  new: 'new',
+  reviewed: 'reviewed',
+  quoted: 'quoted',
+  won: 'won',
+  dismissed: 'dismissed',
+  lost: 'lost',
+} as const;
+
+export interface SalesOpportunityUpdate {
+  status?: SalesOpportunityUpdateStatus;
+  /** @nullable */
+  assignedToUserId?: number | null;
+  /** @nullable */
+  estimatedAnnualValue?: number | null;
+}
+
+export type SalesOpportunityTrendsByCategory = {[key: string]: number};
+
+export type SalesOpportunityTrendsByStatus = {[key: string]: number};
+
+export type SalesOpportunityTrendsByTier = {[key: string]: number};
+
+export type SalesOpportunityTrendsTopPropertiesItem = {
+  propertyAddress: string;
+  count: number;
+};
+
+export interface SalesOpportunityTrends {
+  total: number;
+  byCategory: SalesOpportunityTrendsByCategory;
+  byStatus: SalesOpportunityTrendsByStatus;
+  byTier: SalesOpportunityTrendsByTier;
+  topProperties: SalesOpportunityTrendsTopPropertiesItem[];
+}
+
+export interface OpportunitySettings {
+  id: number;
+  companyId: number;
+  enabled: boolean;
+  minConfidence: number;
+  /** @nullable */
+  enabledCategories: string[] | null;
+  updatedAt: string;
+}
+
+export interface OpportunitySettingsUpdate {
+  enabled?: boolean;
+  minConfidence?: number;
+  /** @nullable */
+  enabledCategories?: string[] | null;
+}
+
+export interface OpportunityNote {
+  id: number;
+  companyId?: number;
+  opportunityId: number;
+  authorUserId: number;
+  authorRole: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface OpportunityNoteCreate {
+  body: string;
+}
+
+export interface CustomerSummaryUpdate {
+  body: string;
+}
+
+export interface CustomerSummaryApprove {
+  /**
+     * @minimum 1
+     * @maximum 90
+     */
+  expiresInDays?: number;
+}
+
+export interface ScorecardComponents {
+  photoCoverage: number;
+  evidenceQuality: number;
+  avgConfidence: number;
+  recommendationCoverage: number;
+}
+
+export interface MissedOpportunity {
+  findingId: number;
+  serviceType: string;
+  description: string;
+  severity: string;
+}
+
+export type InspectionScorecardRiskLevel = typeof InspectionScorecardRiskLevel[keyof typeof InspectionScorecardRiskLevel];
+
+
+export const InspectionScorecardRiskLevel = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export interface InspectionScorecard {
+  id: number;
+  companyId: number;
+  inspectionId: number;
+  technicianName: string;
+  qualityScore: number;
+  components: ScorecardComponents;
+  missedOpportunities: MissedOpportunity[];
+  riskScore: number;
+  riskLevel: InspectionScorecardRiskLevel;
+  findingsCount: number;
+  photosAnalyzed: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type InspectionScorecardListItem = InspectionScorecard & {
+  siteAddress: string;
+  inspectionDate: string;
+};
+
+export type ScorecardSummaryRiskDistribution = {[key: string]: number};
+
+export type ScorecardSummaryTechniciansItem = {
+  technicianName: string;
+  inspections: number;
+  avgQuality: number;
+  missedOpportunities: number;
+};
+
+export type ScorecardSummaryMissedByService = {[key: string]: number};
+
+export type ScorecardSummaryTopConduciveConditionsItem = {
+  label: string;
+  occurrences: number;
+};
+
+export type ScorecardSummaryTopRecommendedServicesItem = {
+  label: string;
+  occurrences: number;
+};
+
+export interface ScorecardSummary {
+  totalScorecards: number;
+  avgQuality: number;
+  avgRisk: number;
+  riskDistribution: ScorecardSummaryRiskDistribution;
+  technicians: ScorecardSummaryTechniciansItem[];
+  missedByService: ScorecardSummaryMissedByService;
+  topConduciveConditions: ScorecardSummaryTopConduciveConditionsItem[];
+  topRecommendedServices: ScorecardSummaryTopRecommendedServicesItem[];
+}
+
+export type CustomerSummaryStatus = typeof CustomerSummaryStatus[keyof typeof CustomerSummaryStatus];
+
+
+export const CustomerSummaryStatus = {
+  draft: 'draft',
+  approved: 'approved',
+} as const;
+
+export interface CustomerSummary {
+  id: number;
+  companyId: number;
+  inspectionId: number;
+  body: string;
+  status: CustomerSummaryStatus;
+  /** @nullable */
+  approvedByUserId: number | null;
+  /** @nullable */
+  approvedAt: string | null;
+  /** @nullable */
+  shareToken: string | null;
+  /** @nullable */
+  shareExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SalesProposalStatus = typeof SalesProposalStatus[keyof typeof SalesProposalStatus];
+
+
+export const SalesProposalStatus = {
+  draft: 'draft',
+  sent: 'sent',
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export interface SalesProposal {
+  id: number;
+  companyId: number;
+  propertyAddress: string;
+  title: string;
+  status: SalesProposalStatus;
+  opportunityIds: number[];
+  /** @nullable */
+  intro: string | null;
+  /** @nullable */
+  notes: string | null;
+  createdByUserId: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SalesProposalDetail = SalesProposal & {
+  opportunities: SalesOpportunity[];
+};
+
+export interface SalesProposalCreate {
+  title: string;
+  propertyAddress: string;
+  opportunityIds: number[];
+  /** @nullable */
+  intro?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
+export type SalesProposalUpdateStatus = typeof SalesProposalUpdateStatus[keyof typeof SalesProposalUpdateStatus];
+
+
+export const SalesProposalUpdateStatus = {
+  draft: 'draft',
+  sent: 'sent',
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export interface SalesProposalUpdate {
+  title?: string;
+  /** @nullable */
+  intro?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  status?: SalesProposalUpdateStatus;
+  opportunityIds?: number[];
+}
+
 export type ListInspectionsParams = {
 status?: string;
 /**
@@ -1288,6 +1666,19 @@ siteAddress: string;
 
 export type ListFeedbackParams = {
 type?: string;
+status?: string;
+};
+
+export type ListSalesOpportunitiesParams = {
+status?: string;
+category?: string;
+};
+
+export type ListScorecardsParams = {
+technician?: string;
+};
+
+export type ListProposalsParams = {
 status?: string;
 };
 

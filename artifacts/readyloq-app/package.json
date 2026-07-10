@@ -67,7 +67,11 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@react-native-community/netinfo": "11.4.1",
     "expo-camera": "~17.0.10",
-    "expo-file-system": "~19.0.23"
+    "expo-file-system": "~19.0.23",
+    "expo-mail-composer": "~15.0.8",
+    "expo-print": "~15.0.8",
+    "expo-sharing": "~14.0.8"
   }
 }

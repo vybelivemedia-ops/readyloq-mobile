@@ -179,6 +179,64 @@ beforeEach(() => {
   summaryMock.mockClear();
 });
 
+describe("POST /inspections clientKey idempotency (offline-first retries)", () => {
+  it("returns the SAME inspection when a create is retried with the same clientKey", async () => {
+    asUser(OWNER_ID);
+    const body = {
+      siteAddress: "77 Retry Rd",
+      technicianName: "Tech",
+      clientKey: "offline-uuid-retry-1",
+    };
+    const first = await request(app).post("/api/inspections").send(body);
+    expect(first.status).toBe(201);
+
+    // Network dropped after the server committed — the client retries.
+    const retry = await request(app).post("/api/inspections").send(body);
+    expect(retry.status).toBe(200);
+    expect(retry.body.id).toBe(first.body.id);
+
+    const rows = await db
+      .select()
+      .from(inspectionsTable)
+      .where(
+        and(
+          eq(inspectionsTable.companyId, companyId),
+          eq(inspectionsTable.clientKey, "offline-uuid-retry-1"),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("scopes clientKey per company — another tenant's identical key creates a new row", async () => {
+    asUser(OWNER_ID);
+    const body = {
+      siteAddress: "88 Tenant Key St",
+      technicianName: "Tech",
+      clientKey: "offline-uuid-shared",
+    };
+    const mine = await request(app).post("/api/inspections").send(body);
+    expect(mine.status).toBe(201);
+
+    asUser(OUTSIDER_ID);
+    const theirs = await request(app).post("/api/inspections").send(body);
+    expect(theirs.status).toBe(201);
+    expect(theirs.body.id).not.toBe(mine.body.id);
+  });
+
+  it("creates without a clientKey exactly as before (web app unchanged)", async () => {
+    asUser(OWNER_ID);
+    const a = await request(app)
+      .post("/api/inspections")
+      .send({ siteAddress: "99 No Key Ave", technicianName: "Tech" });
+    const b = await request(app)
+      .post("/api/inspections")
+      .send({ siteAddress: "99 No Key Ave", technicianName: "Tech" });
+    expect(a.status).toBe(201);
+    expect(b.status).toBe(201);
+    expect(a.body.id).not.toBe(b.body.id);
+  });
+});
+
 describe("draft analysis defers intelligence outputs", () => {
   it("skips opportunity synthesis and scorecard when draft: true", async () => {
     const { inspectionId, imageUrl } = await createInspectionWithPhoto("draftmode");

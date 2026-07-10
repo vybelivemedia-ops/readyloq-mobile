@@ -1,25 +1,41 @@
-import { pgTable, serial, text, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  serial,
+  text,
+  integer,
+  timestamp,
+  jsonb,
+  boolean,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { companiesTable } from "./companies";
 
-export const inspectionsTable = pgTable("inspections", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull().references(() => companiesTable.id),
-  siteAddress: text("site_address").notNull(),
-  clientName: text("client_name"),
-  technicianName: text("technician_name").notNull(),
-  technicianId: text("technician_id"),
-  status: text("status").notNull().default("pending"),
-  pestTypes: jsonb("pest_types").$type<string[]>().default([]),
-  severity: text("severity"),
-  notes: text("notes"),
-  mediaCount: integer("media_count").notNull().default(0),
-  findingsCount: integer("findings_count").notNull().default(0),
-  aiAnalysisId: integer("ai_analysis_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  completedAt: timestamp("completed_at"),
-});
+export const inspectionsTable = pgTable(
+  "inspections",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id),
+    siteAddress: text("site_address").notNull(),
+    clientName: text("client_name"),
+    technicianName: text("technician_name").notNull(),
+    technicianId: text("technician_id"),
+    status: text("status").notNull().default("pending"),
+    pestTypes: jsonb("pest_types").$type<string[]>().default([]),
+    severity: text("severity"),
+    notes: text("notes"),
+    mediaCount: integer("media_count").notNull().default(0),
+    findingsCount: integer("findings_count").notNull().default(0),
+    aiAnalysisId: integer("ai_analysis_id"),
+    // Client-generated idempotency key (UUID) so the offline-first mobile app can
+    // retry inspection creation safely — a lost response never duplicates a row.
+    clientKey: text("client_key"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+  },
+  (t) => [uniqueIndex("inspections_company_client_key_uq").on(t.companyId, t.clientKey)],
+);
 
 export const inspectionMediaTable = pgTable("inspection_media", {
   id: serial("id").primaryKey(),

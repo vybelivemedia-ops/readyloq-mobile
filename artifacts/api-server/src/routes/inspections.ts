@@ -55,11 +55,35 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
-    const { siteAddress, clientName, technicianName, technicianId, notes, pestTypes } =
+    const { siteAddress, clientName, technicianName, technicianId, notes, pestTypes, clientKey } =
       req.body;
     if (!siteAddress || !technicianName) {
       return res.status(400).json({ error: "siteAddress and technicianName are required" });
     }
+
+    // Idempotent create for the offline-first mobile client: `clientKey` is a
+    // client-generated UUID. If a previous attempt already created this
+    // inspection (response lost to a network drop), return the existing row
+    // instead of duplicating it. Company-scoped via the unique index.
+    const key = typeof clientKey === "string" && clientKey.trim() ? clientKey.trim() : null;
+    if (key) {
+      const [existing] = await db
+        .select()
+        .from(inspectionsTable)
+        .where(
+          and(eq(inspectionsTable.companyId, companyId), eq(inspectionsTable.clientKey, key)),
+        );
+      if (existing) {
+        return res.status(200).json({
+          ...existing,
+          pestTypes: existing.pestTypes ?? [],
+          media: [],
+          createdAt: existing.createdAt.toISOString(),
+          completedAt: existing.completedAt?.toISOString() ?? null,
+        });
+      }
+    }
+
     const [row] = await db
       .insert(inspectionsTable)
       .values({
@@ -71,8 +95,33 @@ router.post("/", async (req, res) => {
         notes: notes ?? null,
         pestTypes: pestTypes ?? [],
         status: "pending",
+        clientKey: key,
+      })
+      .onConflictDoNothing({
+        target: [inspectionsTable.companyId, inspectionsTable.clientKey],
       })
       .returning();
+
+    // Insert lost a concurrent race on the same clientKey — fetch the winner.
+    if (!row && key) {
+      const [winner] = await db
+        .select()
+        .from(inspectionsTable)
+        .where(
+          and(eq(inspectionsTable.companyId, companyId), eq(inspectionsTable.clientKey, key)),
+        );
+      if (winner) {
+        return res.status(200).json({
+          ...winner,
+          pestTypes: winner.pestTypes ?? [],
+          media: [],
+          createdAt: winner.createdAt.toISOString(),
+          completedAt: winner.completedAt?.toISOString() ?? null,
+        });
+      }
+    }
+    if (!row) return res.status(500).json({ error: "Failed to create inspection" });
+
     return res.status(201).json({
       ...row,
       pestTypes: row.pestTypes ?? [],
