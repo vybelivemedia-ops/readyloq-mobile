@@ -23,6 +23,7 @@ import opportunitiesRouter from "./opportunities";
 import scorecardsRouter from "./scorecards";
 import customerSummariesRouter from "./customer-summaries";
 import proposalsRouter from "./proposals";
+import briefingRouter from "./briefing";
 import shareRouter from "./share";
 
 const router: IRouter = Router();
@@ -97,6 +98,10 @@ router.use(
   requireRole("manager"),
   customerSummariesRouter,
 );
+// Role Briefing — the role-adaptive dashboard read model. Deliberately NO
+// requireRole: every role is served, and the payload shape is decided
+// server-side from the DB-sourced user role (strict per-role sections).
+router.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefingRouter);
 // Sales Proposals — same sales+ audience as the Opportunity Log they bundle.
 router.use(
   "/proposals",
