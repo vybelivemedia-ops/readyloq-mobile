@@ -37,6 +37,7 @@ import {
 } from "@/lib/delivery/registry";
 import type { LocalInspection, LocalSyncPhase } from "@/lib/local/inspection-store";
 import { syncNow } from "@/lib/sync/engine";
+import { describeCaptureSource, isLowQuality } from "@/lib/vision";
 
 /**
  * Post-completion summary: shown immediately after "Complete Inspection",
@@ -255,12 +256,52 @@ export default function InspectionSummaryScreen() {
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {record.photos.map((photo, i) => {
               const photoFindings = findingsByPhoto.get(i) ?? [];
+              const sourceInfo = describeCaptureSource(photo.captureSource);
+              const lowQ = isLowQuality(photo.qualityScore);
               return (
                 <Pressable key={photo.localUri} onPress={() => setViewerIndex(i)}>
                   <Image
                     source={{ uri: photo.localUri }}
-                    style={{ width: 92, height: 92, borderRadius: 10 }}
+                    style={{
+                      width: 92,
+                      height: 92,
+                      borderRadius: 10,
+                      borderWidth: lowQ ? 2 : 0,
+                      borderColor: lowQ ? colors.warning : "transparent",
+                    }}
                   />
+                  {!sourceInfo.isDefault ? (
+                    <View
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        backgroundColor: "rgba(0,0,0,0.6)",
+                        borderRadius: 6,
+                        padding: 3,
+                      }}
+                    >
+                      <Ionicons
+                        name={sourceInfo.icon as keyof typeof Ionicons.glyphMap}
+                        size={12}
+                        color="#fff"
+                      />
+                    </View>
+                  ) : null}
+                  {lowQ ? (
+                    <View
+                      style={{
+                        position: "absolute",
+                        bottom: 4,
+                        left: 4,
+                        backgroundColor: colors.warning,
+                        borderRadius: 999,
+                        padding: 2,
+                      }}
+                    >
+                      <Ionicons name="warning" size={11} color="#fff" />
+                    </View>
+                  ) : null}
                   <View
                     style={{
                       position: "absolute",
@@ -331,6 +372,10 @@ export default function InspectionSummaryScreen() {
       <PhotoViewer
         visible={viewerIndex != null}
         photos={record.photos.map((p) => p.localUri)}
+        meta={record.photos.map((p) => ({
+          source: p.captureSource,
+          quality: p.qualityScore ?? null,
+        }))}
         initialIndex={viewerIndex ?? 0}
         findingsByPhoto={findingsByPhoto}
         onClose={() => setViewerIndex(null)}
@@ -549,12 +594,14 @@ function SyncStatusCard({
 function PhotoViewer({
   visible,
   photos,
+  meta,
   initialIndex,
   findingsByPhoto,
   onClose,
 }: {
   visible: boolean;
   photos: string[];
+  meta?: { source?: string; quality?: number | null }[];
   initialIndex: number;
   findingsByPhoto: Map<number, Finding[]>;
   onClose: () => void;
@@ -574,6 +621,9 @@ function PhotoViewer({
   }, [visible, initialIndex]);
 
   const findings = findingsByPhoto.get(index) ?? [];
+  const current = meta?.[index];
+  const sourceInfo = describeCaptureSource(current?.source);
+  const lowQ = isLowQuality(current?.quality);
 
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -588,9 +638,29 @@ function PhotoViewer({
             paddingBottom: 10,
           }}
         >
-          <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
-            Photo {index + 1} of {photos.length}
-          </Text>
+          <View style={{ gap: 3 }}>
+            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+              Photo {index + 1} of {photos.length}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Ionicons
+                name={sourceInfo.icon as keyof typeof Ionicons.glyphMap}
+                size={12}
+                color="rgba(255,255,255,0.7)"
+              />
+              <Text style={{ color: "rgba(255,255,255,0.7)", fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                {sourceInfo.label}
+              </Text>
+              {lowQ ? (
+                <>
+                  <Ionicons name="warning" size={12} color={colors.warning} style={{ marginLeft: 4 }} />
+                  <Text style={{ color: colors.warning, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                    Low quality
+                  </Text>
+                </>
+              ) : null}
+            </View>
+          </View>
           <Pressable
             onPress={onClose}
             style={{

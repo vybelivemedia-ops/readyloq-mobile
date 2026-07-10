@@ -27,6 +27,7 @@ import {
   statusTone,
 } from "@/constants/inspection";
 import { ApiError } from "@/lib/api";
+import { describeCaptureSource, isLowQuality } from "@/lib/vision";
 
 interface InspectionDetailProps {
   id: number;
@@ -144,13 +145,56 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
           <View style={{ gap: 10 }}>
             <SectionTitle title={`Evidence (${photos.length})`} colors={colors} />
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              {photos.map((m) => (
-                <AuthedImage
-                  key={m.id}
-                  path={m.url}
-                  style={{ width: 104, height: 104, borderRadius: 10 }}
-                />
-              ))}
+              {photos.map((m) => {
+                const sourceInfo = describeCaptureSource(m.captureSource);
+                const lowQ = isLowQuality(m.qualityScore);
+                return (
+                  <View key={m.id}>
+                    <AuthedImage
+                      path={m.url}
+                      style={{
+                        width: 104,
+                        height: 104,
+                        borderRadius: 10,
+                        borderWidth: lowQ ? 2 : 0,
+                        borderColor: lowQ ? colors.warning : "transparent",
+                      }}
+                    />
+                    {!sourceInfo.isDefault ? (
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          backgroundColor: "rgba(0,0,0,0.6)",
+                          borderRadius: 6,
+                          padding: 3,
+                        }}
+                      >
+                        <Ionicons
+                          name={sourceInfo.icon as keyof typeof Ionicons.glyphMap}
+                          size={12}
+                          color="#fff"
+                        />
+                      </View>
+                    ) : null}
+                    {lowQ ? (
+                      <View
+                        style={{
+                          position: "absolute",
+                          bottom: 4,
+                          left: 4,
+                          backgroundColor: colors.warning,
+                          borderRadius: 999,
+                          padding: 2,
+                        }}
+                      >
+                        <Ionicons name="warning" size={11} color="#fff" />
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
           </View>
         ) : null}
