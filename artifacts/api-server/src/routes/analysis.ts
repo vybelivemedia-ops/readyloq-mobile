@@ -155,6 +155,7 @@ router.post("/analyze", async (req, res) => {
       images = [],
       technicianFindings = [],
       videos = [],
+      draft = false,
     } = req.body as {
       inspectionId?: number;
       images?: Array<{ imageUrl: string; label?: string | null }>;
@@ -165,6 +166,7 @@ router.post("/analyze", async (req, res) => {
         durationSec?: number | null;
         label?: string | null;
       }>;
+      draft?: boolean;
     };
     if (!inspectionId) return res.status(400).json({ error: "inspectionId is required" });
 
@@ -385,24 +387,30 @@ router.post("/analyze", async (req, res) => {
       })
       .returning();
 
-    // Opportunity Intelligence: mine the verified findings for business
-    // opportunities in the background. Fire-and-forget — the technician's
-    // response is never delayed or widened by it, and failures only log.
-    void runOpportunitySynthesis({
-      companyId,
-      inspectionId,
-      findings: mergedFindings,
-    });
+    // Opportunity Intelligence + Scorecard are DEFERRED for draft (in-progress)
+    // analyses — the mobile live-capture flow passes `draft: true` and these run
+    // once, at explicit inspection completion (see /inspections/:id/complete).
+    // Default (web app) behavior is unchanged: fire-and-forget on analyze.
+    if (!draft) {
+      // Opportunity Intelligence: mine the verified findings for business
+      // opportunities in the background. Fire-and-forget — the technician's
+      // response is never delayed or widened by it, and failures only log.
+      void runOpportunitySynthesis({
+        companyId,
+        inspectionId,
+        findings: mergedFindings,
+      });
 
-    // Inspection Scorecard: deterministic quality/missed-opportunity/risk
-    // snapshot for management. Same fire-and-forget contract.
-    void runScorecardComputation({
-      companyId,
-      inspectionId,
-      findings: mergedFindings,
-      recommendations,
-      photosAnalyzed: analyzedImagePaths.length,
-    });
+      // Inspection Scorecard: deterministic quality/missed-opportunity/risk
+      // snapshot for management. Same fire-and-forget contract.
+      void runScorecardComputation({
+        companyId,
+        inspectionId,
+        findings: mergedFindings,
+        recommendations,
+        photosAnalyzed: analyzedImagePaths.length,
+      });
+    }
 
     return res.status(201).json({ ...serializeResult(row), analysisErrors });
   } catch (err) {

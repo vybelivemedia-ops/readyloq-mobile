@@ -248,8 +248,12 @@ describe("POST /inspections/:id/complete", () => {
       expect(opportunityMock).toHaveBeenCalledTimes(1);
       expect(scorecardMock).toHaveBeenCalledTimes(1);
     });
-    expect(opportunityMock.mock.calls[0][0]).toMatchObject({ companyId, inspectionId });
-    expect(scorecardMock.mock.calls[0][0]).toMatchObject({ companyId, inspectionId });
+    expect(opportunityMock).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId, inspectionId }),
+    );
+    expect(scorecardMock).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId, inspectionId }),
+    );
 
     await vi.waitFor(async () => {
       const [summary] = await db
