@@ -5,6 +5,7 @@
 - [ReadyLoq native Windows/EAS build](readyloq-native-windows-build.md) — "build.ninja still dirty" is a Windows toolchain issue not a repo bug; EAS cloud build bypasses it; standalone eas.json setup
 - [Clerk Expo SSO redirect](clerk-expo-sso-redirect.md) — release APKs need makeRedirectUri({scheme, path}) + a callback route; bare makeRedirectUri() misroutes the OAuth return (opens email app)
 - [Inspection Memory](inspection-memory.md) — prior-visit compare: null-zone priors never highlight, no fabricated station #s, strict company+same-address scope, memory_* guidance priorities, old-client safe
+- [Scalability & concurrency risks](readyloq-scalability-risks.md) — pre-scale gaps: untuned pool + long sync analyze, analyze lacks per-inspection advisory lock (branding has one), media-register not idempotent, whole-company SELECT * + missing indexes, full-res images end-to-end
 - [AnalysisResult response shape](analysis-response-shape.md) — computed summaries (evidence tally, Live Guidance next-task) derive-on-read in serializeResult, not persisted; add to openapi as optional (not required) for old-client compat
 - [Coverage model](readyloq-coverage-model.md) — zone completeness; live & finalize must agree on same inputs; async-dedupe carry-over keeps still-saved photos' zone+finding
 - [Offline sync two-writer rule](offline-sync-two-writers.md) — all local-record writes must be serialized merge-updates; sync single-flight; inspections finish "completed" but reports "complete"
