@@ -19,6 +19,13 @@ export function createNativeCameraProvider(
     id: "native-camera",
     source: "phone_camera",
     label: "Phone camera",
+    capabilities: {
+      mode: "request_response",
+      transport: "on_device",
+      hasLivePreview: true,
+      producesVideo: false,
+      requiresPairing: false,
+    },
     capture: async (): Promise<EvidenceItem[]> => {
       const camera = cameraRef.current;
       if (!camera) throw new Error("Camera is not ready");

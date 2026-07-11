@@ -43,9 +43,8 @@ import { requestSync, syncNow } from "@/lib/sync/engine";
 import {
   assessEvidence,
   computeDHash,
-  createMediaImportProvider,
-  createNativeCameraProvider,
   findNearDuplicate,
+  getRequestProvider,
   loadGrayscaleImage,
   type EvidenceItem,
 } from "@/lib/vision";
@@ -102,8 +101,10 @@ export default function NewInspectionScreen() {
   // Vision Platform providers: every evidence source (live camera, imported
   // GoPro/glasses footage, future streams) funnels through the same
   // EvidenceItem contract into the same persist → sync → analyze pipeline.
-  const cameraProvider = useMemo(() => createNativeCameraProvider(cameraRef), []);
-  const importProvider = useMemo(() => createMediaImportProvider(), []);
+  // Sourced from the capture-provider registry (lib/vision/provider-registry):
+  // adding a new usable source registers there, not here.
+  const cameraProvider = useMemo(() => getRequestProvider("native-camera", { cameraRef }), []);
+  const importProvider = useMemo(() => getRequestProvider("media-import", {}), []);
   const [zoom, setZoom] = useState(0);
   const [flash, setFlash] = useState<"off" | "on" | "auto">("off");
 

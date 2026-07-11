@@ -10,6 +10,16 @@ export {
 export { createNativeCameraProvider } from "./native-camera-provider";
 export { createMediaImportProvider } from "./media-import-provider";
 export {
+  registerCaptureProvider,
+  listCaptureProviders,
+  getCaptureProviderDefinition,
+  probeCaptureProviders,
+  getRequestProvider,
+  type CaptureProviderContext,
+  type CaptureProviderDefinition,
+} from "./provider-registry";
+export { FUTURE_PROVIDER_DEFINITIONS } from "./future-source-providers";
+export {
   describeCaptureSource,
   isLowQuality,
   LOW_QUALITY_THRESHOLD,

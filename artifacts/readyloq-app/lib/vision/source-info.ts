@@ -21,6 +21,7 @@ const INFO: Record<CaptureSource, CaptureSourceInfo> = {
   wifi_stream: { label: "Wi-Fi camera", icon: "wifi-outline", isDefault: false },
   usb_camera: { label: "USB scope", icon: "hardware-chip-outline", isDefault: false },
   smart_glasses: { label: "Smart glasses", icon: "glasses-outline", isDefault: false },
+  wearable_camera: { label: "Wearable cam", icon: "body-outline", isDefault: false },
 };
 
 const FALLBACK: CaptureSourceInfo = {

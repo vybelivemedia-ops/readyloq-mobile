@@ -19,6 +19,13 @@ export function createMediaImportProvider(): VisionProvider {
     id: "media-import",
     source: "media_import",
     label: "Import from device",
+    capabilities: {
+      mode: "request_response",
+      transport: "on_device_library",
+      hasLivePreview: false,
+      producesVideo: false,
+      requiresPairing: false,
+    },
     capture: async (): Promise<EvidenceItem[]> => {
       // On iOS 14+/Android photo-picker this shows a scoped picker with no
       // permission prompt; older platforms may still ask.

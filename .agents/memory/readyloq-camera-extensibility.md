@@ -16,15 +16,19 @@ The capture layer is ALREADY a funnel, not a monolith. Respect these when adding
   wifi_stream | usb_camera | smart_glasses` plus `inspection_media.capture_source` /
   `capture_metadata` already exist, and `describeCaptureSource` has a FALLBACK — so adding
   a source needs NO migration and NO display crash. Extend the union + INFO map only.
-- **The real gap is interaction model, not the contract.** Current `VisionProvider.capture()
-  : Promise<EvidenceItem[]>` is pull / request-response (fits phone + library import + USB/WiFi
-  *still* grabs). Glasses and drone are **async-push / session-oriented**: evidence arrives
-  later, out of band, possibly while the capture screen is unmounted. That needs (a) a
-  capability-typed provider (request_response | session_stream | async_push), (b) an
-  EvidenceIntake sink so sources can push evidence without the screen awaiting a call,
-  (c) session/connection lifecycle owned OUTSIDE the screen (like the sync engine), and
-  (d) a provider registry with per-transport availability probing + a preview-surface
-  descriptor (native_camera | stream_url | none) instead of hardcoded `useMemo` providers.
+- **The capability abstraction is now IMPLEMENTED (pure-JS, no hardware).** `types.ts`
+  defines `CaptureMode` (request_response | session_stream | async_push), the provider
+  interfaces (Request/Session/Push), and an `EvidenceIntake` sink so sources can push
+  evidence without the screen awaiting a call. `provider-registry.ts` is the plug-in point
+  (register/probe/create + `PreviewKind` = native_camera | stream_url | none); the screen
+  resolves providers via `getRequestProvider(...)` instead of hardcoded `useMemo`.
+  `future-source-providers.ts` holds reserved glasses/USB/WiFi/wearable definitions
+  (`probe` = unavailable, `create` throws). **To add a real camera: replace one
+  definition's `probe`/`create` — nothing downstream of `EvidenceItem` changes.**
+- **Still NOT built (needs a dev-client / native tier).** The session/push *connection
+  lifecycle* (owned outside the screen, like the sync engine) and the actual transport
+  drivers (USB-OTG UVC, BLE glasses, WiFi/RTSP, drone SDKs) are deliberately unbuilt —
+  the charter says don't integrate hardware unless required. The interfaces are ready.
 - **External transports break the pure-JS / Route A / standalone-portable rules.** USB-OTG
   UVC, BLE glasses SDKs, WiFi/RTSP, and drone SDKs all require custom native modules /
   config plugins + a dev client — they canNOT be pure-JS and won't run in Expo Go. The JS
