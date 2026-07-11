@@ -2023,6 +2023,8 @@ components:
             - type: "null"
         evidence:
           $ref: "#/components/schemas/EvidenceSummary"
+        guidance:
+          $ref: "#/components/schemas/GuidanceSummary"
         overallConfidence: { type: ["number", "null"] }
         riskLevel:    { type: ["string", "null"] }
         technicianFeedback: { type: ["string", "null"] }
@@ -2085,6 +2087,36 @@ components:
         groups:
           type: array
           items: { $ref: "#/components/schemas/EvidenceGroup" }
+
+    GuidanceRecommendation:
+      type: object
+      required: [id, category, priority, title, reason]
+      properties:
+        id:       { type: string }
+        category: { type: string }
+        priority: { type: integer }
+        title:    { type: string }
+        reason:   { type: string }
+        zone:     { type: ["string", "null"] }
+
+    GuidanceSummary:
+      type: object
+      required: [next, queue, remaining]
+      description: >-
+        Live Guidance Engine output. `next` is the single highest-priority next
+        inspection task (null when nothing is pending). `queue` is the full
+        prioritized list, sorted by priority, and includes `next` as its first
+        element. `remaining` is the number of tasks AFTER `next`
+        (queue.length - 1, min 0) — use it to drive an "N more" hint.
+      properties:
+        next:
+          oneOf:
+            - $ref: "#/components/schemas/GuidanceRecommendation"
+            - type: "null"
+        queue:
+          type: array
+          items: { $ref: "#/components/schemas/GuidanceRecommendation" }
+        remaining: { type: integer }
 
     Finding:
       type: object

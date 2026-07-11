@@ -300,6 +300,25 @@ export const ListAnalysisResultsResponseItem = zod.object({
 }))
 }))
 }).optional(),
+  "guidance": zod.object({
+  "next": zod.union([zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "priority": zod.number(),
+  "title": zod.string(),
+  "reason": zod.string(),
+  "zone": zod.string().nullish()
+}),zod.null()]),
+  "queue": zod.array(zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "priority": zod.number(),
+  "title": zod.string(),
+  "reason": zod.string(),
+  "zone": zod.string().nullish()
+})),
+  "remaining": zod.number()
+}).optional().describe('Live Guidance Engine output. `next` is the single highest-priority next inspection task (null when nothing is pending). `queue` is the full prioritized list, sorted by priority, and includes `next` as its first element. `remaining` is the number of tasks AFTER `next` (queue.length - 1, min 0) — use it to drive an \"N more\" hint.'),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -423,6 +442,25 @@ export const GetAnalysisResultResponse = zod.object({
 }))
 }))
 }).optional(),
+  "guidance": zod.object({
+  "next": zod.union([zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "priority": zod.number(),
+  "title": zod.string(),
+  "reason": zod.string(),
+  "zone": zod.string().nullish()
+}),zod.null()]),
+  "queue": zod.array(zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "priority": zod.number(),
+  "title": zod.string(),
+  "reason": zod.string(),
+  "zone": zod.string().nullish()
+})),
+  "remaining": zod.number()
+}).optional().describe('Live Guidance Engine output. `next` is the single highest-priority next inspection task (null when nothing is pending). `queue` is the full prioritized list, sorted by priority, and includes `next` as its first element. `remaining` is the number of tasks AFTER `next` (queue.length - 1, min 0) — use it to drive an \"N more\" hint.'),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -512,6 +550,25 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
 }))
 }))
 }).optional(),
+  "guidance": zod.object({
+  "next": zod.union([zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "priority": zod.number(),
+  "title": zod.string(),
+  "reason": zod.string(),
+  "zone": zod.string().nullish()
+}),zod.null()]),
+  "queue": zod.array(zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "priority": zod.number(),
+  "title": zod.string(),
+  "reason": zod.string(),
+  "zone": zod.string().nullish()
+})),
+  "remaining": zod.number()
+}).optional().describe('Live Guidance Engine output. `next` is the single highest-priority next inspection task (null when nothing is pending). `queue` is the full prioritized list, sorted by priority, and includes `next` as its first element. `remaining` is the number of tasks AFTER `next` (queue.length - 1, min 0) — use it to drive an \"N more\" hint.'),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),

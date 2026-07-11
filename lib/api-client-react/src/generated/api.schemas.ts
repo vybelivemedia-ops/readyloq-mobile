@@ -463,6 +463,25 @@ export interface EvidenceSummary {
   groups: EvidenceGroup[];
 }
 
+export interface GuidanceRecommendation {
+  id: string;
+  category: string;
+  priority: number;
+  title: string;
+  reason: string;
+  /** @nullable */
+  zone?: string | null;
+}
+
+/**
+ * Live Guidance Engine output. `next` is the single highest-priority next inspection task (null when nothing is pending). `queue` is the full prioritized list, sorted by priority, and includes `next` as its first element. `remaining` is the number of tasks AFTER `next` (queue.length - 1, min 0) — use it to drive an "N more" hint.
+ */
+export interface GuidanceSummary {
+  next: GuidanceRecommendation | null;
+  queue: GuidanceRecommendation[];
+  remaining: number;
+}
+
 export interface AnalysisResult {
   id: number;
   inspectionId: number;
@@ -474,6 +493,7 @@ export interface AnalysisResult {
   photoZones?: AnalysisResultPhotoZones;
   coverage?: CoverageSnapshot | null;
   evidence?: EvidenceSummary;
+  guidance?: GuidanceSummary;
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */

@@ -72,6 +72,8 @@ export * from './feedbackInput';
 export * from './finding';
 export * from './generateNarrativeInput';
 export * from './getAnalyticsTrendsParams';
+export * from './guidanceRecommendation';
+export * from './guidanceSummary';
 export * from './healthStatus';
 export * from './highRiskProperty';
 export * from './historicalPhoto';

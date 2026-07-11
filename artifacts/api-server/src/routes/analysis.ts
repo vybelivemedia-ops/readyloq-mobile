@@ -16,6 +16,7 @@ import { objectPathCompanyScope } from "../lib/objectStorage";
 import { logErrorEvent } from "../lib/error-events";
 import { computeCoverage, zonesFromFinding } from "../lib/zone-coverage";
 import { computeEvidenceSummary } from "../lib/evidence-summary";
+import { computeGuidance } from "../lib/guidance-engine";
 import { derivePropertyType } from "../lib/report-narrative-ai";
 
 const router = Router();
@@ -39,6 +40,9 @@ function serializeResult(row: typeof analysisResultsTable.$inferSelect) {
     // Live evidence tally for the AI Inspection Engine — derived on read from
     // this row's own findings + videos, so it is always fresh and never stale.
     evidence: computeEvidenceSummary(row.findings, row.videoEvidence),
+    // Live Guidance Engine — the single highest-priority NEXT inspection task,
+    // derived on read from this row's coverage + findings + analyzed photos.
+    guidance: computeGuidance(row.coverage, row.findings, row.analyzedImagePaths),
     createdAt: row.createdAt.toISOString(),
   };
 }

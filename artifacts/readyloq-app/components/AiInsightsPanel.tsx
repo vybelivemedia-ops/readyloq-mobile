@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { AnalysisResult, CoverageSnapshot, EvidenceSummary, Finding, Report } from "@/lib/api-client";
+import type { AnalysisResult, CoverageSnapshot, EvidenceSummary, Finding, GuidanceRecommendation, Report } from "@/lib/api-client";
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -141,6 +141,29 @@ function evidenceChips(evidence: EvidenceSummary | null | undefined): EvidenceCh
   return chips;
 }
 
+/**
+ * Icon per Live Guidance category. The callout only ever shows ONE task, so the
+ * icon just cues the kind of next-action (exclusion, moisture, room, etc.).
+ */
+const GUIDANCE_ICON: Record<
+  GuidanceRecommendation["category"],
+  React.ComponentProps<typeof Ionicons>["name"]
+> = {
+  missing_exclusion: "shield-outline",
+  missing_moisture: "water-outline",
+  conducive: "construct-outline",
+  missing_room: "scan-outline",
+  bait_stations: "bug-outline",
+  missing_evidence: "camera-outline",
+  suggested_room: "add-circle-outline",
+};
+
+function guidanceIcon(
+  category: GuidanceRecommendation["category"],
+): React.ComponentProps<typeof Ionicons>["name"] {
+  return GUIDANCE_ICON[category] ?? "compass-outline";
+}
+
 export function AiInsightsPanel({
   siteAddress,
   propertyType,
@@ -163,6 +186,7 @@ export function AiInsightsPanel({
   const narrative = report?.aiNarrative ?? null;
   const coverage = analysis?.coverage ?? null;
   const evidence = analysis?.evidence ?? null;
+  const guidance = analysis?.guidance ?? null;
   const rooms = roomChecklist(coverage);
   const chips = evidenceChips(evidence);
   // Incremental progress copy — while a run is in flight we show how many of
@@ -331,6 +355,120 @@ export function AiInsightsPanel({
 
         {tab === "insights" ? (
           <>
+            {/* Live Guidance Engine — ONE prioritized next inspection task at a
+                time, derived server-side from the live AI state (coverage +
+                findings + analyzed photos). It refreshes automatically whenever a
+                new analysis lands, so the technician always sees the single most
+                important thing to do next — no page refresh. */}
+            <Card style={{ gap: 12, borderColor: colors.primary, backgroundColor: colors.accent }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="compass" size={16} color={colors.primary} />
+                <Text
+                  style={{
+                    color: colors.primary,
+                    fontFamily: "Inter_700Bold",
+                    fontSize: 13,
+                    letterSpacing: 0.6,
+                    flex: 1,
+                  }}
+                >
+                  LIVE GUIDANCE
+                </Text>
+                {analyzing ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Badge label={analysis ? "Live" : "Standby"} tone={analysis ? "success" : "default"} />
+                )}
+              </View>
+
+              {guidance?.next ? (
+                <>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: colors.background,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons name={guidanceIcon(guidance.next.category)} size={20} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text
+                        style={{
+                          color: colors.mutedForeground,
+                          fontFamily: "Inter_500Medium",
+                          fontSize: 11,
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        NEXT INSPECTION TASK
+                      </Text>
+                      <Text
+                        style={{
+                          color: colors.foreground,
+                          fontFamily: "Inter_700Bold",
+                          fontSize: 17,
+                          lineHeight: 22,
+                        }}
+                      >
+                        {guidance.next.title}
+                      </Text>
+                      <Text
+                        style={{
+                          color: colors.mutedForeground,
+                          fontFamily: "Inter_400Regular",
+                          fontSize: 12,
+                          lineHeight: 16,
+                        }}
+                      >
+                        {guidance.next.reason}
+                      </Text>
+                    </View>
+                  </View>
+                  {guidance.remaining > 0 ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="layers-outline" size={13} color={colors.mutedForeground} />
+                      <Text
+                        style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}
+                      >
+                        {guidance.remaining} more priorit{guidance.remaining === 1 ? "y" : "ies"} queued
+                      </Text>
+                    </View>
+                  ) : null}
+                </>
+              ) : analysis ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Ionicons name="checkmark-circle" size={22} color={colors.success ?? colors.primary} />
+                  <Text
+                    style={{
+                      color: colors.foreground,
+                      fontFamily: "Inter_500Medium",
+                      fontSize: 14,
+                      flex: 1,
+                      lineHeight: 19,
+                    }}
+                  >
+                    All required areas covered — review findings and finalize.
+                  </Text>
+                </View>
+              ) : (
+                <Text
+                  style={{
+                    color: colors.mutedForeground,
+                    fontFamily: "Inter_400Regular",
+                    fontSize: 13,
+                    lineHeight: 18,
+                  }}
+                >
+                  Run AI analysis to get your next inspection step.
+                </Text>
+              )}
+            </Card>
+
             {/* AI Inspection Engine — the consolidated, real-time state of the
                 live inspection. Progress, room classification and the evidence
                 tally all update automatically as photos are analyzed; nothing

@@ -10,6 +10,7 @@ import type { AnalysisResultVideoEvidenceItem } from './analysisResultVideoEvide
 import type { CoverageSnapshot } from './coverageSnapshot';
 import type { EvidenceSummary } from './evidenceSummary';
 import type { Finding } from './finding';
+import type { GuidanceSummary } from './guidanceSummary';
 
 export interface AnalysisResult {
   id: number;
@@ -22,6 +23,7 @@ export interface AnalysisResult {
   photoZones?: AnalysisResultPhotoZones;
   coverage?: CoverageSnapshot | null;
   evidence?: EvidenceSummary;
+  guidance?: GuidanceSummary;
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */

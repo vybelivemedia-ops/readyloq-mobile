@@ -222,6 +222,15 @@ describe("POST /analysis/analyze does not fabricate findings", () => {
     const pests = res.body.evidence.groups.find((g: { key: string }) => g.key === "pests");
     expect(pests?.total).toBe(1);
     expect(pests?.items[0].label).toBe("German cockroach");
+
+    // Live Guidance rides on every response too, derived on read. A single
+    // kitchen roach photo leaves the (always-required) exterior perimeter
+    // uncovered, so the top next-task is the exclusion inspection.
+    expect(res.body.guidance).toBeTruthy();
+    expect(res.body.guidance.next).toBeTruthy();
+    expect(res.body.guidance.next).toEqual(res.body.guidance.queue[0]);
+    expect(res.body.guidance.next.category).toBe("missing_exclusion");
+    expect(res.body.guidance.remaining).toBe(res.body.guidance.queue.length - 1);
   });
 
   it("mixes a failure and a real finding in one request", async () => {

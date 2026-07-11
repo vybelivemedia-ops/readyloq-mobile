@@ -131,6 +131,49 @@ export interface EvidenceSummary {
 }
 
 /**
+ * A single next-action produced by the Live Guidance Engine. `priority` is a
+ * fixed, deterministic weight (lower = more urgent) so the surfaced "next task"
+ * never flickers between live re-runs. This is PROSPECTIVE ("go inspect X next")
+ * guidance — distinct from the retrospective `recommendations` (corrective
+ * actions grounded in real findings).
+ */
+export interface GuidanceRecommendation {
+  /** Stable key for React lists, e.g. "missing_moisture:moisture_sources". */
+  id: string;
+  category:
+    | "missing_room"
+    | "missing_moisture"
+    | "missing_exclusion"
+    | "bait_stations"
+    | "conducive"
+    | "missing_evidence"
+    | "suggested_room";
+  /** Lower = higher priority; the next task is the lowest number in the queue. */
+  priority: number;
+  /** Imperative next task, e.g. "Inspect moisture sources (plumbing, drains, leaks)". */
+  title: string;
+  /** Short justification, e.g. "Required area not yet captured." */
+  reason: string;
+  /** Coverage zone slug when the task maps to a zone; null / absent otherwise. */
+  zone?: string | null;
+}
+
+/**
+ * Live Guidance Engine output for the AI Inspection Engine. DERIVED on read from
+ * the analysis row's `coverage` + `findings` + `analyzedImagePaths` — never
+ * persisted, so it can never be stale. Surfaces ONE recommendation at a time
+ * (`next`) while keeping the full prioritized `queue` for context.
+ */
+export interface GuidanceSummary {
+  /** The single highest-priority next inspection task; null when nothing pends. */
+  next: GuidanceRecommendation | null;
+  /** Full prioritized queue, sorted by priority; includes `next` as element 0. */
+  queue: GuidanceRecommendation[];
+  /** Count of tasks AFTER `next` (queue.length - 1, min 0) — drives "N more". */
+  remaining: number;
+}
+
+/**
  * Metadata about a video attached to an inspection, recorded on the analysis
  * result as reviewed evidence. Videos are NOT analyzed into findings — see
  * `frameAnalysisStatus`, the forward hook for future per-frame analysis.
