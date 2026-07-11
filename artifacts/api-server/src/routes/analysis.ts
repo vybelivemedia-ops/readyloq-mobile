@@ -5,9 +5,10 @@ import {
   inspectionsTable,
   inspectionMediaTable,
   type Finding,
+  type InspectionMemory,
   type VideoEvidence,
 } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { analyzePhoto } from "../lib/intelligence-ai";
 import { runOpportunitySynthesis } from "../lib/opportunity-ai";
@@ -17,6 +18,8 @@ import { logErrorEvent } from "../lib/error-events";
 import { computeCoverage, zonesFromFinding } from "../lib/zone-coverage";
 import { computeEvidenceSummary } from "../lib/evidence-summary";
 import { computeGuidance } from "../lib/guidance-engine";
+import { computeInspectionMemory, type PriorVisit } from "../lib/inspection-memory";
+import { normalizeAddressKey } from "../lib/property-intelligence";
 import { derivePropertyType } from "../lib/report-narrative-ai";
 
 const router = Router();
@@ -29,7 +32,10 @@ function toStoragePath(url: string): string {
   return url.replace(/^\/api\/storage/, "");
 }
 
-function serializeResult(row: typeof analysisResultsTable.$inferSelect) {
+function serializeResult(
+  row: typeof analysisResultsTable.$inferSelect,
+  memory: InspectionMemory | null = null,
+) {
   return {
     ...row,
     findings: row.findings ?? [],
@@ -41,10 +47,86 @@ function serializeResult(row: typeof analysisResultsTable.$inferSelect) {
     // this row's own findings + videos, so it is always fresh and never stale.
     evidence: computeEvidenceSummary(row.findings, row.videoEvidence),
     // Live Guidance Engine — the single highest-priority NEXT inspection task,
-    // derived on read from this row's coverage + findings + analyzed photos.
-    guidance: computeGuidance(row.coverage, row.findings, row.analyzedImagePaths),
+    // derived on read from this row's coverage + findings + analyzed photos, plus
+    // any Inspection Memory gaps (prior-visit signals not re-covered today) when a
+    // single-inspection scope let us compute memory. `memory` is null on the
+    // multi-inspection list / feedback / web-create paths, so guidance there is
+    // byte-identical to the memory-free behavior.
+    guidance: computeGuidance(
+      row.coverage,
+      row.findings,
+      row.analyzedImagePaths,
+      memory?.highlights ?? null,
+    ),
+    // Inspection Memory — prior-visit context + gap highlights for this address.
+    // null unless the request is scoped to a single inspection.
+    memory,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/**
+ * Gather the PRIOR visits for an inspection: earlier inspections at the SAME
+ * normalized address within the SAME company, each reduced to its latest
+ * completed analysis row. Company-scoped and same-address-only by construction —
+ * the honesty + tenant guardrails for Inspection Memory live here. Returns [] on
+ * an empty address key (address-less inspections must never group together) or
+ * when there is no prior history.
+ */
+async function loadPriorVisits(
+  companyId: number,
+  current: typeof inspectionsTable.$inferSelect,
+): Promise<PriorVisit[]> {
+  const addressKey = normalizeAddressKey(current.siteAddress ?? "");
+  if (!addressKey) return [];
+
+  const inspections = await db
+    .select()
+    .from(inspectionsTable)
+    .where(eq(inspectionsTable.companyId, companyId));
+
+  // Prior = same address key, a DIFFERENT inspection (analyze inserts a new
+  // analysis row per run, so the current inspection has many rows — exclude by
+  // inspectionId, never by row id), and captured strictly before the current one.
+  const currentTs = new Date(current.createdAt).getTime();
+  const priorById = new Map<number, typeof inspectionsTable.$inferSelect>();
+  for (const insp of inspections) {
+    if (insp.id === current.id) continue;
+    if (normalizeAddressKey(insp.siteAddress ?? "") !== addressKey) continue;
+    if (new Date(insp.createdAt).getTime() >= currentTs) continue;
+    priorById.set(insp.id, insp);
+  }
+  if (priorById.size === 0) return [];
+
+  const rows = await db
+    .select()
+    .from(analysisResultsTable)
+    .where(
+      and(
+        eq(analysisResultsTable.companyId, companyId),
+        eq(analysisResultsTable.status, "complete"),
+        inArray(analysisResultsTable.inspectionId, Array.from(priorById.keys())),
+      ),
+    )
+    .orderBy(desc(analysisResultsTable.createdAt));
+
+  // Keep only the latest completed analysis per prior inspection (rows are
+  // newest-first, so the first one seen per inspection wins).
+  const latestByInspection = new Map<number, typeof analysisResultsTable.$inferSelect>();
+  for (const row of rows) {
+    if (row.inspectionId == null || latestByInspection.has(row.inspectionId)) continue;
+    latestByInspection.set(row.inspectionId, row);
+  }
+
+  const visits: PriorVisit[] = [];
+  for (const [inspectionId, row] of latestByInspection) {
+    visits.push({
+      date: priorById.get(inspectionId)?.createdAt ?? row.createdAt,
+      findings: (row.findings ?? []) as Finding[],
+      recommendations: (row.recommendations ?? []) as string[],
+    });
+  }
+  return visits;
 }
 
 // GET /analysis
@@ -60,7 +142,27 @@ router.get("/", async (req, res) => {
       .where(eq(analysisResultsTable.companyId, companyId))
       .orderBy(desc(analysisResultsTable.createdAt));
     if (inspectionId) rows = rows.filter((r) => r.inspectionId === inspectionId);
-    return res.json(rows.map(serializeResult));
+
+    // Single-inspection scope (how mobile loads a live inspection): compute
+    // Inspection Memory ONCE from prior visits, then attach per-row memory so the
+    // memory-driven guidance survives every react-query refetch and resume — not
+    // just the /analyze response. The unfiltered list stays memory-free (it can
+    // serialize many inspections; a prior-visit read per row would be wasteful).
+    if (inspectionId) {
+      const [inspection] = await db
+        .select()
+        .from(inspectionsTable)
+        .where(
+          and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)),
+        );
+      if (inspection) {
+        const priorVisits = await loadPriorVisits(companyId, inspection);
+        return res.json(
+          rows.map((r) => serializeResult(r, computeInspectionMemory(priorVisits, r))),
+        );
+      }
+    }
+    return res.json(rows.map((r) => serializeResult(r)));
   } catch (err) {
     return res.status(500).json({ error: "Failed to list analysis results" });
   }
@@ -473,7 +575,13 @@ router.post("/analyze", async (req, res) => {
       });
     }
 
-    return res.status(201).json({ ...serializeResult(row), analysisErrors });
+    // Inspection Memory: compare this run against prior visits at the same
+    // address so the returned guidance can be memory-driven immediately (the
+    // mobile live flow re-runs analyze after every few captures and shows the new
+    // guidance with no refresh).
+    const memory = computeInspectionMemory(await loadPriorVisits(companyId, inspection), row);
+
+    return res.status(201).json({ ...serializeResult(row, memory), analysisErrors });
   } catch (err) {
     void logErrorEvent("ai", {
       companyId: req.user?.companyId ?? 0,
@@ -495,7 +603,24 @@ router.get("/:id", async (req, res) => {
       .from(analysisResultsTable)
       .where(and(eq(analysisResultsTable.id, id), eq(analysisResultsTable.companyId, companyId)));
     if (!row) return res.status(404).json({ error: "Not found" });
-    return res.json(serializeResult(row));
+
+    // Single-analysis fetch is single-inspection scope -> attach Inspection Memory.
+    let memory: InspectionMemory | null = null;
+    if (row.inspectionId != null) {
+      const [inspection] = await db
+        .select()
+        .from(inspectionsTable)
+        .where(
+          and(
+            eq(inspectionsTable.id, row.inspectionId),
+            eq(inspectionsTable.companyId, companyId),
+          ),
+        );
+      if (inspection) {
+        memory = computeInspectionMemory(await loadPriorVisits(companyId, inspection), row);
+      }
+    }
+    return res.json(serializeResult(row, memory));
   } catch (err) {
     return res.status(500).json({ error: "Failed to get analysis" });
   }

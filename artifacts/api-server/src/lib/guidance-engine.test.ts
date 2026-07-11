@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { CoverageSnapshot, CoverageZone, Finding } from "@workspace/db";
+import type { CoverageSnapshot, CoverageZone, Finding, MemoryHighlight } from "@workspace/db";
 import { computeGuidance } from "./guidance-engine";
+
+function highlight(overrides: Partial<MemoryHighlight> = {}): MemoryHighlight {
+  return {
+    id: "area_not_inspected:kitchen_sanitation",
+    type: "area_not_inspected",
+    zone: "kitchen_sanitation",
+    label: "Kitchen",
+    message: "Kitchen had activity previously.",
+    lastSeen: null,
+    ...overrides,
+  };
+}
 
 const zone = (slug: string, label = slug): CoverageZone => ({ slug, label });
 
@@ -158,5 +170,53 @@ describe("computeGuidance", () => {
     expect(g.queue).toHaveLength(1);
     expect(g.next?.category).toBe("suggested_room");
     expect(g.remaining).toBe(0);
+  });
+
+  it("is byte-identical whether memory is omitted, null, or empty (backward compatible)", () => {
+    const cov = coverage({
+      requiredZones: [zone("exterior_perimeter")],
+      uncoveredRequired: [zone("exterior_perimeter", "Exterior")],
+    });
+    const base = computeGuidance(cov, [], ["a"]);
+    expect(computeGuidance(cov, [], ["a"], null)).toEqual(base);
+    expect(computeGuidance(cov, [], ["a"], [])).toEqual(base);
+  });
+
+  it("promotes a memory highlight above every generic capture task as the next task", () => {
+    const g = computeGuidance(
+      coverage({
+        requiredZones: [zone("exterior_perimeter")],
+        uncoveredRequired: [zone("exterior_perimeter", "Exterior")], // p10
+      }),
+      [],
+      ["a"],
+      [highlight({ type: "rodent_area_not_photographed", zone: "attic_roofline", label: "Attic" })],
+    );
+    expect(g.next?.category).toBe("memory_rodent");
+    expect(g.next?.priority).toBe(4);
+    expect(g.next?.id).toBe("memory_rodent:attic_roofline");
+    expect(g.next?.zone).toBe("attic_roofline");
+    // The grounded highlight message flows through verbatim as the reason.
+    expect(g.next?.reason).toBe("Kitchen had activity previously.");
+    // Generic exterior task is still queued, just below the memory task.
+    expect(g.queue.some((r) => r.category === "missing_exclusion")).toBe(true);
+  });
+
+  it("orders memory tasks rodent(4) < bait(6) < activity(8)", () => {
+    const g = computeGuidance(
+      coverage({ requiredZones: [zone("a")], coveredRequired: [zone("a")] }),
+      [],
+      ["p1", "p2"],
+      [
+        highlight({ type: "area_not_inspected", zone: "z_activity", label: "Area" }),
+        highlight({ type: "bait_station_missing", zone: "z_bait", label: "Bait" }),
+        highlight({ type: "rodent_area_not_photographed", zone: "z_rodent", label: "Rodent" }),
+      ],
+    );
+    expect(g.queue.map((r) => r.category)).toEqual([
+      "memory_rodent",
+      "memory_bait",
+      "memory_activity",
+    ]);
   });
 });

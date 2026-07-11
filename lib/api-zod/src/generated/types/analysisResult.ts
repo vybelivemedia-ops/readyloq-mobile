@@ -11,6 +11,7 @@ import type { CoverageSnapshot } from './coverageSnapshot';
 import type { EvidenceSummary } from './evidenceSummary';
 import type { Finding } from './finding';
 import type { GuidanceSummary } from './guidanceSummary';
+import type { InspectionMemory } from './inspectionMemory';
 
 export interface AnalysisResult {
   id: number;
@@ -24,6 +25,8 @@ export interface AnalysisResult {
   coverage?: CoverageSnapshot | null;
   evidence?: EvidenceSummary;
   guidance?: GuidanceSummary;
+  /** Inspection Memory — prior-visit context for this address (same company) plus gap highlights vs. what has been captured today. Only populated on single-inspection scopes (POST /analyze, GET /:id, and GET /?inspectionId=); null on the unfiltered list and other paths. */
+  memory?: InspectionMemory | null;
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */

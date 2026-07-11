@@ -482,6 +482,78 @@ export interface GuidanceSummary {
   remaining: number;
 }
 
+export interface MemoryPestActivity {
+  key: string;
+  label: string;
+  /** @nullable */
+  zone: string | null;
+  severity: string;
+  visits: number;
+  /** @nullable */
+  lastSeen: string | null;
+}
+
+export interface MemoryBaitStation {
+  key: string;
+  description: string;
+  /** @nullable */
+  zone: string | null;
+  /** @nullable */
+  lastSeen: string | null;
+}
+
+export interface MemoryEntryPoint {
+  key: string;
+  description: string;
+  /** @nullable */
+  zone: string | null;
+  /** @nullable */
+  lastSeen: string | null;
+}
+
+export interface MemoryNote {
+  key: string;
+  text: string;
+  /** @nullable */
+  lastSeen: string | null;
+}
+
+export type MemoryHighlightType = typeof MemoryHighlightType[keyof typeof MemoryHighlightType];
+
+
+export const MemoryHighlightType = {
+  area_not_inspected: 'area_not_inspected',
+  bait_station_missing: 'bait_station_missing',
+  rodent_area_not_photographed: 'rodent_area_not_photographed',
+} as const;
+
+export interface MemoryHighlight {
+  id: string;
+  type: MemoryHighlightType;
+  /** @nullable */
+  zone: string | null;
+  label: string;
+  message: string;
+  /** @nullable */
+  lastSeen: string | null;
+}
+
+/**
+ * Prior-visit context for the CURRENT inspection at the same physical address (same company), aggregated verbatim from earlier inspections' analysis rows — never fabricated. `highlights` are gap alerts comparing remembered signals against what has been captured today, and they feed the Live Guidance Engine so the next task can be memory-driven.
+ */
+export interface InspectionMemory {
+  hasPriorVisits: boolean;
+  priorVisitCount: number;
+  /** @nullable */
+  lastVisitDate: string | null;
+  pestActivity: MemoryPestActivity[];
+  baitStations: MemoryBaitStation[];
+  entryPoints: MemoryEntryPoint[];
+  recommendations: MemoryNote[];
+  treatments: MemoryNote[];
+  highlights: MemoryHighlight[];
+}
+
 export interface AnalysisResult {
   id: number;
   inspectionId: number;
@@ -494,6 +566,8 @@ export interface AnalysisResult {
   coverage?: CoverageSnapshot | null;
   evidence?: EvidenceSummary;
   guidance?: GuidanceSummary;
+  /** Inspection Memory — prior-visit context for this address (same company) plus gap highlights vs. what has been captured today. Only populated on single-inspection scopes (POST /analyze, GET /:id, and GET /?inspectionId=); null on the unfiltered list and other paths. */
+  memory?: InspectionMemory | null;
   /** @nullable */
   overallConfidence?: number | null;
   /** @nullable */

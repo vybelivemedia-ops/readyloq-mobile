@@ -85,7 +85,9 @@ import {
 import { eq } from "drizzle-orm";
 
 const OWNER_ID = "analyze_owner_clerk_id";
+const OWNER2_ID = "analyze_owner2_clerk_id";
 let companyId: number;
+let company2Id: number;
 
 function asUser(id: string | null) {
   authState.userId = id;
@@ -157,6 +159,17 @@ beforeAll(async () => {
 
   await db.delete(usersTable).where(eq(usersTable.clerkUserId, OWNER_ID));
   await db.insert(usersTable).values({ clerkUserId: OWNER_ID, role: "owner", companyId });
+
+  // A second, fully separate tenant — used to prove Inspection Memory never
+  // crosses company boundaries even when two tenants share a street address.
+  const slug2 = "analyze-co-2";
+  const [existing2] = await db.select().from(companiesTable).where(eq(companiesTable.slug, slug2));
+  company2Id = existing2
+    ? existing2.id
+    : (await db.insert(companiesTable).values({ name: "Analyze Co 2", slug: slug2 }).returning())[0]
+        .id;
+  await db.delete(usersTable).where(eq(usersTable.clerkUserId, OWNER2_ID));
+  await db.insert(usersTable).values({ clerkUserId: OWNER2_ID, role: "owner", companyId: company2Id });
 });
 
 beforeEach(() => {
@@ -401,5 +414,175 @@ describe("POST /analysis/analyze records video as evidence but never as findings
     expect(analyzePhotoMock).not.toHaveBeenCalled();
     expect(res.body.findings).toEqual([]);
     expect(res.body.videoEvidence).toEqual([]);
+  });
+});
+
+describe("POST /analysis/analyze remembers prior visits (Inspection Memory)", () => {
+  /** A rodent prediction that becomes a zoned finding (drives rodent memory). */
+  function rodentPrediction(zone: string) {
+    return {
+      category: "pest",
+      subcategory: "rodent",
+      confidence: 0.9,
+      tags: ["rodent", "droppings"],
+      possiblePest: "House mouse",
+      possibleConduciveCondition: null,
+      possibleEntryPoint: null,
+      suggestedCorrectiveAction: "Set snap traps along the wall",
+      rationale: "Fresh rodent droppings observed",
+      zone,
+    };
+  }
+
+  /**
+   * Run a complete inspection visit end to end: create the inspection at
+   * `address`, persist one company-scoped photo, and analyze it with the given
+   * prediction. Each call queues exactly one analyzePhoto result, consumed by the
+   * single submitted image. Returns the analyze response for assertions.
+   */
+  async function runVisit(opts: {
+    user: string;
+    cid: number;
+    address: string;
+    suffix: string;
+    prediction: Record<string, unknown>;
+  }) {
+    asUser(opts.user);
+    const created = await request(app)
+      .post("/api/inspections")
+      .send({ siteAddress: opts.address, technicianName: "Tech", clientName: "Client" });
+    expect(created.status).toBe(201);
+    const inspectionId = created.body.id as number;
+
+    const imageUrl = `/api/storage/objects/companies/${opts.cid}/uploads/photo-${opts.suffix}`;
+    const media = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "photo", url: imageUrl });
+    expect(media.status).toBe(201);
+
+    analyzePhotoMock.mockResolvedValueOnce(opts.prediction);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }] });
+    expect(res.status).toBe(201);
+    return { inspectionId, imageUrl, res };
+  }
+
+  it("surfaces prior pest activity and drives a memory-driven next task for an un-photographed rodent zone", async () => {
+    const address = "10 Recurring Way";
+    // PRIOR visit: rodents in the attic.
+    await runVisit({
+      user: OWNER_ID,
+      cid: companyId,
+      address,
+      suffix: "mem-prior",
+      prediction: rodentPrediction("attic_roofline"),
+    });
+
+    // CURRENT visit at the SAME address: technician only photographs the kitchen,
+    // leaving the previously-active attic un-photographed today.
+    const { res } = await runVisit({
+      user: OWNER_ID,
+      cid: companyId,
+      address,
+      suffix: "mem-current",
+      prediction: { ...pestPrediction(), zone: "kitchen_sanitation" },
+    });
+
+    const memory = res.body.memory;
+    expect(memory).toBeTruthy();
+    expect(memory.hasPriorVisits).toBe(true);
+    expect(memory.priorVisitCount).toBe(1);
+    // SHOW list: prior rodent activity remembered verbatim (no invented numbers).
+    expect(memory.pestActivity.map((p: { label: string }) => p.label)).toContain("House mouse");
+    expect(JSON.stringify(memory)).not.toMatch(/station #\d/i);
+    // GAP: previously-active rodent zone not photographed today.
+    const gap = memory.highlights.find(
+      (h: { zone: string }) => h.zone === "attic_roofline",
+    );
+    expect(gap?.type).toBe("rodent_area_not_photographed");
+    // The gap is promoted into the Live Guidance Engine as the top next task,
+    // ahead of every generic capture prompt.
+    expect(res.body.guidance.next.category).toBe("memory_rodent");
+    expect(res.body.guidance.next.zone).toBe("attic_roofline");
+    expect(res.body.guidance.next).toEqual(res.body.guidance.queue[0]);
+  });
+
+  it("does NOT remember visits at a DIFFERENT address (same company)", async () => {
+    await runVisit({
+      user: OWNER_ID,
+      cid: companyId,
+      address: "1 Alpha Street",
+      suffix: "addr-a",
+      prediction: rodentPrediction("attic_roofline"),
+    });
+    const { res } = await runVisit({
+      user: OWNER_ID,
+      cid: companyId,
+      address: "2 Beta Avenue",
+      suffix: "addr-b",
+      prediction: { ...pestPrediction(), zone: "kitchen_sanitation" },
+    });
+
+    expect(res.body.memory.hasPriorVisits).toBe(false);
+    expect(res.body.memory.highlights).toEqual([]);
+    // With no memory, guidance falls back to the generic exterior prompt.
+    expect(res.body.guidance.next.category).toBe("missing_exclusion");
+  });
+
+  it("does NOT remember another company's visit at the SAME address", async () => {
+    const address = "500 Shared Boulevard";
+    // Another tenant inspected this exact address and found rodents.
+    await runVisit({
+      user: OWNER2_ID,
+      cid: company2Id,
+      address,
+      suffix: "xco-prior",
+      prediction: rodentPrediction("attic_roofline"),
+    });
+
+    // Our tenant's first-ever visit here must see NO memory from the other tenant.
+    const { res } = await runVisit({
+      user: OWNER_ID,
+      cid: companyId,
+      address,
+      suffix: "xco-current",
+      prediction: { ...pestPrediction(), zone: "kitchen_sanitation" },
+    });
+
+    expect(res.body.memory.hasPriorVisits).toBe(false);
+    expect(res.body.memory.highlights).toEqual([]);
+    expect(res.body.guidance.next.category).toBe("missing_exclusion");
+  });
+
+  it("also attaches memory on the list route the mobile app polls (GET /?inspectionId=)", async () => {
+    const address = "77 Polled Place";
+    await runVisit({
+      user: OWNER_ID,
+      cid: companyId,
+      address,
+      suffix: "list-prior",
+      prediction: rodentPrediction("attic_roofline"),
+    });
+    const { inspectionId } = await runVisit({
+      user: OWNER_ID,
+      cid: companyId,
+      address,
+      suffix: "list-current",
+      prediction: { ...pestPrediction(), zone: "kitchen_sanitation" },
+    });
+
+    asUser(OWNER_ID);
+    const list = await request(app).get(`/api/analysis?inspectionId=${inspectionId}`);
+    expect(list.status).toBe(200);
+    expect(Array.isArray(list.body)).toBe(true);
+    // The latest analysis row for this inspection carries the same memory the
+    // /analyze response did — so it survives react-query refetches and resume.
+    const latest = list.body[0];
+    expect(latest.memory.hasPriorVisits).toBe(true);
+    expect(latest.memory.highlights.some((h: { zone: string }) => h.zone === "attic_roofline")).toBe(
+      true,
+    );
+    expect(latest.guidance.next.category).toBe("memory_rodent");
   });
 });

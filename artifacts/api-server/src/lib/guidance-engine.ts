@@ -3,6 +3,7 @@ import type {
   Finding,
   GuidanceRecommendation,
   GuidanceSummary,
+  MemoryHighlight,
 } from "@workspace/db";
 
 /**
@@ -98,6 +99,33 @@ const SUGGESTED_PRIORITY = 90;
 /** Priority for rodent monitoring — just below the exterior-perimeter task. */
 const BAIT_STATION_PRIORITY = 15;
 
+/**
+ * Memory-driven tasks outrank every generic capture task: they are grounded in
+ * REAL detections at this exact address on a prior visit, so re-checking them is
+ * the single most valuable next action. Rodent-not-photographed is the strongest
+ * signal, then un-re-documented monitoring, then a previously-active area.
+ */
+const MEMORY_GUIDANCE: Record<
+  MemoryHighlight["type"],
+  { category: GuidanceRecommendation["category"]; priority: number; title: (label: string) => string }
+> = {
+  rodent_area_not_photographed: {
+    category: "memory_rodent",
+    priority: 4,
+    title: (label) => `Re-photograph ${label} — rodent activity last visit`,
+  },
+  bait_station_missing: {
+    category: "memory_bait",
+    priority: 6,
+    title: (label) => `Re-check rodent monitoring at ${label}`,
+  },
+  area_not_inspected: {
+    category: "memory_activity",
+    priority: 8,
+    title: (label) => `Re-inspect ${label} — active on last visit`,
+  },
+};
+
 /** Substrings that mark a finding's free-text species as a rodent. */
 const RODENT_KEYWORDS = ["rodent", "mouse", "mice", "rat"];
 
@@ -119,11 +147,31 @@ export function computeGuidance(
   coverage: CoverageSnapshot | null | undefined,
   findings: Finding[] | null | undefined,
   analyzedImagePaths?: string[] | null,
+  memoryHighlights?: MemoryHighlight[] | null,
 ): GuidanceSummary {
   if (!coverage) return { next: null, queue: [], remaining: 0 };
 
   const safeFindings = Array.isArray(findings) ? findings : [];
   const queue: GuidanceRecommendation[] = [];
+
+  // 0) Inspection Memory gaps — grounded in real prior-visit detections at this
+  //    address. Highest priority: they are the most valuable next actions and are
+  //    already deduped to one highlight per zone by the memory engine. When no
+  //    memory is passed (unfiltered list, feedback, web POST) this is a no-op and
+  //    guidance is byte-identical to the memory-free behavior.
+  for (const h of Array.isArray(memoryHighlights) ? memoryHighlights : []) {
+    const g = MEMORY_GUIDANCE[h.type];
+    if (!g) continue;
+    const label = h.label || h.zone || "prior area";
+    queue.push({
+      id: `${g.category}:${h.zone ?? h.id}`,
+      category: g.category,
+      priority: g.priority,
+      title: g.title(label),
+      reason: h.message,
+      zone: h.zone ?? null,
+    });
+  }
 
   // 1) Uncovered REQUIRED zones -> specialized "go inspect" tasks.
   for (const zone of coverage.uncoveredRequired ?? []) {

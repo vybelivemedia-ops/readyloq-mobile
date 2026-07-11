@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { AnalysisResult, CoverageSnapshot, EvidenceSummary, Finding, GuidanceRecommendation, Report } from "@/lib/api-client";
+import type { AnalysisResult, CoverageSnapshot, EvidenceSummary, Finding, GuidanceRecommendation, InspectionMemory, MemoryHighlight, Report } from "@/lib/api-client";
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -156,12 +156,98 @@ const GUIDANCE_ICON: Record<
   bait_stations: "bug-outline",
   missing_evidence: "camera-outline",
   suggested_room: "add-circle-outline",
+  // Inspection Memory categories — the next task is driven by a prior-visit gap.
+  memory_rodent: "paw-outline",
+  memory_bait: "shield-half-outline",
+  memory_activity: "time-outline",
 };
 
 function guidanceIcon(
   category: GuidanceRecommendation["category"],
 ): React.ComponentProps<typeof Ionicons>["name"] {
   return GUIDANCE_ICON[category] ?? "compass-outline";
+}
+
+/** Icon per Inspection Memory gap highlight type. */
+const MEMORY_HIGHLIGHT_ICON: Record<
+  MemoryHighlight["type"],
+  React.ComponentProps<typeof Ionicons>["name"]
+> = {
+  rodent_area_not_photographed: "paw-outline",
+  bait_station_missing: "shield-half-outline",
+  area_not_inspected: "alert-circle-outline",
+};
+
+function memoryHighlightIcon(
+  type: MemoryHighlight["type"],
+): React.ComponentProps<typeof Ionicons>["name"] {
+  return MEMORY_HIGHLIGHT_ICON[type] ?? "alert-circle-outline";
+}
+
+/** "Mar 3, 2026" for the last-visit line; empty string when the date is absent. */
+function formatMemoryDate(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** One remembered SHOW row: a label + verbatim prior-visit values (never faked). */
+interface MemoryShowRow {
+  key: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  values: string[];
+}
+
+/**
+ * Build the remembered SHOW rows from prior visits. Each value is composed from
+ * real prior findings/notes only — species counts, zones, and recency are shown,
+ * but nothing (e.g. an enumerated bait-station number) is ever invented.
+ */
+function memoryShowRows(memory: InspectionMemory): MemoryShowRow[] {
+  const zoneSuffix = (zone: string | null) => (zone ? ` · ${prettifyZoneLabel(zone)}` : "");
+  const rows: MemoryShowRow[] = [
+    {
+      key: "pests",
+      icon: "bug-outline",
+      label: "Previous pest activity",
+      values: memory.pestActivity.map((p) => {
+        const times = `${p.visits} visit${p.visits === 1 ? "" : "s"}`;
+        return `${p.label} · ${times}${p.severity ? ` · ${p.severity}` : ""}${zoneSuffix(p.zone)}`;
+      }),
+    },
+    {
+      key: "bait",
+      icon: "shield-half-outline",
+      label: "Rodent monitoring / bait references",
+      values: memory.baitStations.map((b) => `${b.description}${zoneSuffix(b.zone)}`),
+    },
+    {
+      key: "entry",
+      icon: "construct-outline",
+      label: "Entry points / exclusion",
+      values: memory.entryPoints.map((e) => `${e.description}${zoneSuffix(e.zone)}`),
+    },
+    {
+      key: "recs",
+      icon: "bulb-outline",
+      label: "Previous recommendations",
+      values: memory.recommendations.map((r) => r.text),
+    },
+    {
+      key: "treatments",
+      icon: "medkit-outline",
+      label: "Previous treatments",
+      values: memory.treatments.map((t) => t.text),
+    },
+  ];
+  return rows.filter((r) => r.values.length > 0);
+}
+
+/** Prettify a zone slug ("attic_roofline" -> "Attic Roofline") for display. */
+function prettifyZoneLabel(slug: string): string {
+  return slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function AiInsightsPanel({
@@ -187,8 +273,12 @@ export function AiInsightsPanel({
   const coverage = analysis?.coverage ?? null;
   const evidence = analysis?.evidence ?? null;
   const guidance = analysis?.guidance ?? null;
+  const memory = analysis?.memory ?? null;
   const rooms = roomChecklist(coverage);
   const chips = evidenceChips(evidence);
+  // Inspection Memory — prior-visit context for this address, with gap
+  // highlights first. Only rendered once there is real history to remember.
+  const memoryShows = memory?.hasPriorVisits ? memoryShowRows(memory) : [];
   // Incremental progress copy — while a run is in flight we show how many of
   // the captured photos it is working through, so the technician sees the
   // batch advancing rather than a bare spinner.
@@ -468,6 +558,147 @@ export function AiInsightsPanel({
                 </Text>
               )}
             </Card>
+
+            {/* Inspection Memory — prior-visit context for THIS address (same
+                company only). Gap highlights come first (a previously-active area
+                not inspected today, a documented monitoring reference not
+                re-documented, a rodent area not photographed) and are the same
+                signals driving the memory-driven "next task" above. Everything
+                below the gaps is remembered verbatim from earlier visits — no
+                fabricated station numbers. Renders only when history exists. */}
+            {memory?.hasPriorVisits ? (
+              <Card style={{ gap: 12, borderColor: colors.warning, backgroundColor: colors.card }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="time" size={16} color={colors.warning} />
+                  <Text
+                    style={{
+                      color: colors.warning,
+                      fontFamily: "Inter_700Bold",
+                      fontSize: 13,
+                      letterSpacing: 0.6,
+                      flex: 1,
+                    }}
+                  >
+                    INSPECTION MEMORY
+                  </Text>
+                  <Badge
+                    label={`${memory.priorVisitCount} prior visit${memory.priorVisitCount === 1 ? "" : "s"}`}
+                    tone="warning"
+                  />
+                </View>
+
+                {memory.lastVisitDate ? (
+                  <Text
+                    style={{
+                      color: colors.mutedForeground,
+                      fontFamily: "Inter_400Regular",
+                      fontSize: 12,
+                    }}
+                  >
+                    Last visit {formatMemoryDate(memory.lastVisitDate)} · same address
+                  </Text>
+                ) : null}
+
+                {/* GAPS — the highlights, first and most prominent. */}
+                {memory.highlights.length > 0 ? (
+                  <View style={{ gap: 8 }}>
+                    <Text
+                      style={{
+                        color: colors.mutedForeground,
+                        fontFamily: "Inter_500Medium",
+                        fontSize: 11,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      GAPS VS. TODAY
+                    </Text>
+                    {memory.highlights.map((h) => (
+                      <View
+                        key={h.id}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "flex-start",
+                          gap: 10,
+                          backgroundColor: colors.accent,
+                          borderRadius: 10,
+                          borderLeftWidth: 3,
+                          borderLeftColor: colors.warning,
+                          padding: 10,
+                        }}
+                      >
+                        <Ionicons
+                          name={memoryHighlightIcon(h.type)}
+                          size={18}
+                          color={colors.warning}
+                        />
+                        <Text
+                          style={{
+                            color: colors.foreground,
+                            fontFamily: "Inter_500Medium",
+                            fontSize: 13,
+                            lineHeight: 18,
+                            flex: 1,
+                          }}
+                        >
+                          {h.message}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+                    <Text
+                      style={{
+                        color: colors.mutedForeground,
+                        fontFamily: "Inter_400Regular",
+                        fontSize: 13,
+                        lineHeight: 18,
+                        flex: 1,
+                      }}
+                    >
+                      Every remembered area has been re-covered today.
+                    </Text>
+                  </View>
+                )}
+
+                {/* SHOW — remembered prior-visit context, verbatim. */}
+                {memoryShows.map((row) => (
+                  <View
+                    key={row.key}
+                    style={{ gap: 6, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name={row.icon} size={14} color={colors.mutedForeground} />
+                      <Text
+                        style={{
+                          color: colors.mutedForeground,
+                          fontFamily: "Inter_500Medium",
+                          fontSize: 12,
+                        }}
+                      >
+                        {row.label}
+                      </Text>
+                    </View>
+                    <View style={{ gap: 4, paddingLeft: 20 }}>
+                      {row.values.map((v, i) => (
+                        <Text
+                          key={`${row.key}:${i}`}
+                          style={{
+                            color: colors.foreground,
+                            fontFamily: "Inter_400Regular",
+                            fontSize: 13,
+                            lineHeight: 18,
+                          }}
+                        >
+                          {v}
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </Card>
+            ) : null}
 
             {/* AI Inspection Engine — the consolidated, real-time state of the
                 live inspection. Progress, room classification and the evidence

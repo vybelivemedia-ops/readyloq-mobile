@@ -147,7 +147,12 @@ export interface GuidanceRecommendation {
     | "bait_stations"
     | "conducive"
     | "missing_evidence"
-    | "suggested_room";
+    | "suggested_room"
+    // Memory-driven tasks (grounded in real prior-visit detections at this
+    // address). Higher priority than generic capture tasks — see guidance-engine.
+    | "memory_rodent"
+    | "memory_bait"
+    | "memory_activity";
   /** Lower = higher priority; the next task is the lowest number in the queue. */
   priority: number;
   /** Imperative next task, e.g. "Inspect moisture sources (plumbing, drains, leaks)". */
@@ -171,6 +176,88 @@ export interface GuidanceSummary {
   queue: GuidanceRecommendation[];
   /** Count of tasks AFTER `next` (queue.length - 1, min 0) — drives "N more". */
   remaining: number;
+}
+
+/**
+ * Inspection Memory — prior-visit context for the CURRENT inspection at the same
+ * physical address (same company). Aggregated verbatim from earlier inspections'
+ * analysis rows; NEVER fabricated. The `highlights` are gap alerts comparing the
+ * remembered signals against what has been captured today, and they feed the Live
+ * Guidance Engine so the "next task" can be memory-driven.
+ *
+ * Honesty: there is no enumerated bait-station entity, so bait/monitoring memory
+ * is grounded in real prior rodent detections / monitoring references and is
+ * never numbered ("station #N").
+ */
+export interface InspectionMemory {
+  hasPriorVisits: boolean;
+  /** Number of prior inspections at this address (one per visit). */
+  priorVisitCount: number;
+  /** ISO date of the most recent prior visit, or null. */
+  lastVisitDate: string | null;
+  pestActivity: MemoryPestActivity[];
+  baitStations: MemoryBaitStation[];
+  entryPoints: MemoryEntryPoint[];
+  recommendations: MemoryNote[];
+  treatments: MemoryNote[];
+  highlights: MemoryHighlight[];
+}
+
+/** A pest species detected on prior visits, aggregated by species. */
+export interface MemoryPestActivity {
+  /** Lower-cased species for React keys. */
+  key: string;
+  /** Species as detected (first casing kept). */
+  label: string;
+  /** Zone slug of a representative finding, when known. */
+  zone: string | null;
+  /** Highest severity ever seen for this species. */
+  severity: string;
+  /** Number of prior findings of this species. */
+  visits: number;
+  /** ISO date last seen, or null. */
+  lastSeen: string | null;
+}
+
+/** A prior rodent-monitoring / bait-station reference (grounded, never numbered). */
+export interface MemoryBaitStation {
+  key: string;
+  /** Verbatim finding description of the monitoring reference. */
+  description: string;
+  zone: string | null;
+  lastSeen: string | null;
+}
+
+/** A prior entry point / exclusion opportunity. */
+export interface MemoryEntryPoint {
+  key: string;
+  description: string;
+  zone: string | null;
+  lastSeen: string | null;
+}
+
+/** A remembered free-text note (recommendation or treatment) with recency. */
+export interface MemoryNote {
+  key: string;
+  text: string;
+  lastSeen: string | null;
+}
+
+/**
+ * A gap alert: a prior-visit signal that today's inspection has not yet
+ * re-covered. Only zoned signals (finding.zone known) produce highlights — an
+ * unknown zone cannot be proven un-inspected.
+ */
+export interface MemoryHighlight {
+  /** Stable id, `${type}:${zone}`. */
+  id: string;
+  type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+  zone: string | null;
+  /** Human-readable zone / activity label. */
+  label: string;
+  /** Ready-to-display sentence. */
+  message: string;
+  lastSeen: string | null;
 }
 
 /**

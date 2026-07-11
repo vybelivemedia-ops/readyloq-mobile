@@ -2025,6 +2025,15 @@ components:
           $ref: "#/components/schemas/EvidenceSummary"
         guidance:
           $ref: "#/components/schemas/GuidanceSummary"
+        memory:
+          description: >-
+            Inspection Memory — prior-visit context for this address (same
+            company) plus gap highlights vs. what has been captured today. Only
+            populated on single-inspection scopes (POST /analyze, GET /:id, and
+            GET /?inspectionId=); null on the unfiltered list and other paths.
+          oneOf:
+            - $ref: "#/components/schemas/InspectionMemory"
+            - type: "null"
         overallConfidence: { type: ["number", "null"] }
         riskLevel:    { type: ["string", "null"] }
         technicianFeedback: { type: ["string", "null"] }
@@ -2117,6 +2126,89 @@ components:
           type: array
           items: { $ref: "#/components/schemas/GuidanceRecommendation" }
         remaining: { type: integer }
+
+    InspectionMemory:
+      type: object
+      description: >-
+        Prior-visit context for the CURRENT inspection at the same physical
+        address (same company), aggregated verbatim from earlier inspections'
+        analysis rows — never fabricated. `highlights` are gap alerts comparing
+        remembered signals against what has been captured today, and they feed
+        the Live Guidance Engine so the next task can be memory-driven.
+      required:
+        [hasPriorVisits, priorVisitCount, lastVisitDate, pestActivity, baitStations, entryPoints, recommendations, treatments, highlights]
+      properties:
+        hasPriorVisits:  { type: boolean }
+        priorVisitCount: { type: integer }
+        lastVisitDate:   { type: ["string", "null"] }
+        pestActivity:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryPestActivity" }
+        baitStations:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryBaitStation" }
+        entryPoints:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryEntryPoint" }
+        recommendations:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryNote" }
+        treatments:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryNote" }
+        highlights:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryHighlight" }
+
+    MemoryPestActivity:
+      type: object
+      required: [key, label, zone, severity, visits, lastSeen]
+      properties:
+        key:      { type: string }
+        label:    { type: string }
+        zone:     { type: ["string", "null"] }
+        severity: { type: string }
+        visits:   { type: integer }
+        lastSeen: { type: ["string", "null"] }
+
+    MemoryBaitStation:
+      type: object
+      required: [key, description, zone, lastSeen]
+      properties:
+        key:         { type: string }
+        description: { type: string }
+        zone:        { type: ["string", "null"] }
+        lastSeen:    { type: ["string", "null"] }
+
+    MemoryEntryPoint:
+      type: object
+      required: [key, description, zone, lastSeen]
+      properties:
+        key:         { type: string }
+        description: { type: string }
+        zone:        { type: ["string", "null"] }
+        lastSeen:    { type: ["string", "null"] }
+
+    MemoryNote:
+      type: object
+      required: [key, text, lastSeen]
+      properties:
+        key:      { type: string }
+        text:     { type: string }
+        lastSeen: { type: ["string", "null"] }
+
+    MemoryHighlight:
+      type: object
+      required: [id, type, zone, label, message, lastSeen]
+      properties:
+        id:      { type: string }
+        type:
+          type: string
+          enum: [area_not_inspected, bait_station_missing, rodent_area_not_photographed]
+        zone:    { type: ["string", "null"] }
+        label:   { type: string }
+        message: { type: string }
+        lastSeen: { type: ["string", "null"] }
 
     Finding:
       type: object

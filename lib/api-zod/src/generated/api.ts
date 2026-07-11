@@ -319,6 +319,49 @@ export const ListAnalysisResultsResponseItem = zod.object({
 })),
   "remaining": zod.number()
 }).optional().describe('Live Guidance Engine output. `next` is the single highest-priority next inspection task (null when nothing is pending). `queue` is the full prioritized list, sorted by priority, and includes `next` as its first element. `remaining` is the number of tasks AFTER `next` (queue.length - 1, min 0) — use it to drive an \"N more\" hint.'),
+  "memory": zod.union([zod.object({
+  "hasPriorVisits": zod.boolean(),
+  "priorVisitCount": zod.number(),
+  "lastVisitDate": zod.string().nullable(),
+  "pestActivity": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "zone": zod.string().nullable(),
+  "severity": zod.string(),
+  "visits": zod.number(),
+  "lastSeen": zod.string().nullable()
+})),
+  "baitStations": zod.array(zod.object({
+  "key": zod.string(),
+  "description": zod.string(),
+  "zone": zod.string().nullable(),
+  "lastSeen": zod.string().nullable()
+})),
+  "entryPoints": zod.array(zod.object({
+  "key": zod.string(),
+  "description": zod.string(),
+  "zone": zod.string().nullable(),
+  "lastSeen": zod.string().nullable()
+})),
+  "recommendations": zod.array(zod.object({
+  "key": zod.string(),
+  "text": zod.string(),
+  "lastSeen": zod.string().nullable()
+})),
+  "treatments": zod.array(zod.object({
+  "key": zod.string(),
+  "text": zod.string(),
+  "lastSeen": zod.string().nullable()
+})),
+  "highlights": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['area_not_inspected', 'bait_station_missing', 'rodent_area_not_photographed']),
+  "zone": zod.string().nullable(),
+  "label": zod.string(),
+  "message": zod.string(),
+  "lastSeen": zod.string().nullable()
+}))
+}).describe('Prior-visit context for the CURRENT inspection at the same physical address (same company), aggregated verbatim from earlier inspections\' analysis rows — never fabricated. `highlights` are gap alerts comparing remembered signals against what has been captured today, and they feed the Live Guidance Engine so the next task can be memory-driven.'),zod.null()]).optional().describe('Inspection Memory — prior-visit context for this address (same company) plus gap highlights vs. what has been captured today. Only populated on single-inspection scopes (POST \/analyze, GET \/:id, and GET \/?inspectionId=); null on the unfiltered list and other paths.'),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -461,6 +504,49 @@ export const GetAnalysisResultResponse = zod.object({
 })),
   "remaining": zod.number()
 }).optional().describe('Live Guidance Engine output. `next` is the single highest-priority next inspection task (null when nothing is pending). `queue` is the full prioritized list, sorted by priority, and includes `next` as its first element. `remaining` is the number of tasks AFTER `next` (queue.length - 1, min 0) — use it to drive an \"N more\" hint.'),
+  "memory": zod.union([zod.object({
+  "hasPriorVisits": zod.boolean(),
+  "priorVisitCount": zod.number(),
+  "lastVisitDate": zod.string().nullable(),
+  "pestActivity": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "zone": zod.string().nullable(),
+  "severity": zod.string(),
+  "visits": zod.number(),
+  "lastSeen": zod.string().nullable()
+})),
+  "baitStations": zod.array(zod.object({
+  "key": zod.string(),
+  "description": zod.string(),
+  "zone": zod.string().nullable(),
+  "lastSeen": zod.string().nullable()
+})),
+  "entryPoints": zod.array(zod.object({
+  "key": zod.string(),
+  "description": zod.string(),
+  "zone": zod.string().nullable(),
+  "lastSeen": zod.string().nullable()
+})),
+  "recommendations": zod.array(zod.object({
+  "key": zod.string(),
+  "text": zod.string(),
+  "lastSeen": zod.string().nullable()
+})),
+  "treatments": zod.array(zod.object({
+  "key": zod.string(),
+  "text": zod.string(),
+  "lastSeen": zod.string().nullable()
+})),
+  "highlights": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['area_not_inspected', 'bait_station_missing', 'rodent_area_not_photographed']),
+  "zone": zod.string().nullable(),
+  "label": zod.string(),
+  "message": zod.string(),
+  "lastSeen": zod.string().nullable()
+}))
+}).describe('Prior-visit context for the CURRENT inspection at the same physical address (same company), aggregated verbatim from earlier inspections\' analysis rows — never fabricated. `highlights` are gap alerts comparing remembered signals against what has been captured today, and they feed the Live Guidance Engine so the next task can be memory-driven.'),zod.null()]).optional().describe('Inspection Memory — prior-visit context for this address (same company) plus gap highlights vs. what has been captured today. Only populated on single-inspection scopes (POST \/analyze, GET \/:id, and GET \/?inspectionId=); null on the unfiltered list and other paths.'),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
@@ -569,6 +655,49 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
 })),
   "remaining": zod.number()
 }).optional().describe('Live Guidance Engine output. `next` is the single highest-priority next inspection task (null when nothing is pending). `queue` is the full prioritized list, sorted by priority, and includes `next` as its first element. `remaining` is the number of tasks AFTER `next` (queue.length - 1, min 0) — use it to drive an \"N more\" hint.'),
+  "memory": zod.union([zod.object({
+  "hasPriorVisits": zod.boolean(),
+  "priorVisitCount": zod.number(),
+  "lastVisitDate": zod.string().nullable(),
+  "pestActivity": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "zone": zod.string().nullable(),
+  "severity": zod.string(),
+  "visits": zod.number(),
+  "lastSeen": zod.string().nullable()
+})),
+  "baitStations": zod.array(zod.object({
+  "key": zod.string(),
+  "description": zod.string(),
+  "zone": zod.string().nullable(),
+  "lastSeen": zod.string().nullable()
+})),
+  "entryPoints": zod.array(zod.object({
+  "key": zod.string(),
+  "description": zod.string(),
+  "zone": zod.string().nullable(),
+  "lastSeen": zod.string().nullable()
+})),
+  "recommendations": zod.array(zod.object({
+  "key": zod.string(),
+  "text": zod.string(),
+  "lastSeen": zod.string().nullable()
+})),
+  "treatments": zod.array(zod.object({
+  "key": zod.string(),
+  "text": zod.string(),
+  "lastSeen": zod.string().nullable()
+})),
+  "highlights": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['area_not_inspected', 'bait_station_missing', 'rodent_area_not_photographed']),
+  "zone": zod.string().nullable(),
+  "label": zod.string(),
+  "message": zod.string(),
+  "lastSeen": zod.string().nullable()
+}))
+}).describe('Prior-visit context for the CURRENT inspection at the same physical address (same company), aggregated verbatim from earlier inspections\' analysis rows — never fabricated. `highlights` are gap alerts comparing remembered signals against what has been captured today, and they feed the Live Guidance Engine so the next task can be memory-driven.'),zod.null()]).optional().describe('Inspection Memory — prior-visit context for this address (same company) plus gap highlights vs. what has been captured today. Only populated on single-inspection scopes (POST \/analyze, GET \/:id, and GET \/?inspectionId=); null on the unfiltered list and other paths.'),
   "overallConfidence": zod.number().nullish(),
   "riskLevel": zod.string().nullish(),
   "technicianFeedback": zod.string().nullish(),
