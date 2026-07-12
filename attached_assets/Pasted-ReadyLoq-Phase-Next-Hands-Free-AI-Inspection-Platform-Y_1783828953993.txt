@@ -1,0 +1,99 @@
+ReadyLoq Phase Next – Hands-Free AI Inspection Platform
+
+You are extending the existing ReadyLoq Expo React Native application.
+
+This is a major architectural expansion.
+
+Do not immediately begin coding.
+
+Phase A – Architecture Review (Required)
+
+Before implementing anything:
+	1.	Audit the existing codebase.
+	2.	Verify all existing architecture relevant to this work.
+	3.	Confirm:
+	•	Offline-first sync
+	•	AI State Engine
+	•	Camera Provider Abstraction
+	•	Provider Registry
+	•	Evidence Pipeline
+	•	AI Guidance Engine
+	•	Inspection Memory
+	•	Live Report Builder
+	4.	Identify reusable components.
+	5.	Identify architectural conflicts.
+	6.	Produce an implementation plan.
+	7.	Estimate complexity.
+	8.	Identify required native dependencies.
+	9.	Identify features requiring a new EAS build.
+	10.	Do not modify code during this phase.
+
+Only after the architecture review is complete should implementation begin.
+
+⸻
+
+Phase B – Implementation
+
+Implement the following while preserving the existing architecture.
+
+(Then include your entire specification exactly as written from Goal through Deliverables.)
+
+⸻
+
+Implementation Rules
+
+Implement incrementally.
+
+Complete one subsystem before beginning the next.
+
+Recommended order:
+	1.	Voice Intelligence Engine
+	2.	Meta Smart Glasses Provider
+	3.	Auto Capture Engine
+	4.	AI Measurement Engine
+
+After completing each subsystem:
+	•	Run typecheck
+	•	Run unit tests
+	•	Run regression tests
+	•	Verify no architectural regressions
+	•	Update OpenAPI when required
+	•	Regenerate generated clients
+	•	Produce a short implementation summary before continuing
+
+⸻
+
+Final Deliverable
+
+Produce a final report including:
+	•	Architecture changes
+	•	New interfaces
+	•	New providers
+	•	New services
+	•	Database/schema updates
+	•	API updates
+	•	Mobile UI updates
+	•	Background workers
+	•	Integration points
+	•	OpenAPI updates
+	•	Generated types
+	•	Performance impact
+	•	Battery impact
+	•	Memory impact
+	•	Scalability impact
+	•	Test results
+	•	Remaining future work
+
+Do not rewrite working systems.
+
+Extend the platform cleanly using the existing dependency architecture.
+
+⸻
+
+The main reason for this change is that it prevents the agent from trying to tackle everything in one giant pass. It encourages it to:
+	1.	verify the existing architecture,
+	2.	implement one subsystem at a time,
+	3.	test after each subsystem, and
+	4.	only then move on.
+
+That approach is more likely to preserve the stability of your existing app while adding these major capabilities.
