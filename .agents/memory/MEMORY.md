@@ -10,3 +10,4 @@
 - [Coverage model](readyloq-coverage-model.md) — zone completeness; live & finalize must agree on same inputs; async-dedupe carry-over keeps still-saved photos' zone+finding
 - [Offline sync two-writer rule](offline-sync-two-writers.md) — all local-record writes must be serialized merge-updates; sync single-flight; inspections finish "completed" but reports "complete"
 - [Camera/vision extensibility](readyloq-camera-extensibility.md) — abstraction IMPLEMENTED: capability model (pull/stream/push) + provider-registry + reserved future-source stubs; only native drivers + session lifecycle remain
+- [Gemini AI integration wiring](gemini-ai-wiring.md) — Replit-managed proxy (no user key); @google/genai must be a direct api-server dep because esbuild externalizes @google/* and pnpm doesn't hoist it

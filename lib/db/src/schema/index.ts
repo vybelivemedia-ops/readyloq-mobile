@@ -15,3 +15,5 @@ export * from "./opportunities";
 export * from "./scorecards";
 export * from "./customer-summaries";
 export * from "./proposals";
+export * from "./conversations";
+export * from "./messages";

@@ -25,6 +25,7 @@ import customerSummariesRouter from "./customer-summaries";
 import proposalsRouter from "./proposals";
 import briefingRouter from "./briefing";
 import shareRouter from "./share";
+import geminiRouter from "./gemini";
 
 const router: IRouter = Router();
 
@@ -111,5 +112,8 @@ router.use(
   requireRole("sales"),
   proposalsRouter,
 );
+// Gemini AI — chat conversations and image generation. Available to all
+// authenticated beta users (no role restriction — used by Phase Next AI engines).
+router.use("/gemini", requireAuth, requireCompany, requireBetaAccess, geminiRouter);
 
 export default router;
