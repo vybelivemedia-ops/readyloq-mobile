@@ -10,93 +10,38 @@
  * dumb capture adapters; ALL business logic (persist → sync → analyze) stays
  * outside this module.
  *
- * The abstraction has three layers:
- *   1. `EvidenceItem`      — the universal, source-agnostic output (never change).
- *   2. capability model    — how a source produces evidence (pull / stream / push).
- *   3. provider registry   — runtime discovery (see provider-registry.ts).
- * Adding a new camera = implementing one provider + one registry definition;
- * nothing downstream of `EvidenceItem` changes.
+ * PLATFORM MIGRATION (Phase 1 — @platform/shared-types):
+ *   The foundational types (CaptureSource, EvidenceItem, QualityAssessment,
+ *   CaptureMode, CaptureTransport, PreviewKind, CaptureCapabilities) are now
+ *   canonical in @platform/shared-types. This file re-exports them from there
+ *   so all existing `import { X } from "./types"` callers continue to work
+ *   without any changes.
+ *
+ *   Camera-specific provider contracts (ProviderStatus, ProviderAvailability,
+ *   EvidenceIntake, RequestCaptureProvider, SessionCaptureProvider, etc.) remain
+ *   here until Phase 2 (→ @platform/camera-core).
  */
 
-/**
- * Where a piece of evidence physically came from. Stored on the server row
- * (`inspection_media.capture_source`) for provenance and per-source analytics.
- * Tier 1 ships `phone_camera` and `media_import`; the rest are reserved so the
- * schema never needs a migration when new providers land.
- */
-export type CaptureSource =
-  | "phone_camera" // live capture via the in-app camera
-  | "media_import" // imported from the device library (GoPro, glasses, drone…)
-  | "wifi_stream" // future: direct Wi-Fi preview/pull from an action/drone cam
-  | "usb_camera" // future: UVC borescope / endoscope over USB-OTG
-  | "smart_glasses" // future: paired glasses SDK (Meta Ray-Ban)
-  | "wearable_camera"; // future: body-cam / other wearables
+import type {
+  CaptureCapabilities,
+  CaptureSource,
+  EvidenceItem,
+  PreviewKind,
+} from "@platform/shared-types";
 
-/** A single captured/imported piece of evidence, pre-upload. */
-export type EvidenceItem = {
-  /** Local file URI (may live in a cache dir — persist it immediately). */
-  uri: string;
-  source: CaptureSource;
-  /** ISO timestamp of capture/import. */
-  capturedAt: string;
-  /** Pixel dimensions when the provider knows them. */
-  width?: number;
-  height?: number;
-  /** File size in bytes when the provider knows it. */
-  fileSize?: number;
-  /**
-   * Provider-specific context (EXIF, original filename, device model, GPS,
-   * source-side asset id for idempotent re-pulls…). Persisted verbatim to
-   * `inspection_media.capture_metadata`.
-   */
-  metadata?: Record<string, unknown>;
-};
+// ─── Re-export platform-canonical types ──────────────────────────────────────
+// All callers that do `import { X } from "./types"` continue to work unchanged.
+export type {
+  CaptureSource,
+  EvidenceItem,
+  QualityAssessment,
+  CaptureMode,
+  CaptureTransport,
+  PreviewKind,
+  CaptureCapabilities,
+} from "@platform/shared-types";
 
-/** Result of the on-device quality gate. Advisory only — never blocks capture. */
-export type QualityAssessment = {
-  /** 0–100. Higher is better. */
-  score: number;
-  /** False when the evidence is likely too poor for reliable AI analysis. */
-  acceptable: boolean;
-  /** Human-readable reasons (shown to the technician as a warning). */
-  reasons: string[];
-};
-
-// ─── Capability model ───────────────────────────────────────────────────────
-// Describes HOW a source delivers evidence, so the capture UI can render the
-// right controls (shutter vs. connect+grab vs. "listening for device") without
-// knowing anything about the specific hardware.
-
-/**
- * - `request_response`: app asks, gets a finite result now (phone, library import,
- *   USB/Wi-Fi still-grab). Implements `RequestCaptureProvider`.
- * - `session_stream`: connection-oriented live feed; app grabs frames on demand
- *   (USB scope, Wi-Fi/drone). Implements `SessionCaptureProvider`.
- * - `async_push`: the DEVICE initiates; evidence arrives later, out of band,
- *   possibly while the capture screen is closed (glasses, wearables).
- *   Implements `PushCaptureProvider`.
- */
-export type CaptureMode = "request_response" | "session_stream" | "async_push";
-
-/** Physical transport a source uses — drives availability probing + permissions. */
-export type CaptureTransport =
-  | "on_device"
-  | "on_device_library"
-  | "usb"
-  | "wifi"
-  | "ble"
-  | "cloud";
-
-/** How the capture screen should render this source's live preview, if any. */
-export type PreviewKind = "native_camera" | "stream_url" | "none";
-
-export type CaptureCapabilities = {
-  mode: CaptureMode;
-  transport: CaptureTransport;
-  hasLivePreview: boolean;
-  producesVideo: boolean;
-  requiresPairing: boolean;
-};
+// ─── Camera-specific provider contracts (Phase 2 → @platform/camera-core) ───
 
 /** Whether a source is usable on THIS device right now. */
 export type ProviderAvailability =
