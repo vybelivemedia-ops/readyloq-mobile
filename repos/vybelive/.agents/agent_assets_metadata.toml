@@ -1,0 +1,133 @@
+uploads = []
+
+[[generated]]
+id = "NDZ51VWRzpDZZIFZ1RgyI"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "khcnRNwYMXRETwtlSc7I8"
+uri = "file://artifacts/mobile/assets/images/pov_hero.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "G3dB-CI65wZnG_14khSZL"
+uri = "file://artifacts/mobile/assets/images/dashboard_hero.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "e-dw85DlUaaI_Eyif4DR8"
+uri = "file://artifacts/website/public/images/hero-bg.png"
+type = "image"
+title = "Hero background cinematic car meet"
+
+[[generated]]
+id = "1MRrWJItzj-YkACT2ml5P"
+uri = "file://artifacts/website/public/images/dashboard-mockup.png"
+type = "image"
+title = "Broadcast control room dashboard"
+
+[[generated]]
+id = "Tz2b54TxPSz0PNyLL8iPr"
+uri = "file://artifacts/website/public/images/creator-action.png"
+type = "image"
+title = "Creator live streaming night urban"
+
+[[generated]]
+id = "a3Cb73bYhfxGiv2Bv9QWJ"
+uri = "file://attached_assets/generated_images/app_icon_512x512_pure_65a1.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "tXp9wFsn94dRlK8Re-smQ"
+uri = "file://attached_assets/generated_images/google_play_feature_graphic_406b.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "fjhbH-FtGw-4BPp8tM4ib"
+uri = "file://attached_assets/generated_images/play_feature_v1.png"
+type = "image"
+title = "play store feature graphic v1"
+
+[[generated]]
+id = "7BukMrv77HLESMf9lSfkf"
+uri = "file://attached_assets/generated_images/play_feature_v2.png"
+type = "image"
+title = "play store feature graphic v2"
+
+[[generated]]
+id = "7u2LnqyVBAnniyoQbpZb_"
+uri = "file://attached_assets/generated_images/play_feature_v3.png"
+type = "image"
+title = "play store feature graphic v3"
+
+[[outputs]]
+id = "_ltBsOBWZoMkfb2Ff54JU"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "VYBE LIVE App Icon — 1024×1024 PNG"
+
+[[outputs]]
+id = "CO_97qDJ5GRDLz7S5jydO"
+uri = "file://artifacts/website/public/brand/vybe-v-logo.svg"
+type = "image"
+title = "V Logo — SVG (transparent background)"
+
+[[outputs]]
+id = "Tw6btn48Ka1J3aZJOlB4r"
+uri = "file://artifacts/website/public/brand/vybe-v-logo-on-black.svg"
+type = "image"
+title = "V Logo on Black — SVG"
+
+[[outputs]]
+id = "FpbgAIGUBLuI_HlCcBd9R"
+uri = "file://attached_assets/generated_images/play_feature_v1.png"
+type = "image"
+title = "Variation 1 — V emerging from darkness"
+
+[[outputs]]
+id = "dYHtqzeUTH3iWyAyS_r3p"
+uri = "file://attached_assets/generated_images/play_feature_v2.png"
+type = "image"
+title = "Variation 2 — Cinematic energy beams"
+
+[[outputs]]
+id = "LtjNysdq0dpZakSqlo_97"
+uri = "file://attached_assets/generated_images/play_feature_v3.png"
+type = "image"
+title = "Variation 3 — Blade Runner POV viewfinder"
+
+[[outputs]]
+id = "LeUkqwvdpRCGOI6hm29YV"
+uri = "file://.local/expo-dev-qr.png"
+type = "image"
+title = "VYBE LIVE — Expo dev-client QR"
+
+[[outputs]]
+id = "Ip_OXwVNmbkjXcvClnLt_"
+uri = "file://docs/platform-integration-audit.md"
+type = "text"
+title = "VYBE LIVE — Platform Integration Audit"
+
+[[outputs]]
+id = "tuVYsNVTDy3jrV7W-9-qr"
+uri = "file://docs/android16-fold7-crash-audit.md"
+type = "text"
+title = "Android 16 / Fold 7 Crash Audit"
+
+[[outputs]]
+id = "laD3Ugz72zC2j4Hnb9Igw"
+uri = "file://docs/meta-integration-audit.md"
+type = "text"
+title = "VYBE LIVE — Meta Integration Audit"
+
+[[outputs]]
+id = "17cKERwiyT_CHohPnMTWb"
+uri = "file://docs/shared-library-extraction-analysis.md"
+type = "text"
+title = "Shared-Library Extraction Analysis"

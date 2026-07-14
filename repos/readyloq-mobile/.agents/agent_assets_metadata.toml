@@ -1,0 +1,85 @@
+uploads = []
+
+[[generated]]
+id = "OoVBpmERVPj2GcynjwLmR"
+uri = "file://artifacts/readyloq/public/suburban-logo.png"
+type = "image"
+title = "suburban pest logo"
+
+[[generated]]
+id = "Vko-FSG9W-JYcRVEOaBio"
+uri = "file://artifacts/readyloq-marketing/public/hero-bg.png"
+type = "image"
+title = "Hero data visualization"
+
+[[generated]]
+id = "zGBqoRidEGF8-sx4sesEF"
+uri = "file://artifacts/readyloq-marketing/public/product-mockup.png"
+type = "image"
+title = "Product UI Mockup"
+
+[[generated]]
+id = "mPxTkMVkUFKqvLxiCXoyq"
+uri = "file://artifacts/readyloq-marketing/public/og-image.png"
+type = "image"
+title = "OG Social Share Image"
+
+[[generated]]
+id = "amJ0YGyl2zqbCRHTFLrHX"
+uri = "file://artifacts/readyloq-marketing/public/logo.png"
+type = "image"
+title = "Logo Wordmark"
+
+[[generated]]
+id = "T7K1AI2YLLOumCt3TQONJ"
+uri = "file://artifacts/readyloq-marketing/public/favicon.png"
+type = "image"
+title = "Favicon Icon"
+
+[[generated]]
+id = "34l7_JzCW0iaoVE1C4W6o"
+uri = "file://artifacts/readyloq-app/assets/images/icon.png"
+type = "image"
+title = "readyloq app icon"
+
+[[outputs]]
+id = "i6CwXwoiNjRQh1-d1y2oH"
+uri = "file://closed-beta-readiness-audit.md"
+type = "text"
+title = "ReadyLoq — Closed Beta Readiness Audit"
+
+[[outputs]]
+id = "t9tTpfKdxDG6okr-6iIdv"
+uri = "file://readyloq-source.tar.gz"
+type = "unspecified"
+title = "ReadyLoq — Full Source Code"
+
+[[outputs]]
+id = "tmqSGHG8r3mvrB8imrBWU"
+uri = "file://readyloq-native-app.zip"
+type = "unspecified"
+title = "ReadyLoq native app (versionCode 6) — EAS build package"
+
+[[outputs]]
+id = "sn1Casd3UQhTpnKL4qsOG"
+uri = "file://exports/readyloq-beta-0.9.0-apk-qr.png"
+type = "image"
+title = "ReadyLoq Beta 0.9.0 — APK Download QR Code"
+
+[[outputs]]
+id = "g-sSxtm_NYzgzhsvtd2Pi"
+uri = "file://exports/readyloq-beta-0.9.0-build8-apk-qr.png"
+type = "image"
+title = "ReadyLoq Beta 0.9.0 (build 8) — fixed APK download QR"
+
+[[outputs]]
+id = "x5J4n3zLT92e27HpjA5XZ"
+uri = "file://exports/readyloq-beta-0.9.0-build9-apk-qr.png"
+type = "image"
+title = "ReadyLoq Beta 0.9.0 (build 9) — production-auth APK download QR"
+
+[[outputs]]
+id = "hWG1UXLPtqG0b5cNRQAFq"
+uri = "file://exports/readyloq-beta-0.9.0-build10-apk-qr.png"
+type = "image"
+title = "Build 10 APK — install QR code"

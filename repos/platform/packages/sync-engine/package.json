@@ -1,0 +1,20 @@
+{
+  "name": "@platform/sync-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline-first sync engine — 6-step resumable pipeline, debounced queue, single-flight guard, exponential backoff",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@platform/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

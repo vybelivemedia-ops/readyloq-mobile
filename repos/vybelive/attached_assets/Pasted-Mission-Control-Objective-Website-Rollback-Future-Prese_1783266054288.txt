@@ -1,0 +1,121 @@
+Mission Control Objective — Website Rollback & Future Preservation
+
+Objective:
+
+Restore the VYBE Live landing page while preserving the current VYBE 2.0 website for the future.
+
+This is not a rollback because the work was bad.
+
+It is a strategic product decision.
+
+Context
+
+Our immediate company objective is launching VYBE Live.
+
+The website should support today's launch rather than tomorrow's vision.
+
+The current VYBE 2.0 website represents our long-term roadmap and should not be lost.
+
+It should become the official post-launch website.
+
+Requirements
+
+Phase 1 — Preserve Current Website
+
+Before changing anything:
+
+Locate the current landing page.
+Preserve every asset.
+Preserve every component.
+Preserve animations.
+Preserve copy.
+Preserve styling.
+Preserve routing.
+Create a dedicated branch named something like:
+
+website-v2-launch
+
+or
+
+post-launch-website
+
+This branch becomes the future VYBE 2.0 website.
+
+Do not delete anything.
+
+Phase 2 — Restore Previous Landing Page
+
+Locate the last stable landing page that focused on VYBE Live.
+
+Restore it as the production landing page.
+
+Restore:
+
+Homepage
+Hero
+Navigation
+CTA buttons
+Beta messaging
+Creator messaging
+Feature highlights
+Maintain:
+
+Analytics
+SEO
+Performance
+Existing routing
+Existing integrations
+Phase 3 — Compare
+
+Produce a report containing:
+
+Current branch
+Backup branch
+Commit restored from
+Files changed
+Components restored
+Components preserved
+Any merge conflicts
+Any missing assets
+Phase 4 — Verify
+
+Verify:
+
+✓ Site builds
+
+✓ No broken routes
+
+✓ Beta signup still functions
+
+✓ Mobile responsive
+
+✓ Desktop responsive
+
+✓ Lighthouse unaffected
+
+Future Milestone
+
+Do NOT merge the VYBE 2.0 branch.
+
+Instead mark it as:
+
+Post Launch Website
+
+Mission Control should recommend deploying this version only after Founder approval and once VYBE Live reaches its launch milestones.
+
+Success Criteria
+
+At completion we should have:
+
+Production website focused on VYBE Live.
+Complete VYBE 2.0 website safely preserved.
+Ability to deploy the VYBE 2.0 website later with minimal effort.
+No loss of work.
+No broken functionality.
+This is a strategic rollback, not a feature removal. Preserve all future work while optimizing the public website for the current launch phase. Phase 5 — Update Calls to Action
+Before preserving the VYBE 2.0 website:
+Remove all "Join the Beta" messaging.
+Remove beta waitlist references.
+Remove beta countdowns or launch-soon messaging.
+Replace CTAs with production-ready actions appropriate for a post-launch website.
+Preserve the design and functionality while making the copy consistent with a live platform.

@@ -1,0 +1,33 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["APPLE_TEAM_ID.com.vybelive.app"],
+        "components": [
+          {
+            "/": "/invite/*",
+            "comment": "Creator invite links"
+          },
+          {
+            "/": "/stream/*",
+            "comment": "Stream deep links"
+          },
+          {
+            "/": "/profile/*",
+            "comment": "Creator profile links"
+          },
+          {
+            "/": "/clip/*",
+            "comment": "AI clip share links"
+          },
+          {
+            "/": "/*"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["APPLE_TEAM_ID.com.vybelive.app"]
+  }
+}

@@ -1,0 +1,70 @@
+Update the entire VYBE LIVE website to reflect the current product and roadmap.
+
+Remove messaging that describes VYBE LIVE as a traditional livestreaming platform where viewers simply watch creators.
+
+Position VYBE LIVE as:
+
+"The POV Creator Platform"
+
+Core messaging:
+
+Create. Stream. Clip. Publish.
+
+VYBE LIVE helps creators stream from the devices they already use, including phones, GoPro cameras, Meta AI Glasses, and RTMP sources.
+
+Key Features Section:
+
+• POV Streaming
+Go live from your perspective using mobile devices, GoPro cameras, Meta AI Glasses, and external RTMP sources.
+
+• Multi-Platform Broadcasting
+Broadcast to multiple platforms simultaneously from a single stream.
+
+• AI Clip Generation
+Automatically create short-form content from livestreams for TikTok, Reels, Shorts, and other social platforms.
+
+• Creator Dashboard
+Track streams, clips, engagement, followers, and watch time.
+
+• Mobile First
+Built specifically for creators who stream from the field, outdoors, events, jobsites, travel, sports, and real-world environments.
+
+• Hardware Integration
+Supports Phone Camera, GoPro, Meta AI Glasses, and RTMP workflows.
+
+Homepage Hero Section:
+
+Headline:
+The Future of POV Creator Streaming
+
+Subheadline:
+Stream from your phone, GoPro, Meta AI Glasses, or RTMP source. Generate AI-powered clips and broadcast everywhere from one platform.
+
+Primary CTA:
+Join the Beta
+
+Secondary CTA:
+Become a Creator
+
+Add a Roadmap Section showing:
+
+✓ Mobile App Prototype Complete
+✓ AI Clip System Complete
+✓ Google Play Developer Verification Complete
+✓ Meta Wearables Integration Complete
+✓ GoPro Integration In Progress
+✓ Internal Beta Testing Coming Soon
+
+Add a Founder Vision Section:
+
+VYBE LIVE was built for creators who live in the moment. Whether you're working, exploring, competing, traveling, teaching, or creating content, VYBE LIVE turns your point of view into a stream, clips, and content that can be shared anywhere.
+
+Use premium modern styling with dark mode, neon purple accents, glass effects, subtle motion, and a creator-tech aesthetic similar to high-end startup landing pages.
+
+Add screenshots and mock device sections highlighting:
+Phone Camera
+GoPro
+Meta AI Glasses
+External RTMP
+
+Focus the website on creators, POV content, AI clips, and wearable streaming technology.

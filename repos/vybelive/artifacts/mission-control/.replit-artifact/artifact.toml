@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/mission-control/"
+title = "Mission Control"
+version = "1.0.0"
+id = "artifacts/mission-control"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/mission-control/" ]
+localPort = 26054
+
+[services.development]
+run = "pnpm --filter @workspace/mission-control run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mission-control", "run", "build" ]
+publicDir = "artifacts/mission-control/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26054"
+BASE_PATH = "/mission-control/"

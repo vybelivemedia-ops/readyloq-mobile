@@ -1,0 +1,7 @@
+{
+  "branch": "oauth-investigation",
+  "commitSha": "ac48917f80f40ff0b64dc7c263eb9a8422f6c8db",
+  "commitMessage": "Audit app launch failure on specific Android version and device",
+  "buildTimestamp": "2026-07-08T11:55:25.571Z",
+  "workingTreeStatus": "dirty"
+}

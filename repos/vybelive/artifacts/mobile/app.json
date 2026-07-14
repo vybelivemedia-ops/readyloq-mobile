@@ -1,0 +1,111 @@
+{
+  "expo": {
+    "name": "VYBE LIVE",
+    "slug": "mobile",
+    "version": "0.9.18",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "mobile",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/366cc65d-37c8-4d47-800e-f9a309a74e51",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#070311"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.vybelive.app",
+      "associatedDomains": ["applinks:getvybe.live", "webcredentials:getvybe.live"],
+      "infoPlist": {
+        "NSCameraUsageDescription": "VYBE LIVE uses your camera to stream live video.",
+        "NSMicrophoneUsageDescription": "VYBE LIVE uses your microphone to stream live audio.",
+        "NSBluetoothAlwaysUsageDescription": "VYBE LIVE uses Bluetooth to route audio to wireless headsets during live streams.",
+        "NSLocalNetworkUsageDescription": "VYBE LIVE uses the local network to measure connection quality during live streams."
+      }
+    },
+    "android": {
+      "package": "com.vybelive.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#070311"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.BLUETOOTH",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "versionCode": 122,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [{ "scheme": "https", "host": "getvybe.live" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-dev-client",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "VYBE LIVE uses your camera to stream live video.",
+          "microphonePermission": "VYBE LIVE uses your microphone to stream live audio.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.4"
+          },
+          "android": {
+            "minSdkVersion": 24
+          }
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "VYBE LIVE uses your microphone for hands-free voice commands while streaming.",
+          "speechRecognitionPermission": "VYBE LIVE uses speech recognition to detect your trigger phrases and mark stream highlights hands-free.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "366cc65d-37c8-4d47-800e-f9a309a74e51"
+      }
+    }
+  }
+}

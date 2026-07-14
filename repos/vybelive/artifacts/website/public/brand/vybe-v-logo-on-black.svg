@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <title>VYBE LIVE — V Logo on Black</title>
+  <rect width="200" height="200" fill="#070311"/>
+  <defs>
+    <linearGradient id="brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#7c3aed"/>
+      <stop offset="35%"  stop-color="#a855f7"/>
+      <stop offset="75%"  stop-color="#d946ef"/>
+      <stop offset="100%" stop-color="#f0abfc"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- V centered: 116px wide at scale 1.16, height 102px; offset: x=42, y=49 -->
+  <g transform="translate(42,49) scale(1.16)">
+    <path d="M 0,0 L 18,0 L 50,68 L 82,0 L 100,0 L 56,88 L 44,88 Z"
+          fill="url(#brand-grad)" filter="url(#glow)"/>
+  </g>
+</svg>

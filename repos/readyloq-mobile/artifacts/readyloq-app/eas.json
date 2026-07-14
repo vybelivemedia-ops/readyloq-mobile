@@ -1,0 +1,47 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "node": "22.14.0",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "f5b8311f-07a6-49b2-9f87-232606205230-00-3rzmd0y2q5x6t.spock.replit.dev",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_c3VwZXJiLXNrdW5rLTYzLmNsZXJrLmFjY291bnRzLmRldiQ"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "node": "22.14.0",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "readyloq.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsucmVhZHlsb3EuY29tJA",
+        "EXPO_PUBLIC_CLERK_PROXY_URL": "https://readyloq.com/api/__clerk"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "node": "22.14.0",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "readyloq.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsucmVhZHlsb3EuY29tJA",
+        "EXPO_PUBLIC_CLERK_PROXY_URL": "https://readyloq.com/api/__clerk"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

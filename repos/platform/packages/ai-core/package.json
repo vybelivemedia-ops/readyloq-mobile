@@ -1,0 +1,20 @@
+{
+  "name": "@platform/ai-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Generic AI infrastructure only — AIProvider interface, multi-provider fallback factory, confidence scoring (0–1), detection/evidence/measurement models. No domain logic.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@platform/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

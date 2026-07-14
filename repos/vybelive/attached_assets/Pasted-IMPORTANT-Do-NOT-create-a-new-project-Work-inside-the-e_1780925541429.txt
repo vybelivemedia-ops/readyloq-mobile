@@ -1,0 +1,97 @@
+IMPORTANT: Do NOT create a new project.
+
+Work inside the existing VYBE LIVE codebase.
+
+Goal:
+Create a professional public-facing marketing website for VYBE LIVE while preserving all existing application functionality, authentication, routing, streaming features, and current code.
+
+Requirements:
+	1.	Keep all current VYBE LIVE app functionality intact.
+	2.	Create a public landing page at the root domain.
+	3.	Add the following sections using existing VYBE branding and logo:
+
+Hero Section
+Headline:
+“Stream Once. Reach Everyone.”
+
+Subheadline:
+“VYBE LIVE allows creators to livestream to multiple platforms from a single app.”
+
+CTA Buttons:
+	•	Join Beta
+	•	Contact Us
+
+Section: What is VYBE LIVE?
+
+VYBE LIVE is a multi-platform livestreaming platform that allows creators to connect their social media accounts and broadcast to multiple destinations from one application.
+
+Section: Features
+	•	Multi-Platform Streaming
+	•	Creator Dashboard
+	•	Social Platform Integration
+	•	Analytics & Insights
+	•	Mobile-First Streaming
+
+Section: Who Uses VYBE LIVE
+	•	Content Creators
+	•	Car Meets
+	•	Fitness Instructors
+	•	Performers
+	•	Event Organizers
+	•	Businesses
+
+Section: Launching Soon
+
+Include beta signup form.
+
+Section: About VYBE LIVE
+
+Explain the mission:
+
+“VYBE LIVE was created to simplify livestreaming and help creators reach audiences across multiple platforms without managing multiple apps.”
+
+Section: Contact
+
+info@getvybe.live
+
+https://getvybe.live
+	4.	Create pages for:
+
+	•	Privacy Policy
+	•	Terms of Service
+	•	About
+	•	Contact
+
+	5.	Footer:
+
+© 2026 VYBE LIVE MEDIA LLC
+	6.	SEO
+
+Meta Title:
+VYBE LIVE | Multi-Platform Livestreaming
+
+Meta Description:
+Stream to multiple social media platforms from one app. VYBE LIVE helps creators go live everywhere.
+	7.	Stripe Compliance Goal
+
+The website must clearly explain:
+	•	What VYBE LIVE does
+	•	Who the customers are
+	•	What users pay for
+	•	That VYBE LIVE is a software subscription platform
+
+Add text:
+
+“VYBE LIVE is a software subscription platform that provides livestreaming and creator tools for content creators and businesses.”
+	8.	Preserve Existing App
+
+Do not remove, replace, or break:
+	•	Authentication
+	•	OAuth
+	•	Messaging
+	•	Streaming
+	•	Analytics
+	•	Navigation
+	•	Current backend integrations
+
+Add the marketing website alongside the existing application architecture.

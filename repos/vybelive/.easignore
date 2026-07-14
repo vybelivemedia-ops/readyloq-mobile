@@ -1,0 +1,15 @@
+node_modules
+.git
+.local
+.cache
+.pythonlibs
+.config
+.agents
+.claude
+attached_assets
+screenshots
+docs
+artifacts/api-server/dist
+artifacts/*/dist
+*.log
+.env*

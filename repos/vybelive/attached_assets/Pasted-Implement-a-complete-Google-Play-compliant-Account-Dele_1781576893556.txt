@@ -1,0 +1,245 @@
+Implement a complete Google Play compliant Account Deletion and Account Lifecycle Management system for VYBE LIVE.
+
+ACCOUNT DELETION PAGE
+
+Create a public webpage:
+
+https://getvybe.live/delete-account
+
+Requirements:
+
+* Publicly accessible without login.
+* Linked from website footer.
+* Linked from Privacy Policy.
+* Explain account deletion process.
+* Explain what data is deleted.
+* Explain any retention periods.
+* Include deletion request form.
+
+Form Fields:
+
+* Email
+* Username
+* Optional reason
+
+After submission:
+
+* Save request to database.
+* Email [admin@getvybe.live](mailto:admin@getvybe.live).
+* Display confirmation message.
+
+ACCOUNT DELETION INSIDE APP
+
+Add:
+
+Settings → Account → Delete Account
+
+DELETION FLOW
+
+STEP 1
+
+Display warning:
+
+"Are you sure you want to delete your VYBE LIVE account?
+
+This will permanently remove your profile, videos, livestream history, messages, followers, following lists, account information, and associated personal data.
+
+This action cannot be undone."
+
+Buttons:
+
+* Cancel
+* Continue
+
+STEP 2
+
+Display second confirmation:
+
+"Final Confirmation
+
+You are about to permanently delete your VYBE LIVE account.
+
+This action is irreversible."
+
+Require:
+
+☐ Checkbox:
+"I understand my account and associated data will be permanently deleted."
+
+☐ User must type:
+DELETE
+
+Buttons:
+
+* Cancel
+* Continue
+
+STEP 3
+
+Require password verification.
+
+STEP 4
+
+Display:
+
+"Your deletion request has been received. Your account has been scheduled for deletion."
+
+Immediately:
+
+* Log user out.
+* Revoke active sessions.
+* Disable account access.
+* Set account status = PENDING_DELETION.
+
+ACCOUNT DELETION TIMELINE
+
+Day 0:
+
+* User submits deletion request.
+* Account disabled immediately.
+* User cannot access account.
+
+Day 25:
+
+* Send warning email.
+
+Subject:
+Final Reminder: Your VYBE LIVE Account Will Be Permanently Deleted
+
+Body:
+Your account is scheduled for permanent deletion in 5 days. If this request was made in error, contact support immediately.
+
+Day 30:
+
+* Permanently delete account.
+* Delete profile.
+* Delete authentication credentials.
+* Delete messages where applicable.
+* Delete user content where applicable.
+* Remove personal information.
+* Record deletion timestamp.
+
+ACCOUNT INACTIVITY MANAGEMENT
+
+Track:
+
+* Last login
+* Last app activity
+* Last stream
+* Last upload
+
+Inactive Account Definition:
+
+* No activity for 180 consecutive days.
+
+INACTIVITY WARNING
+
+At 175 days:
+
+Send email:
+
+Subject:
+Your VYBE LIVE Account Will Be Suspended Soon
+
+Body:
+Your account has been inactive for nearly 180 days. Sign in within the next 5 days to keep your account active.
+
+If available:
+
+* Send in-app notification.
+
+ACCOUNT SUSPENSION
+
+At 180 days:
+
+* Suspend account.
+* Disable login.
+* Preserve all account data.
+* Set status = SUSPENDED.
+
+Send email:
+
+Subject:
+Your VYBE LIVE Account Has Been Suspended
+
+Body:
+Your account has been suspended due to inactivity. You have 30 days to reactivate your account by signing in.
+
+ACCOUNT RECOVERY PERIOD
+
+Days 180-210:
+
+* User can reactivate account.
+* Restore full access.
+* Remove suspension status.
+
+PERMANENT DELETION AFTER SUSPENSION
+
+Day 205:
+
+Send final warning email.
+
+Subject:
+Final Notice: Your VYBE LIVE Account Will Be Deleted
+
+Body:
+Your suspended account will be permanently deleted in 5 days due to inactivity. Sign in now to reactivate your account.
+
+Day 210:
+
+Automatically:
+
+* Delete account.
+* Delete personal information.
+* Delete profile.
+* Delete authentication data.
+* Delete user-generated content where applicable.
+* Record deletion timestamp.
+
+ADMIN DASHBOARD
+
+Create admin tools for:
+
+* Active Accounts
+* Suspended Accounts
+* Pending Deletion Accounts
+* Deletion Requests
+* Audit Logs
+* Restore Account
+* Cancel Deletion Request
+
+API ENDPOINTS
+
+POST /api/account/delete-request
+
+POST /api/account/cancel-deletion
+
+POST /api/account/reactivate
+
+GET /api/admin/deletion-requests
+
+SECURITY REQUIREMENTS
+
+* Log timestamp.
+* Log user ID.
+* Log IP address.
+* Require password verification.
+* Prevent accidental deletion.
+* Revoke all sessions after deletion request.
+
+GOOGLE PLAY COMPLIANCE
+
+Ensure implementation satisfies:
+
+* Google Play Account Deletion Policy
+* Google Play Data Safety requirements
+* Privacy Policy requirements
+* User Data Policy requirements
+
+After implementation provide:
+
+1. Delete Account webpage URL
+2. Delete Account app location
+3. API endpoints created
+4. Database schema changes
+5. Confirmation of Google Play compliance

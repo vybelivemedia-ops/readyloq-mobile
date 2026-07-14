@@ -1,0 +1,212 @@
+We are redesigning Mission Control from the ground up using Figma as the single source of truth before implementation.
+
+Use the attached concept image only as inspiration for layout and atmosphere. Do not copy artwork, textures, or copyrighted assets. Create a completely original design that captures the same feeling while establishing VYBE’s own visual identity.
+
+Objectives
+
+Build a professional Figma design system for Mission Control.
+
+Deliverables:
+
+• Desktop layout (1920px)
+• Tablet layout (Galaxy Fold)
+• Mobile layout
+• Component library
+• Auto Layout throughout
+• Variables
+• Design tokens
+• Responsive constraints
+
+Brand
+
+Mission Control is the operating system for all VYBE products.
+
+Style:
+	•	futuristic
+	•	clean
+	•	premium
+	•	dark mode only
+	•	neon accents
+	•	cyber command center
+	•	enterprise software quality
+
+Primary colors:
+	•	electric violet
+	•	cyan
+	•	deep navy
+	•	black
+	•	subtle glass effects
+
+Typography should prioritize readability over visual effects.
+
+Every panel must remain usable after several hours of continuous work.
+
+Navigation
+
+Left navigation includes:
+	•	Command Center
+	•	Daily Briefing
+	•	Objectives
+	•	Global Tasks
+	•	Agent Registry
+	•	Operations
+	•	Marketing
+	•	Engineering
+	•	QA
+	•	Portfolio
+	•	AI Intelligence
+	•	Learning
+	•	Settings
+
+Dashboard
+
+Top KPI cards:
+	•	Launch Readiness
+	•	Executives Active
+	•	Tasks Running
+	•	Blockers
+	•	Agent Zero Status
+
+Right sidebar:
+	•	Live Activity
+	•	System Status
+	•	Quick Actions
+
+Bottom:
+
+Quinn Command Bar
+
+Voice Command
+
+Notifications
+
+Components
+
+Create reusable components for:
+
+Executive cards
+
+Status indicators
+
+Agent cards
+
+KPI widgets
+
+Task cards
+
+Chat bubbles
+
+Conversation threads
+
+Timeline entries
+
+Objectives
+
+Reports
+
+Diagnostics
+
+Buttons
+
+Inputs
+
+Search
+
+Navigation
+
+Everything should be production ready.
+
+⸻
+
+PHASE 2 — Design the New V Headquarters
+
+Prompt for Replit
+
+Build the centerpiece of Mission Control as an original 2D interactive headquarters.
+
+Do NOT build a 3D environment.
+
+Do NOT create a game.
+
+This is a professional executive dashboard.
+
+Headquarters Concept
+
+The headquarters is shaped like the VYBE “V”.
+
+The V itself is the building.
+
+Every executive occupies a room inside one branch of the V.
+
+The Founder overlooks the entire headquarters.
+
+Agent Zero powers the headquarters from its core.
+
+Quinn operates from the command bridge near the center.
+
+Layout
+
+Left branch:
+
+Ada Reeves
+
+Mara Linde
+
+Theo Vance
+
+Nadia Cole
+
+Right branch:
+
+Iris Moon
+
+Dario Sol
+
+Agent Specialists
+
+Center:
+
+Quinn Harlow
+
+Lower Center:
+
+Agent Zero Execution Engine
+
+Founder overview above all rooms.
+
+Interaction
+
+Clicking a room opens that executive.
+
+Room lights animate when work is active.
+
+Idle rooms dim slightly.
+
+Blocked rooms pulse softly red.
+
+Completed objectives briefly glow green.
+
+Agent Zero pulses while executing tasks.
+
+Quinn’s room displays live conversations.
+
+The Founder can zoom between:
+	•	Entire headquarters
+	•	Executive level
+	•	Individual room
+
+Requirements
+
+Keep the headquarters flat (2D).
+
+No simulated walking.
+
+No avatars.
+
+No unnecessary animations.
+
+Focus on clarity, responsiveness, and usability.
+
+The headquarters should become the signature visual identity of Mission Control while remaining fast enough for daily operational use on desktop, tablet, and mobile.
+
+These two phases give Replit a clear separation between building the design system and building the interactive Mission Control experience, making implementation much easier and more maintainable.

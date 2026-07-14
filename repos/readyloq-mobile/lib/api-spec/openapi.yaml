@@ -1,0 +1,3564 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: ReadyLoq - AI-powered inspection intelligence platform
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: inspections
+    description: Inspection management
+  - name: analysis
+    description: AI analysis
+  - name: dataset
+    description: Dataset library
+  - name: intelligence-dataset
+    description: Intelligence dataset & AI learning center
+  - name: reports
+    description: Report generation
+  - name: analytics
+    description: Analytics dashboard
+  - name: branding
+    description: White-label branding
+  - name: properties
+    description: Property intelligence feed
+  - name: leads
+    description: Marketing site lead capture
+  - name: beta
+    description: Closed-beta center (feedback, errors, checklist, testers, invites)
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── INSPECTIONS ──────────────────────────────────────────────────────────────
+  /inspections:
+    get:
+      operationId: listInspections
+      tags: [inspections]
+      summary: List all inspections
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: technicianId
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Inspection"
+    post:
+      operationId: createInspection
+      tags: [inspections]
+      summary: Create a new inspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InspectionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Inspection"
+
+  /inspections/{id}:
+    get:
+      operationId: getInspection
+      tags: [inspections]
+      summary: Get inspection by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Inspection"
+    patch:
+      operationId: updateInspection
+      tags: [inspections]
+      summary: Update inspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InspectionUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Inspection"
+    delete:
+      operationId: deleteInspection
+      tags: [inspections]
+      summary: Delete inspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /inspections/{id}/complete:
+    post:
+      operationId: completeInspection
+      tags: [inspections]
+      summary: >
+        Explicitly complete an in-progress inspection and trigger the
+        finalization pipeline (report, AI narrative, customer summary draft,
+        Opportunity Intelligence, scorecard). Idempotent.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Completed (or already completed — safe no-op)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompleteInspectionResult"
+
+  /inspections/{id}/media:
+    post:
+      operationId: addInspectionMedia
+      tags: [inspections]
+      summary: Add media to inspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MediaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectionMedia"
+
+  # ── AI ANALYSIS ──────────────────────────────────────────────────────────────
+  /analysis:
+    get:
+      operationId: listAnalysisResults
+      tags: [analysis]
+      summary: List AI analysis results
+      parameters:
+        - name: inspectionId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalysisResult"
+
+  /analysis/analyze:
+    post:
+      operationId: analyzeInspection
+      tags: [analysis]
+      summary: Run real AI vision analysis on captured inspection photos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeInspectionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+
+  /analysis/{id}:
+    get:
+      operationId: getAnalysisResult
+      tags: [analysis]
+      summary: Get analysis result
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+
+  /analysis/{id}/feedback:
+    post:
+      operationId: submitAnalysisFeedback
+      tags: [analysis]
+      summary: Submit technician feedback on analysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+
+  /analysis/summary:
+    get:
+      operationId: getAnalysisSummary
+      tags: [analysis]
+      summary: Get aggregated AI analysis summary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisSummary"
+
+  # ── DATASET LIBRARY ───────────────────────────────────────────────────────────
+  /dataset:
+    get:
+      operationId: listDatasetImages
+      tags: [dataset]
+      summary: List dataset library images
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: pestType
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetPage"
+
+  /dataset/categories:
+    get:
+      operationId: listDatasetCategories
+      tags: [dataset]
+      summary: List all dataset categories with counts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DatasetCategory"
+
+  # ── INTELLIGENCE DATASET ─────────────────────────────────────────────────────
+  /intelligence-dataset/categories:
+    get:
+      operationId: listIntelligenceCategories
+      tags: [intelligence-dataset]
+      summary: Taxonomy groups + subcategories with per-company counts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntelligenceCategory"
+
+  /intelligence-dataset/settings:
+    get:
+      operationId: getIntelligenceSettings
+      tags: [intelligence-dataset]
+      summary: Get the company's intelligence sharing participation setting
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceSettings"
+    patch:
+      operationId: updateIntelligenceSettings
+      tags: [intelligence-dataset]
+      summary: Update the company's sharing participation (manager+)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceSettingsInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceSettings"
+
+  /intelligence-dataset/analytics:
+    get:
+      operationId: getIntelligenceAnalytics
+      tags: [intelligence-dataset]
+      summary: Per-company intelligence dataset analytics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceAnalytics"
+
+  /intelligence-dataset/records:
+    get:
+      operationId: listIntelligenceRecords
+      tags: [intelligence-dataset]
+      summary: List intelligence records for the caller's company
+      parameters:
+        - name: category
+          in: query
+          schema: { type: ["string", "null"] }
+        - name: subcategory
+          in: query
+          schema: { type: ["string", "null"] }
+        - name: status
+          in: query
+          schema: { type: ["string", "null"] }
+        - name: verificationLevel
+          in: query
+          schema: { type: ["integer", "null"] }
+        - name: mine
+          in: query
+          schema: { type: ["boolean", "null"] }
+        - name: search
+          in: query
+          schema: { type: ["string", "null"] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecordPage"
+    post:
+      operationId: createIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Create a record from an uploaded image (runs the AI suggestion)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceRecordInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+
+  /intelligence-dataset/records/{id}:
+    get:
+      operationId: getIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Get a single intelligence record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+    patch:
+      operationId: confirmIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Technician confirms/corrects the AI suggestion + adds detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceConfirmInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+
+  /intelligence-dataset/records/{id}/skip:
+    post:
+      operationId: skipIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Skip a record (retained, excluded from the dataset)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+
+  /intelligence-dataset/records/{id}/vote:
+    post:
+      operationId: voteIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Cast a confirm/dispute vote (drives multi-technician verification)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceVoteInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+
+  /intelligence-dataset/records/{id}/review:
+    post:
+      operationId: reviewIntelligenceRecord
+      tags: [intelligence-dataset]
+      summary: Manager review — approve / reject / edit / expert-verify
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntelligenceReviewInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntelligenceRecord"
+
+  # ── REPORTS ──────────────────────────────────────────────────────────────────
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      summary: List generated reports
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+    post:
+      operationId: generateReport
+      tags: [reports]
+      summary: Generate a new report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /reports/{id}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Get report by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+    delete:
+      operationId: deleteReport
+      tags: [reports]
+      summary: Delete report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /reports/{id}/generate-narrative:
+    post:
+      operationId: generateReportNarrative
+      tags: [reports]
+      summary: Generate or regenerate the AI narrative report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateNarrativeInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  # ── ANALYTICS ────────────────────────────────────────────────────────────────
+  /analytics/dashboard:
+    get:
+      operationId: getAnalyticsDashboard
+      tags: [analytics]
+      summary: Get full analytics dashboard data
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsDashboard"
+
+  /analytics/trends:
+    get:
+      operationId: getAnalyticsTrends
+      tags: [analytics]
+      summary: Get findings trends over time
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            default: "30d"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendDataPoint"
+
+  /analytics/technicians:
+    get:
+      operationId: getTechnicianPerformance
+      tags: [analytics]
+      summary: Get technician performance metrics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TechnicianPerformance"
+
+  /analytics/risk:
+    get:
+      operationId: getInfestationRisk
+      tags: [analytics]
+      summary: Get infestation risk assessment
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfestationRisk"
+
+  # ── INTELLIGENCE (ReadyLoq Command) ──────────────────────────────────────────
+  /intelligence/opportunities:
+    get:
+      operationId: getOpportunityIntelligence
+      tags: [intelligence]
+      summary: Get evidence-based opportunity intelligence
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunityIntelligence"
+
+  /intelligence/callbacks:
+    get:
+      operationId: getCallbackIntelligence
+      tags: [intelligence]
+      summary: Get callback intelligence (chains and patterns)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallbackIntelligence"
+
+  /intelligence/property-risk:
+    get:
+      operationId: getPropertyRiskInsights
+      tags: [intelligence]
+      summary: Get property risk insights
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyRiskInsights"
+
+  # ── BRANDING ─────────────────────────────────────────────────────────────────
+  /branding:
+    get:
+      operationId: getBranding
+      tags: [branding]
+      summary: Get the active white-label branding profile (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/active:
+    get:
+      operationId: getActiveBranding
+      tags: [branding]
+      summary: Get the active white-label branding profile (public)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/company:
+    get:
+      operationId: getCompanyBranding
+      tags: [branding]
+      summary: Get the caller company's active branding profile (authenticated)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/profiles:
+    get:
+      operationId: listBrandingProfiles
+      tags: [branding]
+      summary: List all branding profiles (manager only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BrandingProfile"
+    post:
+      operationId: createBrandingProfile
+      tags: [branding]
+      summary: Create a branding profile (manager only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandingProfileInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/profiles/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: getBrandingProfile
+      tags: [branding]
+      summary: Get a branding profile (manager only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+    patch:
+      operationId: updateBrandingProfile
+      tags: [branding]
+      summary: Update a branding profile (manager only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandingProfileInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+    delete:
+      operationId: deleteBrandingProfile
+      tags: [branding]
+      summary: Delete a branding profile (manager only)
+      responses:
+        "204":
+          description: No Content
+
+  /branding/profiles/{id}/duplicate:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: duplicateBrandingProfile
+      tags: [branding]
+      summary: Duplicate a branding profile (manager only)
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/profiles/{id}/activate:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: activateBrandingProfile
+      tags: [branding]
+      summary: Set a branding profile as active (manager only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  /branding/restore-defaults:
+    post:
+      operationId: restoreBrandingDefaults
+      tags: [branding]
+      summary: Reset the default profile to ReadyLoq defaults and activate it (manager only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingProfile"
+
+  # ── PROPERTIES ───────────────────────────────────────────────────────────────
+  /properties:
+    get:
+      operationId: listProperties
+      tags: [properties]
+      summary: List all known properties with an intelligence summary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PropertySummary"
+
+  /properties/lookup:
+    get:
+      operationId: lookupProperty
+      tags: [properties]
+      summary: Look up property intelligence by free-text site address (pre-inspection)
+      parameters:
+        - name: siteAddress
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyLookupResult"
+
+  /properties/{addressKey}:
+    get:
+      operationId: getPropertyFeed
+      tags: [properties]
+      summary: Get the full intelligence feed for a property
+      parameters:
+        - name: addressKey
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyFeed"
+    patch:
+      operationId: updatePropertyProfile
+      tags: [properties]
+      summary: Create or update the authored intelligence for a property
+      parameters:
+        - name: addressKey
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PropertyProfileUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyFeed"
+
+  /properties/{addressKey}/notes:
+    post:
+      operationId: addPropertyNote
+      tags: [properties]
+      summary: Append a field note to a property
+      parameters:
+        - name: addressKey
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PropertyNoteInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyNote"
+
+  /leads:
+    post:
+      operationId: createLead
+      tags: [leads]
+      summary: Capture a marketing-site lead (demo request or contact inquiry)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ── BETA CENTER ──────────────────────────────────────────────────────────────
+  /beta/feedback:
+    post:
+      operationId: submitFeedback
+      tags: [beta]
+      summary: Submit beta feedback (any company member)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitFeedbackInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BetaFeedback"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      operationId: listFeedback
+      tags: [beta]
+      summary: List beta feedback (manager+)
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BetaFeedback"
+
+  /beta/feedback/{id}:
+    patch:
+      operationId: updateFeedback
+      tags: [beta]
+      summary: Update feedback status/severity (manager+)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFeedbackInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BetaFeedback"
+
+  /beta/errors:
+    post:
+      operationId: reportClientError
+      tags: [beta]
+      summary: Report a client-side failure (any company member)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientErrorInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+    get:
+      operationId: listErrorEvents
+      tags: [beta]
+      summary: List error events with summary (manager+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEventList"
+
+  /beta/checklist:
+    get:
+      operationId: getChecklist
+      tags: [beta]
+      summary: Get the closed-beta checklist with company state (manager+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistResponse"
+
+  /beta/checklist/{itemKey}:
+    patch:
+      operationId: toggleChecklistItem
+      tags: [beta]
+      summary: Toggle a checklist item (manager+)
+      parameters:
+        - name: itemKey
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleChecklistInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistToggleResult"
+
+  /beta/testers:
+    get:
+      operationId: listTesters
+      tags: [beta]
+      summary: List beta testers with activity (manager+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tester"
+
+  /beta/testers/{userId}/access:
+    patch:
+      operationId: updateTesterAccess
+      tags: [beta]
+      summary: Pause or restore a technician's beta access (manager+)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleAccessInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TesterAccessResult"
+
+  # ── AUTH INVITES (manager+) ──────────────────────────────────────────────────
+  /auth/invites:
+    post:
+      operationId: createInvite
+      tags: [beta]
+      summary: Create a company invite (manager+)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInviteInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+    get:
+      operationId: listInvites
+      tags: [beta]
+      summary: List company invites (manager+)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invite"
+
+  # ── OPPORTUNITY INTELLIGENCE (hidden log, sales+ only) ──────────────────────
+  /opportunities:
+    get:
+      operationId: listSalesOpportunities
+      tags: [opportunities]
+      summary: List the company's opportunity log (sales, manager, owner)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+        - name: category
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalesOpportunity"
+
+  /opportunities/trends:
+    get:
+      operationId: getSalesOpportunityTrends
+      tags: [opportunities]
+      summary: Deterministic aggregates over the opportunity log
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOpportunityTrends"
+
+  /opportunities/settings:
+    get:
+      operationId: getOpportunitySettings
+      tags: [opportunities]
+      summary: Get opportunity mining settings (owner only)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunitySettings"
+    patch:
+      operationId: updateOpportunitySettings
+      tags: [opportunities]
+      summary: Update opportunity mining settings (owner only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpportunitySettingsUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunitySettings"
+
+  /opportunities/{id}:
+    get:
+      operationId: getSalesOpportunity
+      tags: [opportunities]
+      summary: Get one opportunity with its audit trail (logs a viewed event)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOpportunityDetail"
+    patch:
+      operationId: updateSalesOpportunity
+      tags: [opportunities]
+      summary: Update status or assignment (dismiss requires manager+)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalesOpportunityUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOpportunity"
+
+  /opportunities/{id}/notes:
+    get:
+      operationId: listOpportunityNotes
+      tags: [opportunities]
+      summary: Immutable notes thread, oldest first (sales, manager, owner)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpportunityNote"
+    post:
+      operationId: addOpportunityNote
+      tags: [opportunities]
+      summary: Append a note (append-only — corrections are new notes)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpportunityNoteCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpportunityNote"
+
+  /scorecards:
+    get:
+      operationId: listScorecards
+      tags: [scorecards]
+      summary: List inspection scorecards, newest first (manager, owner)
+      parameters:
+        - name: technician
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InspectionScorecardListItem"
+
+  /scorecards/summary:
+    get:
+      operationId: getScorecardSummary
+      tags: [scorecards]
+      summary: Deterministic management-intelligence aggregates (manager, owner)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScorecardSummary"
+
+  /scorecards/inspection/{inspectionId}:
+    get:
+      operationId: getInspectionScorecard
+      tags: [scorecards]
+      summary: Get one inspection's scorecard (manager, owner)
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectionScorecard"
+
+  /customer-summaries/inspection/{inspectionId}:
+    get:
+      operationId: getCustomerSummaryForInspection
+      tags: [customer-summaries]
+      summary: Get the inspection's customer summary (manager, owner)
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /customer-summaries/inspection/{inspectionId}/generate:
+    post:
+      operationId: generateCustomerSummary
+      tags: [customer-summaries]
+      summary: Generate/regenerate the draft from the latest analysis (manager, owner)
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Regenerated existing draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /customer-summaries/{id}:
+    patch:
+      operationId: updateCustomerSummary
+      tags: [customer-summaries]
+      summary: Edit the draft body (drafts only — approved summaries are frozen)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerSummaryUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /customer-summaries/{id}/approve:
+    post:
+      operationId: approveCustomerSummary
+      tags: [customer-summaries]
+      summary: Approve — freezes the body and mints the expiring share token
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerSummaryApprove"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /customer-summaries/{id}/revoke:
+    post:
+      operationId: revokeCustomerSummaryShare
+      tags: [customer-summaries]
+      summary: Revoke the public share link immediately
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerSummary"
+
+  /proposals:
+    get:
+      operationId: listProposals
+      tags: [proposals]
+      summary: List proposals, newest first (sales, manager, owner)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalesProposal"
+    post:
+      operationId: createProposal
+      tags: [proposals]
+      summary: Assemble a proposal from same-company opportunity IDs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalesProposalCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesProposal"
+
+  /proposals/{id}:
+    get:
+      operationId: getProposal
+      tags: [proposals]
+      summary: Get one proposal with its resolved opportunities
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesProposalDetail"
+    patch:
+      operationId: updateProposal
+      tags: [proposals]
+      summary: Edit content or move the paperwork status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalesProposalUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesProposal"
+    delete:
+      operationId: deleteProposal
+      tags: [proposals]
+      summary: Delete a draft proposal (sent/decided proposals are records)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  # ── ROLE BRIEFING (role-adaptive dashboard read model) ──────────────────────
+  /briefing:
+    get:
+      operationId: getBriefing
+      tags: [briefing]
+      summary: Get the caller's role-shaped intelligence briefing
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleBriefing"
+
+components:
+  schemas:
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    SubmitFeedbackInput:
+      type: object
+      required: [type, title, description]
+      properties:
+        type:         { type: string, enum: [bug, feature, ai_accuracy] }
+        title:        { type: string }
+        description:  { type: string }
+        severity:     { type: string, enum: [low, medium, high] }
+        inspectionId: { type: integer }
+        analysisId:   { type: integer }
+        reportId:     { type: integer }
+
+    UpdateFeedbackInput:
+      type: object
+      properties:
+        status:   { type: string, enum: [open, triaged, resolved] }
+        severity: { type: string, enum: [low, medium, high] }
+
+    BetaFeedback:
+      type: object
+      required: [id, type, title, description, status, createdAt, updatedAt]
+      properties:
+        id:           { type: integer }
+        type:         { type: string }
+        title:        { type: string }
+        description:  { type: string }
+        severity:     { type: ["string", "null"] }
+        status:       { type: string }
+        userId:       { type: ["integer", "null"] }
+        inspectionId: { type: ["integer", "null"] }
+        analysisId:   { type: ["integer", "null"] }
+        reportId:     { type: ["integer", "null"] }
+        createdAt:    { type: string }
+        updatedAt:    { type: string }
+
+    ClientErrorInput:
+      type: object
+      required: [category, message]
+      properties:
+        category:     { type: string, enum: [upload, ai, report, auth] }
+        message:      { type: string }
+        context:      { type: object, additionalProperties: true }
+        inspectionId: { type: integer }
+        reportId:     { type: integer }
+
+    ErrorEvent:
+      type: object
+      required: [id, category, message, source, createdAt]
+      properties:
+        id:           { type: integer }
+        category:     { type: string }
+        message:      { type: string }
+        context:      { type: ["object", "null"], additionalProperties: true }
+        userId:       { type: ["integer", "null"] }
+        inspectionId: { type: ["integer", "null"] }
+        reportId:     { type: ["integer", "null"] }
+        source:       { type: string }
+        createdAt:    { type: string }
+
+    ErrorEventList:
+      type: object
+      required: [summary, events]
+      properties:
+        summary:
+          type: object
+          required: [upload, ai, report, auth, total]
+          properties:
+            upload: { type: integer }
+            ai:     { type: integer }
+            report: { type: integer }
+            auth:   { type: integer }
+            total:  { type: integer }
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorEvent"
+
+    ChecklistItem:
+      type: object
+      required: [key, category, label, done]
+      properties:
+        key:      { type: string }
+        category: { type: string }
+        label:    { type: string }
+        detail:   { type: ["string", "null"] }
+        done:     { type: boolean }
+        doneAt:   { type: ["string", "null"] }
+
+    ChecklistResponse:
+      type: object
+      required: [items, completed, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistItem"
+        completed: { type: integer }
+        total:     { type: integer }
+
+    ToggleChecklistInput:
+      type: object
+      required: [done]
+      properties:
+        done: { type: boolean }
+
+    ChecklistToggleResult:
+      type: object
+      required: [key, done]
+      properties:
+        key:  { type: string }
+        done: { type: boolean }
+
+    Tester:
+      type: object
+      required: [id, clerkUserId, role, betaAccess, joinedAt, inspectionCount, feedbackCount]
+      properties:
+        id:              { type: integer }
+        clerkUserId:     { type: string }
+        role:            { type: string }
+        betaAccess:      { type: boolean }
+        lastSeenAt:      { type: ["string", "null"] }
+        joinedAt:        { type: string }
+        inspectionCount: { type: integer }
+        feedbackCount:   { type: integer }
+
+    ToggleAccessInput:
+      type: object
+      required: [betaAccess]
+      properties:
+        betaAccess: { type: boolean }
+
+    TesterAccessResult:
+      type: object
+      required: [id, betaAccess]
+      properties:
+        id:         { type: integer }
+        betaAccess: { type: boolean }
+
+    CreateInviteInput:
+      type: object
+      properties:
+        role:  { type: string, enum: [manager, technician] }
+        email: { type: ["string", "null"] }
+
+    Invite:
+      type: object
+      required: [id, companyId, token, role, createdAt]
+      properties:
+        id:               { type: integer }
+        companyId:        { type: integer }
+        token:            { type: string }
+        email:            { type: ["string", "null"] }
+        role:             { type: string }
+        createdByUserId:  { type: ["integer", "null"] }
+        acceptedByUserId: { type: ["integer", "null"] }
+        expiresAt:        { type: ["string", "null"] }
+        acceptedAt:       { type: ["string", "null"] }
+        createdAt:        { type: string }
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    # ── LEAD SCHEMAS ────────────────────────────────────────────────────────────
+    Lead:
+      type: object
+      required: [id, type, name, email, status, createdAt]
+      properties:
+        id:          { type: integer }
+        type:        { type: string, enum: [demo, contact] }
+        name:        { type: string }
+        email:       { type: string }
+        phone:       { type: ["string", "null"] }
+        companyName: { type: ["string", "null"] }
+        role:        { type: ["string", "null"] }
+        teamSize:    { type: ["string", "null"] }
+        message:     { type: ["string", "null"] }
+        status:      { type: string }
+        source:      { type: ["string", "null"] }
+        createdAt:   { type: string }
+
+    LeadInput:
+      type: object
+      required: [type, name, email]
+      properties:
+        type:        { type: string, enum: [demo, contact] }
+        name:        { type: string, minLength: 1, maxLength: 200 }
+        email:       { type: string, format: email, maxLength: 320 }
+        phone:       { type: string, maxLength: 50 }
+        companyName: { type: string, maxLength: 200 }
+        role:        { type: string, maxLength: 100 }
+        teamSize:    { type: string, maxLength: 50 }
+        message:     { type: string, maxLength: 5000 }
+        source:      { type: string, maxLength: 200 }
+
+    # ── INSPECTION SCHEMAS ──────────────────────────────────────────────────────
+    Inspection:
+      type: object
+      required: [id, siteAddress, status, technicianName, createdAt]
+      properties:
+        id:          { type: integer }
+        siteAddress: { type: string }
+        clientName:  { type: ["string", "null"] }
+        technicianName: { type: string }
+        technicianId: { type: ["string", "null"] }
+        status:      { type: string }
+        pestTypes:
+          type: array
+          items: { type: string }
+        severity:    { type: ["string", "null"] }
+        notes:       { type: ["string", "null"] }
+        mediaCount:  { type: integer }
+        findingsCount: { type: integer }
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/InspectionMedia"
+        aiAnalysisId: { type: ["integer", "null"] }
+        createdAt:   { type: string }
+        completedAt: { type: ["string", "null"] }
+
+    CompleteInspectionResult:
+      type: object
+      required: [inspection, alreadyCompleted, finalization]
+      properties:
+        inspection:
+          $ref: "#/components/schemas/Inspection"
+        reportId: { type: ["integer", "null"] }
+        alreadyCompleted:
+          type: boolean
+          description: True when the inspection was already completed (safe no-op).
+        finalization:
+          type: string
+          enum: [started, skipped]
+          description: >
+            "started" when the background finalization pipeline (AI narrative,
+            customer summary draft, Opportunity Intelligence, scorecard) was
+            kicked off by this call.
+
+    InspectionInput:
+      type: object
+      required: [siteAddress, technicianName]
+      properties:
+        siteAddress:    { type: string }
+        clientName:     { type: string }
+        technicianName: { type: string }
+        technicianId:   { type: string }
+        notes:          { type: string }
+        pestTypes:
+          type: array
+          items: { type: string }
+        clientKey:
+          type: string
+          description: >-
+            Client-generated idempotency key (UUID). Retrying a create with the
+            same key returns the previously created inspection (200) instead of
+            duplicating it — required for offline-first sync retries.
+
+    InspectionUpdate:
+      type: object
+      properties:
+        status:      { type: string }
+        notes:       { type: string }
+        severity:    { type: string }
+        pestTypes:
+          type: array
+          items: { type: string }
+        completedAt: { type: string }
+
+    InspectionMedia:
+      type: object
+      required: [id, inspectionId, mediaType, url, createdAt]
+      properties:
+        id:           { type: integer }
+        inspectionId: { type: integer }
+        mediaType:    { type: string }
+        url:          { type: string }
+        filename:     { type: ["string", "null"] }
+        caption:      { type: ["string", "null"] }
+        durationSec:  { type: ["integer", "null"] }
+        captureSource:   { type: string }
+        qualityScore:    { type: ["integer", "null"] }
+        captureMetadata:
+          type: ["object", "null"]
+          additionalProperties: true
+        createdAt:    { type: string }
+
+    MediaInput:
+      type: object
+      required: [mediaType, url]
+      properties:
+        mediaType:   { type: string }
+        url:         { type: string }
+        filename:    { type: string }
+        caption:     { type: string }
+        durationSec: { type: integer }
+        captureSource: { type: string }
+        qualityScore:  { type: integer }
+        captureMetadata:
+          type: object
+          additionalProperties: true
+
+    # ── ANALYSIS SCHEMAS ────────────────────────────────────────────────────────
+    AnalysisResult:
+      type: object
+      required: [id, inspectionId, status, createdAt]
+      properties:
+        id:           { type: integer }
+        inspectionId: { type: integer }
+        status:       { type: string }
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        recommendations:
+          type: array
+          items: { type: string }
+        videoEvidence:
+          type: array
+          items:
+            type: object
+            required: [url, frameAnalysisStatus]
+            properties:
+              url:         { type: string }
+              filename:    { type: ["string", "null"] }
+              durationSec: { type: ["integer", "null"] }
+              label:       { type: ["string", "null"] }
+              frameAnalysisStatus: { type: string }
+        analyzedImagePaths:
+          type: array
+          items: { type: string }
+        photoZones:
+          type: object
+          additionalProperties: { type: string }
+        coverage:
+          oneOf:
+            - $ref: "#/components/schemas/CoverageSnapshot"
+            - type: "null"
+        evidence:
+          $ref: "#/components/schemas/EvidenceSummary"
+        guidance:
+          $ref: "#/components/schemas/GuidanceSummary"
+        memory:
+          description: >-
+            Inspection Memory — prior-visit context for this address (same
+            company) plus gap highlights vs. what has been captured today. Only
+            populated on single-inspection scopes (POST /analyze, GET /:id, and
+            GET /?inspectionId=); null on the unfiltered list and other paths.
+          oneOf:
+            - $ref: "#/components/schemas/InspectionMemory"
+            - type: "null"
+        overallConfidence: { type: ["number", "null"] }
+        riskLevel:    { type: ["string", "null"] }
+        technicianFeedback: { type: ["string", "null"] }
+        feedbackStatus: { type: ["string", "null"] }
+        analysisErrors: { type: ["integer", "null"] }
+        createdAt:    { type: string }
+
+    CoverageZone:
+      type: object
+      required: [slug, label]
+      properties:
+        slug:  { type: string }
+        label: { type: string }
+
+    CoverageSnapshot:
+      type: object
+      required: [propertyType, completenessPct, requiredZones, coveredRequired, uncoveredRequired, suggested]
+      properties:
+        propertyType:    { type: string }
+        completenessPct: { type: number }
+        requiredZones:
+          type: array
+          items: { $ref: "#/components/schemas/CoverageZone" }
+        coveredRequired:
+          type: array
+          items: { $ref: "#/components/schemas/CoverageZone" }
+        uncoveredRequired:
+          type: array
+          items: { $ref: "#/components/schemas/CoverageZone" }
+        suggested:
+          type: array
+          items: { $ref: "#/components/schemas/CoverageZone" }
+
+    EvidenceCount:
+      type: object
+      required: [key, label, count]
+      properties:
+        key:   { type: string }
+        label: { type: string }
+        count: { type: integer }
+
+    EvidenceGroup:
+      type: object
+      required: [key, label, total, items]
+      properties:
+        key:   { type: string }
+        label: { type: string }
+        total: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/EvidenceCount" }
+
+    EvidenceSummary:
+      type: object
+      required: [totalEvidence, photoEvidence, videoEvidence, groups]
+      properties:
+        totalEvidence: { type: integer }
+        photoEvidence: { type: integer }
+        videoEvidence: { type: integer }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/EvidenceGroup" }
+
+    GuidanceRecommendation:
+      type: object
+      required: [id, category, priority, title, reason]
+      properties:
+        id:       { type: string }
+        category: { type: string }
+        priority: { type: integer }
+        title:    { type: string }
+        reason:   { type: string }
+        zone:     { type: ["string", "null"] }
+
+    GuidanceSummary:
+      type: object
+      required: [next, queue, remaining]
+      description: >-
+        Live Guidance Engine output. `next` is the single highest-priority next
+        inspection task (null when nothing is pending). `queue` is the full
+        prioritized list, sorted by priority, and includes `next` as its first
+        element. `remaining` is the number of tasks AFTER `next`
+        (queue.length - 1, min 0) — use it to drive an "N more" hint.
+      properties:
+        next:
+          oneOf:
+            - $ref: "#/components/schemas/GuidanceRecommendation"
+            - type: "null"
+        queue:
+          type: array
+          items: { $ref: "#/components/schemas/GuidanceRecommendation" }
+        remaining: { type: integer }
+
+    InspectionMemory:
+      type: object
+      description: >-
+        Prior-visit context for the CURRENT inspection at the same physical
+        address (same company), aggregated verbatim from earlier inspections'
+        analysis rows — never fabricated. `highlights` are gap alerts comparing
+        remembered signals against what has been captured today, and they feed
+        the Live Guidance Engine so the next task can be memory-driven.
+      required:
+        [hasPriorVisits, priorVisitCount, lastVisitDate, pestActivity, baitStations, entryPoints, recommendations, treatments, highlights]
+      properties:
+        hasPriorVisits:  { type: boolean }
+        priorVisitCount: { type: integer }
+        lastVisitDate:   { type: ["string", "null"] }
+        pestActivity:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryPestActivity" }
+        baitStations:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryBaitStation" }
+        entryPoints:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryEntryPoint" }
+        recommendations:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryNote" }
+        treatments:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryNote" }
+        highlights:
+          type: array
+          items: { $ref: "#/components/schemas/MemoryHighlight" }
+
+    MemoryPestActivity:
+      type: object
+      required: [key, label, zone, severity, visits, lastSeen]
+      properties:
+        key:      { type: string }
+        label:    { type: string }
+        zone:     { type: ["string", "null"] }
+        severity: { type: string }
+        visits:   { type: integer }
+        lastSeen: { type: ["string", "null"] }
+
+    MemoryBaitStation:
+      type: object
+      required: [key, description, zone, lastSeen]
+      properties:
+        key:         { type: string }
+        description: { type: string }
+        zone:        { type: ["string", "null"] }
+        lastSeen:    { type: ["string", "null"] }
+
+    MemoryEntryPoint:
+      type: object
+      required: [key, description, zone, lastSeen]
+      properties:
+        key:         { type: string }
+        description: { type: string }
+        zone:        { type: ["string", "null"] }
+        lastSeen:    { type: ["string", "null"] }
+
+    MemoryNote:
+      type: object
+      required: [key, text, lastSeen]
+      properties:
+        key:      { type: string }
+        text:     { type: string }
+        lastSeen: { type: ["string", "null"] }
+
+    MemoryHighlight:
+      type: object
+      required: [id, type, zone, label, message, lastSeen]
+      properties:
+        id:      { type: string }
+        type:
+          type: string
+          enum: [area_not_inspected, bait_station_missing, rodent_area_not_photographed]
+        zone:    { type: ["string", "null"] }
+        label:   { type: string }
+        message: { type: string }
+        lastSeen: { type: ["string", "null"] }
+
+    Finding:
+      type: object
+      required: [id, category, description, confidence]
+      properties:
+        id:            { type: integer }
+        category:      { type: string }
+        description:   { type: string }
+        confidence:    { type: number }
+        severity:      { type: string }
+        location:      { type: ["string", "null"] }
+        imageUrl:      { type: ["string", "null"] }
+        treatment:     { type: ["string", "null"] }
+        exclusionOpportunity: { type: ["boolean", "null"] }
+        evidenceQuality: { type: ["string", "null"] }
+        species:       { type: ["string", "null"] }
+        lifeStage:     { type: ["string", "null"] }
+        conduciveCondition: { type: ["string", "null"] }
+        harborage:     { type: ["string", "null"] }
+        moisture:      { type: ["string", "null"] }
+        structuralIssue: { type: ["string", "null"] }
+        zone:          { type: ["string", "null"] }
+
+    FeedbackInput:
+      type: object
+      required: [feedbackStatus]
+      properties:
+        feedbackStatus: { type: string }
+        technicianFeedback: { type: string }
+
+    AnalyzeInspectionInput:
+      type: object
+      required: [inspectionId]
+      properties:
+        inspectionId: { type: integer }
+        images:
+          type: array
+          items:
+            type: object
+            required: [imageUrl]
+            properties:
+              imageUrl: { type: string }
+              label:    { type: ["string", "null"] }
+        technicianFindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        videos:
+          type: array
+          items:
+            type: object
+            required: [url]
+            properties:
+              url:         { type: string }
+              filename:    { type: ["string", "null"] }
+              durationSec: { type: ["integer", "null"] }
+              label:       { type: ["string", "null"] }
+        draft:
+          type: boolean
+          description: >
+            Live-capture mode: analyze photos but defer Opportunity
+            Intelligence and scorecard computation until the technician
+            explicitly completes the inspection. Defaults to false.
+
+    AnalysisSummary:
+      type: object
+      required: [totalAnalyses, avgConfidence, topFindings, findingsByCategory]
+      properties:
+        totalAnalyses:     { type: integer }
+        avgConfidence:     { type: number }
+        topFindings:
+          type: array
+          items:
+            type: object
+            required: [category, count]
+            properties:
+              category: { type: string }
+              count:    { type: integer }
+        findingsByCategory:
+          type: array
+          items:
+            type: object
+            required: [category, count, percentage]
+            properties:
+              category:   { type: string }
+              count:      { type: integer }
+              percentage: { type: number }
+
+    # ── DATASET SCHEMAS ─────────────────────────────────────────────────────────
+    DatasetImage:
+      type: object
+      required: [id, category, title, imageUrl, pestType, createdAt]
+      properties:
+        id:          { type: integer }
+        category:    { type: string }
+        title:       { type: string }
+        description: { type: ["string", "null"] }
+        imageUrl:    { type: string }
+        thumbnailUrl: { type: ["string", "null"] }
+        pestType:    { type: string }
+        severity:    { type: ["string", "null"] }
+        location:    { type: ["string", "null"] }
+        tags:
+          type: array
+          items: { type: string }
+        createdAt:   { type: string }
+
+    DatasetPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatasetImage"
+        total:  { type: integer }
+        page:   { type: integer }
+        limit:  { type: integer }
+
+    DatasetCategory:
+      type: object
+      required: [name, count, slug]
+      properties:
+        name:  { type: string }
+        slug:  { type: string }
+        count: { type: integer }
+        icon:  { type: ["string", "null"] }
+
+    # ── INTELLIGENCE DATASET SCHEMAS ────────────────────────────────────────────
+    AiPrediction:
+      type: object
+      required: [confidence, tags]
+      properties:
+        category:                   { type: ["string", "null"] }
+        subcategory:                { type: ["string", "null"] }
+        confidence:                 { type: number }
+        tags:
+          type: array
+          items: { type: string }
+        possiblePest:               { type: ["string", "null"] }
+        possibleConduciveCondition: { type: ["string", "null"] }
+        possibleEntryPoint:         { type: ["string", "null"] }
+        suggestedCorrectiveAction:  { type: ["string", "null"] }
+        rationale:                  { type: ["string", "null"] }
+
+    IntelligenceTag:
+      type: object
+      required: [tag, source]
+      properties:
+        tag:    { type: string }
+        source: { type: string }
+
+    IntelligenceRecord:
+      type: object
+      required:
+        [id, imageUrl, aiPrediction, verificationLevel, status,
+         approvedForTraining, createdBy, tags, confirmVotes, disputeVotes,
+         createdAt, updatedAt]
+      properties:
+        id:                         { type: integer }
+        imageUrl:                   { type: string }
+        thumbnailUrl:               { type: ["string", "null"] }
+        aiPrediction:
+          $ref: "#/components/schemas/AiPrediction"
+        aiConfidence:               { type: ["number", "null"] }
+        category:                   { type: ["string", "null"] }
+        subcategory:                { type: ["string", "null"] }
+        possiblePest:               { type: ["string", "null"] }
+        possibleConduciveCondition: { type: ["string", "null"] }
+        possibleEntryPoint:         { type: ["string", "null"] }
+        correctiveAction:           { type: ["string", "null"] }
+        severity:                   { type: ["string", "null"] }
+        whatIsShown:                { type: ["string", "null"] }
+        whyItMatters:               { type: ["string", "null"] }
+        notes:                      { type: ["string", "null"] }
+        treatmentOutcome:           { type: ["string", "null"] }
+        daysUntilFollowup:          { type: ["integer", "null"] }
+        verificationLevel:          { type: integer }
+        status:                     { type: string }
+        approvedForTraining:        { type: boolean }
+        aiCorrected:                { type: ["boolean", "null"] }
+        createdBy:                  { type: integer }
+        confirmedBy:                { type: ["integer", "null"] }
+        reviewedBy:                 { type: ["integer", "null"] }
+        tags:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceTag" }
+        confirmVotes:               { type: integer }
+        disputeVotes:               { type: integer }
+        myVote:                     { type: ["string", "null"] }
+        createdAt:                  { type: string }
+        updatedAt:                  { type: string }
+        confirmedAt:                { type: ["string", "null"] }
+        reviewedAt:                 { type: ["string", "null"] }
+
+    IntelligenceRecordPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceRecord" }
+        total: { type: integer }
+        page:  { type: integer }
+        limit: { type: integer }
+
+    IntelligenceSubcategory:
+      type: object
+      required: [slug, label, count]
+      properties:
+        slug:  { type: string }
+        label: { type: string }
+        count: { type: integer }
+
+    IntelligenceCategory:
+      type: object
+      required: [slug, label, description, count, subcategories]
+      properties:
+        slug:        { type: string }
+        label:       { type: string }
+        description: { type: string }
+        count:       { type: integer }
+        subcategories:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceSubcategory" }
+
+    IntelligenceSettings:
+      type: object
+      required: [sharingEnabled]
+      properties:
+        sharingEnabled: { type: boolean }
+
+    IntelligenceSettingsInput:
+      type: object
+      required: [sharingEnabled]
+      properties:
+        sharingEnabled: { type: boolean }
+
+    IntelligenceRecordInput:
+      type: object
+      required: [imageUrl]
+      properties:
+        imageUrl:     { type: string, minLength: 1 }
+        thumbnailUrl: { type: string }
+
+    IntelligenceConfirmInput:
+      type: object
+      required: [category]
+      properties:
+        category:                   { type: string, minLength: 1 }
+        subcategory:                { type: string }
+        possiblePest:               { type: string }
+        possibleConduciveCondition: { type: string }
+        possibleEntryPoint:         { type: string }
+        correctiveAction:           { type: string }
+        severity:                   { type: string, enum: [low, moderate, high, critical] }
+        whatIsShown:                { type: string }
+        whyItMatters:               { type: string }
+        notes:                      { type: string }
+        treatmentOutcome:           { type: string, enum: [resolved, improved, unchanged, worsened, pending, not_applicable] }
+        daysUntilFollowup:          { type: integer, minimum: 0 }
+        tags:
+          type: array
+          items: { type: string }
+
+    IntelligenceVoteInput:
+      type: object
+      required: [vote]
+      properties:
+        vote: { type: string, enum: [confirm, dispute] }
+
+    IntelligenceReviewInput:
+      type: object
+      required: [action]
+      properties:
+        action:                     { type: string, enum: [approve, reject, edit, expert_verify] }
+        comment:                    { type: string }
+        category:                   { type: string }
+        subcategory:                { type: string }
+        possiblePest:               { type: string }
+        possibleConduciveCondition: { type: string }
+        possibleEntryPoint:         { type: string }
+        correctiveAction:           { type: string }
+        severity:                   { type: string, enum: [low, moderate, high, critical] }
+        whatIsShown:                { type: string }
+        whyItMatters:               { type: string }
+        notes:                      { type: string }
+        treatmentOutcome:           { type: string, enum: [resolved, improved, unchanged, worsened, pending, not_applicable] }
+        daysUntilFollowup:          { type: integer, minimum: 0 }
+
+    IntelligenceCategoryStat:
+      type: object
+      required: [slug, label, count]
+      properties:
+        slug:  { type: string }
+        label: { type: string }
+        count: { type: integer }
+
+    IntelligenceLevelStat:
+      type: object
+      required: [level, count]
+      properties:
+        level: { type: integer }
+        count: { type: integer }
+
+    IntelligenceGrowthPoint:
+      type: object
+      required: [date, total, approved]
+      properties:
+        date:     { type: string }
+        total:    { type: integer }
+        approved: { type: integer }
+
+    IntelligenceContributor:
+      type: object
+      required: [userId, contributions, approved]
+      properties:
+        userId:        { type: integer }
+        contributions: { type: integer }
+        approved:      { type: integer }
+
+    IntelligenceAnalytics:
+      type: object
+      required:
+        [totalRecords, approvedRecords, approvedForTraining, pendingReview,
+         aiAccuracyRate, aiVsTechnicianAgreementRate, technicianCorrectionRate,
+         managerApprovalRate, mostSubmittedCategories, mostVerifiedCategories,
+         byVerificationLevel, datasetGrowth, topContributors, sharingEnabled]
+      properties:
+        totalRecords:                { type: integer }
+        approvedRecords:             { type: integer }
+        approvedForTraining:         { type: integer }
+        pendingReview:               { type: integer }
+        aiAccuracyRate:              { type: number }
+        aiVsTechnicianAgreementRate: { type: number }
+        technicianCorrectionRate:    { type: number }
+        managerApprovalRate:         { type: number }
+        sharingEnabled:              { type: boolean }
+        mostSubmittedCategories:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceCategoryStat" }
+        mostVerifiedCategories:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceCategoryStat" }
+        byVerificationLevel:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceLevelStat" }
+        datasetGrowth:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceGrowthPoint" }
+        topContributors:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceContributor" }
+
+    # ── REPORT SCHEMAS ──────────────────────────────────────────────────────────
+    Report:
+      type: object
+      required: [id, inspectionId, title, status, createdAt]
+      properties:
+        id:              { type: integer }
+        inspectionId:    { type: integer }
+        title:           { type: string }
+        clientName:      { type: ["string", "null"] }
+        siteAddress:     { type: string }
+        status:          { type: string }
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        recommendations:
+          type: array
+          items: { type: string }
+        treatmentNotes:  { type: ["string", "null"] }
+        exclusionOpportunities:
+          type: array
+          items: { type: string }
+        technicianName:  { type: string }
+        inspectionDate:  { type: string }
+        severity:        { type: ["string", "null"] }
+        pdfUrl:          { type: ["string", "null"] }
+        aiNarrative:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/AiReportNarrative"
+        createdAt:       { type: string }
+
+    AiReportNarrative:
+      type: object
+      required: [executiveSummary, inspectionFindings, evidenceObserved, pestActivityAssessment, structuralDeficiencies, sanitationConcerns, recommendedCorrectiveActions, monitoringRecommendations, followUpSchedule, technicianNotes, managerReviewNotes, propertyType, model, generatedAt]
+      properties:
+        executiveSummary:             { type: string }
+        inspectionFindings:           { type: string }
+        evidenceObserved:             { type: string }
+        pestActivityAssessment:       { type: string }
+        structuralDeficiencies:       { type: string }
+        sanitationConcerns:           { type: string }
+        recommendedCorrectiveActions: { type: array, items: { type: string } }
+        monitoringRecommendations:    { type: array, items: { type: string } }
+        followUpSchedule:             { type: string }
+        technicianNotes:              { type: string }
+        managerReviewNotes:           { type: string }
+        propertyType:                 { type: string }
+        model:                        { type: string }
+        generatedAt:                  { type: string }
+        # Optional for backward compatibility with narratives generated before
+        # these sections existed; always present on new generations.
+        conduciveConditions:          { type: string }
+        customerRecommendations:      { type: array, items: { type: string } }
+
+    GenerateNarrativeInput:
+      type: object
+      properties:
+        refreshFindings:
+          type: boolean
+          description: >-
+            When true, re-snapshot the report's findings and recommendations
+            from the inspection's latest AI analysis before generating the
+            narrative (used by the live report builder).
+
+    ReportInput:
+      type: object
+      required: [inspectionId, title]
+      properties:
+        inspectionId:   { type: integer }
+        title:          { type: string }
+        treatmentNotes: { type: string }
+        includePhotos:  { type: boolean }
+        includeAiFindings: { type: boolean }
+
+    # ── ANALYTICS SCHEMAS ───────────────────────────────────────────────────────
+    AnalyticsDashboard:
+      type: object
+      required: [totalInspections, completedInspections, openInspections, avgFindingsPerInspection, topPestTypes, recentActivity, inspectionsByStatus, monthlyInspections]
+      properties:
+        totalInspections:          { type: integer }
+        completedInspections:      { type: integer }
+        openInspections:           { type: integer }
+        avgFindingsPerInspection:  { type: number }
+        totalReports:              { type: integer }
+        photosCaptured:            { type: integer }
+        videosCaptured:            { type: integer }
+        aiAnalysesCompleted:       { type: integer }
+        avgAiConfidence:           { type: number }
+        topPestTypes:
+          type: array
+          items:
+            type: object
+            required: [pestType, count]
+            properties:
+              pestType: { type: string }
+              count:    { type: integer }
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+        inspectionsByStatus:
+          type: array
+          items:
+            type: object
+            required: [status, count]
+            properties:
+              status: { type: string }
+              count:  { type: integer }
+        monthlyInspections:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendDataPoint"
+
+    TrendDataPoint:
+      type: object
+      required: [date, value]
+      properties:
+        date:     { type: string }
+        value:    { type: number }
+        category: { type: ["string", "null"] }
+        label:    { type: ["string", "null"] }
+
+    ActivityItem:
+      type: object
+      required: [id, type, description, technicianName, createdAt]
+      properties:
+        id:             { type: integer }
+        type:           { type: string }
+        description:    { type: string }
+        technicianName: { type: string }
+        siteAddress:    { type: ["string", "null"] }
+        createdAt:      { type: string }
+
+    TechnicianPerformance:
+      type: object
+      required: [technicianName, inspectionCount, avgFindingsPerInspection, avgAiConfidence, completionRate]
+      properties:
+        technicianName:             { type: string }
+        technicianId:               { type: ["string", "null"] }
+        inspectionCount:            { type: integer }
+        avgFindingsPerInspection:   { type: number }
+        avgAiConfidence:            { type: number }
+        completionRate:             { type: number }
+        badge:                      { type: ["string", "null"] }
+
+    InfestationRisk:
+      type: object
+      required: [overallRisk, riskByPestType, riskTrend, highRiskSites]
+      properties:
+        overallRisk:   { type: string }
+        riskScore:     { type: number }
+        riskByPestType:
+          type: array
+          items:
+            type: object
+            required: [pestType, riskLevel, count]
+            properties:
+              pestType:  { type: string }
+              riskLevel: { type: string }
+              count:     { type: integer }
+        riskTrend:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendDataPoint"
+        highRiskSites:
+          type: array
+          items:
+            type: object
+            required: [siteAddress, riskScore, lastInspected]
+            properties:
+              siteAddress:   { type: string }
+              riskScore:     { type: number }
+              lastInspected: { type: string }
+
+    # ── INTELLIGENCE SCHEMAS ────────────────────────────────────────────────────
+    OpportunityItem:
+      type: object
+      required: [id, inspectionId, siteAddress, propertyType, type, typeLabel, category, finding, severity, confidence, recommendation, documented]
+      properties:
+        id:            { type: string }
+        inspectionId:  { type: integer }
+        siteAddress:   { type: string }
+        propertyType:  { type: string }
+        type:          { type: string }
+        typeLabel:     { type: string }
+        category:      { type: string }
+        finding:       { type: string }
+        location:      { type: ["string", "null"] }
+        imageUrl:      { type: ["string", "null"] }
+        severity:      { type: string }
+        confidence:    { type: number }
+        recommendation: { type: string }
+        documented:    { type: boolean }
+
+    OpportunityIntelligence:
+      type: object
+      required: [totalOpportunities, exclusionCount, structuralCount, sanitationCount, moistureCount, followUpCount, unreportedCount, highRiskPropertyCount, byType, opportunities]
+      properties:
+        totalOpportunities:    { type: integer }
+        exclusionCount:        { type: integer }
+        structuralCount:       { type: integer }
+        sanitationCount:       { type: integer }
+        moistureCount:         { type: integer }
+        followUpCount:         { type: integer }
+        unreportedCount:       { type: integer }
+        highRiskPropertyCount: { type: integer }
+        byType:
+          type: array
+          items:
+            type: object
+            required: [type, label, count]
+            properties:
+              type:  { type: string }
+              label: { type: string }
+              count: { type: integer }
+        opportunities:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpportunityItem"
+
+    CallbackChain:
+      type: object
+      required: [id, finding, outcome, outcomeLabel, propertyType, pestType, createdAt]
+      properties:
+        id:                 { type: integer }
+        finding:            { type: string }
+        recommendation:     { type: ["string", "null"] }
+        followUpVisit:      { type: ["string", "null"] }
+        outcome:            { type: string }
+        outcomeLabel:       { type: string }
+        propertyType:       { type: string }
+        pestType:           { type: string }
+        callbackCause:      { type: ["string", "null"] }
+        callbackCauseLabel: { type: ["string", "null"] }
+        createdAt:          { type: string }
+
+    CallbackIntelligence:
+      type: object
+      required: [totalChains, totalCallbacks, callbackRate, resolvedCount, activityReducedCount, topCauses, recurringFindings, byPropertyType, byPestType, pestRecurrence, trend, conduciveConditions, chains]
+      properties:
+        totalChains:          { type: integer }
+        totalCallbacks:       { type: integer }
+        callbackRate:         { type: integer }
+        resolvedCount:        { type: integer }
+        activityReducedCount: { type: integer }
+        topCauses:
+          type: array
+          items:
+            type: object
+            required: [cause, label, count]
+            properties:
+              cause: { type: string }
+              label: { type: string }
+              count: { type: integer }
+        recurringFindings:
+          type: array
+          items:
+            type: object
+            required: [finding, count]
+            properties:
+              finding: { type: string }
+              count:   { type: integer }
+        byPropertyType:
+          type: array
+          items:
+            type: object
+            required: [propertyType, total, callbacks]
+            properties:
+              propertyType: { type: string }
+              total:        { type: integer }
+              callbacks:    { type: integer }
+        byPestType:
+          type: array
+          items:
+            type: object
+            required: [pestType, total, callbacks]
+            properties:
+              pestType:  { type: string }
+              total:     { type: integer }
+              callbacks: { type: integer }
+        pestRecurrence:
+          type: array
+          items:
+            type: object
+            required: [pestType, count, recurrenceRate]
+            properties:
+              pestType:       { type: string }
+              count:          { type: integer }
+              recurrenceRate: { type: integer }
+        trend:
+          type: array
+          items:
+            type: object
+            required: [month, label, total, callbacks]
+            properties:
+              month:     { type: string }
+              label:     { type: string }
+              total:     { type: integer }
+              callbacks: { type: integer }
+        conduciveConditions:
+          type: array
+          items:
+            type: object
+            required: [condition, count]
+            properties:
+              condition: { type: string }
+              count:     { type: integer }
+        chains:
+          type: array
+          items:
+            $ref: "#/components/schemas/CallbackChain"
+
+    HighRiskProperty:
+      type: object
+      required: [inspectionId, siteAddress, propertyType, riskScore, conditions, findingCount]
+      properties:
+        inspectionId: { type: integer }
+        siteAddress:  { type: string }
+        propertyType: { type: string }
+        riskScore:    { type: number }
+        conditions:
+          type: array
+          items: { type: string }
+        findingCount: { type: integer }
+
+    PropertyRiskInsights:
+      type: object
+      required: [riskIndicators, recurringConditions, highRiskProperties, riskTrend]
+      properties:
+        riskIndicators:
+          type: array
+          items:
+            type: object
+            required: [condition, count]
+            properties:
+              condition: { type: string }
+              count:     { type: integer }
+        recurringConditions:
+          type: array
+          items:
+            type: object
+            required: [condition, count]
+            properties:
+              condition: { type: string }
+              count:     { type: integer }
+        highRiskProperties:
+          type: array
+          items:
+            $ref: "#/components/schemas/HighRiskProperty"
+        riskTrend:
+          type: array
+          items:
+            type: object
+            required: [month, label, value]
+            properties:
+              month: { type: string }
+              label: { type: string }
+              value: { type: integer }
+
+    # ── BRANDING SCHEMAS ────────────────────────────────────────────────────────
+    BrandingProfile:
+      type: object
+      required: [id, name, isDefault, isActive, companyName, poweredByVisible, createdAt, updatedAt]
+      properties:
+        id:                  { type: integer }
+        name:                { type: string }
+        isDefault:           { type: boolean }
+        isActive:            { type: boolean }
+        companyName:         { type: string }
+        tagline:             { type: ["string", "null"] }
+        companyAddress:      { type: ["string", "null"] }
+        companyPhone:        { type: ["string", "null"] }
+        companyEmail:        { type: ["string", "null"] }
+        companyWebsite:      { type: ["string", "null"] }
+        licenseNumber:       { type: ["string", "null"] }
+        logoUrl:             { type: ["string", "null"] }
+        appIconUrl:          { type: ["string", "null"] }
+        primaryColor:        { type: ["string", "null"] }
+        secondaryColor:      { type: ["string", "null"] }
+        accentColor:         { type: ["string", "null"] }
+        reportFooterText:    { type: ["string", "null"] }
+        supportInfo:         { type: ["string", "null"] }
+        signatureDisclaimer: { type: ["string", "null"] }
+        emailSenderName:     { type: ["string", "null"] }
+        emailReplyTo:        { type: ["string", "null"] }
+        emailFooter:         { type: ["string", "null"] }
+        poweredByVisible:    { type: boolean }
+        createdAt:           { type: string }
+        updatedAt:           { type: string }
+
+    BrandingProfileInput:
+      type: object
+      properties:
+        name:                { type: string }
+        companyName:         { type: string }
+        tagline:             { type: ["string", "null"] }
+        companyAddress:      { type: ["string", "null"] }
+        companyPhone:        { type: ["string", "null"] }
+        companyEmail:        { type: ["string", "null"] }
+        companyWebsite:      { type: ["string", "null"] }
+        licenseNumber:       { type: ["string", "null"] }
+        logoUrl:             { type: ["string", "null"] }
+        appIconUrl:          { type: ["string", "null"] }
+        primaryColor:        { type: ["string", "null"] }
+        secondaryColor:      { type: ["string", "null"] }
+        accentColor:         { type: ["string", "null"] }
+        reportFooterText:    { type: ["string", "null"] }
+        supportInfo:         { type: ["string", "null"] }
+        signatureDisclaimer: { type: ["string", "null"] }
+        emailSenderName:     { type: ["string", "null"] }
+        emailReplyTo:        { type: ["string", "null"] }
+        emailFooter:         { type: ["string", "null"] }
+        poweredByVisible:    { type: boolean }
+
+    # ── PROPERTY SCHEMAS ────────────────────────────────────────────────────────
+    Hotspot:
+      type: object
+      required: [zone, description, severity]
+      properties:
+        zone:        { type: string }
+        description: { type: string }
+        severity:    { type: string, enum: [low, medium, high] }
+
+    PropertySummary:
+      type: object
+      required: [addressKey, siteAddress, propertyType, inspectionCount, hotspotCount, noteCount, openIssueCount, hasProfile]
+      properties:
+        addressKey:      { type: string }
+        siteAddress:     { type: string }
+        clientName:      { type: ["string", "null"] }
+        propertyType:    { type: string }
+        inspectionCount: { type: integer }
+        hotspotCount:    { type: integer }
+        noteCount:       { type: integer }
+        openIssueCount:  { type: integer }
+        lastVisit:       { type: ["string", "null"] }
+        hasProfile:      { type: boolean }
+
+    RecurringIssue:
+      type: object
+      required: [category, count, severity]
+      properties:
+        category:          { type: string }
+        count:             { type: integer }
+        severity:          { type: string }
+        lastSeen:          { type: ["string", "null"] }
+        sampleDescription: { type: ["string", "null"] }
+
+    HistoricalPhoto:
+      type: object
+      required: [url, inspectionId]
+      properties:
+        url:          { type: string }
+        caption:      { type: ["string", "null"] }
+        inspectionId: { type: integer }
+        createdAt:    { type: ["string", "null"] }
+
+    VisitHistoryItem:
+      type: object
+      required: [inspectionId, createdAt, status, findingsCount]
+      properties:
+        inspectionId:   { type: integer }
+        createdAt:      { type: string }
+        status:         { type: string }
+        technicianName: { type: ["string", "null"] }
+        severity:       { type: ["string", "null"] }
+        findingsCount:  { type: integer }
+        completedAt:    { type: ["string", "null"] }
+
+    PropertyNote:
+      type: object
+      required: [id, addressKey, note, createdAt]
+      properties:
+        id:         { type: integer }
+        addressKey: { type: string }
+        note:       { type: string }
+        zone:       { type: ["string", "null"] }
+        category:   { type: ["string", "null"] }
+        authorName: { type: ["string", "null"] }
+        createdAt:  { type: string }
+
+    PropertyFeed:
+      type: object
+      required: [addressKey, siteAddress, propertyType, hasProfile, hotspots, recurringIssues, historicalPhotos, visitHistory, notes]
+      properties:
+        addressKey:          { type: string }
+        siteAddress:         { type: string }
+        clientName:          { type: ["string", "null"] }
+        propertyType:        { type: string }
+        technicianKnowledge: { type: ["string", "null"] }
+        hasProfile:          { type: boolean }
+        updatedAt:           { type: ["string", "null"] }
+        hotspots:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hotspot"
+        recurringIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecurringIssue"
+        historicalPhotos:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoricalPhoto"
+        visitHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/VisitHistoryItem"
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PropertyNote"
+
+    PropertyLookupResult:
+      type: object
+      required: [matchStatus, suggestions]
+      properties:
+        matchStatus: { type: string }
+        feed:
+          $ref: "#/components/schemas/PropertyFeed"
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PropertySummary"
+
+    PropertyProfileUpdate:
+      type: object
+      properties:
+        siteAddress:         { type: string }
+        clientName:          { type: string }
+        propertyType:        { type: string }
+        technicianKnowledge: { type: string }
+        hotspots:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hotspot"
+
+    PropertyNoteInput:
+      type: object
+      required: [note]
+      properties:
+        note:       { type: string }
+        zone:       { type: string }
+        category:   { type: string }
+        authorName: { type: string }
+
+    SalesOpportunity:
+      type: object
+      required: [id, companyId, inspectionId, propertyAddress, category, title, rationale, fingerprint, evidenceFindingIds, evidenceImagePaths, estimatedValueTier, confidence, status, assignedToUserId, createdAt, updatedAt]
+      properties:
+        id:                 { type: integer }
+        companyId:          { type: integer }
+        inspectionId:       { type: integer }
+        propertyAddress:    { type: string }
+        category:           { type: string, enum: [revenue, additional_service, structural, conducive_condition, property_risk, pest_trend, preventative] }
+        title:              { type: string }
+        rationale:          { type: string }
+        fingerprint:        { type: string }
+        evidenceFindingIds:
+          type: array
+          items: { type: integer }
+        evidenceImagePaths:
+          type: array
+          items: { type: string }
+        estimatedValueTier: { type: string, enum: [low, medium, high] }
+        confidence:         { type: number }
+        status:             { type: string, enum: [new, reviewed, quoted, won, dismissed, lost] }
+        priority:           { type: integer }
+        riskLevel:          { type: ["string", "null"], enum: [low, medium, high, critical, null] }
+        estimatedAnnualValue: { type: ["integer", "null"] }
+        assignedToUserId:   { type: ["integer", "null"] }
+        createdAt:          { type: string }
+        updatedAt:          { type: string }
+
+    SalesOpportunityEvent:
+      type: object
+      required: [id, opportunityId, action, createdAt]
+      properties:
+        id:            { type: integer }
+        opportunityId: { type: integer }
+        userId:        { type: ["integer", "null"] }
+        action:        { type: string, enum: [created, strengthened, viewed, status_changed, assigned, note_added, value_set] }
+        detail:        { type: ["object", "null"], additionalProperties: true }
+        createdAt:     { type: string }
+
+    SalesOpportunityDetail:
+      allOf:
+        - $ref: "#/components/schemas/SalesOpportunity"
+        - type: object
+          required: [events]
+          properties:
+            events:
+              type: array
+              items:
+                $ref: "#/components/schemas/SalesOpportunityEvent"
+
+    SalesOpportunityUpdate:
+      type: object
+      properties:
+        status:           { type: string, enum: [new, reviewed, quoted, won, dismissed, lost] }
+        assignedToUserId: { type: ["integer", "null"] }
+        estimatedAnnualValue: { type: ["integer", "null"] }
+
+    SalesOpportunityTrends:
+      type: object
+      required: [total, byCategory, byStatus, byTier, topProperties]
+      properties:
+        total: { type: integer }
+        byCategory:
+          type: object
+          additionalProperties: { type: integer }
+        byStatus:
+          type: object
+          additionalProperties: { type: integer }
+        byTier:
+          type: object
+          additionalProperties: { type: integer }
+        topProperties:
+          type: array
+          items:
+            type: object
+            required: [propertyAddress, count]
+            properties:
+              propertyAddress: { type: string }
+              count:           { type: integer }
+
+    OpportunitySettings:
+      type: object
+      required: [id, companyId, enabled, minConfidence, enabledCategories, updatedAt]
+      properties:
+        id:            { type: integer }
+        companyId:     { type: integer }
+        enabled:       { type: boolean }
+        minConfidence: { type: number }
+        enabledCategories:
+          type: ["array", "null"]
+          items: { type: string }
+        updatedAt:     { type: string }
+
+    OpportunitySettingsUpdate:
+      type: object
+      properties:
+        enabled:       { type: boolean }
+        minConfidence: { type: number }
+        enabledCategories:
+          type: ["array", "null"]
+          items: { type: string }
+
+    OpportunityNote:
+      type: object
+      required: [id, opportunityId, authorUserId, authorRole, body, createdAt]
+      properties:
+        id:            { type: integer }
+        companyId:     { type: integer }
+        opportunityId: { type: integer }
+        authorUserId:  { type: integer }
+        authorRole:    { type: string }
+        body:          { type: string }
+        createdAt:     { type: string }
+
+    OpportunityNoteCreate:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+
+    CustomerSummaryUpdate:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+
+    CustomerSummaryApprove:
+      type: object
+      properties:
+        expiresInDays: { type: integer, minimum: 1, maximum: 90 }
+
+    ScorecardComponents:
+      type: object
+      required: [photoCoverage, evidenceQuality, avgConfidence, recommendationCoverage]
+      properties:
+        photoCoverage:          { type: integer }
+        evidenceQuality:        { type: integer }
+        avgConfidence:          { type: integer }
+        recommendationCoverage: { type: integer }
+
+    MissedOpportunity:
+      type: object
+      required: [findingId, serviceType, description, severity]
+      properties:
+        findingId:   { type: integer }
+        serviceType: { type: string }
+        description: { type: string }
+        severity:    { type: string }
+
+    InspectionScorecard:
+      type: object
+      required: [id, companyId, inspectionId, technicianName, qualityScore, components, missedOpportunities, riskScore, riskLevel, findingsCount, photosAnalyzed, createdAt, updatedAt]
+      properties:
+        id:             { type: integer }
+        companyId:      { type: integer }
+        inspectionId:   { type: integer }
+        technicianName: { type: string }
+        qualityScore:   { type: integer }
+        components:
+          $ref: "#/components/schemas/ScorecardComponents"
+        missedOpportunities:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissedOpportunity"
+        riskScore:      { type: integer }
+        riskLevel:      { type: string, enum: [low, medium, high, critical] }
+        findingsCount:  { type: integer }
+        photosAnalyzed: { type: integer }
+        createdAt:      { type: string }
+        updatedAt:      { type: string }
+
+    InspectionScorecardListItem:
+      allOf:
+        - $ref: "#/components/schemas/InspectionScorecard"
+        - type: object
+          required: [siteAddress, inspectionDate]
+          properties:
+            siteAddress:    { type: string }
+            inspectionDate: { type: string }
+
+    ScorecardSummary:
+      type: object
+      required: [totalScorecards, avgQuality, avgRisk, riskDistribution, technicians, missedByService, topConduciveConditions, topRecommendedServices]
+      properties:
+        totalScorecards: { type: integer }
+        avgQuality:      { type: integer }
+        avgRisk:         { type: integer }
+        riskDistribution:
+          type: object
+          additionalProperties: { type: integer }
+        technicians:
+          type: array
+          items:
+            type: object
+            required: [technicianName, inspections, avgQuality, missedOpportunities]
+            properties:
+              technicianName:      { type: string }
+              inspections:         { type: integer }
+              avgQuality:          { type: integer }
+              missedOpportunities: { type: integer }
+        missedByService:
+          type: object
+          additionalProperties: { type: integer }
+        topConduciveConditions:
+          type: array
+          items:
+            type: object
+            required: [label, occurrences]
+            properties:
+              label:       { type: string }
+              occurrences: { type: integer }
+        topRecommendedServices:
+          type: array
+          items:
+            type: object
+            required: [label, occurrences]
+            properties:
+              label:       { type: string }
+              occurrences: { type: integer }
+
+    CustomerSummary:
+      type: object
+      required: [id, companyId, inspectionId, body, status, approvedByUserId, approvedAt, shareToken, shareExpiresAt, createdAt, updatedAt]
+      properties:
+        id:               { type: integer }
+        companyId:        { type: integer }
+        inspectionId:     { type: integer }
+        body:             { type: string }
+        status:           { type: string, enum: [draft, approved] }
+        approvedByUserId: { type: ["integer", "null"] }
+        approvedAt:       { type: ["string", "null"] }
+        shareToken:       { type: ["string", "null"] }
+        shareExpiresAt:   { type: ["string", "null"] }
+        createdAt:        { type: string }
+        updatedAt:        { type: string }
+
+    SalesProposal:
+      type: object
+      required: [id, companyId, propertyAddress, title, status, opportunityIds, intro, notes, createdByUserId, createdAt, updatedAt]
+      properties:
+        id:              { type: integer }
+        companyId:       { type: integer }
+        propertyAddress: { type: string }
+        title:           { type: string }
+        status:          { type: string, enum: [draft, sent, accepted, declined] }
+        opportunityIds:
+          type: array
+          items: { type: integer }
+        intro:           { type: ["string", "null"] }
+        notes:           { type: ["string", "null"] }
+        createdByUserId: { type: integer }
+        createdAt:       { type: string }
+        updatedAt:       { type: string }
+
+    SalesProposalDetail:
+      allOf:
+        - $ref: "#/components/schemas/SalesProposal"
+        - type: object
+          required: [opportunities]
+          properties:
+            opportunities:
+              type: array
+              items:
+                $ref: "#/components/schemas/SalesOpportunity"
+
+    SalesProposalCreate:
+      type: object
+      required: [title, propertyAddress, opportunityIds]
+      properties:
+        title:           { type: string }
+        propertyAddress: { type: string }
+        opportunityIds:
+          type: array
+          items: { type: integer }
+        intro: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+
+    SalesProposalUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        intro: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        status: { type: string, enum: [draft, sent, accepted, declined] }
+        opportunityIds:
+          type: array
+          items: { type: integer }
+
+    # ── ROLE BRIEFING SCHEMAS ────────────────────────────────────────────────────
+    BriefingRecentInspection:
+      type: object
+      required: [id, siteAddress, status, findingsCount, createdAt]
+      properties:
+        id:            { type: integer }
+        siteAddress:   { type: string }
+        status:        { type: string }
+        findingsCount: { type: integer }
+        createdAt:     { type: string }
+
+    TechnicianBriefing:
+      type: object
+      required:
+        [totalInspections, completedInspections, openInspections, completedThisWeek, recentInspections]
+      properties:
+        totalInspections:     { type: integer }
+        completedInspections: { type: integer }
+        openInspections:      { type: integer }
+        completedThisWeek:    { type: integer }
+        recentInspections:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingRecentInspection" }
+
+    BriefingTopOpportunity:
+      type: object
+      required:
+        [id, inspectionId, title, category, propertyAddress, priority, estimatedValueTier, status, createdAt]
+      properties:
+        id:                 { type: integer }
+        inspectionId:       { type: integer }
+        title:              { type: string }
+        category:           { type: string }
+        propertyAddress:    { type: string }
+        priority:           { type: integer }
+        estimatedValueTier: { type: string }
+        riskLevel:          { type: ["string", "null"] }
+        status:             { type: string }
+        createdAt:          { type: string }
+
+    SalesBriefing:
+      type: object
+      required: [pipeline, openCount, pipelineValue, staleCount, topOpportunities, proposals]
+      properties:
+        pipeline:
+          type: object
+          required: [new, reviewed, quoted, won, lost, dismissed]
+          properties:
+            new:       { type: integer }
+            reviewed:  { type: integer }
+            quoted:    { type: integer }
+            won:       { type: integer }
+            lost:      { type: integer }
+            dismissed: { type: integer }
+        openCount:     { type: integer }
+        pipelineValue: { type: integer }
+        staleCount:    { type: integer }
+        topOpportunities:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingTopOpportunity" }
+        proposals:
+          type: object
+          required: [draft, sent, accepted, declined]
+          properties:
+            draft:    { type: integer }
+            sent:     { type: integer }
+            accepted: { type: integer }
+            declined: { type: integer }
+
+    BriefingApprovalItem:
+      type: object
+      required: [id, inspectionId, siteAddress, createdAt, ageDays]
+      properties:
+        id:           { type: integer }
+        inspectionId: { type: integer }
+        siteAddress:  { type: string }
+        createdAt:    { type: string }
+        ageDays:      { type: integer }
+
+    BriefingTechnicianStat:
+      type: object
+      required: [technicianName, scorecards, avgQuality]
+      properties:
+        technicianName: { type: string }
+        scorecards:     { type: integer }
+        avgQuality:     { type: integer }
+
+    BriefingCompletion:
+      type: object
+      required: [id, siteAddress, technicianName, findingsCount]
+      properties:
+        id:             { type: integer }
+        siteAddress:    { type: string }
+        technicianName: { type: string }
+        completedAt:    { type: ["string", "null"] }
+        findingsCount:  { type: integer }
+
+    ManagerBriefing:
+      type: object
+      required: [pendingApprovals, approvalsQueue, team, recentCompletions]
+      properties:
+        pendingApprovals: { type: integer }
+        approvalsQueue:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingApprovalItem" }
+        team:
+          type: object
+          required: [scorecardCount30d, highRisk30d, missedOpportunities30d, technicians]
+          properties:
+            scorecardCount30d:      { type: integer }
+            avgQualityScore30d:     { type: ["integer", "null"] }
+            highRisk30d:            { type: integer }
+            missedOpportunities30d: { type: integer }
+            technicians:
+              type: array
+              items: { $ref: "#/components/schemas/BriefingTechnicianStat" }
+        recentCompletions:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingCompletion" }
+
+    BriefingAlert:
+      type: object
+      required: [type, severity, message, count]
+      properties:
+        type:
+          type: string
+          enum: [approvals_aging, quality_low, high_risk, stale_pipeline, share_links_expiring]
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        message: { type: string }
+        count:   { type: integer }
+
+    OwnerBriefing:
+      type: object
+      required: [kpis, alerts]
+      properties:
+        kpis:
+          type: object
+          required:
+            [completions7d, completions30d, openOpportunities, pipelineValue, approvedSummaries30d]
+          properties:
+            completions7d:        { type: integer }
+            completions30d:       { type: integer }
+            openOpportunities:    { type: integer }
+            pipelineValue:        { type: integer }
+            avgQualityScore30d:   { type: ["integer", "null"] }
+            approvedSummaries30d: { type: integer }
+        alerts:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingAlert" }
+
+    RoleBriefing:
+      type: object
+      required: [role, generatedAt]
+      properties:
+        role:
+          type: string
+          enum: [technician, sales, manager, owner]
+        generatedAt: { type: string }
+        technician:  { $ref: "#/components/schemas/TechnicianBriefing" }
+        sales:       { $ref: "#/components/schemas/SalesBriefing" }
+        manager:     { $ref: "#/components/schemas/ManagerBriefing" }
+        owner:       { $ref: "#/components/schemas/OwnerBriefing" }

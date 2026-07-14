@@ -1,0 +1,300 @@
+ReadyLoq v2 Refinement Prompt
+
+The current ReadyLoq design direction is correct. Do not redesign the application from scratch.
+
+Maintain:
+	•	Dark theme
+	•	Camera-first design
+	•	Large Start Inspection button
+	•	AI Inspection Copilot concept
+	•	Multifamily support
+	•	Voice-first workflow
+
+The goal is now to make ReadyLoq feel like a professional field inspection tool used by pest control technicians every day.
+
+TECHNICIAN-FIRST EXPERIENCE
+
+Technicians should spend 90% of their time inside:
+	•	Scout
+	•	Inspection Camera
+	•	Evidence Review
+	•	Reports
+
+The AI should remain mostly invisible.
+
+Avoid overusing the term “AI”.
+
+Replace:
+
+“AI Findings”
+
+with
+
+“Findings”
+
+Replace:
+
+“AI Active”
+
+with
+
+“Inspection Active”
+
+or a subtle ReadyLoq indicator.
+
+BOTTOM NAVIGATION
+
+Replace:
+
+Jobs
+
+with
+
+Stops
+
+Replace:
+
+AI
+
+with
+
+Evidence
+
+Final Navigation:
+
+Scout
+Stops
+Evidence
+Reports
+Learn
+
+SCOUT SCREEN
+
+Keep the current Start Inspection experience.
+
+Add:
+
+Current Stop
+
+Property Name
+
+Address
+
+Property Type
+
+Service Type
+
+Example:
+
+123 Main Street
+Unit 2A
+Multifamily Inspection
+
+Large Start Inspection button remains primary action.
+
+PROPERTY SETUP IMPROVEMENTS
+
+Reduce manual typing.
+
+Use:
+	•	GPS auto-fill
+	•	Recent properties
+	•	Property history
+	•	Saved locations
+
+Technician name should come from login profile.
+
+Do not ask for technician name before every inspection.
+
+LIVE INSPECTION SCREEN
+
+This should be the most important screen in the app.
+
+Maintain:
+	•	Recording timer
+	•	Voice commands
+	•	Detection indicators
+	•	AI-assisted inspection
+
+Add:
+
+Live camera feed
+
+Torch button
+
+Photo capture button
+
+Voice note button
+
+Pause recording button
+
+End inspection button
+
+Evidence counter
+
+VOICE NOTES
+
+Technician should be able to say:
+
+“Fresh mouse droppings behind refrigerator.”
+
+“Utility penetration under sink.”
+
+“Heavy German roach activity.”
+
+“Missing door sweep rear exit.”
+
+Convert speech to structured notes automatically.
+
+Display:
+
+Voice Note Captured
+
+without interrupting inspection.
+
+EVIDENCE REVIEW
+
+After inspection show:
+
+Inspection Summary
+
+Duration
+
+Evidence Captured
+
+Findings
+
+Voice Notes
+
+Recommendations
+
+Each finding should display:
+
+Image
+
+Timestamp
+
+Finding Type
+
+Confidence Level
+
+Technician Review
+
+Actions:
+
+Confirm
+
+Reject
+
+Add Note
+
+REPORT GENERATION
+
+Generate professional pest control reports.
+
+Sections:
+
+Findings
+
+Evidence Photos
+
+Recommendations
+
+Conducive Conditions
+
+Exclusion Opportunities
+
+Treatment Notes
+
+Customer Notes
+
+Technician Notes
+
+Export:
+
+PDF
+
+Email
+
+Future PestPac Integration Placeholder
+
+MULTIFAMILY MODE
+
+Expand support for:
+
+Hallways
+
+Laundry Rooms
+
+Trash Rooms
+
+Boiler Rooms
+
+Utility Closets
+
+Basements
+
+Exterior Areas
+
+Apartment Units
+
+The AI should track inspection context and recognize area types.
+
+Provide helpful suggestions such as:
+
+“Common hallways may provide additional evidence.”
+
+“Utility rooms often contain conducive conditions.”
+
+Do not use compliance language.
+
+Do not score technicians.
+
+READYLOQ LEARN
+
+Training section should use real inspection examples.
+
+Topics:
+
+Rodent Evidence
+
+Cockroach Evidence
+
+Termite Evidence
+
+Entry Points
+
+Conducive Conditions
+
+Moisture Issues
+
+Exclusion Opportunities
+
+The goal is technician development, not technician evaluation.
+
+REMOVE OR HIDE
+
+Dataset Management
+
+AI Training Controls
+
+Analytics
+
+Admin Tools
+
+These should be moved into a future desktop-only ReadyLoq Command portal.
+
+FINAL PRODUCT VISION
+
+ReadyLoq should feel like:
+
+A professional pest technician’s body camera, inspection assistant, evidence recorder, and report writer.
+
+It should not feel like:
+
+CRM software
+Management software
+Employee monitoring software
+Traditional pest control software
+
+The technician should feel that ReadyLoq helps them find, document, and explain what they see while reducing paperwork and improving inspection quality.

@@ -1,0 +1,12 @@
+- [ReadyLoq Architecture](readyloq-architecture.md) — stack, conventions, API routes, real-capture/no-simulation beta model (0–1 confidence, batched AI), Wouter base path fix
+- [ReadyLoq multi-tenancy](readyloq-multitenancy.md) — per-company isolation rules, reserved platform/legacy companies, storage scoping, vitest harness, frontend typecheck gotcha
+- [API Server Testing](api-server-testing.md) — vitest + isolated `<db>_test` DB + Clerk getAuth mock; pre-existing TS7030 typecheck failures are baseline
+- [EAS build setup](eas-monorepo.md) — artifacts/readyloq-app is the REAL app (readyloq-mobile/ is a decoy skeleton); build with EAS_NO_VCS=1 + node pinned in eas.json
+- [ReadyLoq native Windows/EAS build](readyloq-native-windows-build.md) — "build.ninja still dirty" is a Windows toolchain issue not a repo bug; EAS cloud build bypasses it; standalone eas.json setup
+- [Clerk Expo SSO redirect](clerk-expo-sso-redirect.md) — release APKs need makeRedirectUri({scheme, path}) + a callback route; bare makeRedirectUri() misroutes the OAuth return (opens email app)
+- [Inspection Memory](inspection-memory.md) — prior-visit compare: null-zone priors never highlight, no fabricated station #s, strict company+same-address scope, memory_* guidance priorities, old-client safe
+- [Scalability & concurrency risks](readyloq-scalability-risks.md) — pre-scale gaps: untuned pool, analyze lacks per-inspection advisory lock, non-idempotent media-register, missing indexes, full-res images end-to-end
+- [AnalysisResult response shape](analysis-response-shape.md) — computed summaries derive-on-read in serializeResult (not persisted); mark them optional (not required) in openapi for old-client compat
+- [Coverage model](readyloq-coverage-model.md) — zone completeness; live & finalize must agree on same inputs; async-dedupe carry-over keeps still-saved photos' zone+finding
+- [Offline sync two-writer rule](offline-sync-two-writers.md) — all local-record writes must be serialized merge-updates; sync single-flight; inspections finish "completed" but reports "complete"
+- [Camera/vision extensibility](readyloq-camera-extensibility.md) — abstraction IMPLEMENTED: capability model (pull/stream/push) + provider-registry + reserved future-source stubs; only native drivers + session lifecycle remain
