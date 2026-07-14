@@ -26,19 +26,22 @@ description: Which packages have been extracted, what changed, what's next in th
   typechecking `@platform/shared-types` (project references require dist/.d.ts files).
 - Vitest bumped from ^1.6.0 to ^4.1.8 in platform packages (1.6.x blocked by Replit firewall).
 
-## Next (Phase 2 — infrastructure, one PR per package)
+### Phase 2 — @platform/camera-core (PR 2 complete)
+- Platform commit: 7a14c212 (vybelivemedia-ops/platform)
+- readyloq-mobile commit: cc596175 (vybelivemedia-ops/readyloq-mobile)
+- Replaced wrong scaffold types (string-literal ProviderAvailability, 4-state ProviderStatus, CameraProvider unified interface)
+- Added canonical types from ReadyLoq: ProviderAvailability (discriminated union), ProviderStatus (6-state),
+  EvidenceIntake, CaptureProviderBase, RequestCaptureProvider, CaptureSession, SessionCaptureProvider,
+  PushCaptureSession, PushCaptureProvider, CaptureProvider, VisionProvider
+- Updated ProviderRegistry to use CaptureProvider (canonical union) instead of removed CameraProvider
+- Kept scaffold abstractions: AssessEvidence, CaptureModeRouter, ProviderState, ProviderRegistry (interface contracts)
+- lib/vision/types.ts now has ZERO local type definitions — pure platform re-exports
+- readyloq-app typecheck: ✅ zero errors; camera-core build: ✅ zero errors
+- VYBE: unaffected (VYBE ProviderStatus is a completely different AI/engineering type)
 
-**Phase 2.2: @platform/camera-core** (natural next step)
-- Canonical source: `artifacts/readyloq-app/lib/vision/types.ts` (remaining provider types)
-- Types to move: ProviderAvailability, ProviderStatus, EvidenceIntake, CaptureProviderBase,
-  RequestCaptureProvider, CaptureSession, SessionCaptureProvider, PushCaptureSession,
-  PushCaptureProvider, CaptureProvider, VisionProvider
-- Note: camera-core's current platform definition has DIFFERENT type names/shapes vs app.
-  Must reconcile with canonical app source (same approach as Phase 1).
-- Also need: provider-registry.ts types (CaptureProviderContext, CaptureProviderDefinition)
-- Unblocks: @platform/evidence-core, @platform/meta-wearables
+## Next (Phase 3 — infrastructure, one PR per package)
 
-**Phase 2.1: @platform/storage-core**
+**Phase 3.1: @platform/storage-core**
 - Canonical source: `artifacts/api-server/src/lib/objectStorage.ts`
 - ObjectStorageClient, StorageNamespace, SignedUrlRequest interfaces
 - No app-level type imports needed (server-side only)

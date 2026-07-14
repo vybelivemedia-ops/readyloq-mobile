@@ -651,6 +651,9 @@ importers:
 
   artifacts/readyloq-app:
     dependencies:
+      '@platform/camera-core':
+        specifier: workspace:*
+        version: link:../../repos/platform/packages/camera-core
       '@platform/shared-types':
         specifier: workspace:*
         version: link:../../repos/platform/packages/shared-types
