@@ -92,10 +92,12 @@ Level 2 (→ Level 0–1):
   voice-intelligence     → ai-core, shared-types
   live-session-core      → shared-types, storage-core
 
-Level 3 (→ Level 0–2, two packages at this level; neither imports the other):
+Level 3 (→ Level 0–2, three packages at this level; none imports another):
   platform-intelligence  → shared-types, ai-core, camera-core,
                            evidence-core, storage-core, voice-intelligence
   local-intelligence     → shared-types, ai-core, camera-core,
+                           storage-core, evidence-core
+  measurement-core       → shared-types, camera-core,
                            storage-core, evidence-core
 
 Level 4 (applications — never imported by platform):
@@ -112,7 +114,8 @@ Level 4 (applications — never imported by platform):
 5. **ai-core does not import camera-core, evidence-core, or live-session-core.** AI infrastructure is orthogonal to all capture pipelines.
 6. **platform-intelligence does not import asset-core, sync-engine, meta-wearables, or live-session-core.** The OS kernel is agnostic of domain-specific plugins. Plugins are injected at runtime — not statically imported.
 7. **local-intelligence does NOT import platform-intelligence.** local-intelligence is a plugin for the OS kernel, not a consumer of it. The registration is one-way: the application registers `LocalIntelligencePlugin` with `platform-intelligence`; `local-intelligence` itself has no knowledge of the kernel.
-8. **No shared package imports from `node_modules` of the consuming app.** All runtime dependencies must be declared in the package's own `package.json`.
+8. **measurement-core does NOT import ai-core, local-intelligence, or platform-intelligence.** The inference provider is injected via `MeasurementInferenceProvider` at initialisation. Applications inject a `LocalAIProvider` or cloud provider; measurement-core does not care which.
+9. **No shared package imports from `node_modules` of the consuming app.** All runtime dependencies must be declared in the package's own `package.json`.
 
 ### How to verify
 
@@ -295,6 +298,7 @@ Every PR that modifies a shared package must check:
 | ai-core | VYBE | ReadyLoq |
 | platform-intelligence | Both | — |
 | local-intelligence | Both | — |
+| measurement-core | ReadyLoq | VYBE |
 | live-session-core | VYBE | — |
 | meta-wearables | ReadyLoq | — |
 | voice-intelligence | Both | — |

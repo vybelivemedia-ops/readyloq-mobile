@@ -3,7 +3,7 @@
 > **Generated:** 2026-07-14 · **Revised:** 2026-07-14  
 > **Scope:** Cross-repo analysis of `readyloq-mobile` + `vybelive` → extraction plan for `platform`  
 > **Status:** Analysis complete. Package scaffolding created. NO code migrated yet.  
-> **Changes in this revision:** property-core renamed to asset-core; platform-intelligence added as the OS kernel; governance codified in GOVERNANCE.md (ADR-011); local-intelligence added as the 13th package (on-device AI runtime, ADR-013).
+> **Changes in this revision:** property-core renamed to asset-core; platform-intelligence added as the OS kernel; governance codified in GOVERNANCE.md (ADR-011); local-intelligence added as the 13th package (on-device AI runtime, ADR-013); measurement-core added as the 14th package (computer vision measurements, ADR-014).
 
 ---
 
@@ -16,7 +16,7 @@ Two production apps share significant infrastructure that is currently duplicate
 | **ReadyLoq** (`readyloq-mobile`) | Pest inspection — mobile capture, offline sync, AI analysis, multi-tenant SaaS | Expo + React Native + Express API + Drizzle/Postgres |
 | **VYBE LIVE** (`vybelive`) | Creator live-streaming — Agora RTC, social publishing, Mission Control AI OS | Expo + React Native + Express API + Drizzle/Postgres + AI executive layer |
 
-Both use an **identical** monorepo structure (pnpm workspaces, `artifacts/`, `lib/`) and target the **same Replit sidecar object storage** at `127.0.0.1:1106`. Thirteen infrastructure packages are identified: ten with existing code to extract, three that are new greenfield packages (wearables stubs, voice, and local-intelligence).
+Both use an **identical** monorepo structure (pnpm workspaces, `artifacts/`, `lib/`) and target the **same Replit sidecar object storage** at `127.0.0.1:1106`. Fourteen infrastructure packages are identified: ten with existing code to extract, four that are new greenfield packages (wearables stubs, voice, local-intelligence, and measurement-core).
 
 The extracted platform repo (`platform/`) is a **pure TypeScript interface and type layer** — no runtime dependencies, no framework coupling. Each app consumes it as a workspace dependency and provides its own concrete implementations.
 
@@ -27,6 +27,7 @@ ReadyLoq / VYBE LIVE
          ↓
 platform-intelligence  (OS kernel — orchestrates everything)
 local-intelligence     (on-device AI runtime — plugs into platform-intelligence)
+measurement-core       (computer vision measurements — plugs into platform-intelligence)
          ↓
 camera-core · voice-intelligence · ai-core · evidence-core
 asset-core · sync-engine · storage-core · live-session-core
@@ -125,10 +126,12 @@ Level 2 — → Level 0–1:
   voice-intelligence   → ai-core, shared-types
   live-session-core    → shared-types, storage-core
 
-Level 3 — → Level 0–2 (two packages; neither imports the other):
+Level 3 — → Level 0–2 (three packages; none imports another):
   platform-intelligence → shared-types, ai-core, camera-core,
                           evidence-core, storage-core, voice-intelligence
   local-intelligence    → shared-types, ai-core, camera-core,
+                          storage-core, evidence-core
+  measurement-core      → shared-types, camera-core,
                           storage-core, evidence-core
 
 Level 4 — Applications (never imported by platform):
@@ -147,6 +150,7 @@ readyloq-mobile ──→ shared-types
                 ──→ meta-wearables
                 ──→ ai-core
                 ──→ local-intelligence     ← on-device AI (Phase 3.5)
+                ──→ measurement-core       ← measurements (Phase 3.6)
                 ──→ platform-intelligence  ← OS kernel
                 ──→ ui-core
                 ──→ voice-intelligence (Phase 4)
@@ -158,6 +162,7 @@ vybelive        ──→ shared-types
                 ──→ asset-core
                 ──→ ai-core
                 ──→ local-intelligence     ← on-device AI (Phase 4)
+                ──→ measurement-core       ← measurements (Phase 4)
                 ──→ live-session-core
                 ──→ platform-intelligence  ← OS kernel
                 ──→ ui-core
@@ -185,6 +190,7 @@ vybelive        ──→ shared-types
 | **ai-core** | `vybelive` (provider/factory/bus/state) + `readyloq-mobile` (confidence model) | VYBE's infrastructure is superior; ReadyLoq's 0–1 confidence is more principled | Strictly generic; normalise confidence to 0–1; remove VYBE-specific event kinds |
 | **platform-intelligence** | New (generalised from patterns in both repos) | Neither app has an orchestration kernel | Entirely new — see `src/index.ts` for the full interface set |
 | **local-intelligence** | New (greenfield) | Neither app has on-device ML infrastructure | Entirely new — ModelManager, InferenceEngine, VisionEngine, OCR, Embedding, Quality, AICache, ResourceMonitor, ProviderSelector |
+| **measurement-core** | New (greenfield) | Neither app has automated measurement tooling | Entirely new — MeasurementEngine, CalibrationService, ReferenceObjectService, DepthEstimator, DimensionEstimator, ScaleEstimator, GeometryService, MeasurementHistory |
 | **ui-core** | Both | Design tokens + component contracts | Tokens only; no JSX |
 
 ---
@@ -227,7 +233,9 @@ See `GOVERNANCE.md § 8` for the canonical statement. Summary:
 
 **T3.5: local-intelligence** — Register `LocalIntelligencePlugin` in both apps. Wire ReadyLoq's on-capture `QualityGate` to `ImageQualityEngine.detectBlur()`. Download and register a vision model; wire offline fallback via `LocalAIProvider` in ai-core's fallback chain.
 
-### Phase 4 — Wearables, Voice, Live Session, On-Device AI (Weeks 9–12)
+**T3.6: measurement-core** — Register `MeasurementPlugin` in both apps. Wire ReadyLoq's inspection photo capture to `MeasurementEngine.measure()`. Wire VYBE's studio setup to scene dimension estimation. Inject `LocalAIProvider` as the `MeasurementInferenceProvider` for offline-capable measurement.
+
+### Phase 4 — Wearables, Voice, Live Session (Weeks 10–13)
 
 **T4.1: meta-wearables** — Promote ReadyLoq stubs to WearableProvider implementations. BLE discovery.
 
@@ -257,6 +265,8 @@ See `GOVERNANCE.md § 8` for the canonical statement. Summary:
    live-session-core      (→ shared-types, storage-core)
 5. platform-intelligence  (→ everything in levels 0–2)  ← parallel at level 3
    local-intelligence     (→ shared-types, ai-core, camera-core,
+                             storage-core, evidence-core)  ←
+   measurement-core       (→ shared-types, camera-core,
                              storage-core, evidence-core)  ←
 ```
 
@@ -289,13 +299,14 @@ See `GOVERNANCE.md § 8` for the canonical statement. Summary:
 | 4 — Wearables, Voice, Live Session | meta-wearables, voice-intelligence, live-session-core | 3.5 | Greenfield voice; Agora decoupling |
 | 5 — UI Core | ui-core | 0.5 | Token extraction only |
 | 3.5 — On-Device AI | local-intelligence (both apps) | 2.0 | Model download infra; TFLite/ONNX adapters per platform |
-| **Total** | **13 packages** | **~14 eng-weeks** | Parallelisable at levels 3–4; ~10 weeks with 2 engineers |
+| 3.6 — Measurements | measurement-core (both apps) | 2.0 | CalibrationService; reference object DB; depth estimator; ReadyLoq + VYBE integration |
+| **Total** | **14 packages** | **~16 eng-weeks** | Parallelisable at levels 3–4; ~11 weeks with 2 engineers |
 
 ---
 
 ## 10. Package Scaffolding Summary
 
-All 13 packages are created in `packages/` with `package.json`, `tsconfig.json`, and documented `src/index.ts`.
+All 14 packages are created in `packages/` with `package.json`, `tsconfig.json`, and documented `src/index.ts`.
 
 ```
 platform/
@@ -318,6 +329,7 @@ platform/
     ├── ai-core/                  @platform/ai-core
     ├── platform-intelligence/    @platform/platform-intelligence  ← OS kernel
     ├── local-intelligence/       @platform/local-intelligence     ← on-device AI runtime
+    ├── measurement-core/         @platform/measurement-core       ← CV measurements
     └── ui-core/                  @platform/ui-core
 ```
 
@@ -350,3 +362,5 @@ platform/
 **ADR-012:** platform-intelligence is the OS kernel. Applications do not call packages directly — they register plugins with platform-intelligence and define workflows. The platform provides capabilities; the application defines purpose.
 
 **ADR-013:** local-intelligence is separate from ai-core. Cloud AI (ai-core) is stateless API calls; on-device AI is stateful model lifecycle (download → load → warmup → infer → unload). Merging them would force ai-core to carry mobile ML framework deps (TFLite, ONNX, CoreML) in every consumer, including pure-web tools. Battery/thermal awareness and perceptual-hash caching are also mobile-only concerns. See `adrs/ADR-013-local-intelligence.md` for the full text.
+
+**ADR-014:** measurement-core is separate from ai-core and local-intelligence. ai-core is AI orchestration; local-intelligence is the on-device ML runtime; measurement-core is the domain of computer vision measurements — optics, calibration profiles, reference object libraries, geometry, depth projection, and annotated measurement history. Measurement coordinates multiple services (calibration, detection, geometry) and adds evidence versioning; that coordination cannot live in either inference package without contaminating them with geometry and photogrammetry concerns. See `adrs/ADR-014-measurement-core.md` for the full text.
