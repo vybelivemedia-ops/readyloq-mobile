@@ -67,6 +67,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@platform/camera-core": "workspace:*",
     "@platform/shared-types": "workspace:*",
     "@react-native-community/netinfo": "11.4.1",
     "expo-camera": "~17.0.10",
