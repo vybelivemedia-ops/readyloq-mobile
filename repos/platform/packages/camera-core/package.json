@@ -2,7 +2,7 @@
   "name": "@platform/camera-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Universal camera abstraction — 3-mode capability model (request_response, session_stream, async_push), provider registry, EvidenceItem capture",
+  "description": "Universal camera abstraction \u2014 3-mode capability model (request_response, session_stream, async_push), provider registry, EvidenceItem capture",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@platform/core": "workspace:*",
     "@platform/shared-types": "workspace:*"
   },
   "devDependencies": {

@@ -4,9 +4,18 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../shared-types" },
-    { "path": "../camera-core" }
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../shared-types"
+    },
+    {
+      "path": "../camera-core"
+    }
   ]
 }

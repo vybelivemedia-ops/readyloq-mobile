@@ -4,6 +4,15 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src"],
-  "references": [{ "path": "../shared-types" }]
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../shared-types"
+    }
+  ]
 }

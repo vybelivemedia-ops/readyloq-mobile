@@ -3,7 +3,7 @@
 > **Generated:** 2026-07-14 · **Revised:** 2026-07-14  
 > **Scope:** Cross-repo analysis of `readyloq-mobile` + `vybelive` → extraction plan for `platform`  
 > **Status:** Analysis complete. Package scaffolding created. NO code migrated yet.  
-> **Changes in this revision:** property-core renamed to asset-core; platform-intelligence added as the OS kernel; governance codified in GOVERNANCE.md (ADR-011); local-intelligence added as the 13th package (on-device AI runtime, ADR-013); measurement-core added as the 14th package (computer vision measurements, ADR-014).
+> **Changes in this revision:** `@platform/core` added as the 15th package (universal programming-model primitives, ADR-015) — the new root of the DAG below shared-types. Migration plan updated to 5-phase parallel extraction order validated by DAG analysis. `ConfidenceScore` is now a branded type. `SyncRecord` carries typed `Result<void, SyncError>` for last-attempt result. All 14 existing packages wired to `@platform/core`.
 
 ---
 
@@ -23,17 +23,25 @@ The extracted platform repo (`platform/`) is a **pure TypeScript interface and t
 **The architecture model:**
 
 ```
-ReadyLoq / VYBE LIVE
-         ↓
-platform-intelligence  (OS kernel — orchestrates everything)
-local-intelligence     (on-device AI runtime — plugs into platform-intelligence)
-measurement-core       (computer vision measurements — plugs into platform-intelligence)
-         ↓
-camera-core · voice-intelligence · ai-core · evidence-core
-asset-core · sync-engine · storage-core · live-session-core
-meta-wearables · ui-core
-         ↓
-shared-types  (no deps)
+ReadyLoq / VYBE LIVE / Mission Control
+                  ↓
+   platform-intelligence  local-intelligence
+     (OS kernel)            (on-device ML)
+                  ↓
+  evidence-core · meta-wearables · voice-intelligence
+  live-session-core · measurement-core (injected)
+                  ↓
+  camera-core · storage-core · ai-core
+  sync-engine · asset-core · ui-core
+                  ↓
+             shared-types
+          (domain primitives)
+                  ↓
+             @platform/core
+          (programming-model primitives)
+          Result · Plugin · Service · Registry
+          Pipeline · Event · Command · Query
+          Capability · FeatureFlag · Brand · ID
 ```
 
 ReadyLoq is not an inspection app. It is **an AI Inspection Operating System** with one application (pest inspection) running on top of it. The platform is the OS; the inspection is the app.
@@ -113,29 +121,32 @@ lib/
 ### 3.1 Platform package dependency levels
 
 ```
-Level 0 — no deps:
-  shared-types
+Level 0 — no deps (root of DAG):
+  @platform/core    ← programming-model primitives; zero external deps
 
-Level 1 — → shared-types only:
+Level 1 — → core only:
+  shared-types      ← domain types; re-exports Result, Brand, ID, Timestamp
+
+Level 2 — → core + shared-types:
   storage-core    ai-core    camera-core    asset-core    ui-core
+  sync-engine
 
-Level 2 — → Level 0–1:
-  evidence-core        → shared-types, storage-core
-  sync-engine          → shared-types (storage-core injected by caller)
-  meta-wearables       → camera-core, shared-types
-  voice-intelligence   → ai-core, shared-types
-  live-session-core    → shared-types, storage-core
+Level 3 — → Level 0–2:
+  evidence-core        → core, shared-types, storage-core
+  meta-wearables       → core, camera-core, shared-types
+  voice-intelligence   → core, ai-core, shared-types
+  live-session-core    → core, shared-types, storage-core
 
-Level 3 — → Level 0–2 (three packages; none imports another):
-  platform-intelligence → shared-types, ai-core, camera-core,
+Level 4 — → Level 0–3 (three packages; none imports another):
+  platform-intelligence → core, shared-types, ai-core, camera-core,
                           evidence-core, storage-core, voice-intelligence
-  local-intelligence    → shared-types, ai-core, camera-core,
+  local-intelligence    → core, shared-types, ai-core, camera-core,
                           storage-core, evidence-core
-  measurement-core      → shared-types, camera-core,
+  measurement-core      → core, shared-types, camera-core,
                           storage-core, evidence-core
 
-Level 4 — Applications (never imported by platform):
-  readyloq-mobile    vybelive
+Level 5 — Applications (never imported by platform):
+  readyloq-mobile    vybelive    Mission Control
 ```
 
 ### 3.2 App consumption
@@ -207,68 +218,89 @@ See `GOVERNANCE.md § 8` for the canonical statement. Summary:
 
 ## 6. Migration Plan
 
-### Phase 1 — Foundation (Weeks 1–2)
+> Phase ordering validated by DAG analysis (2026-07-14). No package may be extracted before all its declared dependencies are extracted. Parallel packages within a phase have no dependencies on each other.
 
-**T1.1: shared-types** — Synthesise EvidenceItem, CaptureMode, OSEvent, AIRequest/Response/Usage, SyncRecord, ConfidenceScore. Wire project references.
+### Phase 0 — Programming-Model Primitives (Day 1, single task)
 
-**T1.2: storage-core** — Extract ReadyLoq `objectStorage.ts`. Add StorageNamespace interface. Move sidecar URL to `OBJECT_STORAGE_BASE_URL` env var.
+**T0.1: @platform/core** — Scaffold and typecheck `Result`, `AsyncResult`, `Option`, `Disposable`, `AsyncDisposable`, `Plugin`, `Service`, `Lifecycle`, `Registry`, `Event`, `EventHandler`, `EventSubscription`, `Command`, `Query`, `Capability`, `FeatureFlag`, `FeatureFlagRegistry`, `Provider`, `PipelineStep`, `PipelineContext`, `Pipeline`, `Observable`, `Observer`, `Brand`, `ID`, `Timestamp`, `Version`. Zero external deps. This is scaffolding-only — no extraction source exists. Typecheck must pass before Phase 1.
 
-### Phase 2 — Capture, Sync & Evidence (Weeks 3–5)
+### Phase 1 — Domain Types Foundation (Week 1)
 
-**T2.1: camera-core** — Extract ReadyLoq `vision/`. Injectable QualityGate thresholds. KVAdapter replaces AsyncStorage coupling.
+**T1.1: shared-types** — Synthesise EvidenceItem, CaptureMode, OSEvent, AIRequest/Response/Usage, SyncRecord, `ConfidenceScore` (branded `Brand<number,"ConfidenceScore">`), `SyncError` + `Result<void,SyncError>` on SyncRecord. Import from `@platform/core`; re-export `Result`, `Brand`, `ID`, `Timestamp` so downstream packages can single-import. Wire project references.
 
-**T2.2: sync-engine** — Generic `SyncEngine<T>`. Inject KVAdapter + FileUploader. Configurable pipeline steps.
+### Phase 2 — Infrastructure Layer (Weeks 2–3, all parallel)
 
-**T2.3: evidence-core** — Extract ReadyLoq evidence lifecycle. VYBE `uploadMedia.ts` upload patterns become EvidenceUploadPipeline. EvidenceCollection + Annotation + QualityRecord.
+**T2.1: storage-core** — Extract ReadyLoq `objectStorage.ts`. `ObjectStorageClient`, `StorageNamespace`, `SignedUrlRequest`. Move sidecar URL to `OBJECT_STORAGE_BASE_URL` env var (first concrete change to app code). Unblocks evidence-core and live-session-core.
 
-### Phase 3 — Assets, AI Core & OS Kernel (Weeks 6–8)
+**T2.2: camera-core** — Extract ReadyLoq `lib/vision/`: `CaptureProvider`, `ProviderRegistry`, `QualityThresholds`, `KVAdapter`. Injectable thresholds; KVAdapter replaces AsyncStorage coupling. Unblocks evidence-core and meta-wearables.
 
-**T3.1: asset-core** — Extract ReadyLoq `properties` schema. ownerId scoping. Remove pest-specific fields to app layer.
+**T2.3: sync-engine** — Generic `SyncEngine<T>` with injectable `SyncStep[]`. ReadyLoq defines its own step array in the app layer (UploadPhotosStep, AnalyzeInspectionStep, BuildReportStep, FinalizeInspectionStep). Feature-flag before cutover.
 
-**T3.2: ai-core** — Extract VYBE AIProviderFactory + EventBus + StateEngine. Add AISession + AIPipeline + AIRateLimiter + AIUsageTracker + AI_EVENT_KINDS. Normalise confidence to 0–1.
+**T2.4: asset-core** — Extract ReadyLoq `properties` schema. `ownerId` optional. Remove pest-specific fields. `AssetType` broadened beyond real estate.
 
-**T3.3: platform-intelligence** — Implement PlatformOS, PluginRegistry, WorkflowEngine, IntelligenceSessionManager, GuidanceEngine, MeasurementState, MemoryOrchestrator, ProviderCoordinator, EventRouter. Wire ReadyLoq as the first application using it.
+**T2.5: ai-core** — Extract VYBE `AIProvider` + `AIProviderFactory` + `EventBus` + `StateEngine`. Inject `ProviderConfigLoader` interface so VYBE keeps DB-backed config, ReadyLoq uses static config, future products use Redis/JSON/etc. `AIProviderFactory` must never know about PostgreSQL, Drizzle, or `ai_model_configs` directly. Shadow-run alongside existing VYBE calls for one sprint before cutover. Normalise confidence to 0–1.
 
-**T3.4: Migrate ReadyLoq to platform-intelligence** — Replace direct service calls with plugin registrations. Define pest-inspection workflow definition in readyloq-app. AIProviderFactory replaces direct OpenAI calls.
+**T2.6: ui-core** — Design tokens from both Tailwind configs and native StyleSheet constants. Component prop contracts. No JSX.
 
-**T3.5: local-intelligence** — Register `LocalIntelligencePlugin` in both apps. Wire ReadyLoq's on-capture `QualityGate` to `ImageQualityEngine.detectBlur()`. Download and register a vision model; wire offline fallback via `LocalAIProvider` in ai-core's fallback chain.
+### Phase 3 — Domain Layer (Weeks 4–5, parallel)
 
-**T3.6: measurement-core** — Register `MeasurementPlugin` in both apps. Wire ReadyLoq's inspection photo capture to `MeasurementEngine.measure()`. Wire VYBE's studio setup to scene dimension estimation. Inject `LocalAIProvider` as the `MeasurementInferenceProvider` for offline-capable measurement.
+**T3.1: evidence-core** — Extract ReadyLoq `quality-gate.ts` + `dedupe.ts`. Generic `entityType/entityId` scoping. EvidenceStore decoupled from AsyncStorage. VYBE `uploadMedia.ts` upload patterns → `EvidenceUploadPipeline`. Requires storage-core (Phase 2.1) ✓
 
-### Phase 4 — Wearables, Voice, Live Session (Weeks 10–13)
+**T3.2: meta-wearables** — Promote ReadyLoq provider-registry stubs to `WearableProvider` implementations. BLE discovery interface. Requires camera-core (Phase 2.2) ✓
 
-**T4.1: meta-wearables** — Promote ReadyLoq stubs to WearableProvider implementations. BLE discovery.
+### Phase 4 — Specialist Layer (Weeks 6–7, parallel)
 
-**T4.2: live-session-core** — Extract VYBE stream session + AgoraAdapter + SocialPublisher adapters.
+**T4.1: voice-intelligence** — Greenfield. `VoiceRecorder`, `TranscriptionService`, `VoiceCommandRouter<TAction>`. Wire ReadyLoq (dictation) and VYBE (stream control + captions). Requires ai-core (Phase 2.5) ✓
 
-**T4.3: voice-intelligence** — Greenfield VoiceRecorder + TranscriptionService + VoiceCommandRouter. Wire into ReadyLoq (dictation) and VYBE (stream control + captions).
+**T4.2: live-session-core** — Extract VYBE `agoraPush.ts` + `agoraCloudRecording.ts`. `AgoraAdapter`, `SocialPublisher`, `SessionRecorder`. Agora credentials injected; RTMP destination URLs are app config. **Shadow mode** — run old + new code in parallel for one full streaming cycle before cutover. Requires storage-core (Phase 2.1) ✓
 
-### Phase 5 — UI Core (Week 12)
+**T4.3: measurement-core** — Greenfield. `MeasurementEngine`, `CalibrationService`, `ReferenceObjectService`, `DepthEstimator`, `DimensionEstimator`. `MeasurementInferenceProvider` interface injected at runtime; does not import ai-core or local-intelligence directly. Requires storage-core + evidence-core (Phase 2.1, 3.1) ✓
 
-**T5.1: ui-core** — Design tokens from both Tailwind configs and native StyleSheet constants. Component prop interface contracts. No JSX migration.
+### Phase 5 — OS Kernel (Weeks 8–10, parallel)
+
+**T5.1: platform-intelligence** — `PlatformOS`, `PluginRegistry`, `WorkflowEngine`, `IntelligenceSessionManager`, `GuidanceEngine`, `MemoryOrchestrator`, `ProviderCoordinator`, `EventRouter`. Interface-only; apps register plugins and define workflow step arrays. ReadyLoq registers the pest-inspection workflow; VYBE registers the streaming workflow.
+
+**T5.2: local-intelligence** — Greenfield. `ModelManager`, `InferenceEngine`, `VisionEngine`, `OCREngine`, `EmbeddingEngine`, `ResourceMonitor`. TFLite/ONNX/CoreML adapters per platform — registered as a plugin in platform-intelligence.
+
+> **`ai-core` injection spec (before Phase 2.5):** Spec and both-team sign-off required on the `ProviderConfigLoader` interface before extraction begins. See ADR-015 § Consequences.
+>
+> **`sync-engine` injection spec (before Phase 2.3):** ReadyLoq team must define and review the five `SyncStep[]` definitions in the app layer before the old engine is removed.
 
 ---
 
-## 7. Extraction Order (dependency-safe)
+## 7. Extraction Order (dependency-safe, DAG-validated)
 
 ```
-1. shared-types           (no deps — must go first)
-2. storage-core           (→ shared-types)
-3. ai-core                (→ shared-types)               ← parallel at this level
-   camera-core            (→ shared-types)               ←
-   sync-engine            (→ shared-types)               ←
-   asset-core             (→ shared-types)               ←
-   ui-core                (→ shared-types)               ←
-4. evidence-core          (→ shared-types, storage-core)
-   meta-wearables         (→ camera-core)
-   voice-intelligence     (→ ai-core)
-   live-session-core      (→ shared-types, storage-core)
-5. platform-intelligence  (→ everything in levels 0–2)  ← parallel at level 3
-   local-intelligence     (→ shared-types, ai-core, camera-core,
-                             storage-core, evidence-core)  ←
-   measurement-core       (→ shared-types, camera-core,
-                             storage-core, evidence-core)  ←
+Phase 0  @platform/core         (zero deps — scaffolding only; no extraction source)
+
+Phase 1  shared-types           (→ core)
+
+Phase 2  storage-core           (→ core, shared-types)          ┐
+         camera-core            (→ core, shared-types)          │ all parallel
+         sync-engine            (→ core, shared-types)          │
+         asset-core             (→ core, shared-types)          │
+         ai-core                (→ core, shared-types)          │
+         ui-core                (→ core, shared-types)          ┘
+
+Phase 3  evidence-core          (→ core, shared-types, storage-core)    ┐ parallel
+         meta-wearables         (→ core, camera-core, shared-types)     ┘
+
+Phase 4  voice-intelligence     (→ core, ai-core, shared-types)              ┐
+         live-session-core      (→ core, shared-types, storage-core)         │ parallel
+         measurement-core       (→ core, shared-types, storage-core,         │
+                                     camera-core, evidence-core) (injected)  ┘
+
+Phase 5  platform-intelligence  (→ core + all Level 2–3)   ┐ parallel
+         local-intelligence     (→ core, shared-types,      │
+                                    ai-core, camera-core,   │
+                                    storage-core, evidence) ┘
 ```
+
+**DAG invariants:**
+- Phase N packages may only depend on packages extracted in Phases 0…N-1.
+- No platform package at any level may import another package at the same level.
+- No platform package may import application code (readyloq-mobile, vybelive).
+- `@platform/core` has zero deps — any import found in its source is a build failure.
 
 ---
 
@@ -306,7 +338,7 @@ See `GOVERNANCE.md § 8` for the canonical statement. Summary:
 
 ## 10. Package Scaffolding Summary
 
-All 14 packages are created in `packages/` with `package.json`, `tsconfig.json`, and documented `src/index.ts`.
+All 15 packages are created in `packages/` with `package.json`, `tsconfig.json`, and documented `src/index.ts`.
 
 ```
 platform/
@@ -316,21 +348,23 @@ platform/
 ├── .npmrc
 ├── ARCHITECTURE.md               ← this document
 ├── GOVERNANCE.md                 ← platform governance rules (ADR-011)
+├── VALIDATION-REPORT.md          ← pre-migration readiness audit
 └── packages/
-    ├── shared-types/             @platform/shared-types
-    ├── camera-core/              @platform/camera-core
-    ├── storage-core/             @platform/storage-core
-    ├── sync-engine/              @platform/sync-engine
-    ├── evidence-core/            @platform/evidence-core
-    ├── asset-core/               @platform/asset-core       ← renamed from property-core
-    ├── meta-wearables/           @platform/meta-wearables
-    ├── voice-intelligence/       @platform/voice-intelligence
-    ├── live-session-core/        @platform/live-session-core
-    ├── ai-core/                  @platform/ai-core
-    ├── platform-intelligence/    @platform/platform-intelligence  ← OS kernel
-    ├── local-intelligence/       @platform/local-intelligence     ← on-device AI runtime
-    ├── measurement-core/         @platform/measurement-core       ← CV measurements
-    └── ui-core/                  @platform/ui-core
+    ├── core/                     @platform/core             ← L0: programming-model primitives
+    ├── shared-types/             @platform/shared-types     ← L1: domain types (→ core)
+    ├── camera-core/              @platform/camera-core      ← L2
+    ├── storage-core/             @platform/storage-core     ← L2
+    ├── sync-engine/              @platform/sync-engine      ← L2
+    ├── asset-core/               @platform/asset-core       ← L2 (renamed from property-core)
+    ├── ai-core/                  @platform/ai-core          ← L2
+    ├── ui-core/                  @platform/ui-core          ← L2
+    ├── evidence-core/            @platform/evidence-core    ← L3
+    ├── meta-wearables/           @platform/meta-wearables   ← L3
+    ├── voice-intelligence/       @platform/voice-intelligence ← L3
+    ├── live-session-core/        @platform/live-session-core  ← L3
+    ├── measurement-core/         @platform/measurement-core   ← L3 (injected deps)
+    ├── platform-intelligence/    @platform/platform-intelligence ← L4 OS kernel
+    └── local-intelligence/       @platform/local-intelligence    ← L4 on-device AI
 ```
 
 ---
@@ -364,3 +398,5 @@ platform/
 **ADR-013:** local-intelligence is separate from ai-core. Cloud AI (ai-core) is stateless API calls; on-device AI is stateful model lifecycle (download → load → warmup → infer → unload). Merging them would force ai-core to carry mobile ML framework deps (TFLite, ONNX, CoreML) in every consumer, including pure-web tools. Battery/thermal awareness and perceptual-hash caching are also mobile-only concerns. See `adrs/ADR-013-local-intelligence.md` for the full text.
 
 **ADR-014:** measurement-core is separate from ai-core and local-intelligence. ai-core is AI orchestration; local-intelligence is the on-device ML runtime; measurement-core is the domain of computer vision measurements — optics, calibration profiles, reference object libraries, geometry, depth projection, and annotated measurement history. Measurement coordinates multiple services (calibration, detection, geometry) and adds evidence versioning; that coordination cannot live in either inference package without contaminating them with geometry and photogrammetry concerns. See `adrs/ADR-014-measurement-core.md` for the full text.
+
+**ADR-015:** `@platform/core` is the root of the DAG — universal programming-model primitives (Result, Plugin, Service, Registry, Pipeline, Event, Command, Query, Capability, FeatureFlag, Brand, ID, Timestamp, Version) with zero external dependencies and zero domain logic. Every other platform package depends on it. `@platform/shared-types` sits one level above and re-exports the most commonly needed core primitives so downstream packages need not double-import. `ConfidenceScore` is branded (`Brand<number,"ConfidenceScore">`); `SyncRecord` carries typed `Result<void, SyncError>` for last-attempt results. See `adrs/ADR-015-platform-core.md` for the full text.

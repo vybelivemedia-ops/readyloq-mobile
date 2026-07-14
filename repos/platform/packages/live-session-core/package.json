@@ -2,7 +2,7 @@
   "name": "@platform/live-session-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Live-session infrastructure — RTC adapter (Agora), cloud recording, clip processing, social publishing (RTMP re-stream)",
+  "description": "Live-session infrastructure \u2014 RTC adapter (Agora), cloud recording, clip processing, social publishing (RTMP re-stream)",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@platform/core": "workspace:*",
     "@platform/shared-types": "workspace:*",
     "@platform/storage-core": "workspace:*"
   },

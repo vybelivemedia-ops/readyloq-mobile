@@ -1,8 +1,13 @@
 /**
  * @platform/shared-types
  *
- * Cross-app primitive types shared across ALL platform packages and consuming
+ * Cross-app domain types shared across ALL platform packages and consuming
  * applications (readyloq-mobile, vybelive, and any future product).
+ *
+ * Depends on @platform/core for programming-model primitives (Result, Brand…).
+ * All platform packages that need both domain types and programming-model
+ * primitives import from here; they do not need to also import @platform/core
+ * directly unless they use a primitive that shared-types does not re-export.
  *
  * CANONICAL SOURCES (do not duplicate in app repos once migrated):
  *   - EvidenceItem, CaptureMode, CaptureSource, QualityAssessment
@@ -17,6 +22,11 @@
  * MIGRATION NOTE: These types must stay domain-agnostic. No pest-inspection
  * logic, no streaming/social logic. Both products import from here.
  */
+
+import type { Result, Brand } from "@platform/core";
+
+// Re-export core primitives so downstream packages can import from one place.
+export type { Result, AsyncResult, Option, Brand, ID, Timestamp, Version } from "@platform/core";
 
 // ─── Evidence / Capture (from readyloq-mobile) ────────────────────────────────
 
@@ -107,8 +117,11 @@ export interface QualityAssessment {
  * ReadyLoq uses this as the raw AI detection confidence returned by the batch
  * analysis pipeline. VYBE's executive recommendation confidence (0–100) is
  * divided by 100 to align with this range.
+ *
+ * Branded so that a raw `number` cannot be silently assigned as a confidence
+ * value — callers must explicitly cast: `0.87 as ConfidenceScore`.
  */
-export type ConfidenceScore = number; // branded types to be added after extraction
+export type ConfidenceScore = Brand<number, "ConfidenceScore">;
 
 // ─── OS Events (from vybelive) ───────────────────────────────────────────────
 
@@ -180,6 +193,17 @@ export type SyncStatus =
   | "complete"
   | "error";
 
+/**
+ * A typed sync failure, carried inside `Result<void, SyncError>`.
+ * `retryable` distinguishes transient failures (network timeout → retry)
+ * from permanent ones (server 400 → discard).
+ */
+export interface SyncError {
+  readonly code: string;
+  readonly message: string;
+  readonly retryable: boolean;
+}
+
 export interface SyncRecord {
   id: string;
   entityType: string;
@@ -187,6 +211,9 @@ export interface SyncRecord {
   status: SyncStatus;
   attempts: number;
   lastAttemptAt?: string;
+  /** Typed result of the last sync attempt. Replaces the string `lastError`. */
+  lastResult?: Result<void, SyncError>;
+  /** @deprecated Use `lastResult.error.message` instead. Kept for migration. */
   lastError?: string;
   createdAt: string;
   updatedAt: string;

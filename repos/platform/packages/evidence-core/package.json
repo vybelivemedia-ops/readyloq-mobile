@@ -2,7 +2,7 @@
   "name": "@platform/evidence-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Evidence lifecycle management — EvidenceStore, EvidenceCollection, annotation, upload pipeline, quality records",
+  "description": "Evidence lifecycle management \u2014 EvidenceStore, EvidenceCollection, annotation, upload pipeline, quality records",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@platform/core": "workspace:*",
     "@platform/shared-types": "workspace:*",
     "@platform/storage-core": "workspace:*"
   },

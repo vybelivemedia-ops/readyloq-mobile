@@ -4,13 +4,30 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../shared-types" },
-    { "path": "../ai-core" },
-    { "path": "../camera-core" },
-    { "path": "../evidence-core" },
-    { "path": "../storage-core" },
-    { "path": "../voice-intelligence" }
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../shared-types"
+    },
+    {
+      "path": "../ai-core"
+    },
+    {
+      "path": "../camera-core"
+    },
+    {
+      "path": "../evidence-core"
+    },
+    {
+      "path": "../storage-core"
+    },
+    {
+      "path": "../voice-intelligence"
+    }
   ]
 }

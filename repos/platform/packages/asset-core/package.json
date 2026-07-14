@@ -2,7 +2,7 @@
   "name": "@platform/asset-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Generic physical asset abstraction — AssetRecord, address components, geocoordinates, contacts, asset store. Covers buildings, equipment, vehicles, infrastructure, and any other inspectable or manageable entity.",
+  "description": "Generic physical asset abstraction \u2014 AssetRecord, address components, geocoordinates, contacts, asset store. Covers buildings, equipment, vehicles, infrastructure, and any other inspectable or manageable entity.",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@platform/core": "workspace:*",
     "@platform/shared-types": "workspace:*"
   },
   "devDependencies": {

@@ -2,7 +2,7 @@
   "name": "@platform/meta-wearables",
   "version": "0.1.0",
   "private": true,
-  "description": "Wearable device provider stubs — smart glasses (BLE async_push), USB and WiFi cameras, extensible WearableRegistry",
+  "description": "Wearable device provider stubs \u2014 smart glasses (BLE async_push), USB and WiFi cameras, extensible WearableRegistry",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@platform/core": "workspace:*",
     "@platform/shared-types": "workspace:*",
     "@platform/camera-core": "workspace:*"
   },
