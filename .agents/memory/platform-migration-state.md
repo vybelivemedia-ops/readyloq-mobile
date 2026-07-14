@@ -1,0 +1,52 @@
+---
+name: Platform migration state
+description: Which packages have been extracted, what changed, what's next in the migration sequence.
+---
+
+## Completed
+
+### Phase 0 — @platform/core (scaffolding only)
+- 28 exports: Result, AsyncResult, Option, Brand, ID, Timestamp, Version, Service, Registry, etc.
+- Zero external deps. Typechecks clean. Pushed to vybelivemedia-ops/platform (68146a99).
+
+### Phase 1 — @platform/shared-types (PR 1 complete)
+- Platform commit: 560d3dbf (vybelivemedia-ops/platform)
+- readyloq-mobile commit: c58765ca (vybelivemedia-ops/readyloq-mobile)
+- What was extracted from `artifacts/readyloq-app/lib/vision/types.ts`:
+  CaptureSource, EvidenceItem, QualityAssessment, CaptureMode, CaptureTransport,
+  PreviewKind, CaptureCapabilities
+- These are now re-exported from @platform/shared-types; vision/types.ts re-exports them.
+- App-specific provider contracts remain in vision/types.ts for Phase 2 (camera-core).
+- Typecheck: @platform/core ✅, @platform/shared-types ✅, @workspace/readyloq-app ✅
+- Pre-existing baseline errors: @workspace/readyloq (queryKey/null), @workspace/api-server (TS7030 in gemini.ts)
+
+## Workspace wiring
+- `pnpm-workspace.yaml` now includes `repos/platform/packages/*`
+- `@platform/core` must be built (`pnpm --filter @platform/core run build`) before
+  typechecking `@platform/shared-types` (project references require dist/.d.ts files).
+- Vitest bumped from ^1.6.0 to ^4.1.8 in platform packages (1.6.x blocked by Replit firewall).
+
+## Next (Phase 2 — infrastructure, one PR per package)
+
+**Phase 2.2: @platform/camera-core** (natural next step)
+- Canonical source: `artifacts/readyloq-app/lib/vision/types.ts` (remaining provider types)
+- Types to move: ProviderAvailability, ProviderStatus, EvidenceIntake, CaptureProviderBase,
+  RequestCaptureProvider, CaptureSession, SessionCaptureProvider, PushCaptureSession,
+  PushCaptureProvider, CaptureProvider, VisionProvider
+- Note: camera-core's current platform definition has DIFFERENT type names/shapes vs app.
+  Must reconcile with canonical app source (same approach as Phase 1).
+- Also need: provider-registry.ts types (CaptureProviderContext, CaptureProviderDefinition)
+- Unblocks: @platform/evidence-core, @platform/meta-wearables
+
+**Phase 2.1: @platform/storage-core**
+- Canonical source: `artifacts/api-server/src/lib/objectStorage.ts`
+- ObjectStorageClient, StorageNamespace, SignedUrlRequest interfaces
+- No app-level type imports needed (server-side only)
+- Unblocks: @platform/evidence-core, @platform/live-session-core
+
+**Phase 2.3: @platform/sync-engine**
+- Canonical source: `artifacts/readyloq-app/lib/sync/engine.ts`
+- Needs SyncStep[] defined by app layer first (see ARCHITECTURE.md note)
+
+**Why:** The extraction order follows the DAG — each package's types/interfaces must be
+settled before downstream packages (evidence-core, etc.) can be extracted.

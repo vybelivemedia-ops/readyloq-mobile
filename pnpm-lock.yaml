@@ -651,6 +651,9 @@ importers:
 
   artifacts/readyloq-app:
     dependencies:
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../../repos/platform/packages/shared-types
       '@react-native-community/netinfo':
         specifier: 11.4.1
         version: 11.4.1(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
@@ -1090,6 +1093,248 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.14
+
+  repos/platform/packages/ai-core:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/asset-core:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/camera-core:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/core:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)
+
+  repos/platform/packages/evidence-core:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@platform/storage-core':
+        specifier: workspace:*
+        version: link:../storage-core
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/live-session-core:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@platform/storage-core':
+        specifier: workspace:*
+        version: link:../storage-core
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/local-intelligence:
+    dependencies:
+      '@platform/ai-core':
+        specifier: workspace:*
+        version: link:../ai-core
+      '@platform/camera-core':
+        specifier: workspace:*
+        version: link:../camera-core
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/evidence-core':
+        specifier: workspace:*
+        version: link:../evidence-core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@platform/storage-core':
+        specifier: workspace:*
+        version: link:../storage-core
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)
+
+  repos/platform/packages/measurement-core:
+    dependencies:
+      '@platform/camera-core':
+        specifier: workspace:*
+        version: link:../camera-core
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/evidence-core':
+        specifier: workspace:*
+        version: link:../evidence-core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@platform/storage-core':
+        specifier: workspace:*
+        version: link:../storage-core
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)
+
+  repos/platform/packages/meta-wearables:
+    dependencies:
+      '@platform/camera-core':
+        specifier: workspace:*
+        version: link:../camera-core
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/platform-intelligence:
+    dependencies:
+      '@platform/ai-core':
+        specifier: workspace:*
+        version: link:../ai-core
+      '@platform/camera-core':
+        specifier: workspace:*
+        version: link:../camera-core
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/evidence-core':
+        specifier: workspace:*
+        version: link:../evidence-core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+      '@platform/storage-core':
+        specifier: workspace:*
+        version: link:../storage-core
+      '@platform/voice-intelligence':
+        specifier: workspace:*
+        version: link:../voice-intelligence
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/shared-types:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/storage-core:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/sync-engine:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/ui-core:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/voice-intelligence:
+    dependencies:
+      '@platform/ai-core':
+        specifier: workspace:*
+        version: link:../ai-core
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
   scripts:
     devDependencies:
