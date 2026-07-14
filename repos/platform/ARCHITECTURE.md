@@ -3,7 +3,7 @@
 > **Generated:** 2026-07-14 · **Revised:** 2026-07-14  
 > **Scope:** Cross-repo analysis of `readyloq-mobile` + `vybelive` → extraction plan for `platform`  
 > **Status:** Analysis complete. Package scaffolding created. NO code migrated yet.  
-> **Changes in this revision:** property-core renamed to asset-core; platform-intelligence added as the OS kernel; governance codified in GOVERNANCE.md (ADR-011).
+> **Changes in this revision:** property-core renamed to asset-core; platform-intelligence added as the OS kernel; governance codified in GOVERNANCE.md (ADR-011); local-intelligence added as the 13th package (on-device AI runtime, ADR-013).
 
 ---
 
@@ -16,7 +16,7 @@ Two production apps share significant infrastructure that is currently duplicate
 | **ReadyLoq** (`readyloq-mobile`) | Pest inspection — mobile capture, offline sync, AI analysis, multi-tenant SaaS | Expo + React Native + Express API + Drizzle/Postgres |
 | **VYBE LIVE** (`vybelive`) | Creator live-streaming — Agora RTC, social publishing, Mission Control AI OS | Expo + React Native + Express API + Drizzle/Postgres + AI executive layer |
 
-Both use an **identical** monorepo structure (pnpm workspaces, `artifacts/`, `lib/`) and target the **same Replit sidecar object storage** at `127.0.0.1:1106`. Twelve infrastructure packages are identified: ten with existing code to extract, two that are new greenfield packages (wearables stubs + voice).
+Both use an **identical** monorepo structure (pnpm workspaces, `artifacts/`, `lib/`) and target the **same Replit sidecar object storage** at `127.0.0.1:1106`. Thirteen infrastructure packages are identified: ten with existing code to extract, three that are new greenfield packages (wearables stubs, voice, and local-intelligence).
 
 The extracted platform repo (`platform/`) is a **pure TypeScript interface and type layer** — no runtime dependencies, no framework coupling. Each app consumes it as a workspace dependency and provides its own concrete implementations.
 
@@ -26,6 +26,7 @@ The extracted platform repo (`platform/`) is a **pure TypeScript interface and t
 ReadyLoq / VYBE LIVE
          ↓
 platform-intelligence  (OS kernel — orchestrates everything)
+local-intelligence     (on-device AI runtime — plugs into platform-intelligence)
          ↓
 camera-core · voice-intelligence · ai-core · evidence-core
 asset-core · sync-engine · storage-core · live-session-core
@@ -124,9 +125,11 @@ Level 2 — → Level 0–1:
   voice-intelligence   → ai-core, shared-types
   live-session-core    → shared-types, storage-core
 
-Level 3 — OS kernel → Level 0–2:
+Level 3 — → Level 0–2 (two packages; neither imports the other):
   platform-intelligence → shared-types, ai-core, camera-core,
                           evidence-core, storage-core, voice-intelligence
+  local-intelligence    → shared-types, ai-core, camera-core,
+                          storage-core, evidence-core
 
 Level 4 — Applications (never imported by platform):
   readyloq-mobile    vybelive
@@ -143,6 +146,7 @@ readyloq-mobile ──→ shared-types
                 ──→ asset-core
                 ──→ meta-wearables
                 ──→ ai-core
+                ──→ local-intelligence     ← on-device AI (Phase 3.5)
                 ──→ platform-intelligence  ← OS kernel
                 ──→ ui-core
                 ──→ voice-intelligence (Phase 4)
@@ -153,6 +157,7 @@ vybelive        ──→ shared-types
                 ──→ evidence-core
                 ──→ asset-core
                 ──→ ai-core
+                ──→ local-intelligence     ← on-device AI (Phase 4)
                 ──→ live-session-core
                 ──→ platform-intelligence  ← OS kernel
                 ──→ ui-core
@@ -179,6 +184,7 @@ vybelive        ──→ shared-types
 | **live-session-core** | `vybelive` | ReadyLoq has no streaming | Agora credentials injected; SocialPublisher adapters per platform |
 | **ai-core** | `vybelive` (provider/factory/bus/state) + `readyloq-mobile` (confidence model) | VYBE's infrastructure is superior; ReadyLoq's 0–1 confidence is more principled | Strictly generic; normalise confidence to 0–1; remove VYBE-specific event kinds |
 | **platform-intelligence** | New (generalised from patterns in both repos) | Neither app has an orchestration kernel | Entirely new — see `src/index.ts` for the full interface set |
+| **local-intelligence** | New (greenfield) | Neither app has on-device ML infrastructure | Entirely new — ModelManager, InferenceEngine, VisionEngine, OCR, Embedding, Quality, AICache, ResourceMonitor, ProviderSelector |
 | **ui-core** | Both | Design tokens + component contracts | Tokens only; no JSX |
 
 ---
@@ -219,7 +225,9 @@ See `GOVERNANCE.md § 8` for the canonical statement. Summary:
 
 **T3.4: Migrate ReadyLoq to platform-intelligence** — Replace direct service calls with plugin registrations. Define pest-inspection workflow definition in readyloq-app. AIProviderFactory replaces direct OpenAI calls.
 
-### Phase 4 — Wearables, Voice, Live Session (Weeks 9–11)
+**T3.5: local-intelligence** — Register `LocalIntelligencePlugin` in both apps. Wire ReadyLoq's on-capture `QualityGate` to `ImageQualityEngine.detectBlur()`. Download and register a vision model; wire offline fallback via `LocalAIProvider` in ai-core's fallback chain.
+
+### Phase 4 — Wearables, Voice, Live Session, On-Device AI (Weeks 9–12)
 
 **T4.1: meta-wearables** — Promote ReadyLoq stubs to WearableProvider implementations. BLE discovery.
 
@@ -247,7 +255,9 @@ See `GOVERNANCE.md § 8` for the canonical statement. Summary:
    meta-wearables         (→ camera-core)
    voice-intelligence     (→ ai-core)
    live-session-core      (→ shared-types, storage-core)
-5. platform-intelligence  (→ everything in levels 0–2)  ← must go last
+5. platform-intelligence  (→ everything in levels 0–2)  ← parallel at level 3
+   local-intelligence     (→ shared-types, ai-core, camera-core,
+                             storage-core, evidence-core)  ←
 ```
 
 ---
@@ -278,13 +288,14 @@ See `GOVERNANCE.md § 8` for the canonical statement. Summary:
 | 3 — Assets, AI, OS kernel | asset-core, ai-core, platform-intelligence + ReadyLoq migration | 3.5 | platform-intelligence is complex but interface-only |
 | 4 — Wearables, Voice, Live Session | meta-wearables, voice-intelligence, live-session-core | 3.5 | Greenfield voice; Agora decoupling |
 | 5 — UI Core | ui-core | 0.5 | Token extraction only |
-| **Total** | **12 packages** | **~12 eng-weeks** | Parallelisable at levels 3–4; ~8 weeks with 2 engineers |
+| 3.5 — On-Device AI | local-intelligence (both apps) | 2.0 | Model download infra; TFLite/ONNX adapters per platform |
+| **Total** | **13 packages** | **~14 eng-weeks** | Parallelisable at levels 3–4; ~10 weeks with 2 engineers |
 
 ---
 
 ## 10. Package Scaffolding Summary
 
-All 12 packages are created in `packages/` with `package.json`, `tsconfig.json`, and documented `src/index.ts`.
+All 13 packages are created in `packages/` with `package.json`, `tsconfig.json`, and documented `src/index.ts`.
 
 ```
 platform/
@@ -305,7 +316,8 @@ platform/
     ├── voice-intelligence/       @platform/voice-intelligence
     ├── live-session-core/        @platform/live-session-core
     ├── ai-core/                  @platform/ai-core
-    ├── platform-intelligence/    @platform/platform-intelligence  ← NEW (OS kernel)
+    ├── platform-intelligence/    @platform/platform-intelligence  ← OS kernel
+    ├── local-intelligence/       @platform/local-intelligence     ← on-device AI runtime
     └── ui-core/                  @platform/ui-core
 ```
 
@@ -336,3 +348,5 @@ platform/
 **ADR-011:** Platform Governance — what is allowed, what is forbidden, dependency DAG rules, versioning strategy, package proposal process. See `GOVERNANCE.md` for the full text.
 
 **ADR-012:** platform-intelligence is the OS kernel. Applications do not call packages directly — they register plugins with platform-intelligence and define workflows. The platform provides capabilities; the application defines purpose.
+
+**ADR-013:** local-intelligence is separate from ai-core. Cloud AI (ai-core) is stateless API calls; on-device AI is stateful model lifecycle (download → load → warmup → infer → unload). Merging them would force ai-core to carry mobile ML framework deps (TFLite, ONNX, CoreML) in every consumer, including pure-web tools. Battery/thermal awareness and perceptual-hash caching are also mobile-only concerns. See `adrs/ADR-013-local-intelligence.md` for the full text.

@@ -60,7 +60,7 @@ These categories must **never** appear in any file under `platform/packages/`, i
 
 ### Product-specific event kinds
 - `inspection.completed`, `stream.started`, `proposal.sent` — these belong in the application's event schema
-- Only `ai.*`, `platform.*`, and `camera.*` style namespaces belong in the platform
+- Only `ai.*`, `platform.*`, `camera.*`, and `local_ai.*` style namespaces belong in the platform
 
 ### Business rules embedded as code
 - Pricing logic, eligibility checks, compliance requirements, role-based access rules — all in the application layer
@@ -92,9 +92,11 @@ Level 2 (→ Level 0–1):
   voice-intelligence     → ai-core, shared-types
   live-session-core      → shared-types, storage-core
 
-Level 3 (→ Level 0–2):
+Level 3 (→ Level 0–2, two packages at this level; neither imports the other):
   platform-intelligence  → shared-types, ai-core, camera-core,
                            evidence-core, storage-core, voice-intelligence
+  local-intelligence     → shared-types, ai-core, camera-core,
+                           storage-core, evidence-core
 
 Level 4 (applications — never imported by platform):
   readyloq-mobile        → any platform packages
@@ -109,7 +111,8 @@ Level 4 (applications — never imported by platform):
 4. **asset-core has no platform dependencies beyond shared-types.** Physical asset data is pure — it should be adoptable by any future tool (CRM, BI, mapping service) with zero transitive baggage.
 5. **ai-core does not import camera-core, evidence-core, or live-session-core.** AI infrastructure is orthogonal to all capture pipelines.
 6. **platform-intelligence does not import asset-core, sync-engine, meta-wearables, or live-session-core.** The OS kernel is agnostic of domain-specific plugins. Plugins are injected at runtime — not statically imported.
-7. **No shared package imports from `node_modules` of the consuming app.** All runtime dependencies must be declared in the package's own `package.json`.
+7. **local-intelligence does NOT import platform-intelligence.** local-intelligence is a plugin for the OS kernel, not a consumer of it. The registration is one-way: the application registers `LocalIntelligencePlugin` with `platform-intelligence`; `local-intelligence` itself has no knowledge of the kernel.
+8. **No shared package imports from `node_modules` of the consuming app.** All runtime dependencies must be declared in the package's own `package.json`.
 
 ### How to verify
 
@@ -291,6 +294,7 @@ Every PR that modifies a shared package must check:
 | asset-core | ReadyLoq | VYBE |
 | ai-core | VYBE | ReadyLoq |
 | platform-intelligence | Both | — |
+| local-intelligence | Both | — |
 | live-session-core | VYBE | — |
 | meta-wearables | ReadyLoq | — |
 | voice-intelligence | Both | — |
