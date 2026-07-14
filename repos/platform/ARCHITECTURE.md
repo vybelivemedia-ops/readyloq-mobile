@@ -1,8 +1,9 @@
 # Platform Architecture & Migration Analysis
 
-> **Generated:** 2026-07-14  
+> **Generated:** 2026-07-14 · **Revised:** 2026-07-14  
 > **Scope:** Cross-repo analysis of `readyloq-mobile` + `vybelive` → extraction plan for `platform`  
-> **Status:** Analysis complete. Package scaffolding created. NO code migrated yet.
+> **Status:** Analysis complete. Package scaffolding created. NO code migrated yet.  
+> **Changes in this revision:** streaming-core renamed to live-session-core; evidence-core and property-core added; ai-core expanded to include sessions, pipeline, and event infrastructure.
 
 ---
 
@@ -15,7 +16,7 @@ Two production apps share significant infrastructure that is currently duplicate
 | **ReadyLoq** (`readyloq-mobile`) | Pest inspection — mobile capture, offline sync, AI analysis, multi-tenant SaaS | Expo + React Native + Express API + Drizzle/Postgres |
 | **VYBE LIVE** (`vybelive`) | Creator live-streaming — Agora RTC, social publishing, Mission Control AI OS | Expo + React Native + Express API + Drizzle/Postgres + AI executive layer |
 
-Both use an **identical** monorepo structure (pnpm workspaces, `artifacts/`, `lib/`) and target the **same Replit sidecar object storage** at `127.0.0.1:1106`. Seven infrastructure packages can be extracted; two are new (wearables stubs + voice, which neither app has implemented yet).
+Both use an **identical** monorepo structure (pnpm workspaces, `artifacts/`, `lib/`) and target the **same Replit sidecar object storage** at `127.0.0.1:1106`. Eleven infrastructure packages are identified: nine with existing code to extract, two that are new greenfield packages (wearables stubs + voice).
 
 The extracted platform repo (`platform/`) is a **pure TypeScript interface and type layer** — no runtime dependencies, no framework coupling. Each app consumes it as a workspace dependency and provides its own concrete implementations.
 
@@ -38,19 +39,20 @@ artifacts/
         future-source-providers.ts
       sync/           Offline sync engine ← CANONICAL for sync-engine
         engine.ts
-      local/          AsyncStorage KV store
+      local/          AsyncStorage KV store ← CANONICAL for evidence-core (local store)
         inspection-store.ts
       objectStorage.ts ← CANONICAL for storage-core (superset)
 lib/
   db/src/schema/
     inspections, analysis, callbacks, dataset, reports, training,
-    branding, users, properties, companies, leads, intelligence-dataset,
+    branding, users, properties ← CANONICAL for property-core,
+    companies, leads, intelligence-dataset,
     beta, opportunities, scorecards, customer-summaries, proposals
 ```
 
-**Domain:** pest inspection. Schemas are heavily pest-specific (inspections, findings, evidence, pest species, treatment recommendations, scorecards, proposals). These stay in readyloq-mobile.
+**Domain:** pest inspection. Schemas are heavily pest-specific (inspections, findings, pest species, treatment recommendations, scorecards, proposals). These stay in readyloq-mobile.
 
-**AI:** Direct OpenAI calls from the Express API. No provider abstraction — single provider, batched analysis pipeline, confidence 0–1 float. VYBE's AIProviderFactory is the superior abstraction.
+**AI:** Direct OpenAI calls from the Express API. No provider abstraction — single provider, batched analysis pipeline, confidence 0–1 float. VYBE's AIProviderFactory is the superior abstraction; ReadyLoq migrates to it in Phase 3.
 
 **Multi-tenancy:** Every DB query is gated on `companyId`. Object storage keys are namespaced `companies/{companyId}/…`. Per-company branding, user isolation, and lead management.
 
@@ -71,11 +73,11 @@ artifacts/
         providers/            ← engineering/github/replit provider (stays)
   mobile/
     app/
-      stream/                 ← live stream session (Agora RTC) ← CANONICAL for streaming-core
+      stream/                 ← live stream session (Agora RTC) ← CANONICAL for live-session-core
       creator/                ← creator dashboard
       (tabs)/discover, recordings, notifications, collaborations
     lib/
-      uploadMedia.ts          ← media upload patterns
+      uploadMedia.ts          ← CANONICAL for evidence-core (upload patterns)
   marketing/                  ← public website (stays in vybelive)
 lib/
   db/src/schema/
@@ -94,11 +96,11 @@ lib/
     Phase 10: deployment events, provider reliability ledger
 ```
 
-**Domain:** live-streaming social platform + AI Mission Control (AI executives managing product objectives). All Mission Control/AI executive schemas stay in vybelive.
+**Domain:** live-streaming social platform + AI Mission Control. All Mission Control/AI executive schemas stay in vybelive.
 
 **AI:** `AIProviderFactory` with multi-provider fallback chain (OpenAI → Anthropic → Google → Mock), per-request model hints, per-objective DB overrides, provider reliability ledger, cost tracking. This is the canonical AI infrastructure.
 
-**No camera abstraction:** VYBE uses Agora's RTC SDK directly for live streaming. No EvidenceItem model. No offline sync.
+**No camera abstraction:** VYBE uses Agora's RTC SDK directly for live streaming.
 
 ---
 
@@ -107,28 +109,35 @@ lib/
 ### 3.1 Platform package dependencies
 
 ```
-                    ┌─────────────────┐
-                    │  shared-types   │  (no dependencies)
-                    └────────┬────────┘
-              ┌──────────────┼──────────────┬──────────────┐
-              │              │              │              │
-     ┌────────▼──────┐  ┌────▼────┐  ┌─────▼────┐  ┌─────▼─────┐
-     │  camera-core  │  │ ai-core │  │storage-  │  │  ui-core  │
-     │               │  │         │  │  core    │  │           │
-     └───────┬───────┘  └────┬────┘  └────┬─────┘  └───────────┘
-             │               │            │
-    ┌────────▼──────┐  ┌─────▼──────┐  ┌─▼──────────────┐
-    │ meta-wearables│  │  voice-    │  │ streaming-core │
-    │               │  │intelligence│  │                │
-    └───────────────┘  └────────────┘  └────────────────┘
+                         ┌──────────────────┐
+                         │   shared-types   │  (no dependencies)
+                         └────────┬─────────┘
+          ┌──────────────┬────────┼────────┬─────────────┬──────────────┐
+          │              │        │        │             │              │
+  ┌───────▼──────┐ ┌─────▼────┐ ┌▼───────┐ ┌───────────▼┐ ┌──────────▼─┐
+  │  camera-core │ │ ai-core  │ │storage-│ │property-   │ │  ui-core   │
+  │              │ │          │ │ core   │ │  core      │ │            │
+  └──────┬───────┘ └────┬─────┘ └┬──────┘ └────────────┘ └────────────┘
+         │              │        │
+  ┌──────▼──────┐ ┌─────▼────┐  ├──────────────┐
+  │meta-wearables│ │  voice-  │  │              │
+  │             │ │intellig. │  │              │
+  └─────────────┘ └──────────┘  │              │
+                          ┌─────▼───────┐ ┌────▼──────────────┐
+                          │evidence-core│ │live-session-core   │
+                          │             │ │                    │
+                          └─────────────┘ └────────────────────┘
 
-    ┌───────────────┐
-    │  sync-engine  │  → shared-types only
-    │               │    (storage-core wired by caller, not imported)
-    └───────────────┘
+  ┌───────────────┐
+  │  sync-engine  │  → shared-types only
+  │               │    (storage-core wired by caller via FileUploader injection)
+  └───────────────┘
 ```
 
-**Key design rule:** `sync-engine` does NOT import `storage-core`. The caller wires them together by injecting a `FileUploader` adapter into the engine constructor. This keeps the packages independently testable.
+**Key design rules:**
+- `sync-engine` does NOT import `storage-core` — the caller injects a `FileUploader` adapter.
+- `evidence-core` depends on `storage-core` for uploads but does NOT depend on `camera-core` — the two are parallel (camera-core produces evidence; evidence-core manages its lifecycle).
+- `property-core` has no platform dependencies beyond `shared-types` — it is deliberately isolated.
 
 ### 3.2 App consumption
 
@@ -137,39 +146,44 @@ readyloq-mobile ──→ shared-types
                 ──→ camera-core       (vision/ → provider-registry, quality-gate)
                 ──→ storage-core      (objectStorage.ts with company namespace)
                 ──→ sync-engine       (engine.ts + inspection-store.ts)
+                ──→ evidence-core     (inspection evidence lifecycle, upload pipeline)
+                ──→ property-core     (inspection properties / sites)
                 ──→ meta-wearables    (FUTURE_PROVIDER_DEFINITIONS)
-                ──→ ai-core           (replace direct OpenAI with AIProviderFactory)
+                ──→ ai-core           (AIProviderFactory, sessions, pipeline, events)
                 ──→ ui-core           (design tokens + component variants)
                 ──→ voice-intelligence (Phase Next — dictation during inspections)
+                ✗   live-session-core (not needed — no streaming in ReadyLoq today)
 
 vybelive       ──→ shared-types
-               ──→ storage-core      (objectStorage.ts as-is, IdentityNamespace)
-               ──→ ai-core           (AIProvider, AIProviderFactory, EventBus, StateEngine)
-               ──→ streaming-core    (Agora, cloud recording, clips, social publish)
-               ──→ ui-core           (design tokens + component variants)
+               ──→ storage-core       (objectStorage.ts, IdentityNamespace)
+               ──→ evidence-core      (stream clips and recordings as evidence)
+               ──→ property-core      (stream venues / creator locations)
+               ──→ ai-core            (AIProvider, factory, sessions, pipeline, EventBus, StateEngine)
+               ──→ live-session-core  (Agora, cloud recording, clips, social publish)
+               ──→ ui-core            (design tokens + component variants)
                ──→ voice-intelligence (Phase Next — stream transcription, commands)
-               ✗   camera-core       (not needed — Agora owns the camera)
-               ✗   sync-engine       (not needed — always-online streaming app)
-               ✗   meta-wearables    (not needed yet — possible future creator tools)
+               ✗   camera-core        (not needed — Agora owns the camera)
+               ✗   sync-engine        (not needed — always-online streaming app)
+               ✗   meta-wearables     (not needed yet)
 ```
 
 ---
 
 ## 4. Canonical Implementation Map
 
-For each platform package, the table shows which app's code is the canonical source and what generalisation is required before extraction.
-
 | Package | Canonical Source | Reason | Generalisation Required |
 |---------|-----------------|--------|------------------------|
-| **shared-types** | New (synthesised from both) | Types exist in both; this is a merge | Define domain-agnostic versions; both apps add domain fields locally |
-| **camera-core** | `readyloq-mobile` | VYBE has no camera abstraction | Remove pest-specific field names from provider configs; make QualityGate thresholds injectable; decouple from AsyncStorage |
-| **storage-core** | `readyloq-mobile` (superset) | ReadyLoq adds `objectPathCompanyScope()` on top of the identical base VYBE uses | Move sidecar URL to env var; typed error objects instead of raw throws |
-| **sync-engine** | `readyloq-mobile` | VYBE has no offline sync | Generify entity type `T`; decouple from AsyncStorage (inject KVAdapter); decouple from expo-file-system (inject FileUploader); make pipeline steps configurable |
-| **meta-wearables** | `readyloq-mobile` (stubs only) | VYBE has no wearables code | Already stub-level; move to WearableRegistry plugin pattern |
-| **voice-intelligence** | New (no existing code) | Neither app has implemented voice yet | Greenfield; design from roadmap comments in both repos |
-| **streaming-core** | `vybelive` | ReadyLoq has no streaming | Move Agora credentials to injected config; extract SocialPublisher adapters; decouple CloudRecording from Agora-specific API |
-| **ai-core** | `vybelive` (factory) + `readyloq-mobile` (confidence model) | VYBE's AIProviderFactory is superior; ReadyLoq's 0–1 confidence is more principled than VYBE's 0–100 | Keep strictly generic — no pest or streaming logic; normalise confidence to 0–1; make EventBus generic over payload |
-| **ui-core** | Both (shadcn/ui set is identical on web; native components differ) | Both web apps share shadcn/ui; mobile component APIs are similar | Extract prop interfaces and design tokens only — no JSX; implementations stay per-app |
+| **shared-types** | New (synthesised from both) | Types exist in both; this is a merge | Domain-agnostic versions only; apps add domain fields locally |
+| **camera-core** | `readyloq-mobile` | VYBE has no camera abstraction | Remove pest-specific identifiers; injectable QualityGate thresholds; KVAdapter instead of AsyncStorage |
+| **storage-core** | `readyloq-mobile` (superset) | ReadyLoq adds company-scoped path namespacing on top of the identical base VYBE uses | Move sidecar URL to env var; typed error objects |
+| **sync-engine** | `readyloq-mobile` | VYBE has no offline sync | Generic `SyncEngine<T>`; KVAdapter injection; FileUploader injection; configurable pipeline steps |
+| **evidence-core** | `readyloq-mobile` (primary) + `vybelive` (upload patterns) | ReadyLoq has the richest evidence lifecycle (quality records, annotations, local store); VYBE's uploadMedia.ts adds upload flow patterns | Decouple from Inspection entity; EvidenceStore becomes generic; annotations apply to both photos and video clips |
+| **property-core** | `readyloq-mobile` | ReadyLoq's properties schema is the most complete (structured address, lat/lng, area, year built, contacts, access instructions); VYBE stores location as a free-text string only | Remove pest-specific fields (access instructions, treatment history) to app layer; ownerId scoping for both company (ReadyLoq) and creator (VYBE) |
+| **meta-wearables** | `readyloq-mobile` (stubs only) | VYBE has no wearables code | Already stub-level; WearableRegistry plugin pattern |
+| **voice-intelligence** | New (no existing code) | Neither app has implemented voice yet | Greenfield |
+| **live-session-core** | `vybelive` | ReadyLoq has no streaming | Agora credentials injected; SocialPublisher adapters per platform; CloudRecording decoupled from Agora-specific API |
+| **ai-core** | `vybelive` (provider/factory/bus/state/pipeline) + `readyloq-mobile` (confidence model) | VYBE's AIProviderFactory and EventBus are the superior infrastructure; ReadyLoq's 0–1 confidence is more principled than VYBE's 0–100 int | Keep strictly generic; normalise confidence to 0–1; EventBus generic over payload; extract StateEngine's localStorage coupling; remove VYBE-specific event kind constants |
+| **ui-core** | Both (shadcn/ui set is identical on web; native component APIs are parallel) | Merge — tokens and contracts only | No JSX extracted; implementations stay per-app |
 
 ---
 
@@ -179,26 +193,27 @@ For each platform package, the table shows which app's code is the canonical sou
 - All pest-inspection domain schemas: inspections, findings, pest species, treatments, scorecards, proposals
 - Multi-tenant company management, user/role management
 - Pest-specific AI prompts, batch analysis pipeline, detection labels
-- Report generation (PDF/Word) with pest-specific templates
-- Lead management, opportunity tracking
+- Report generation (PDF/Word) with pest-inspection templates
+- Lead management, opportunity tracking, customer summaries
+- Property-specific pest history, treatment records, pricing logic
 - ReadyLoq-specific UI: inspection flows, evidence review, property maps
 
 ### Stays in vybelive
-- AI Executive layer: Quinn + executive team (Ada, Theo, Mara, …) — all `V1–V12` schemas
+- AI Executive layer: Quinn + executive team — all V1–V12 schemas
 - Mission Control — objectives, tasks, approvals, autonomy engine, agent-zero jobs
 - Executive memory, chief reasoning, retrospectives, weekly reviews
 - Organisation events ledger, cause→effect event chains
 - Engineering intelligence (GitHub/Replit telemetry), engineering snapshots
-- VYBE-specific event kinds (`vybe.*`, `github.*`, `replit.*`)
+- VYBE-specific event kinds (`vybe.*`, `github.*`, `replit.*`, `stream.*`)
 - Social features: streams, creator dashboard, discover, collaborations, recordings
-- Stream-specific schemas (stays in vybelive DB — streaming-core exports interfaces only)
+- Stream-specific DB schemas (live-session-core exports interfaces; the DB tables stay in vybelive)
+- Stream venue permissions, capacity, audience demographics (property-core provides the base; VYBE adds these fields)
 
 ---
 
 ## 6. Migration Plan
 
 ### Phase 1 — Foundation (Weeks 1–2)
-Extract the zero-dependency foundation first. No app code changes yet.
 
 **T1.1: shared-types**
 - Synthesise `EvidenceItem`, `CaptureMode`, `CaptureSource`, `QualityAssessment` from ReadyLoq `vision/types.ts`
@@ -211,66 +226,81 @@ Extract the zero-dependency foundation first. No app code changes yet.
 - Extract ReadyLoq `objectStorage.ts` as the base implementation
 - Add `StorageNamespace` interface + `IdentityNamespace` + `companyNamespace()`
 - Move sidecar URL to `OBJECT_STORAGE_BASE_URL` env var (default: `http://127.0.0.1:1106`)
-- Typed error class `StorageError` replacing raw `Error` throws
+- Typed error class `StorageError`
 - Unit tests with a mock HTTP server
 
-### Phase 2 — Camera & Sync (Weeks 3–4)
+### Phase 2 — Camera, Sync & Evidence (Weeks 3–5)
 
 **T2.1: camera-core**
 - Extract ReadyLoq `vision/types.ts`, `provider-registry.ts`, `quality-gate.ts`, `pixels.ts`
-- Generalise: rename any pest-specific identifiers; inject QualityGate thresholds
-- Replace `AsyncStorage` coupling with `KVAdapter` interface
-- Keep `DeviceCameraProvider` (wraps `expo-camera`) as the default implementation
-- Wire into readyloq-app; confirm all existing capture flows work
+- Remove pest-specific identifiers from provider configs; inject QualityGate thresholds
+- Replace AsyncStorage coupling with `KVAdapter` interface
+- Keep `DeviceCameraProvider` (wraps expo-camera) as default
+- Wire into readyloq-app; confirm all capture flows work
 
 **T2.2: sync-engine**
 - Extract ReadyLoq `sync/engine.ts` + `local/inspection-store.ts`
 - Generalise entity type to `SyncEngine<T extends SyncableEntity>`
-- Inject `KVAdapter` (AsyncStorage adapter for mobile, MemoryAdapter for tests)
-- Inject `FileUploader` (wraps storage-core upload for the binary evidence step)
-- Replace Inspection-specific step logic with configurable pipeline
+- Inject `KVAdapter` + `FileUploader`
+- Make pipeline steps configurable (not all entities need the upload step)
 - Unit tests with MemoryAdapter + mock FileUploader
 
-### Phase 3 — AI Core (Weeks 5–6)
+**T2.3: evidence-core**
+- Extract ReadyLoq `inspection-store.ts` evidence-related operations as `EvidenceStore`
+- Extract VYBE `uploadMedia.ts` upload patterns as `EvidenceUploadPipeline`
+- Add `EvidenceCollection`, `EvidenceAnnotation`, `EvidenceQualityRecord`
+- Decouple from Inspection entity — make `entityType`/`entityId` generic
+- Unit tests with MemoryAdapter backing EvidenceStore
 
-**T3.1: ai-core**
-- Extract VYBE `AIProvider.ts` interface + `AIProviderFactory.ts` logic
+### Phase 3 — Properties & AI Core (Weeks 6–7)
+
+**T3.1: property-core**
+- Extract ReadyLoq `properties` DB schema into `PropertyRecord` + `PropertyStore` + `GeocodingService`
+- Remove pest-specific fields (access instructions, treatment history) to ReadyLoq app layer
+- Add `ownerId` scoping that maps to `companyId` (ReadyLoq) or `creatorId` (VYBE)
+- Integration tests against a Postgres test DB
+
+**T3.2: ai-core**
+- Extract VYBE `AIProvider.ts` + `AIProviderFactory.ts` + `AIProviderCapabilities`
 - Extract VYBE `EventBus.ts` + `StateEngine.ts`
-- Normalise confidence to 0–1 (VYBE uses 0–100 int in `executiveRecommendations.confidence`)
-- Remove all VYBE-specific event kind constants from the package
-- Make EventBus generic: `EventBus` with payload type parameter
-- Unit tests for fallback chain (mock providers with controlled failure)
+- Add `AISession`, `AIMessage`, `AISessionConfig`, `AISessionManager`
+- Add `AIPipeline`, `AIMiddleware`, `AIRequestContext`
+- Add `AIRateLimiter`, `AIUsageTracker`, `AIUsageSummary`
+- Add `AI_EVENT_KINDS` constants + typed event payloads
+- Normalise confidence to 0–1; remove all VYBE-specific event kind constants
+- Unit tests: fallback chain, session multi-turn, pipeline middleware ordering
 
-**T3.2: Migrate ReadyLoq to use ai-core**
+**T3.3: Migrate ReadyLoq to use ai-core**
 - Replace ReadyLoq's direct `OpenAI` import with `AIProviderFactory`
-- Add `EventBus` for AI analysis lifecycle events (analysis.started, analysis.completed, analysis.failed)
+- Wrap analysis calls in `AISession` per inspection batch
+- Emit AI infrastructure events via `EventBus`
 - Replace confidence `number` with `ConfidenceResult` struct
 
-### Phase 4 — Wearables, Voice, Streaming (Weeks 7–9)
+### Phase 4 — Wearables, Voice, Live Session (Weeks 8–10)
 
 **T4.1: meta-wearables**
-- Promote ReadyLoq's `FUTURE_PROVIDER_DEFINITIONS` stubs to `WearableProvider` implementations
+- Promote ReadyLoq's `FUTURE_PROVIDER_DEFINITIONS` to `WearableProvider` implementations
 - Add `WearableRegistry.discover()` with BLE scan (react-native-ble-plx)
-- Integration test with a mock BLE peripheral
+- Integration test with mock BLE peripheral
 
-**T4.2: streaming-core**
+**T4.2: live-session-core**
 - Extract VYBE mobile `stream/` session logic + `lib/uploadMedia.ts`
-- Extract VYBE API stream routes into interface definitions
 - Wrap Agora SDK behind `AgoraAdapter` — all Agora imports confined to adapter
 - Add `SocialPublisher` adapters for YouTube and Instagram
+- Move Agora credentials to injected configuration
 
 **T4.3: voice-intelligence**
-- Greenfield implementation: `VoiceRecorder` (expo-av on mobile, MediaRecorder on web)
+- Greenfield: `VoiceRecorder` (expo-av on mobile, MediaRecorder on web)
 - `TranscriptionService` backed by Whisper via `AIProviderFactory`
-- `VoiceCommandRouter` with pattern matching
-- Wire into ReadyLoq mobile (dictation mode during inspections)
-- Wire into VYBE mobile (stream control commands)
+- `VoiceCommandRouter` with pattern matching + generic `TAction` type
+- Wire into ReadyLoq mobile (dictation during inspections)
+- Wire into VYBE mobile (stream control commands + auto-captioning)
 
-### Phase 5 — UI Core (Week 10)
+### Phase 5 — UI Core (Week 11)
 
 **T5.1: ui-core**
 - Extract design tokens from both apps' Tailwind configs and native StyleSheet constants
-- Confirm both apps' component prop interfaces match the ui-core contracts
+- Confirm component prop interfaces match ui-core contracts
 - Both apps keep their own JSX implementations — no component code migrates
 
 ---
@@ -278,18 +308,20 @@ Extract the zero-dependency foundation first. No app code changes yet.
 ## 7. Extraction Order (dependency-safe)
 
 ```
-1. shared-types          (no deps — must go first)
-2. storage-core          (→ shared-types)
-3. ai-core               (→ shared-types)
-   camera-core           (→ shared-types)   ← parallel with ai-core
-   sync-engine           (→ shared-types)   ← parallel with ai-core
-4. meta-wearables        (→ camera-core)
-   voice-intelligence    (→ ai-core)        ← parallel with meta-wearables
-   streaming-core        (→ storage-core)   ← parallel with meta-wearables
-5. ui-core               (→ shared-types — can go any time after step 1)
+1. shared-types           (no deps — must go first)
+2. storage-core           (→ shared-types)
+3. ai-core                (→ shared-types)               ← parallel
+   camera-core            (→ shared-types)               ← parallel
+   sync-engine            (→ shared-types)               ← parallel
+   property-core          (→ shared-types)               ← parallel
+   ui-core                (→ shared-types)               ← parallel
+4. evidence-core          (→ shared-types, storage-core) ← after step 2
+   meta-wearables         (→ camera-core)                ← after step 3
+   voice-intelligence     (→ ai-core)                    ← after step 3
+   live-session-core      (→ shared-types, storage-core) ← after step 2
 ```
 
-Step 3 packages can all be worked in parallel by separate engineers/tasks. Step 4 packages each depend on exactly one step-3 package.
+Step 3 packages are all independently workable in parallel. Step 4 each depend on exactly one step-3 package.
 
 ---
 
@@ -297,14 +329,16 @@ Step 3 packages can all be worked in parallel by separate engineers/tasks. Step 
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| **objectStorage.ts sidecar URL hardcoded** — both apps have `127.0.0.1:1106` hardcoded; tests outside Replit will fail | High | Medium | Move to `OBJECT_STORAGE_BASE_URL` env var in Phase 1 |
-| **AsyncStorage coupling in sync-engine** — the engine's KV layer assumes AsyncStorage; web apps would fail | High | High | KVAdapter interface in Phase 2; inject before any web consumer exists |
-| **VYBE confidence is 0–100 int; ReadyLoq is 0–1 float** — if normalised incorrectly, detection results mis-score | Medium | High | Normalise in ai-core; add branded type `ConfidenceScore = number & { _brand: 'confidence' }` with validator |
-| **Agora SDK deep-coupled in VYBE mobile** — stream session state, recording, and UI are tightly coupled to Agora types | Medium | High | AgoraAdapter abstraction in Phase 4; do not migrate until adapter is stable |
-| **ReadyLoq pest-specific AI prompts mixed into analysis service** — extraction may accidentally include domain prompts | Low | Medium | Code review gate: no string literals referencing pest species in platform packages |
-| **VYBE Mission Control AI schemas are very large** — 12 migration versions; accidental inclusion would pollute shared-types | Low | High | Explicit allow-list of types in shared-types; CI lint rule blocking import of VYBE-specific table types |
-| **React Native version skew** — ReadyLoq and VYBE may target different RN versions; native module APIs may differ | Medium | Medium | Audit RN versions before Phase 2; ui-core contains no JSX so this is not a blocker for Phase 1–3 |
-| **expo-file-system API differences** — ReadyLoq sync engine uses `FileSystem.uploadAsync` which is Expo-specific | Medium | Medium | FileUploader adapter interface in sync-engine; expo-file-system stays in the app, not the package |
+| **objectStorage.ts sidecar URL hardcoded** — both apps have `127.0.0.1:1106` hardcoded; tests outside Replit fail | High | Medium | Move to `OBJECT_STORAGE_BASE_URL` env var in Phase 1 |
+| **AsyncStorage coupling in sync-engine + evidence-core** — both use AsyncStorage directly; web apps fail | High | High | KVAdapter interface; inject before any web consumer exists |
+| **VYBE confidence is 0–100 int; ReadyLoq is 0–1 float** — if mis-normalised, detection results mis-score | Medium | High | Normalise in ai-core; branded `ConfidenceScore` type with validator |
+| **Agora SDK deep-coupled in VYBE mobile** — stream state, recording, and UI tightly coupled to Agora types | Medium | High | AgoraAdapter abstraction in Phase 4; do not migrate until adapter is stable |
+| **ReadyLoq pest-specific AI prompts mixed into analysis service** — extraction may accidentally include domain prompts | Low | Medium | Code review gate: no pest species string literals in platform packages |
+| **VYBE Mission Control AI schemas are very large** — 12 migration versions; accidental inclusion pollutes shared-types | Low | High | Explicit allow-list in shared-types; CI lint rule blocking VYBE-specific table imports |
+| **evidence-core annotation model may conflict** — ReadyLoq uses region overlays on images; VYBE uses timestamp-based tags on video | Medium | Medium | `AnnotationKind` union is open (string); both models satisfy it; no forced merge |
+| **property-core ownerId scoping mismatch** — ReadyLoq always scopes to companyId; VYBE is currently single-tenant | Low | Low | ownerId is optional; single-tenant apps pass undefined |
+| **React Native version skew** — ReadyLoq and VYBE may target different RN versions | Medium | Medium | Audit before Phase 2; ui-core and property-core have no JSX so not a Phase 1–3 blocker |
+| **expo-file-system API differences** — ReadyLoq sync engine uses `FileSystem.uploadAsync` | Medium | Medium | FileUploader adapter; expo-file-system stays in the app |
 
 ---
 
@@ -313,24 +347,20 @@ Step 3 packages can all be worked in parallel by separate engineers/tasks. Step 
 | Phase | Packages | Engineer-weeks | Notes |
 |-------|----------|---------------|-------|
 | 1 — Foundation | shared-types, storage-core | 1.5 | Low risk; mostly type lifting + env var |
-| 2 — Camera & Sync | camera-core, sync-engine | 2.5 | Highest generalisation effort (AsyncStorage → KVAdapter) |
-| 3 — AI Core | ai-core + ReadyLoq migration | 2.0 | VYBE factory is already well-abstracted |
-| 4 — Wearables, Voice, Streaming | meta-wearables, voice-intelligence, streaming-core | 3.5 | Greenfield voice; Agora decoupling is non-trivial |
+| 2 — Camera, Sync, Evidence | camera-core, sync-engine, evidence-core | 3.0 | evidence-core adds annotation + collection model |
+| 3 — Properties, AI Core | property-core, ai-core + ReadyLoq migration | 2.5 | AI session + pipeline is new; property extraction is straightforward |
+| 4 — Wearables, Voice, Live Session | meta-wearables, voice-intelligence, live-session-core | 3.5 | Greenfield voice; Agora decoupling is non-trivial |
 | 5 — UI Core | ui-core | 0.5 | Token extraction only; no JSX migration |
-| **Total** | **9 packages** | **~10 eng-weeks** | Parallelisable at Phase 3–4; could compress to ~6 weeks with 2 engineers |
+| **Total** | **11 packages** | **~11 eng-weeks** | Parallelisable at Phase 3; could compress to ~7 weeks with 2 engineers |
 
 ---
 
 ## 10. Package Scaffolding Summary
 
-All 9 packages are created in `packages/` with:
-- `package.json` — correct `@platform/` scoped name, `workspace:*` dependencies, typecheck + build scripts
+All 11 packages are created in `packages/` with:
+- `package.json` — `@platform/` scoped name, `workspace:*` dependencies, typecheck + build scripts
 - `tsconfig.json` — extends root config, composite mode, correct project references
-- `src/index.ts` — fully documented type interfaces with:
-  - Canonical source file paths from both repos
-  - Generalisation notes
-  - Dependency graph documentation
-  - Placeholder interfaces ready to be filled by extracted implementations
+- `src/index.ts` — fully documented type interfaces with canonical source paths, generalisation notes, dependency graph
 
 ### Package structure
 
@@ -340,38 +370,51 @@ platform/
 ├── pnpm-workspace.yaml
 ├── tsconfig.json
 ├── .npmrc
-├── ARCHITECTURE.md           ← this document
+├── ARCHITECTURE.md               ← this document
 └── packages/
-    ├── shared-types/         @platform/shared-types
-    ├── camera-core/          @platform/camera-core
-    ├── storage-core/         @platform/storage-core
-    ├── sync-engine/          @platform/sync-engine
-    ├── meta-wearables/       @platform/meta-wearables
-    ├── voice-intelligence/   @platform/voice-intelligence
-    ├── streaming-core/       @platform/streaming-core
-    ├── ai-core/              @platform/ai-core
-    └── ui-core/              @platform/ui-core
+    ├── shared-types/             @platform/shared-types
+    ├── camera-core/              @platform/camera-core
+    ├── storage-core/             @platform/storage-core
+    ├── sync-engine/              @platform/sync-engine
+    ├── evidence-core/            @platform/evidence-core        ← NEW
+    ├── property-core/            @platform/property-core        ← NEW
+    ├── meta-wearables/           @platform/meta-wearables
+    ├── voice-intelligence/       @platform/voice-intelligence
+    ├── live-session-core/        @platform/live-session-core    ← renamed
+    ├── ai-core/                  @platform/ai-core              ← expanded
+    └── ui-core/                  @platform/ui-core
 ```
 
 ---
 
 ## 11. Key Architectural Decisions
 
-**ADR-001: Platform packages export interfaces only**  
-Concrete implementations stay in each app. The platform repo is a typed contract layer. This eliminates framework coupling and allows ReadyLoq (Expo + React Native) and VYBE (Expo + Agora + web) to satisfy the same interfaces without sharing runtime code.  
-*Consequence:* Platform packages have zero runtime dependencies. All `devDependencies` are TypeScript only.
+**ADR-001: Platform packages export interfaces only**
+Concrete implementations stay in each app. The platform repo is a typed contract layer — zero runtime dependencies. All `devDependencies` are TypeScript only. This eliminates framework coupling between ReadyLoq (Expo + React Native) and VYBE (Expo + Agora + web).
 
-**ADR-002: sync-engine does not depend on storage-core**  
-The sync engine's upload step is handled via an injected `FileUploader` interface, not a direct `storage-core` import. This keeps both packages independently testable and allows VYBE to adopt sync-engine in the future without pulling in storage-core.
+**ADR-002: sync-engine does not depend on storage-core**
+The upload step is handled via an injected `FileUploader` interface. This keeps both packages independently testable and allows VYBE to adopt sync-engine without inheriting storage-core.
 
-**ADR-003: ai-core stays generic — zero domain logic**  
-ReadyLoq keeps all pest-specific AI prompts, detection labels, and analysis pipelines. VYBE keeps all Mission Control executive logic, autonomy engine, and engineering intelligence. ai-core exports only: AIProvider interface, AIProviderFactory, EventBus, StateEngine, ConfidenceResult, Detection, AnalysisResult, Measurement.
+**ADR-003: ai-core stays generic — zero domain logic**
+ReadyLoq keeps all pest-specific AI prompts, detection labels, and analysis pipelines. VYBE keeps all Mission Control executive logic, autonomy engine, and engineering intelligence. ai-core exports: AIProvider interface, AIProviderFactory, AISession + AISessionManager, AIPipeline + AIMiddleware, AIRateLimiter, AIUsageTracker, AI_EVENT_KINDS constants, EventBus, StateEngine, ConfidenceResult, Detection, AnalysisResult, Measurement. No domain strings anywhere in the package.
 
-**ADR-004: Confidence is 0–1 float platform-wide**  
-VYBE's `executiveRecommendations.confidence` (0–100 int) is a DB storage detail that does not set the platform standard. All platform confidence values are normalised to `[0, 1]`. A branded TypeScript type (`ConfidenceScore`) will enforce this at compile time.
+**ADR-004: Confidence is 0–1 float platform-wide**
+VYBE's `executiveRecommendations.confidence` (0–100 int) is a DB storage detail. All platform confidence values normalise to `[0, 1]`. A branded TypeScript type (`ConfidenceScore`) enforces this at compile time.
 
-**ADR-005: objectStorage.ts sidecar URL moved to env var**  
-Both apps hardcode `http://127.0.0.1:1106`. storage-core will use `process.env.OBJECT_STORAGE_BASE_URL ?? 'http://127.0.0.1:1106'`. This allows test environments and future non-Replit deployments to override the endpoint without code changes.
+**ADR-005: objectStorage.ts sidecar URL moved to env var**
+Both apps hardcode `http://127.0.0.1:1106`. storage-core uses `process.env.OBJECT_STORAGE_BASE_URL ?? 'http://127.0.0.1:1106'`.
 
-**ADR-006: ui-core is tokens + contracts only**  
-Both apps share the shadcn/ui component set on web and have parallel native component APIs. Rather than trying to share JSX (which would require React as a peer dependency and force a web/native split), ui-core exports only: design token types, component prop interfaces, and variant union types. Each app provides its own JSX implementations satisfying those interfaces.
+**ADR-006: ui-core is tokens + contracts only**
+No JSX. Both apps keep their own React/React Native component implementations satisfying the ui-core prop interfaces.
+
+**ADR-007: camera-core and evidence-core are separate packages**
+camera-core = acquisition (getting frames from devices). evidence-core = persistence (storing, annotating, querying frames after capture). The separation allows web dashboards that review field evidence to depend on evidence-core without pulling in camera-core or any native camera SDK.
+
+**ADR-008: property-core has no platform dependencies beyond shared-types**
+Properties are a pure data record — they don't need storage-core, camera-core, or ai-core. Keeping property-core isolated means it can be adopted by any future product (web reporting tool, CRM integration) with minimal transitive dependencies.
+
+**ADR-009: live-session-core name (not streaming-core)**
+"Streaming" implies one-way media delivery; the package manages bidirectional live sessions (viewer count, pause/resume, recording, social re-stream). "Live session" is a more accurate and general term that also applies if ReadyLoq ever adds a live inspection walkthrough mode.
+
+**ADR-010: AIPipeline sits above AIProviderFactory**
+The factory handles provider selection and fallback. The pipeline handles cross-cutting concerns (logging, caching, rate limiting, content filtering) as composable middleware. Callers that need only simple dispatch use the factory directly; callers that need instrumented dispatch use the pipeline. Both are in ai-core.

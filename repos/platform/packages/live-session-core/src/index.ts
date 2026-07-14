@@ -1,7 +1,7 @@
 /**
- * @platform/streaming-core
+ * @platform/live-session-core
  *
- * Live-stream infrastructure extracted from vybelive.
+ * Live-session infrastructure extracted from vybelive.
  *
  * CANONICAL SOURCE:
  *   repos/vybelive/artifacts/mobile/lib/
@@ -16,7 +16,7 @@
  *   lib/uploadMedia.ts   — media upload to object storage
  *
  * ReadyLoq has NO streaming — it is a capture/sync/report app. This package
- * is VYBE-owned. ReadyLoq would consume streaming-core only if it adds a
+ * is VYBE-owned. ReadyLoq would consume live-session-core only if it adds a
  * "live inspection walkthrough" feature in a future phase.
  *
  * AGORA:
@@ -33,8 +33,8 @@
  *     work with any recording provider.
  *
  * DEPENDENCY GRAPH:
- *   streaming-core → shared-types
- *   streaming-core → storage-core  (recording files → object storage)
+ *   live-session-core → shared-types
+ *   live-session-core → storage-core  (recording files → object storage)
  */
 
 import type { EvidenceItem } from "@platform/shared-types";
@@ -201,11 +201,11 @@ export interface SocialPublisher {
   >;
 }
 
-// ─── Media upload ────────────────────────────────────────────────────────────
+// ─── Media upload ─────────────────────────────────────────────────────────────
 
 /**
  * Upload stream-related media (thumbnails, clips, cover images) to object
- * storage. Wraps storage-core for streaming-specific path conventions.
+ * storage. Wraps storage-core for live-session-specific path conventions.
  *
  * Path convention:
  *   streams/{sessionId}/thumbnail.jpg
