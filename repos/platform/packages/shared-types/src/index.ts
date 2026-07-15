@@ -137,6 +137,20 @@ export interface CaptureCapabilities {
  */
 export type ConfidenceScore = Brand<number, "ConfidenceScore">;
 
+/**
+ * Generic AI/ML confidence result. Defined here (not in ai-core) so that
+ * packages which intentionally avoid depending on ai-core (e.g. measurement-core)
+ * can still use a typed confidence result.
+ */
+export interface ConfidenceResult {
+  /** Normalised confidence 0–1. */
+  score: number;
+  /** The method or model that produced this result (informational). */
+  method: string;
+  /** Optional per-signal breakdown used for diagnostics. */
+  breakdown?: Record<string, number>;
+}
+
 // ─── OS Events (from vybelive) ───────────────────────────────────────────────
 
 export type EventPriority = "low" | "normal" | "high" | "critical";

@@ -138,10 +138,20 @@ description: Which packages have been extracted, what changed, what's next in th
   - Pick<EvidenceItem, "id" | "localUri"> × 2 → "localUri" doesn't exist on EvidenceItem; correct field is "uri"
 - Build: @platform/local-intelligence ✅
 
-## Next (Phase 12 — infrastructure, one PR per package)
+### Phase 12 — @platform/measurement-core (PR 12 complete)
+- STATUS: new package — no existing measurement code in either app (roadmap only)
+- 4 build errors corrected:
+  - ConfidenceResult imported from @platform/shared-types (not ai-core) — but shared-types didn't have it. Fix: added ConfidenceResult to shared-types (correct home for packages that can't depend on ai-core by design per ADR-014)
+  - Test polygonAreaPx Shoelace: pts[i].x → pts[i]!.x × 4 (noUncheckedIndexedAccess)
+  - Test polygonPerimeterPx: same issue × 2 (lines 138-139)
+  - Test stats() mock: sizeBytes: undefined → omit field (sizeBytes?: number can't be set to undefined)
+- shared-types addition: ConfidenceResult { score, method, breakdown? } — structurally identical to ai-core's, TypeScript structural typing ensures compat
+- Build: @platform/shared-types ✅  @platform/measurement-core ✅
 
-**Phase 12: @platform/measurement-core**
-- Canonical source: ReadyLoq measurement/dimensions, VYBE viewer metrics
+## Next (Phase 13 — infrastructure, one PR per package)
+
+**Phase 13: @platform/meta-wearables**
+- Canonical source: VYBE wearable/sensor integration, ReadyLoq future IoT
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
