@@ -148,10 +148,23 @@ description: Which packages have been extracted, what changed, what's next in th
 - shared-types addition: ConfidenceResult { score, method, breakdown? } — structurally identical to ai-core's, TypeScript structural typing ensures compat
 - Build: @platform/shared-types ✅  @platform/measurement-core ✅
 
-## Next (Phase 13 — infrastructure, one PR per package)
+### Phase 13 — @platform/meta-wearables (PR 13 complete)
+- Canonical source: readyloq-app/lib/vision/future-source-providers.ts (FUTURE_PROVIDER_DEFINITIONS)
+- VYBE: no wearable code — Agora SDK on device camera only
+- Full rewrite needed (7 error categories):
+  - CameraProvider → CaptureProviderBase (correct extendable base type; CaptureProvider is a union)
+  - EvidenceItem unused import removed
+  - modes: [...] → mode: single_value × 4 (CaptureCapabilities.mode is singular)
+  - transports: [...] → transport: single_value × 4 (singular), offlineCapable/streamingCapable don't exist
+  - "remote_camera" → "usb_camera" / "wifi_stream" (canonical CaptureSource values)
+  - availability: ProviderAvailability was assigned string "future" — ProviderAvailability is { available, reason } object; fix to { available: false, reason: "...no driver yet." }
+  - All capability objects rewritten from canonical future-source-providers.ts values
+- Build: @platform/meta-wearables ✅
 
-**Phase 13: @platform/meta-wearables**
-- Canonical source: VYBE wearable/sensor integration, ReadyLoq future IoT
+## Next (Phase 14 — infrastructure, one PR per package)
+
+**Phase 14: @platform/platform-intelligence**
+- Canonical source: ReadyLoq + VYBE shared orchestration layer
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
