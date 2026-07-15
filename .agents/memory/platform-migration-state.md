@@ -173,15 +173,42 @@ description: Which packages have been extracted, what changed, what's next in th
 
 ## Platform roadmap (post-migration)
 
-**@platform/device-core (recommended Phase 15 — new package, not a migration)**
-- Unify hardware interfaces from camera-core, voice-intelligence, measurement-core, meta-wearables
-- DeviceProvider / DeviceRegistry model for cross-hardware orchestration at platform-intelligence level
-- Removes per-package hardware concept duplication
-- User confirmed this recommendation on 2026-07-15
+**@platform/device-core — new package, foundational contract (NOT an orchestration layer)**
 
-**Why:** Each hardware-facing package currently defines its own hardware concepts independently.
-device-core would be the common foundation, consistent with how platform-intelligence is the
-common orchestration foundation.
+POSITION IN DAG (user-confirmed 2026-07-15):
+  @platform/core
+       │
+       ▼
+  @platform/shared-types
+       │
+       ▼
+  @platform/device-core           ← inserts HERE, not after platform-intelligence
+       │
+  ┌────┼────────┬──────────┬─────────────┐
+  │    │        │          │             │
+camera  voice  measurement meta-wearables live-session-core
+-core   -intel  -core
 
-**Why:** The extraction order follows the DAG — each package's types/interfaces must be
-settled before downstream packages (evidence-core, etc.) can be extracted.
+This is a foundational contract, not an orchestration layer. Sequence:
+  1. Migration is DONE (all 15 packages complete).
+  2. Stabilize the platform.
+  3. Introduce device-core BEFORE adding more hardware integrations (Meta, GoPro, DJI,
+     Insta360, USB cameras, FLIR thermal, Wi-Fi inspection cameras, BLE sensors, LiDAR).
+     This prevents per-device refactors later — all future hardware implements the same contract.
+
+RESPONSIBILITIES (user-defined 2026-07-15):
+  DeviceProvider, DeviceRegistry, DeviceCapabilities, DeviceConnection, DeviceStatus,
+  DeviceIdentity, DeviceDiscovery, DeviceLifecycle, DeviceHealth, DeviceBattery,
+  DeviceThermal, DevicePermissions, DeviceEvents, DeviceDiagnostics, DeviceFirmware,
+  DeviceProfile
+
+ReadyLoq opens beyond cameras once device-core exists:
+  Moisture meters, temperature/humidity sensors, thermal imagers, borescopes,
+  laser distance meters, environmental sensors, smart bait stations, BLE traps,
+  future IoT devices. Inspection engine sees DeviceProvider, not manufacturer.
+
+VYBE: Meta Ray-Ban, GoPro, DJI, Insta360, future streaming devices — all same contract.
+
+NOT a migration: no existing code to extract. New platform capability that future packages
+build upon. camera-core, voice-intelligence, measurement-core, meta-wearables will
+adopt device-core as a foundation in a subsequent refactor pass.
