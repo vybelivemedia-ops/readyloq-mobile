@@ -240,11 +240,14 @@ as their foundation in a subsequent refactor pass.
 
 ─── SEQUENCING ─────────────────────────────────────────────────────────────────
   1. Migration DONE (Phases 0–14, all 15 packages complete).
-  2. Stabilize the platform.
-  3. Build @platform/provider-registry (generic pattern).
-  4. Build @platform/device-core (depends on provider-registry).
-  5. Add hardware integrations (each implements DeviceProvider — never ad hoc again).
-  6. Refactor existing hardware packages to adopt device-core foundation.
+  2. @platform/provider-registry DONE (Phase 15) — generic registry pattern.
+  3. @platform/device-core DONE (Phase 16) — universal hardware abstraction.
+  4. Add hardware integrations (each implements DeviceProvider — never ad hoc again).
+  5. Refactor existing hardware packages to adopt device-core foundation.
+
+Build errors fixed:
+  provider-registry: TS2484 duplicate export — re-export barrel removed (types already
+  exported inline with export interface / export type; barrel was redundant).
 
 STRATEGIC FRAMING (user, 2026-07-15):
   "This is starting to look less like two apps sharing code and more like a genuine

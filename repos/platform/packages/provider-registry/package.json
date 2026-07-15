@@ -1,0 +1,21 @@
+{
+  "name": "@platform/provider-registry",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Generic provider registration, discovery, health checks, capability matching, and lifecycle management — the common pattern all provider-based packages implement",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@platform/core": "workspace:*",
+    "@platform/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
