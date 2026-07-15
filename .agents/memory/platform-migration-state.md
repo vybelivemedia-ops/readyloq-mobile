@@ -86,11 +86,20 @@ description: Which packages have been extracted, what changed, what's next in th
 - VYBE has no evidence-core usage
 - Build: shared-types ✅ evidence-core ✅ readyloq-app typecheck ✅
 
-## Next (Phase 7 — infrastructure, one PR per package)
+### Phase 7 — @platform/live-session-core (PR 7 complete)
+- Canonical: repos/vybelive/ (VYBE-owned; ReadyLoq has no streaming)
+- Correction: SocialPlatform missing "facebook" + "kick" — added
+  - Canonical OAUTH_PUSH_PLATFORMS = ["youtube","facebook","twitch","instagram","kick"]
+  - platformsTable.type also includes "tiktok" + "custom_rtmp" (manual RTMP)
+- All else validated accurate: StreamSession/Publisher/AgoraAdapter, CloudRecording,
+  ClipProcessor, StreamMediaUploader, SocialPublisher/Options
+- CloudRecording.start() correctly collapses Agora's 2-step (acquireResourceId+start)
+- Build: @platform/live-session-core ✅
 
-**Phase 7: @platform/live-session-core**
-- Canonical source: VYBE live streaming session types
-- StreamSession, StreamRecording, LiveSession models
+## Next (Phase 8 — infrastructure, one PR per package)
+
+**Phase 8: @platform/ui-core**
+- Canonical source: shared design tokens, theme, primitives used by both apps
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
