@@ -173,42 +173,80 @@ description: Which packages have been extracted, what changed, what's next in th
 
 ## Platform roadmap (post-migration)
 
-**@platform/device-core — new package, foundational contract (NOT an orchestration layer)**
+**New packages (user-confirmed 2026-07-15) — design, not migration**
 
-POSITION IN DAG (user-confirmed 2026-07-15):
+FULL DAG after new packages inserted:
+
   @platform/core
        │
        ▼
   @platform/shared-types
        │
        ▼
-  @platform/device-core           ← inserts HERE, not after platform-intelligence
+  @platform/provider-registry     ← generic registration/discovery/health/lifecycle contract
+       │                             ALL registries across the platform implement this
+       ▼
+  @platform/device-core           ← universal hardware abstraction (foundational contract)
        │
-  ┌────┼────────┬──────────┬─────────────┐
-  │    │        │          │             │
-camera  voice  measurement meta-wearables live-session-core
+  ┌────┼────────┬──────────┬────────────────┐
+  │    │        │          │                │
+camera  voice  measurement meta-wearables  live-session-core
 -core   -intel  -core
+       │    ... (all hardware packages)
+       ▼
+  @platform/platform-intelligence  (OS kernel — top of the graph)
 
-This is a foundational contract, not an orchestration layer. Sequence:
-  1. Migration is DONE (all 15 packages complete).
-  2. Stabilize the platform.
-  3. Introduce device-core BEFORE adding more hardware integrations (Meta, GoPro, DJI,
-     Insta360, USB cameras, FLIR thermal, Wi-Fi inspection cameras, BLE sensors, LiDAR).
-     This prevents per-device refactors later — all future hardware implements the same contract.
+
+─── @platform/provider-registry ───────────────────────────────────────────────
+PURPOSE: Generic registration and discovery mechanism that all provider-based
+packages use. Eliminates per-package registry reinvention.
 
 RESPONSIBILITIES (user-defined 2026-07-15):
-  DeviceProvider, DeviceRegistry, DeviceCapabilities, DeviceConnection, DeviceStatus,
-  DeviceIdentity, DeviceDiscovery, DeviceLifecycle, DeviceHealth, DeviceBattery,
-  DeviceThermal, DevicePermissions, DeviceEvents, DeviceDiagnostics, DeviceFirmware,
-  DeviceProfile
+  Registration, discovery, health checks, capability matching, lifecycle management.
+  All provider registries across the platform share this pattern:
+  AI providers, device providers, storage providers, measurement providers, voice providers.
 
-ReadyLoq opens beyond cameras once device-core exists:
+DAG: sits between shared-types and device-core. Existing packages (ai-core, camera-core,
+voice-intelligence, storage-core) would adopt it in a subsequent refactor pass.
+New packages start with it from day one.
+
+
+─── @platform/device-core ──────────────────────────────────────────────────────
+PURPOSE: Universal hardware abstraction. Every hardware provider implements the same
+contract — the inspection engine / stream engine never knows the manufacturer.
+
+RESPONSIBILITIES (user-defined 2026-07-15):
+  DeviceProvider, DeviceRegistry (implements provider-registry contract), DeviceCapabilities,
+  DeviceConnection, DeviceStatus, DeviceIdentity, DeviceDiscovery, DeviceLifecycle,
+  DeviceHealth, DeviceBattery, DeviceThermal, DevicePermissions, DeviceEvents,
+  DeviceDiagnostics, DeviceFirmware, DeviceProfile
+
+ReadyLoq hardware beyond cameras (all implement DeviceProvider):
   Moisture meters, temperature/humidity sensors, thermal imagers, borescopes,
   laser distance meters, environmental sensors, smart bait stations, BLE traps,
-  future IoT devices. Inspection engine sees DeviceProvider, not manufacturer.
+  future IoT devices. Inspection engine sees DeviceProvider + discovers capabilities.
 
-VYBE: Meta Ray-Ban, GoPro, DJI, Insta360, future streaming devices — all same contract.
+VYBE hardware (all implement DeviceProvider):
+  Meta Ray-Ban, GoPro, DJI, Insta360, USB cameras, FLIR thermal, Wi-Fi inspection cameras,
+  future streaming wearables, future LiDAR devices.
 
-NOT a migration: no existing code to extract. New platform capability that future packages
-build upon. camera-core, voice-intelligence, measurement-core, meta-wearables will
-adopt device-core as a foundation in a subsequent refactor pass.
+FUTURE-PROOFING: New device in 3 years = one new provider implementing DeviceProvider.
+No architecture change. The rest of the platform works unchanged.
+
+NOT a migration: no existing code to extract. New platform capability.
+camera-core, voice-intelligence, measurement-core, meta-wearables adopt device-core
+as their foundation in a subsequent refactor pass.
+
+
+─── SEQUENCING ─────────────────────────────────────────────────────────────────
+  1. Migration DONE (Phases 0–14, all 15 packages complete).
+  2. Stabilize the platform.
+  3. Build @platform/provider-registry (generic pattern).
+  4. Build @platform/device-core (depends on provider-registry).
+  5. Add hardware integrations (each implements DeviceProvider — never ad hoc again).
+  6. Refactor existing hardware packages to adopt device-core foundation.
+
+STRATEGIC FRAMING (user, 2026-07-15):
+  "This is starting to look less like two apps sharing code and more like a genuine
+   platform SDK. ReadyLoq and VYBE become products built on top of a common operating
+   layer rather than independent applications with duplicated infrastructure."
