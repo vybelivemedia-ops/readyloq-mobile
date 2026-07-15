@@ -107,10 +107,22 @@ description: Which packages have been extracted, what changed, what's next in th
   - BadgeVariant: added "primary" (ReadyLoq native BadgeTone) + "secondary" (shadcn web)
 - Build: @platform/ui-core ✅
 
-## Next (Phase 9 — infrastructure, one PR per package)
+### Phase 9 — @platform/asset-core (PR 9 complete)
+- Canonical: repos/readyloq-mobile/lib/db/src/schema/properties.ts
+- IMPORTANT: actual schema is "propertyProfilesTable" (NOT "properties"), much simpler:
+  id (serial), companyId, addressKey (text, normalised key), siteAddress (free-text),
+  clientName (inline), propertyType (free-text, no enum), technicianKnowledge, hotspots[]
+  Also: propertyNotesTable — separate table (not a simple internalNotes field)
+- Stub types are internally coherent but platform-forward (not canonically grounded):
+  AddressComponents, AssetType union, GeoCoordinates, AssetContact, areaSqm/yearBuilt/isActive
+  ReadyLoq uses free-text siteAddress + normalised addressKey as primary lookup
+- Correction: documentation-only — corrected false "properties table" header claim
+- Build: @platform/asset-core ✅
 
-**Phase 9: @platform/asset-core**
-- Canonical source: ReadyLoq property/asset management (reports, inspections)
+## Next (Phase 10 — infrastructure, one PR per package)
+
+**Phase 10: @platform/voice-intelligence**
+- Canonical source: VYBE audio transcription / ReadyLoq voice notes
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
