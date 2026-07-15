@@ -54,6 +54,12 @@ export type CaptureSource =
 
 /** A single captured/imported piece of evidence, pre-upload. */
 export interface EvidenceItem {
+  /**
+   * Stable identity for this item. Set by the capture provider at acquisition
+   * time (e.g. UUID). Used as the key in EvidenceStore, EvidenceAnnotation,
+   * and EvidenceQualityRecord.
+   */
+  id: string;
   /** Local file URI (may live in a cache dir — persist it immediately). */
   uri: string;
   source: CaptureSource;

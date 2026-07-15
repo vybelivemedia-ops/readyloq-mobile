@@ -74,11 +74,23 @@ description: Which packages have been extracted, what changed, what's next in th
 - Canonical ReadyLoq: intelligence-ai.ts — all domain-specific, none extracted
 - Build: shared-types ✅ ai-core ✅ readyloq-app typecheck ✅
 
-## Next (Phase 6 — infrastructure, one PR per package)
+### Phase 6 — @platform/evidence-core (PR 6 complete)
+- Platform commit: (see push output) — shared-types only; evidence-core stub already accurate
+- evidence-core stub validated as accurate: EvidenceQualityRecord, EvidenceAnnotation,
+  EvidenceCollection, EvidenceStore, EvidenceQuery (minQualityScore 0–100 ✓), 
+  UploadPhase/Progress/EvidenceUploadPipeline, EvidenceCollectionManager
+- shared-types correction: EvidenceItem.id: string added (was missing; evidenceId refs
+  in EvidenceStore.get/Annotation/QualityRecord required it)
+- App changes: native-camera-provider.ts + media-import-provider.ts each add
+  id: Crypto.randomUUID() — matches expo-crypto pattern from inspection-store.ts
+- VYBE has no evidence-core usage
+- Build: shared-types ✅ evidence-core ✅ readyloq-app typecheck ✅
 
-**Phase 6: @platform/evidence-core**
-- Canonical source: ReadyLoq evidence/media models
-- Photos, binary evidence, media registration patterns
+## Next (Phase 7 — infrastructure, one PR per package)
+
+**Phase 7: @platform/live-session-core**
+- Canonical source: VYBE live streaming session types
+- StreamSession, StreamRecording, LiveSession models
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
