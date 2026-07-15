@@ -129,10 +129,19 @@ description: Which packages have been extracted, what changed, what's next in th
 - VoiceCaptureMode, VoiceRecorder, VoiceCommandRouter: forward-looking design, no canonical backing
 - Build: @platform/voice-intelligence ✅
 
-## Next (Phase 11 — infrastructure, one PR per package)
+### Phase 11 — @platform/local-intelligence (PR 11 complete)
+- STATUS: new package — no existing on-device ML code in either app
+- ReadyLoq canonical reviewed: guidance-engine.ts, intelligence-ai.ts (cloud AI, not on-device); vision/ (Laplacian sharpness inline — already modelled in camera-core)
+- VYBE: no on-device ML code, cloud-only via aiGeneration.ts
+- Build errors (3):
+  - ConfidenceResult imported from @platform/shared-types → fix to @platform/ai-core (lives at ai-core:438)
+  - Pick<EvidenceItem, "id" | "localUri"> × 2 → "localUri" doesn't exist on EvidenceItem; correct field is "uri"
+- Build: @platform/local-intelligence ✅
 
-**Phase 11: @platform/local-intelligence**
-- Canonical source: ReadyLoq on-device intelligence (inspection analysis, guidance)
+## Next (Phase 12 — infrastructure, one PR per package)
+
+**Phase 12: @platform/measurement-core**
+- Canonical source: ReadyLoq measurement/dimensions, VYBE viewer metrics
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
