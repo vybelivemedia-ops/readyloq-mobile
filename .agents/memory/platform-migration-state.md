@@ -39,13 +39,22 @@ description: Which packages have been extracted, what changed, what's next in th
 - readyloq-app typecheck: ✅ zero errors; camera-core build: ✅ zero errors
 - VYBE: unaffected (VYBE ProviderStatus is a completely different AI/engineering type)
 
-## Next (Phase 3 — infrastructure, one PR per package)
+### Phase 3 — @platform/storage-core (PR 3 complete)
+- Platform commit: 53dc2b29 (vybelivemedia-ops/platform only — no app changes)
+- Added: ObjectNotFoundError (canonical — identical in both apps), StorageNotConfiguredError,
+  REPLIT_SIDECAR_ENDPOINT constant, SidecarSignedUrlRequest interface, SignedUrlMethod type
+- Updated: companyNamespace now accepts string|number (ReadyLoq uses numeric DB IDs)
+- Kept: StorageNamespace, IdentityNamespace, UploadOptions, UploadResult, PresignedUrlOptions,
+  ObjectStorageService interface (forward-looking contract)
+- Neither app imports from @platform/storage-core yet — both use concrete GCS classes
+- VYBE workspace wiring deferred (repos/vybelive/ not in pnpm-workspace.yaml)
+- Build: ✅ zero errors; apps: unaffected; api-server TS7030 in gemini.ts is pre-existing baseline
 
-**Phase 3.1: @platform/storage-core**
-- Canonical source: `artifacts/api-server/src/lib/objectStorage.ts`
-- ObjectStorageClient, StorageNamespace, SignedUrlRequest interfaces
-- No app-level type imports needed (server-side only)
-- Unblocks: @platform/evidence-core, @platform/live-session-core
+## Next (Phase 4 — infrastructure, one PR per package)
+
+**Phase 4.1: @platform/sync-engine**
+- Canonical source: `artifacts/readyloq-app/lib/sync/engine.ts`
+- SyncStep, SyncResult interfaces defined by app layer
 
 **Phase 2.3: @platform/sync-engine**
 - Canonical source: `artifacts/readyloq-app/lib/sync/engine.ts`
