@@ -119,10 +119,20 @@ description: Which packages have been extracted, what changed, what's next in th
 - Correction: documentation-only — corrected false "properties table" header claim
 - Build: @platform/asset-core ✅
 
-## Next (Phase 10 — infrastructure, one PR per package)
+### Phase 10 — @platform/voice-intelligence (PR 10 complete)
+- STATUS: new package — no existing code in either app (roadmap-planned both)
+- VYBE canonical: transcribeAudio(audioFilePath): Promise<string|null> — plain text, no confidence/language returned
+- Corrections (3):
+  - Removed unused `import type { AIRequest }` (not referenced in any exported type)
+  - TranscriptionResult.confidence: number → confidence?: number (VYBE returns string|null only)
+  - TranscriptionResult.language: string → language?: string (VYBE hardcodes "en" but doesn't return detected lang)
+- VoiceCaptureMode, VoiceRecorder, VoiceCommandRouter: forward-looking design, no canonical backing
+- Build: @platform/voice-intelligence ✅
 
-**Phase 10: @platform/voice-intelligence**
-- Canonical source: VYBE audio transcription / ReadyLoq voice notes
+## Next (Phase 11 — infrastructure, one PR per package)
+
+**Phase 11: @platform/local-intelligence**
+- Canonical source: ReadyLoq on-device intelligence (inspection analysis, guidance)
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
