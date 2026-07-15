@@ -96,10 +96,21 @@ description: Which packages have been extracted, what changed, what's next in th
 - CloudRecording.start() correctly collapses Agora's 2-step (acquireResourceId+start)
 - Build: @platform/live-session-core ✅
 
-## Next (Phase 8 — infrastructure, one PR per package)
+### Phase 8 — @platform/ui-core (PR 8 complete)
+- Canonical: readyloq web (shadcn), readyloq-app native, VYBE GlowButton/LiveBadge
+- Corrections (4):
+  - ColorTokens: added secondary/secondaryForeground, accent/accentForeground,
+    destructive/destructiveForeground, muted/mutedForeground (all in canonical components)
+  - ButtonVariant: "danger"→"destructive" (ReadyLoq web+native both use "destructive";
+    VYBE GlowButton's "danger" is VYBE-specific, not cross-platform)
+  - ButtonSize: removed "xs" (zero canonical backing across all 3 source files)
+  - BadgeVariant: added "primary" (ReadyLoq native BadgeTone) + "secondary" (shadcn web)
+- Build: @platform/ui-core ✅
 
-**Phase 8: @platform/ui-core**
-- Canonical source: shared design tokens, theme, primitives used by both apps
+## Next (Phase 9 — infrastructure, one PR per package)
+
+**Phase 9: @platform/asset-core**
+- Canonical source: ReadyLoq property/asset management (reports, inspections)
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
