@@ -62,15 +62,23 @@ description: Which packages have been extracted, what changed, what's next in th
 - VYBE has no offline sync; sync-engine is ReadyLoq-only for now
 - Build: ✅ zero errors; readyloq-app typecheck: ✅ zero errors
 
-## Next (Phase 5 — infrastructure, one PR per package)
+### Phase 5 — @platform/ai-core (PR 5 complete)
+- Platform commit: daa6f0de (shared-types + ai-core; no app changes)
+- ai-core stub was already accurate — no ai-core changes needed
+- shared-types corrections (2 changes):
+  - AIResponse.text → AIResponse.content (VYBE canonical uses "content")
+  - AIResponse.parsed?: Record<string,unknown> added (VYBE canonical)
+  - AIRequest.responseFormat?: "json"|"text" added (VYBE canonical)
+- Canonical VYBE: AIProvider.ts — AITask type, provider interface, MODEL_PRICING table
+  (MODEL_PRICING not extracted — goes stale; ai-core has no pricing tables)
+- Canonical ReadyLoq: intelligence-ai.ts — all domain-specific, none extracted
+- Build: shared-types ✅ ai-core ✅ readyloq-app typecheck ✅
 
-**Phase 5.1: @platform/ai-core**
-- Canonical source: ReadyLoq AI client, VYBE AI integrations
-- Prompt contracts, AIUsage, AIResponse types
+## Next (Phase 6 — infrastructure, one PR per package)
 
-**Phase 2.3: @platform/sync-engine**
-- Canonical source: `artifacts/readyloq-app/lib/sync/engine.ts`
-- Needs SyncStep[] defined by app layer first (see ARCHITECTURE.md note)
+**Phase 6: @platform/evidence-core**
+- Canonical source: ReadyLoq evidence/media models
+- Photos, binary evidence, media registration patterns
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
