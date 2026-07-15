@@ -119,6 +119,19 @@ export interface VoiceCommand<TAction extends string = string> {
 }
 
 /**
+ * Composite voice capability provider registered with the ProviderCoordinator
+ * in platform-intelligence.
+ *
+ * A VoicePlugin assembles a VoiceProvider from a concrete VoiceRecorder and
+ * TranscriptionService implementation and registers it with the coordinator.
+ * WorkflowSteps access voice capabilities through the coordinator, not directly.
+ */
+export interface VoiceProvider {
+  readonly recorder: VoiceRecorder;
+  readonly transcription: TranscriptionService;
+}
+
+/**
  * Maps utterances to typed Commands.
  * The consuming app registers its own grammar; this interface stays generic.
  */

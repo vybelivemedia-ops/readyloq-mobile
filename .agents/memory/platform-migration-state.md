@@ -161,10 +161,27 @@ description: Which packages have been extracted, what changed, what's next in th
   - All capability objects rewritten from canonical future-source-providers.ts values
 - Build: @platform/meta-wearables ✅
 
-## Next (Phase 14 — infrastructure, one PR per package)
+### Phase 14 — @platform/platform-intelligence (PR 14 complete — MIGRATION COMPLETE)
+- Final package: Platform OS kernel (plugin registry, workflow engine, intelligence session,
+  guidance engine, measurement state, memory orchestrator, provider coordinator, event router)
+- Canonical: ReadyLoq inspection workflow + VYBE live-session; domain logic stays in apps
+- Build errors (2, targeted):
+  - CameraProvider → CaptureProvider (same root cause as Phase 13 meta-wearables fix)
+  - VoiceProvider not in voice-intelligence: added composite interface { recorder, transcription }
+    (natural container for VoicePlugin to assemble and register with ProviderCoordinator)
+- Build: @platform/voice-intelligence ✅  @platform/platform-intelligence ✅
 
-**Phase 14: @platform/platform-intelligence**
-- Canonical source: ReadyLoq + VYBE shared orchestration layer
+## Platform roadmap (post-migration)
+
+**@platform/device-core (recommended Phase 15 — new package, not a migration)**
+- Unify hardware interfaces from camera-core, voice-intelligence, measurement-core, meta-wearables
+- DeviceProvider / DeviceRegistry model for cross-hardware orchestration at platform-intelligence level
+- Removes per-package hardware concept duplication
+- User confirmed this recommendation on 2026-07-15
+
+**Why:** Each hardware-facing package currently defines its own hardware concepts independently.
+device-core would be the common foundation, consistent with how platform-intelligence is the
+common orchestration foundation.
 
 **Why:** The extraction order follows the DAG — each package's types/interfaces must be
 settled before downstream packages (evidence-core, etc.) can be extracted.
