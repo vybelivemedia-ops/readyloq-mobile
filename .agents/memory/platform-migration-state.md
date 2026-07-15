@@ -50,11 +50,23 @@ description: Which packages have been extracted, what changed, what's next in th
 - VYBE workspace wiring deferred (repos/vybelive/ not in pnpm-workspace.yaml)
 - Build: ✅ zero errors; apps: unaffected; api-server TS7030 in gemini.ts is pre-existing baseline
 
-## Next (Phase 4 — infrastructure, one PR per package)
+### Phase 4 — @platform/sync-engine (PR 4 complete)
+- Platform commit: d1e46ac9 (vybelivemedia-ops/platform only — no app changes)
+- Corrections: DEFAULT_RETRY_POLICY constants wrong vs canonical
+  - baseDelayMs 1_000→10_000, maxDelayMs 30_000→300_000, maxAttempts 5→0 (unlimited)
+  - Canonical formula: Math.min(10_000 * 2^(max(attempts-1,0)), 300_000)
+- Added: DEFAULT_DEBOUNCE_MS=1_200 (canonical requestSync() default)
+- Retained: SyncableEntity, KVAdapter, FileUploader, SyncPipelineStep, SyncCheckpoint,
+  SyncEngineOptions<T>, SyncEngine<T> — generic design is correct direction
+- Canonical engine.ts is a module singleton (not a class), Inspection-specific; no import changes yet
+- VYBE has no offline sync; sync-engine is ReadyLoq-only for now
+- Build: ✅ zero errors; readyloq-app typecheck: ✅ zero errors
 
-**Phase 4.1: @platform/sync-engine**
-- Canonical source: `artifacts/readyloq-app/lib/sync/engine.ts`
-- SyncStep, SyncResult interfaces defined by app layer
+## Next (Phase 5 — infrastructure, one PR per package)
+
+**Phase 5.1: @platform/ai-core**
+- Canonical source: ReadyLoq AI client, VYBE AI integrations
+- Prompt contracts, AIUsage, AIResponse types
 
 **Phase 2.3: @platform/sync-engine**
 - Canonical source: `artifacts/readyloq-app/lib/sync/engine.ts`
