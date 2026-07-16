@@ -171,6 +171,22 @@ description: Which packages have been extracted, what changed, what's next in th
     (natural container for VoicePlugin to assemble and register with ProviderCoordinator)
 - Build: @platform/voice-intelligence ✅  @platform/platform-intelligence ✅
 
+## GitHub repo sync (completed 2026-07-16)
+
+Both repos pushed clean via GitHub REST API (git blobs → tree → commit → ref PATCH):
+
+| Repo | HEAD | Contents |
+|------|------|----------|
+| vybelivemedia-ops/platform | bb5017729533 | 18 packages, 18/18 typecheck Done |
+| vybelivemedia-ops/readyloq-mobile | 6f245cd67030 | 932 ReadyLoq app files, no platform code |
+
+**@platform/* dep strategy for standalone readyloq-mobile checkout:**
+- `@platform/camera-core` and `@platform/shared-types` are `workspace:*` in readyloq-app/package.json
+- For local dev, clone vybelivemedia-ops/platform alongside and add its `packages/*` to the pnpm workspace
+- TypeScript deps are type-only (all `export type`) so no runtime coupling
+
+**Exclusions from readyloq-mobile push:** attached_assets/, exports/ (QR codes), *.zip, *.tar.gz, .tsbuildinfo, node_modules/, dist/, .expo/
+
 ## Platform roadmap (post-migration)
 
 **New packages (user-confirmed 2026-07-15) — design, not migration**
