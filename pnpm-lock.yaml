@@ -1145,6 +1145,22 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)
 
+  repos/platform/packages/device-core:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/provider-registry':
+        specifier: workspace:*
+        version: link:../provider-registry
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   repos/platform/packages/evidence-core:
     dependencies:
       '@platform/core':
@@ -1274,11 +1290,40 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
+  repos/platform/packages/provider-registry:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   repos/platform/packages/shared-types:
     dependencies:
       '@platform/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  repos/platform/packages/smart-vision:
+    dependencies:
+      '@platform/camera-core':
+        specifier: workspace:*
+        version: link:../camera-core
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
     devDependencies:
       typescript:
         specifier: ^5.4.0

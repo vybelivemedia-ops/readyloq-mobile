@@ -253,3 +253,30 @@ STRATEGIC FRAMING (user, 2026-07-15):
   "This is starting to look less like two apps sharing code and more like a genuine
    platform SDK. ReadyLoq and VYBE become products built on top of a common operating
    layer rather than independent applications with duplicated infrastructure."
+
+
+─── @platform/smart-vision (Phase 17 — COMPLETE) ──────────────────────────────
+PURPOSE: Pure vision-intelligence contracts. Zero domain logic (no pest, no creator).
+
+OWNS (all types/interfaces, zero implementations):
+  Live frame processing    → VideoFrame, FrameBuffer, FramePipeline, FrameProcessor, PipelineStats
+  Object tracking          → ObjectTracker, TrackedRegion, TrackingTarget, TrackState, TrackId
+  Motion prediction        → MotionPredictor, MotionVector, MotionSample
+  Smart zoom               → SmartZoomController, ZoomCommand, ZoomConstraints, ZoomLevel
+  Subject locking          → SubjectLockController, SubjectLock, SubjectLockEvent
+  Smart crop               → SmartCropper, CropSuggestion, CropRule, CropConstraints
+  Auto capture             → AutoCaptureTrigger, CaptureReadiness, AutoCaptureConfig, ReadinessBlocker
+  Super resolution         → SuperResolutionProvider, SuperResolutionRequest/Result, SCALE_MULTIPLIER const
+  Quality scoring          → QualityScorer, FrameQualityReport, QualityDimension, PlatformQualityDimension
+  Device capability        → CapabilityNegotiator, VisionCapabilities, NegotiatedVisionConfig, CapabilityProbe
+
+DAG: smart-vision → camera-core → shared-types → core
+Source files: frame.ts, tracking.ts, zoom.ts, crop.ts, auto-capture.ts,
+              super-resolution.ts, quality.ts, capability.ts, index.ts
+Build: ✅ zero errors (strict + exactOptionalPropertyTypes + noUncheckedIndexedAccess)
+Location: repos/platform/packages/smart-vision/
+
+QUALITY SCORING NOTE: Promotes the ReadyLoq quality-gate pattern (quality-gate.ts)
+to platform contracts. The concrete implementation (Laplacian variance, resolution
+penalty, detail penalty) stays in the app layer; only the interfaces live here.
+Phase 3 will migrate the implementation with injectable thresholds.
