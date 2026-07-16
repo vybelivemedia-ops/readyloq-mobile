@@ -493,3 +493,67 @@ export type {
   PrivacyObjectTracker,
   PrivacyTrackerUpdateResult,
 } from "./privacy/impl/privacy-tracker";
+
+// ─── Live Session Engine ──────────────────────────────────────────────────────
+export { DEFAULT_LIVE_SESSION_CONFIG, DEFAULT_LIVE_SESSION_FEATURES } from "./live-session/types";
+export type {
+  PipelineState,
+  PipelineStage,
+  PipelineStageResult,
+  PipelineFrameResult,
+  LiveSessionFeatureFlags,
+  LiveSessionConfig,
+} from "./live-session/types";
+export type {
+  PipelineEventKind,
+  PipelineEvent,
+  PipelineEventListener,
+  PipelineEventBus,
+  PipelineSessionStartedEvent,
+  PipelineSessionStoppedEvent,
+  PipelineSessionErrorEvent,
+  PipelineFrameAcquiredEvent,
+  PipelineFrameDroppedEvent,
+  PipelineFrameProcessedEvent,
+  PipelineQualityScoredEvent,
+  PipelineDetectionCompletedEvent,
+  PipelineTrackingUpdatedEvent,
+  PipelineSceneDuplicateDetectedEvent,
+  PipelineZoomChangedEvent,
+  PipelinePrivacyObjectDetectedEvent,
+  PipelinePrivacyRedactedEvent,
+  PipelineCaptureTriggeredEvent,
+  PipelineCaptureSkippedEvent,
+  PipelinePerformanceAdaptedEvent,
+  PipelinePerformanceReportEvent,
+} from "./live-session/events";
+export { PROFILE_TARGET_FPS } from "./live-session/performance";
+export type {
+  PerformanceProfile,
+  PerformanceMetrics,
+  AdaptationDecision,
+  PerformanceMonitor,
+} from "./live-session/performance";
+export type {
+  FrameSchedulerDecision,
+  FrameScheduleResult,
+  LiveFrameScheduler,
+} from "./live-session/scheduler";
+export type {
+  PipelineStageDescriptor,
+  PipelineStageRunner,
+  PipelineContext,
+  PipelineCoordinator,
+} from "./live-session/pipeline";
+export type {
+  SessionStatistics,
+  VisionSessionSnapshot,
+  VisionSession,
+} from "./live-session/session";
+export type {
+  LiveSessionDependencies,
+  LiveSessionEngine,
+  LiveSessionFactory,
+} from "./live-session/engine";
+export { createLiveSessionFactory } from "./live-session/impl/live-session-engine";
+export { createPipelineEventBus } from "./live-session/impl/pipeline-impl";
