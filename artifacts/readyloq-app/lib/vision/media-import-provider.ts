@@ -8,6 +8,7 @@
  * in one gesture. Cancelling resolves to an empty array (not an error).
  */
 
+import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
 
 import type { EvidenceItem, VisionProvider } from "./types";
@@ -51,6 +52,7 @@ export function createMediaImportProvider(): VisionProvider {
         const shotAt =
           typeof exif?.DateTimeOriginal === "string" ? exif.DateTimeOriginal : undefined;
         return {
+          id: Crypto.randomUUID(),
           uri: asset.uri,
           source: "media_import",
           capturedAt: importedAt,

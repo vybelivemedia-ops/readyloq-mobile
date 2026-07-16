@@ -40,6 +40,7 @@ export function fallbackPrediction(): AiPrediction {
     possibleMoistureIssue: null,
     possibleStructuralIssue: null,
     zone: null,
+    pestCandidates: [],
   };
 }
 
@@ -74,9 +75,13 @@ function userPrompt(): string {
     "Return a JSON object with EXACTLY these keys:",
     '- "category": one taxonomy category slug, or null if unclear',
     '- "subcategory": one subcategory slug belonging to that category, or null',
-    '- "confidence": a number from 0 to 1 (your confidence in the category)',
+    '- "confidence": a number from 0 to 1 (your confidence in the single best pest/category identification)',
     '- "tags": array of 1-6 short lowercase keyword strings describing the image',
-    '- "possiblePest": likely pest species/common name if any, else null',
+    '- "possiblePest": the single most likely pest species/common name if any, else null',
+    '- "pestCandidates": array of up to 3 candidate pest species sorted by confidence descending.',
+    '  Each entry: {"species":"<common name>","confidence":<0-1>}.',
+    '  Include only candidates genuinely plausible in this image; use [] when no pest is visible.',
+    '  Example: [{"species":"Bed Bug","confidence":0.72},{"species":"Spider Beetle","confidence":0.18},{"species":"Carpet Beetle","confidence":0.10}]',
     '- "possibleLifeStage": pest life stage VISIBLE in the image (e.g. egg, larva, nymph, pupa, adult, juvenile), else null',
     '- "possibleConduciveCondition": conducive condition observed, else null',
     '- "possibleHarborage": harborage (nesting/shelter site) observed, else null',
@@ -144,6 +149,23 @@ function parsePrediction(raw: string): AiPrediction | null {
         .slice(0, 6)
     : [];
 
+  const pestCandidates = Array.isArray(parsed.pestCandidates)
+    ? (parsed.pestCandidates as unknown[])
+        .filter(
+          (c): c is { species: string; confidence: number } =>
+            c !== null &&
+            typeof c === "object" &&
+            typeof (c as Record<string, unknown>).species === "string" &&
+            typeof (c as Record<string, unknown>).confidence === "number",
+        )
+        .map((c) => ({
+          species: c.species.trim(),
+          confidence: clampConfidence(c.confidence),
+        }))
+        .filter((c) => c.species.length > 0)
+        .slice(0, 3)
+    : [];
+
   return {
     category,
     subcategory,
@@ -159,6 +181,7 @@ function parsePrediction(raw: string): AiPrediction | null {
     possibleMoistureIssue: asStringOrNull(parsed.possibleMoistureIssue),
     possibleStructuralIssue: asStringOrNull(parsed.possibleStructuralIssue),
     zone: normalizeZone(parsed.zone),
+    pestCandidates,
   };
 }
 

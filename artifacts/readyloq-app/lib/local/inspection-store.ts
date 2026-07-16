@@ -33,6 +33,13 @@ export type LocalPhoto = {
   duplicateOf?: string;
   /** Provider/EXIF context, passed through to the server verbatim. */
   captureMetadata?: Record<string, unknown>;
+  /**
+   * True while the sync engine is actively uploading this photo to object
+   * storage (between the network request start and the `storagePath` write).
+   * Checked by `removePhoto` to prevent deleting a photo that is mid-flight,
+   * which would orphan the uploaded file without a local or server record.
+   */
+  uploading?: boolean;
 };
 
 export type LocalSyncPhase =
@@ -69,6 +76,25 @@ export type LocalInspection = {
 
   syncError: string | null;
   syncAttempts: number;
+  /** ISO timestamp of last successful server sync (any step). */
+  lastSyncSuccess: string | null;
+  /**
+   * RLQ-008: true once the technician has reviewed (accepted/corrected/dismissed)
+   * every AI finding from the latest draft analysis. Defaults to false.
+   * Completion is gated on this being true, or there being no findings to review.
+   */
+  allFindingsReviewed: boolean;
+  /**
+   * RLQ-001: pending finding corrections to push to the server.
+   * Each entry is applied via PATCH /api/analysis/:id/findings/correct and
+   * removed from this queue once the server acknowledges it.
+   */
+  pendingCorrections: Array<{
+    analysisId: number;
+    findingId: number;
+    action: "accept" | "correct" | "dismiss";
+    technicianSpecies?: string;
+  }>;
 };
 
 const INDEX_KEY = "readyloq.local-inspections.index.v1";
@@ -123,6 +149,9 @@ export function newLocalInspection(
     reportId: null,
     syncError: null,
     syncAttempts: 0,
+    lastSyncSuccess: null,
+    allFindingsReviewed: false,
+    pendingCorrections: [],
   };
 }
 
@@ -255,6 +284,9 @@ function parseRecord(raw: string): LocalInspection | null {
   try {
     const rec = JSON.parse(raw) as LocalInspection;
     if (rec?.schemaVersion !== 1 || typeof rec.localId !== "string") return null;
+    rec.lastSyncSuccess ??= null;
+    rec.allFindingsReviewed ??= false;
+    rec.pendingCorrections ??= [];
     return rec;
   } catch {
     return null;

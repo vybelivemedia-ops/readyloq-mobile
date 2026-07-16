@@ -152,6 +152,38 @@ export default function AnalysisDetail() {
                       f.severity === 'high' ? 'bg-orange-500/15 text-orange-400' : 'bg-amber-500/15 text-amber-400'}`}>
                       {f.severity}
                     </span>
+                    {/* RLQ-003: confidence-gated species label */}
+                    {f.confidenceLabel === 'identified' && f.species && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-medium">
+                        {f.species}
+                      </span>
+                    )}
+                    {f.confidenceLabel === 'possible' && f.species && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-medium">
+                        {f.species}
+                      </span>
+                    )}
+                    {f.confidenceLabel === 'unidentified' && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                        Unable to identify
+                      </span>
+                    )}
+                    {/* RLQ-001: technician correction */}
+                    {f.reviewStatus === 'corrected' && f.technicianSpecies && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">
+                        Tech: {f.technicianSpecies}
+                      </span>
+                    )}
+                    {/* RLQ-001: review status badge */}
+                    {f.reviewStatus && f.reviewStatus !== 'pending' && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                        f.reviewStatus === 'accepted' ? 'bg-emerald-500/10 text-emerald-400' :
+                        f.reviewStatus === 'corrected' ? 'bg-blue-500/10 text-blue-400' :
+                        'bg-muted text-muted-foreground'}`}>
+                        {f.reviewStatus === 'accepted' ? '✓ Accepted' :
+                         f.reviewStatus === 'corrected' ? '✎ Corrected' : '✗ Dismissed'}
+                      </span>
+                    )}
                     {f.exclusionOpportunity && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">Exclusion</span>
                     )}
@@ -161,6 +193,17 @@ export default function AnalysisDetail() {
                 </div>
               </div>
               <ConfidenceBar value={f.confidence} />
+              {/* RLQ-002: alternative candidate species from the model */}
+              {Array.isArray(f.candidates) && f.candidates.length > 1 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">Other candidates:</span>
+                  {f.candidates.slice(1).map((c: { species: string; confidence: number }, i: number) => (
+                    <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                      {c.species} ({Math.round(c.confidence * 100)}%)
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-1.5">
                 <EvidenceQualityChip finding={f} />
                 <VerificationChip status={deriveVerificationStatus({ feedbackStatus: result.feedbackStatus })} />

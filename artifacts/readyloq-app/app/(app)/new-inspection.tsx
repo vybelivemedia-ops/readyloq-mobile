@@ -9,9 +9,9 @@ import {
 } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { type Href, useLocalSearchParams, useRouter } from "expo-router";
+import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -122,6 +122,16 @@ export default function NewInspectionScreen() {
   const [uploadedCount, setUploadedCount] = useState(0);
   const analyzedCount = useRef(0);
 
+  // RLQ-008: tick incremented by useFocusEffect to re-read allFindingsReviewed on resume.
+  const [reviewTick, setReviewTick] = useState(0);
+  // RLQ-008: analysis query for the pending-findings review gate in the review step.
+  const reviewAnalysisQ = useQuery({
+    ...getListAnalysisResultsQueryOptions({ inspectionId: wsInspectionId ?? 0 }),
+    enabled: wsInspectionId != null,
+    staleTime: 10_000,
+    refetchInterval: false,
+  });
+
   // Local-first record: the single durable source of truth for this
   // inspection. Every capture and field edit is persisted to device storage
   // immediately, so a crash, fold, or dead zone never loses work. The sync
@@ -164,6 +174,20 @@ export default function NewInspectionScreen() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteAddress, clientName, technicianName, propertyType, pestTypes, notes]);
+
+  // RLQ-008: re-read allFindingsReviewed when the screen gains focus (e.g. after
+  // returning from the findings-review screen).
+  useFocusEffect(
+    useCallback(() => {
+      void (async () => {
+        const rec = recordRef.current;
+        if (!rec) return;
+        const fresh = await getLocalInspection(rec.localId);
+        if (fresh) recordRef.current = fresh;
+        setReviewTick((t) => t + 1);
+      })();
+    }, []),
+  );
 
   const persistDraft = async () => {
     const rec = recordRef.current;
@@ -389,12 +413,17 @@ export default function NewInspectionScreen() {
   const removePhoto = async (index: number) => {
     const rec = recordRef.current;
     const target = rec?.photos[index];
-    if (!rec || !target || target.storagePath) return;
+    // Refuse to delete a photo that is uploaded OR actively mid-upload.
+    // The `uploading` flag is set by the sync engine before the network
+    // request and cleared once the storagePath is written, preventing a
+    // race where the file lands on storage but the local record still shows
+    // storagePath === undefined.
+    if (!rec || !target || target.storagePath || target.uploading) return;
     const updated = await updateLocalInspection(rec.localId, (r) => {
       const i = r.photos.findIndex((p) => p.localUri === target.localUri);
-      // Re-check against the fresh copy — the engine may have started
-      // uploading this photo since the guard above.
-      if (i !== -1 && !r.photos[i].storagePath) r.photos.splice(i, 1);
+      // Re-check in the atomic context — engine may have set uploading or
+      // storagePath between the outer guard and this callback.
+      if (i !== -1 && !r.photos[i].storagePath && !r.photos[i].uploading) r.photos.splice(i, 1);
     });
     if (updated) {
       recordRef.current = updated;
@@ -727,20 +756,46 @@ export default function NewInspectionScreen() {
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: 6,
+          gap: 8,
           backgroundColor: "rgba(202,138,4,0.92)",
-          paddingHorizontal: 12,
-          paddingVertical: 8,
+          paddingHorizontal: 10,
+          paddingVertical: 7,
           borderRadius: 10,
-          maxWidth: 420,
+          maxWidth: 440,
         }}
       >
         <Ionicons name="warning-outline" size={16} color="#fff" />
         <Text
-          style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 12, flexShrink: 1 }}
+          style={{
+            color: "#fff",
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 12,
+            flex: 1,
+            flexShrink: 1,
+          }}
         >
-          {qualityNotice} — photo kept, consider retaking
+          {qualityNotice}
         </Text>
+        {/* RLQ-007: Actionable retake button. Removes the just-captured photo so the
+            technician can try a sharper or better-lit shot without accumulating poor evidence. */}
+        {photos.length > 0 && (
+          <Pressable
+            onPress={() => {
+              void removePhoto(photos.length - 1);
+              setQualityNotice(null);
+            }}
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 6,
+              backgroundColor: "rgba(255,255,255,0.28)",
+            }}
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11 }}>
+              Retake
+            </Text>
+          </Pressable>
+        )}
       </View>
     ) : null;
 
@@ -1094,6 +1149,22 @@ export default function NewInspectionScreen() {
 
   // ─── Review step ────────────────────────────────────────────────────────────
   if (step === "review") {
+    // RLQ-008: derive findings review gate. reviewTick (from useFocusEffect) triggers
+    // re-reads of recordRef so allFindingsReviewed is fresh after returning from review.
+    void reviewTick;
+    const allFindingsReviewed = recordRef.current?.allFindingsReviewed ?? false;
+    const reviewFindings = (reviewAnalysisQ.data?.[0]?.findings ?? []) as Array<{
+      reviewStatus?: string | null;
+    }>;
+    const unreviewedCount = reviewFindings.filter(
+      (f) => !f.reviewStatus || f.reviewStatus === "pending",
+    ).length;
+    const hasReviewGate = wsInspectionId != null && !allFindingsReviewed && unreviewedCount > 0;
+    const showReviewedBadge =
+      wsInspectionId != null &&
+      (allFindingsReviewed || unreviewedCount === 0) &&
+      reviewFindings.length > 0;
+
     return (
       <Screen edges={["top", "bottom"]} padded>
         <Header title="Review & submit" onClose={() => setStep("capture")} colors={colors} />
@@ -1131,8 +1202,82 @@ export default function NewInspectionScreen() {
             </View>
           </View>
 
+          {/* RLQ-008: AI findings review gate */}
+          {hasReviewGate ? (
+            <View
+              style={{
+                gap: 10,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 10,
+                padding: 14,
+                backgroundColor: colors.card,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Ionicons name="sparkles" size={20} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: colors.foreground,
+                      fontFamily: "Inter_600SemiBold",
+                      fontSize: 15,
+                    }}
+                  >
+                    Review AI Findings
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.mutedForeground,
+                      fontFamily: "Inter_400Regular",
+                      fontSize: 13,
+                    }}
+                  >
+                    {unreviewedCount} finding{unreviewedCount !== 1 ? "s" : ""} need
+                    {unreviewedCount === 1 ? "s" : ""} review before completing
+                  </Text>
+                </View>
+              </View>
+              <Button
+                title={`Review Findings (${unreviewedCount})`}
+                variant="outline"
+                icon="sparkles"
+                onPress={() => {
+                  const rec = recordRef.current;
+                  if (rec) router.push(`/findings-review/${rec.localId}` as Href);
+                }}
+              />
+            </View>
+          ) : showReviewedBadge ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                padding: 12,
+                borderRadius: 10,
+                backgroundColor: (colors.success ?? "#22c55e") + "22",
+                borderWidth: 1,
+                borderColor: (colors.success ?? "#22c55e") + "55",
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={20} color={colors.success ?? "#22c55e"} />
+              <Text
+                style={{
+                  color: colors.success ?? "#22c55e",
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 14,
+                }}
+              >
+                AI findings reviewed
+              </Text>
+            </View>
+          ) : null}
+
           {error ? (
-            <Text style={{ color: colors.destructive, fontSize: 14, textAlign: "center" }}>{error}</Text>
+            <Text style={{ color: colors.destructive, fontSize: 14, textAlign: "center" }}>
+              {error}
+            </Text>
           ) : null}
         </ScrollView>
 
@@ -1145,13 +1290,15 @@ export default function NewInspectionScreen() {
               textAlign: "center",
             }}
           >
-            Completing locks in your evidence and generates the report, summary, and
-            insights. Works offline — everything syncs automatically.
+            {hasReviewGate
+              ? "Review AI findings above before completing."
+              : "Completing locks in your evidence and generates the report, summary, and insights. Works offline — everything syncs automatically."}
           </Text>
           <Button
             title="Complete Inspection"
             size="lg"
             icon="checkmark-circle"
+            disabled={hasReviewGate}
             onPress={completeNow}
           />
           <Button title="Add more photos" variant="ghost" onPress={() => setStep("capture")} />

@@ -177,6 +177,29 @@ router.patch("/:id", async (req, res) => {
     if (severity !== undefined) updateData.severity = severity;
     if (pestTypes !== undefined) updateData.pestTypes = pestTypes;
     if (completedAt !== undefined) updateData.completedAt = new Date(completedAt);
+    if (Object.keys(updateData).length === 0) {
+      const [current] = await db
+        .select()
+        .from(inspectionsTable)
+        .where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+      if (!current) return res.status(404).json({ error: "Not found" });
+      const media = await db
+        .select()
+        .from(inspectionMediaTable)
+        .where(
+          and(
+            eq(inspectionMediaTable.companyId, companyId),
+            eq(inspectionMediaTable.inspectionId, id),
+          ),
+        );
+      return res.json({
+        ...current,
+        pestTypes: current.pestTypes ?? [],
+        media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        createdAt: current.createdAt.toISOString(),
+        completedAt: current.completedAt?.toISOString() ?? null,
+      });
+    }
     const [row] = await db
       .update(inspectionsTable)
       .set(updateData)
@@ -352,6 +375,23 @@ router.post("/:id/media", async (req, res) => {
         and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)),
       );
     if (!inspection) return res.status(404).json({ error: "Not found" });
+    // Idempotency: the mobile sync engine may retry this call if the app
+    // crashes between uploading the file and writing the mediaRowId locally.
+    // Returning the existing row (HTTP 200) instead of inserting a duplicate
+    // prevents the same file from being analyzed twice by the AI pipeline.
+    const [existing] = await db
+      .select()
+      .from(inspectionMediaTable)
+      .where(
+        and(
+          eq(inspectionMediaTable.inspectionId, inspectionId),
+          eq(inspectionMediaTable.url, url),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      return res.status(200).json({ ...existing, createdAt: existing.createdAt.toISOString() });
+    }
     const [row] = await db
       .insert(inspectionMediaTable)
       .values({

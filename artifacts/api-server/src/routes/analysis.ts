@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   analysisResultsTable,
+  intelligenceRecordsTable,
   inspectionsTable,
   inspectionMediaTable,
   type Finding,
@@ -424,6 +425,31 @@ router.post("/analyze", async (req, res) => {
 
       const severity =
         prediction.confidence >= 0.7 ? "high" : prediction.confidence >= 0.4 ? "medium" : "low";
+
+      // RLQ-003: confidence-gated species label.
+      // ≥0.70 → auto-identified; 0.40–0.69 → possible; <0.40 → unable to identify.
+      const confidenceLabel: "identified" | "possible" | "unidentified" =
+        prediction.confidence >= 0.70
+          ? "identified"
+          : prediction.confidence >= 0.40
+            ? "possible"
+            : "unidentified";
+      const displaySpecies: string | null =
+        confidenceLabel === "unidentified"
+          ? null
+          : confidenceLabel === "possible" && prediction.possiblePest
+            ? `Possible: ${prediction.possiblePest}`
+            : (prediction.possiblePest ?? null);
+
+      // RLQ-002: top-3 candidates from the model; fall back to single-candidate
+      // when the model didn't return a candidates array.
+      const candidates: Array<{ species: string; confidence: number }> =
+        prediction.pestCandidates && prediction.pestCandidates.length > 0
+          ? prediction.pestCandidates
+          : prediction.possiblePest
+            ? [{ species: prediction.possiblePest, confidence: prediction.confidence }]
+            : [];
+
       const description =
         prediction.rationale ??
         prediction.possiblePest ??
@@ -441,7 +467,7 @@ router.post("/analyze", async (req, res) => {
         treatment: prediction.suggestedCorrectiveAction ?? null,
         exclusionOpportunity: !!prediction.possibleEntryPoint,
         evidenceQuality: null,
-        species: prediction.possiblePest ?? null,
+        species: displaySpecies,
         lifeStage: prediction.possibleLifeStage ?? null,
         conduciveCondition: prediction.possibleConduciveCondition ?? null,
         harborage: prediction.possibleHarborage ?? null,
@@ -449,6 +475,9 @@ router.post("/analyze", async (req, res) => {
         structuralIssue:
           prediction.possibleStructuralIssue ?? prediction.possibleEntryPoint ?? null,
         zone: prediction.zone ?? null,
+        candidates,
+        confidenceLabel,
+        reviewStatus: "pending",
       });
     }
 
@@ -642,6 +671,92 @@ router.post("/:id/feedback", async (req, res) => {
     return res.json(serializeResult(row));
   } catch (err) {
     return res.status(500).json({ error: "Failed to submit feedback" });
+  }
+});
+
+// PATCH /analysis/:id/findings/correct — RLQ-001: technician reviews a finding.
+// Updates the reviewStatus on the finding in JSONB and stores a feedback record
+// in intelligence_records for the training dataset (RLQ-004).
+router.patch("/:id/findings/correct", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    const { findingId, action, technicianSpecies } = req.body as {
+      findingId?: number;
+      action?: "accept" | "correct" | "dismiss";
+      technicianSpecies?: string;
+    };
+    if (findingId == null || !action) {
+      return res.status(400).json({ error: "findingId and action are required" });
+    }
+    if (!["accept", "correct", "dismiss"].includes(action)) {
+      return res.status(400).json({ error: "action must be accept, correct, or dismiss" });
+    }
+    if (action === "correct" && !technicianSpecies?.trim()) {
+      return res.status(400).json({ error: "technicianSpecies is required when action is correct" });
+    }
+
+    const [row] = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(and(eq(analysisResultsTable.id, id), eq(analysisResultsTable.companyId, companyId)));
+    if (!row) return res.status(404).json({ error: "Not found" });
+
+    const findings = (row.findings ?? []) as Finding[];
+    const idx = findings.findIndex((f) => f.id === findingId);
+    if (idx === -1) return res.status(404).json({ error: "Finding not found" });
+
+    const reviewStatus: Finding["reviewStatus"] =
+      action === "accept" ? "accepted" : action === "correct" ? "corrected" : "dismissed";
+
+    const updatedFinding: Finding = {
+      ...findings[idx],
+      reviewStatus,
+      technicianSpecies:
+        action === "correct"
+          ? (technicianSpecies?.trim() ?? null)
+          : (findings[idx].technicianSpecies ?? null),
+    };
+    const updatedFindings = [
+      ...findings.slice(0, idx),
+      updatedFinding,
+      ...findings.slice(idx + 1),
+    ];
+
+    const [updated] = await db
+      .update(analysisResultsTable)
+      .set({ findings: updatedFindings })
+      .where(and(eq(analysisResultsTable.id, id), eq(analysisResultsTable.companyId, companyId)))
+      .returning();
+    if (!updated) return res.status(404).json({ error: "Not found" });
+
+    // RLQ-004: store correction to intelligence_records (best-effort training signal).
+    const userId = req.user?.id;
+    if (userId && findings[idx].imageUrl) {
+      void db
+        .insert(intelligenceRecordsTable)
+        .values({
+          companyId,
+          imageUrl: findings[idx].imageUrl!,
+          aiConfidence: findings[idx].confidence,
+          category: action !== "dismiss" ? (findings[idx].category ?? null) : null,
+          possiblePest:
+            action === "correct"
+              ? (technicianSpecies?.trim() ?? null)
+              : action === "accept"
+                ? (findings[idx].species ?? null)
+                : null,
+          correctiveAction: findings[idx].treatment ?? null,
+          aiCorrected: action === "correct",
+          createdBy: userId,
+        })
+        .onConflictDoNothing()
+        .catch(() => {});
+    }
+
+    return res.json(serializeResult(updated));
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to correct finding" });
   }
 });
 

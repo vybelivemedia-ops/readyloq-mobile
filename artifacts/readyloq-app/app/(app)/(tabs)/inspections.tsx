@@ -317,6 +317,19 @@ function LocalInspectionCard({
           </Text>
         </View>
       </View>
+      {phase === "failed" && !!record.syncError && (
+        <Text
+          numberOfLines={2}
+          style={{
+            color: colors.destructive,
+            fontFamily: "Inter_400Regular",
+            fontSize: 11,
+            opacity: 0.8,
+          }}
+        >
+          {record.syncError}
+        </Text>
+      )}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <Meta icon="camera-outline" text={`${record.photos.length}`} />
         <Meta icon="calendar-outline" text={formatDate(record.createdAt)} />

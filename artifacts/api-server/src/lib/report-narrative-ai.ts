@@ -94,10 +94,30 @@ const SYSTEM_PROMPT =
   "single JSON object only.";
 
 function buildUserPrompt(input: NarrativeInput): string {
-  const findings = input.findings.slice(0, MAX_FINDINGS).map((f, i) => {
+  // RLQ-011: Filter out findings the technician explicitly dismissed — they
+  // represent false positives that should not appear in the client report.
+  // Use the technician-corrected species when reviewStatus === "corrected".
+  const activeFindings = input.findings.filter(
+    (f) => f.reviewStatus !== "dismissed",
+  );
+
+  const findings = activeFindings.slice(0, MAX_FINDINGS).map((f, i) => {
+    // Prefer technician-verified species; fall back to AI-detected species.
+    const displaySpecies =
+      f.reviewStatus === "corrected" && f.technicianSpecies
+        ? f.technicianSpecies
+        : (f.species ?? null);
+    const reviewNote =
+      f.reviewStatus === "corrected"
+        ? "tech-corrected"
+        : f.reviewStatus === "accepted"
+          ? "tech-verified"
+          : null;
+
     const parts = [
       `#${i + 1}`,
       f.category ? `category=${trunc(String(f.category), 80)}` : "",
+      displaySpecies ? `species=${trunc(displaySpecies, 80)}` : "",
       f.severity ? `severity=${f.severity}` : "",
       f.location ? `location=${trunc(String(f.location), 80)}` : "",
       typeof f.confidence === "number"
@@ -105,6 +125,7 @@ function buildUserPrompt(input: NarrativeInput): string {
         : "",
       f.evidenceQuality ? `evidence=${f.evidenceQuality}` : "",
       f.exclusionOpportunity ? "exclusionOpportunity=yes" : "",
+      reviewNote ? `review=${reviewNote}` : "",
       f.description ? `desc=${trunc(String(f.description), 200)}` : "",
       f.treatment ? `treatment=${trunc(String(f.treatment), 160)}` : "",
     ].filter(Boolean);

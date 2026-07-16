@@ -7,6 +7,7 @@
  * callers must persist it immediately (the OS can purge cache at any time).
  */
 
+import * as Crypto from "expo-crypto";
 import type { CameraView } from "expo-camera";
 import type { RefObject } from "react";
 
@@ -33,6 +34,7 @@ export function createNativeCameraProvider(
       if (!pic?.uri) return [];
       return [
         {
+          id: Crypto.randomUUID(),
           uri: pic.uri,
           source: "phone_camera",
           capturedAt: new Date().toISOString(),

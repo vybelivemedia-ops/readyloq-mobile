@@ -427,6 +427,16 @@ export interface Finding {
   structuralIssue?: string | null;
   /** @nullable */
   zone?: string | null;
+  candidates?: Array<{
+    species: string;
+    confidence: number;
+  }>;
+  /** @nullable */
+  confidenceLabel?: 'identified' | 'possible' | 'unidentified' | null;
+  /** @nullable */
+  reviewStatus?: 'pending' | 'accepted' | 'corrected' | 'dismissed' | null;
+  /** @nullable */
+  technicianSpecies?: string | null;
 }
 
 export interface CoverageZone {

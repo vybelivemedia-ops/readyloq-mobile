@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { AnalysisResult, CoverageSnapshot, EvidenceSummary, Finding, GuidanceRecommendation, InspectionMemory, MemoryHighlight, Report } from "@/lib/api-client";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
 import { FindingCard } from "@/components/FindingCard";
@@ -278,7 +278,13 @@ export function AiInsightsPanel({
   const chips = evidenceChips(evidence);
   // Inspection Memory — prior-visit context for this address, with gap
   // highlights first. Only rendered once there is real history to remember.
-  const memoryShows = memory?.hasPriorVisits ? memoryShowRows(memory) : [];
+  // Suppressed when the AI run had errors: a failed analysis leaves all zones
+  // uncovered, which would cause every prior-visit zone to appear as a gap —
+  // false urgency that misleads the technician. Once the error clears (next
+  // successful analysis run) the highlights return automatically.
+  const memoryShows = (memory?.hasPriorVisits && !analysis?.analysisErrors)
+    ? memoryShowRows(memory)
+    : [];
   // Incremental progress copy — while a run is in flight we show how many of
   // the captured photos it is working through, so the technician sees the
   // batch advancing rather than a bare spinner.
@@ -291,13 +297,16 @@ export function AiInsightsPanel({
   // Live AI Inspection Panel — every value is aggregated straight from the
   // model's per-photo detections. Nothing is inferred client-side; a row is
   // empty until a real detection populates it.
-  const species = speciesWithConfidence(findings);
+  // Memoized: dedupeDetections + speciesWithConfidence run O(n) per call.
+  // On large inspections (40+ photos) these were re-running on every render
+  // cycle (scroll, timer, state change) — visible as UI thread frame drops.
+  const species = useMemo(() => speciesWithConfidence(findings), [findings]);
   const detectionRows: {
     key: string;
     icon: keyof typeof Ionicons.glyphMap;
     label: string;
     values: string[];
-  }[] = [
+  }[] = useMemo(() => [
     {
       key: "species",
       icon: "bug-outline",
@@ -340,7 +349,7 @@ export function AiInsightsPanel({
       label: "Recommended treatment",
       values: analysis?.recommendations ?? [],
     },
-  ];
+  ], [species, findings, analysis?.recommendations]);
 
   // Live report sections — every value comes from the server-generated
   // narrative, which is grounded in real detections and inspection data.

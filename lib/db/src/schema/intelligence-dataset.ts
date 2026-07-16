@@ -182,6 +182,9 @@ export type AiPrediction = {
   // Inspection zone (scene) the photo depicts, as a zone-coverage taxonomy
   // slug, or null when the scene is unclear. Drives live completeness scoring.
   zone?: string | null;
+  // RLQ-002: top-3 pest species candidates with confidence scores, sorted
+  // descending. Absent on older predictions; [] when no pest is visible.
+  pestCandidates?: Array<{ species: string; confidence: number }>;
 };
 
 // ── Tables ───────────────────────────────────────────────────────────────────

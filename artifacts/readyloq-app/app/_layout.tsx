@@ -23,7 +23,12 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 // Point the shared API client at the deployment domain (same backend the web
 // app uses). This runs once at module load, before any query fires.
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
-if (domain) setBaseUrl(`https://${domain}`);
+if (domain) {
+  setBaseUrl(`https://${domain}`);
+  console.log("[API] Base URL →", `https://${domain}`);
+} else {
+  console.error("[API] EXPO_PUBLIC_DOMAIN is not set — API calls will fail");
+}
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;

@@ -217,16 +217,35 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
       const localUri = snapshot[i].localUri;
       let photo = rec.photos.find((p) => p.localUri === localUri);
       if (!photo) continue; // removed while syncing
-      if (!photo.storagePath) {
-        const token = state.getToken ? await state.getToken() : null;
-        const storagePath = await uploadPhoto(
-          token,
-          localUri,
-          `inspection-${serverId}-${Date.now()}-${i}.jpg`,
-        );
+      if (!photo.storagePath && !photo.uploading) {
+        // Mark as in-flight BEFORE the network request so removePhoto sees it
+        // and refuses to delete a photo that is mid-upload. The flag is cleared
+        // whether the upload succeeds or throws.
         await merge((r) => {
           const p = r.photos.find((x) => x.localUri === localUri);
-          if (p && !p.storagePath) p.storagePath = storagePath;
+          if (p) p.uploading = true;
+        });
+        let storagePath: string;
+        try {
+          const token = state.getToken ? await state.getToken() : null;
+          storagePath = await uploadPhoto(
+            token,
+            localUri,
+            `inspection-${serverId}-${Date.now()}-${i}.jpg`,
+          );
+        } catch (uploadErr) {
+          await merge((r) => {
+            const p = r.photos.find((x) => x.localUri === localUri);
+            if (p) p.uploading = false;
+          });
+          throw uploadErr;
+        }
+        await merge((r) => {
+          const p = r.photos.find((x) => x.localUri === localUri);
+          if (p) {
+            if (!p.storagePath) p.storagePath = storagePath;
+            p.uploading = false;
+          }
         });
         photo = rec.photos.find((p) => p.localUri === localUri);
       }
@@ -299,8 +318,10 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     state.onSynced?.(rec);
     return rec;
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "Sync failed";
+    console.error("[Sync] syncOne failed for", record.localId, "—", msg, e);
     await merge((r) => {
-      r.syncError = e instanceof Error ? e.message : "Sync failed";
+      r.syncError = msg;
       r.syncAttempts += 1;
     });
     throw e;

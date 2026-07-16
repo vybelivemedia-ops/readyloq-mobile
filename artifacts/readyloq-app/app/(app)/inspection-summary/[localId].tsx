@@ -164,7 +164,12 @@ export default function InspectionSummaryScreen() {
           alignSelf: "center",
         }}
       >
-        <SyncStatusCard phase={phase} error={record.syncError} localId={record.localId} />
+        <SyncStatusCard
+          phase={phase}
+          error={record.syncError}
+          localId={record.localId}
+          syncAttempts={record.syncAttempts}
+        />
 
         <Card style={{ gap: 10 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -516,13 +521,22 @@ function SyncStatusCard({
   phase,
   error,
   localId,
+  syncAttempts,
 }: {
   phase: LocalSyncPhase | null;
   error: string | null;
   localId: string;
+  syncAttempts?: number;
 }) {
   const colors = useColors();
   if (!phase) return null;
+
+  const failedDetail = [
+    error ?? "Something went wrong. We'll keep retrying automatically.",
+    syncAttempts && syncAttempts > 1 ? `(attempt ${syncAttempts})` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const config: Record<
     LocalSyncPhase,
@@ -548,8 +562,8 @@ function SyncStatusCard({
     },
     failed: {
       icon: "alert-circle-outline",
-      label: "Sync failed",
-      detail: error || "Something went wrong. We'll keep retrying automatically.",
+      label: syncAttempts && syncAttempts > 1 ? `Sync failed (attempt ${syncAttempts})` : "Sync failed",
+      detail: failedDetail,
       color: colors.destructive,
     },
   };

@@ -62,6 +62,20 @@ export interface Finding {
   // taxonomy), when the vision model could place it. Null / absent when the
   // scene was unclear — it simply doesn't count toward completeness.
   zone?: string | null;
+  // RLQ-002: top-3 AI species candidates with individual confidence scores,
+  // sorted descending. Allows the technician to select the correct answer
+  // when the model is uncertain. Absent on older findings.
+  candidates?: Array<{ species: string; confidence: number }>;
+  // RLQ-001/003: confidence-gated display label.
+  //   "identified"  → confidence ≥ 0.70, auto-identified species
+  //   "possible"    → confidence 0.40–0.69, "Possible: <species>"
+  //   "unidentified"→ confidence < 0.40, "Unable to identify"
+  confidenceLabel?: "identified" | "possible" | "unidentified";
+  // RLQ-001/008: technician review outcome. "pending" = not yet reviewed.
+  reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed";
+  // RLQ-001: species the technician selected / typed during review.
+  // Only set when reviewStatus = "corrected".
+  technicianSpecies?: string | null;
 }
 
 /** A single inspection zone in a coverage snapshot. */
