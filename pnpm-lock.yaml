@@ -654,9 +654,15 @@ importers:
       '@platform/camera-core':
         specifier: workspace:*
         version: link:../../repos/platform/packages/camera-core
+      '@platform/provider-registry':
+        specifier: workspace:*
+        version: link:../../repos/platform/packages/provider-registry
       '@platform/shared-types':
         specifier: workspace:*
         version: link:../../repos/platform/packages/shared-types
+      '@platform/smart-vision':
+        specifier: workspace:*
+        version: link:../../repos/platform/packages/smart-vision
       '@react-native-community/netinfo':
         specifier: 11.4.1
         version: 11.4.1(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))

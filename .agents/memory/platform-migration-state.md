@@ -171,7 +171,26 @@ description: Which packages have been extracted, what changed, what's next in th
     (natural container for VoicePlugin to assemble and register with ProviderCoordinator)
 - Build: @platform/voice-intelligence ✅  @platform/platform-intelligence ✅
 
-## GitHub repo sync (completed 2026-07-16)
+## Platform wiring — ReadyLoq app layer (completed 2026-07-16)
+
+Two platform interfaces wired into ReadyLoq's vision layer. Zero new TS errors.
+
+### quality-gate.ts → @platform/smart-vision QualityScorer
+- `createInspectionQualityScorer(config?)` factory added; implements `QualityScorer`
+- `scoreMetadata(frame)` → resolution dimension only (sync, no pixel decode)
+- `score(frame)` → resolution + sharpness; extracts GrayscaleImage from VideoFrame
+  pixel formats: gray8 (copy), rgb8/rgba8 (BT.601 luminance), yuv420p/nv12 (Y-plane slice)
+- `assessEvidence()` kept unchanged (post-capture EvidenceItem path)
+- New deps: `@platform/smart-vision: workspace:*`, `@platform/provider-registry: workspace:*`
+
+### provider-registry.ts → @platform/provider-registry Registry<CaptureProviderDefinition>
+- `CaptureProviderDefinition.label` renamed to `.name` (satisfies Provider structurally)
+- `captureProviderRegistry: Registry<CaptureProviderDefinition>` exported (canonical interface)
+- Added `unregisterCaptureProvider()` + `hasCaptureProvider()` (new; backed by registry)
+- Existing `registerCaptureProvider()` / `listCaptureProviders()` etc. kept as aliases
+- future-source-providers.ts: `label:` → `name:` in all 4 definitions
+
+### GitHub repo sync (completed 2026-07-16)
 
 Both repos pushed clean via GitHub REST API (git blobs → tree → commit → ref PATCH):
 
