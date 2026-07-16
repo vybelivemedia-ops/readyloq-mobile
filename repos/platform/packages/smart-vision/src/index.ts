@@ -142,3 +142,29 @@ export type {
   NegotiatedVisionConfig,
   CapabilityNegotiator,
 } from "./capability";
+
+// ─── Scene memory ─────────────────────────────────────────────────────────────
+export type {
+  ObservationId,
+  AnchorId,
+  NoveltyScore,
+  OverlapScore,
+  ObservationKind,
+  SceneCoordinateSpace,
+  SceneObservation,
+  DuplicateVerdictKind,
+  DuplicateVerdict,
+  CoverageCell,
+  SceneCoverage,
+  NavigationPriority,
+  SceneNavigationHint,
+  SceneAnchor,
+  SceneAnchoring,
+  SceneMemoryConfig,
+  SceneMemoryQuery,
+  SceneSnapshot,
+  SceneMemoryEventKind,
+  SceneMemoryEvent,
+  SceneMemory,
+  SceneMemoryStore,
+} from "./scene-memory";

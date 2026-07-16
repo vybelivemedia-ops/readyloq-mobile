@@ -280,3 +280,17 @@ QUALITY SCORING NOTE: Promotes the ReadyLoq quality-gate pattern (quality-gate.t
 to platform contracts. The concrete implementation (Laplacian variance, resolution
 penalty, detail penalty) stays in the app layer; only the interfaces live here.
 Phase 3 will migrate the implementation with injectable thresholds.
+
+SCENE MEMORY (added same session):
+  scene-memory.ts — 22 exported types across 3 concern layers:
+    Layer 1 (Observations): ObservationId, ObservationKind, SceneObservation,
+      DuplicateVerdict, NoveltyScore, OverlapScore, SceneMemoryQuery
+    Layer 2 (Anchoring): AnchorId, SceneAnchor, SceneAnchoring, SceneCoordinateSpace
+      Coordinate spaces: "frame" | "anchor_relative" | "world"
+    Layer 3 (Coverage+Nav): CoverageCell, SceneCoverage, NavigationPriority,
+      SceneNavigationHint, SceneMemoryConfig, SceneSnapshot, SceneMemoryEvent,
+      SceneMemory (main interface), SceneMemoryStore
+  Core design insight: checkDuplicate() before capture, novelty() in hot-path,
+    navigationHints() to guide operator. gc() expires TTL. snapshot()/restore()
+    for cross-session persistence.
+  Build: ✅ zero errors
