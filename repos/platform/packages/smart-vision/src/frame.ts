@@ -191,3 +191,98 @@ export interface PipelineStats {
   peakLatencyMs: number;
   currentFps: number;
 }
+
+// ─── Frame priority ───────────────────────────────────────────────────────────
+
+/**
+ * Priority levels for scheduled analysis frames.
+ *
+ * The FrameScheduler uses priority to decide which frames to process when
+ * the pipeline is running behind its target FPS.
+ *
+ * "critical"    — must be processed regardless of load (e.g. manual capture trigger)
+ * "high"        — detection inference frame; process before normal ticks
+ * "normal"      — standard analysis tick
+ * "low"         — background quality check; drop first when overloaded
+ * "background"  — deferred enhancement or scene-memory GC; drop freely
+ */
+export type FramePriority = "critical" | "high" | "normal" | "low" | "background";
+
+// ─── Scheduled frame ──────────────────────────────────────────────────────────
+
+/**
+ * A VideoFrame wrapped with scheduling metadata.
+ * Created by the FrameScheduler and passed to the FramePipeline.
+ */
+export interface ScheduledFrame {
+  frame: VideoFrame;
+  priority: FramePriority;
+  /**
+   * Absolute deadline (epoch ms) by which this frame must begin processing,
+   * or it is dropped. The scheduler computes this from the target FPS and
+   * the drop policy.
+   */
+  deadlineMs: number;
+  /**
+   * Whether this frame was flagged as a mandatory detection frame
+   * (i.e. the detectionStrideFrames counter reached zero for this frame).
+   */
+  isDetectionFrame: boolean;
+}
+
+// ─── Frame drop policy ────────────────────────────────────────────────────────
+
+/**
+ * Strategy for handling frames when the pipeline is overloaded.
+ *
+ * "drop_oldest"            — evict the oldest queued frame to make room.
+ * "drop_lowest_priority"   — evict the lowest-priority queued frame.
+ * "drop_incoming"          — reject the new frame; preserve the queue.
+ */
+export type FrameDropPolicy =
+  | "drop_oldest"
+  | "drop_lowest_priority"
+  | "drop_incoming";
+
+// ─── Frame scheduler ──────────────────────────────────────────────────────────
+
+/**
+ * Regulates the rate at which frames are submitted to the FramePipeline.
+ *
+ * The scheduler decouples the camera's hardware frame rate (e.g. 60 fps)
+ * from the vision analysis rate (e.g. 15 fps). It decides which frames to
+ * analyse, assigns priorities, marks detection frames, and applies the drop
+ * policy when the pipeline falls behind.
+ *
+ * `submit` is called by the camera provider on every raw frame. The scheduler
+ * either queues the frame for pipeline processing or drops it silently.
+ */
+export interface FrameScheduler {
+  /** Target analysis frames per second (independent of camera fps). */
+  readonly targetFps: number;
+  /** How many frames are waiting to be picked up by the pipeline. */
+  readonly queueDepth: number;
+  /** Total frames submitted since the scheduler was created or last reset. */
+  readonly submittedFrames: number;
+  /** Total frames dropped since creation or last reset. */
+  readonly droppedFrames: number;
+  /**
+   * Submit a raw camera frame for scheduling.
+   * The scheduler decides immediately whether to enqueue, drop, or
+   * assign priority based on the current queue state.
+   */
+  submit(frame: VideoFrame): void;
+  /**
+   * Dequeue the next frame for pipeline processing.
+   * Returns null when the queue is empty.
+   * The caller (FramePipeline) calls this in its processing loop.
+   */
+  dequeue(): ScheduledFrame | null;
+  /**
+   * Update the target analysis FPS at runtime
+   * (e.g. in response to a battery-saver mode change).
+   */
+  setTargetFps(fps: number): void;
+  /** Reset all queues, counters, and stride state. */
+  reset(): void;
+}
