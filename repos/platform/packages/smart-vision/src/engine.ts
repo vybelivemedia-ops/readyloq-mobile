@@ -42,6 +42,8 @@ import type { SmartVisionConfig } from "./config";
 import type { VisionCapabilities, NegotiatedVisionConfig } from "./capability";
 import type { StabilityMeasure } from "./auto-capture";
 import type { CropSuggestion, CropRule } from "./crop";
+import type { VisionProviderRegistry } from "./vision-provider";
+import type { SceneMemoryEngine } from "./scene-memory-engine";
 
 // ─── Engine state ─────────────────────────────────────────────────────────────
 
@@ -260,7 +262,32 @@ export interface SmartVisionEngine {
  * domain-agnostic.
  */
 export interface SmartVisionDependencies {
-  /** AI model for per-frame object detection. Required for confidence-based capture. */
+  /**
+   * Registry of VisionProviders — the preferred extension point.
+   *
+   * Register one or more VisionProviders (CoreML, TFLite, ONNX, OpenAI Vision,
+   * Gemini Vision, MediaPipe, or any custom backend). The engine selects the
+   * best healthy provider per frame based on priority and constraints.
+   *
+   * When both `visionProviderRegistry` and `detectionEngine` are supplied,
+   * the registry takes precedence; the legacy `detectionEngine` is wrapped
+   * internally as a fallback ObjectDetectionProvider.
+   */
+  visionProviderRegistry?: VisionProviderRegistry;
+  /**
+   * First-class scene understanding subsystem.
+   * When supplied, the engine feeds all observations, captures, and measurements
+   * through this engine so they are available to any other subsystem that shares
+   * the same SceneMemoryEngine instance (e.g. MeasurementCore, AICore).
+   *
+   * If omitted, the engine falls back to the lighter SceneMemory interface below.
+   */
+  sceneMemoryEngine?: SceneMemoryEngine;
+  /**
+   * @deprecated Prefer `visionProviderRegistry`.
+   * Kept for backward compatibility. When supplied without a registry, the engine
+   * wraps this engine as an ObjectDetectionProvider automatically.
+   */
   detectionEngine?: DetectionEngine;
   /** Object tracking across frames. Required for subject locking. */
   objectTracker?: ObjectTracker;

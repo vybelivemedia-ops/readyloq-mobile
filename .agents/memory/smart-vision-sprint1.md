@@ -20,6 +20,12 @@ Sprint 1 additions:
 
 frame.ts was extended with: FramePriority, ScheduledFrame, FrameDropPolicy, FrameScheduler
 
+## Final file inventory (18 source files, all typechecked clean)
+
+Sprint 1 additions (7 from previous session, 2 new):
+- vision-provider.ts — VisionProvider (universal AI backend interface); VisionAnalysisKind (8 kinds); full typed result types for each kind; VisionProviderRegistry with priority + health-checked fallback chains
+- scene-memory-engine.ts — SceneMemoryEngine hierarchy: ObjectRegistry, SpatialMap, ObservationHistory, CaptureHistory, MeasurementHistory; DEFAULT_SCENE_MEMORY_ENGINE_CONFIG
+
 ## Key design decisions
 
 **DetectionEngine is model-agnostic:** classId values are application-defined integers. ClassMapping (classId → label) is injected from the application layer. The platform never interprets what classId 7 means.

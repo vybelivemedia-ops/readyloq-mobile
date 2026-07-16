@@ -279,6 +279,61 @@ export type {
   SmartVisionConfig,
 } from "./config";
 
+// ─── Vision provider registry ─────────────────────────────────────────────────
+export type {
+  VisionProviderId,
+  VisionAnalysisKind,
+  VisionProviderCapabilities,
+  ObjectDetectionAnalysis,
+  ClassificationLabel,
+  ClassificationAnalysis,
+  TextRegion,
+  OcrAnalysis,
+  PoseKeypoint,
+  PoseSubject,
+  PoseAnalysis,
+  DepthAnalysis,
+  FaceRegion,
+  FaceDetectionAnalysis,
+  SegmentationMask,
+  SegmentationAnalysis,
+  CustomAnalysis,
+  VisionAnalysisResult,
+  VisionAnalysisOptions,
+  VisionProvider,
+  ProviderConstraints,
+  VisionProviderRegistry,
+} from "./vision-provider";
+
+// ─── Scene memory engine (first-class scene understanding) ────────────────────
+export { DEFAULT_SCENE_MEMORY_ENGINE_CONFIG } from "./scene-memory-engine";
+export type {
+  ObjectRecordId,
+  SpatialZoneId,
+  ObservationRecordId,
+  CaptureRecordId,
+  MeasurementRecordId,
+  ObjectRecord,
+  ObjectRegistry,
+  SpatialZone,
+  SpatialMap,
+  ObservationRecord,
+  ObservationHistoryQuery,
+  ObservationHistory,
+  CaptureRecord,
+  CaptureHistoryQuery,
+  CaptureHistory,
+  MeasurementRecord,
+  MeasurementHistoryQuery,
+  MeasurementHistory,
+  SceneMemoryEngineConfig,
+  SceneMemoryEngineEventKind,
+  SceneMemoryEngineEvent,
+  SceneMemoryEngineListener,
+  SceneMemoryEngine,
+  SceneSummary,
+} from "./scene-memory-engine";
+
 // ─── Engine orchestrator ──────────────────────────────────────────────────────
 export type {
   SmartVisionEngineState,
