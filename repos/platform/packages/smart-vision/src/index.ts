@@ -346,3 +346,67 @@ export type {
   SmartVisionFactory,
   DeepPartial,
 } from "./engine";
+
+// ─── Concrete implementations ─────────────────────────────────────────────────
+// Factory functions that return ready-to-use instances of all platform contracts.
+// Applications import these to wire up the engine without depending on internals.
+export {
+  createSmartVisionFactory,
+} from "./impl/smart-vision-engine";
+
+export {
+  createFrameBuffer,
+} from "./impl/frame-buffer";
+
+export {
+  createFrameScheduler,
+} from "./impl/frame-scheduler";
+
+export {
+  createFramePipeline,
+} from "./impl/frame-pipeline";
+
+export {
+  createQualityScorer,
+} from "./impl/quality-scorer";
+
+export {
+  createObjectTracker,
+} from "./impl/object-tracker";
+
+export {
+  createMotionPredictor,
+} from "./impl/motion-predictor";
+
+export {
+  createGuidanceEngine,
+} from "./impl/guidance-engine";
+
+export {
+  createAutoCaptureEngine,
+} from "./impl/auto-capture-engine";
+
+export {
+  createBuiltInPolicy,
+  createManualPolicy,
+  createQualityFirstPolicy,
+  createConfidenceFirstPolicy,
+  createBalancedPolicy,
+  createContinuousPolicy,
+} from "./impl/capture-policies";
+
+export {
+  createSceneMemory,
+} from "./impl/scene-memory-impl";
+
+export {
+  createSceneMemoryEngine,
+} from "./impl/scene-memory-engine-impl";
+
+export {
+  createEventBus,
+} from "./impl/event-bus";
+
+export {
+  createStabilityEstimator,
+} from "./impl/stability";

@@ -290,42 +290,58 @@ STRATEGIC FRAMING (user, 2026-07-15):
    layer rather than independent applications with duplicated infrastructure."
 
 
-─── @platform/smart-vision (Phase 17 — COMPLETE) ──────────────────────────────
-PURPOSE: Pure vision-intelligence contracts. Zero domain logic (no pest, no creator).
+─── @platform/smart-vision (Phase 17 — IMPL COMPLETE) ─────────────────────────
+PURPOSE: Pure vision-intelligence contracts + production-grade concrete engine.
+Zero domain logic (no pest, no creator). All implementations in src/impl/.
 
-OWNS (all types/interfaces, zero implementations):
+CONTRACTS (src/*.ts — all types/interfaces):
   Live frame processing    → VideoFrame, FrameBuffer, FramePipeline, FrameProcessor, PipelineStats
   Object tracking          → ObjectTracker, TrackedRegion, TrackingTarget, TrackState, TrackId
   Motion prediction        → MotionPredictor, MotionVector, MotionSample
   Smart zoom               → SmartZoomController, ZoomCommand, ZoomConstraints, ZoomLevel
   Subject locking          → SubjectLockController, SubjectLock, SubjectLockEvent
   Smart crop               → SmartCropper, CropSuggestion, CropRule, CropConstraints
-  Auto capture             → AutoCaptureTrigger, CaptureReadiness, AutoCaptureConfig, ReadinessBlocker
-  Super resolution         → SuperResolutionProvider, SuperResolutionRequest/Result, SCALE_MULTIPLIER const
-  Quality scoring          → QualityScorer, FrameQualityReport, QualityDimension, PlatformQualityDimension
-  Device capability        → CapabilityNegotiator, VisionCapabilities, NegotiatedVisionConfig, CapabilityProbe
+  Capture policies         → CapturePolicy, CapturePolicyContext, CaptureDecision, BuiltInPolicyId
+  Auto-capture engine      → AutoCaptureEngine, PolicySelection
+  Guidance engine          → GuidanceEngine, GuidanceContext, GuidanceDirective, GuidanceCode
+  Scene memory             → SceneMemory, DuplicateVerdict, SceneCoverage, SceneObservation
+  Scene memory engine      → SceneMemoryEngine, ObjectRegistry, SpatialMap, CaptureHistory
+  Quality scoring          → QualityScorer, FrameQualityReport, QualityDimension
+  Device capability        → VisionCapabilities, NegotiatedVisionConfig
+  Engine orchestrator      → SmartVisionEngine, SmartVisionSession, SmartVisionFactory
+  Event bus                → SmartVisionEventBus (22 typed events)
+  Config                   → SmartVisionConfig, DEFAULT_SMART_VISION_CONFIG
+
+IMPLEMENTATIONS (src/impl/*.ts — all concrete factories):
+  event-bus.ts             → createEventBus()
+  frame-buffer.ts          → createFrameBuffer()
+  frame-scheduler.ts       → createFrameScheduler() — drop-tail w/ detection stride
+  frame-pipeline.ts        → createFramePipeline()
+  stability.ts             → createStabilityEstimator() — rolling gyro+motion window
+  quality-scorer.ts        → createQualityScorer() — Laplacian, luminance, resolution
+  object-tracker.ts        → createObjectTracker() — IoU assignment + KF prediction
+  motion-predictor.ts      → createMotionPredictor()
+  capture-policies.ts      → createBuiltInPolicy() + 5 concrete policies (manual,
+                             quality_first, confidence_first, balanced, continuous)
+  auto-capture-engine.ts   → createAutoCaptureEngine() — rate-limit + cooldown + hold
+  guidance-engine.ts       → createGuidanceEngine() — debounced, severity-ordered
+  scene-memory-impl.ts     → createSceneMemory() — IoU dedup, coverage grid, nav hints
+  scene-memory-engine-impl → createSceneMemoryEngine() — 5 sub-registries composed
+  smart-vision-engine.ts   → createSmartVisionFactory() — 7-stage pipeline per frame
+
+PIPELINE STAGES (per frame, all gated by feature flags):
+  1. Stability estimation (always)
+  2. Quality scoring (qualityScoring flag; pixelQuality flag for pixel decode)
+  3. Detection (detectionEngine flag; detection-stride frames only)
+  4. Object tracking + tracker seeding from detections
+  5. Scene memory duplicate check
+  6. Auto-capture policy evaluation + event emission
+  7. Guidance engine evaluation + event emission
+
+EXACTOPTIONALPROPERTYTYPES PATTERN: Use conditional spread instead of `field: val | undefined`.
+  BAD:  { lastObservedAt: z.lastObservedAt ?? undefined }
+  GOOD: { ...(z.lastObservedAt != null ? { lastObservedAt: z.lastObservedAt } : {}) }
 
 DAG: smart-vision → camera-core → shared-types → core
-Source files: frame.ts, tracking.ts, zoom.ts, crop.ts, auto-capture.ts,
-              super-resolution.ts, quality.ts, capability.ts, index.ts
 Build: ✅ zero errors (strict + exactOptionalPropertyTypes + noUncheckedIndexedAccess)
 Location: repos/platform/packages/smart-vision/
-
-QUALITY SCORING NOTE: Promotes the ReadyLoq quality-gate pattern (quality-gate.ts)
-to platform contracts. The concrete implementation (Laplacian variance, resolution
-penalty, detail penalty) stays in the app layer; only the interfaces live here.
-Phase 3 will migrate the implementation with injectable thresholds.
-
-SCENE MEMORY (added same session):
-  scene-memory.ts — 22 exported types across 3 concern layers:
-    Layer 1 (Observations): ObservationId, ObservationKind, SceneObservation,
-      DuplicateVerdict, NoveltyScore, OverlapScore, SceneMemoryQuery
-    Layer 2 (Anchoring): AnchorId, SceneAnchor, SceneAnchoring, SceneCoordinateSpace
-      Coordinate spaces: "frame" | "anchor_relative" | "world"
-    Layer 3 (Coverage+Nav): CoverageCell, SceneCoverage, NavigationPriority,
-      SceneNavigationHint, SceneMemoryConfig, SceneSnapshot, SceneMemoryEvent,
-      SceneMemory (main interface), SceneMemoryStore
-  Core design insight: checkDuplicate() before capture, novelty() in hot-path,
-    navigationHints() to guide operator. gc() expires TTL. snapshot()/restore()
-    for cross-session persistence.
-  Build: ✅ zero errors
