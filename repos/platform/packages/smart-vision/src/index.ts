@@ -410,3 +410,86 @@ export {
 export {
   createStabilityEstimator,
 } from "./impl/stability";
+
+// ─── Privacy Engine ───────────────────────────────────────────────────────────
+// Re-export all privacy contracts from the sub-module barrel.
+// Concrete implementations: import from "./privacy/impl".
+export { DEFAULT_PRIVACY_CONFIGURATION } from "./privacy/config";
+export type {
+  PrivacyObjectId,
+  PrivacyZoneId,
+  PrivacyObservationId,
+  PrivacyObject,
+  PrivacyMask,
+  PrivacyZone,
+  PrivacyZoneMode,
+  PrivacyFrameResult,
+  PrivacyStatistics,
+  PrivacyClassStats,
+} from "./privacy/types";
+export type {
+  PrivacyObjectClass,
+  PrivacyDetectionRequest,
+  DetectedPrivacyObject,
+  PrivacyDetectionResult,
+  PrivacyDetector,
+} from "./privacy/detection";
+export type {
+  RedactionType,
+  PrivacyObjectPolicy,
+  PrivacyPolicy,
+  PrivacyPolicyMap,
+} from "./privacy/policy";
+export type {
+  PrivacyRenderInput,
+  PrivacyRenderOutput,
+  PrivacyRenderer,
+} from "./privacy/renderer";
+export type {
+  PrivacyObservation,
+  PrivacyObservationTrigger,
+  PrivacyHistoryQuery,
+  PrivacyHistory,
+} from "./privacy/history";
+export type {
+  PrivacyEventKind,
+  PrivacyEvent,
+  PrivacyEventListener,
+  PrivacyEventBus,
+  PrivacySessionStartedEvent,
+  PrivacySessionStoppedEvent,
+  PrivacySessionErrorEvent,
+  PrivacyDetectedEvent,
+  PrivacyUpdatedEvent,
+  PrivacyLostEvent,
+  PrivacyRedactedEvent,
+  PrivacyRestoredEvent,
+  PrivacyPolicyChangedEvent,
+  PrivacyRendererChangedEvent,
+  PrivacyFrameProcessedEvent,
+} from "./privacy/events";
+export type {
+  PrivacyPerformanceMode,
+  PrivacyConfiguration,
+} from "./privacy/config";
+export type {
+  PrivacyProviderCapabilities,
+  PrivacyProvider,
+  PrivacyProviderRegistry,
+  PrivacyProviderRequirements,
+} from "./privacy/provider";
+export type {
+  PrivacyEngineState,
+  PrivacyEngineDependencies,
+  PrivacySession,
+  PrivacyEngine,
+  PrivacyFactory,
+} from "./privacy/engine";
+export { createPrivacyFactory } from "./privacy/impl/privacy-engine-impl";
+export { createPrivacyHistory } from "./privacy/impl/privacy-history-impl";
+export { createPrivacyTracker } from "./privacy/impl/privacy-tracker";
+export type {
+  PrivacyTrackerOptions,
+  PrivacyObjectTracker,
+  PrivacyTrackerUpdateResult,
+} from "./privacy/impl/privacy-tracker";

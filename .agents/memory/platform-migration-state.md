@@ -345,3 +345,42 @@ EXACTOPTIONALPROPERTYTYPES PATTERN: Use conditional spread instead of `field: va
 DAG: smart-vision → camera-core → shared-types → core
 Build: ✅ zero errors (strict + exactOptionalPropertyTypes + noUncheckedIndexedAccess)
 Location: repos/platform/packages/smart-vision/
+
+─── @platform/smart-vision/privacy (Privacy Engine — COMPLETE) ─────────────────
+PURPOSE: Reusable Privacy Engine — provider-agnostic, AI-model-agnostic,
+device-agnostic, application-agnostic. Zero pest logic, zero creator logic.
+
+CONTRACTS (src/privacy/*.ts):
+  types.ts       — PrivacyObjectId/ZoneId/ObservationId, PrivacyObject, PrivacyMask,
+                   PrivacyZone (3 modes), PrivacyFrameResult, PrivacyStatistics
+  detection.ts   — PrivacyObjectClass (17 classes), DetectedPrivacyObject,
+                   PrivacyDetectionRequest/Result, PrivacyDetector
+  policy.ts      — RedactionType (7 types incl ai_inpainting future),
+                   PrivacyObjectPolicy, PrivacyPolicy (redactUnknownClasses flag)
+  renderer.ts    — PrivacyRenderInput/Output, PrivacyRenderer (never mutates original)
+  history.ts     — PrivacyObservation, PrivacyObservationTrigger (5 triggers),
+                   PrivacyHistoryQuery, PrivacyHistory
+  events.ts      — PrivacyEventKind (11 events), all event interfaces, PrivacyEventBus
+  config.ts      — PrivacyConfiguration + DEFAULT_PRIVACY_CONFIGURATION (16 fields)
+  provider.ts    — PrivacyProviderCapabilities, PrivacyProvider, PrivacyProviderRegistry
+  engine.ts      — PrivacyEngineDependencies, PrivacySession, PrivacyEngine, PrivacyFactory
+
+IMPLEMENTATIONS (src/privacy/impl/*.ts):
+  privacy-tracker.ts      — createPrivacyTracker() — greedy IoU matching for stable
+                            PrivacyObjectIds across frames; tickMissing() for non-inference frames
+  privacy-history-impl.ts — createPrivacyHistory() — in-memory log, query/prune/clear
+  privacy-engine-impl.ts  — createPrivacyFactory() — full pipeline:
+                            inference (stride-gated) → IoU track → policy apply →
+                            mask build (with zone modes) → render → events → history
+
+KEY DESIGN DECISIONS:
+  - PrivacyPolicy is a plain data object; engine evaluates it (no methods on policy)
+  - Original frame NEVER mutated; renderer produces a separate copy
+  - redactUnknownClasses: false = evidence-first (ReadyLoq); true = privacy-first
+  - Zone modes: always_redact / never_redact / detect_and_redact
+  - PrivacyEventBus uses same pattern as SmartVisionEventBus (generic on/off/emit/clear)
+  - frame.meta.timestamp (not capturedAt) — FrameMetadata has no capturedAt field
+
+EXPORTS: All types re-exported from src/index.ts; concrete factories also exported.
+
+Build: ✅ zero errors (strict + exactOptionalPropertyTypes + noUncheckedIndexedAccess)
