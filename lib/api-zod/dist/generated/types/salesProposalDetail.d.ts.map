@@ -1,0 +1,1 @@
+{"version":3,"file":"salesProposalDetail.d.ts","sourceRoot":"","sources":["../../../src/generated/types/salesProposalDetail.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,gBAAgB,EAAE,MAAM,oBAAoB,CAAC;AAC3D,OAAO,KAAK,EAAE,aAAa,EAAE,MAAM,iBAAiB,CAAC;AAErD,MAAM,MAAM,mBAAmB,GAAG,aAAa,GAAG;IAChD,aAAa,EAAE,gBAAgB,EAAE,CAAC;CACnC,CAAC"}

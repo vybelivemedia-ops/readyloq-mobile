@@ -1,0 +1,1 @@
+{"version":3,"file":"memoryEntryPoint.d.ts","sourceRoot":"","sources":["../../../src/generated/types/memoryEntryPoint.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,MAAM,WAAW,gBAAgB;IAC/B,GAAG,EAAE,MAAM,CAAC;IACZ,WAAW,EAAE,MAAM,CAAC;IACpB,gBAAgB;IAChB,IAAI,EAAE,MAAM,GAAG,IAAI,CAAC;IACpB,gBAAgB;IAChB,QAAQ,EAAE,MAAM,GAAG,IAAI,CAAC;CACzB"}

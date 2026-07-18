@@ -1,0 +1,1 @@
+{"version":3,"file":"historicalPhoto.d.ts","sourceRoot":"","sources":["../../../src/generated/types/historicalPhoto.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,MAAM,WAAW,eAAe;IAC9B,GAAG,EAAE,MAAM,CAAC;IACZ,gBAAgB;IAChB,OAAO,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IACxB,YAAY,EAAE,MAAM,CAAC;IACrB,gBAAgB;IAChB,SAAS,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;CAC3B"}

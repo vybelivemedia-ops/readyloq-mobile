@@ -1,0 +1,1 @@
+{"version":3,"file":"hotspot.d.ts","sourceRoot":"","sources":["../../../src/generated/types/hotspot.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,eAAe,EAAE,MAAM,mBAAmB,CAAC;AAEzD,MAAM,WAAW,OAAO;IACtB,IAAI,EAAE,MAAM,CAAC;IACb,WAAW,EAAE,MAAM,CAAC;IACpB,QAAQ,EAAE,eAAe,CAAC;CAC3B"}

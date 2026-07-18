@@ -1,0 +1,1 @@
+{"version":3,"file":"quizQuestion.d.ts","sourceRoot":"","sources":["../../../src/generated/types/quizQuestion.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,MAAM,WAAW,YAAY;IAC3B,EAAE,EAAE,MAAM,CAAC;IACX,QAAQ,EAAE,MAAM,CAAC;IACjB,QAAQ,EAAE,MAAM,CAAC;IACjB,OAAO,EAAE,MAAM,EAAE,CAAC;IAClB,aAAa,EAAE,MAAM,CAAC;IACtB,gBAAgB;IAChB,WAAW,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;CAC7B"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"briefingCompletion.d.ts","sourceRoot":"","sources":["../../../src/generated/types/briefingCompletion.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,MAAM,WAAW,kBAAkB;IACjC,EAAE,EAAE,MAAM,CAAC;IACX,WAAW,EAAE,MAAM,CAAC;IACpB,cAAc,EAAE,MAAM,CAAC;IACvB,gBAAgB;IAChB,WAAW,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IAC5B,aAAa,EAAE,MAAM,CAAC;CACvB"}

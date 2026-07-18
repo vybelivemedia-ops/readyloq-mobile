@@ -1,0 +1,1 @@
+{"version":3,"file":"ownerBriefing.d.ts","sourceRoot":"","sources":["../../../src/generated/types/ownerBriefing.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,aAAa,EAAE,MAAM,iBAAiB,CAAC;AACrD,OAAO,KAAK,EAAE,iBAAiB,EAAE,MAAM,qBAAqB,CAAC;AAE7D,MAAM,WAAW,aAAa;IAC5B,IAAI,EAAE,iBAAiB,CAAC;IACxB,MAAM,EAAE,aAAa,EAAE,CAAC;CACzB"}

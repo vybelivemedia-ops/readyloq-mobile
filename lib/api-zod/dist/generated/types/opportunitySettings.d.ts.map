@@ -1,0 +1,1 @@
+{"version":3,"file":"opportunitySettings.d.ts","sourceRoot":"","sources":["../../../src/generated/types/opportunitySettings.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,MAAM,WAAW,mBAAmB;IAClC,EAAE,EAAE,MAAM,CAAC;IACX,SAAS,EAAE,MAAM,CAAC;IAClB,OAAO,EAAE,OAAO,CAAC;IACjB,aAAa,EAAE,MAAM,CAAC;IACtB,gBAAgB;IAChB,iBAAiB,EAAE,MAAM,EAAE,GAAG,IAAI,CAAC;IACnC,SAAS,EAAE,MAAM,CAAC;CACnB"}

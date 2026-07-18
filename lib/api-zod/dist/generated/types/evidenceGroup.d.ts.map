@@ -1,0 +1,1 @@
+{"version":3,"file":"evidenceGroup.d.ts","sourceRoot":"","sources":["../../../src/generated/types/evidenceGroup.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,aAAa,EAAE,MAAM,iBAAiB,CAAC;AAErD,MAAM,WAAW,aAAa;IAC5B,GAAG,EAAE,MAAM,CAAC;IACZ,KAAK,EAAE,MAAM,CAAC;IACd,KAAK,EAAE,MAAM,CAAC;IACd,KAAK,EAAE,aAAa,EAAE,CAAC;CACxB"}
