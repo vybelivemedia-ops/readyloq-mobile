@@ -197,12 +197,29 @@ Both repos pushed clean via GitHub REST API (git blobs → tree → commit → r
 | Repo | Final HEAD | Contents |
 |------|------|----------|
 | vybelivemedia-ops/platform | c61873850049 | ADR-016–019 added, ARCHITECTURE.md §11 updated |
-| vybelivemedia-ops/readyloq-mobile | 7b17ba99f546 | Phase 3 + typecheck fixes + migration report |
+| vybelivemedia-ops/readyloq-mobile | 6be4c760cd1b | Governance + all missing Phase 2/3 files |
 
-ReadyLoq linear chain: 7b17ba99 → 4129cabb → f03d5b18 → 6f245cd67030 (Phase 2 base)
-Platform linear chain: c61873850049 → 3f91d8b75afb → bb5017729533
+ReadyLoq full chain (tip → Phase 2 base):
+  6be4c760cd1b  docs: REPOSITORY_GOVERNANCE.md + scripts/pre-push-check.sh
+  dc20750f1f85  feat(api-zod): flat gemini type files for index.ts
+  4a75a4704aa7  feat(platform-wiring): Phase 2 vision layer + Phase 3 fixes
+  7b17ba99f546  docs: migration report §9
+  4129cabb9f70  fix(typecheck): UseQueryOptions sweep
+  f03d5b180098  feat(phase-3): migration report, workspace cleanup
+  6f245cd67030  (Phase 2 base)
 
-All typecheck errors resolved (tsc --noEmit exit 0). 181 api-server tests passing.
+Platform chain: c61873850049 → 3f91d8b75afb → bb5017729533
+
+Tree verified by blob-SHA comparison: 0 code content differences after final push.
+Local cleanup: `git fetch origin && git reset --hard origin/main` → 0 ahead/0 behind.
+
+### Governance rules (docs/REPOSITORY_GOVERNANCE.md)
+Rule 1 — One writer per repo: Replit Git owns readyloq-mobile; GitHub API owns platform.
+Rule 2 — Never commit to main directly; use feature/*, phase/* branches.
+Rule 3 — GitHub REST API is now READ-ONLY for commit history (final API commit done).
+Rule 4 — Every phase starts with git fetch + pull --ff-only + switch -c.
+Rule 5 — scripts/pre-push-check.sh must pass before any push (typecheck, tests,
+          platform boundary, no duplicate paths, dep versions, generated code freshness).
 
 **@platform/* dep strategy for standalone readyloq-mobile checkout:**
 - `@platform/camera-core` and `@platform/shared-types` are `workspace:*` in readyloq-app/package.json
