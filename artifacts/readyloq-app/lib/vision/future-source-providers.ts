@@ -18,15 +18,15 @@ import type { CaptureProviderDefinition } from "./provider-registry";
 const COMING_SOON =
   "Hardware support is planned — this build has no driver for it yet.";
 
-function notImplemented(label: string): never {
-  throw new Error(`${label} capture is not available in this build yet.`);
+function notImplemented(sourceName: string): never {
+  throw new Error(`${sourceName} capture is not available in this build yet.`);
 }
 
 export const FUTURE_PROVIDER_DEFINITIONS: CaptureProviderDefinition[] = [
   {
     id: "smart-glasses",
     source: "smart_glasses",
-    label: "Meta Ray-Ban glasses",
+    name: "Meta Ray-Ban glasses",
     description: "Hands-free capture; frames arrive over the companion app / BLE.",
     capabilities: {
       mode: "async_push",
@@ -42,7 +42,7 @@ export const FUTURE_PROVIDER_DEFINITIONS: CaptureProviderDefinition[] = [
   {
     id: "usb-camera",
     source: "usb_camera",
-    label: "USB scope",
+    name: "USB scope",
     description: "UVC borescope / endoscope over USB-OTG. Live feed, grab stills on demand.",
     capabilities: {
       mode: "session_stream",
@@ -58,7 +58,7 @@ export const FUTURE_PROVIDER_DEFINITIONS: CaptureProviderDefinition[] = [
   {
     id: "wifi-camera",
     source: "wifi_stream",
-    label: "Wi-Fi camera",
+    name: "Wi-Fi camera",
     description: "Action / drone camera over Wi-Fi (RTSP/HTTP). Pull preview and stills.",
     capabilities: {
       mode: "session_stream",
@@ -74,7 +74,7 @@ export const FUTURE_PROVIDER_DEFINITIONS: CaptureProviderDefinition[] = [
   {
     id: "wearable-camera",
     source: "wearable_camera",
-    label: "Wearable camera",
+    name: "Wearable camera",
     description: "Body-cam / other wearables; frames push in as they're recorded.",
     capabilities: {
       mode: "async_push",

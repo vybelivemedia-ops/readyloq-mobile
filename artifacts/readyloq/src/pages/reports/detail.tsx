@@ -116,7 +116,7 @@ function AiNarrativeView({ narrative }: { narrative: AiReportNarrative }) {
 export default function ReportDetail() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id);
-  const { data: report, isLoading } = useGetReport(id, { query: { enabled: !!id } });
+  const { data: report, isLoading } = useGetReport(id);
 
   const [mode, setMode] = useState<ReportMode>("customer");
   const [previewOpen, setPreviewOpen] = useState(false);

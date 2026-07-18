@@ -7,10 +7,20 @@
  * so adding a new camera means adding ONE definition — the screen, gallery,
  * provenance badges, and the persist → sync → analyze pipeline are untouched.
  *
- * This is the composition layer, so it may depend on platform types
- * (expo-camera, react); the pure contracts in ./types stay transport-neutral.
+ * PLATFORM WIRING:
+ *   `captureProviderRegistry` implements @platform/provider-registry's
+ *   Registry<CaptureProviderDefinition> contract. CaptureProviderDefinition
+ *   satisfies Provider (has id + name) so it fits the generic constraint.
+ *
+ *   The extra methods (probeCaptureProviders, getRequestProvider) are domain-
+ *   specific helpers that sit above the platform registry abstraction.
+ *
+ * DEPENDENCY NOTE:
+ *   This file may depend on platform types and expo-camera / react because it
+ *   is the composition layer. Pure contracts live in ./types (transport-neutral).
  */
 
+import type { Registry } from "@platform/provider-registry";
 import type { RefObject } from "react";
 import type { CameraView } from "expo-camera";
 
@@ -32,10 +42,17 @@ export type CaptureProviderContext = {
   cameraRef?: RefObject<CameraView | null>;
 };
 
+/**
+ * Static metadata + factory for a single capture source.
+ *
+ * Satisfies @platform/provider-registry's Provider constraint via `id` + `name`.
+ * `name` is the human-readable display label (shown in source pickers).
+ */
 export type CaptureProviderDefinition = {
   id: string;
+  /** Human-readable display label. Satisfies Provider.name. */
+  name: string;
   source: CaptureSource;
-  label: string;
   description: string;
   capabilities: CaptureCapabilities;
   previewKind: PreviewKind;
@@ -45,21 +62,65 @@ export type CaptureProviderDefinition = {
   create: (ctx: CaptureProviderContext) => CaptureProvider;
 };
 
+// ─── Internal registry Map ───────────────────────────────────────────────────
+
 const REGISTRY = new Map<string, CaptureProviderDefinition>();
 
+// ─── @platform/provider-registry — Registry<CaptureProviderDefinition> ───────
+
+/**
+ * Platform-standard registry interface for capture provider definitions.
+ *
+ * Implements Registry<CaptureProviderDefinition> from @platform/provider-registry.
+ * Use this when working with generic registry utilities or when the platform
+ * registry contract is required.
+ *
+ * The module-level helpers (registerCaptureProvider, listCaptureProviders, etc.)
+ * are thin aliases over this object and remain available for existing callers.
+ */
+export const captureProviderRegistry: Registry<CaptureProviderDefinition> = {
+  register(def: CaptureProviderDefinition): void {
+    REGISTRY.set(def.id, def);
+  },
+  unregister(id: string): void {
+    REGISTRY.delete(id);
+  },
+  get(id: string): CaptureProviderDefinition | undefined {
+    return REGISTRY.get(id);
+  },
+  list(): CaptureProviderDefinition[] {
+    return [...REGISTRY.values()];
+  },
+  has(id: string): boolean {
+    return REGISTRY.has(id);
+  },
+};
+
+// ─── Module-level aliases (backward-compatible) ───────────────────────────────
+
 export function registerCaptureProvider(def: CaptureProviderDefinition): void {
-  REGISTRY.set(def.id, def);
+  captureProviderRegistry.register(def);
+}
+
+export function unregisterCaptureProvider(id: string): void {
+  captureProviderRegistry.unregister(id);
 }
 
 export function listCaptureProviders(): CaptureProviderDefinition[] {
-  return [...REGISTRY.values()];
+  return captureProviderRegistry.list();
 }
 
 export function getCaptureProviderDefinition(
   id: string,
 ): CaptureProviderDefinition | undefined {
-  return REGISTRY.get(id);
+  return captureProviderRegistry.get(id);
 }
+
+export function hasCaptureProvider(id: string): boolean {
+  return captureProviderRegistry.has(id);
+}
+
+// ─── Domain-specific helpers (above the Registry abstraction) ────────────────
 
 /** Probe every registered source — powers a "which cameras can I use?" picker. */
 export async function probeCaptureProviders(
@@ -68,7 +129,7 @@ export async function probeCaptureProviders(
   { definition: CaptureProviderDefinition; availability: ProviderAvailability }[]
 > {
   return Promise.all(
-    listCaptureProviders().map(async (definition) => ({
+    captureProviderRegistry.list().map(async (definition) => ({
       definition,
       availability: await definition.probe(ctx),
     })),
@@ -80,7 +141,7 @@ export function getRequestProvider(
   id: string,
   ctx: CaptureProviderContext,
 ): RequestCaptureProvider {
-  const def = REGISTRY.get(id);
+  const def = captureProviderRegistry.get(id);
   if (!def) throw new Error(`Unknown capture provider: ${id}`);
   if (def.capabilities.mode !== "request_response") {
     throw new Error(`Capture provider "${id}" is not a request/response source`);
@@ -88,12 +149,12 @@ export function getRequestProvider(
   return def.create(ctx) as RequestCaptureProvider;
 }
 
-// ─── Built-in sources (Tier 1, shipping today) ──────────────────────────────
+// ─── Built-in sources (Tier 1, shipping today) ───────────────────────────────
 
 registerCaptureProvider({
   id: "native-camera",
   source: "phone_camera",
-  label: "Phone camera",
+  name: "Phone camera",
   description: "The in-app camera with live AI preview.",
   capabilities: {
     mode: "request_response",
@@ -115,7 +176,7 @@ registerCaptureProvider({
 registerCaptureProvider({
   id: "media-import",
   source: "media_import",
-  label: "Import from device",
+  name: "Import from device",
   description: "Pull existing footage (GoPro, drone, wearables) from the photo library.",
   capabilities: {
     mode: "request_response",
@@ -129,7 +190,7 @@ registerCaptureProvider({
   create: () => createMediaImportProvider(),
 });
 
-// ─── Reserved future sources (metadata only, no driver yet) ─────────────────
+// ─── Reserved future sources (metadata only, no driver yet) ──────────────────
 // Registered so a source picker can list them as "coming soon"; wiring real
 // hardware means replacing their `probe`/`create` — nothing else changes.
 for (const def of FUTURE_PROVIDER_DEFINITIONS) registerCaptureProvider(def);

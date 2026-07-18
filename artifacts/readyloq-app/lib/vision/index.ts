@@ -1,5 +1,5 @@
 export * from "./types";
-export { assessEvidence } from "./quality-gate";
+export { assessEvidence, createInspectionQualityScorer } from "./quality-gate";
 export { loadGrayscaleImage, type GrayscaleImage } from "./pixels";
 export {
   computeDHash,
@@ -10,9 +10,12 @@ export {
 export { createNativeCameraProvider } from "./native-camera-provider";
 export { createMediaImportProvider } from "./media-import-provider";
 export {
+  captureProviderRegistry,
   registerCaptureProvider,
+  unregisterCaptureProvider,
   listCaptureProviders,
   getCaptureProviderDefinition,
+  hasCaptureProvider,
   probeCaptureProviders,
   getRequestProvider,
   type CaptureProviderContext,

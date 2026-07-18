@@ -68,7 +68,9 @@
   },
   "dependencies": {
     "@platform/camera-core": "workspace:*",
+    "@platform/provider-registry": "workspace:*",
     "@platform/shared-types": "workspace:*",
+    "@platform/smart-vision": "workspace:*",
     "@react-native-community/netinfo": "11.4.1",
     "expo-camera": "~17.0.10",
     "expo-file-system": "~19.0.23",
