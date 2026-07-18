@@ -76,7 +76,10 @@ const ZOOM_LEVELS = [
 
 export default function NewInspectionScreen() {
   const colors = useColors();
-  const { isLandscape, isExpanded } = useWindowSizeClass();
+  const { isLandscape, isExpanded, width } = useWindowSizeClass();
+  // Co-Pilot split-screen kicks in at 600 px — covers portrait tablets and
+  // medium windows in addition to fully unfolded foldables.
+  const isWideScreen = width >= 600;
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user: clerkUser } = useUser();
@@ -695,7 +698,7 @@ export default function NewInspectionScreen() {
       );
     }
 
-    const isPhoneLandscape = isLandscape && !isExpanded;
+    const isPhoneLandscape = isLandscape && !isWideScreen;
 
     const thumbs =
       photos.length > 0 ? (
@@ -880,7 +883,7 @@ export default function NewInspectionScreen() {
     );
 
     // ─── Expanded: AI Inspection Workspace (camera + live insights) ──────────
-    if (isExpanded) {
+    if (isWideScreen) {
       return (
         <Screen edges={["top", "bottom"]}>
           <View style={{ flex: 1, flexDirection: "row" }}>
