@@ -37,7 +37,7 @@ export default function AnalysisDetail() {
   const id = parseInt(params.id);
   const { toast } = useToast();
 
-  const { data: result, isLoading, refetch } = useGetAnalysisResult(id, { query: { enabled: !!id } });
+  const { data: result, isLoading, refetch } = useGetAnalysisResult(id);
   const submitFeedback = useSubmitAnalysisFeedback();
   const { coachingEnabled } = useCoaching();
 

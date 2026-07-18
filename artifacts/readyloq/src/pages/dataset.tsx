@@ -37,7 +37,6 @@ export default function DatasetLibrary() {
   const { data: categories } = useListDatasetCategories();
   const { data: pageData, isLoading } = useListDatasetImages(
     { category: activeCategory ?? undefined, search: search || undefined, limit: 24 },
-    { query: { enabled: true } }
   );
 
   const images = pageData?.items ?? [];

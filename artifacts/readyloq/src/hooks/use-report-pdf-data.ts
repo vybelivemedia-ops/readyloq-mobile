@@ -2,21 +2,16 @@ import { useGetReport, useGetInspection, useGetBranding, useGetPropertyFeed } fr
 import { normalizeAddressKey } from "@/lib/normalize-address-key";
 
 export function useReportPdfData(reportId: number | null) {
-  const { data: report, isLoading: rl } = useGetReport(reportId ?? 0, {
-    query: { enabled: !!reportId },
-  });
+  const { data: report, isLoading: rl } = useGetReport(reportId ?? 0);
 
   const { data: inspection, isLoading: il } = useGetInspection(
     report?.inspectionId ?? 0,
-    { query: { enabled: !!report?.inspectionId } },
   );
 
   const { data: branding, isLoading: bl } = useGetBranding();
 
   const addressKey = report?.siteAddress ? normalizeAddressKey(report.siteAddress) : "";
-  const { data: propertyFeed } = useGetPropertyFeed(addressKey, {
-    query: { enabled: !!addressKey },
-  });
+  const { data: propertyFeed } = useGetPropertyFeed(addressKey);
 
   const isLoading = rl || il || bl;
   const isReady = !isLoading && !!report && !!inspection && !!branding;

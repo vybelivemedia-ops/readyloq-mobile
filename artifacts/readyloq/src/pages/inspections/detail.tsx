@@ -36,8 +36,8 @@ export default function InspectionDetail() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const { data: inspection, isLoading } = useGetInspection(id, { query: { enabled: !!id } });
-  const { data: analyses } = useListAnalysisResults({ inspectionId: id }, { query: { enabled: !!id } });
+  const { data: inspection, isLoading } = useGetInspection(id);
+  const { data: analyses } = useListAnalysisResults({ inspectionId: id });
   const { data: currentUser } = useCurrentUser();
   const isManager = isManagerRole(currentUser?.role);
 

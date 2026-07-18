@@ -198,7 +198,6 @@ export function PreInspectionIntel({ siteAddress }: { siteAddress: string }) {
   const enabled = debounced.length >= 4;
   const { data, isFetching } = useLookupProperty(
     { siteAddress: debounced },
-    { query: { enabled } },
   );
 
   if (!enabled) return null;
