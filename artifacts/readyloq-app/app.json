@@ -63,6 +63,7 @@
             "deploymentTarget": "15.1"
           },
           "android": {
+            "minSdkVersion": 26,
             "packagingOptions": {
               "exclude": [
                 "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
