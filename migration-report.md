@@ -1,8 +1,9 @@
 # ReadyLoq Phase 3 — Platform Extraction Migration Report
 
-**Date:** 2026-07-18
-**Baseline commit (local HEAD):** `648ceae`
-**Platform repository:** `vybelivemedia-ops/platform` (`repos/platform/`, 18 packages)
+**Date:** 2026-07-18  
+**Baseline commit (local HEAD):** `648ceae`  
+**Platform repository:** `vybelivemedia-ops/platform` (`repos/platform/`, 18 packages)  
+**Push strategy:** Option B — fast-forward on top of Phase 2 remote HEAD `6f245cd` (history preserved)
 
 ---
 
@@ -171,3 +172,82 @@ VYBE                ← creator/streaming product (consumes @platform/*)
 git clone https://github.com/vybelivemedia-ops/platform.git repos/platform
 pnpm install
 ```
+
+---
+
+## 9. GitHub Push Results (2026-07-18)
+
+### Final commit SHAs
+
+| Repository | SHA | Commit |
+|---|---|---|
+| `vybelivemedia-ops/readyloq-mobile` | `4129cabb9f707b4c33bf71e22bf832e21922259d` | fix(typecheck): resolve remaining UseQueryOptions errors |
+| `vybelivemedia-ops/platform` | `c61873850049a10a5043d6a871902f46a4a70ed5` | docs: add ADR-016 through ADR-019 |
+
+### ReadyLoq linear history (tip → Phase 2 baseline)
+
+```
+4129cabb9f70  2026-07-18  fix(typecheck): resolve remaining UseQueryOptions errors
+f03d5b180098  2026-07-18  feat(phase-3): migration report, typecheck fixes, workspace cleanup
+6f245cd67030  2026-07-16  feat(split): ReadyLoq standalone app — migrated from development monorepo
+cc596175f1a6  2026-07-14  feat(phase-2): migrate camera provider contracts to @platform/camera-core
+c58765ca996e  2026-07-14  feat(phase-1): migrate vision types to @platform/shared-types
+```
+
+### Platform linear history (tip → prior baseline)
+
+```
+c61873850049  2026-07-18  docs: add ADR-016 through ADR-019 — repository strategy decisions
+3f91d8b75afb  2026-07-17  feat(smart-vision): live session engine, privacy engine, real-time vision OS
+bb5017729533  2026-07-16  feat(smart-vision): add @platform/smart-vision + root @types/node correction
+```
+
+### Phase 3 typecheck fix summary
+
+All `{ query: { enabled: ... } }` options removed from generated orval hook calls.
+Root cause: `@tanstack/query-core` v5.100.9 made `queryKey` required in `UseQueryOptions`.
+The generated hooks derive `queryKey` internally; the explicit guard is not needed.
+
+Files fixed across 2 commits (`f03d5b` and `4129ca`):
+
+| File | Fix |
+|---|---|
+| `artifacts/readyloq/src/hooks/use-voice-recognition.ts` | Removed `{ query: { enabled } }` |
+| `artifacts/readyloq/src/pages/analysis/index.tsx` | Removed `{ query: { enabled } }` |
+| `artifacts/readyloq/src/pages/dashboard.tsx` | Removed `{ query: { enabled } }` |
+| `artifacts/readyloq/src/pages/dataset.tsx` | Removed `{ query: { enabled } }` |
+| `artifacts/readyloq/src/pages/inspections/detail.tsx` | Removed `{ query: { enabled } }` (2 hooks) |
+| `artifacts/readyloq/src/pages/reports/index.tsx` | Removed `{ query: { enabled } }` |
+| `artifacts/readyloq/src/pages/analysis/detail.tsx` | Removed `{ query: { enabled } }` |
+| `artifacts/readyloq/src/components/property-intel.tsx` | Removed `{ query: { enabled } }` |
+| `artifacts/readyloq/src/hooks/use-report-pdf-data.ts` | Removed 3× `{ query: { enabled } }` |
+| `lib/api-client-react/src/generated/api.ts` | Generated client update |
+
+### Validation results
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` (artifacts/readyloq) | ✅ Exit 0 — zero errors |
+| API server test suite | ✅ 181 tests passing |
+| ReadyLoq PATCH `force: false` accepted | ✅ Confirmed genuine fast-forward |
+| Platform PATCH `force: false` accepted | ✅ Confirmed genuine fast-forward |
+| Lease check (both repos pre-PATCH) | ✅ Both refs matched expected SHAs |
+| Platform `adrs/` tree | ✅ ADR-013 through ADR-019 all present |
+| `pnpm-workspace.yaml` in remote | ✅ Contains `repos/platform/packages/*` |
+
+### New ADRs in vybelivemedia-ops/platform
+
+| ADR | Decision |
+|---|---|
+| ADR-016 | Platform extracted into independent repository |
+| ADR-017 | Product-specific AI agents live in applications, not `@platform/*` |
+| ADR-018 | Consumption roadmap: workspace link → versioned packages; no git submodule |
+| ADR-019 | Product-specific code must never enter `@platform/*` packages |
+
+### Remaining follow-up (post-push)
+
+1. **Fresh-clone setup script** — Add `scripts/setup-platform.sh` and update `README.md` with clone instructions for `repos/platform/`
+2. **CI pipeline** — No GitHub Actions exist yet; add tsc + test on every PR
+3. **`pnpm-lock.yaml` refresh** — Regenerate after a fresh platform clone + `pnpm install`
+4. **Platform versioning** — Publish `@platform/*` to npm registry when API stabilises (per ADR-018)
+5. **`readyloq-mobile/` skeleton** — Remove from repo root if no longer needed as a reference
