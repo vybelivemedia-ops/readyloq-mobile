@@ -19,62 +19,65 @@ interface ZonePrompt {
   id: string;
   label: string;
   keywords: string[];
+  /** expo-camera zoom value (0–1 scale) the Co-Pilot should request for this zone.
+   *  0 = 1× wide, 0.25 = 2×, 0.5 = 4×. Defaults to 0 when omitted. */
+  suggestedZoom?: number;
 }
 
 type PropertyType = string;
 
 const ZONE_PROMPTS: Record<string, ZonePrompt[]> = {
   Restaurant: [
-    { id: "fryer", label: "Under Fryer", keywords: ["fryer", "frier", "kitchen", "fryer area"] },
-    { id: "prep", label: "Prep Stations", keywords: ["prep", "preparation", "cutting", "worktop", "counter"] },
-    { id: "drains", label: "Floor Drains", keywords: ["drain", "floor drain", "drainage"] },
-    { id: "receiving", label: "Receiving / Dock", keywords: ["receiving", "dock", "delivery", "loading"] },
-    { id: "storage", label: "Dry Storage", keywords: ["storage", "dry goods", "pantry", "stockroom"] },
-    { id: "grease", label: "Grease Trap / Hood", keywords: ["grease", "hood", "exhaust", "vent"] },
+    { id: "fryer",     label: "Under Fryer",      keywords: ["fryer", "frier", "kitchen", "fryer area"],           suggestedZoom: 0.5  },
+    { id: "prep",      label: "Prep Stations",     keywords: ["prep", "preparation", "cutting", "worktop", "counter"], suggestedZoom: 0.25 },
+    { id: "drains",    label: "Floor Drains",      keywords: ["drain", "floor drain", "drainage"],                  suggestedZoom: 0.5  },
+    { id: "receiving", label: "Receiving / Dock",  keywords: ["receiving", "dock", "delivery", "loading"],          suggestedZoom: 0    },
+    { id: "storage",   label: "Dry Storage",       keywords: ["storage", "dry goods", "pantry", "stockroom"],       suggestedZoom: 0.25 },
+    { id: "grease",    label: "Grease Trap / Hood", keywords: ["grease", "hood", "exhaust", "vent"],                suggestedZoom: 0.5  },
   ],
   Residential: [
-    { id: "sink", label: "Under Sink", keywords: ["sink", "under sink", "cabinet under", "plumbing"] },
-    { id: "baseboard", label: "Baseboards", keywords: ["baseboard", "base", "wall junction", "floor edge"] },
-    { id: "attic", label: "Attic / Crawlspace", keywords: ["attic", "crawlspace", "crawl space", "roof"] },
-    { id: "garage", label: "Garage / Entry", keywords: ["garage", "entry", "door sweep", "threshold"] },
-    { id: "utility", label: "Utility / Laundry", keywords: ["utility", "laundry", "washer", "dryer", "water heater"] },
+    { id: "sink",      label: "Under Sink",        keywords: ["sink", "under sink", "cabinet under", "plumbing"],   suggestedZoom: 0.5  },
+    { id: "baseboard", label: "Baseboards",         keywords: ["baseboard", "base", "wall junction", "floor edge"], suggestedZoom: 0.25 },
+    { id: "attic",     label: "Attic / Crawlspace", keywords: ["attic", "crawlspace", "crawl space", "roof"],       suggestedZoom: 0    },
+    { id: "garage",    label: "Garage / Entry",     keywords: ["garage", "entry", "door sweep", "threshold"],       suggestedZoom: 0    },
+    { id: "utility",   label: "Utility / Laundry",  keywords: ["utility", "laundry", "washer", "dryer", "water heater"], suggestedZoom: 0.25 },
   ],
   Commercial: [
-    { id: "loading", label: "Loading / Dock", keywords: ["dock", "loading", "receiving"] },
-    { id: "mechanical", label: "Mechanical Room", keywords: ["mechanical", "hvac", "boiler", "utility"] },
-    { id: "breakroom", label: "Break Room", keywords: ["break room", "breakroom", "lunchroom", "kitchen"] },
-    { id: "exterior", label: "Exterior Perimeter", keywords: ["exterior", "perimeter", "outside", "dumpster"] },
-    { id: "storage", label: "Storage Areas", keywords: ["storage", "warehouse", "storeroom", "stockroom"] },
+    { id: "loading",    label: "Loading / Dock",    keywords: ["dock", "loading", "receiving"],                     suggestedZoom: 0    },
+    { id: "mechanical", label: "Mechanical Room",   keywords: ["mechanical", "hvac", "boiler", "utility"],          suggestedZoom: 0.25 },
+    { id: "breakroom",  label: "Break Room",        keywords: ["break room", "breakroom", "lunchroom", "kitchen"],  suggestedZoom: 0    },
+    { id: "exterior",   label: "Exterior Perimeter", keywords: ["exterior", "perimeter", "outside", "dumpster"],    suggestedZoom: 0    },
+    { id: "storage",    label: "Storage Areas",     keywords: ["storage", "warehouse", "storeroom", "stockroom"],   suggestedZoom: 0.25 },
   ],
   Warehouse: [
-    { id: "pallets", label: "Pallet / Racking Areas", keywords: ["pallet", "rack", "racking", "shelving"] },
-    { id: "loading", label: "Loading Docks", keywords: ["dock", "loading", "bay"] },
-    { id: "corners", label: "Floor Corners", keywords: ["corner", "floor edge", "junction"] },
-    { id: "drains", label: "Floor Drains", keywords: ["drain", "drainage", "floor drain"] },
-    { id: "exterior", label: "Exterior / Perimeter", keywords: ["exterior", "perimeter", "outside"] },
+    { id: "pallets",  label: "Pallet / Racking Areas", keywords: ["pallet", "rack", "racking", "shelving"],         suggestedZoom: 0    },
+    { id: "loading",  label: "Loading Docks",           keywords: ["dock", "loading", "bay"],                        suggestedZoom: 0    },
+    { id: "corners",  label: "Floor Corners",           keywords: ["corner", "floor edge", "junction"],              suggestedZoom: 0.5  },
+    { id: "drains",   label: "Floor Drains",            keywords: ["drain", "drainage", "floor drain"],              suggestedZoom: 0.5  },
+    { id: "exterior", label: "Exterior / Perimeter",    keywords: ["exterior", "perimeter", "outside"],              suggestedZoom: 0    },
   ],
   "Multi-Family": [
-    { id: "laundry", label: "Laundry Room", keywords: ["laundry", "washer", "dryer"] },
-    { id: "trash", label: "Trash / Compactor", keywords: ["trash", "garbage", "compactor", "refuse"] },
-    { id: "basement", label: "Basement / Utility", keywords: ["basement", "utility", "boiler"] },
-    { id: "units", label: "Unit Interiors", keywords: ["unit", "apartment", "interior", "room"] },
-    { id: "exterior", label: "Exterior Perimeter", keywords: ["exterior", "perimeter", "outside"] },
+    { id: "laundry",  label: "Laundry Room",       keywords: ["laundry", "washer", "dryer"],                        suggestedZoom: 0    },
+    { id: "trash",    label: "Trash / Compactor",  keywords: ["trash", "garbage", "compactor", "refuse"],           suggestedZoom: 0.25 },
+    { id: "basement", label: "Basement / Utility", keywords: ["basement", "utility", "boiler"],                     suggestedZoom: 0    },
+    { id: "units",    label: "Unit Interiors",      keywords: ["unit", "apartment", "interior", "room"],             suggestedZoom: 0    },
+    { id: "exterior", label: "Exterior Perimeter",  keywords: ["exterior", "perimeter", "outside"],                 suggestedZoom: 0    },
   ],
   School: [
-    { id: "cafeteria", label: "Cafeteria / Kitchen", keywords: ["cafeteria", "kitchen", "food service"] },
-    { id: "bathrooms", label: "Restrooms", keywords: ["restroom", "bathroom", "toilet"] },
-    { id: "locker", label: "Locker Rooms", keywords: ["locker", "changing"] },
-    { id: "storage", label: "Storage / Closets", keywords: ["storage", "closet", "custodial"] },
-    { id: "exterior", label: "Exterior / Grounds", keywords: ["exterior", "grounds", "outside"] },
+    { id: "cafeteria", label: "Cafeteria / Kitchen", keywords: ["cafeteria", "kitchen", "food service"],            suggestedZoom: 0.25 },
+    { id: "bathrooms", label: "Restrooms",            keywords: ["restroom", "bathroom", "toilet"],                 suggestedZoom: 0.25 },
+    { id: "locker",    label: "Locker Rooms",         keywords: ["locker", "changing"],                             suggestedZoom: 0    },
+    { id: "storage",   label: "Storage / Closets",    keywords: ["storage", "closet", "custodial"],                 suggestedZoom: 0.25 },
+    { id: "exterior",  label: "Exterior / Grounds",   keywords: ["exterior", "grounds", "outside"],                 suggestedZoom: 0    },
   ],
 };
 
 const DEFAULT_PROMPTS: ZonePrompt[] = [
-  { id: "exterior", label: "Exterior Perimeter", keywords: ["exterior", "perimeter", "outside"] },
-  { id: "interior", label: "Interior Zones", keywords: ["interior", "inside", "room"] },
-  { id: "kitchen", label: "Kitchen / Food Areas", keywords: ["kitchen", "food", "prep"] },
-  { id: "storage", label: "Storage Areas", keywords: ["storage", "stockroom"] },
-  { id: "moisture", label: "Moisture Areas", keywords: ["moisture", "water", "leak", "drain"] },
+  { id: "exterior", label: "Exterior Perimeter",  keywords: ["exterior", "perimeter", "outside"],           suggestedZoom: 0    },
+  { id: "interior", label: "Interior Zones",       keywords: ["interior", "inside", "room"],                 suggestedZoom: 0    },
+  { id: "kitchen",  label: "Kitchen / Food Areas", keywords: ["kitchen", "food", "prep"],                    suggestedZoom: 0.25 },
+  { id: "storage",  label: "Storage Areas",        keywords: ["storage", "stockroom"],                       suggestedZoom: 0.25 },
+  { id: "moisture", label: "Moisture Areas",        keywords: ["moisture", "water", "leak", "drain"],        suggestedZoom: 0.5  },
 ];
 
 function getPromptsForPropertyType(propertyType: PropertyType): ZonePrompt[] {
@@ -90,6 +93,7 @@ interface ZoneItem {
   label: string;
   status: ZoneStatus;
   keywords: string[];
+  suggestedZoom?: number;
 }
 
 interface Hotspot {
@@ -226,6 +230,8 @@ export interface CoPilotHUDProps {
   analysis?: AnalysisResult;
   analyzing: boolean;
   photosCount: number;
+  /** Called whenever Co-Pilot wants to change the camera zoom level (0–1). */
+  onZoomSuggestion?: (zoom: number) => void;
 }
 
 export function CoPilotHUD({
@@ -233,6 +239,7 @@ export function CoPilotHUD({
   analysis,
   analyzing,
   photosCount,
+  onZoomSuggestion,
 }: CoPilotHUDProps) {
   const colors = useColors();
 
@@ -286,6 +293,19 @@ export function CoPilotHUD({
     Speech.stop();
     Speech.speak(title, { language: "en-US", rate: 0.88, pitch: 1.0 });
   }, [analysis?.guidance?.next?.title, muted]);
+
+  // Suggest a zoom level to the parent whenever the active guidance zone changes.
+  useEffect(() => {
+    if (!onZoomSuggestion) return;
+    const title = analysis?.guidance?.next?.title;
+    if (!title) return;
+    const tl = title.toLowerCase();
+    const match = zones.find(
+      (z) => tl.includes(z.label.toLowerCase()) || z.label.toLowerCase().includes(tl),
+    );
+    onZoomSuggestion(match?.suggestedZoom ?? 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis?.guidance?.next?.title]);
 
   // Narrate new hotspot discoveries.
   useEffect(() => {

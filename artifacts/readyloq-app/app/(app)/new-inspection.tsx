@@ -117,6 +117,12 @@ export default function NewInspectionScreen() {
   const cameraProvider = useMemo(() => getRequestProvider("native-camera", { cameraRef }), []);
   const importProvider = useMemo(() => getRequestProvider("media-import", {}), []);
   const [zoom, setZoom] = useState(0);
+  // true while Co-Pilot is controlling the zoom level (cleared on manual tap)
+  const [autoZoom, setAutoZoom] = useState(false);
+  const handleCopilotZoom = useCallback(
+    (z: number) => { setZoom(z); setAutoZoom(true); },
+    [],
+  );
   const [flash, setFlash] = useState<"off" | "on" | "auto">("off");
 
   // ── Dictation state ────────────────────────────────────────────────────────
@@ -856,29 +862,42 @@ export default function NewInspectionScreen() {
     ) : null;
 
     const zoomChips = (
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        {ZOOM_LEVELS.map((z) => (
-          <Pressable
-            key={z.label}
-            onPress={() => setZoom(z.value)}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 999,
-              backgroundColor: zoom === z.value ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.5)",
-            }}
-          >
-            <Text
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+        {ZOOM_LEVELS.map((z) => {
+          const active = zoom === z.value;
+          const aiControlled = active && autoZoom && mode === "copilot";
+          return (
+            <Pressable
+              key={z.label}
+              onPress={() => { setZoom(z.value); setAutoZoom(false); }}
               style={{
-                color: zoom === z.value ? "#000" : "#fff",
-                fontFamily: "Inter_600SemiBold",
-                fontSize: 13,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 999,
+                backgroundColor: active ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.5)",
+                borderWidth: aiControlled ? 1.5 : 0,
+                borderColor: "#17c4d3",
               }}
             >
-              {z.label}
-            </Text>
-          </Pressable>
-        ))}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Text
+                  style={{
+                    color: active ? "#000" : "#fff",
+                    fontFamily: "Inter_600SemiBold",
+                    fontSize: 13,
+                  }}
+                >
+                  {z.label}
+                </Text>
+                {aiControlled && (
+                  <Text style={{ color: "#17c4d3", fontFamily: "Inter_700Bold", fontSize: 9 }}>
+                    AUTO
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
     );
 
@@ -957,6 +976,7 @@ export default function NewInspectionScreen() {
                   analysis={wsAnalysis}
                   analyzing={wsAnalyzing}
                   photosCount={photos.length}
+                  onZoomSuggestion={handleCopilotZoom}
                 />
               ) : (
                 <AiInsightsPanel
@@ -1187,6 +1207,7 @@ export default function NewInspectionScreen() {
                 analysis={wsAnalysis}
                 analyzing={wsAnalyzing}
                 photosCount={photos.length}
+                onZoomSuggestion={handleCopilotZoom}
               />
             </View>
           ) : (
