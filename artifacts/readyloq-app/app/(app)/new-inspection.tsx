@@ -62,6 +62,11 @@ const OFFLINE_NOTICE =
 type Step = "setup" | "capture" | "review";
 type Photo = { uri: string };
 
+// Manual  — standard typed-form capture (no voice features)
+// Voice   — offline Whisper dictation, no network required
+// Copilot — live cloud VLM over 5G/Wi-Fi (not yet available)
+type InspectionMode = "manual" | "voice" | "copilot";
+
 const ZOOM_LEVELS = [
   { label: "1×", value: 0 },
   { label: "2×", value: 0.25 },
@@ -80,6 +85,7 @@ export default function NewInspectionScreen() {
   const generateNarrative = useGenerateReportNarrative();
 
   const [step, setStep] = useState<Step>("setup");
+  const [mode, setMode] = useState<InspectionMode>("voice");
   const [siteAddress, setSiteAddress] = useState("");
   const [clientName, setClientName] = useState("");
   const [technicianName, setTechnicianName] = useState(clerkUser?.fullName ?? "");
@@ -1361,6 +1367,10 @@ export default function NewInspectionScreen() {
         onClose={() => (recordRef.current ? confirmExit() : router.back())}
         colors={colors}
       />
+
+      {/* ── Mode selector ──────────────────────────────────────────────── */}
+      <ModeSelector mode={mode} onSelect={setMode} colors={colors} />
+
       <ScrollView
         contentContainerStyle={{
           gap: 16,
@@ -1449,6 +1459,7 @@ export default function NewInspectionScreen() {
             >
               Notes
             </Text>
+            {mode === "voice" ? (
             <Pressable
               onPress={() => void handleDictationPress()}
               style={{
@@ -1492,6 +1503,7 @@ export default function NewInspectionScreen() {
                     : "Dictate"}
               </Text>
             </Pressable>
+            ) : null}
           </View>
           <TextField
             placeholder="Conditions observed, access notes, etc."
@@ -1618,6 +1630,104 @@ function SummaryRow({
       <Text style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15 }}>
         {value}
       </Text>
+    </View>
+  );
+}
+
+// ─── Mode selector ────────────────────────────────────────────────────────────
+
+const MODE_CONFIG: {
+  key: InspectionMode;
+  label: string;
+  sub: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  available: boolean;
+}[] = [
+  {
+    key: "manual",
+    label: "Manual",
+    sub: "Standard",
+    icon: "pencil-outline",
+    available: true,
+  },
+  {
+    key: "voice",
+    label: "Voice",
+    sub: "Offline AI",
+    icon: "mic-outline",
+    available: true,
+  },
+  {
+    key: "copilot",
+    label: "Co-Pilot",
+    sub: "Live · 5G",
+    icon: "sparkles-outline",
+    available: false,
+  },
+];
+
+function ModeSelector({
+  mode,
+  onSelect,
+  colors,
+}: {
+  mode: InspectionMode;
+  onSelect: (m: InspectionMode) => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        gap: 8,
+        paddingVertical: 10,
+      }}
+    >
+      {MODE_CONFIG.map(({ key, label, sub, icon, available }) => {
+        const active = mode === key;
+        return (
+          <Pressable
+            key={key}
+            onPress={() => available && onSelect(key)}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              paddingHorizontal: 10,
+              borderRadius: colors.radius,
+              backgroundColor: active ? colors.accent : colors.card,
+              borderWidth: 1,
+              borderColor: active ? colors.primary : colors.border,
+              alignItems: "center",
+              gap: 4,
+              opacity: available ? 1 : 0.38,
+            }}
+          >
+            <Ionicons
+              name={icon}
+              size={18}
+              color={active ? colors.primary : colors.mutedForeground}
+            />
+            <Text
+              style={{
+                color: active ? colors.primary : colors.foreground,
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 13,
+              }}
+            >
+              {label}
+            </Text>
+            <Text
+              style={{
+                color: colors.mutedForeground,
+                fontFamily: "Inter_400Regular",
+                fontSize: 10,
+              }}
+            >
+              {available ? sub : "Coming soon"}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
