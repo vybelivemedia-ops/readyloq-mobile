@@ -23,6 +23,7 @@ import {
 } from "react-native";
 
 import { AiInsightsPanel } from "@/components/AiInsightsPanel";
+import { CoPilotHUD } from "@/components/CoPilotHUD";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
@@ -945,23 +946,32 @@ export default function NewInspectionScreen() {
               </View>
             </View>
 
-            {/* Right: live AI insights panel */}
+            {/* Right: Co-Pilot HUD or AI Insights panel depending on mode */}
             <View style={{ flex: 1, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: colors.border }}>
-              <AiInsightsPanel
-                siteAddress={siteAddress}
-                propertyType={propertyType}
-                pestTypes={pestTypes}
-                photosCount={photos.length}
-                pendingCount={Math.max(0, photos.length - analyzedCount.current)}
-                analysis={wsAnalysis}
-                analyzing={wsAnalyzing}
-                error={wsError}
-                report={wsReport}
-                reportBuilding={wsReportBuilding}
-                reportError={wsReportError}
-                onRunAnalysis={runWorkspaceAnalysis}
-                onReview={() => setStep("review")}
-              />
+              {mode === "copilot" ? (
+                <CoPilotHUD
+                  propertyType={propertyType}
+                  analysis={wsAnalysis}
+                  analyzing={wsAnalyzing}
+                  photosCount={photos.length}
+                />
+              ) : (
+                <AiInsightsPanel
+                  siteAddress={siteAddress}
+                  propertyType={propertyType}
+                  pestTypes={pestTypes}
+                  photosCount={photos.length}
+                  pendingCount={Math.max(0, photos.length - analyzedCount.current)}
+                  analysis={wsAnalysis}
+                  analyzing={wsAnalyzing}
+                  error={wsError}
+                  report={wsReport}
+                  reportBuilding={wsReportBuilding}
+                  reportError={wsReportError}
+                  onRunAnalysis={runWorkspaceAnalysis}
+                  onReview={() => setStep("review")}
+                />
+              )}
             </View>
           </View>
         </Screen>
@@ -1018,19 +1028,24 @@ export default function NewInspectionScreen() {
                     paddingVertical: 8,
                     borderRadius: 999,
                     borderWidth: 1,
-                    borderColor: "rgba(255,255,255,0.35)",
+                    borderColor: mode === "copilot"
+                      ? "rgba(23,196,211,0.6)"
+                      : "rgba(255,255,255,0.35)",
                   }}
                 >
                   {wsAnalyzing ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Ionicons name="sparkles" size={15} color="#fff" />
+                    <Ionicons
+                      name={mode === "copilot" ? "navigate-circle-outline" : "sparkles"}
+                      size={15}
+                      color="#fff"
+                    />
                   )}
                   <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
-                    AI Insights
-                    {(wsAnalysis?.findings?.length ?? 0) > 0
-                      ? ` (${wsAnalysis?.findings?.length})`
-                      : ""}
+                    {mode === "copilot"
+                      ? "Co-Pilot"
+                      : `AI Insights${(wsAnalysis?.findings?.length ?? 0) > 0 ? ` (${wsAnalysis?.findings?.length})` : ""}`}
                   </Text>
                 </Pressable>
               </View>
@@ -1110,90 +1125,150 @@ export default function NewInspectionScreen() {
           </View>
         )}
 
-        {/* Full-screen AI Inspection overlay for compact/medium windows. The
-            camera underneath stays mounted, so uploads and auto-run analysis
-            continue while the technician reviews live insights. */}
+        {/* Compact/medium overlay — Co-Pilot mode shows as a bottom sheet that
+            sits over the bottom 42% of the camera; AI Insights takes full screen.
+            Camera stays mounted in both cases so the AI loop keeps running. */}
         {showInsights ? (
-          <View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: colors.background,
-            }}
-          >
-            <Screen edges={["top", "bottom"]}>
+          mode === "copilot" ? (
+            /* ── Co-Pilot bottom sheet ── */
+            <View
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: "42%",
+                borderTopWidth: 1,
+                borderTopColor: colors.primary + "55",
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                overflow: "hidden",
+              }}
+            >
+              {/* Drag handle + close */}
               <View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
                   paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.border,
+                  paddingTop: 10,
+                  paddingBottom: 4,
+                  backgroundColor: colors.background,
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Ionicons name="sparkles" size={18} color={colors.primary} />
-                  <Text
-                    style={{
-                      color: colors.foreground,
-                      fontFamily: "Inter_700Bold",
-                      fontSize: 18,
-                    }}
-                  >
-                    AI Inspection
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                  <Ionicons name="navigate-circle" size={16} color={colors.primary} />
+                  <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+                    Co-Pilot
                   </Text>
                 </View>
                 <Pressable
                   onPress={() => setShowInsights(false)}
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
-                    borderRadius: 999,
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
                     backgroundColor: colors.card,
                     borderWidth: 1,
                     borderColor: colors.border,
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  <Ionicons name="camera-outline" size={16} color={colors.foreground} />
-                  <Text
-                    style={{
-                      color: colors.foreground,
-                      fontFamily: "Inter_600SemiBold",
-                      fontSize: 13,
-                    }}
-                  >
-                    Back to camera
-                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.mutedForeground} />
                 </Pressable>
               </View>
-              <AiInsightsPanel
-                siteAddress={siteAddress}
+              <CoPilotHUD
                 propertyType={propertyType}
-                pestTypes={pestTypes}
-                photosCount={photos.length}
-                pendingCount={Math.max(0, photos.length - analyzedCount.current)}
                 analysis={wsAnalysis}
                 analyzing={wsAnalyzing}
-                error={wsError}
-                report={wsReport}
-                reportBuilding={wsReportBuilding}
-                reportError={wsReportError}
-                onRunAnalysis={runWorkspaceAnalysis}
-                onReview={() => {
-                  setShowInsights(false);
-                  setStep("review");
-                }}
+                photosCount={photos.length}
               />
-            </Screen>
-          </View>
+            </View>
+          ) : (
+            /* ── Full-screen AI Insights ── */
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: colors.background,
+              }}
+            >
+              <Screen edges={["top", "bottom"]}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Ionicons name="sparkles" size={18} color={colors.primary} />
+                    <Text
+                      style={{
+                        color: colors.foreground,
+                        fontFamily: "Inter_700Bold",
+                        fontSize: 18,
+                      }}
+                    >
+                      AI Inspection
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setShowInsights(false)}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      backgroundColor: colors.card,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Ionicons name="camera-outline" size={16} color={colors.foreground} />
+                    <Text
+                      style={{
+                        color: colors.foreground,
+                        fontFamily: "Inter_600SemiBold",
+                        fontSize: 13,
+                      }}
+                    >
+                      Back to camera
+                    </Text>
+                  </Pressable>
+                </View>
+                <AiInsightsPanel
+                  siteAddress={siteAddress}
+                  propertyType={propertyType}
+                  pestTypes={pestTypes}
+                  photosCount={photos.length}
+                  pendingCount={Math.max(0, photos.length - analyzedCount.current)}
+                  analysis={wsAnalysis}
+                  analyzing={wsAnalyzing}
+                  error={wsError}
+                  report={wsReport}
+                  reportBuilding={wsReportBuilding}
+                  reportError={wsReportError}
+                  onRunAnalysis={runWorkspaceAnalysis}
+                  onReview={() => {
+                    setShowInsights(false);
+                    setStep("review");
+                  }}
+                />
+              </Screen>
+            </View>
+          )
         ) : null}
       </View>
     );
