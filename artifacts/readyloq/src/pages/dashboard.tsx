@@ -80,7 +80,7 @@ export default function Dashboard() {
           {[
             { label: "Total", value: stats.totalInspections, color: "text-foreground" },
             { label: "Open", value: stats.openInspections, color: "text-amber-400" },
-            { label: "Coverage", value: `${Math.round(stats.avgAiConfidence * 100)}%`, color: "text-primary" },
+            { label: "Coverage", value: `${Math.round((stats.avgAiConfidence ?? 0) * 100)}%`, color: "text-primary" },
           ].map(s => (
             <div key={s.label} className="bg-card border border-border/60 rounded-2xl px-3 py-3 text-center">
               <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>

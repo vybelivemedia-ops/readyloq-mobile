@@ -4,14 +4,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Camera, AlertTriangle, ChevronRight } from "lucide-react";
 
-function riskColor(risk: string | null) {
+function riskColor(risk: string | null | undefined) {
   if (risk === "critical") return "text-red-400 bg-red-500/10 border-red-500/30";
   if (risk === "high")     return "text-orange-400 bg-orange-500/10 border-orange-500/30";
   if (risk === "medium")   return "text-amber-400 bg-amber-500/10 border-amber-500/30";
   return "text-slate-400 bg-slate-500/10 border-slate-500/30";
 }
 
-function confidenceBar(confidence: number | null) {
+function confidenceBar(confidence: number | null | undefined) {
   const pct = Math.round((confidence ?? 0) * 100);
   const color = pct >= 80 ? "bg-emerald-500" : pct >= 60 ? "bg-amber-500" : "bg-red-500";
   return (

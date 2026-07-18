@@ -14,7 +14,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   structural: "Structural Deficiencies",
 };
 
-function severityBadge(severity: string | null) {
+function severityBadge(severity: string | null | undefined) {
   if (!severity) return null;
   const colors: Record<string, string> = {
     critical: "bg-red-500/15 text-red-400",

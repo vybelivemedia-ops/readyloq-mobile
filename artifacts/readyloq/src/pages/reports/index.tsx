@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListReportsQueryKey } from "@workspace/api-client-react";
 
-function severityBadge(severity: string | null) {
+function severityBadge(severity: string | null | undefined) {
   const colors: Record<string, string> = {
     critical: "bg-red-500/15 text-red-400 border-red-500/30",
     high: "bg-orange-500/15 text-orange-400 border-orange-500/30",

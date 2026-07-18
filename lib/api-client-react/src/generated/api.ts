@@ -15,9 +15,20 @@ import type {
   QueryKey,
   UseMutationOptions,
   UseMutationResult,
-  UseQueryOptions,
+  UseQueryOptions as UseQueryOptionsBase,
   UseQueryResult
 } from '@tanstack/react-query';
+
+// Allow callers to omit queryKey — generated query-options functions always
+// provide a default key, so requiring it at every call site is unnecessary.
+type UseQueryOptions<
+  TQueryFnData = unknown,
+  TError = unknown,
+  TData = TQueryFnData,
+  TQueryKey extends QueryKey = QueryKey,
+> = Omit<UseQueryOptionsBase<TQueryFnData, TError, TData, TQueryKey>, 'queryKey'> & {
+  queryKey?: TQueryKey;
+};
 
 import type {
   AnalysisResult,

@@ -23,7 +23,7 @@ function formatClock(totalSeconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function severityColor(severity: string | null) {
+function severityColor(severity: string | null | undefined) {
   if (severity === "critical") return "bg-red-500/15 text-red-400 border-red-500/30";
   if (severity === "high") return "bg-orange-500/15 text-orange-400 border-orange-500/30";
   if (severity === "medium") return "bg-amber-500/15 text-amber-400 border-amber-500/30";

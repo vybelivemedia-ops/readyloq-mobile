@@ -3,6 +3,8 @@ packages:
   - lib/*
   - lib/integrations/*
   - scripts
+  # Platform packages — local workspace links (replace with npm registry when published)
+  - repos/platform/packages/*
 
 autoInstallPeers: false
 

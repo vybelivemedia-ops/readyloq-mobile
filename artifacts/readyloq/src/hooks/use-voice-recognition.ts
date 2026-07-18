@@ -18,14 +18,14 @@ export function useVoiceRecognition({
   const recognitionRef = useRef<any>(null);
 
   const isSupported = typeof window !== "undefined" &&
-    !!(window.SpeechRecognition || (window as any).webkitSpeechRecognition);
+    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   const start = useCallback(() => {
     if (!isSupported) {
       setState("unsupported");
       return;
     }
-    const SR = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SR();
     recognitionRef.current = recognition;
 
