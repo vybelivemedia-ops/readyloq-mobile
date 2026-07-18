@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { AnalysisResult } from "@/lib/api-client";
+import * as Speech from "expo-speech";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
   FlatList,
+  Pressable,
   Text,
   View,
 } from "react-native";
@@ -258,6 +260,48 @@ export function CoPilotHUD({
     );
     setHotspots([]);
   }, [propertyType]);
+
+  // ── Voice narration ─────────────────────────────────────────────────────────
+  const [muted, setMuted] = useState(false);
+  const prevGuidanceTitle = useRef<string | null>(null);
+  const prevHotspotCount = useRef(0);
+  const isFirstMount = useRef(true);
+
+  // Stop any in-flight speech when the component unmounts.
+  useEffect(() => {
+    return () => { Speech.stop(); };
+  }, []);
+
+  // Narrate the next guidance task whenever it changes.
+  useEffect(() => {
+    const title = analysis?.guidance?.next?.title ?? null;
+    if (isFirstMount.current) {
+      // Skip narration on initial mount — only speak reactive changes.
+      isFirstMount.current = false;
+      prevGuidanceTitle.current = title;
+      return;
+    }
+    if (muted || !title || title === prevGuidanceTitle.current) return;
+    prevGuidanceTitle.current = title;
+    Speech.stop();
+    Speech.speak(title, { language: "en-US", rate: 0.88, pitch: 1.0 });
+  }, [analysis?.guidance?.next?.title, muted]);
+
+  // Narrate new hotspot discoveries.
+  useEffect(() => {
+    if (muted || isFirstMount.current) return;
+    if (hotspots.length <= prevHotspotCount.current) {
+      prevHotspotCount.current = hotspots.length;
+      return;
+    }
+    prevHotspotCount.current = hotspots.length;
+    const newest = hotspots[0];
+    if (!newest) return;
+    // Strip the emoji prefix before speaking.
+    const label = newest.label.replace(/^[^\w\s]+\s*/, "");
+    Speech.stop();
+    Speech.speak(`Hotspot detected: ${label}`, { language: "en-US", rate: 0.88 });
+  }, [hotspots, muted]);
 
   // Drive checklist from the AI analysis loop
   useEffect(() => {
@@ -517,6 +561,29 @@ export function CoPilotHUD({
         >
           {propertyType}
         </Text>
+        <Pressable
+          onPress={() => {
+            if (!muted) Speech.stop();
+            setMuted((m) => !m);
+          }}
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 15,
+            backgroundColor: muted ? colors.card : colors.accent,
+            borderWidth: 1,
+            borderColor: muted ? colors.border : colors.primary + "66",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          accessibilityLabel={muted ? "Unmute Co-Pilot voice" : "Mute Co-Pilot voice"}
+        >
+          <Ionicons
+            name={muted ? "volume-mute-outline" : "volume-medium-outline"}
+            size={15}
+            color={muted ? colors.mutedForeground : colors.primary}
+          />
+        </Pressable>
       </View>
 
       <FlatList
