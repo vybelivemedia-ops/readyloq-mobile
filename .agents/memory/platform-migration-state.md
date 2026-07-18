@@ -190,14 +190,19 @@ Two platform interfaces wired into ReadyLoq's vision layer. Zero new TS errors.
 - Existing `registerCaptureProvider()` / `listCaptureProviders()` etc. kept as aliases
 - future-source-providers.ts: `label:` → `name:` in all 4 definitions
 
-### GitHub repo sync (completed 2026-07-16)
+### GitHub repo sync (completed 2026-07-18 — FINAL)
 
-Both repos pushed clean via GitHub REST API (git blobs → tree → commit → ref PATCH):
+Both repos pushed clean via GitHub REST API (git blobs → tree → commit → ref PATCH, force: false):
 
-| Repo | HEAD | Contents |
+| Repo | Final HEAD | Contents |
 |------|------|----------|
-| vybelivemedia-ops/platform | bb5017729533 | 18 packages, 18/18 typecheck Done |
-| vybelivemedia-ops/readyloq-mobile | 6f245cd67030 | 932 ReadyLoq app files, no platform code |
+| vybelivemedia-ops/platform | c61873850049 | ADR-016–019 added, ARCHITECTURE.md §11 updated |
+| vybelivemedia-ops/readyloq-mobile | 7b17ba99f546 | Phase 3 + typecheck fixes + migration report |
+
+ReadyLoq linear chain: 7b17ba99 → 4129cabb → f03d5b18 → 6f245cd67030 (Phase 2 base)
+Platform linear chain: c61873850049 → 3f91d8b75afb → bb5017729533
+
+All typecheck errors resolved (tsc --noEmit exit 0). 181 api-server tests passing.
 
 **@platform/* dep strategy for standalone readyloq-mobile checkout:**
 - `@platform/camera-core` and `@platform/shared-types` are `workspace:*` in readyloq-app/package.json
