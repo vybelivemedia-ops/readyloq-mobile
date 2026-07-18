@@ -206,6 +206,19 @@ Both repos pushed clean via GitHub REST API (git blobs → tree → commit → r
 
 **Exclusions from readyloq-mobile push:** attached_assets/, exports/ (QR codes), *.zip, *.tar.gz, .tsbuildinfo, node_modules/, dist/, .expo/
 
+## Repository split — current state (2026-07-18)
+
+Phase 1 (smart-vision sprint push to vybelivemedia-ops/platform) ✅ complete at `3f91d8b7`.
+Phase 2 build verification ✅ complete:
+- pnpm install works with 32 workspace packages; all @platform/* resolve via repos/platform/ (regular dir)
+- artifacts/readyloq typecheck clean — 15+ pre-existing TanStack Query v5 errors fixed:
+  - lib/api-client-react/src/generated/api.ts: local UseQueryOptions alias makes queryKey optional
+  - use-voice-recognition.ts: cast SpeechRecognition to (window as any)
+  - dashboard.tsx, analysis/index.tsx, dataset.tsx, inspections/detail.tsx, reports/index.tsx: widen severity/confidence helper signatures
+- api-server TS7030 remains (pre-existing, acceptable baseline)
+
+Phase 2 git operations still pending (blocked in main agent): checkout -b from 6f245cd, cherry-picks of 4 commits, git rm + submodule add, commit. Tracked as Task #19.
+
 ## Platform roadmap (post-migration)
 
 **New packages (user-confirmed 2026-07-15) — design, not migration**
