@@ -46,6 +46,7 @@ import {
   findNearDuplicate,
   getRequestProvider,
   loadGrayscaleImage,
+  speechService,
   type EvidenceItem,
 } from "@/lib/vision";
 
@@ -107,6 +108,51 @@ export default function NewInspectionScreen() {
   const importProvider = useMemo(() => getRequestProvider("media-import", {}), []);
   const [zoom, setZoom] = useState(0);
   const [flash, setFlash] = useState<"off" | "on" | "auto">("off");
+
+  // ── Dictation state ────────────────────────────────────────────────────────
+  // SpeechService is a singleton outside React, so recording survives foldable
+  // screen-resize events that would otherwise unmount and remount this component.
+  const [isDictating, setIsDictating] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const stopDictationRef = useRef<(() => void) | null>(null);
+
+  // Clean up any live recording if the screen is dismissed mid-dictation.
+  useEffect(() => {
+    return () => {
+      stopDictationRef.current?.();
+      stopDictationRef.current = null;
+    };
+  }, []);
+
+  const handleDictationPress = async () => {
+    if (isDictating) {
+      stopDictationRef.current?.();
+      stopDictationRef.current = null;
+      setIsDictating(false);
+      // isTranscribing becomes true when onProgress('…') fires
+      return;
+    }
+    try {
+      const stop = await speechService.startDictation((transcript) => {
+        if (transcript === "…") {
+          setIsTranscribing(true);
+          return;
+        }
+        setIsTranscribing(false);
+        setNotes((prev) => {
+          const trimmed = prev.trim();
+          return trimmed.length > 0 ? `${trimmed} ${transcript}` : transcript;
+        });
+      });
+      stopDictationRef.current = stop;
+      setIsDictating(true);
+    } catch (e) {
+      Alert.alert(
+        "Dictation unavailable",
+        e instanceof Error ? e.message : "Could not start dictation.",
+      );
+    }
+  };
 
   // Phone-size AI Inspection entry point. On expanded windows (tablets,
   // unfolded foldables) the AI panel renders side-by-side with the camera;
@@ -1386,13 +1432,74 @@ export default function NewInspectionScreen() {
           </View>
         </View>
 
-        <TextField
-          label="Notes"
-          placeholder="Conditions observed, access notes, etc."
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-        />
+        <View style={{ gap: 6 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text
+              style={{
+                color: colors.foreground,
+                fontFamily: "Inter_500Medium",
+                fontSize: 14,
+              }}
+            >
+              Notes
+            </Text>
+            <Pressable
+              onPress={() => void handleDictationPress()}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 999,
+                backgroundColor: isDictating
+                  ? "#ef444418"
+                  : colors.card,
+                borderWidth: 1,
+                borderColor: isDictating ? "#ef4444" : colors.border,
+              }}
+            >
+              {isTranscribing ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons
+                  name={isDictating ? "mic" : "mic-outline"}
+                  size={14}
+                  color={isDictating ? "#ef4444" : colors.mutedForeground}
+                />
+              )}
+              <Text
+                style={{
+                  color: isDictating
+                    ? "#ef4444"
+                    : isTranscribing
+                      ? colors.primary
+                      : colors.mutedForeground,
+                  fontFamily: "Inter_500Medium",
+                  fontSize: 12,
+                }}
+              >
+                {isDictating
+                  ? "Stop"
+                  : isTranscribing
+                    ? "Transcribing…"
+                    : "Dictate"}
+              </Text>
+            </Pressable>
+          </View>
+          <TextField
+            placeholder="Conditions observed, access notes, etc."
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+          />
+        </View>
       </ScrollView>
 
       <View style={{ gap: 8, paddingBottom: 8, width: "100%", maxWidth: 640, alignSelf: "center" }}>

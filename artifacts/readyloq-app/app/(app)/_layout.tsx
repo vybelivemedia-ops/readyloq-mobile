@@ -16,6 +16,7 @@ import {
   listLocalInspections,
 } from "@/lib/local/inspection-store";
 import { configureSyncEngine } from "@/lib/sync/engine";
+import { speechService } from "@/lib/vision";
 
 export default function AppLayout() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -59,6 +60,17 @@ function Gate() {
   // Resume prompt: if the app was killed mid-inspection, the draft survives
   // in local storage. Offer to pick up exactly where the technician left off.
   const ready = !isLoading && !error && !!user && user.companyId != null;
+
+  // Warm up the speech model as soon as the workspace loads — well before any
+  // inspection starts. The ~75 MB ggml-tiny model is downloaded once and cached
+  // on device. Fires silently in the background; never blocks the UI.
+  useEffect(() => {
+    if (!ready) return;
+    speechService.initialize().catch((e: unknown) => {
+      console.warn("[SpeechService] Background warm-up failed:", e);
+    });
+  }, [ready]);
+
   useEffect(() => {
     if (!ready || promptedResume.current) return;
     promptedResume.current = true;
