@@ -28,3 +28,5 @@ export {
   LOW_QUALITY_THRESHOLD,
   type CaptureSourceInfo,
 } from "./source-info";
+export { speechService } from "./speech-service";
+export { BILINGUAL_PEST_JARGON_PROMPT } from "./pest-jargon";

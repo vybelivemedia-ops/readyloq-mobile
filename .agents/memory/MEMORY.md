@@ -17,3 +17,4 @@
 - [smart-vision Live Session Engine](smart-vision-live-session.md) — Privacy stage uses PrivacyProvider.detect() directly (no stable IDs); FramePipeline/FrameDropPolicy omit from top-level barrel (name clash); stage runner contract notes
 - [AI review & correction workflow](ai-review-correction.md) — Finding schema (candidates/confidenceLabel/reviewStatus/technicianSpecies); db rebuild process; report filters dismissed findings
 - [DB schema rebuild](db-schema-rebuild.md) — after editing lib/db/src/schema/*.ts, run `pnpm exec tsc --build lib/db/tsconfig.json` or api-server sees stale .d.ts
+- [whisper.rn integration](whisper-rn-integration.md) — v0.6.0 quirks: no root exports entry (add tsconfig paths), transcribeRealtime removed (use expo-av + transcribe(file)), expo-file-system legacy import

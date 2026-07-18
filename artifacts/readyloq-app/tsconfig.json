@@ -8,6 +8,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "whisper.rn": [
+        "./node_modules/whisper.rn/lib/typescript/index"
       ]
     }
   },
