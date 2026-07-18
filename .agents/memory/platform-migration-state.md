@@ -206,18 +206,30 @@ Both repos pushed clean via GitHub REST API (git blobs → tree → commit → r
 
 **Exclusions from readyloq-mobile push:** attached_assets/, exports/ (QR codes), *.zip, *.tar.gz, .tsbuildinfo, node_modules/, dist/, .expo/
 
-## Repository split — current state (2026-07-18)
+## Repository split — current state (2026-07-18) — PHASE 3 COMPLETE
 
 Phase 1 (smart-vision sprint push to vybelivemedia-ops/platform) ✅ complete at `3f91d8b7`.
-Phase 2 build verification ✅ complete:
-- pnpm install works with 32 workspace packages; all @platform/* resolve via repos/platform/ (regular dir)
-- artifacts/readyloq typecheck clean — 15+ pre-existing TanStack Query v5 errors fixed:
-  - lib/api-client-react/src/generated/api.ts: local UseQueryOptions alias makes queryKey optional
-  - use-voice-recognition.ts: cast SpeechRecognition to (window as any)
-  - dashboard.tsx, analysis/index.tsx, dataset.tsx, inspections/detail.tsx, reports/index.tsx: widen severity/confidence helper signatures
-- api-server TS7030 remains (pre-existing, acceptable baseline)
+Phase 2 build verification ✅ complete (typecheck fixes, pnpm install, 181 api-server tests pass).
+Phase 3 (ReadyLoq finalization) ✅ complete:
 
-Phase 2 git operations still pending (blocked in main agent): checkout -b from 6f245cd, cherry-picks of 4 commits, git rm + submodule add, commit. Tracked as Task #19.
+### Phase 3 changes
+- Removed `repos/readyloq-mobile/` (180MB legacy monorepo) from filesystem
+- Removed `repos/vybelive/` (25MB VYBE codebase — wrong project) from filesystem
+- repos/ now contains ONLY `repos/platform/` (18 @platform/* packages)
+- All 5 post-split ReadyLoq features confirmed present at flat paths:
+  Gemini AI layer, AI analysis pipeline, findings-review screen,
+  inspection sync engine, media upload fixes
+- Platform imports clean: @platform/camera-core, provider-registry, shared-types, smart-vision
+- Zero old monorepo path references in source files
+- Verification: pnpm install ✅, typecheck ✅*, 181 api-server tests ✅
+  (* pre-existing TS7030 in api-server/src/routes/gemini.ts:121 — acceptable baseline)
+- Migration report written: migration-report.md
+
+### Remaining blocker
+`repos/platform/` is a regular directory, NOT a git submodule.
+Fresh clones of readyloq-mobile will fail (pnpm-workspace.yaml refs repos/platform/packages/*).
+Fix: `git submodule add git@github.com:vybelivemedia-ops/platform.git repos/platform` pinned at 3f91d8b7.
+Requires git write access.
 
 ## Platform roadmap (post-migration)
 
