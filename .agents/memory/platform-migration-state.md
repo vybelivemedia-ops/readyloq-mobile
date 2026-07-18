@@ -206,6 +206,27 @@ Both repos pushed clean via GitHub REST API (git blobs → tree → commit → r
 
 **Exclusions from readyloq-mobile push:** attached_assets/, exports/ (QR codes), *.zip, *.tar.gz, .tsbuildinfo, node_modules/, dist/, .expo/
 
+## Platform Consumption Strategy (Architectural Decision — 2026-07-18)
+
+Three-layer model — canonical and locked:
+- `@platform/*` → reusable infrastructure (independent repo)
+- ReadyLoq → pest inspection product (consumes `@platform/*`)
+- VYBE → creator/streaming product (consumes `@platform/*`)
+
+Consumption by phase:
+1. **Now (active dev):** local workspace link (`repos/platform/packages/*` in pnpm-workspace.yaml). No publish step needed.
+2. **API stabilizing:** optionally switch to git-based dep or submodule for repo isolation, if needed before semver is ready.
+3. **API stable:** publish to GitHub Packages as versioned releases; both apps use semver deps; `repos/platform/` removed from workspace.
+
+**No git submodule.** Submodule was a validation-tool suggestion, not an architectural requirement. Platform API is still evolving — submodule friction isn't worth it yet. Skip directly to versioned packages when stable.
+
+Fresh-clone workaround (until versioned packages):
+```bash
+git clone https://github.com/vybelivemedia-ops/platform.git repos/platform && pnpm install
+```
+
+---
+
 ## Repository split — current state (2026-07-18) — PHASE 3 COMPLETE
 
 Phase 1 (smart-vision sprint push to vybelivemedia-ops/platform) ✅ complete at `3f91d8b7`.
