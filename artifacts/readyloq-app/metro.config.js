@@ -1,6 +1,21 @@
 const { getDefaultConfig } = require("expo/metro-config");
+const path = require("path");
+
+const workspaceRoot = path.resolve(__dirname, "../..");
+const platformPackagesRoot = path.resolve(workspaceRoot, "repos/platform/packages");
 
 const config = getDefaultConfig(__dirname);
+
+config.watchFolders = [platformPackagesRoot];
+
+config.resolver = {
+  ...config.resolver,
+  unstable_enableSymlinks: true,
+  nodeModulesPaths: [
+    path.resolve(__dirname, "node_modules"),
+    path.resolve(workspaceRoot, "node_modules"),
+  ],
+};
 
 config.transformer = {
   ...config.transformer,
