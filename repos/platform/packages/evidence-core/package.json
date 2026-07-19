@@ -1,0 +1,21 @@
+{
+  "name": "@platform/evidence-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Evidence capture, storage, and annotation abstractions.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@platform/shared-types": "workspace:*",
+    "@platform/camera-core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

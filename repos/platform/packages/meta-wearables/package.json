@@ -1,0 +1,21 @@
+{
+  "name": "@platform/meta-wearables",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Meta wearables integration — Ray-Ban smart glasses provider contracts.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@platform/camera-core": "workspace:*",
+    "@platform/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

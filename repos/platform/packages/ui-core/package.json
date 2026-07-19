@@ -1,0 +1,20 @@
+{
+  "name": "@platform/ui-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Platform UI primitives — design tokens, component contracts, theming.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@platform/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@platform/measurement-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Measurement and metrics abstractions — units, conversions, aggregations.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@platform/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
