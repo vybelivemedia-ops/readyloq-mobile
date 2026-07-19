@@ -25,8 +25,12 @@ Two packages (`camera-core`, `shared-types`) also have no `package.json` at all 
 
 ## Build Command (via Replit Workflow)
 ```
-cd /home/runner/workspace/artifacts/readyloq-app && node scripts/eas-vendor-setup.js && EAS_NO_VCS=1 eas build --platform android --profile development --non-interactive --no-wait; node scripts/eas-vendor-restore.js
+cd /home/runner/workspace/artifacts/readyloq-app && node scripts/eas-vendor-setup.js && EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile development --non-interactive --no-wait; node scripts/eas-vendor-restore.js
 ```
+
+**Why `EAS_SKIP_AUTO_FINGERPRINT=1`**: EAS fingerprint scanner walks into pnpm's `.pnpm` store and crashes on missing native C++ dirs inside `react-native-reanimated`. Always set this flag.
+
+**New Architecture**: `newArchEnabled=false` in `android/gradle.properties` — New Arch + expo-dev-client causes "App react context shouldn't be created before" crash on launch (DevLauncherAppLoader detects eagerly-initialized ReactNativeHost). Keep disabled for dev builds.
 
 Run this via a Replit workflow (not bare bash — the bash tool times out in 2 min and background processes are reaped when it returns).
 
