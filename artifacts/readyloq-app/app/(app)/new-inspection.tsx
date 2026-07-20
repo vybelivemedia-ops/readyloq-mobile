@@ -50,6 +50,12 @@ import {
   speechService,
   type EvidenceItem,
 } from "@/lib/vision";
+import {
+  AudioSessionManager,
+  LocalWhisperProvider,
+  ConfidenceAction,
+  type StructuredInspectionEvent,
+} from "@/lib/audio";
 
 /** True when an error smells like a connectivity failure (not a server rejection). */
 function isOfflineError(e: unknown): boolean {
@@ -132,11 +138,19 @@ export default function NewInspectionScreen() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const stopDictationRef = useRef<(() => void) | null>(null);
 
+  // ── FAIE (Field Audio Intelligence Engine) state ──────────────────────────
+  const [isFaieListening, setIsFaieListening] = useState(false);
+  const [faieStatus, setFaieStatus] = useState<string | null>(null);
+  const [faiePendingConfirm, setFaiePendingConfirm] = useState<StructuredInspectionEvent | null>(null);
+  const sessionManagerRef = useRef<AudioSessionManager | null>(null);
+
   // Clean up any live recording if the screen is dismissed mid-dictation.
   useEffect(() => {
     return () => {
       stopDictationRef.current?.();
       stopDictationRef.current = null;
+      void sessionManagerRef.current?.cancelSession();
+      sessionManagerRef.current = null;
     };
   }, []);
 
@@ -168,6 +182,75 @@ export default function NewInspectionScreen() {
         e instanceof Error ? e.message : "Could not start dictation.",
       );
     }
+  };
+
+  // ── FAIE handlers ──────────────────────────────────────────────────────────
+  const handleFaiePress = async () => {
+    if (isFaieListening) {
+      setIsFaieListening(false);
+      setFaieStatus(null);
+      setFaiePendingConfirm(null);
+      await sessionManagerRef.current?.stopSession();
+      return;
+    }
+    if (!sessionManagerRef.current) {
+      sessionManagerRef.current = new AudioSessionManager(new LocalWhisperProvider());
+    }
+    const formatEvent = (ev: StructuredInspectionEvent): string => {
+      const parts: string[] = [ev.action];
+      if (ev.product) parts.push(ev.product);
+      if (ev.room) parts.push(`in ${ev.room}`);
+      if (ev.pest && ev.evidence) parts.push(`(${ev.pest} — ${ev.evidence})`);
+      else if (ev.pest) parts.push(`(${ev.pest})`);
+      else if (ev.evidence) parts.push(`(${ev.evidence})`);
+      return parts.join(" ").trim();
+    };
+    try {
+      setIsFaieListening(true);
+      setFaieStatus("Listening for commands…");
+      setFaiePendingConfirm(null);
+      await sessionManagerRef.current.startSession(({ event, action }) => {
+        switch (action) {
+          case ConfidenceAction.AUTO_COMMIT: {
+            const line = formatEvent(event);
+            setNotes((prev) => (prev.trim() ? `${prev.trim()}\n${line}` : line));
+            setFaieStatus(`Logged: ${line}`);
+            setTimeout(() => setFaieStatus("Listening…"), 3000);
+            break;
+          }
+          case ConfidenceAction.CONFIRM:
+            setFaiePendingConfirm(event);
+            setFaieStatus(`Confirm: "${event.rawText}" (${Math.round(event.confidence * 100)}%)`);
+            break;
+          case ConfidenceAction.ASK_AGAIN:
+            setFaieStatus("Didn't catch that — please repeat.");
+            setTimeout(() => setFaieStatus("Listening…"), 2500);
+            break;
+        }
+      });
+    } catch (e) {
+      setIsFaieListening(false);
+      setFaieStatus(null);
+      Alert.alert(
+        "Voice unavailable",
+        e instanceof Error ? e.message : "Could not start voice session.",
+      );
+    }
+  };
+
+  const confirmFaieEvent = () => {
+    if (!faiePendingConfirm) return;
+    const ev = faiePendingConfirm;
+    const parts: string[] = [ev.action];
+    if (ev.product) parts.push(ev.product);
+    if (ev.room) parts.push(`in ${ev.room}`);
+    if (ev.pest && ev.evidence) parts.push(`(${ev.pest} — ${ev.evidence})`);
+    else if (ev.pest) parts.push(`(${ev.pest})`);
+    else if (ev.evidence) parts.push(`(${ev.evidence})`);
+    const line = parts.join(" ").trim();
+    setNotes((prev) => (prev.trim() ? `${prev.trim()}\n${line}` : line));
+    setFaiePendingConfirm(null);
+    setFaieStatus("Listening…");
   };
 
   // Phone-size AI Inspection entry point. On expanded windows (tablets,
@@ -352,6 +435,19 @@ export default function NewInspectionScreen() {
     enabled: wsInspectionId != null,
   });
   const wsAnalysis = wsInspectionId != null ? wsAnalysisQ.data?.[0] : undefined;
+
+  // Keep FAIE vision context current with the latest AI analysis detections.
+  useEffect(() => {
+    const manager = sessionManagerRef.current;
+    if (!manager || !wsAnalysis) return;
+    const findings = (wsAnalysis.findings ?? []) as Array<{ species?: string; zone?: string }>;
+    if (findings.length === 0) return;
+    const top = findings[0];
+    manager.setVisionContext({
+      detectedPest: top?.species ?? undefined,
+      detectedRoom: top?.zone ?? undefined,
+    });
+  }, [wsAnalysis]);
 
   const canContinueSetup = siteAddress.trim().length > 0 && technicianName.trim().length > 0;
 
@@ -813,6 +909,72 @@ export default function NewInspectionScreen() {
       </Pressable>
     );
 
+    // FAIE: mic button — voice mode only, activates the audio intelligence session.
+    const faieButton = mode === "voice" ? (
+      <Pressable
+        onPress={() => void handleFaiePress()}
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: isFaieListening ? "rgba(239,68,68,0.85)" : "rgba(0,0,0,0.5)",
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: isFaieListening ? 1.5 : 0,
+          borderColor: isFaieListening ? "#ef4444" : "transparent",
+        }}
+      >
+        <Ionicons
+          name={isFaieListening ? "mic" : "mic-outline"}
+          size={20}
+          color="#fff"
+        />
+      </Pressable>
+    ) : null;
+
+    // FAIE: status / confirmation banner shown during a live voice session.
+    const faieBanner = (isFaieListening || faiePendingConfirm) ? (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          backgroundColor: faiePendingConfirm ? "rgba(37,99,235,0.92)" : "rgba(0,0,0,0.72)",
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 10,
+          maxWidth: 440,
+          borderWidth: 1,
+          borderColor: faiePendingConfirm ? "rgba(96,165,250,0.8)" : "rgba(255,255,255,0.15)",
+        }}
+      >
+        <Ionicons
+          name={faiePendingConfirm ? "checkmark-circle-outline" : "mic"}
+          size={15}
+          color="#fff"
+        />
+        <Text style={{ color: "#fff", fontFamily: "Inter_500Medium", fontSize: 12, flex: 1, flexShrink: 1 }}>
+          {faieStatus}
+        </Text>
+        {faiePendingConfirm ? (
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            <Pressable
+              onPress={confirmFaieEvent}
+              style={{ backgroundColor: "#fff", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
+            >
+              <Text style={{ color: "#1d4ed8", fontFamily: "Inter_700Bold", fontSize: 11 }}>Log it</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { setFaiePendingConfirm(null); setFaieStatus("Listening…"); }}
+              style={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
+            >
+              <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>Skip</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    ) : null;
+
     const qualityBanner = qualityNotice ? (
       <View
         style={{
@@ -957,10 +1119,12 @@ export default function NewInspectionScreen() {
 
               <View style={{ padding: 16, gap: 14, alignItems: "center" }}>
                 {qualityBanner}
+                {faieBanner}
                 {zoomChips}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 28 }}>
                   {flashButton}
                   {importButton}
+                  {faieButton}
                   {captureButton}
                   {doneButton}
                 </View>
@@ -1096,6 +1260,7 @@ export default function NewInspectionScreen() {
               {importButton}
               {captureButton}
               {doneButton}
+              {faieButton}
             </View>
             <View
               style={{
@@ -1108,6 +1273,7 @@ export default function NewInspectionScreen() {
               }}
             >
               {qualityBanner}
+              {faieBanner}
               {zoomChips}
             </View>
             {thumbs}
@@ -1129,6 +1295,9 @@ export default function NewInspectionScreen() {
             {qualityBanner ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{qualityBanner}</View>
             ) : null}
+            {faieBanner ? (
+              <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{faieBanner}</View>
+            ) : null}
             <View style={{ alignItems: "center" }}>{zoomChips}</View>
             <View
               style={{
@@ -1141,6 +1310,7 @@ export default function NewInspectionScreen() {
               <View style={{ width: 64, alignItems: "center", gap: 12 }}>
                 {flashButton}
                 {importButton}
+                {faieButton}
               </View>
               {captureButton}
               {doneButton}
