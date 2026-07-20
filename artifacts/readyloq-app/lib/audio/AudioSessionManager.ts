@@ -1,5 +1,5 @@
 import type { SpeechProvider } from "./providers/SpeechProvider";
-import type { SpeechProviderOptions } from "./types/audio.types";
+import type { SessionOptions } from "./types/audio.types";
 import { NoiseSuppression } from "./preprocessing/NoiseSuppression";
 import { SpeechIntentEngine } from "./intelligence/SpeechIntentEngine";
 import { AudioConfidence, ConfidenceAction } from "./processing/AudioConfidence";
@@ -16,12 +16,17 @@ export type SessionStateUpdate = {
  *
  * Supports an optional visionContext so co-pilot commands like
  * "another one here" or "seal this" resolve against what the camera sees.
+ * Supports an optional getFrame hook so the live camera frame is atomically
+ * bundled into every StructuredInspectionEvent at the moment of transcription.
  *
  * @example
  * const manager = new AudioSessionManager(new LocalWhisperProvider());
- * await manager.startSession((update) => {
- *   if (update.action === ConfidenceAction.AUTO_COMMIT) saveFindig(update.event);
- * });
+ * await manager.startSession(
+ *   (update) => {
+ *     if (update.action === ConfidenceAction.AUTO_COMMIT) saveFinding(update.event);
+ *   },
+ *   { getFrame: () => cameraRef.current?.takePictureAsync({ quality: 0.1 }) },
+ * );
  * await manager.stopSession();
  */
 export class AudioSessionManager {
@@ -31,15 +36,20 @@ export class AudioSessionManager {
 
   constructor(private readonly provider: SpeechProvider) {}
 
+  /**
+   * Merges ctx into the current vision context (additive — existing fields are
+   * preserved unless explicitly overwritten by the caller).
+   */
   setVisionContext(ctx: VisionContext): void {
-    this.visionContext = ctx;
+    this.visionContext = { ...this.visionContext, ...ctx };
   }
 
   async startSession(
     onStateUpdate: (update: SessionStateUpdate) => void,
-    options: SpeechProviderOptions = {},
+    options: SessionOptions = {},
   ): Promise<void> {
-    await this.provider.initialize(options);
+    const { getFrame, ...providerOptions } = options;
+    await this.provider.initialize(providerOptions);
     await this.provider.start();
 
     this.provider.onTranscription(async (result) => {
@@ -51,6 +61,17 @@ export class AudioSessionManager {
         result.confidence,
         this.visionContext,
       );
+
+      // Capture the live camera frame at the exact moment of this command.
+      // Best-effort: a failure here never blocks event dispatch.
+      if (getFrame) {
+        try {
+          const uri = await getFrame();
+          if (uri) event.imageUri = uri;
+        } catch {
+          // intentionally swallowed
+        }
+      }
 
       onStateUpdate({ event, action });
     });

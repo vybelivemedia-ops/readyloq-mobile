@@ -200,6 +200,7 @@ export default function NewInspectionScreen() {
       const parts: string[] = [ev.action];
       if (ev.product) parts.push(ev.product);
       if (ev.room) parts.push(`in ${ev.room}`);
+      if (ev.visionTarget) parts.push(`@ ${ev.visionTarget}`);
       if (ev.pest && ev.evidence) parts.push(`(${ev.pest} — ${ev.evidence})`);
       else if (ev.pest) parts.push(`(${ev.pest})`);
       else if (ev.evidence) parts.push(`(${ev.evidence})`);
@@ -209,6 +210,8 @@ export default function NewInspectionScreen() {
       setIsFaieListening(true);
       setFaieStatus("Listening for commands…");
       setFaiePendingConfirm(null);
+      // Stamp the session start time so the session manager can timestamp events.
+      sessionManagerRef.current.setVisionContext({ timestamp: Date.now() });
       await sessionManagerRef.current.startSession(({ event, action }) => {
         switch (action) {
           case ConfidenceAction.AUTO_COMMIT: {
@@ -227,6 +230,21 @@ export default function NewInspectionScreen() {
             setTimeout(() => setFaieStatus("Listening…"), 2500);
             break;
         }
+      }, {
+        // Capture a lightweight reference frame at the moment of each command.
+        // The URI is merged into the StructuredInspectionEvent as imageUri so
+        // spatial findings ("Seal this gap") carry a camera snapshot.
+        getFrame: async () => {
+          try {
+            const pic = await cameraRef.current?.takePictureAsync({
+              quality: 0.1,
+              skipProcessing: true,
+            });
+            return pic?.uri ?? null;
+          } catch {
+            return null;
+          }
+        },
       });
     } catch (e) {
       setIsFaieListening(false);
@@ -446,6 +464,7 @@ export default function NewInspectionScreen() {
     manager.setVisionContext({
       detectedPest: top?.species ?? undefined,
       detectedRoom: top?.zone ?? undefined,
+      timestamp: Date.now(),
     });
   }, [wsAnalysis]);
 
