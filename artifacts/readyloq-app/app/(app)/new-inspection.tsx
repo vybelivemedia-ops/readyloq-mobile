@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
+import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,10 +25,13 @@ import {
 
 import { AiInsightsPanel } from "@/components/AiInsightsPanel";
 import { CoPilotHUD } from "@/components/CoPilotHUD";
+import { BaitStationPanel, type BaitStation } from "@/components/BaitStationPanel";
+import { WifiCameraModal } from "@/components/WifiCameraModal";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
 import { useColors } from "@/hooks/useColors";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { PEST_TYPES, PROPERTY_TYPES } from "@/constants/inspection";
 import { ApiError } from "@/lib/api";
@@ -123,10 +127,33 @@ export default function NewInspectionScreen() {
   const cameraProvider = useMemo(() => getRequestProvider("native-camera", { cameraRef }), []);
   const importProvider = useMemo(() => getRequestProvider("media-import", {}), []);
   const [zoom, setZoom] = useState(0);
+  const zoomRef = useRef(0);
   // true while Co-Pilot is controlling the zoom level (cleared on manual tap)
   const [autoZoom, setAutoZoom] = useState(false);
+  const zoomAnimRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
   const handleCopilotZoom = useCallback(
-    (z: number) => { setZoom(z); setAutoZoom(true); },
+    (targetZoom: number) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setAutoZoom(true);
+      if (zoomAnimRef.current != null) cancelAnimationFrame(zoomAnimRef.current);
+      const startZoom = zoomRef.current;
+      const duration = 450;
+      const startTime = performance.now();
+      const animate = (now: number) => {
+        const elapsed = now - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const current = startZoom + (targetZoom - startZoom) * eased;
+        zoomRef.current = current;
+        setZoom(current);
+        if (t < 1) {
+          zoomAnimRef.current = requestAnimationFrame(animate);
+        } else {
+          zoomAnimRef.current = null;
+        }
+      };
+      zoomAnimRef.current = requestAnimationFrame(animate);
+    },
     [],
   );
   const [flash, setFlash] = useState<"off" | "on" | "auto">("off");
@@ -143,6 +170,32 @@ export default function NewInspectionScreen() {
   const [faieStatus, setFaieStatus] = useState<string | null>(null);
   const [faiePendingConfirm, setFaiePendingConfirm] = useState<StructuredInspectionEvent | null>(null);
   const sessionManagerRef = useRef<AudioSessionManager | null>(null);
+
+  // ── Bait station tracking (T002) ──────────────────────────────────────────
+  const [baitStations, setBaitStations] = useState<BaitStation[]>([]);
+  const [showBaitPanel, setShowBaitPanel] = useState(false);
+
+  function addBaitStation(station: Omit<BaitStation, "id">) {
+    setBaitStations((prev) => [
+      ...prev,
+      { ...station, id: Math.random().toString(36).slice(2) },
+    ]);
+  }
+  function updateBaitStation(id: string, update: Partial<BaitStation>) {
+    setBaitStations((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...update } : s)),
+    );
+  }
+  function removeBaitStation(id: string) {
+    setBaitStations((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  // ── Wi-Fi camera (T004) ───────────────────────────────────────────────────
+  const [showWifiCamera, setShowWifiCamera] = useState(false);
+  const [wifiCameraConnected, setWifiCameraConnected] = useState(false);
+
+  // ── Offline status (T003) ─────────────────────────────────────────────────
+  const { isConnected } = useNetworkStatus();
 
   // Clean up any live recording if the screen is dismissed mid-dictation.
   useEffect(() => {
@@ -1050,7 +1103,12 @@ export default function NewInspectionScreen() {
           return (
             <Pressable
               key={z.label}
-              onPress={() => { setZoom(z.value); setAutoZoom(false); }}
+              onPress={() => {
+                if (zoomAnimRef.current != null) cancelAnimationFrame(zoomAnimRef.current);
+                zoomRef.current = z.value;
+                setZoom(z.value);
+                setAutoZoom(false);
+              }}
               style={{
                 paddingHorizontal: 12,
                 paddingVertical: 6,
@@ -1137,30 +1195,71 @@ export default function NewInspectionScreen() {
               </View>
 
               <View style={{ padding: 16, gap: 14, alignItems: "center" }}>
+                {!isConnected && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(239,68,68,0.15)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, alignSelf: "stretch" }}>
+                    <Ionicons name="cloud-offline" size={16} color="#ef4444" />
+                    <Text style={{ color: "#ef4444", fontFamily: "Inter_400Regular", fontSize: 12, flex: 1 }}>
+                      Offline — photos save locally and sync when connected
+                    </Text>
+                  </View>
+                )}
                 {qualityBanner}
                 {faieBanner}
                 {zoomChips}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 28 }}>
                   {flashButton}
                   {importButton}
+                  <Pressable onPress={() => setShowWifiCamera(true)} style={{ alignItems: "center", gap: 4 }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: wifiCameraConnected ? "rgba(23,196,211,0.2)" : "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center", borderWidth: wifiCameraConnected ? 1 : 0, borderColor: "#17c4d3" }}>
+                      <Ionicons name="wifi" size={20} color={wifiCameraConnected ? "#17c4d3" : "#fff"} />
+                    </View>
+                    <Text style={{ color: wifiCameraConnected ? "#17c4d3" : "#9ca3af", fontFamily: "Inter_400Regular", fontSize: 10 }}>Wi-Fi</Text>
+                  </Pressable>
                   {faieButton}
                   {captureButton}
                   {doneButton}
                 </View>
                 {thumbs}
               </View>
+              <WifiCameraModal
+                visible={showWifiCamera}
+                onClose={() => setShowWifiCamera(false)}
+                onConnected={() => setWifiCameraConnected(true)}
+              />
             </View>
 
             {/* Right: Co-Pilot HUD or AI Insights panel depending on mode */}
             <View style={{ flex: 1, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: colors.border }}>
               {mode === "copilot" ? (
-                <CoPilotHUD
-                  propertyType={propertyType}
-                  analysis={wsAnalysis}
-                  analyzing={wsAnalyzing}
-                  photosCount={photos.length}
-                  onZoomSuggestion={handleCopilotZoom}
-                />
+                <View style={{ flex: 1, flexDirection: "column" }}>
+                  <CoPilotHUD
+                    propertyType={propertyType}
+                    analysis={wsAnalysis}
+                    analyzing={wsAnalyzing}
+                    photosCount={photos.length}
+                    onZoomSuggestion={handleCopilotZoom}
+                  />
+                  <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 8 }}>
+                    <Pressable
+                      onPress={() => setShowBaitPanel((v) => !v)}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 6 }}
+                    >
+                      <Ionicons name="location" size={14} color="#9ca3af" />
+                      <Text style={{ color: "#9ca3af", fontFamily: "Inter_600SemiBold", fontSize: 12, flex: 1 }}>
+                        Bait Stations {baitStations.length > 0 ? `(${baitStations.length})` : ""}
+                      </Text>
+                      <Ionicons name={showBaitPanel ? "chevron-down" : "chevron-up"} size={12} color="#6b7280" />
+                    </Pressable>
+                    {showBaitPanel && (
+                      <BaitStationPanel
+                        stations={baitStations}
+                        onAdd={addBaitStation}
+                        onUpdate={updateBaitStation}
+                        onRemove={removeBaitStation}
+                      />
+                    )}
+                  </View>
+                </View>
               ) : (
                 <AiInsightsPanel
                   siteAddress={siteAddress}
@@ -1317,6 +1416,14 @@ export default function NewInspectionScreen() {
             {faieBanner ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{faieBanner}</View>
             ) : null}
+            {!isConnected && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(239,68,68,0.15)", marginHorizontal: 16, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Ionicons name="cloud-offline" size={13} color="#ef4444" />
+                <Text style={{ color: "#ef4444", fontFamily: "Inter_400Regular", fontSize: 11, flex: 1 }}>
+                  Offline — saving locally
+                </Text>
+              </View>
+            )}
             <View style={{ alignItems: "center" }}>{zoomChips}</View>
             <View
               style={{
@@ -1329,13 +1436,20 @@ export default function NewInspectionScreen() {
               <View style={{ width: 64, alignItems: "center", gap: 12 }}>
                 {flashButton}
                 {importButton}
-                {faieButton}
+                <Pressable onPress={() => setShowWifiCamera(true)} style={{ alignItems: "center" }}>
+                  <Ionicons name="wifi" size={22} color={wifiCameraConnected ? "#17c4d3" : "#fff"} />
+                </Pressable>
               </View>
               {captureButton}
               {doneButton}
             </View>
           </View>
         )}
+        <WifiCameraModal
+          visible={showWifiCamera}
+          onClose={() => setShowWifiCamera(false)}
+          onConnected={() => setWifiCameraConnected(true)}
+        />
 
         {/* Compact/medium overlay — Co-Pilot mode shows as a bottom sheet that
             sits over the bottom 42% of the camera; AI Insights takes full screen.
@@ -1398,6 +1512,26 @@ export default function NewInspectionScreen() {
                 photosCount={photos.length}
                 onZoomSuggestion={handleCopilotZoom}
               />
+              <View style={{ borderTopWidth: 1, borderTopColor: colors.border + "55", paddingVertical: 6 }}>
+                <Pressable
+                  onPress={() => setShowBaitPanel((v) => !v)}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 4 }}
+                >
+                  <Ionicons name="location" size={13} color="#9ca3af" />
+                  <Text style={{ color: "#9ca3af", fontFamily: "Inter_600SemiBold", fontSize: 11, flex: 1 }}>
+                    Bait Stations {baitStations.length > 0 ? `(${baitStations.length})` : ""}
+                  </Text>
+                  <Ionicons name={showBaitPanel ? "chevron-down" : "chevron-up"} size={11} color="#6b7280" />
+                </Pressable>
+                {showBaitPanel && (
+                  <BaitStationPanel
+                    stations={baitStations}
+                    onAdd={addBaitStation}
+                    onUpdate={updateBaitStation}
+                    onRemove={removeBaitStation}
+                  />
+                )}
+              </View>
             </View>
           ) : (
             /* ── Full-screen AI Insights ── */

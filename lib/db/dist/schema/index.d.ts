@@ -17,4 +17,5 @@ export * from "./customer-summaries";
 export * from "./proposals";
 export * from "./conversations";
 export * from "./messages";
+export * from "./bait-stations";
 //# sourceMappingURL=index.d.ts.map

@@ -14,6 +14,12 @@
  */
 
 import type { CaptureProviderDefinition } from "./provider-registry";
+import {
+  configureWifiCamera,
+  probeWifiCamera,
+  createWifiCameraProvider,
+  getWifiCameraConfig,
+} from "./wifi-camera-provider";
 
 const COMING_SOON =
   "Hardware support is planned — this build has no driver for it yet.";
@@ -59,17 +65,25 @@ export const FUTURE_PROVIDER_DEFINITIONS: CaptureProviderDefinition[] = [
     id: "wifi-camera",
     source: "wifi_stream",
     name: "Wi-Fi camera",
-    description: "Action / drone camera over Wi-Fi (RTSP/HTTP). Pull preview and stills.",
+    description: "Action / drone camera (GoPro, IP cam) over Wi-Fi. Tap to configure and capture stills.",
     capabilities: {
-      mode: "session_stream",
+      mode: "request_response",
       transport: "wifi",
-      hasLivePreview: true,
-      producesVideo: true,
+      hasLivePreview: false,
+      producesVideo: false,
       requiresPairing: false,
     },
-    previewKind: "stream_url",
-    probe: async () => ({ available: false, reason: COMING_SOON }),
-    create: () => notImplemented("Wi-Fi camera"),
+    previewKind: "none",
+    probe: async (_ctx) => {
+      const cfg = getWifiCameraConfig();
+      if (!cfg) return { available: false, reason: "No Wi-Fi camera configured. Tap to set up." };
+      return probeWifiCamera();
+    },
+    create: () => {
+      const cfg = getWifiCameraConfig();
+      if (!cfg) throw new Error("Configure a Wi-Fi camera URL before capturing.");
+      return createWifiCameraProvider() as ReturnType<typeof createWifiCameraProvider>;
+    },
   },
   {
     id: "wearable-camera",

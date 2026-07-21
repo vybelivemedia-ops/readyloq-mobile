@@ -9,7 +9,8 @@
 - [AnalysisResult response shape](analysis-response-shape.md) — computed summaries derive-on-read in serializeResult (not persisted); mark them optional (not required) in openapi for old-client compat
 - [Coverage model](readyloq-coverage-model.md) — zone completeness; live & finalize must agree on same inputs; async-dedupe carry-over keeps still-saved photos' zone+finding
 - [Offline sync two-writer rule](offline-sync-two-writers.md) — all local-record writes must be serialized merge-updates; sync single-flight; inspections finish "completed" but reports "complete"
-- [Camera/vision extensibility](readyloq-camera-extensibility.md) — abstraction IMPLEMENTED: capability model (pull/stream/push) + provider-registry + reserved future-source stubs; only native drivers + session lifecycle remain
+- [Camera/vision extensibility](readyloq-camera-extensibility.md) — abstraction IMPLEMENTED: wifi-camera provider now LIVE (HTTP still capture, ProbeResult discriminated union); stub replaced in future-source-providers.ts
+- [Co-Pilot feature gaps](copilot-feature-gaps.md) — zoom lerp (rAF cubic ease-out), bait_stations table + CRUD API, useNetworkStatus hook + offline banner, WifiCameraModal + wifi-camera-provider.ts
 - [Gemini AI integration wiring](gemini-ai-wiring.md) — Replit-managed proxy (no user key); @google/genai must be a direct api-server dep because esbuild externalizes @google/* and pnpm doesn't hoist it
 - [Platform OS architecture](platform-os-architecture.md) — 12-package platform in repos/platform/; platform-intelligence is the OS kernel; asset-core (not property-core); GOVERNANCE.md enforces the boundary
 - [Platform migration state](platform-migration-state.md) — ALL 15 PACKAGES COMPLETE (Phases 0–14); roadmap: @platform/device-core as Phase 15 (new package unifying hardware interfaces)

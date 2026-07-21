@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router23;
+    module.exports = Router24;
     module.exports.Route = Route;
-    function Router23(options) {
-      if (!(this instanceof Router23)) {
-        return new Router23(options);
+    function Router24(options) {
+      if (!(this instanceof Router24)) {
+        return new Router24(options);
       }
       const opts = options || {};
-      function router23(req, res, next) {
-        router23.handle(req, res, next);
+      function router24(req, res, next) {
+        router24.handle(req, res, next);
       }
-      Object.setPrototypeOf(router23, this);
-      router23.caseSensitive = opts.caseSensitive;
-      router23.mergeParams = opts.mergeParams;
-      router23.params = {};
-      router23.strict = opts.strict;
-      router23.stack = [];
-      return router23;
+      Object.setPrototypeOf(router24, this);
+      router24.caseSensitive = opts.caseSensitive;
+      router24.mergeParams = opts.mergeParams;
+      router24.params = {};
+      router24.strict = opts.strict;
+      router24.stack = [];
+      return router24;
     }
-    Router23.prototype = function() {
+    Router24.prototype = function() {
     };
-    Router23.prototype.param = function param(name, fn) {
+    Router24.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router23.prototype.handle = function handle(req, res, callback) {
+    Router24.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router23.prototype.use = function use(handler) {
+    Router24.prototype.use = function use(handler) {
       let offset = 0;
       let path2 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router23.prototype.route = function route(path2) {
+    Router24.prototype.route = function route(path2) {
       const route2 = new Route(path2);
       const layer = new Layer(path2, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router23.prototype[method] = function(path2) {
+      Router24.prototype[method] = function(path2) {
         const route = this.route(path2);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router23 = require_router();
+    var Router24 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router23 = null;
+      var router24 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router23 === null) {
-            router23 = new Router23({
+          if (router24 === null) {
+            router24 = new Router24({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router23;
+          return router24;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router23 = this.router;
+      var router24 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router23.use(path2, fn2);
+          return router24.use(path2, fn2);
         }
         debug7(".use app under %s", path2);
         fn2.mountpath = path2;
         fn2.parent = this;
-        router23.use(path2, function mounted_app(req, res, next) {
+        router24.use(path2, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter2 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router23 = require_router();
+    var Router24 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router23.Route;
-    exports.Router = Router23;
+    exports.Route = Router24.Route;
+    exports.Router = Router24;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express24 = __toESM(require_express2(), 1);
+var import_express25 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router23 = config2.router;
-  if (isPlainObject(router23)) {
-    newTarget = getTargetFromProxyTable(req, router23);
-  } else if (typeof router23 === "function") {
-    newTarget = await router23(req, res, config2);
+  const router24 = config2.router;
+  if (isPlainObject(router24)) {
+    newTarget = getTargetFromProxyTable(req, router24);
+  } else if (typeof router24 === "function") {
+    newTarget = await router24(req, res, config2);
   }
   return newTarget;
 }
@@ -50181,7 +50181,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express23 = __toESM(require_express2(), 1);
+var import_express24 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -57273,6 +57273,7 @@ __export(schema_exports, {
   READYLOQ_DEFAULT_PROFILE: () => READYLOQ_DEFAULT_PROFILE,
   TAXONOMY_CATEGORY_SLUGS: () => TAXONOMY_CATEGORY_SLUGS,
   analysisResultsTable: () => analysisResultsTable,
+  baitStationsTable: () => baitStationsTable,
   betaChecklistStateTable: () => betaChecklistStateTable,
   betaFeedbackTable: () => betaFeedbackTable,
   brandingProfilesTable: () => brandingProfilesTable,
@@ -57284,6 +57285,7 @@ __export(schema_exports, {
   datasetImagesTable: () => datasetImagesTable,
   errorEventsTable: () => errorEventsTable,
   insertAnalysisResultSchema: () => insertAnalysisResultSchema,
+  insertBaitStationSchema: () => insertBaitStationSchema,
   insertBetaFeedbackSchema: () => insertBetaFeedbackSchema,
   insertBrandingProfileSchema: () => insertBrandingProfileSchema,
   insertCallbackSchema: () => insertCallbackSchema,
@@ -69557,6 +69559,26 @@ var messages = pgTable("messages", {
 var insertMessageSchema = createInsertSchema(messages).omit({
   id: true,
   createdAt: true
+});
+
+// ../../lib/db/src/schema/bait-stations.ts
+var baitStationsTable = pgTable("bait_stations", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id),
+  inspectionId: integer("inspection_id").notNull().references(() => inspectionsTable.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  locationType: text("location_type"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  status: text("status").notNull().default("active"),
+  notes: text("notes"),
+  lastCheckedAt: timestamp("last_checked_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow()
+});
+var insertBaitStationSchema = createInsertSchema(baitStationsTable).omit({
+  id: true,
+  createdAt: true,
+  companyId: true
 });
 
 // ../../lib/db/src/index.ts
@@ -92465,19 +92487,125 @@ router21.post("/generate-image", async (req, res) => {
 });
 var gemini_default = router21;
 
+// src/routes/bait-stations.ts
+var import_express23 = __toESM(require_express2(), 1);
+var router22 = (0, import_express23.Router)({ mergeParams: true });
+var upsertSchema = external_exports.object({
+  label: external_exports.string().min(1).max(100),
+  locationType: external_exports.string().optional(),
+  latitude: external_exports.string().optional(),
+  longitude: external_exports.string().optional(),
+  status: external_exports.enum(["active", "missing", "damaged", "removed"]).default("active"),
+  notes: external_exports.string().optional(),
+  lastCheckedAt: external_exports.string().optional()
+});
+router22.get("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    if (isNaN(inspectionId)) return res.status(400).json({ error: "Invalid inspection ID" });
+    const rows = await db.select().from(baitStationsTable).where(
+      and(
+        eq(baitStationsTable.companyId, companyId),
+        eq(baitStationsTable.inspectionId, inspectionId)
+      )
+    );
+    return res.json(rows.map((r) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+      lastCheckedAt: r.lastCheckedAt?.toISOString() ?? null
+    })));
+  } catch {
+    return res.status(500).json({ error: "Failed to list bait stations" });
+  }
+});
+router22.post("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    if (isNaN(inspectionId)) return res.status(400).json({ error: "Invalid inspection ID" });
+    const parse4 = upsertSchema.safeParse(req.body);
+    if (!parse4.success) return res.status(400).json({ error: "Invalid body", detail: parse4.error.issues });
+    const [row] = await db.insert(baitStationsTable).values({
+      companyId,
+      inspectionId,
+      label: parse4.data.label,
+      locationType: parse4.data.locationType,
+      latitude: parse4.data.latitude,
+      longitude: parse4.data.longitude,
+      status: parse4.data.status,
+      notes: parse4.data.notes,
+      lastCheckedAt: parse4.data.lastCheckedAt ? new Date(parse4.data.lastCheckedAt) : /* @__PURE__ */ new Date()
+    }).returning();
+    return res.status(201).json({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      lastCheckedAt: row.lastCheckedAt?.toISOString() ?? null
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to create bait station" });
+  }
+});
+router22.patch("/:stationId", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    const stationId = Number(req.params.stationId);
+    if (isNaN(inspectionId) || isNaN(stationId)) return res.status(400).json({ error: "Invalid ID" });
+    const parse4 = upsertSchema.partial().safeParse(req.body);
+    if (!parse4.success) return res.status(400).json({ error: "Invalid body", detail: parse4.error.issues });
+    const update = { ...parse4.data };
+    if (parse4.data.lastCheckedAt) update.lastCheckedAt = new Date(parse4.data.lastCheckedAt);
+    const [row] = await db.update(baitStationsTable).set(update).where(
+      and(
+        eq(baitStationsTable.id, stationId),
+        eq(baitStationsTable.inspectionId, inspectionId),
+        eq(baitStationsTable.companyId, companyId)
+      )
+    ).returning();
+    if (!row) return res.status(404).json({ error: "Bait station not found" });
+    return res.json({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      lastCheckedAt: row.lastCheckedAt?.toISOString() ?? null
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to update bait station" });
+  }
+});
+router22.delete("/:stationId", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    const stationId = Number(req.params.stationId);
+    if (isNaN(inspectionId) || isNaN(stationId)) return res.status(400).json({ error: "Invalid ID" });
+    await db.delete(baitStationsTable).where(
+      and(
+        eq(baitStationsTable.id, stationId),
+        eq(baitStationsTable.inspectionId, inspectionId),
+        eq(baitStationsTable.companyId, companyId)
+      )
+    );
+    return res.status(204).send();
+  } catch {
+    return res.status(500).json({ error: "Failed to delete bait station" });
+  }
+});
+var bait_stations_default = router22;
+
 // src/routes/index.ts
-var router22 = (0, import_express23.Router)();
-router22.use(health_default);
-router22.use("/auth", auth_default);
-router22.use(storage_default);
-router22.use("/leads", leads_default);
-router22.use("/share", share_default);
-router22.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router22.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router22.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router22.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router22.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router22.use(
+var router23 = (0, import_express24.Router)();
+router23.use(health_default);
+router23.use("/auth", auth_default);
+router23.use(storage_default);
+router23.use("/leads", leads_default);
+router23.use("/share", share_default);
+router23.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router23.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router23.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router23.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router23.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router23.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -92485,17 +92613,17 @@ router22.use(
   requireRole("manager"),
   intelligence_default
 );
-router22.use(
+router23.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router22.use("/branding", branding_default);
-router22.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router22.use("/beta", requireAuth, requireCompany, beta_default);
-router22.use(
+router23.use("/branding", branding_default);
+router23.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router23.use("/beta", requireAuth, requireCompany, beta_default);
+router23.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -92503,7 +92631,7 @@ router22.use(
   requireRole("sales"),
   opportunities_default
 );
-router22.use(
+router23.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -92511,7 +92639,7 @@ router22.use(
   requireRole("manager"),
   scorecards_default
 );
-router22.use(
+router23.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -92519,8 +92647,8 @@ router22.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router22.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router22.use(
+router23.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router23.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -92528,8 +92656,15 @@ router22.use(
   requireRole("sales"),
   proposals_default
 );
-router22.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-var routes_default = router22;
+router23.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router23.use(
+  "/inspections/:inspectionId/bait-stations",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  bait_stations_default
+);
+var routes_default = router23;
 
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
@@ -92550,7 +92685,7 @@ var logger2 = (0, import_pino.default)({
 });
 
 // src/app.ts
-var app = (0, import_express24.default)();
+var app = (0, import_express25.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -92601,8 +92736,8 @@ app.use(
     }
   })
 );
-app.use(import_express24.default.json());
-app.use(import_express24.default.urlencoded({ extended: true }));
+app.use(import_express25.default.json());
+app.use(import_express25.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
