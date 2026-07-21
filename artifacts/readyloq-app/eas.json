@@ -9,8 +9,7 @@
       "distribution": "internal",
       "node": "22.14.0",
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug -PreactNativeArchitectures=arm64-v8a"
+        "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_DOMAIN": "f5b8311f-07a6-49b2-9f87-232606205230-00-3rzmd0y2q5x6t.spock.replit.dev",
