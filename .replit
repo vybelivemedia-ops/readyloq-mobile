@@ -29,7 +29,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd /home/runner/workspace/artifacts/readyloq-app && EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY node_modules/.bin/expo start --tunnel --clear"
+args = "cd /home/runner/workspace/artifacts/readyloq-app && EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY node_modules/.bin/expo start --tunnel --port 8082 --clear"
 
 [agent]
 stack = "PNPM_WORKSPACE"
