@@ -30325,18 +30325,18 @@ var require_logger = __commonJS({
       delete opts.customErroredMessage;
       const quietReqLogger = !!opts.quietReqLogger;
       const quietResLogger = !!opts.quietResLogger;
-      const logger4 = wrapChild(opts, theStream);
-      const validLogLevels = Object.keys(logger4.levels.values).concat("silent");
+      const logger3 = wrapChild(opts, theStream);
+      const validLogLevels = Object.keys(logger3.levels.values).concat("silent");
       const useLevel = getValidLogLevel(opts.useLevel);
       delete opts.useLevel;
       const genReqId = reqIdGenFactory(opts.genReqId);
       const result = (req, res, next) => {
-        return loggingMiddleware(logger4, req, res, next);
+        return loggingMiddleware(logger3, req, res, next);
       };
-      result.logger = logger4;
+      result.logger = logger3;
       return result;
-      function onResFinished(res, logger5, err) {
-        let log = logger5;
+      function onResFinished(res, logger4, err) {
+        let log = logger4;
         const responseTime = Date.now() - res[startTime];
         const req = res[reqObject];
         const level = getLogLevelFromCustomLogLevel(customLogLevel, useLevel, res, err, req);
@@ -30345,10 +30345,10 @@ var require_logger = __commonJS({
         }
         const customPropBindings = typeof customProps === "function" ? customProps(req, res) : customProps;
         if (customPropBindings) {
-          const customPropBindingStr = logger5[stringifySym](customPropBindings).replace(/[{}]/g, "");
-          const customPropBindingsStr = logger5[chindingsSym];
+          const customPropBindingStr = logger4[stringifySym](customPropBindings).replace(/[{}]/g, "");
+          const customPropBindingsStr = logger4[chindingsSym];
           if (!customPropBindingsStr.includes(customPropBindingStr)) {
-            log = logger5.child(customPropBindings);
+            log = logger4.child(customPropBindings);
           }
         }
         if (err || res.err || res.statusCode >= 500) {
@@ -30371,10 +30371,10 @@ var require_logger = __commonJS({
           successMessage(req, res, responseTime)
         );
       }
-      function loggingMiddleware(logger5, req, res, next) {
+      function loggingMiddleware(logger4, req, res, next) {
         let shouldLogSuccess = true;
         req.id = req.id || genReqId(req, res);
-        const log = quietReqLogger ? logger5.child({ [requestIdKey]: req.id }) : logger5;
+        const log = quietReqLogger ? logger4.child({ [requestIdKey]: req.id }) : logger4;
         let fullReqLogger = log.child({ [reqKey]: req });
         const customPropBindings = typeof customProps === "function" ? customProps(req, res) : customProps;
         if (customPropBindings) {
@@ -30430,20 +30430,20 @@ var require_logger = __commonJS({
     function wrapChild(opts, stream) {
       const prevLogger = opts.logger;
       const prevGenReqId = opts.genReqId;
-      let logger4 = null;
+      let logger3 = null;
       if (prevLogger) {
         opts.logger = void 0;
         opts.genReqId = void 0;
-        logger4 = prevLogger.child({}, opts);
+        logger3 = prevLogger.child({}, opts);
         opts.logger = prevLogger;
         opts.genReqId = prevGenReqId;
       } else {
         if (opts.transport && !opts.transport.caller) {
           opts.transport.caller = getCallerFile();
         }
-        logger4 = pino2(opts, stream);
+        logger3 = pino2(opts, stream);
       }
-      return logger4;
+      return logger3;
     }
     function reqIdGenFactory(func) {
       if (typeof func === "function") return func;
@@ -39886,15 +39886,15 @@ var validations = {
     }
   }
 };
-function validateLogger(logger4) {
-  if (typeof logger4 !== "object" || typeof logger4.error !== "function" || typeof logger4.warn !== "function") {
+function validateLogger(logger3) {
+  if (typeof logger3 !== "object" || typeof logger3.error !== "function" || typeof logger3.warn !== "function") {
     throw new TypeError(
       "Provided logger does not implement the Logger interface"
     );
   }
 }
-var getValidations = (_enabled, logger4) => {
-  validateLogger(logger4);
+var getValidations = (_enabled, logger3) => {
+  validateLogger(logger3);
   let enabled;
   if (typeof _enabled === "boolean") {
     enabled = {
@@ -39920,8 +39920,8 @@ var getValidations = (_enabled, logger4) => {
             args
           );
         } catch (error40) {
-          if (error40 instanceof ChangeWarning) logger4.warn(error40);
-          else logger4.error(error40);
+          if (error40 instanceof ChangeWarning) logger3.warn(error40);
+          else logger3.error(error40);
         }
       };
   }
@@ -39972,10 +39972,10 @@ var getOptionsFromConfig = (config2) => {
 };
 var parseOptions = (passedOptions) => {
   const notUndefinedOptions = omitUndefinedProperties(passedOptions);
-  const logger4 = passedOptions.logger ?? ConsoleLogger;
+  const logger3 = passedOptions.logger ?? ConsoleLogger;
   const validations2 = getValidations(
     notUndefinedOptions?.validate ?? true,
-    logger4
+    logger3
   );
   validations2.validationsConfig();
   validations2.knownOptions(passedOptions);
@@ -40052,7 +40052,7 @@ var parseOptions = (passedOptions) => {
     ),
     // Print an error to the console if a few known misconfigurations are detected.
     validations: validations2,
-    logger: logger4
+    logger: logger3
   };
   if (typeof config2.store.increment !== "function" || typeof config2.store.decrement !== "function" || typeof config2.store.resetKey !== "function" || config2.store.resetAll !== void 0 && typeof config2.store.resetAll !== "function" || config2.store.init !== void 0 && typeof config2.store.init !== "function") {
     throw new TypeError(
@@ -40223,7 +40223,7 @@ var rate_limit_default = rateLimit;
 // src/app.ts
 var import_pino_http = __toESM(require_logger(), 1);
 
-// ../../node_modules/.pnpm/@clerk+shared@4.17.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/runtime/_chunks/underscore-CPJSkOtE.mjs
+// ../../node_modules/.pnpm/@clerk+shared@4.22.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/underscore.mjs
 function snakeToCamel(str3) {
   return str3 ? str3.replace(/([-_][a-z])/g, (match2) => match2.toUpperCase().replace(/-|_/, "")) : "";
 }
@@ -40431,6 +40431,16 @@ var isomorphicBtoa = (data) => {
 // ../../node_modules/.pnpm/@clerk+shared@4.22.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/keys.mjs
 var PUBLISHABLE_KEY_LIVE_PREFIX = "pk_live_";
 var PUBLISHABLE_KEY_TEST_PREFIX = "pk_test_";
+var PUBLISHABLE_FRONTEND_API_DEV_REGEX = /^(([a-z]+)-){2}([0-9]{1,2})\.clerk\.accounts([a-z.]*)(dev|com)$/i;
+function buildPublishableKey(frontendApi) {
+  return `${PUBLISHABLE_FRONTEND_API_DEV_REGEX.test(frontendApi) || frontendApi.startsWith("clerk.") && LEGACY_DEV_INSTANCE_SUFFIXES.some((s2) => frontendApi.endsWith(s2)) ? PUBLISHABLE_KEY_TEST_PREFIX : PUBLISHABLE_KEY_LIVE_PREFIX}${isomorphicBtoa(`${frontendApi}$`).replace(/=+$/, "")}`;
+}
+function publishableKeyFromHost(host, fallbackKey) {
+  if (fallbackKey && isDevelopmentFromPublishableKey(fallbackKey)) return fallbackKey;
+  const hostname2 = host.toLowerCase().replace(/:\d+$/, "");
+  if (!hostname2) throw new Error("Host must not be empty.");
+  return buildPublishableKey(`clerk.${hostname2}`);
+}
 function isValidDecodedPublishableKey(decoded) {
   if (!decoded.endsWith("$")) return false;
   const withoutTrailing = decoded.slice(0, -1);
@@ -40496,6 +40506,9 @@ function createDevOrStagingUrlCache() {
       return res;
     }
   };
+}
+function isDevelopmentFromPublishableKey(apiKey) {
+  return apiKey.startsWith("test_") || apiKey.startsWith("pk_test_");
 }
 function isProductionFromPublishableKey(apiKey) {
   return apiKey.startsWith("live_") || apiKey.startsWith("pk_live_");
@@ -41270,6 +41283,16 @@ var logger = {
 };
 
 // ../../node_modules/.pnpm/@clerk+shared@4.22.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/proxy.mjs
+function isValidProxyUrl(key) {
+  if (!key) return true;
+  return isHttpOrHttps(key) || isProxyUrlRelative(key);
+}
+function isHttpOrHttps(key) {
+  return /^http(s)?:\/\//.test(key || "");
+}
+function isProxyUrlRelative(key) {
+  return key.startsWith("/");
+}
 var AUTO_PROXY_HOST_SUFFIXES = [".vercel.app"];
 var AUTO_PROXY_PATH = "/__clerk";
 function shouldAutoProxy(hostname2) {
@@ -48153,49 +48176,6 @@ function withLegacyReturn(cb) {
   };
 }
 
-// ../../node_modules/.pnpm/@clerk+shared@4.22.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/underscore.mjs
-function snakeToCamel2(str3) {
-  return str3 ? str3.replace(/([-_][a-z])/g, (match2) => match2.toUpperCase().replace(/-|_/, "")) : "";
-}
-function camelToSnake2(str3) {
-  return str3 ? str3.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`) : "";
-}
-var createDeepObjectTransformer2 = (transform2) => {
-  const deepTransform = (obj) => {
-    if (!obj) return obj;
-    if (Array.isArray(obj)) return obj.map((el) => {
-      if (typeof el === "object" || Array.isArray(el)) return deepTransform(el);
-      return el;
-    });
-    const copy = { ...obj };
-    const keys = Object.keys(copy);
-    for (const oldName of keys) {
-      const newName = transform2(oldName.toString());
-      if (newName !== oldName) {
-        copy[newName] = copy[oldName];
-        delete copy[oldName];
-      }
-      if (typeof copy[newName] === "object") copy[newName] = deepTransform(copy[newName]);
-    }
-    return copy;
-  };
-  return deepTransform;
-};
-var deepCamelToSnake2 = createDeepObjectTransformer2(camelToSnake2);
-var deepSnakeToCamel2 = createDeepObjectTransformer2(snakeToCamel2);
-function isTruthy2(value) {
-  if (typeof value === `boolean`) return value;
-  if (value === void 0 || value === null) return false;
-  if (typeof value === `string`) {
-    if (value.toLowerCase() === `true`) return true;
-    if (value.toLowerCase() === `false`) return false;
-  }
-  const number4 = parseInt(value, 10);
-  if (isNaN(number4)) return false;
-  if (number4 > 0) return true;
-  return false;
-}
-
 // ../../node_modules/.pnpm/@clerk+shared@4.22.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/_chunks/telemetry-9C6N5ppw.mjs
 var PROCESS_FLAG = /* @__PURE__ */ Symbol.for("@clerk/shared.telemetryNoticeShown");
 var NOTICE_LINES = [
@@ -48210,7 +48190,7 @@ function isServerRuntime() {
 }
 function isCI() {
   if (typeof process === "undefined" || !process.env) return false;
-  return automatedEnvironmentVariables.some((name) => isTruthy2(process.env[name]));
+  return automatedEnvironmentVariables.some((name) => isTruthy(process.env[name]));
 }
 function hasSeen() {
   return Boolean(globalThis[PROCESS_FLAG]);
@@ -48367,12 +48347,12 @@ var TelemetryCollector = class {
   }
   get isEnabled() {
     if (this.#metadata.instanceType !== "development") return false;
-    if (this.#config.disabled || typeof process !== "undefined" && process.env && isTruthy2(process.env.CLERK_TELEMETRY_DISABLED)) return false;
+    if (this.#config.disabled || typeof process !== "undefined" && process.env && isTruthy(process.env.CLERK_TELEMETRY_DISABLED)) return false;
     if (typeof window !== "undefined" && !!window?.navigator?.webdriver) return false;
     return true;
   }
   get isDebug() {
-    return this.#config.debug || typeof process !== "undefined" && process.env && isTruthy2(process.env.CLERK_TELEMETRY_DEBUG);
+    return this.#config.debug || typeof process !== "undefined" && process.env && isTruthy(process.env.CLERK_TELEMETRY_DEBUG);
   }
   record(event) {
     try {
@@ -48759,39 +48739,7 @@ async function clerkFrontendApiProxy(request2, options) {
   }
 }
 
-// ../../node_modules/.pnpm/@clerk+shared@4.17.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/runtime/_chunks/keys-jlv3GIE3.mjs
-function isDevelopmentFromSecretKey2(apiKey) {
-  return apiKey.startsWith("test_") || apiKey.startsWith("sk_test_");
-}
-
-// ../../node_modules/.pnpm/@clerk+shared@4.17.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/runtime/_chunks/logger-C6joC6-q.mjs
-var loggedMessages2 = /* @__PURE__ */ new Set();
-var logger2 = {
-  warnOnce: (msg) => {
-    if (loggedMessages2.has(msg)) return;
-    loggedMessages2.add(msg);
-    console.warn(msg);
-  },
-  logOnce: (msg) => {
-    if (loggedMessages2.has(msg)) return;
-    console.log(msg);
-    loggedMessages2.add(msg);
-  }
-};
-
-// ../../node_modules/.pnpm/@clerk+shared@4.17.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/runtime/_chunks/proxy-6sFESt4u.mjs
-function isValidProxyUrl(key) {
-  if (!key) return true;
-  return isHttpOrHttps(key) || isProxyUrlRelative(key);
-}
-function isHttpOrHttps(key) {
-  return /^http(s)?:\/\//.test(key || "");
-}
-function isProxyUrlRelative(key) {
-  return key.startsWith("/");
-}
-
-// ../../node_modules/.pnpm/@clerk+shared@4.17.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/runtime/_chunks/handleValueOrFn-xqbU450o.mjs
+// ../../node_modules/.pnpm/@clerk+shared@4.22.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/_chunks/handleValueOrFn-CKEDuW4I.mjs
 function handleValueOrFn(value, url2, defaultValue) {
   if (typeof value === "function") return value(url2);
   if (typeof value !== "undefined") return value;
@@ -48867,7 +48815,7 @@ var authenticateRequest2 = (opts) => {
   if (isSatellite && !proxyUrl && !domain2) {
     throw new Error(satelliteAndMissingProxyUrlAndDomain);
   }
-  if (isSatellite && !isHttpOrHttps(signInUrl) && isDevelopmentFromSecretKey2(secretKey || "")) {
+  if (isSatellite && !isHttpOrHttps(signInUrl) && isDevelopmentFromSecretKey(secretKey || "")) {
     throw new Error(satelliteAndMissingSignInUrl);
   }
   return clerkClient2.authenticateRequest(clerkRequest, {
@@ -48925,7 +48873,7 @@ var authenticateAndDecorateRequest = (options = {}) => {
       return next();
     }
     if ("auth" in request2) {
-      logger2.warnOnce(
+      logger.warnOnce(
         "Clerk: another middleware has already set `req.auth` on this request. Clerk authentication will run anyway and overwrite it. To use another auth library alongside Clerk, configure it to store its state on a different request property."
       );
     }
@@ -49029,37 +48977,6 @@ var getAuth = ((req, options) => {
   const authObject = req.auth(options);
   return getAuthObjectForAcceptedToken({ authObject, acceptsToken: options?.acceptsToken });
 });
-
-// node_modules/@clerk/shared/dist/runtime/_chunks/constants-BVchI2jn.mjs
-var LEGACY_DEV_INSTANCE_SUFFIXES3 = [
-  ".lcl.dev",
-  ".lclstage.dev",
-  ".lclclerk.com"
-];
-
-// node_modules/@clerk/shared/dist/runtime/_chunks/isomorphicBtoa-BBBfp_jr.mjs
-var isomorphicBtoa3 = (data) => {
-  if (typeof btoa !== "undefined" && typeof btoa === "function") return btoa(data);
-  else if (typeof globalThis.Buffer !== "undefined") return globalThis.Buffer.from(data).toString("base64");
-  return data;
-};
-
-// node_modules/@clerk/shared/dist/runtime/_chunks/keys-jlv3GIE3.mjs
-var PUBLISHABLE_KEY_LIVE_PREFIX2 = "pk_live_";
-var PUBLISHABLE_KEY_TEST_PREFIX2 = "pk_test_";
-var PUBLISHABLE_FRONTEND_API_DEV_REGEX = /^(([a-z]+)-){2}([0-9]{1,2})\.clerk\.accounts([a-z.]*)(dev|com)$/i;
-function buildPublishableKey2(frontendApi) {
-  return `${PUBLISHABLE_FRONTEND_API_DEV_REGEX.test(frontendApi) || frontendApi.startsWith("clerk.") && LEGACY_DEV_INSTANCE_SUFFIXES3.some((s2) => frontendApi.endsWith(s2)) ? PUBLISHABLE_KEY_TEST_PREFIX2 : PUBLISHABLE_KEY_LIVE_PREFIX2}${isomorphicBtoa3(`${frontendApi}$`).replace(/=+$/, "")}`;
-}
-function publishableKeyFromHost2(host, fallbackKey) {
-  if (fallbackKey && isDevelopmentFromPublishableKey2(fallbackKey)) return fallbackKey;
-  const hostname2 = host.toLowerCase().replace(/:\d+$/, "");
-  if (!hostname2) throw new Error("Host must not be empty.");
-  return buildPublishableKey2(`clerk.${hostname2}`);
-}
-function isDevelopmentFromPublishableKey2(apiKey) {
-  return apiKey.startsWith("test_") || apiKey.startsWith("pk_test_");
-}
 
 // ../../node_modules/.pnpm/httpxy@0.5.3/node_modules/httpxy/dist/index.mjs
 import http, { request } from "node:http";
@@ -49789,14 +49706,14 @@ function getPort2(sockets) {
 
 // ../../node_modules/.pnpm/http-proxy-middleware@4.1.0/node_modules/http-proxy-middleware/dist/plugins/default/logger-plugin.js
 var loggerPlugin = definePlugin((proxyServer, options) => {
-  const logger4 = getLogger(options);
+  const logger3 = getLogger(options);
   proxyServer.on("error", (err, req, res, target) => {
     const hostname2 = req?.headers?.host;
     const requestHref = `${hostname2}${req?.url}`;
     const targetHref = `${target?.href}`;
     const errorMessage = "[HPM] Error occurred while proxying request %s to %s [%s] (%s)";
     const errReference = "https://nodejs.org/api/errors.html#errors_common_system_errors";
-    logger4.error(errorMessage, requestHref, targetHref, err.code || err, errReference);
+    logger3.error(errorMessage, requestHref, targetHref, err.code || err, errReference);
   });
   proxyServer.on("proxyRes", (proxyRes, req, res) => {
     const originalUrl = req.originalUrl ?? `${req.baseUrl || ""}${req.url}`;
@@ -49812,13 +49729,13 @@ var loggerPlugin = definePlugin((proxyServer, options) => {
     }
     const targetUrl = target.toString();
     const exchange = `[HPM] ${req.method} ${originalUrl} -> ${targetUrl} [${proxyRes.statusCode}]`;
-    logger4.info(exchange);
+    logger3.info(exchange);
   });
   proxyServer.on("open", (socket) => {
-    logger4.info("[HPM] Client connected: %o", socket.address());
+    logger3.info("[HPM] Client connected: %o", socket.address());
   });
   proxyServer.on("close", (req, proxySocket, proxyHead) => {
-    logger4.info("[HPM] Client disconnected: %o", proxySocket.address());
+    logger3.info("[HPM] Client disconnected: %o", proxySocket.address());
   });
 });
 
@@ -57061,12 +56978,12 @@ var PgTransaction = class extends PgDatabase {
 // ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/drizzle-orm/node-postgres/session.js
 var { Pool: Pool2, types: types2 } = esm_default;
 var NodePgPreparedQuery = class extends PgPreparedQuery {
-  constructor(client, queryString, params, logger4, cache2, queryMetadata, cacheConfig, fields, name, _isResponseInArrayMode, customResultMapper) {
+  constructor(client, queryString, params, logger3, cache2, queryMetadata, cacheConfig, fields, name, _isResponseInArrayMode, customResultMapper) {
     super({ sql: queryString, params }, cache2, queryMetadata, cacheConfig);
     this.client = client;
     this.queryString = queryString;
     this.params = params;
-    this.logger = logger4;
+    this.logger = logger3;
     this.fields = fields;
     this._isResponseInArrayMode = _isResponseInArrayMode;
     this.customResultMapper = customResultMapper;
@@ -57294,11 +57211,11 @@ var NodePgDatabase = class extends PgDatabase {
 };
 function construct(client, config2 = {}) {
   const dialect = new PgDialect({ casing: config2.casing });
-  let logger4;
+  let logger3;
   if (config2.logger === true) {
-    logger4 = new DefaultLogger();
+    logger3 = new DefaultLogger();
   } else if (config2.logger !== false) {
-    logger4 = config2.logger;
+    logger3 = config2.logger;
   }
   let schema;
   if (config2.schema) {
@@ -57312,7 +57229,7 @@ function construct(client, config2 = {}) {
       tableNamesMap: tablesConfig.tableNamesMap
     };
   }
-  const driver = new NodePgDriver(client, dialect, { logger: logger4, cache: config2.cache });
+  const driver = new NodePgDriver(client, dialect, { logger: logger3, cache: config2.cache });
   const session = driver.createSession(schema);
   const db2 = new NodePgDatabase(dialect, session, schema);
   db2.$client = client;
@@ -77424,11 +77341,11 @@ var parseLogLevel = (maybeLevel, sourceName, client) => {
 };
 function noop2() {
 }
-function makeLogFn(fnLevel, logger4, logLevel) {
-  if (!logger4 || levelNumbers[fnLevel] > levelNumbers[logLevel]) {
+function makeLogFn(fnLevel, logger3, logLevel) {
+  if (!logger3 || levelNumbers[fnLevel] > levelNumbers[logLevel]) {
     return noop2;
   } else {
-    return logger4[fnLevel].bind(logger4);
+    return logger3[fnLevel].bind(logger3);
   }
 }
 var noopLogger2 = {
@@ -77439,22 +77356,22 @@ var noopLogger2 = {
 };
 var cachedLoggers = /* @__PURE__ */ new WeakMap();
 function loggerFor(client) {
-  const logger4 = client.logger;
+  const logger3 = client.logger;
   const logLevel = client.logLevel ?? "off";
-  if (!logger4) {
+  if (!logger3) {
     return noopLogger2;
   }
-  const cachedLogger = cachedLoggers.get(logger4);
+  const cachedLogger = cachedLoggers.get(logger3);
   if (cachedLogger && cachedLogger[0] === logLevel) {
     return cachedLogger[1];
   }
   const levelLogger = {
-    error: makeLogFn("error", logger4, logLevel),
-    warn: makeLogFn("warn", logger4, logLevel),
-    info: makeLogFn("info", logger4, logLevel),
-    debug: makeLogFn("debug", logger4, logLevel)
+    error: makeLogFn("error", logger3, logLevel),
+    warn: makeLogFn("warn", logger3, logLevel),
+    info: makeLogFn("info", logger3, logLevel),
+    debug: makeLogFn("debug", logger3, logLevel)
   };
-  cachedLoggers.set(logger4, [logLevel, levelLogger]);
+  cachedLoggers.set(logger3, [logLevel, levelLogger]);
   return levelLogger;
 }
 var formatRequestDetails = (details) => {
@@ -77488,7 +77405,7 @@ var Stream = class _Stream {
   }
   static fromSSEResponse(response, controller, client, synthesizeEventData) {
     let consumed = false;
-    const logger4 = client ? loggerFor(client) : console;
+    const logger3 = client ? loggerFor(client) : console;
     async function* iterator() {
       if (consumed) {
         throw new OpenAIError("Cannot iterate over a consumed stream, use `.tee()` to split the stream.");
@@ -77508,8 +77425,8 @@ var Stream = class _Stream {
             try {
               data = JSON.parse(sse.data);
             } catch (e) {
-              logger4.error(`Could not parse message into JSON:`, sse.data);
-              logger4.error(`From chunk:`, sse.raw);
+              logger3.error(`Could not parse message into JSON:`, sse.data);
+              logger3.error(`From chunk:`, sse.raw);
               throw e;
             }
             if (data && data.error) {
@@ -92617,7 +92534,7 @@ var routes_default = router22;
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
 var isProduction = process.env.NODE_ENV === "production";
-var logger3 = (0, import_pino.default)({
+var logger2 = (0, import_pino.default)({
   level: process.env.LOG_LEVEL ?? "info",
   redact: [
     "req.headers.authorization",
@@ -92637,7 +92554,7 @@ var app = (0, import_express24.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
-    logger: logger3,
+    logger: logger2,
     serializers: {
       req(req) {
         return {
@@ -92688,7 +92605,7 @@ app.use(import_express24.default.json());
 app.use(import_express24.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost2(
+    publishableKey: publishableKeyFromHost(
       getClerkProxyHost(req) ?? "",
       process.env.CLERK_PUBLISHABLE_KEY
     )
@@ -92710,7 +92627,7 @@ var CLERK_API_BASE = "https://api.clerk.com/v1";
 async function ensureClerkNativeRedirectUrls() {
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (!secretKey) {
-    logger3.warn("clerk redirect allowlist: CLERK_SECRET_KEY not set, skipping");
+    logger2.warn("clerk redirect allowlist: CLERK_SECRET_KEY not set, skipping");
     return;
   }
   const headers = {
@@ -92722,7 +92639,7 @@ async function ensureClerkNativeRedirectUrls() {
       headers
     });
     if (!listRes.ok) {
-      logger3.warn(
+      logger2.warn(
         { status: listRes.status },
         "clerk redirect allowlist: failed to list redirect URLs"
       );
@@ -92733,7 +92650,7 @@ async function ensureClerkNativeRedirectUrls() {
     const existingUrls = new Set(existing.map((r) => r.url));
     for (const url2 of NATIVE_REDIRECT_URLS) {
       if (existingUrls.has(url2)) {
-        logger3.info({ url: url2 }, "clerk redirect allowlist: already registered");
+        logger2.info({ url: url2 }, "clerk redirect allowlist: already registered");
         continue;
       }
       const createRes = await fetch(`${CLERK_API_BASE}/redirect_urls`, {
@@ -92742,17 +92659,17 @@ async function ensureClerkNativeRedirectUrls() {
         body: JSON.stringify({ url: url2 })
       });
       if (createRes.ok) {
-        logger3.info({ url: url2 }, "clerk redirect allowlist: registered");
+        logger2.info({ url: url2 }, "clerk redirect allowlist: registered");
       } else {
         const errText = await createRes.text().catch(() => "");
-        logger3.warn(
+        logger2.warn(
           { url: url2, status: createRes.status, error: errText.slice(0, 500) },
           "clerk redirect allowlist: failed to register"
         );
       }
     }
   } catch (err) {
-    logger3.warn({ err }, "clerk redirect allowlist: unexpected error");
+    logger2.warn({ err }, "clerk redirect allowlist: unexpected error");
   }
 }
 
@@ -92769,10 +92686,10 @@ if (Number.isNaN(port) || port <= 0) {
 }
 app_default.listen(port, (err) => {
   if (err) {
-    logger3.error({ err }, "Error listening on port");
+    logger2.error({ err }, "Error listening on port");
     process.exit(1);
   }
-  logger3.info({ port }, "Server listening");
+  logger2.info({ port }, "Server listening");
   void ensureClerkNativeRedirectUrls();
 });
 /*! Bundled license information:
