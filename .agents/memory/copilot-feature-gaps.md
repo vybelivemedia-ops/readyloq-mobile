@@ -1,32 +1,26 @@
 ---
-name: Co-Pilot feature gaps
-description: Implementation notes for the 4 Co-Pilot feature gaps completed in one session
+name: Co-Pilot animation and hardware camera patterns
+description: Durable decisions for CameraView zoom animation and external camera providers
 ---
 
-## T001 — Auto-zoom smooth animation
-- `handleCopilotZoom` uses `requestAnimationFrame` cubic-ease-out lerp (450 ms) into `setZoom`
-- A `zoomRef` tracks the running zoom value so a new AI command lerps FROM wherever the lens is, not from the snapped chip value
-- Manual tap calls `cancelAnimationFrame` on any in-flight animation before setting the new value
-- `expo-haptics` light impact fires once per AI zoom takeover
+## Smooth CameraView zoom without Reanimated animated props
+Drive `CameraView zoom=` via `requestAnimationFrame` + `useState`, not `useSharedValue`/`useAnimatedProps`.
+CameraView does not support animated props, so the rAF loop calling `setState` every frame is the right pattern.
+Track the running value in a `ref` so new AI commands lerp from the actual current position, not the last discrete chip value.
+Cancel any in-flight frame before starting a new animation.
 
-**Why:** CameraView zoom prop updates on every render; driving it via rAF state calls gives smooth hardware lens motion without Reanimated animated props.
+**Why:** Reanimated animated props require the host component to be wrapped in `Animated.createAnimatedComponent`; expo-camera's `CameraView` is not. rAF + setState is lighter and sidesteps the dependency.
 
-## T002 — Bait station tracking
-- Table: `bait_stations` (companyId, inspectionId, label, locationType, lat/lng text, status enum, notes, lastCheckedAt, createdAt)
-- DB pushed with `drizzle-kit push` (no migration files in this project)
-- API: `Router({ mergeParams: true })` — must type handlers as `async (req: Request<Params>, res)` to get proper `req.params` types; plain `req.params.x` is `{}` without this
-- Bait station panel lives in Co-Pilot overlay (wide + narrow) as a collapsible accordion below CoPilotHUD
+## External camera providers: prefer request_response over session_stream
+HTTP-still cameras (GoPro, IP cams, anything with a `/snapshot.jpg` endpoint) should be registered as `request_response` mode, not `session_stream`.
+Session mode requires implementing the full `CaptureSession` connect/end lifecycle; request mode works directly with the existing capture pipeline.
 
-## T003 — Offline/local AI
-- `useNetworkStatus` hook: `NetInfo.addEventListener` + initial `NetInfo.fetch()`, returns `{ isConnected, isInternetReachable }`
-- NetInfo was already wired into the sync engine (try/catch require pattern in `engine.ts`)
-- LocalWhisperProvider was already the default speech provider — no change needed
-- Offline banner rendered in capture UI when `isConnected` is false
+**Why:** session_stream is only needed for cameras that push a live video stream requiring explicit connect/disconnect lifecycle management.
 
-## T004 — Wi-Fi camera provider
-- `ProviderAvailability` is a discriminated union `{ available: true } | { available: false; reason: string }` — `reason` is required (not optional) on the false branch
-- wifi-camera-provider.ts: HTTP GET probe (3 s AbortController), Blob → FileReader → dataURL capture
-- GoPro detected by `10.5.5.9` in URL; generic cameras use `/snapshot.jpg`
-- Mode changed from `session_stream` to `request_response` — far simpler, works with existing capture pipeline without implementing CaptureSession
+## ProviderAvailability is a discriminated union — reason required on false branch
+`ProviderAvailability = { available: true } | { available: false; reason: string }`.
+The `reason` field is **required** (not optional) when `available: false`. A probe function returning `{ available: boolean; reason?: string }` will fail the TS assignability check.
 
-**How to apply:** Any future external camera using HTTP stills should use `request_response` mode unless true live streaming is needed.
+## Express mergeParams router params typing
+`Router({ mergeParams: true })` loses parent-segment params in the TS type.
+Fix: type each handler as `async (req: Request<ParamsType>, res)` where `ParamsType` maps the merged segment names.
