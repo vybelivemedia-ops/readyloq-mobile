@@ -2,21 +2,23 @@ const { getDefaultConfig } = require("expo/metro-config");
 const path = require("path");
 const fs = require("fs");
 
-const workspaceRoot = path.resolve(__dirname, "../..");
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, "../..");
 const platformPackagesRoot = path.resolve(workspaceRoot, "repos/platform/packages");
 const rootNodeModules = path.resolve(workspaceRoot, "node_modules");
 
-const config = getDefaultConfig(__dirname);
+const config = getDefaultConfig(projectRoot);
 
+const extraWatchFolders = [workspaceRoot];
 if (fs.existsSync(platformPackagesRoot)) {
-  config.watchFolders = [platformPackagesRoot];
+  extraWatchFolders.push(platformPackagesRoot);
 }
+config.watchFolders = extraWatchFolders;
 
 config.resolver = {
   ...config.resolver,
-  unstable_enableSymlinks: true,
   nodeModulesPaths: [
-    path.resolve(__dirname, "node_modules"),
+    path.resolve(projectRoot, "node_modules"),
     ...(fs.existsSync(rootNodeModules) ? [rootNodeModules] : []),
   ],
 };
