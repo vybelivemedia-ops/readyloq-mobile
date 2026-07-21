@@ -9,6 +9,27 @@ args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
 [workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Expo Dev Server"
+
+[[workflows.workflow]]
+name = "Expo Dev Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace/artifacts/readyloq-app && EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY node_modules/.bin/expo start --tunnel --clear"
 
 [agent]
 stack = "PNPM_WORKSPACE"
@@ -21,3 +42,6 @@ timeoutMs = 20000
 [nix]
 channel = "stable-25_05"
 packages = ["eas-cli"]
+
+[[ports]]
+localPort = 8081
