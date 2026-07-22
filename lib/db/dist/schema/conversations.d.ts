@@ -20,6 +20,23 @@ export declare const conversations: import("drizzle-orm/pg-core").PgTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        companyId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "company_id";
+            tableName: "conversations";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         title: import("drizzle-orm/pg-core").PgColumn<{
             name: "title";
             tableName: "conversations";
@@ -58,6 +75,7 @@ export declare const conversations: import("drizzle-orm/pg-core").PgTableWithCol
     dialect: "pg";
 }>;
 export declare const insertConversationSchema: z.ZodObject<{
+    companyId: z.ZodInt;
     title: z.ZodString;
 }, {
     out: {};

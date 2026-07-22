@@ -1,16 +1,22 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and } from "drizzle-orm";
 import { ai } from "@workspace/integrations-gemini-ai";
 import { generateImage } from "@workspace/integrations-gemini-ai/image";
+import { getCompanyId } from "../lib/tenant";
 
 const router: IRouter = Router();
 
 // GET /gemini/conversations
-router.get("/conversations", async (_req, res) => {
+router.get("/conversations", async (req: Request, res: Response) => {
   try {
-    const rows = await db.select().from(conversations).orderBy(asc(conversations.createdAt));
+    const companyId = getCompanyId(req);
+    const rows = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.companyId, companyId))
+      .orderBy(asc(conversations.createdAt));
     return res.json(
       rows.map((c) => ({
         id: c.id,
@@ -24,13 +30,14 @@ router.get("/conversations", async (_req, res) => {
 });
 
 // POST /gemini/conversations
-router.post("/conversations", async (req, res) => {
+router.post("/conversations", async (req: Request, res: Response) => {
   try {
+    const companyId = getCompanyId(req);
     const { title } = req.body as { title?: string };
     if (!title || typeof title !== "string") {
       return res.status(400).json({ error: "title is required" });
     }
-    const [row] = await db.insert(conversations).values({ title }).returning();
+    const [row] = await db.insert(conversations).values({ companyId, title }).returning();
     return res.status(201).json({
       id: row.id,
       title: row.title,
@@ -42,12 +49,16 @@ router.post("/conversations", async (req, res) => {
 });
 
 // GET /gemini/conversations/:id
-router.get("/conversations/:id", async (req, res) => {
+router.get("/conversations/:id", async (req: Request, res: Response) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(404).json({ error: "Not found" });
 
-    const [conv] = await db.select().from(conversations).where(eq(conversations.id, id));
+    const [conv] = await db
+      .select()
+      .from(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.companyId, companyId)));
     if (!conv) return res.status(404).json({ error: "Not found" });
 
     const msgs = await db
@@ -74,14 +85,15 @@ router.get("/conversations/:id", async (req, res) => {
 });
 
 // DELETE /gemini/conversations/:id
-router.delete("/conversations/:id", async (req, res) => {
+router.delete("/conversations/:id", async (req: Request, res: Response) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(404).json({ error: "Not found" });
 
     const deleted = await db
       .delete(conversations)
-      .where(eq(conversations.id, id))
+      .where(and(eq(conversations.id, id), eq(conversations.companyId, companyId)))
       .returning();
     if (!deleted.length) return res.status(404).json({ error: "Not found" });
 
@@ -92,10 +104,18 @@ router.delete("/conversations/:id", async (req, res) => {
 });
 
 // GET /gemini/conversations/:id/messages
-router.get("/conversations/:id/messages", async (req, res) => {
+router.get("/conversations/:id/messages", async (req: Request, res: Response) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(404).json({ error: "Not found" });
+
+    // Verify conversation belongs to caller's company before returning messages.
+    const [conv] = await db
+      .select()
+      .from(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.companyId, companyId)));
+    if (!conv) return res.status(404).json({ error: "Not found" });
 
     const msgs = await db
       .select()
@@ -118,7 +138,8 @@ router.get("/conversations/:id/messages", async (req, res) => {
 });
 
 // POST /gemini/conversations/:id/messages  (SSE stream)
-router.post("/conversations/:id/messages", async (req, res) => {
+router.post("/conversations/:id/messages", async (req: Request, res: Response) => {
+  const companyId = getCompanyId(req);
   const id = Number(req.params.id);
   if (isNaN(id)) return res.status(404).json({ error: "Not found" });
 
@@ -128,7 +149,10 @@ router.post("/conversations/:id/messages", async (req, res) => {
   }
 
   try {
-    const [conv] = await db.select().from(conversations).where(eq(conversations.id, id));
+    const [conv] = await db
+      .select()
+      .from(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.companyId, companyId)));
     if (!conv) return res.status(404).json({ error: "Not found" });
 
     // Save the user message
@@ -184,7 +208,7 @@ router.post("/conversations/:id/messages", async (req, res) => {
 });
 
 // POST /gemini/generate-image
-router.post("/generate-image", async (req, res) => {
+router.post("/generate-image", async (req: Request, res: Response) => {
   try {
     const { prompt } = req.body as { prompt?: string };
     if (!prompt || typeof prompt !== "string") {

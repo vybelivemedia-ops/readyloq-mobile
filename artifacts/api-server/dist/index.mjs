@@ -69543,11 +69543,16 @@ var salesProposalsTable = pgTable(
 );
 
 // ../../lib/db/src/schema/conversations.ts
-var conversations = pgTable("conversations", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
-});
+var conversations = pgTable(
+  "conversations",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id),
+    title: text("title").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (t) => [index("conversations_company_id_idx").on(t.companyId)]
+);
 var insertConversationSchema = createInsertSchema(conversations).omit({
   id: true,
   createdAt: true
@@ -92366,9 +92371,10 @@ async function generateImage(prompt) {
 
 // src/routes/gemini.ts
 var router21 = (0, import_express22.Router)();
-router21.get("/conversations", async (_req, res) => {
+router21.get("/conversations", async (req, res) => {
   try {
-    const rows = await db.select().from(conversations).orderBy(asc(conversations.createdAt));
+    const companyId = getCompanyId(req);
+    const rows = await db.select().from(conversations).where(eq(conversations.companyId, companyId)).orderBy(asc(conversations.createdAt));
     return res.json(
       rows.map((c) => ({
         id: c.id,
@@ -92382,11 +92388,12 @@ router21.get("/conversations", async (_req, res) => {
 });
 router21.post("/conversations", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const { title } = req.body;
     if (!title || typeof title !== "string") {
       return res.status(400).json({ error: "title is required" });
     }
-    const [row] = await db.insert(conversations).values({ title }).returning();
+    const [row] = await db.insert(conversations).values({ companyId, title }).returning();
     return res.status(201).json({
       id: row.id,
       title: row.title,
@@ -92398,9 +92405,10 @@ router21.post("/conversations", async (req, res) => {
 });
 router21.get("/conversations/:id", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(404).json({ error: "Not found" });
-    const [conv] = await db.select().from(conversations).where(eq(conversations.id, id));
+    const [conv] = await db.select().from(conversations).where(and(eq(conversations.id, id), eq(conversations.companyId, companyId)));
     if (!conv) return res.status(404).json({ error: "Not found" });
     const msgs = await db.select().from(messages).where(eq(messages.conversationId, id)).orderBy(asc(messages.createdAt));
     return res.json({
@@ -92421,9 +92429,10 @@ router21.get("/conversations/:id", async (req, res) => {
 });
 router21.delete("/conversations/:id", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(404).json({ error: "Not found" });
-    const deleted = await db.delete(conversations).where(eq(conversations.id, id)).returning();
+    const deleted = await db.delete(conversations).where(and(eq(conversations.id, id), eq(conversations.companyId, companyId))).returning();
     if (!deleted.length) return res.status(404).json({ error: "Not found" });
     return res.status(204).send();
   } catch {
@@ -92432,8 +92441,11 @@ router21.delete("/conversations/:id", async (req, res) => {
 });
 router21.get("/conversations/:id/messages", async (req, res) => {
   try {
+    const companyId = getCompanyId(req);
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(404).json({ error: "Not found" });
+    const [conv] = await db.select().from(conversations).where(and(eq(conversations.id, id), eq(conversations.companyId, companyId)));
+    if (!conv) return res.status(404).json({ error: "Not found" });
     const msgs = await db.select().from(messages).where(eq(messages.conversationId, id)).orderBy(asc(messages.createdAt));
     return res.json(
       msgs.map((m) => ({
@@ -92449,6 +92461,7 @@ router21.get("/conversations/:id/messages", async (req, res) => {
   }
 });
 router21.post("/conversations/:id/messages", async (req, res) => {
+  const companyId = getCompanyId(req);
   const id = Number(req.params.id);
   if (isNaN(id)) return res.status(404).json({ error: "Not found" });
   const { content } = req.body;
@@ -92456,7 +92469,7 @@ router21.post("/conversations/:id/messages", async (req, res) => {
     return res.status(400).json({ error: "content is required" });
   }
   try {
-    const [conv] = await db.select().from(conversations).where(eq(conversations.id, id));
+    const [conv] = await db.select().from(conversations).where(and(eq(conversations.id, id), eq(conversations.companyId, companyId)));
     if (!conv) return res.status(404).json({ error: "Not found" });
     await db.insert(messages).values({ conversationId: id, role: "user", content });
     const history = await db.select().from(messages).where(eq(messages.conversationId, id)).orderBy(asc(messages.createdAt));
