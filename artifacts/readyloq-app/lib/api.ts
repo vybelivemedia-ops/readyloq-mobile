@@ -108,3 +108,18 @@ export function requestUploadUrl(
     body: JSON.stringify(args),
   });
 }
+
+// ─── Inspection state transitions (not in generated client) ──────────────────
+
+export interface ReopenInspectionResult {
+  id: number;
+  status: string;
+  completedAt: string | null;
+  alreadyOpen: boolean;
+}
+
+export function reopenInspection(token: string | null, id: number) {
+  return request<ReopenInspectionResult>(`/api/inspections/${id}/reopen`, token, {
+    method: "POST",
+  });
+}

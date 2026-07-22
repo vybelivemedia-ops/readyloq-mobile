@@ -345,6 +345,87 @@ router.post("/:id/complete", async (req, res) => {
   }
 });
 
+// POST /inspections/:id/reopen — revert a completed inspection back to
+// 'pending' so the technician can add evidence or correct information.
+//
+// Permission: managers and owners may reopen any inspection in the company.
+// A technician may only reopen their own inspection (matched via clerkUserId
+// stored in technicianId at creation time). Returns 403 otherwise.
+// Idempotent: re-opening an already-pending inspection is a safe no-op.
+router.post("/:id/reopen", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [inspection] = await db
+      .select()
+      .from(inspectionsTable)
+      .where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+    if (!inspection) return res.status(404).json({ error: "Not found" });
+
+    // Permission: manager/owner may reopen any inspection; a technician may
+    // only reopen inspections where they are the original technician.
+    const user = req.user!;
+    const ROLE_RANK: Record<string, number> = { technician: 0, sales: 1, manager: 2, owner: 3 };
+    const isPrivileged = (ROLE_RANK[user.role] ?? 0) >= ROLE_RANK.manager;
+    const isOwnInspection = inspection.technicianId === user.clerkUserId;
+    if (!isPrivileged && !isOwnInspection) {
+      return res.status(403).json({
+        error: "You can only reopen your own inspections. Ask a manager or owner to reopen this one.",
+      });
+    }
+
+    // Already pending — idempotent no-op.
+    if (inspection.status !== "completed") {
+      const media = await db
+        .select()
+        .from(inspectionMediaTable)
+        .where(
+          and(
+            eq(inspectionMediaTable.companyId, companyId),
+            eq(inspectionMediaTable.inspectionId, id),
+          ),
+        );
+      return res.json({
+        ...inspection,
+        pestTypes: inspection.pestTypes ?? [],
+        media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        createdAt: inspection.createdAt.toISOString(),
+        completedAt: null,
+        alreadyOpen: true,
+      });
+    }
+
+    const [updated] = await db
+      .update(inspectionsTable)
+      .set({ status: "pending", completedAt: null })
+      .where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)))
+      .returning();
+    if (!updated) return res.status(404).json({ error: "Not found" });
+
+    const media = await db
+      .select()
+      .from(inspectionMediaTable)
+      .where(
+        and(
+          eq(inspectionMediaTable.companyId, companyId),
+          eq(inspectionMediaTable.inspectionId, id),
+        ),
+      );
+    return res.json({
+      ...updated,
+      pestTypes: updated.pestTypes ?? [],
+      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+      createdAt: updated.createdAt.toISOString(),
+      completedAt: null,
+      alreadyOpen: false,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to reopen inspection" });
+  }
+});
+
 // DELETE /inspections/:id
 router.delete("/:id", async (req, res) => {
   try {

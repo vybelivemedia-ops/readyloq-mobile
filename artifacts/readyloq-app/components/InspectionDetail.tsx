@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
   getGetInspectionQueryOptions,
@@ -8,7 +9,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 
 import { AuthedImage } from "@/components/AuthedImage";
 import { FindingCard } from "@/components/FindingCard";
@@ -20,6 +21,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { FullScreenLoader } from "@/components/ui/Loader";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   confidencePct,
   formatDate,
@@ -27,7 +29,7 @@ import {
   severityTone,
   statusTone,
 } from "@/constants/inspection";
-import { ApiError } from "@/lib/api";
+import { ApiError, reopenInspection } from "@/lib/api";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
 
 interface InspectionDetailProps {
@@ -40,6 +42,8 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const colors = useColors();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { getToken } = useAuth();
+  const { user } = useCurrentUser();
 
   const inspectionQ = useQuery(getGetInspectionQueryOptions(id));
   const analysisQ = useQuery(getListAnalysisResultsQueryOptions({ inspectionId: id }));
@@ -47,6 +51,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const analyze = useAnalyzeInspection();
   const genReport = useGenerateReport();
   const [error, setError] = useState<string | null>(null);
+  const [reopening, setReopening] = useState(false);
 
   const inspection = inspectionQ.data;
   const analysis = analysisQ.data?.[0];
@@ -84,6 +89,41 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
     } catch (e) {
       setError(e instanceof ApiError ? e.message : (e as Error).message);
     }
+  };
+
+  // A manager/owner can reopen any inspection; a technician can only reopen
+  // their own (matched via the clerkUserId stored in technicianId at creation).
+  const canReopen =
+    inspection?.status === "completed" &&
+    !!user &&
+    (["manager", "owner"].includes(user.role) ||
+      (user.role === "technician" && inspection.technicianId === user.clerkUserId));
+
+  const handleReopen = () => {
+    Alert.alert(
+      "Reopen inspection?",
+      "The inspection will return to in-progress so you can add photos or make corrections. Previous AI analysis and reports are kept.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reopen",
+          style: "destructive",
+          onPress: async () => {
+            setReopening(true);
+            setError(null);
+            try {
+              const token = await getToken();
+              await reopenInspection(token, id);
+              await queryClient.invalidateQueries();
+            } catch (e) {
+              setError(e instanceof ApiError ? e.message : "Failed to reopen inspection");
+            } finally {
+              setReopening(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   let body: React.ReactNode;
@@ -271,6 +311,17 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
           loading={genReport.isPending}
           onPress={createReport}
         />
+
+        {/* Reopen inspection — visible only when completed and caller has permission */}
+        {canReopen ? (
+          <Button
+            title="Reopen inspection"
+            variant="outline"
+            icon="lock-open-outline"
+            loading={reopening}
+            onPress={handleReopen}
+          />
+        ) : null}
       </ScrollView>
     );
   }
