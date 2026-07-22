@@ -5,11 +5,12 @@ import {
   getListAnalysisResultsQueryOptions,
   useAnalyzeInspection,
   useGenerateReport,
+  type Finding,
 } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { AuthedImage } from "@/components/AuthedImage";
 import { FindingCard } from "@/components/FindingCard";
@@ -29,8 +30,10 @@ import {
   severityTone,
   statusTone,
 } from "@/constants/inspection";
-import { ApiError, reopenInspection } from "@/lib/api";
+import { API_BASE, ApiError, reopenInspection } from "@/lib/api";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
+
+type ReviewAction = "accept" | "correct" | "dismiss";
 
 interface InspectionDetailProps {
   id: number;
@@ -52,6 +55,14 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const genReport = useGenerateReport();
   const [error, setError] = useState<string | null>(null);
   const [reopening, setReopening] = useState(false);
+
+  // ── Inline finding correction state ───────────────────────────────────────
+  // `reviewResults` maps findingId → action so FindingCard can highlight the
+  // chosen action immediately without waiting for a refetch.
+  const [reviewResults, setReviewResults] = useState<Record<number, ReviewAction>>({});
+  const [correctingFinding, setCorrectingFinding] = useState<Finding | null>(null);
+  const [customSpecies, setCustomSpecies] = useState("");
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   const inspection = inspectionQ.data;
   const analysis = analysisQ.data?.[0];
@@ -124,6 +135,64 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
         },
       ],
     );
+  };
+
+  // ── Finding correction handlers ────────────────────────────────────────────
+
+  /**
+   * Called from FindingCard when the technician taps Accept / Correct / Dismiss.
+   * For "correct" we open a modal to capture the species; the other two actions
+   * post immediately.
+   */
+  const handleFindingAction = (finding: Finding, action: ReviewAction) => {
+    if (action === "correct") {
+      setCorrectingFinding(finding);
+      setCustomSpecies(finding.species?.replace(/^Possible:\s*/i, "") ?? "");
+      return;
+    }
+    void submitReview(finding.id, action);
+  };
+
+  const submitReview = async (
+    findingId: number,
+    action: ReviewAction,
+    species?: string,
+  ) => {
+    const analysisId = analysis?.id;
+    if (!analysisId) return;
+    setReviewSaving(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/analysis/${analysisId}/findings/correct`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ findingId, action, technicianSpecies: species }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? "Failed to save review");
+      }
+      setReviewResults((prev) => ({ ...prev, [findingId]: action }));
+      await queryClient.invalidateQueries();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save review");
+    } finally {
+      setReviewSaving(false);
+    }
+  };
+
+  const handleSaveCorrection = () => {
+    if (!correctingFinding) return;
+    const species = customSpecies.trim();
+    if (!species) return;
+    const finding = correctingFinding;
+    setCorrectingFinding(null);
+    setCustomSpecies("");
+    void submitReview(finding.id, "correct", species);
   };
 
   let body: React.ReactNode;
@@ -273,7 +342,14 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                 </View>
               </Card>
 
-              {analysis.findings?.map((f) => <FindingCard key={f.id} finding={f} />)}
+              {analysis.findings?.map((f) => (
+                <FindingCard
+                  key={f.id}
+                  finding={f}
+                  onReview={(action) => handleFindingAction(f, action)}
+                  savedAction={reviewResults[f.id] ?? null}
+                />
+              ))}
 
               {analysis.recommendations?.length ? (
                 <Card style={{ gap: 8 }}>
@@ -326,15 +402,162 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
     );
   }
 
-  if (embedded) {
-    return <View style={{ flex: 1, paddingHorizontal: 16 }}>{body}</View>;
-  }
-
   return (
-    <Screen edges={["top"]} padded>
-      <TopBar onBack={() => router.back()} colors={colors} />
-      {body}
-    </Screen>
+    <>
+      {embedded ? (
+        <View style={{ flex: 1, paddingHorizontal: 16 }}>{body}</View>
+      ) : (
+        <Screen edges={["top"]} padded>
+          <TopBar onBack={() => router.back()} colors={colors} />
+          {body}
+        </Screen>
+      )}
+
+      {/* ── Species correction modal ─────────────────────────────────────────
+          Slides up from the bottom when the technician taps "Correct" on a
+          finding. Shows AI candidates (tappable) + free-text fallback so
+          the technician can always enter the right label even when all
+          candidates are wrong.
+      */}
+      <Modal
+        visible={correctingFinding !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setCorrectingFinding(null);
+          setCustomSpecies("");
+        }}
+      >
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <View
+            style={{
+              backgroundColor: colors.background,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              padding: 20,
+              gap: 14,
+            }}
+          >
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 18 }}>
+              Correct Species ID
+            </Text>
+
+            {(correctingFinding?.candidates ?? []).length > 0 ? (
+              <View style={{ gap: 8 }}>
+                <Text
+                  style={{
+                    color: colors.mutedForeground,
+                    fontFamily: "Inter_600SemiBold",
+                    fontSize: 12,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  AI Candidates
+                </Text>
+                {(correctingFinding?.candidates ?? []).map((c, i) => (
+                  <Pressable
+                    key={i}
+                    onPress={() => setCustomSpecies(c.species)}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: customSpecies === c.species ? colors.primary : colors.border,
+                      backgroundColor: customSpecies === c.species ? colors.primary + "11" : colors.card,
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 15 }}>
+                      {c.species}
+                    </Text>
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14 }}>
+                      {Math.round(c.confidence * 100)}%
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={{ gap: 6 }}>
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Enter correct species
+              </Text>
+              <TextInput
+                value={customSpecies}
+                onChangeText={setCustomSpecies}
+                placeholder="e.g. German Cockroach"
+                placeholderTextColor={colors.mutedForeground}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 8,
+                  padding: 12,
+                  color: colors.foreground,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 15,
+                  backgroundColor: colors.card,
+                }}
+                autoCapitalize="words"
+                returnKeyType="done"
+                onSubmitEditing={handleSaveCorrection}
+              />
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable
+                onPress={() => {
+                  setCorrectingFinding(null);
+                  setCustomSpecies("");
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: "center",
+                  backgroundColor: colors.muted,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSaveCorrection}
+                disabled={!customSpecies.trim() || reviewSaving}
+                style={{
+                  flex: 2,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: "center",
+                  backgroundColor:
+                    !customSpecies.trim() || reviewSaving
+                      ? colors.primary + "66"
+                      : colors.primary,
+                }}
+              >
+                <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+                  {reviewSaving ? "Saving…" : "Save Correction"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 

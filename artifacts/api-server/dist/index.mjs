@@ -88946,16 +88946,39 @@ router4.patch("/:id/findings/correct", async (req, res) => {
     if (!updated) return res.status(404).json({ error: "Not found" });
     const userId = req.user?.id;
     if (userId && findings[idx].imageUrl) {
+      const f = findings[idx];
       void db.insert(intelligenceRecordsTable).values({
         companyId,
-        imageUrl: findings[idx].imageUrl,
-        aiConfidence: findings[idx].confidence,
-        category: action !== "dismiss" ? findings[idx].category ?? null : null,
-        possiblePest: action === "correct" ? technicianSpecies?.trim() ?? null : action === "accept" ? findings[idx].species ?? null : null,
-        correctiveAction: findings[idx].treatment ?? null,
+        imageUrl: f.imageUrl,
+        // Full immutable snapshot of the AI's original prediction.
+        aiPrediction: {
+          category: f.category ?? null,
+          subcategory: null,
+          confidence: f.confidence,
+          tags: [],
+          possiblePest: f.species ?? null,
+          possibleConduciveCondition: f.conduciveCondition ?? null,
+          possibleEntryPoint: null,
+          suggestedCorrectiveAction: f.treatment ?? null,
+          rationale: f.description ?? null,
+          possibleLifeStage: f.lifeStage ?? null,
+          possibleHarborage: f.harborage ?? null,
+          possibleMoistureIssue: f.moisture ?? null,
+          possibleStructuralIssue: f.structuralIssue ?? null,
+          zone: f.zone ?? null,
+          // All AI candidate species for this finding (top-3, sorted by conf).
+          pestCandidates: f.candidates ?? []
+        },
+        aiConfidence: f.confidence,
+        // Ground-truth label after technician review.
+        category: action !== "dismiss" ? f.category ?? null : null,
+        possiblePest: action === "correct" ? technicianSpecies?.trim() ?? null : action === "accept" ? f.species ?? null : null,
+        correctiveAction: f.treatment ?? null,
         aiCorrected: action === "correct",
+        // L2 = technician review (L1 = AI only, L3 = peer-confirmed, L4/L5 = manager).
+        verificationLevel: 2,
         createdBy: userId
-      }).onConflictDoNothing().catch(() => {
+      }).catch(() => {
       });
     }
     return res.json(serializeResult(updated));
@@ -89997,6 +90020,49 @@ async function upsertVote(companyId, recordId, userId, vote) {
     set: { vote }
   });
 }
+router9.get("/corrections/export", requireRole("manager"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const { format } = req.query;
+    const rows = await db.select().from(intelligenceRecordsTable).where(eq(intelligenceRecordsTable.companyId, companyId)).orderBy(desc(intelligenceRecordsTable.createdAt));
+    const records = rows.map((r) => ({
+      id: r.id,
+      imageUrl: r.imageUrl,
+      // Original AI prediction snapshot (populated from finding correction flow).
+      aiPrediction: r.aiPrediction ?? null,
+      aiConfidence: r.aiConfidence ?? null,
+      // Technician-verified ground-truth labels.
+      groundTruth: {
+        category: r.category ?? null,
+        possiblePest: r.possiblePest ?? null,
+        possibleConduciveCondition: r.possibleConduciveCondition ?? null,
+        possibleEntryPoint: r.possibleEntryPoint ?? null,
+        correctiveAction: r.correctiveAction ?? null
+      },
+      // Was the AI prediction overridden by the technician? True = correction signal.
+      aiCorrected: r.aiCorrected ?? false,
+      verificationLevel: r.verificationLevel,
+      status: r.status,
+      approvedForTraining: r.approvedForTraining,
+      createdAt: r.createdAt.toISOString()
+    }));
+    const ts = Date.now();
+    if (format === "ndjson") {
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.setHeader("Content-Disposition", `attachment; filename="readyloq-corrections-${ts}.ndjson"`);
+      return res.send(records.map((r) => JSON.stringify(r)).join("\n"));
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="readyloq-corrections-${ts}.json"`);
+    return res.json({
+      exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      count: records.length,
+      records
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to export corrections" });
+  }
+});
 router9.get("/categories", async (req, res) => {
   try {
     const companyId = getCompanyId(req);

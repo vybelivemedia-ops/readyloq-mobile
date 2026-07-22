@@ -1,6 +1,6 @@
 ---
 name: AI review & correction workflow
-description: Finding schema additions, correction endpoint, mobile review screen, report intelligence for RLQ-001–011
+description: Finding schema additions, correction endpoint, mobile review screens, training dataset write-path, export endpoint
 ---
 
 ## Schema additions on Finding (lib/db/src/schema/analysis.ts)
@@ -19,11 +19,36 @@ description: Finding schema additions, correction endpoint, mobile review screen
 Stores feedback record to `intelligence_records` (best-effort, never blocks response).
 Created-by must be non-null; skip insert if `req.user?.id` is null.
 
-## Mobile findings review screen
+**aiPrediction JSONB must be populated** — the insert now includes the full structured
+snapshot: `{category, confidence, possiblePest (species), pestCandidates (candidates),
+conduciveCondition, lifeStage, harborage, moisture, structuralIssue, zone, rationale}`.
+Without this the (AI → human) correction delta is lost; it is the primary training signal.
+verificationLevel: 2 (technician-reviewed) is always set on these records.
+
+## Training dataset export
+`GET /api/intelligence-dataset/corrections/export` — manager+ only.
+Returns all `intelligence_records` for the company as JSON envelope (default) or NDJSON
+(?format=ndjson). Each record includes `aiPrediction`, `groundTruth`, `aiCorrected`,
+`approvedForTraining`, `imageUrl`. Ready for Label Studio / Roboflow / HuggingFace datasets.
+
+## Mobile findings review — local inspection flow
 `artifacts/readyloq-app/app/(app)/findings-review/[localId].tsx`
 - Loads analysis via `getListAnalysisResultsQueryOptions`
 - Tracks reviews locally; sends corrections on "Done"
 - Sets `record.allFindingsReviewed = true` on confirm
+
+## Mobile findings review — server-viewed inspection (InspectionDetail)
+`artifacts/readyloq-app/components/InspectionDetail.tsx`
+- `handleFindingAction(finding, action)` — "correct" opens species modal, others post immediately
+- `submitReview(findingId, action, species?)` — fetches `PATCH /api/analysis/:id/findings/correct`
+- `reviewResults` state maps findingId → action for immediate highlight without refetch
+- Correction modal shows AI candidates (tappable) + free-text input; same UX as findings-review screen
+
+## FindingCard (components/FindingCard.tsx)
+- Optional `onReview?: (action: "accept"|"correct"|"dismiss") => void` prop
+- Optional `savedAction?: ReviewAction | null` prop for highlighting the chosen action
+- Shows Accept / Correct / Dismiss buttons inline when `onReview` is provided
+- Shows review status badge (Accepted / Corrected / Dismissed) from `savedAction` OR `finding.reviewStatus`
 
 ## Gating in new-inspection.tsx
 - `reviewTick` state + `useFocusEffect` refresh `recordRef` when returning from review screen
@@ -37,3 +62,4 @@ Created-by must be non-null; skip insert if `req.user?.id` is null.
 - Adds `review=tech-corrected|tech-verified` annotation per finding in the prompt
 
 **Why:** Dismissed findings are AI false positives; including them would fabricate evidence in client reports. Corrected species must override AI guesses for regulatory/accuracy reasons.
+The aiPrediction snapshot is the stable, immutable signal for ML training — it must be written at correction time because the finding JSONB may later be mutated further.

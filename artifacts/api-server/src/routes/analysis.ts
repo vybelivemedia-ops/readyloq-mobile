@@ -730,27 +730,53 @@ router.patch("/:id/findings/correct", async (req, res) => {
       .returning();
     if (!updated) return res.status(404).json({ error: "Not found" });
 
-    // RLQ-004: store correction to intelligence_records (best-effort training signal).
+    // RLQ-004: store correction to intelligence_records as a training signal.
+    // We capture the FULL original AI prediction snapshot alongside the
+    // technician's ground-truth label so the (AI → human) delta is permanently
+    // preserved for future model fine-tuning. Best-effort: never blocks the
+    // PATCH response, never throws back to the client.
     const userId = req.user?.id;
     if (userId && findings[idx].imageUrl) {
+      const f = findings[idx];
       void db
         .insert(intelligenceRecordsTable)
         .values({
           companyId,
-          imageUrl: findings[idx].imageUrl!,
-          aiConfidence: findings[idx].confidence,
-          category: action !== "dismiss" ? (findings[idx].category ?? null) : null,
+          imageUrl: f.imageUrl!,
+          // Full immutable snapshot of the AI's original prediction.
+          aiPrediction: {
+            category: f.category ?? null,
+            subcategory: null,
+            confidence: f.confidence,
+            tags: [],
+            possiblePest: f.species ?? null,
+            possibleConduciveCondition: f.conduciveCondition ?? null,
+            possibleEntryPoint: null,
+            suggestedCorrectiveAction: f.treatment ?? null,
+            rationale: f.description ?? null,
+            possibleLifeStage: f.lifeStage ?? null,
+            possibleHarborage: f.harborage ?? null,
+            possibleMoistureIssue: f.moisture ?? null,
+            possibleStructuralIssue: f.structuralIssue ?? null,
+            zone: f.zone ?? null,
+            // All AI candidate species for this finding (top-3, sorted by conf).
+            pestCandidates: f.candidates ?? [],
+          },
+          aiConfidence: f.confidence,
+          // Ground-truth label after technician review.
+          category: action !== "dismiss" ? (f.category ?? null) : null,
           possiblePest:
             action === "correct"
               ? (technicianSpecies?.trim() ?? null)
               : action === "accept"
-                ? (findings[idx].species ?? null)
+                ? (f.species ?? null)
                 : null,
-          correctiveAction: findings[idx].treatment ?? null,
+          correctiveAction: f.treatment ?? null,
           aiCorrected: action === "correct",
+          // L2 = technician review (L1 = AI only, L3 = peer-confirmed, L4/L5 = manager).
+          verificationLevel: 2,
           createdBy: userId,
         })
-        .onConflictDoNothing()
         .catch(() => {});
     }
 

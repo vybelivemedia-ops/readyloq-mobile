@@ -235,6 +235,65 @@ async function upsertVote(
 }
 
 // ── GET /categories ──────────────────────────────────────────────────────────
+// GET /intelligence-dataset/corrections/export — manager+ only.
+// Returns every intelligence_record that originated from a technician finding
+// correction, formatted as a training dataset for custom vision model fine-tuning.
+// Supports ?format=ndjson (newline-delimited JSON) or default JSON envelope.
+// Each record includes the immutable aiPrediction snapshot, the technician's
+// ground-truth label, and the image URL so the data is immediately consumable
+// by standard ML tooling (Label Studio, Roboflow, HuggingFace datasets, etc.).
+router.get("/corrections/export", requireRole("manager"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const { format } = req.query;
+
+    const rows = await db
+      .select()
+      .from(intelligenceRecordsTable)
+      .where(eq(intelligenceRecordsTable.companyId, companyId))
+      .orderBy(desc(intelligenceRecordsTable.createdAt));
+
+    const records = rows.map((r) => ({
+      id: r.id,
+      imageUrl: r.imageUrl,
+      // Original AI prediction snapshot (populated from finding correction flow).
+      aiPrediction: r.aiPrediction ?? null,
+      aiConfidence: r.aiConfidence ?? null,
+      // Technician-verified ground-truth labels.
+      groundTruth: {
+        category: r.category ?? null,
+        possiblePest: r.possiblePest ?? null,
+        possibleConduciveCondition: r.possibleConduciveCondition ?? null,
+        possibleEntryPoint: r.possibleEntryPoint ?? null,
+        correctiveAction: r.correctiveAction ?? null,
+      },
+      // Was the AI prediction overridden by the technician? True = correction signal.
+      aiCorrected: r.aiCorrected ?? false,
+      verificationLevel: r.verificationLevel,
+      status: r.status,
+      approvedForTraining: r.approvedForTraining,
+      createdAt: r.createdAt.toISOString(),
+    }));
+
+    const ts = Date.now();
+    if (format === "ndjson") {
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.setHeader("Content-Disposition", `attachment; filename="readyloq-corrections-${ts}.ndjson"`);
+      return res.send(records.map((r) => JSON.stringify(r)).join("\n"));
+    }
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="readyloq-corrections-${ts}.json"`);
+    return res.json({
+      exportedAt: new Date().toISOString(),
+      count: records.length,
+      records,
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to export corrections" });
+  }
+});
+
 router.get("/categories", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
