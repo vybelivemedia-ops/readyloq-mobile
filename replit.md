@@ -99,6 +99,19 @@ settings pages, analytics, and administrative features come *after* these pillar
 
 - `readyloq-mobile/` is a decoy — the real app is `artifacts/readyloq-app`.
 
+## Developer setup
+
+### GitHub token (GH_TOKEN)
+
+Store a **classic Personal Access Token** in the `GH_TOKEN` secret with exactly these two scopes — no more:
+
+| Scope | Why |
+|---|---|
+| `repo` | Read/write access to private repositories (push, pull, clone) |
+| `workflow` | Update GitHub Actions workflow files |
+
+To generate one: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token (classic). Check only `repo` and `workflow`, then paste the value into the `GH_TOKEN` Replit secret. Rotate the token when it expires and keep the scopes the same.
+
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
