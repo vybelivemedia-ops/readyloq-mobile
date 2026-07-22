@@ -15,12 +15,30 @@ if (fs.existsSync(platformPackagesRoot)) {
 }
 config.watchFolders = extraWatchFolders;
 
+const homeDir = process.env.HOME || "/home/runner";
+const blockedPaths = [
+  path.join(homeDir, ".config"),
+  path.join(homeDir, ".npm"),
+  path.join(homeDir, ".nvm"),
+  path.join(homeDir, ".yarn"),
+  path.join(workspaceRoot, ".config"),
+  path.join(workspaceRoot, ".cache"),
+  path.join(workspaceRoot, ".git"),
+  path.join(workspaceRoot, "artifacts/readyloq-app/.expo"),
+];
+
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const blockListRegexes = blockedPaths.map(
+  (p) => new RegExp(`^${escapeRegex(p)}`)
+);
+
 config.resolver = {
   ...config.resolver,
   nodeModulesPaths: [
     path.resolve(projectRoot, "node_modules"),
     ...(fs.existsSync(rootNodeModules) ? [rootNodeModules] : []),
   ],
+  blockList: blockListRegexes,
 };
 
 config.transformer = {

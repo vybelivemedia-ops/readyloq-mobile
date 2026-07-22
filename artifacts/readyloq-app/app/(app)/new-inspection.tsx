@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   BackHandler,
   Pressable,
   ScrollView,
@@ -27,6 +28,9 @@ import { AiInsightsPanel } from "@/components/AiInsightsPanel";
 import { CoPilotHUD } from "@/components/CoPilotHUD";
 import { BaitStationPanel, type BaitStation } from "@/components/BaitStationPanel";
 import { WifiCameraModal } from "@/components/WifiCameraModal";
+import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
+import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
+import { useSmartGuidance } from "@/hooks/useSmartGuidance";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
@@ -114,6 +118,12 @@ export default function NewInspectionScreen() {
 
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
+
+  const guidance = useSmartGuidance({
+    propertyType,
+    photoCount: photos.length,
+    sessionActive: step === "capture",
+  });
   const [capturing, setCapturing] = useState(false);
   const [importing, setImporting] = useState(false);
   // Advisory warning from the on-device quality gate — auto-clears; never
@@ -490,6 +500,30 @@ export default function NewInspectionScreen() {
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, photos.length]);
+
+  // Task #36: Re-check camera permissions when the app returns to the foreground
+  // during an active capture session. useCameraPermissions is reactive, but an
+  // explicit AppState listener ensures the state is refreshed promptly so the
+  // camera-not-granted screen renders before the CameraView has a chance to error.
+  useEffect(() => {
+    if (step !== "capture") return;
+    const sub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        void requestPermission().catch(() => {
+          // Silently ignored — if the OS blocks the call (denied/never-ask-again),
+          // permission.granted will be false and the grant screen renders normally.
+        });
+      }
+    });
+    return () => sub.remove();
+  }, [step, requestPermission]);
+
+  // Notify smart guidance when a new photo is captured so it can track idle time.
+  useEffect(() => {
+    const latest = photos[photos.length - 1];
+    if (latest) guidance.notifyCapture(latest.uri);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos.length]);
 
   // Live report builder state. The report is created once per inspection and
   // its AI narrative regenerated (with a fresh findings snapshot) after every
@@ -1206,6 +1240,31 @@ export default function NewInspectionScreen() {
                 {qualityBanner}
                 {faieBanner}
                 {zoomChips}
+                <DeviceHealthStrip />
+                {guidance.text ? (
+                  <View
+                    style={{
+                      alignSelf: "stretch",
+                      backgroundColor: "rgba(23,196,211,0.08)",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      borderWidth: 1,
+                      borderColor: "rgba(23,196,211,0.2)",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#17c4d3",
+                        fontFamily: "Inter_400Regular",
+                        fontSize: 12,
+                        textAlign: "center",
+                      }}
+                    >
+                      {guidance.text}
+                    </Text>
+                  </View>
+                ) : null}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 28 }}>
                   {flashButton}
                   {importButton}
@@ -1258,6 +1317,15 @@ export default function NewInspectionScreen() {
                         onRemove={removeBaitStation}
                       />
                     )}
+                  </View>
+                  <View
+                    style={{
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                      padding: 12,
+                    }}
+                  >
+                    <MeasurementDevicePanel />
                   </View>
                 </View>
               ) : (
@@ -1425,6 +1493,33 @@ export default function NewInspectionScreen() {
               </View>
             )}
             <View style={{ alignItems: "center" }}>{zoomChips}</View>
+            {guidance.text ? (
+              <View
+                style={{
+                  marginHorizontal: 16,
+                  backgroundColor: "rgba(23,196,211,0.08)",
+                  borderRadius: 10,
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderWidth: 1,
+                  borderColor: "rgba(23,196,211,0.2)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#17c4d3",
+                    fontFamily: "Inter_400Regular",
+                    fontSize: 12,
+                    textAlign: "center",
+                  }}
+                >
+                  {guidance.text}
+                </Text>
+              </View>
+            ) : null}
+            <View style={{ alignItems: "center", paddingHorizontal: 16 }}>
+              <DeviceHealthStrip />
+            </View>
             <View
               style={{
                 flexDirection: "row",
@@ -1531,6 +1626,15 @@ export default function NewInspectionScreen() {
                     onRemove={removeBaitStation}
                   />
                 )}
+              </View>
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: colors.border + "55",
+                  padding: 12,
+                }}
+              >
+                <MeasurementDevicePanel />
               </View>
             </View>
           ) : (

@@ -21,3 +21,4 @@
 - [DB schema rebuild](db-schema-rebuild.md) — after editing lib/db/src/schema/*.ts, run `pnpm exec tsc --build lib/db/tsconfig.json` or api-server sees stale .d.ts
 - [whisper.rn integration](whisper-rn-integration.md) — v0.6.0 quirks: no root exports entry (add tsconfig paths), transcribeRealtime removed (use expo-av + transcribe(file)), expo-file-system legacy import
 - [EAS build from Replit sandbox](eas-sandbox-build.md) — workflow trick to bypass 120s bash timeout for eas build + pnpm install
+- [Capture screen production wiring](capture-screen-production.md) — DeviceHealthStrip + useSmartGuidance + MeasurementDevicePanel wired into new-inspection.tsx; AppState permission recheck; Expo ENOSPC fix = clear .expo + node_modules/.cache
