@@ -20,8 +20,26 @@
  *   ReadyLoq's lib/vision/types.ts re-exports them so all existing callers
  *   continue to work without change.
  *
+ * DEVICE-CORE ADOPTION (Phase 15 — @platform/device-core):
+ *   CaptureDeviceProvider enriches the camera provider contract with the
+ *   full DeviceProvider lifecycle: connect/disconnect, getStatus, checkHealth,
+ *   getPermissions, on/emit, initialize/teardown. All lifecycle methods are
+ *   optional so that existing plain-object providers (ReadyLoq's phone camera,
+ *   media import, WiFi grab) continue to compile without modification.
+ *   Implementations that connect to real hardware SHOULD implement them.
+ *
+ *   `captureCapabilities` is added alongside `capabilities` as the explicit
+ *   new name for camera-specific capabilities. `capabilities` (CaptureCapabilities)
+ *   is kept as-is for backward compat — ReadyLoq reads capabilities.mode,
+ *   capabilities.transport, etc.
+ *
+ *   CaptureProviderBase is retained as a backward-compat type alias.
+ *   RequestCaptureProvider, SessionCaptureProvider, PushCaptureProvider
+ *   are updated to extend CaptureDeviceProvider.
+ *
  * DEPENDENCY GRAPH:
  *   camera-core → shared-types → core
+ *   camera-core → device-core → provider-registry → core
  *   meta-wearables → camera-core   (wearable providers implement CaptureProvider)
  *
  * FUTURE WORK (not yet migrated):
@@ -30,7 +48,9 @@
  *   - KVAdapter decoupling from AsyncStorage → Phase 3
  */
 import type { CaptureCapabilities, CaptureMode, CaptureSource, EvidenceItem, PreviewKind, QualityAssessment } from "@platform/shared-types";
+import type { DeviceProvider } from "@platform/device-core";
 export type { CaptureCapabilities, CaptureMode, CaptureSource, EvidenceItem, PreviewKind, QualityAssessment, } from "@platform/shared-types";
+export type { DeviceProvider, DeviceCapabilities, DeviceCategory, DeviceTransport, DeviceIdentity, DeviceStatus, DeviceConnection, DeviceConnectionState, DeviceOperationalStatus, DeviceBattery, DeviceThermal, DevicePermissions, DeviceFirmware, DeviceDiagnostics, DeviceEvent, DeviceEventKind, DeviceEventListener, } from "@platform/device-core";
 /** Whether a source is usable on THIS device right now. */
 export type ProviderAvailability = {
     available: true;
@@ -67,18 +87,65 @@ export type EvidenceIntake = (items: EvidenceItem[], ctx: {
     providerId: string;
     source: CaptureSource;
 }) => Promise<void>;
-/** Common fields shared by every capture provider. */
-export type CaptureProviderBase = {
-    id: string;
-    source: CaptureSource;
-    label: string;
-    capabilities: CaptureCapabilities;
+/**
+ * The device-grounded base type for all camera providers.
+ *
+ * Derived from DeviceProvider via `Partial<Omit<DeviceProvider, ...>>` so that
+ * ALL DeviceProvider lifecycle members — including checkHealth() — are declared
+ * on this type while remaining optional. This preserves full backward compat:
+ *
+ *   1. Existing plain-object providers (ReadyLoq's phone camera, media import,
+ *      WiFi grab) only supply `id`, `source`, `label`, `capabilities` and
+ *      continue to compile without any modification.
+ *   2. New real-hardware implementations (BLE glasses, USB scope, WiFi IP camera)
+ *      SHOULD implement the full lifecycle for proper DeviceRegistry integration.
+ *
+ * Required camera fields (backward compat from CaptureProviderBase):
+ *   id, source, label, capabilities (CaptureCapabilities)
+ *
+ * Camera-specific overrides vs. DeviceProvider:
+ *   capabilities → CaptureCapabilities (not DeviceCapabilities) so that callers
+ *     reading capabilities.mode / capabilities.transport still compile.
+ *   id, name are excluded from the Partial base and re-declared here so they
+ *     carry the correct optionality (id: required; name: optional).
+ *
+ * Optional device lifecycle declared (implement for hardware providers):
+ *   connect, disconnect, getStatus, checkHealth, getPermissions,
+ *   getFirmware, getDiagnostics, on, emit, initialize, teardown,
+ *   identity, priority.
+ */
+export type CaptureDeviceProvider = Partial<Omit<DeviceProvider, "id" | "name" | "capabilities">> & {
+    readonly id: string;
+    readonly source: CaptureSource;
+    /** Human-readable display label. */
+    readonly label: string;
+    /**
+     * Camera-specific capabilities (CaptureCapabilities, not DeviceCapabilities).
+     * Retained under the existing key for full backward compat with callers
+     * that read `capabilities.mode`, `capabilities.transport`, etc.
+     */
+    readonly capabilities: CaptureCapabilities;
+    /**
+     * Camera-specific capabilities under the explicit new name.
+     * Same data as `capabilities`; present on providers that adopt
+     * CaptureDeviceProvider. Optional so plain-object providers compile.
+     */
+    readonly captureCapabilities?: CaptureCapabilities;
+    /** DeviceProvider: human-readable display name (alias of label). */
+    readonly name?: string;
 };
+/**
+ * Backward-compat alias — identical to CaptureDeviceProvider.
+ *
+ * All pre-existing imports of `CaptureProviderBase` continue to compile.
+ * @see CaptureDeviceProvider
+ */
+export type CaptureProviderBase = CaptureDeviceProvider;
 /**
  * Pull model: phone camera, library import, USB/Wi-Fi still-grab.
  * The provider is stateless between captures.
  */
-export type RequestCaptureProvider = CaptureProviderBase & {
+export type RequestCaptureProvider = CaptureDeviceProvider & {
     /**
      * Resolves with zero or more evidence items — zero when the user cancels,
      * several for multi-select imports. MUST throw on real failures (never
@@ -96,7 +163,7 @@ export type CaptureSession = {
  * Session model: connection-oriented live streams (USB scope, Wi-Fi/drone).
  * The provider maintains a persistent connection for the session lifetime.
  */
-export type SessionCaptureProvider = CaptureProviderBase & {
+export type SessionCaptureProvider = CaptureDeviceProvider & {
     previewKind: PreviewKind;
     /** Open the connection; frames grabbed later flow through `intake`. */
     connect: (intake: EvidenceIntake) => Promise<CaptureSession>;
@@ -109,7 +176,7 @@ export type PushCaptureSession = {
  * Push model: the device initiates capture (glasses, wearables, BLE sensors).
  * Evidence arrives asynchronously through `intake` as the device captures.
  */
-export type PushCaptureProvider = CaptureProviderBase & {
+export type PushCaptureProvider = CaptureDeviceProvider & {
     /** Start listening; the device pushes evidence through `intake` as it arrives. */
     startSession: (intake: EvidenceIntake) => Promise<PushCaptureSession>;
 };

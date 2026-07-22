@@ -13,7 +13,8 @@
 - [Co-Pilot feature gaps](copilot-feature-gaps.md) — zoom lerp (rAF cubic ease-out), bait_stations table + CRUD API, useNetworkStatus hook + offline banner, WifiCameraModal + wifi-camera-provider.ts
 - [Gemini AI integration wiring](gemini-ai-wiring.md) — Replit-managed proxy (no user key); @google/genai must be a direct api-server dep because esbuild externalizes @google/* and pnpm doesn't hoist it
 - [Platform OS architecture](platform-os-architecture.md) — 12-package platform in repos/platform/; platform-intelligence is the OS kernel; asset-core (not property-core); GOVERNANCE.md enforces the boundary
-- [Platform migration state](platform-migration-state.md) — ALL 15 PACKAGES COMPLETE (Phases 0–14); roadmap: @platform/device-core as Phase 15 (new package unifying hardware interfaces)
+- [Platform migration state](platform-migration-state.md) — ALL 15 PACKAGES COMPLETE (Phases 0–14); device-core adopted in camera-core, voice-intelligence, measurement-core, meta-wearables (Phase 15 DONE)
+- [Platform package build setup](platform-package-build.md) — tsconfig pattern; @platform/core exports fixed to dist/; CaptureDeviceProvider lifecycle optional for compat
 - [smart-vision Sprint 1](smart-vision-sprint1.md) — @platform/smart-vision complete (16 source files, typecheck clean); DetectionEngine is model-agnostic; CapturePolicy is pluggable; GuidanceCodes are generic signal codes only
 - [smart-vision Live Session Engine](smart-vision-live-session.md) — Privacy stage uses PrivacyProvider.detect() directly (no stable IDs); FramePipeline/FrameDropPolicy omit from top-level barrel (name clash); stage runner contract notes
 - [AI review & correction workflow](ai-review-correction.md) — Finding schema (candidates/confidenceLabel/reviewStatus/technicianSpecies); db rebuild process; report filters dismissed findings

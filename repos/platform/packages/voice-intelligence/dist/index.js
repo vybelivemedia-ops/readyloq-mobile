@@ -13,8 +13,15 @@
  *     — voice commands for stream control ("go live", "end stream")
  *     — AI transcription of stream audio for auto-captioning
  *
+ * DEVICE-CORE ADOPTION (Phase 15 — @platform/device-core):
+ *   MicrophoneDeviceProvider extends DeviceProvider, giving microphone hardware
+ *   the full device lifecycle: connect/disconnect, status, health checks,
+ *   permissions, and events. VoiceRecorder extends MicrophoneDeviceProvider so
+ *   the microphone hardware interface participates in the device registry.
+ *
  * DEPENDENCY GRAPH:
  *   voice-intelligence → shared-types
+ *   voice-intelligence → device-core → provider-registry → core
  *   voice-intelligence → ai-core  (transcription uses AIProvider)
  *   camera-core does NOT depend on voice-intelligence — they are parallel
  *   capture channels that both produce EvidenceItem-like artefacts.
@@ -29,4 +36,3 @@
  *     in the consuming app, not in this package).
  */
 export {};
-//# sourceMappingURL=index.js.map

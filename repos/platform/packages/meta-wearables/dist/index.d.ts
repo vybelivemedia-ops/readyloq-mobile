@@ -2,7 +2,7 @@
  * @platform/meta-wearables
  *
  * Wearable device provider stubs — smart glasses, BLE cameras, USB cameras,
- * WiFi cameras. Implements camera-core's CaptureProviderBase interface.
+ * WiFi cameras. Implements DeviceProvider as its device foundation.
  *
  * CANONICAL SOURCE:
  *   repos/readyloq-mobile/artifacts/readyloq-app/lib/vision/provider-registry.ts
@@ -19,6 +19,14 @@
  *   which runs on the device camera. Meta wearables could eventually be used
  *   by VYBE creators to stream from a first-person perspective.
  *
+ * DEVICE-CORE ADOPTION (Phase 15 — @platform/device-core):
+ *   WearableProvider now extends DeviceProvider directly, gaining the full
+ *   device lifecycle: connect/disconnect, getStatus, checkHealth, getPermissions,
+ *   on/emit, initialize/teardown. The hand-rolled connect/disconnect/isConnected
+ *   fields are superseded by DeviceProvider's contract; isConnected is kept as
+ *   a convenience getter. WearableRegistry extends DeviceDiscovery, mapping
+ *   discover() to scan() semantics.
+ *
  * INTEGRATION ROADMAP (from ReadyLoq roadmap comments):
  *   Phase Next:
  *     - Meta Ray-Ban smart glasses → react-native-ble-plx BLE notify stream
@@ -28,10 +36,13 @@
  *     - Generic wearable camera (heart-rate + video, e.g. Polar Verity)
  *
  * DEPENDENCY GRAPH:
+ *   meta-wearables → device-core → provider-registry → core
  *   meta-wearables → camera-core → shared-types
  */
 import type { CaptureCapabilities, CaptureSource } from "@platform/shared-types";
-import type { CaptureProviderBase, ProviderAvailability } from "@platform/camera-core";
+import type { DeviceProvider, DeviceDiscovery } from "@platform/device-core";
+import type { ProviderAvailability } from "@platform/camera-core";
+export type { DeviceProvider, DeviceCapabilities, DeviceCategory, DeviceTransport, DeviceIdentity, DeviceStatus, DeviceConnectionState, DevicePermissions, DeviceEvent, DeviceEventKind, DeviceDiscovery, } from "@platform/device-core";
 /**
  * Extended metadata present on all wearable providers.
  */
@@ -45,17 +56,44 @@ export interface WearableProviderMeta {
     /** Battery level 0–100, if the hardware exposes it. */
     batteryLevel?: number;
 }
-export interface WearableProvider extends CaptureProviderBase {
+/**
+ * Wearable device provider.
+ *
+ * Extends DeviceProvider directly — the wearable IS a device and
+ * DeviceProvider's connect/disconnect replaces the old hand-rolled versions.
+ *
+ * categories: ["wearable", "camera"] for smart glasses; ["wearable"] for
+ * health-band wearables without a camera.
+ *
+ * isConnected is a convenience getter derived from:
+ *   getStatus().connection.state === "connected"
+ * It is retained for backward compat with existing callers.
+ */
+export interface WearableProvider extends DeviceProvider {
     readonly meta: WearableProviderMeta;
-    /** Pair/connect to the hardware. Separate from initialize() for UX flow. */
-    connect(): Promise<void>;
-    disconnect(): Promise<void>;
+    /**
+     * Convenience accessor — true when connection.state === "connected".
+     * Prefer getStatus() for full connection detail.
+     */
     readonly isConnected: boolean;
+    /** Camera-specific capture capabilities, if the wearable has a camera. */
+    readonly captureCapabilities?: CaptureCapabilities;
+    /** Capture source identifier for camera-bearing wearables. */
+    readonly source?: CaptureSource;
 }
-export interface WearableRegistry {
+/**
+ * Registry for wearable devices.
+ *
+ * Extends DeviceDiscovery — WearableRegistry.discover() maps semantically to
+ * DeviceDiscovery.scan() over BLE/USB/WiFi transports. The discover() method
+ * is preserved as the domain-specific entry point; implementations delegate
+ * to scan() internally.
+ */
+export interface WearableRegistry extends DeviceDiscovery {
     /**
      * Scan for nearby wearable devices (BLE scan, USB enumeration, mDNS).
      * Returns discovered devices that have NOT yet been registered.
+     * Internally delegates to DeviceDiscovery.scan() over supported transports.
      */
     discover(timeoutMs?: number): Promise<WearableProvider[]>;
     register(provider: WearableProvider): void;
@@ -71,6 +109,8 @@ export interface WearableRegistry {
  *             the phone receives the frame via BLE notification.
  *
  * Canonical: future-source-providers.ts "smart-glasses" entry
+ *
+ * DeviceCapabilities: categories: ["wearable", "camera"], transports: ["ble"]
  */
 export declare const SMART_GLASSES_CAPABILITIES: CaptureCapabilities;
 export declare const SMART_GLASSES_SOURCE: CaptureSource;
@@ -82,6 +122,8 @@ export declare const SMART_GLASSES_SOURCE: CaptureSource;
  * Mode:       session_stream (MJPEG live feed; grab stills on demand)
  *
  * Canonical: future-source-providers.ts "usb-camera" entry
+ *
+ * DeviceCapabilities: categories: ["camera"], transports: ["usb"]
  */
 export declare const USB_CAMERA_CAPABILITIES: CaptureCapabilities;
 export declare const USB_CAMERA_SOURCE: CaptureSource;
@@ -93,6 +135,8 @@ export declare const USB_CAMERA_SOURCE: CaptureSource;
  * Mode:       session_stream (MJPEG or H.264 over WebSocket)
  *
  * Canonical: future-source-providers.ts "wifi-camera" entry (source: "wifi_stream")
+ *
+ * DeviceCapabilities: categories: ["camera"], transports: ["wifi"]
  */
 export declare const WIFI_CAMERA_CAPABILITIES: CaptureCapabilities;
 export declare const WIFI_CAMERA_SOURCE: CaptureSource;
@@ -103,6 +147,8 @@ export declare const WIFI_CAMERA_SOURCE: CaptureSource;
  * Transport: BLE (primary — async_push; frames push in as recorded).
  *
  * Canonical: future-source-providers.ts "wearable-camera" entry
+ *
+ * DeviceCapabilities: categories: ["wearable", "camera"], transports: ["ble"]
  */
 export declare const WEARABLE_CAMERA_CAPABILITIES: CaptureCapabilities;
 export declare const WEARABLE_CAMERA_SOURCE: CaptureSource;

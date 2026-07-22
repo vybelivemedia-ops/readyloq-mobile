@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@platform/camera-core": "workspace:*",
+    "@platform/device-core": "workspace:*",
     "@platform/shared-types": "workspace:*"
   },
   "devDependencies": {

@@ -1,3 +1,4 @@
+"use strict";
 /**
  * @platform/device-core
  *
@@ -45,5 +46,4 @@
  *   The application layer assigns meaning (e.g. "capture.photo", "sensor.temperature").
  *   DeviceProfile.settings is Record<string, unknown> — the app defines the schema.
  */
-export {};
-//# sourceMappingURL=index.js.map
+Object.defineProperty(exports, "__esModule", { value: true });

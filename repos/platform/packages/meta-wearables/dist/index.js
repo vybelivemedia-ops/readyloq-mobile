@@ -2,7 +2,7 @@
  * @platform/meta-wearables
  *
  * Wearable device provider stubs — smart glasses, BLE cameras, USB cameras,
- * WiFi cameras. Implements camera-core's CaptureProviderBase interface.
+ * WiFi cameras. Implements DeviceProvider as its device foundation.
  *
  * CANONICAL SOURCE:
  *   repos/readyloq-mobile/artifacts/readyloq-app/lib/vision/provider-registry.ts
@@ -19,6 +19,14 @@
  *   which runs on the device camera. Meta wearables could eventually be used
  *   by VYBE creators to stream from a first-person perspective.
  *
+ * DEVICE-CORE ADOPTION (Phase 15 — @platform/device-core):
+ *   WearableProvider now extends DeviceProvider directly, gaining the full
+ *   device lifecycle: connect/disconnect, getStatus, checkHealth, getPermissions,
+ *   on/emit, initialize/teardown. The hand-rolled connect/disconnect/isConnected
+ *   fields are superseded by DeviceProvider's contract; isConnected is kept as
+ *   a convenience getter. WearableRegistry extends DeviceDiscovery, mapping
+ *   discover() to scan() semantics.
+ *
  * INTEGRATION ROADMAP (from ReadyLoq roadmap comments):
  *   Phase Next:
  *     - Meta Ray-Ban smart glasses → react-native-ble-plx BLE notify stream
@@ -28,6 +36,7 @@
  *     - Generic wearable camera (heart-rate + video, e.g. Polar Verity)
  *
  * DEPENDENCY GRAPH:
+ *   meta-wearables → device-core → provider-registry → core
  *   meta-wearables → camera-core → shared-types
  */
 // ─── Smart Glasses (Meta Ray-Ban) — async_push / BLE ────────────────────────
@@ -40,6 +49,8 @@
  *             the phone receives the frame via BLE notification.
  *
  * Canonical: future-source-providers.ts "smart-glasses" entry
+ *
+ * DeviceCapabilities: categories: ["wearable", "camera"], transports: ["ble"]
  */
 export const SMART_GLASSES_CAPABILITIES = {
     mode: "async_push",
@@ -60,6 +71,8 @@ export const SMART_GLASSES_SOURCE = "smart_glasses";
  * Mode:       session_stream (MJPEG live feed; grab stills on demand)
  *
  * Canonical: future-source-providers.ts "usb-camera" entry
+ *
+ * DeviceCapabilities: categories: ["camera"], transports: ["usb"]
  */
 export const USB_CAMERA_CAPABILITIES = {
     mode: "session_stream",
@@ -78,6 +91,8 @@ export const USB_CAMERA_SOURCE = "usb_camera";
  * Mode:       session_stream (MJPEG or H.264 over WebSocket)
  *
  * Canonical: future-source-providers.ts "wifi-camera" entry (source: "wifi_stream")
+ *
+ * DeviceCapabilities: categories: ["camera"], transports: ["wifi"]
  */
 export const WIFI_CAMERA_CAPABILITIES = {
     mode: "session_stream",
@@ -95,6 +110,8 @@ export const WIFI_CAMERA_SOURCE = "wifi_stream";
  * Transport: BLE (primary — async_push; frames push in as recorded).
  *
  * Canonical: future-source-providers.ts "wearable-camera" entry
+ *
+ * DeviceCapabilities: categories: ["wearable", "camera"], transports: ["ble"]
  */
 export const WEARABLE_CAMERA_CAPABILITIES = {
     mode: "async_push",
@@ -148,4 +165,3 @@ export const FUTURE_WEARABLE_PROVIDERS = [
         estimatedRelease: "2026",
     },
 ];
-//# sourceMappingURL=index.js.map

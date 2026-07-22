@@ -13,8 +13,15 @@
  *     — voice commands for stream control ("go live", "end stream")
  *     — AI transcription of stream audio for auto-captioning
  *
+ * DEVICE-CORE ADOPTION (Phase 15 — @platform/device-core):
+ *   MicrophoneDeviceProvider extends DeviceProvider, giving microphone hardware
+ *   the full device lifecycle: connect/disconnect, status, health checks,
+ *   permissions, and events. VoiceRecorder extends MicrophoneDeviceProvider so
+ *   the microphone hardware interface participates in the device registry.
+ *
  * DEPENDENCY GRAPH:
  *   voice-intelligence → shared-types
+ *   voice-intelligence → device-core → provider-registry → core
  *   voice-intelligence → ai-core  (transcription uses AIProvider)
  *   camera-core does NOT depend on voice-intelligence — they are parallel
  *   capture channels that both produce EvidenceItem-like artefacts.
@@ -28,6 +35,22 @@
  *   - VoiceCommandRouter maps recognised phrases to typed Commands (app-defined
  *     in the consuming app, not in this package).
  */
+
+import type { DeviceProvider } from "@platform/device-core";
+
+// ─── Re-export device-core types needed by voice consumers ───────────────────
+export type {
+  DeviceProvider,
+  DeviceCapabilities,
+  DeviceCategory,
+  DeviceTransport,
+  DeviceIdentity,
+  DeviceStatus,
+  DevicePermissions,
+  DeviceEvent,
+  DeviceEventKind,
+  DeviceEventListener,
+} from "@platform/device-core";
 
 // ─── Voice capture ────────────────────────────────────────────────────────────
 
@@ -52,9 +75,58 @@ export interface VoiceCapture {
   fileSize: number;
 }
 
+// ─── MicrophoneDeviceProvider — DeviceProvider foundation for microphones ────
+
+/**
+ * Device provider interface for physical microphone hardware.
+ *
+ * Extends DeviceProvider giving every microphone provider the full device
+ * lifecycle: connect/disconnect, getStatus, checkHealth, getPermissions,
+ * on/emit, initialize/teardown. Registered in the DeviceRegistry under
+ * categories: ["microphone"].
+ *
+ * Implementations include:
+ *   - Built-in phone microphone (transport: "internal")
+ *   - BLE headset microphone (transport: "ble")
+ *   - USB microphone (transport: "usb")
+ *   - WiFi broadcast microphone (transport: "wifi")
+ */
+export interface MicrophoneDeviceProvider extends DeviceProvider {
+  /**
+   * Microphone-specific capabilities.
+   * DeviceCapabilities.categories must include "microphone".
+   * DeviceCapabilities.producesMedia must be true.
+   */
+  readonly microphoneCapabilities: MicrophoneCapabilities;
+}
+
+/**
+ * Microphone-specific capability metadata.
+ */
+export interface MicrophoneCapabilities {
+  /** Maximum supported sample rate in Hz. */
+  maxSampleRateHz: number;
+  /** Supported audio MIME types. */
+  supportedMimeTypes: string[];
+  /** Whether the device supports always-on voice activity detection. */
+  supportsVoiceActivityDetection: boolean;
+  /** Whether the device supports noise cancellation. */
+  supportsNoiseCancellation: boolean;
+  /** Number of audio channels supported. */
+  channelCount: number;
+}
+
 // ─── Recorder interface ───────────────────────────────────────────────────────
 
-export interface VoiceRecorder {
+/**
+ * Voice recorder hardware interface.
+ *
+ * Extends MicrophoneDeviceProvider so implementations participate in the
+ * full device lifecycle (connect/disconnect, health checks, permissions,
+ * events) while also exposing the voice-capture-specific API:
+ * requestPermission, start, stop, cancel, onStatusChange.
+ */
+export interface VoiceRecorder extends MicrophoneDeviceProvider {
   readonly status: VoiceCaptureStatus;
   /** Request microphone permission. */
   requestPermission(): Promise<boolean>;

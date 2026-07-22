@@ -20,8 +20,26 @@
  *   ReadyLoq's lib/vision/types.ts re-exports them so all existing callers
  *   continue to work without change.
  *
+ * DEVICE-CORE ADOPTION (Phase 15 — @platform/device-core):
+ *   CaptureDeviceProvider enriches the camera provider contract with the
+ *   full DeviceProvider lifecycle: connect/disconnect, getStatus, checkHealth,
+ *   getPermissions, on/emit, initialize/teardown. All lifecycle methods are
+ *   optional so that existing plain-object providers (ReadyLoq's phone camera,
+ *   media import, WiFi grab) continue to compile without modification.
+ *   Implementations that connect to real hardware SHOULD implement them.
+ *
+ *   `captureCapabilities` is added alongside `capabilities` as the explicit
+ *   new name for camera-specific capabilities. `capabilities` (CaptureCapabilities)
+ *   is kept as-is for backward compat — ReadyLoq reads capabilities.mode,
+ *   capabilities.transport, etc.
+ *
+ *   CaptureProviderBase is retained as a backward-compat type alias.
+ *   RequestCaptureProvider, SessionCaptureProvider, PushCaptureProvider
+ *   are updated to extend CaptureDeviceProvider.
+ *
  * DEPENDENCY GRAPH:
  *   camera-core → shared-types → core
+ *   camera-core → device-core → provider-registry → core
  *   meta-wearables → camera-core   (wearable providers implement CaptureProvider)
  *
  * FUTURE WORK (not yet migrated):
@@ -30,4 +48,3 @@
  *   - KVAdapter decoupling from AsyncStorage → Phase 3
  */
 export {};
-//# sourceMappingURL=index.js.map

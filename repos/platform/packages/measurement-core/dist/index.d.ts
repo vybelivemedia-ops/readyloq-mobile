@@ -1,69 +1,95 @@
 /**
  * @platform/measurement-core
  *
- * Generic computer vision measurement for the platform.
+ * Measurement and metrics abstractions — units, conversions, calibration,
+ * dimension estimation from images, and physical hardware device contracts.
  *
- * PURPOSE:
- *   Provide every platform application with the ability to estimate
- *   real-world measurements (width, height, depth, area, volume, distance,
- *   angle, slope) from images, video, or depth data.
+ * STATUS: New package — interfaces extracted from ReadyLoq measurement roadmap.
  *
- * SCOPE CONSTRAINT (explicit):
- *   This package is domain-agnostic. Zero domain logic.
- *   - NO pest inspection logic (gap scoring, rodent-hole classification)
- *   - NO proposal pricing or material estimation rules
- *   - NO streaming / studio / camera-placement logic
- *   "Object to measure", "what the measurement means", and "what to do with it"
- *   are ALL defined by the consuming application.
+ * TWO MEASUREMENT PARADIGMS:
+ *   1. Software / AI inference  — MeasurementInferenceProvider (no hardware)
+ *      Uses computer vision + monocular depth to estimate dimensions from photos.
+ *      ReadyLoq's primary path: photo → reference object detection → scale → estimate.
  *
- * WHY SEPARATE FROM ai-core + local-intelligence (see ADR-014):
- *   ai-core = stateless AI orchestration (providers, sessions, pipelines)
- *   local-intelligence = on-device ML runtime (model lifecycle, inference engine)
- *   measurement-core = DOMAIN of measuring things in images. It coordinates
- *   geometry, optics, calibration, reference objects, depth estimation, and
- *   evidence annotation — concerns that cross-cut every inference engine.
- *   Mixing this into ai-core or local-intelligence would bloat those packages
- *   with geometry and optics knowledge.
+ *   2. Physical hardware        — MeasurementDeviceProvider (extends DeviceProvider)
+ *      Moisture meters, laser distance meters, thermal imagers, environmental
+ *      sensors. Plugged in via BLE/USB/wired; readings arrive as structured data.
  *
- * INFERENCE INTEGRATION:
- *   measurement-core does NOT import ai-core or local-intelligence.
- *   Instead it defines `MeasurementInferenceProvider` — a narrow interface
- *   that `LocalAIProvider` (from local-intelligence) and cloud providers
- *   both satisfy. Applications inject the provider at initialisation.
+ * DEVICE-CORE ADOPTION (Phase 15 — @platform/device-core):
+ *   MeasurementDeviceProvider extends DeviceProvider, giving every physical
+ *   measurement instrument the full device lifecycle: connect/disconnect,
+ *   getStatus, checkHealth, getPermissions, on/emit, initialize/teardown.
+ *   MeasurementInferenceProvider stays unchanged — it is software, not hardware.
  *
- *   Recommended injection pattern:
- *     new MeasurementEngine({
- *       inferenceProvider: myLocalAIProvider,  // or cloud provider
- *       calibration: calibrationService,
- *       ...
- *     })
+ * DEPENDENCY GRAPH:
+ *   measurement-core → shared-types
+ *   measurement-core → device-core → provider-registry → core
  *
- * APPLICATION INTEGRATION (examples):
- *   ReadyLoq: measure gap widths, rodent hole diameters, pipe diameters,
- *             window gap clearances, door sweep heights.
- *             The MEANING of the measurement (is the gap big enough for a mouse?)
- *             is defined in readyloq-mobile — NOT here.
- *   VYBE:     measure scene dimensions, camera-to-subject distances, studio
- *             layout for optimal camera placement.
- *   Future:   construction, insurance, facilities, security.
- *
- * DEPENDENCY GRAPH (Level 3 in the platform DAG):
- *   measurement-core → shared-types   (ConfidenceResult, EvidenceItem)
- *   measurement-core → camera-core    (CaptureFrame image input types)
- *   measurement-core → storage-core   (CalibrationStore, MeasurementHistoryStore)
- *   measurement-core → evidence-core  (MeasurementAnnotation → EvidenceItem)
- *
- *   Does NOT import: ai-core, local-intelligence, platform-intelligence
- *   (all three are integrated at runtime via injection or plugin registration)
+ * FUTURE WORK:
+ *   - Concrete adapters for Protimeter, Fluke, FLIR (extracted from ReadyLoq)
+ *   - Calibration service implementation
+ *   - AR anchor calibration path
  */
-import type { ConfidenceResult } from "@platform/shared-types";
-/** The physical quantity being measured. */
-export type MeasurementKind = "width" | "height" | "depth" | "diameter" | "circumference" | "area" | "volume" | "distance" | "angle" | "slope" | "perimeter" | "thickness";
-/** SI and Imperial units, selected by the consuming application. */
-export type MeasurementUnit = "mm" | "cm" | "m" | "km" | "in" | "ft" | "yd" | "mi" | "mm2" | "cm2" | "m2" | "km2" | "in2" | "ft2" | "yd2" | "mm3" | "cm3" | "m3" | "in3" | "ft3" | "deg" | "rad" | "ratio";
+import type { DeviceProvider } from "@platform/device-core";
+export type { DeviceProvider, DeviceCapabilities, DeviceCategory, DeviceTransport, DeviceIdentity, DeviceStatus, DevicePermissions, DeviceEvent, DeviceEventKind, DeviceEventListener, } from "@platform/device-core";
+export type MeasurementKind = "width" | "height" | "depth" | "diameter" | "radius" | "length" | "perimeter" | "area" | "volume" | "angle" | "distance" | "thickness";
+export type MeasurementUnit = "mm" | "cm" | "m" | "in" | "ft" | "yd" | "mm2" | "cm2" | "m2" | "in2" | "ft2" | "mm3" | "cm3" | "m3" | "in3" | "ft3" | "deg";
+export type MeasurementMethod = "single_image_reference" | "stereo_depth" | "monocular_depth" | "ar_anchored" | "hardware_sensor" | "manual";
+export type CalibrationStatus = "uncalibrated" | "focal_length_auto" | "reference_object" | "ar_anchored" | "hardware_calibrated" | "manual";
 /**
- * A 2D bounding region in a normalised image coordinate space (0–1).
- * Used to scope measurements to a specific part of the image.
+ * Camera calibration profile used to convert pixel distances to real-world
+ * measurements. Derived from EXIF data, reference objects, or AR anchors.
+ */
+export interface CalibrationProfile {
+    id: string;
+    status: CalibrationStatus;
+    /** Focal length in millimetres (from EXIF or manufacturer spec). */
+    focalLengthMm?: number;
+    /** Physical sensor width in millimetres. */
+    sensorWidthMm?: number;
+    /** Image width in pixels at the time of calibration. */
+    imageWidthPx: number;
+    /**
+     * Derived scale factor: pixels per real-world millimetre.
+     * The core quantity used in all dimension calculations.
+     */
+    pixelsPerMm?: number;
+    /** Confidence in this calibration profile (0–1). */
+    calibrationConfidence: number;
+    /** ISO-8601 creation timestamp. */
+    createdAt: string;
+    /** Raw EXIF JSON from the reference capture, if available. */
+    exifJson?: string;
+}
+export type ReferenceObjectKind = "credit_card" | "us_dollar" | "a4_paper" | "letter_paper" | "coin_quarter" | "coin_dime" | "coin_nickel" | "coin_penny" | "custom";
+/**
+ * A known-dimension object used as a scale reference in images.
+ * Detection of these objects enables reference_object calibration.
+ */
+export interface ReferenceObject {
+    kind: ReferenceObjectKind;
+    /** Real-world width in millimetres. */
+    widthMm: number;
+    /** Real-world height in millimetres. */
+    heightMm: number;
+    /** Where the object was detected in the image (normalised 0–1 coords). */
+    boundingRegion?: BoundingRegion;
+    /** Confidence score for the detection (0–1). */
+    detectionConfidence?: number;
+}
+/** Normalised image coordinates (0–1 relative to image dimensions). */
+export interface ImagePoint {
+    x: number;
+    y: number;
+}
+/** A closed or open polygon defined by normalised image coordinates. */
+export interface ImagePolygon {
+    points: ImagePoint[];
+    isClosed: boolean;
+}
+/**
+ * A normalised axis-aligned bounding box.
+ * All values 0–1 relative to image dimensions.
  */
 export interface BoundingRegion {
     x: number;
@@ -71,569 +97,232 @@ export interface BoundingRegion {
     width: number;
     height: number;
 }
-/** A single point in normalised image coordinates. */
-export interface ImagePoint {
-    x: number;
-    y: number;
-}
-/** A polygon defined by a sequence of 2D image points (normalised 0–1). */
-export interface ImagePolygon {
-    points: ImagePoint[];
-    /** True if the last point connects back to the first. */
-    isClosed: boolean;
-}
-/** A 3D point in world coordinates (metres from origin). */
-export interface WorldPoint3D {
-    x: number;
-    y: number;
-    z: number;
-    unit: MeasurementUnit;
-}
-/**
- * A reference object is any item of known real-world dimensions visible in
- * the frame. The measurement engine uses it to establish a pixel-to-mm scale.
- *
- * Standard objects are pre-populated in `ReferenceObjectService`. Applications
- * can add custom reference objects (e.g. a labelled calibration card, a
- * proprietary inspection target).
- */
-export type ReferenceObjectKind = "credit_card" | "us_dollar_bill" | "us_letter_paper" | "a4_paper" | "us_electrical_outlet" | "standard_brick" | "standard_door" | "ping_pong_ball" | "golf_ball" | "us_quarter_coin" | "human_hand" | "custom";
-export interface ReferenceObject {
-    id: string;
-    kind: ReferenceObjectKind;
-    name: string;
-    /** Known width in the specified unit. */
-    knownWidth: number;
-    /** Known height in the specified unit. */
-    knownHeight: number;
-    /** Known depth (thickness) in the specified unit, if applicable. */
-    knownDepth?: number;
-    unit: MeasurementUnit;
-    /**
-     * How reliable this reference object is for establishing scale.
-     * credit_card = high; human_hand = low.
-     */
-    reliabilityScore: number;
-    /** Whether this reference object is built-in (platform) or custom (app). */
-    isBuiltIn: boolean;
-}
-export type CalibrationStatus = "uncalibrated" | "focal_length_auto" | "reference_object" | "manual" | "depth_map" | "ar_anchored" | "lidar" | "stereo" | "wearable_sensor";
-/**
- * A calibration profile stores the optical and scale parameters needed to
- * convert pixel measurements to real-world dimensions.
- *
- * Profiles are persisted via storage-core and can be cached per device model
- * or camera session.
- */
-export interface CalibrationProfile {
-    id: string;
-    status: CalibrationStatus;
-    /**
-     * Effective focal length in mm (from EXIF, device spec, or manual entry).
-     * Required for single-image estimation from known camera parameters.
-     */
-    focalLengthMm?: number;
-    /**
-     * Physical sensor width in mm.
-     * Required for single-image estimation together with focalLengthMm.
-     */
-    sensorWidthMm?: number;
-    /**
-     * Image width in pixels (recorded at calibration time).
-     * Used to derive pixels-per-mm from focalLengthMm + sensorWidthMm.
-     */
-    imageWidthPx?: number;
-    /**
-     * Direct pixel-to-mm scale factor (pixels per millimetre).
-     * Derived from reference object or directly from camera spec.
-     */
-    pixelsPerMm?: number;
-    /** Reference object used to establish scale, if any. */
-    referenceObject?: ReferenceObject;
-    /** Bounding region of the reference object in the calibration image. */
-    referenceRegion?: BoundingRegion;
-    /**
-     * Device model string (e.g. "Apple iPhone 15 Pro").
-     * Stored for cache invalidation when the device changes.
-     */
-    deviceModel?: string;
-    /**
-     * Confidence in the calibration: 0–1.
-     * AR/LiDAR/stereo = 0.95+; focal-length auto = 0.7; uncalibrated = 0.
-     */
-    calibrationConfidence: number;
-    createdAt: string;
-    /** Calibration should be re-validated after this time (ISO-8601). */
-    expiresAt?: string;
-    metadata?: Record<string, unknown>;
-}
-export type MeasurementMethod = "single_image_ml" | "single_image_reference" | "single_image_focal" | "multi_image_triangulate" | "video_tracking" | "depth_map_projection" | "ar_world_coordinates" | "lidar_scan" | "stereo_camera" | "wearable_sensor" | "manual_annotation" | "hybrid";
 export interface MeasurementConfidence {
-    /**
-     * Overall confidence in the measurement: 0–1.
-     * High (0.9+): AR/LiDAR, high-quality reference object with good lighting.
-     * Medium (0.6–0.9): Reference object detected, moderate conditions.
-     * Low (<0.6): Pure ML estimation, poor lighting, no reference object.
-     */
+    /** Overall confidence score (0–1). */
     score: number;
-    /** The method that produced this measurement. */
+    /** Method used to derive this estimate. */
     method: MeasurementMethod;
-    /** What established the scale / depth reference. */
+    /** Calibration quality underlying this estimate. */
     calibrationStatus: CalibrationStatus;
-    /**
-     * Human-readable warnings. Applications may surface these to users.
-     * Examples: "poor lighting", "partial reference object occlusion",
-     *           "image blur may reduce accuracy", "no calibration — ML estimate only"
-     */
+    /** Human-readable warnings (e.g. "No reference object detected"). */
     warnings: string[];
-    /**
-     * Uncertainty band: half the 90% confidence interval.
-     * E.g. if value=25mm and uncertainty=3mm, the true value is likely 22–28mm.
-     * Undefined if the method cannot produce a statistical uncertainty.
-     */
-    uncertaintyMm?: number;
+    /** Estimated measurement uncertainty in millimetres. */
+    uncertaintyMm: number;
 }
 /**
- * A single measured quantity — the core value object of measurement-core.
- * Every measurement that exits the system is a DimensionEstimate.
+ * A single dimensional measurement estimate.
+ * Always advisory — never the sole basis for a safety-critical decision.
  */
 export interface DimensionEstimate {
     kind: MeasurementKind;
     value: number;
     unit: MeasurementUnit;
-    /** Lower bound of the 90% confidence interval (in the same unit). */
+    /** Lower bound of the confidence interval (same unit as value). */
     lowerBound?: number;
-    /** Upper bound of the 90% confidence interval (in the same unit). */
+    /** Upper bound of the confidence interval (same unit as value). */
     upperBound?: number;
     confidence: MeasurementConfidence;
-    /**
-     * Pixel span (in the source image) that corresponds to this measurement.
-     * Useful for drawing measurement overlays at the correct scale.
-     */
-    pixelSpan?: number;
-    /** The image region where the measurement was taken. */
-    sourceRegion?: BoundingRegion;
 }
-/**
- * An object detected in the image that can be measured.
- * The `label` is a generic string — domain-specific naming (e.g. "rodent hole",
- * "pipe", "window") happens in the consuming application.
- */
-export interface DetectedMeasurableObject {
-    id: string;
-    /** Generic label from the detection model (e.g. "circular opening", "gap"). */
-    label: string;
-    detectionConfidence: ConfidenceResult;
-    boundingRegion: BoundingRegion;
-    /** Polygon outline (more precise than bounding box). */
-    outline?: ImagePolygon;
-    /** Preliminary size estimate from the detector alone (low confidence). */
-    preliminaryEstimate?: DimensionEstimate;
-}
-export type MeasurementInputKind = "image_bytes" | "image_base64" | "video_frames" | "depth_map" | "point_cloud";
-export interface DepthMap {
-    /** Float32 depth values in metres, row-major, same size as the RGB image. */
-    depthValues: number[];
-    width: number;
-    height: number;
-    /** Minimum valid depth value in metres. */
-    minDepthM: number;
-    /** Maximum valid depth value in metres. */
-    maxDepthM: number;
-}
-export interface MeasurementInput {
-    kind: MeasurementInputKind;
-    imageBytes?: Uint8Array;
-    imageBase64?: string;
-    imageMimeType?: string;
-    /** Width of the source image in pixels. */
-    imageWidthPx?: number;
-    /** Height of the source image in pixels. */
-    imageHeightPx?: number;
-    /** EXIF data for focal length extraction (JSON-serialised). */
+export type MeasurementInput = {
+    kind: "image_base64";
+    imageBase64: string;
+    imageMimeType: string;
+    imageWidthPx: number;
+    imageHeightPx: number;
     exifJson?: string;
-    /** For video_frames: ordered array of base64-encoded frames. */
-    videoFrames?: string[];
-    /** Aligned depth map (same resolution as the colour image). */
-    depthMap?: DepthMap;
-    /** For point_cloud: array of [x, y, z] world-coordinate triples (metres). */
-    pointCloud?: number[][];
-}
-/**
- * Narrow AI inference interface injected into MeasurementEngine.
- *
- * measurement-core does NOT import ai-core or local-intelligence directly.
- * Instead, both `LocalAIProvider` (from @platform/local-intelligence) and
- * cloud AIProvider implementations (from @platform/ai-core) satisfy this
- * interface — applications inject whichever they have available.
- *
- * The two operations measurement-core needs:
- *   detectObjects — run a detection model to find measurable objects
- *   estimateDepth — run a monocular depth estimation model
- *
- * Both accept image bytes (base64) and return generic JSON.
- */
-export interface MeasurementInferenceProvider {
-    /** Whether this provider is available right now (network/model-ready check). */
-    isAvailable(): boolean;
-    /** True if this provider works without a network connection. */
-    worksOffline: boolean;
-    /**
-     * Run an object detection model on an image.
-     * Returns raw model output; MeasurementEngine parses the specific format.
-     */
-    detectObjects(input: {
-        imageBase64: string;
-        modelId?: string;
-        minConfidence?: number;
-    }): Promise<MeasurementDetectionOutput>;
-    /**
-     * Run a monocular depth estimation model on an image.
-     * Returns a depth map aligned to the input image.
-     */
-    estimateDepth(input: {
-        imageBase64: string;
-        modelId?: string;
-    }): Promise<MeasurementDepthOutput>;
-}
-/** Raw output from the detection inference call. */
-export interface MeasurementDetectionOutput {
-    detections: Array<{
-        label: string;
-        confidence: number;
-        /** Normalised bounding box [x, y, width, height] (0–1). */
-        box: [number, number, number, number];
-    }>;
-    modelId: string;
-    latencyMs: number;
-}
-/** Raw output from the depth estimation inference call. */
-export interface MeasurementDepthOutput {
-    /** Float32 relative depth values (not absolute metres — requires calibration). */
-    relativeDepthValues: number[];
-    width: number;
-    height: number;
-    modelId: string;
-    latencyMs: number;
-}
+} | {
+    kind: "image_uri";
+    imageUri: string;
+    imageWidthPx?: number;
+    imageHeightPx?: number;
+    exifJson?: string;
+} | {
+    kind: "depth_map";
+    depthMap: DepthMap;
+    referenceImageUri?: string;
+} | {
+    kind: "hardware_reading";
+    /** Raw reading from a physical measurement device. */
+    rawValue: number;
+    unit: MeasurementUnit;
+    deviceId: string;
+};
 export interface MeasurementRequest {
     id: string;
-    /** What to measure. Pass multiple kinds to measure in a single pass. */
     kinds: MeasurementKind[];
     input: MeasurementInput;
-    /**
-     * If provided, the engine uses this reference object to establish pixel scale.
-     * Higher priority than the calibration profile's reference object.
-     */
+    /** Reference object to use for scale calibration. */
     referenceObject?: ReferenceObject;
-    /**
-     * ID of a previously stored CalibrationProfile to use.
-     * If omitted, the engine tries EXIF focal length, then ML estimation.
-     */
+    /** Calibration profile to apply. Omit to auto-detect from EXIF. */
     calibrationProfileId?: string;
-    /**
-     * Preferred measurement method. If omitted, the engine picks the best
-     * available method based on input type and calibration status.
-     */
-    preferredMethod?: MeasurementMethod;
-    /**
-     * Restrict detection and measurement to this region of the image.
-     * Useful for focused measurements (e.g. "measure only the gap at the bottom
-     * of this door", not the whole door).
-     */
-    targetRegion?: BoundingRegion;
-    /**
-     * Target unit for all returned measurements.
-     * Defaults to millimetres for length, mm² for area, mm³ for volume.
-     */
-    outputUnit?: MeasurementUnit;
-    useCache?: boolean;
-    priority?: "high" | "normal" | "low";
-    metadata?: Record<string, unknown>;
+    useCache: boolean;
+    priority: "low" | "normal" | "high";
 }
 export interface MeasurementResult {
     requestId: string;
-    /** All dimension estimates produced for this request. */
     estimates: DimensionEstimate[];
-    /** Objects detected in the image that were used for measurement. */
-    detectedObjects: DetectedMeasurableObject[];
-    /** The calibration profile used (auto-created if none was provided). */
+    /** Reference objects detected during inference (for calibration feedback). */
+    detectedObjects: ReferenceObject[];
     calibrationProfile: CalibrationProfile;
-    /** The primary method used for this measurement. */
     method: MeasurementMethod;
-    /** Whether this result was served from the cache. */
+    /** True when result was served from cache. */
     cached: boolean;
     latencyMs: number;
     measuredAt: string;
-    metadata?: Record<string, unknown>;
 }
 /**
- * Attaches a set of measurements to an EvidenceItem from evidence-core.
- *
- * Multiple annotations may exist per evidence item (e.g. initial auto-estimate,
- * then a corrected manual measurement). The `version` field tracks revisions.
- * Only one annotation is `isActive = true` at any time.
- *
- * EXTRACTION NOTE:
- *   ReadyLoq: MeasurementAnnotation is attached to an inspection photo
- *             (EvidenceItem). The annotation records the gap measurement
- *             or hole diameter that informed the technician's report.
- *   VYBE:     MeasurementAnnotation is attached to a stream screenshot or
- *             venue photo. The annotation records scene or studio dimensions.
+ * A measurement annotation attached to a specific evidence item.
+ * Supports versioning: each revision creates a new version; only the
+ * highest isActive version is considered current.
  */
 export interface MeasurementAnnotation {
     id: string;
-    /** The evidence item this annotation belongs to. */
     evidenceItemId: string;
-    /**
-     * App-defined entity type (e.g. "inspection", "stream_session", "venue").
-     * Used for searching and grouping annotations.
-     */
-    entityType: string;
-    entityId: string;
-    /** All measurements on this evidence item at this version. */
-    estimates: DimensionEstimate[];
-    /** The image region these measurements apply to (optional). */
-    annotatedRegion?: BoundingRegion;
-    /** The request that produced these measurements. */
-    requestId: string;
-    /** Method used. */
-    method: MeasurementMethod;
-    /** Calibration profile used. */
-    calibrationProfileId?: string;
-    /** Version number. Starts at 1; increments on correction. */
+    result: MeasurementResult;
+    /** Monotonically increasing version counter. Starts at 1. */
     version: number;
-    /** True for the most recent, authoritative version. */
+    /** True for the current (highest) version; false for superseded versions. */
     isActive: boolean;
-    /** Reason for this version (e.g. "manual correction by technician"). */
-    revisionReason?: string;
-    /** User ID of the person who created or revised this annotation. */
-    authorId?: string;
-    notes?: string;
     createdAt: string;
-    updatedAt: string;
+    createdBy?: string;
+    notes?: string;
 }
 export interface MeasurementHistoryRecord {
     id: string;
-    annotation: MeasurementAnnotation;
-    /** The evidence item being measured. */
     evidenceItemId: string;
-    /** App-defined entity type and ID (for search scoping). */
-    entityType: string;
-    entityId: string;
-    createdAt: string;
+    annotation: MeasurementAnnotation;
+    revisedAt?: string;
 }
 export interface MeasurementHistorySearchFilter {
-    entityType?: string;
-    entityId?: string;
     evidenceItemId?: string;
-    kinds?: MeasurementKind[];
-    /** Only return the active annotation per evidence item. */
-    activeOnly?: boolean;
-    /** ISO-8601 start of date range. */
-    after?: string;
-    /** ISO-8601 end of date range. */
-    before?: string;
-    limit?: number;
-    offset?: number;
+    inspectionId?: string;
+    zoneId?: string;
+    method?: MeasurementMethod;
+    minConfidence?: number;
+    since?: string;
+    until?: string;
+    includeSuperseded?: boolean;
 }
 /**
- * Extracts and stores calibration data for a camera or session.
- *
- * Auto-calibration priority order:
- *   1. AR world coordinates (highest accuracy)
- *   2. LiDAR / stereo camera
- *   3. Reference object detected in frame
- *   4. EXIF focal length + sensor width from device spec
- *   5. ML depth estimation (lowest accuracy; no reference)
- *
- * Calibration profiles are stored via storage-core and keyed by device model
- * + camera type so they can be reused across sessions.
+ * Monocular depth estimation output.
+ * Values are relative depth (not absolute distance) unless calibrated.
  */
-export interface CalibrationService {
+export interface DepthMap {
+    /** Width of the depth map in pixels. */
+    width: number;
+    /** Height of the depth map in pixels. */
+    height: number;
     /**
-     * Attempt to auto-calibrate from the provided image and optional reference
-     * object. Returns a CalibrationProfile at whatever accuracy the input allows.
+     * Row-major depth values. Length = width * height.
+     * Values are relative (0 = near, 1 = far) unless absoluteScaleMm is set.
      */
-    autoCalibrate(input: {
-        image: MeasurementInput;
-        referenceObject?: ReferenceObject;
-        inferenceProvider?: MeasurementInferenceProvider;
-    }): Promise<CalibrationProfile>;
-    /**
-     * Create a calibration profile from a manually provided reference measurement.
-     * E.g. "I know this doorway is 914mm wide; here's where it is in the image."
-     */
-    calibrateFromManualReference(input: {
-        knownDimensionMm: number;
-        pixelSpan: number;
-        imageWidthPx: number;
-        imageHeightPx: number;
-    }): CalibrationProfile;
-    /** Retrieve a stored calibration profile. */
-    get(profileId: string): Promise<CalibrationProfile | null>;
-    /** Save or update a calibration profile. */
-    save(profile: CalibrationProfile): Promise<CalibrationProfile>;
-    /** Delete a calibration profile. */
-    delete(profileId: string): Promise<void>;
-    /**
-     * Find the best available calibration profile for a device model.
-     * Returns null if no profile exists (MeasurementEngine falls back to ML).
-     */
-    findBestForDevice(deviceModel: string): Promise<CalibrationProfile | null>;
+    data: Float32Array;
+    /** If known, the scale factor to convert relative depth to millimetres. */
+    absoluteScaleMm?: number;
+    /** Which depth model produced this map. */
+    modelId?: string;
 }
 /**
- * Manages the library of reference objects and detects them in images.
- *
- * Built-in reference objects are pre-populated. Applications can register
- * custom reference objects (e.g. a branded inspection calibration card with
- * a known size).
+ * Output from an object detection pass (reference objects found in image).
  */
-export interface ReferenceObjectService {
-    /** All built-in reference objects. */
-    listBuiltIn(): ReferenceObject[];
-    /** Register a custom reference object for the current application context. */
-    registerCustom(obj: Omit<ReferenceObject, "id" | "isBuiltIn">): ReferenceObject;
-    /** Retrieve a reference object by ID. */
-    get(id: string): ReferenceObject | undefined;
-    /**
-     * Attempt to detect a known reference object in the provided image.
-     * The inference provider runs the detection model. Returns the best match
-     * and its bounding region in the image, or null if nothing is recognised.
-     */
-    detectInImage(input: {
-        image: MeasurementInput;
-        inferenceProvider: MeasurementInferenceProvider;
-        candidates?: ReferenceObject[];
-    }): Promise<{
-        referenceObject: ReferenceObject;
-        region: BoundingRegion;
-        confidence: number;
-    } | null>;
-    /**
-     * Convert a detected reference object into a CalibrationProfile.
-     * pixelsPerMm = detectedWidthPx / referenceObject.knownWidth (converted to mm).
-     */
-    toCalibrationProfile(referenceObject: ReferenceObject, detectedRegion: BoundingRegion, imageWidthPx: number, imageHeightPx: number): CalibrationProfile;
+export interface MeasurementDetectionOutput {
+    detectedObjects: ReferenceObject[];
+    /** Inference latency in milliseconds. */
+    latencyMs: number;
+    modelId: string;
+    imageWidthPx: number;
+    imageHeightPx: number;
 }
 /**
- * Estimates a depth map from a single colour image (monocular depth estimation)
- * or projects an existing depth map to 3D world coordinates.
- *
- * Monocular depth estimation models (e.g. Depth Anything, MiDaS, ZoeDepth)
- * produce relative depth — not absolute metres. The DepthEstimator calibrates
- * relative depth to absolute depth when a calibration profile is available.
+ * Output from a monocular depth estimation pass.
  */
-export interface DepthEstimator {
-    /**
-     * Estimate a depth map from a single colour image.
-     * Requires an inference provider for the ML model call.
-     */
-    estimateMonocular(image: MeasurementInput, inferenceProvider: MeasurementInferenceProvider, calibration?: CalibrationProfile): Promise<DepthMap>;
-    /**
-     * Convert a relative depth map (0–1 normalised) to absolute depth (metres)
-     * using a calibration profile's known scale.
-     */
-    toAbsoluteDepth(relativeDepth: DepthMap, calibration: CalibrationProfile): DepthMap;
-    /**
-     * Project a depth map + colour image into a 3D point cloud.
-     * Requires calibration for pixel-to-world mapping.
-     */
-    toPointCloud(depthMap: DepthMap, calibration: CalibrationProfile): WorldPoint3D[];
-    /**
-     * Sample the depth at a specific image point.
-     * Returns metres if the depth map is absolute, or a relative value [0–1].
-     */
-    sampleDepth(depthMap: DepthMap, point: ImagePoint): number;
+export interface MeasurementDepthOutput {
+    depthMap: DepthMap;
+    latencyMs: number;
+    modelId: string;
 }
 /**
- * Establishes the pixel-to-real-world scale for a given image.
- * The scale (pixelsPerMm) is the fundamental bridge between image measurements
- * and physical measurements.
- *
- * Scale sources (in priority order):
- *   1. AR world coordinates (sub-mm)
- *   2. LiDAR / stereo depth
- *   3. Reference object in frame (mm/px from known size)
- *   4. EXIF focal length + sensor width + assumed distance
- *   5. ML monocular depth estimate (lowest accuracy)
- */
-export interface ScaleEstimator {
-    /**
-     * Estimate the pixel-to-mm scale for the provided image.
-     * Returns pixelsPerMm and the calibration status achieved.
-     */
-    estimate(input: {
-        image: MeasurementInput;
-        referenceObject?: ReferenceObject;
-        referenceRegion?: BoundingRegion;
-        depthMap?: DepthMap;
-        existingCalibration?: CalibrationProfile;
-        inferenceProvider?: MeasurementInferenceProvider;
-    }): Promise<{
-        pixelsPerMm: number;
-        calibration: CalibrationProfile;
-    }>;
-    /**
-     * Convert a pixel distance to millimetres using a known scale.
-     * inverse: mmToPixels
-     */
-    pixelsToMm(pixels: number, pixelsPerMm: number): number;
-    mmToPixels(mm: number, pixelsPerMm: number): number;
-}
-/**
- * Converts image-space measurements (pixel spans, bounding regions) to
- * real-world DimensionEstimates using a calibration profile.
- */
-export interface DimensionEstimator {
-    /** Estimate the width of a bounding region in real-world units. */
-    estimateWidth(region: BoundingRegion, imageWidthPx: number, calibration: CalibrationProfile, outputUnit: MeasurementUnit): DimensionEstimate;
-    /** Estimate the height of a bounding region. */
-    estimateHeight(region: BoundingRegion, imageHeightPx: number, calibration: CalibrationProfile, outputUnit: MeasurementUnit): DimensionEstimate;
-    /** Estimate the diameter of a circular feature. */
-    estimateDiameter(region: BoundingRegion, imageWidthPx: number, imageHeightPx: number, calibration: CalibrationProfile, outputUnit: MeasurementUnit): DimensionEstimate;
-    /**
-     * Estimate depth (distance into the scene) at an image point.
-     * Requires a depth map (monocular ML or hardware).
-     */
-    estimateDepthAtPoint(point: ImagePoint, depthMap: DepthMap, calibration: CalibrationProfile, outputUnit: MeasurementUnit): DimensionEstimate;
-    /**
-     * Estimate the straight-line distance between two image points.
-     * Requires depth information for 3D distance.
-     */
-    estimateDistance(pointA: ImagePoint, pointB: ImagePoint, calibration: CalibrationProfile, outputUnit: MeasurementUnit, depthMap?: DepthMap): DimensionEstimate;
-}
-/**
- * Pure geometry calculations for measurement post-processing.
- * No inference required — mathematical operations only.
+ * Geometric computation utilities for measurement inference.
+ * Stateless — all methods are pure functions.
  */
 export interface GeometryService {
-    /** Compute the area of a polygon defined in image coordinates (normalised). */
+    /**
+     * Compute the area of a polygon in square pixels.
+     * @param polygon  Normalised polygon (coords 0–1).
+     * @param imageWidthPx   Image width in pixels.
+     * @param imageHeightPx  Image height in pixels.
+     */
     polygonAreaPx(polygon: ImagePolygon, imageWidthPx: number, imageHeightPx: number): number;
-    /** Convert pixel area to real-world area using calibration. */
+    /**
+     * Convert a pixel area to a real-world DimensionEstimate using calibration.
+     */
     pixelAreaToRealArea(pixelArea: number, calibration: CalibrationProfile, outputUnit: MeasurementUnit): DimensionEstimate;
-    /** Compute perimeter of a polygon in pixels. */
+    /**
+     * Compute the perimeter of a polygon in pixels.
+     */
     polygonPerimeterPx(polygon: ImagePolygon, imageWidthPx: number, imageHeightPx: number): number;
-    /** Compute the angle between two line segments (degrees). */
-    angleBetweenSegments(segmentA: [ImagePoint, ImagePoint], segmentB: [ImagePoint, ImagePoint]): number;
-    /** Estimate volume from cross-section area and depth. */
+    /**
+     * Compute the angle (degrees) between two line segments.
+     */
+    angleBetweenSegments(segA: [ImagePoint, ImagePoint], segB: [ImagePoint, ImagePoint]): number;
+    /**
+     * Estimate volume from a cross-sectional area and depth.
+     */
     estimateVolume(crossSectionAreaMm2: number, depthMm: number, outputUnit: MeasurementUnit): DimensionEstimate;
-    /** Convert between measurement units. */
+    /**
+     * Convert a value between measurement units.
+     */
     convert(value: number, from: MeasurementUnit, to: MeasurementUnit): number;
 }
 /**
- * Caches MeasurementResult objects keyed on a content-addressed hash of the
- * input image + request parameters.
- *
- * Cache keys for image inputs use perceptual hash (pHash) so visually-similar
- * frames share a cache entry. Cache invalidation is by TTL or explicit clear.
+ * Derives a pixel-per-mm scale from image data.
+ * Uses reference objects, EXIF focal length, or AR anchors as the calibration
+ * source; returns a CalibrationProfile.
+ */
+export interface ScaleEstimator {
+    /**
+     * Attempt to derive scale from detected reference objects.
+     * Returns a "reference_object" calibration profile when a reference is found.
+     */
+    fromReferenceObject(detection: MeasurementDetectionOutput, imageWidthPx: number, imageHeightPx: number): Promise<CalibrationProfile>;
+    /**
+     * Derive scale from EXIF focal length and sensor data.
+     * Returns a "focal_length_auto" calibration profile.
+     */
+    fromExif(exifJson: string, imageWidthPx: number): Promise<CalibrationProfile>;
+    /**
+     * Fallback — returns an "uncalibrated" profile with low confidence.
+     */
+    uncalibrated(imageWidthPx: number): CalibrationProfile;
+}
+/**
+ * Computes DimensionEstimates from image geometry and a calibration profile.
+ */
+export interface DimensionEstimator {
+    /**
+     * Estimate the real-world dimensions of a bounding region.
+     */
+    fromBoundingRegion(region: BoundingRegion, kinds: MeasurementKind[], calibration: CalibrationProfile, imageWidthPx: number, imageHeightPx: number): DimensionEstimate[];
+    /**
+     * Estimate dimensions from a polygon (perimeter, area, bounding box).
+     */
+    fromPolygon(polygon: ImagePolygon, kinds: MeasurementKind[], calibration: CalibrationProfile, imageWidthPx: number, imageHeightPx: number): DimensionEstimate[];
+    /**
+     * Estimate depth/distance from a depth map at a specific image point.
+     */
+    fromDepthMap(depthMap: DepthMap, point: ImagePoint, calibration: CalibrationProfile): DimensionEstimate;
+}
+/**
+ * Content-addressed cache for MeasurementResult.
+ * Keys are derived from image content (perceptual hash) + request parameters.
  */
 export interface MeasurementCache {
     get(key: string): MeasurementResult | undefined;
     set(key: string, result: MeasurementResult, ttlSeconds?: number): void;
     delete(key: string): void;
+    /** Evict all entries derived from a given calibration profile. */
     invalidateForCalibrationProfile(profileId: string): void;
-    /** Remove all expired entries. */
+    /** Remove entries past their TTL. */
     pruneExpired(): void;
     clear(): void;
     hitRate(): number;
@@ -641,172 +330,128 @@ export interface MeasurementCache {
         entries: number;
         hits: number;
         misses: number;
-        sizeBytes?: number;
     };
 }
 /**
- * Persists and queries MeasurementAnnotation records.
- * Stored via storage-core; queryable by entity, evidence item, date range, etc.
+ * AI/algorithm-based measurement inference provider.
+ *
+ * Software-only — no physical hardware involved. Uses computer vision to
+ * estimate dimensions from image data. Does NOT extend DeviceProvider.
+ *
+ * Compare with MeasurementDeviceProvider, which represents physical meters,
+ * sensors, and instruments that connect via BLE/USB/wired.
  */
-export interface MeasurementHistory {
-    /** Save or update an annotation (creates a new version if it already exists). */
-    save(annotation: Omit<MeasurementAnnotation, "id" | "version" | "createdAt" | "updatedAt">): Promise<MeasurementAnnotation>;
-    /** Retrieve a specific annotation by ID. */
-    get(annotationId: string): Promise<MeasurementAnnotation | null>;
+export interface MeasurementInferenceProvider {
+    readonly id: string;
+    readonly name: string;
     /**
-     * Retrieve the active annotation for an evidence item.
-     * Returns null if no measurements exist for this item.
-     */
-    getActive(evidenceItemId: string): Promise<MeasurementAnnotation | null>;
-    /** Retrieve all annotation versions for an evidence item (newest first). */
-    getVersionHistory(evidenceItemId: string): Promise<MeasurementAnnotation[]>;
-    /** Search measurement history. */
-    search(filter: MeasurementHistorySearchFilter): Promise<MeasurementHistoryRecord[]>;
-    /** Retire the active annotation (mark isActive=false) without deleting. */
-    deactivate(annotationId: string, reason?: string): Promise<void>;
-    /** Hard-delete an annotation (use sparingly; prefer deactivate). */
-    delete(annotationId: string): Promise<void>;
-}
-export interface MeasurementEngineConfig {
-    /** Injected inference provider (local or cloud). Optional — falls back to geometry-only estimation. */
-    inferenceProvider?: MeasurementInferenceProvider;
-    calibration: CalibrationService;
-    referenceObjects: ReferenceObjectService;
-    depthEstimator: DepthEstimator;
-    scaleEstimator: ScaleEstimator;
-    dimensionEstimator: DimensionEstimator;
-    geometry: GeometryService;
-    cache: MeasurementCache;
-    history: MeasurementHistory;
-    /** Default output unit (defaults to "mm"). */
-    defaultUnit?: MeasurementUnit;
-    /** Default minimum confidence threshold for detections (0–1). */
-    defaultMinConfidence?: number;
-}
-/**
- * The primary entry point for all measurement operations.
- *
- * Orchestrates: input parsing → calibration → scale estimation → object
- * detection → dimension estimation → annotation → caching.
- *
- * Single-image flow:
- *   1. Extract EXIF focal length (if available)
- *   2. Detect reference object in frame (if inferenceProvider available)
- *   3. Establish pixel-to-mm scale (CalibrationService)
- *   4. Detect measurable objects (VisionEngine via inferenceProvider)
- *   5. Compute DimensionEstimate for each detected object
- *   6. Return MeasurementResult
- *
- * Multi-image flow:
- *   Uses triangulation across frames for better depth accuracy.
- *
- * Video flow:
- *   Tracks objects across frames; uses frame-to-frame motion for scale.
- */
-export interface MeasurementEngine {
-    readonly config: MeasurementEngineConfig;
-    /**
-     * Measure from a single image.
-     * This is the primary call for photo-based workflows.
+     * Run measurement inference on a request.
+     * Returns a MeasurementResult with one or more DimensionEstimates.
      */
     measure(request: MeasurementRequest): Promise<MeasurementResult>;
     /**
-     * Measure from multiple images of the same scene (different viewpoints).
-     * Uses triangulation for improved accuracy. Minimum 2 images; maximum 10.
+     * Run object detection to find reference objects in an image.
      */
-    measureMultiImage(requests: MeasurementRequest[], method?: "triangulation" | "sfm"): Promise<MeasurementResult>;
+    detectReferenceObjects(input: MeasurementInput): Promise<MeasurementDetectionOutput>;
     /**
-     * Measure from a sequence of video frames.
-     * Tracks objects across frames and uses optical flow for scale estimation.
+     * Run monocular depth estimation on an image.
      */
-    measureFromVideo(frames: MeasurementInput[], kinds: MeasurementKind[], options?: {
-        calibrationProfileId?: string;
-        referenceObject?: ReferenceObject;
-    }): Promise<MeasurementResult>;
+    estimateDepth(input: MeasurementInput): Promise<MeasurementDepthOutput>;
     /**
-     * Attach a MeasurementResult to an EvidenceItem, creating a
-     * MeasurementAnnotation. Updates the history store.
+     * Annotate an evidence item with a measurement result.
      */
-    annotateEvidence(evidenceItemId: string, entityType: string, entityId: string, result: MeasurementResult, notes?: string): Promise<MeasurementAnnotation>;
-    /**
-     * Manually revise an existing annotation with corrected measurements.
-     * Creates a new version; previous version is deactivated.
-     */
-    reviseAnnotation(annotationId: string, correctedEstimates: DimensionEstimate[], revisionReason: string, authorId?: string): Promise<MeasurementAnnotation>;
+    annotateEvidence(evidenceItemId: string, result: MeasurementResult): Promise<MeasurementAnnotation>;
 }
 /**
- * High-level provider interface used by platform-intelligence's ProviderCoordinator.
- * Workflow steps request measurements via this interface without knowing the
- * underlying engine configuration.
+ * Physical measurement hardware provider.
  *
- * Applications register a MeasurementProvider as a plugin with platform-intelligence.
- * The plugin wraps a fully-configured MeasurementEngine.
+ * Represents instruments that a technician carries to a job site and connects
+ * via BLE, USB, or wired cable:
+ *   - Moisture meters (Protimeter, Delmhorst, General Tools)
+ *   - Laser distance meters (Bosch, Leica, Hilti)
+ *   - Thermal imagers (FLIR, Seek, Testo)
+ *   - Environmental sensors (temperature, humidity, CO2, VOC)
+ *   - Smart bait trap monitors
+ *
+ * Extends DeviceProvider, giving physical meters the full device lifecycle:
+ * connect/disconnect, getStatus, checkHealth, getPermissions, on/emit.
+ *
+ * DeviceCapabilities guidance:
+ *   categories: ["sensor"] for environmental/moisture/laser meters
+ *   categories: ["sensor", "diagnostic"] for multi-function instruments
+ *   categories: ["camera", "sensor"] for thermal imagers
+ *   transports: ["ble"] for most modern wireless meters
+ *   transports: ["usb", "wired"] for older or professional instruments
  */
-export interface MeasurementProvider {
-    /** Provider identifier for the ProviderCoordinator. */
-    readonly providerId: string;
-    /** Whether this provider can handle the given request right now. */
-    canHandle(request: MeasurementRequest): boolean;
-    /** Execute the measurement. */
-    execute(request: MeasurementRequest): Promise<MeasurementResult>;
-    /** Whether the provider works without a network connection. */
-    worksOffline: boolean;
+export interface MeasurementDeviceProvider extends DeviceProvider {
+    /**
+     * Device-specific measurement capabilities.
+     * Defines which measurement kinds the instrument can produce and
+     * the units it natively reports.
+     */
+    readonly measurementCapabilities: MeasurementDeviceCapabilities;
+    /**
+     * Take a single reading from the instrument.
+     * Resolves with a structured measurement reading.
+     */
+    read(): Promise<MeasurementReading>;
+    /**
+     * Subscribe to a continuous stream of readings.
+     * Returns an unsubscribe function.
+     */
+    subscribe(listener: (reading: MeasurementReading) => void, intervalMs?: number): () => void;
 }
 /**
- * Complete measurement runtime surface. Passed to applications via the
- * platform-intelligence plugin context. Applications should not instantiate
- * this directly — it is assembled by the MeasurementPlugin at app bootstrap.
+ * Describes what a physical measurement device can measure.
  */
-export interface MeasurementContext {
-    engine: MeasurementEngine;
-    calibration: CalibrationService;
-    referenceObjects: ReferenceObjectService;
-    depthEstimator: DepthEstimator;
-    scaleEstimator: ScaleEstimator;
-    dimensionEstimator: DimensionEstimator;
-    geometry: GeometryService;
-    cache: MeasurementCache;
-    history: MeasurementHistory;
+export interface MeasurementDeviceCapabilities {
+    /** Measurement kinds this instrument produces (e.g. ["depth"] for laser distance). */
+    supportedKinds: MeasurementKind[];
+    /** Native unit(s) the instrument reports. */
+    nativeUnits: MeasurementUnit[];
+    /** Measurement range minimum (in the first nativeUnit). */
+    rangeMin?: number;
+    /** Measurement range maximum (in the first nativeUnit). */
+    rangeMax?: number;
+    /** Instrument accuracy (±value in the first nativeUnit). */
+    accuracy?: number;
+    /** Whether the instrument supports continuous streaming (vs. single shot). */
+    supportsStreaming: boolean;
+    /** Whether the instrument supports self-calibration. */
+    supportsSelfCalibration: boolean;
 }
+/**
+ * A single reading from a physical measurement device.
+ */
+export interface MeasurementReading {
+    deviceId: string;
+    kind: MeasurementKind;
+    value: number;
+    unit: MeasurementUnit;
+    /** Raw value from the device before unit conversion. */
+    rawValue?: number;
+    /** Raw unit from the device. */
+    rawUnit?: MeasurementUnit;
+    /** Signal quality / confidence from the device (0–1), if reported. */
+    signalQuality?: number;
+    capturedAt: string;
+}
+/**
+ * Domain event kinds emitted by the measurement subsystem.
+ * All values follow the "measurement.<noun>.<verb>" convention.
+ */
 export declare const MEASUREMENT_EVENT_KINDS: {
-    readonly MEASUREMENT_STARTED: "measurement.session.started";
-    readonly MEASUREMENT_COMPLETE: "measurement.session.complete";
-    readonly MEASUREMENT_FAILED: "measurement.session.failed";
-    readonly CALIBRATION_COMPLETE: "measurement.calibration.complete";
-    readonly CALIBRATION_FAILED: "measurement.calibration.failed";
-    readonly REFERENCE_OBJECT_DETECTED: "measurement.reference_object.detected";
-    readonly REFERENCE_OBJECT_NOT_FOUND: "measurement.reference_object.not_found";
+    readonly INFERENCE_STARTED: "measurement.inference.started";
+    readonly INFERENCE_COMPLETED: "measurement.inference.completed";
+    readonly INFERENCE_FAILED: "measurement.inference.failed";
     readonly ANNOTATION_CREATED: "measurement.annotation.created";
     readonly ANNOTATION_REVISED: "measurement.annotation.revised";
-    readonly DEPTH_ESTIMATION_COMPLETE: "measurement.depth.estimated";
-    readonly LOW_CONFIDENCE_WARNING: "measurement.confidence.low";
+    readonly CALIBRATION_UPDATED: "measurement.calibration.updated";
+    readonly DEVICE_READING_RECEIVED: "measurement.device.reading_received";
+    readonly DEVICE_CONNECTED: "measurement.device.connected";
+    readonly DEVICE_DISCONNECTED: "measurement.device.disconnected";
+    readonly CACHE_HIT: "measurement.cache.hit";
+    readonly CACHE_MISS: "measurement.cache.miss";
 };
 export type MeasurementEventKind = (typeof MEASUREMENT_EVENT_KINDS)[keyof typeof MEASUREMENT_EVENT_KINDS];
-export interface MeasurementCompletePayload {
-    requestId: string;
-    estimateCount: number;
-    method: MeasurementMethod;
-    topConfidence: number;
-    cached: boolean;
-    latencyMs: number;
-}
-export interface CalibrationCompletePayload {
-    profileId: string;
-    status: CalibrationStatus;
-    calibrationConfidence: number;
-    deviceModel?: string;
-}
-export interface AnnotationCreatedPayload {
-    annotationId: string;
-    evidenceItemId: string;
-    entityType: string;
-    entityId: string;
-    estimateCount: number;
-    version: number;
-}
-export interface LowConfidenceWarningPayload {
-    requestId: string;
-    confidenceScore: number;
-    warnings: string[];
-}
 //# sourceMappingURL=index.d.ts.map

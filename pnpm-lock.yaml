@@ -1156,6 +1156,9 @@ importers:
 
   repos/platform/packages/camera-core:
     dependencies:
+      '@platform/device-core':
+        specifier: workspace:*
+        version: link:../device-core
       '@platform/shared-types':
         specifier: workspace:*
         version: link:../shared-types
@@ -1242,6 +1245,9 @@ importers:
 
   repos/platform/packages/measurement-core:
     dependencies:
+      '@platform/device-core':
+        specifier: workspace:*
+        version: link:../device-core
       '@platform/shared-types':
         specifier: workspace:*
         version: link:../shared-types
@@ -1255,6 +1261,9 @@ importers:
       '@platform/camera-core':
         specifier: workspace:*
         version: link:../camera-core
+      '@platform/device-core':
+        specifier: workspace:*
+        version: link:../device-core
       '@platform/shared-types':
         specifier: workspace:*
         version: link:../shared-types
@@ -1350,6 +1359,9 @@ importers:
 
   repos/platform/packages/voice-intelligence:
     dependencies:
+      '@platform/device-core':
+        specifier: workspace:*
+        version: link:../device-core
       '@platform/shared-types':
         specifier: workspace:*
         version: link:../shared-types
