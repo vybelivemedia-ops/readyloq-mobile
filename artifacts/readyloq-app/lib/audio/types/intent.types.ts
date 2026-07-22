@@ -4,6 +4,8 @@ export interface StructuredInspectionEvent {
   room?: string;
   pest?: string;
   evidence?: string;
+  /** Severity level extracted from the transcript ("minor", "high severity", "critical", etc.). */
+  severity?: "low" | "medium" | "high" | "critical";
   confidence: number;
   rawText: string;
   /** True when the transcript contains spatial/deictic language ("this", "here", etc.). */
@@ -15,6 +17,24 @@ export interface StructuredInspectionEvent {
   visionTarget?: string;
   /** URI of the camera frame captured at the instant this voice command fired. */
   imageUri?: string;
+  /**
+   * True when the voice command is a photo-capture trigger
+   * ("take a photo", "snap", "capture", etc.).
+   * The FAIE handler fires takePhoto() and skips the notes append.
+   */
+  capturePhoto?: boolean;
+  /**
+   * The inspection form field the technician explicitly addressed via a
+   * routing prefix ("client name is…", "site address is…", etc.).
+   * When set, the FAIE handler writes fieldValue to that field directly
+   * instead of appending to the notes log.
+   */
+  targetField?: "clientName" | "siteAddress" | "notes" | "pestType" | "baitStation";
+  /**
+   * The extracted value for targetField, with the routing prefix stripped.
+   * Only present when targetField is set.
+   */
+  fieldValue?: string;
 }
 
 export interface VisionContext {

@@ -20,6 +20,7 @@
 - [smart-vision Live Session Engine](smart-vision-live-session.md) — Privacy stage uses PrivacyProvider.detect() directly (no stable IDs); FramePipeline/FrameDropPolicy omit from top-level barrel (name clash); stage runner contract notes
 - [AI review & correction workflow](ai-review-correction.md) — Finding schema; correction endpoint populates full aiPrediction snapshot; InspectionDetail inline correction modal; FindingCard review buttons
 - [Bulk dataset ingestion](bulk-dataset-ingest.md) — POST /bulk-ingest endpoint; fetch+blob PUT pattern (not FileSystem.uploadAsync — FileSystemUploadType moved in expo-file-system v19)
+- [Hands-free voice pipeline](hands-free-voice-pipeline.md) — FAIE dispatch order: capturePhoto → field routing → bait station → pest chip → notes; useVoiceField hook; VoiceMicButton component
 - [DB schema rebuild](db-schema-rebuild.md) — after editing lib/db/src/schema/*.ts, run `pnpm exec tsc --build lib/db/tsconfig.json` or api-server sees stale .d.ts
 - [whisper.rn integration](whisper-rn-integration.md) — v0.6.0 quirks: no root exports entry (add tsconfig paths), transcribeRealtime removed (use expo-av + transcribe(file)), expo-file-system legacy import
 - [EAS build from Replit sandbox](eas-sandbox-build.md) — workflow trick to bypass 120s bash timeout for eas build + pnpm install

@@ -24,9 +24,12 @@ import {
   View,
 } from "react-native";
 
+import * as Speech from "expo-speech";
 import { AiInsightsPanel } from "@/components/AiInsightsPanel";
 import { CoPilotHUD } from "@/components/CoPilotHUD";
 import { BaitStationPanel } from "@/components/BaitStationPanel";
+import { VoiceMicButton } from "@/components/VoiceMicButton";
+import { useVoiceField } from "@/hooks/useVoiceField";
 import { type LocalBaitStation } from "@/lib/local/inspection-store";
 import { WifiCameraModal } from "@/components/WifiCameraModal";
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
@@ -182,6 +185,14 @@ export default function NewInspectionScreen() {
   const [faiePendingConfirm, setFaiePendingConfirm] = useState<StructuredInspectionEvent | null>(null);
   const sessionManagerRef = useRef<AudioSessionManager | null>(null);
 
+  // ── Per-field voice dictation (setup form) ─────────────────────────────────
+  const voiceSiteAddress = useVoiceField({
+    onTranscript: (text) => setSiteAddress((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text)),
+  });
+  const voiceClientName = useVoiceField({
+    onTranscript: (text) => setClientName((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text)),
+  });
+
   // ── Bait station tracking (T002) ──────────────────────────────────────────
   const [baitStations, setBaitStations] = useState<LocalBaitStation[]>([]);
   const [showBaitPanel, setShowBaitPanel] = useState(false);
@@ -293,10 +304,72 @@ export default function NewInspectionScreen() {
       await sessionManagerRef.current.startSession(({ event, action }) => {
         switch (action) {
           case ConfidenceAction.AUTO_COMMIT: {
-            const line = formatEvent(event);
-            setNotes((prev) => (prev.trim() ? `${prev.trim()}\n${line}` : line));
-            setFaieStatus(`Logged: ${line}`);
-            setTimeout(() => setFaieStatus("Listening…"), 3000);
+            // 1. Voice-triggered photo capture ("snap", "take a photo", "capture")
+            if (event.capturePhoto) {
+              void takePhoto();
+              setFaieStatus("Capturing photo…");
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setTimeout(() => setFaieStatus("Listening…"), 2500);
+              break;
+            }
+
+            // 2. Explicit field routing via prefix ("client name is…", "site address is…")
+            if (event.targetField === "clientName" && event.fieldValue) {
+              setClientName(event.fieldValue);
+              setFaieStatus(`Client: "${event.fieldValue}"`);
+              Speech.speak("Client name set", { rate: 1.1 });
+              setTimeout(() => setFaieStatus("Listening…"), 2500);
+              break;
+            }
+            if (event.targetField === "siteAddress" && event.fieldValue) {
+              setSiteAddress(event.fieldValue);
+              setFaieStatus(`Site: "${event.fieldValue}"`);
+              Speech.speak("Site address set", { rate: 1.1 });
+              setTimeout(() => setFaieStatus("Listening…"), 2500);
+              break;
+            }
+
+            // 3. Bait station auto-log: "placed Contrac Blox in kitchen" or any
+            //    transcript matching a baitStationTrigger phrase.
+            if (
+              event.targetField === "baitStation" ||
+              ((event.action === "placed" || event.action === "applied") && event.product)
+            ) {
+              const where = event.room ?? "Unknown location";
+              addBaitStation({
+                label: event.product ?? "Bait station",
+                locationType: event.room,
+                status: "active",
+                notes: event.severity ? `Severity: ${event.severity}` : undefined,
+              });
+              const summary = `Bait: ${event.product ?? "station"} @ ${where}`;
+              setFaieStatus(summary);
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Speech.speak(`Logged ${event.product ?? "bait station"}`, { rate: 1.1 });
+              setTimeout(() => setFaieStatus("Listening…"), 3000);
+              break;
+            }
+
+            // 4. Auto-add detected pest to the Suspected Pests chip list.
+            if (event.pest) {
+              const pestLower = event.pest.toLowerCase();
+              const match = PEST_TYPES.find(
+                (p) => p.toLowerCase().includes(pestLower) || pestLower.includes(p.toLowerCase()),
+              );
+              if (match) {
+                setPestTypes((prev) => (prev.includes(match) ? prev : [...prev, match]));
+                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            }
+
+            // 5. Default — format finding and append to inspection notes.
+            {
+              const severityTag = event.severity ? ` [${event.severity}]` : "";
+              const line = `${formatEvent(event)}${severityTag}`;
+              setNotes((prev) => (prev.trim() ? `${prev.trim()}\n${line}` : line));
+              setFaieStatus(`Logged: ${line}`);
+              setTimeout(() => setFaieStatus("Listening…"), 3000);
+            }
             break;
           }
           case ConfidenceAction.CONFIRM:
@@ -337,14 +410,36 @@ export default function NewInspectionScreen() {
   const confirmFaieEvent = () => {
     if (!faiePendingConfirm) return;
     const ev = faiePendingConfirm;
-    const parts: string[] = [ev.action];
-    if (ev.product) parts.push(ev.product);
-    if (ev.room) parts.push(`in ${ev.room}`);
-    if (ev.pest && ev.evidence) parts.push(`(${ev.pest} — ${ev.evidence})`);
-    else if (ev.pest) parts.push(`(${ev.pest})`);
-    else if (ev.evidence) parts.push(`(${ev.evidence})`);
-    const line = parts.join(" ").trim();
-    setNotes((prev) => (prev.trim() ? `${prev.trim()}\n${line}` : line));
+
+    // Mirror the AUTO_COMMIT routing so "Log it" on a pending event
+    // follows the same field-dispatch logic as an auto-committed one.
+    if (ev.targetField === "clientName" && ev.fieldValue) {
+      setClientName(ev.fieldValue);
+    } else if (ev.targetField === "siteAddress" && ev.fieldValue) {
+      setSiteAddress(ev.fieldValue);
+    } else if (
+      ev.targetField === "baitStation" ||
+      ((ev.action === "placed" || ev.action === "applied") && ev.product)
+    ) {
+      addBaitStation({
+        label: ev.product ?? "Bait station",
+        locationType: ev.room,
+        status: "active",
+        notes: ev.severity ? `Severity: ${ev.severity}` : undefined,
+      });
+    } else {
+      const severityTag = ev.severity ? ` [${ev.severity}]` : "";
+      const parts: string[] = [ev.action];
+      if (ev.product) parts.push(ev.product);
+      if (ev.room) parts.push(`in ${ev.room}`);
+      if (ev.pest && ev.evidence) parts.push(`(${ev.pest} — ${ev.evidence})`);
+      else if (ev.pest) parts.push(`(${ev.pest})`);
+      else if (ev.evidence) parts.push(`(${ev.evidence})`);
+      const line = `${parts.join(" ").trim()}${severityTag}`;
+      setNotes((prev) => (prev.trim() ? `${prev.trim()}\n${line}` : line));
+    }
+
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setFaiePendingConfirm(null);
     setFaieStatus("Listening…");
   };
@@ -1946,22 +2041,53 @@ export default function NewInspectionScreen() {
             locked. Notes and suspected pests can still be updated.
           </Text>
         ) : null}
-        <TextField
-          label="Site address *"
-          placeholder="123 Main St, Suite 200"
-          value={siteAddress}
-          onChangeText={setSiteAddress}
-          editable={wsInspectionId == null}
-          style={wsInspectionId != null ? { opacity: 0.5 } : undefined}
-        />
-        <TextField
-          label="Client name"
-          placeholder="Acme Restaurant Group"
-          value={clientName}
-          onChangeText={setClientName}
-          editable={wsInspectionId == null}
-          style={wsInspectionId != null ? { opacity: 0.5 } : undefined}
-        />
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+              Site address *
+            </Text>
+            {wsInspectionId == null && (
+              <VoiceMicButton
+                isDictating={voiceSiteAddress.isDictating}
+                isTranscribing={voiceSiteAddress.isTranscribing}
+                onPress={() => void voiceSiteAddress.toggle()}
+                size={28}
+                accessibilityLabel="Dictate site address"
+              />
+            )}
+          </View>
+          <TextField
+            placeholder="123 Main St, Suite 200"
+            value={siteAddress}
+            onChangeText={setSiteAddress}
+            editable={wsInspectionId == null}
+            style={wsInspectionId != null ? { opacity: 0.5 } : undefined}
+          />
+        </View>
+
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+              Client name
+            </Text>
+            {wsInspectionId == null && (
+              <VoiceMicButton
+                isDictating={voiceClientName.isDictating}
+                isTranscribing={voiceClientName.isTranscribing}
+                onPress={() => void voiceClientName.toggle()}
+                size={28}
+                accessibilityLabel="Dictate client name"
+              />
+            )}
+          </View>
+          <TextField
+            placeholder="Acme Restaurant Group"
+            value={clientName}
+            onChangeText={setClientName}
+            editable={wsInspectionId == null}
+            style={wsInspectionId != null ? { opacity: 0.5 } : undefined}
+          />
+        </View>
         <TextField
           label="Technician *"
           placeholder="Your name"
