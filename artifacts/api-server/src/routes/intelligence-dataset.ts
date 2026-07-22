@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod/v4";
 import { db } from "@workspace/db";
 import {
   intelligenceRecordsTable,
@@ -291,6 +292,99 @@ router.get("/corrections/export", requireRole("manager"), async (req, res) => {
     });
   } catch {
     return res.status(500).json({ error: "Failed to export corrections" });
+  }
+});
+
+// POST /intelligence-dataset/bulk-ingest — technician+ access.
+// Ingests a batch of pre-uploaded historical photos alongside human-provided
+// metadata directly into the intelligence_records training dataset, bypassing
+// AI analysis (the human IS the label source for historical archives).
+//
+// Flow the client follows for each image:
+//   1. POST /api/storage/uploads/request-url → { uploadURL, objectPath }
+//   2. PUT <file-binary> to uploadURL
+//   3. Collect objectPath and include in this request body.
+//
+// Each record is created with status="confirmed" (L2 — tech-verified label)
+// and aiPrediction=null (no model ran; human provided the ground truth).
+// A manager can later upgrade verificationLevel to 4/5 via the review flow.
+const BulkIngestBody = z.object({
+  images: z
+    .array(
+      z.object({
+        objectPath: z.string().startsWith("/objects/"),
+        filename: z.string().optional(),
+      }),
+    )
+    .min(1)
+    .max(50),
+  metadata: z.object({
+    category: z.string().min(1),
+    subcategory: z.string().optional(),
+    possiblePest: z.string().optional(),
+    possibleConduciveCondition: z.string().optional(),
+    possibleEntryPoint: z.string().optional(),
+    severity: z.enum(["low", "moderate", "high", "critical"]).optional(),
+    locationType: z.string().optional(),
+    notes: z.string().optional(),
+  }),
+});
+
+router.post("/bulk-ingest", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const userId = req.user!.id;
+
+    const parsed = BulkIngestBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", details: parsed.error.issues });
+    }
+    const { images, metadata } = parsed.data;
+
+    // Tenant safety: every image must be namespaced under the caller's company.
+    const invalid = images.filter((img) => objectPathCompanyScope(img.objectPath) !== companyId);
+    if (invalid.length > 0) {
+      return res.status(400).json({
+        error: "One or more images do not belong to your company",
+        paths: invalid.map((i) => i.objectPath),
+      });
+    }
+
+    // Insert all records in a single batch. Each gets the same shared metadata
+    // block; the image URL is per-row. status="confirmed" because the human is
+    // already providing the ground-truth label — no AI review step needed.
+    const values = images.map((img) => ({
+      companyId,
+      imageUrl: img.objectPath,
+      aiPrediction: null,
+      aiConfidence: null,
+      category: metadata.category,
+      subcategory: metadata.subcategory ?? null,
+      possiblePest: metadata.possiblePest ?? null,
+      possibleConduciveCondition: metadata.possibleConduciveCondition ?? null,
+      possibleEntryPoint: metadata.possibleEntryPoint ?? null,
+      severity: (metadata.severity as typeof intelligenceRecordsTable.$inferInsert["severity"]) ?? null,
+      notes: metadata.notes
+        ? `${metadata.notes}${metadata.locationType ? ` | Location: ${metadata.locationType}` : ""}`
+        : (metadata.locationType ? `Location: ${metadata.locationType}` : null),
+      whatIsShown: metadata.locationType ?? null,
+      aiCorrected: false,
+      // L2 = technician-verified ground-truth; manager can promote to L4+ via review.
+      verificationLevel: 2,
+      status: "confirmed" as const,
+      createdBy: userId,
+    }));
+
+    const rows = await db.insert(intelligenceRecordsTable).values(values).returning({ id: intelligenceRecordsTable.id });
+
+    return res.status(201).json({
+      created: rows.length,
+      failed: images.length - rows.length,
+      recordIds: rows.map((r) => r.id),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Bulk ingest failed");
+    return res.status(500).json({ error: "Bulk ingest failed" });
   }
 });
 

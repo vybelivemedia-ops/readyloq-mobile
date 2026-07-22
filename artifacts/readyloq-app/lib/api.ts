@@ -123,3 +123,33 @@ export function reopenInspection(token: string | null, id: number) {
     method: "POST",
   });
 }
+
+// ─── Bulk dataset ingestion ───────────────────────────────────────────────────
+
+export interface BulkIngestMetadata {
+  category: string;
+  subcategory?: string;
+  possiblePest?: string;
+  possibleConduciveCondition?: string;
+  possibleEntryPoint?: string;
+  severity?: "low" | "moderate" | "high" | "critical";
+  locationType?: string;
+  notes?: string;
+}
+
+export interface BulkIngestResult {
+  created: number;
+  failed: number;
+  recordIds: number[];
+}
+
+export function bulkIngestDataset(
+  token: string | null,
+  images: Array<{ objectPath: string; filename?: string }>,
+  metadata: BulkIngestMetadata,
+) {
+  return request<BulkIngestResult>("/api/intelligence-dataset/bulk-ingest", token, {
+    method: "POST",
+    body: JSON.stringify({ images, metadata }),
+  });
+}

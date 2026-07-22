@@ -90063,6 +90063,70 @@ router9.get("/corrections/export", requireRole("manager"), async (req, res) => {
     return res.status(500).json({ error: "Failed to export corrections" });
   }
 });
+var BulkIngestBody = external_exports.object({
+  images: external_exports.array(
+    external_exports.object({
+      objectPath: external_exports.string().startsWith("/objects/"),
+      filename: external_exports.string().optional()
+    })
+  ).min(1).max(50),
+  metadata: external_exports.object({
+    category: external_exports.string().min(1),
+    subcategory: external_exports.string().optional(),
+    possiblePest: external_exports.string().optional(),
+    possibleConduciveCondition: external_exports.string().optional(),
+    possibleEntryPoint: external_exports.string().optional(),
+    severity: external_exports.enum(["low", "moderate", "high", "critical"]).optional(),
+    locationType: external_exports.string().optional(),
+    notes: external_exports.string().optional()
+  })
+});
+router9.post("/bulk-ingest", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const userId = req.user.id;
+    const parsed = BulkIngestBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", details: parsed.error.issues });
+    }
+    const { images, metadata } = parsed.data;
+    const invalid = images.filter((img) => objectPathCompanyScope(img.objectPath) !== companyId);
+    if (invalid.length > 0) {
+      return res.status(400).json({
+        error: "One or more images do not belong to your company",
+        paths: invalid.map((i) => i.objectPath)
+      });
+    }
+    const values = images.map((img) => ({
+      companyId,
+      imageUrl: img.objectPath,
+      aiPrediction: null,
+      aiConfidence: null,
+      category: metadata.category,
+      subcategory: metadata.subcategory ?? null,
+      possiblePest: metadata.possiblePest ?? null,
+      possibleConduciveCondition: metadata.possibleConduciveCondition ?? null,
+      possibleEntryPoint: metadata.possibleEntryPoint ?? null,
+      severity: metadata.severity ?? null,
+      notes: metadata.notes ? `${metadata.notes}${metadata.locationType ? ` | Location: ${metadata.locationType}` : ""}` : metadata.locationType ? `Location: ${metadata.locationType}` : null,
+      whatIsShown: metadata.locationType ?? null,
+      aiCorrected: false,
+      // L2 = technician-verified ground-truth; manager can promote to L4+ via review.
+      verificationLevel: 2,
+      status: "confirmed",
+      createdBy: userId
+    }));
+    const rows = await db.insert(intelligenceRecordsTable).values(values).returning({ id: intelligenceRecordsTable.id });
+    return res.status(201).json({
+      created: rows.length,
+      failed: images.length - rows.length,
+      recordIds: rows.map((r) => r.id)
+    });
+  } catch (err) {
+    req.log.error({ err }, "Bulk ingest failed");
+    return res.status(500).json({ error: "Bulk ingest failed" });
+  }
+});
 router9.get("/categories", async (req, res) => {
   try {
     const companyId = getCompanyId(req);

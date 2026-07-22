@@ -153,6 +153,47 @@ export default function DashboardScreen() {
           <Ionicons name="arrow-forward" size={22} color={colors.primaryForeground} />
         </Pressable>
 
+        {/* Quick tools row — role-gated utilities below the primary CTA */}
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <Pressable
+            onPress={() => router.push("/dataset/bulk-upload" as Href)}
+            style={({ pressed }) => ({
+              flex: 1,
+              backgroundColor: colors.card,
+              borderRadius: colors.radius,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              opacity: pressed ? 0.75 : 1,
+            })}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                backgroundColor: colors.accent,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="cloud-upload-outline" size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                Upload Training Photos
+              </Text>
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                Add historical data to dataset
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
+
         {briefing.data ? (
           /* Role-adaptive briefing: technician, sales, manager, or owner view */
           <RoleBriefingView briefing={briefing.data} />
