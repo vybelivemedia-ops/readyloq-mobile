@@ -9,10 +9,27 @@
  *   1. Call `configureWifiCamera({ baseUrl })` before use.
  *   2. Call `probeWifiCamera()` to verify the camera is reachable.
  *   3. The provider is registered in the registry and capture works normally.
+ *
+ * DEVICE-CORE LIFECYCLE (Phase 29):
+ *   All optional CaptureDeviceProvider lifecycle methods are now implemented so
+ *   this provider can be registered in the DeviceRegistry and participate in
+ *   health monitoring and event streaming. connect() performs a live HTTP probe.
  */
 
 import * as Crypto from "expo-crypto";
-import type { EvidenceItem, VisionProvider } from "./types";
+
+import type { HealthCheckResult } from "@platform/provider-registry";
+import type {
+  DeviceStatus,
+  DevicePermissions,
+  DeviceEvent,
+  DeviceEventKind,
+  DeviceEventListener,
+  DeviceIdentity,
+} from "@platform/device-core";
+import type { EvidenceItem, RequestCaptureProvider } from "./types";
+
+// ─── Configuration ────────────────────────────────────────────────────────────
 
 interface WifiCameraConfig {
   baseUrl: string;
@@ -38,7 +55,8 @@ export function clearWifiCameraConfig(): void {
   _config = null;
 }
 
-/** Try to detect camera type from URL and return the right capture path. */
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
 function detectCapturePath(baseUrl: string): string {
   if (baseUrl.includes("10.5.5.9") || baseUrl.includes("gopro")) {
     return "/gp/gpControl/execute?p1=gpStream&a1=proto_v2&c1=restart";
@@ -46,11 +64,6 @@ function detectCapturePath(baseUrl: string): string {
   return "/snapshot.jpg";
 }
 
-/**
- * Build a JPEG capture URL for GoPro or generic cameras.
- * GoPro: GET /gp/gpMediaList then fetch first item, or use keepalive URL.
- * Generic: GET <baseUrl>/snapshot.jpg or custom path.
- */
 function buildCaptureUrl(config: WifiCameraConfig): string {
   const base = config.baseUrl;
   if (base.includes("10.5.5.9")) {
@@ -61,10 +74,6 @@ function buildCaptureUrl(config: WifiCameraConfig): string {
 
 type ProbeResult = { available: true } | { available: false; reason: string };
 
-/**
- * Probe the camera for availability.
- * Returns { available: true } if the camera responds to HTTP within 3 s.
- */
 export async function probeWifiCamera(): Promise<ProbeResult> {
   if (!_config) return { available: false, reason: "No Wi-Fi camera configured." };
 
@@ -88,10 +97,6 @@ export async function probeWifiCamera(): Promise<ProbeResult> {
   }
 }
 
-/**
- * Capture a still from the Wi-Fi camera.
- * Fetches the configured snapshot URL and converts the Blob to a local URI.
- */
 async function captureFromWifiCamera(): Promise<EvidenceItem[]> {
   if (!_config) throw new Error("Wi-Fi camera is not configured.");
 
@@ -127,15 +132,58 @@ async function captureFromWifiCamera(): Promise<EvidenceItem[]> {
   ];
 }
 
-/** Create a VisionProvider backed by the configured Wi-Fi camera. */
-export function createWifiCameraProvider(): VisionProvider {
+// ─── Minimal event emitter ───────────────────────────────────────────────────
+
+function makeDeviceEmitter() {
+  const listeners = new Map<DeviceEventKind, Set<DeviceEventListener>>();
+  return {
+    on(kind: DeviceEventKind, listener: DeviceEventListener): () => void {
+      if (!listeners.has(kind)) listeners.set(kind, new Set());
+      listeners.get(kind)!.add(listener);
+      return () => listeners.get(kind)?.delete(listener);
+    },
+    emit(event: DeviceEvent): void {
+      listeners.get(event.kind)?.forEach((l) => l(event));
+    },
+  };
+}
+
+// ─── Extended provider type ──────────────────────────────────────────────────
+
+export type WifiCameraProvider = RequestCaptureProvider & {
+  readonly name: string;
+  readonly priority: number;
+  readonly identity: DeviceIdentity;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  getStatus(): Promise<DeviceStatus>;
+  checkHealth(): Promise<HealthCheckResult>;
+  getPermissions(): DevicePermissions;
+  on(kind: DeviceEventKind, listener: DeviceEventListener): () => void;
+  emit(event: DeviceEvent): void;
+  initialize(): Promise<void>;
+  teardown(): Promise<void>;
+};
+
+// ─── Factory ─────────────────────────────────────────────────────────────────
+
+export function createWifiCameraProvider(): WifiCameraProvider {
   const config = _config;
   if (!config) throw new Error("Wi-Fi camera is not configured.");
+
+  const emitter = makeDeviceEmitter();
+  let _connected = false;
 
   return {
     id: "wifi-camera",
     source: "wifi_stream",
     label: config.label ?? "Wi-Fi camera",
+    name: config.label ?? "Wi-Fi camera",
+    priority: 75,
+    identity: {
+      manufacturer: config.label ?? "Wi-Fi Camera",
+      model: config.baseUrl,
+    },
     capabilities: {
       mode: "request_response",
       transport: "wifi",
@@ -143,6 +191,86 @@ export function createWifiCameraProvider(): VisionProvider {
       producesVideo: false,
       requiresPairing: false,
     },
+
+    async initialize(): Promise<void> {
+      // No-op: the Wi-Fi connection is established in connect()
+    },
+
+    async teardown(): Promise<void> {
+      _connected = false;
+    },
+
+    async connect(): Promise<void> {
+      const probe = await probeWifiCamera();
+      if (!probe.available) {
+        throw new Error(`Wi-Fi camera unreachable: ${probe.reason}`);
+      }
+      _connected = true;
+      emitter.emit({
+        kind: "device.connected",
+        deviceId: "wifi-camera",
+        timestamp: new Date().toISOString(),
+      });
+    },
+
+    async disconnect(): Promise<void> {
+      _connected = false;
+      emitter.emit({
+        kind: "device.disconnected",
+        deviceId: "wifi-camera",
+        timestamp: new Date().toISOString(),
+      });
+    },
+
+    async getStatus(): Promise<DeviceStatus> {
+      const probe = await probeWifiCamera();
+      const now = new Date().toISOString();
+      const reachable = probe.available;
+      return {
+        operational: reachable ? (_connected ? "idle" : "unavailable") : "error",
+        connection: {
+          state: reachable ? "connected" : "error",
+          transport: "wifi",
+          error: reachable ? undefined : (probe as { available: false; reason: string }).reason,
+          connectedAt: _connected ? now : undefined,
+        },
+        lastSeenAt: now,
+      };
+    },
+
+    async checkHealth(): Promise<HealthCheckResult> {
+      const start = Date.now();
+      const probe = await probeWifiCamera();
+      const latencyMs = Date.now() - start;
+      if (probe.available) {
+        return {
+          status: "healthy",
+          message: `Wi-Fi camera reachable at ${config.baseUrl}`,
+          checkedAt: new Date().toISOString(),
+          latencyMs,
+        };
+      }
+      return {
+        status: "unhealthy",
+        message: probe.reason,
+        checkedAt: new Date().toISOString(),
+        latencyMs,
+      };
+    },
+
+    getPermissions(): DevicePermissions {
+      return {
+        granted: true, // Wi-Fi cameras require no OS permissions beyond network access
+        required: [],
+        async request(): Promise<boolean> {
+          return true;
+        },
+      };
+    },
+
+    on: emitter.on.bind(emitter),
+    emit: emitter.emit.bind(emitter),
+
     capture: captureFromWifiCamera,
   };
 }

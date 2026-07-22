@@ -66,6 +66,7 @@
   },
   "dependencies": {
     "@platform/camera-core": "workspace:*",
+    "@platform/device-core": "workspace:*",
     "@platform/provider-registry": "workspace:*",
     "@platform/shared-types": "workspace:*",
     "@platform/smart-vision": "workspace:*",

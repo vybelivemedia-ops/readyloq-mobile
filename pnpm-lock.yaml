@@ -660,6 +660,9 @@ importers:
       '@platform/camera-core':
         specifier: workspace:*
         version: link:../../repos/platform/packages/camera-core
+      '@platform/device-core':
+        specifier: workspace:*
+        version: link:../../repos/platform/packages/device-core
       '@platform/provider-registry':
         specifier: workspace:*
         version: link:../../repos/platform/packages/provider-registry

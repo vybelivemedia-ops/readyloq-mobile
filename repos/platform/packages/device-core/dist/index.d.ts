@@ -293,6 +293,7 @@ export interface DeviceDiscovery {
     stopScan(): void;
     readonly isScanning: boolean;
 }
+export { createDeviceRegistry } from "./device-registry-impl";
 /**
  * Higher-level lifecycle that manages the device subsystem as a whole.
  * Distinct from DeviceProvider's Lifecycle (which manages a single device).

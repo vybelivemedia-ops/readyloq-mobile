@@ -456,6 +456,12 @@ export interface DeviceDiscovery {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DEVICE REGISTRY — concrete factory
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { createDeviceRegistry } from "./device-registry-impl";
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DEVICE LIFECYCLE — subsystem-level lifecycle (manages the whole registry)
 // ─────────────────────────────────────────────────────────────────────────────
 
