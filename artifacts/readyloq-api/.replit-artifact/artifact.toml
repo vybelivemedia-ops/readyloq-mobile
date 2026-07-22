@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "ReadyLoq API"
+version = "1.0.0"
+id = "artifacts/readyloq-api"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 23590
+
+[services.development]
+run = "pnpm --filter @workspace/readyloq-api run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/api-server", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/api-server", "run", "start" ]
+
+[services.env]
+PORT = "23590"
+BASE_PATH = "/"
