@@ -14,6 +14,7 @@ import {
   derivePropertyType,
 } from "../lib/report-narrative-ai";
 import { logErrorEvent } from "../lib/error-events";
+import { buildServerReportHtml } from "../lib/report-html-server";
 
 const router = Router();
 
@@ -295,6 +296,42 @@ router.post("/:id/share", async (req, res) => {
     return res.json({ shareUrl: `${baseUrl}/share/summary/${summary.shareToken}` });
   } catch {
     return res.status(500).json({ error: "Failed to generate share URL" });
+  }
+});
+
+// GET /reports/:id/html
+// Returns a standalone, print-ready HTML page for the inspection report.
+// pdfUrl on the report record is set to /api/reports/:id/html after finalization
+// so technicians and managers can share a persistent browser-viewable URL.
+router.get("/:id/html", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).send("Invalid report id");
+
+    const [report] = await db
+      .select()
+      .from(reportsTable)
+      .where(and(eq(reportsTable.id, id), eq(reportsTable.companyId, companyId)));
+    if (!report) return res.status(404).send("Report not found");
+
+    const [inspection] = await db
+      .select()
+      .from(inspectionsTable)
+      .where(
+        and(
+          eq(inspectionsTable.id, report.inspectionId),
+          eq(inspectionsTable.companyId, companyId),
+        ),
+      );
+    if (!inspection) return res.status(404).send("Inspection not found");
+
+    const html = buildServerReportHtml(report, inspection);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "private, max-age=300");
+    return res.send(html);
+  } catch {
+    return res.status(500).send("Failed to render report");
   }
 });
 

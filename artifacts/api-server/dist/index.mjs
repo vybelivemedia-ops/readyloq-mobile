@@ -32724,14 +32724,14 @@ var require_parse3 = __commonJS({
       };
       if (opts.fastpaths !== false && !/(^[*!]|[/()[\]{}"])/.test(input)) {
         let backslashes = false;
-        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc2, chars, first, rest, index2) => {
+        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc3, chars, first, rest, index2) => {
           if (first === "\\") {
             backslashes = true;
             return m;
           }
           if (first === "?") {
-            if (esc2) {
-              return esc2 + first + (rest ? QMARK.repeat(rest.length) : "");
+            if (esc3) {
+              return esc3 + first + (rest ? QMARK.repeat(rest.length) : "");
             }
             if (index2 === 0) {
               return qmarkNoDot + (rest ? QMARK.repeat(rest.length) : "");
@@ -32742,12 +32742,12 @@ var require_parse3 = __commonJS({
             return DOT_LITERAL.repeat(chars.length);
           }
           if (first === "*") {
-            if (esc2) {
-              return esc2 + first + (rest ? star : "");
+            if (esc3) {
+              return esc3 + first + (rest ? star : "");
             }
             return star;
           }
-          return esc2 ? m : `\\${m}`;
+          return esc3 ? m : `\\${m}`;
         });
         if (backslashes === true) {
           if (opts.unescape === true) {
@@ -87149,7 +87149,7 @@ async function runInspectionFinalization(input) {
           photoCount: photoMedia.length,
           riskLevel: latestAnalysis?.riskLevel ?? null
         });
-        await db.update(reportsTable).set({ aiNarrative: narrative }).where(and(eq(reportsTable.id, reportId), eq(reportsTable.companyId, companyId)));
+        await db.update(reportsTable).set({ aiNarrative: narrative, pdfUrl: `/api/reports/${reportId}/html` }).where(and(eq(reportsTable.id, reportId), eq(reportsTable.companyId, companyId)));
       }
     } catch {
       void logErrorEvent("report", {
@@ -88980,6 +88980,140 @@ var dataset_default = router5;
 
 // src/routes/reports.ts
 var import_express7 = __toESM(require_express2(), 1);
+
+// src/lib/report-html-server.ts
+var SEVERITY_COLOR = {
+  critical: "#dc2626",
+  high: "#ea580c",
+  medium: "#d97706",
+  low: "#16a34a"
+};
+var SEVERITY_BG = {
+  critical: "#fee2e2",
+  high: "#ffedd5",
+  medium: "#fef9c3",
+  low: "#dcfce7"
+};
+function badge(text2, color, bg) {
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;color:${color};background:${bg};text-transform:uppercase;letter-spacing:.5px">${esc2(text2)}</span>`;
+}
+function esc2(s2) {
+  return String(s2 ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function section(title, content) {
+  return `
+    <div style="margin-bottom:28px">
+      <h2 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#6b7280;margin:0 0 12px 0;padding-bottom:6px;border-bottom:1px solid #e5e7eb">${esc2(title)}</h2>
+      ${content}
+    </div>`;
+}
+function buildServerReportHtml(report, inspection) {
+  const findings = (report.findings ?? []).filter(
+    (f) => f.category || f.description
+  );
+  const recommendations = report.recommendations ?? [];
+  const exclusions = report.exclusionOpportunities ?? [];
+  const sev = (report.severity ?? inspection.severity ?? "").toLowerCase();
+  const sevColor = SEVERITY_COLOR[sev] ?? "#6b7280";
+  const sevBg = SEVERITY_BG[sev] ?? "#f3f4f6";
+  const findingsHtml = findings.length === 0 ? `<p style="color:#6b7280;font-style:italic">No findings recorded.</p>` : findings.map((f) => {
+    const fsev = (f.severity ?? "").toLowerCase();
+    const fc = SEVERITY_COLOR[fsev] ?? "#6b7280";
+    const fb = SEVERITY_BG[fsev] ?? "#f9fafb";
+    return `
+          <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:${fb}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
+              <strong style="font-size:13px;color:#111827">${esc2(f.category ?? "Finding")}</strong>
+              ${fsev ? badge(fsev, fc, fb) : ""}
+            </div>
+            ${f.description ? `<p style="margin:4px 0 0 0;color:#374151;font-size:13px">${esc2(f.description)}</p>` : ""}
+            ${f.location ? `<p style="margin:4px 0 0 0;color:#6b7280;font-size:12px">\u{1F4CD} ${esc2(f.location)}</p>` : ""}
+            ${f.exclusionOpportunity ? `<p style="margin:6px 0 0 0;font-size:11px;color:#0369a1">\u{1F512} Exclusion opportunity identified</p>` : ""}
+          </div>`;
+  }).join("");
+  const recsHtml = recommendations.length === 0 ? `<p style="color:#6b7280;font-style:italic">No recommendations recorded.</p>` : `<ul style="margin:0;padding-left:18px">${recommendations.map((r) => `<li style="margin-bottom:6px;color:#374151;font-size:13px">${esc2(r)}</li>`).join("")}</ul>`;
+  const exclHtml = exclusions.length === 0 ? "" : section(
+    "Exclusion Opportunities",
+    `<ul style="margin:0;padding-left:18px">${exclusions.map((e) => `<li style="margin-bottom:6px;color:#374151;font-size:13px">${esc2(e)}</li>`).join("")}</ul>`
+  );
+  const narrativeHtml = report.aiNarrative ? section(
+    "AI Narrative",
+    `<div style="color:#374151;font-size:13px;line-height:1.7;white-space:pre-wrap">${esc2(report.aiNarrative)}</div>`
+  ) : "";
+  const treatmentHtml = report.treatmentNotes ? section(
+    "Treatment Notes",
+    `<div style="color:#374151;font-size:13px;line-height:1.6;white-space:pre-wrap">${esc2(report.treatmentNotes)}</div>`
+  ) : "";
+  const pestTypes = (inspection.pestTypes ?? []).join(", ");
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>${esc2(report.title)}</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;background:#f9fafb;color:#111827;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{max-width:820px;margin:0 auto;background:#fff;padding:40px 48px;min-height:100vh}
+    @media print{body{background:#fff}.page{padding:24px;box-shadow:none}}
+    @media(max-width:640px){.page{padding:24px 20px}}
+    .print-btn{position:fixed;bottom:24px;right:24px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(14,165,233,.35)}
+    .print-btn:hover{background:#0284c7}
+    @media print{.print-btn{display:none}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <div style="margin-bottom:32px;padding-bottom:24px;border-bottom:2px solid #0ea5e9">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+        <div>
+          <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#0ea5e9">ReadyLoq Inspection Report</p>
+          <h1 style="margin:0 0 6px 0;font-size:22px;font-weight:800;color:#111827">${esc2(report.title)}</h1>
+          <p style="margin:0;color:#6b7280;font-size:13px">${esc2(report.siteAddress)}</p>
+        </div>
+        <div style="text-align:right">
+          ${sev ? badge(sev + " severity", sevColor, sevBg) : ""}
+        </div>
+      </div>
+    </div>
+
+    <!-- Meta grid -->
+    ${section(
+    "Inspection Details",
+    `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        ${[
+      ["Date", report.inspectionDate],
+      ["Technician", report.technicianName],
+      ["Client", report.clientName],
+      ["Pest Types", pestTypes || null]
+    ].filter(([, v]) => v).map(
+      ([label, value]) => `
+          <div style="background:#f9fafb;border-radius:6px;padding:10px 12px">
+            <p style="margin:0 0 2px 0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af">${esc2(label)}</p>
+            <p style="margin:0;font-size:13px;color:#111827;font-weight:500">${esc2(value)}</p>
+          </div>`
+    ).join("")}
+      </div>`
+  )}
+
+    ${section("Findings", findingsHtml)}
+    ${section("Recommendations", recsHtml)}
+    ${exclHtml}
+    ${narrativeHtml}
+    ${treatmentHtml}
+
+    <!-- Footer -->
+    <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:11px">
+      Generated by ReadyLoq \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+    </div>
+  </div>
+  <button class="print-btn" onclick="window.print()">\u{1F5A8} Print / Save PDF</button>
+</body>
+</html>`;
+}
+
+// src/routes/reports.ts
 var router6 = (0, import_express7.Router)();
 function serializeReport(row) {
   return {
@@ -89161,6 +89295,28 @@ router6.post("/:id/share", async (req, res) => {
     return res.status(500).json({ error: "Failed to generate share URL" });
   }
 });
+router6.get("/:id/html", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).send("Invalid report id");
+    const [report] = await db.select().from(reportsTable).where(and(eq(reportsTable.id, id), eq(reportsTable.companyId, companyId)));
+    if (!report) return res.status(404).send("Report not found");
+    const [inspection] = await db.select().from(inspectionsTable).where(
+      and(
+        eq(inspectionsTable.id, report.inspectionId),
+        eq(inspectionsTable.companyId, companyId)
+      )
+    );
+    if (!inspection) return res.status(404).send("Inspection not found");
+    const html = buildServerReportHtml(report, inspection);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "private, max-age=300");
+    return res.send(html);
+  } catch {
+    return res.status(500).send("Failed to render report");
+  }
+});
 router6.delete("/:id", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
@@ -89296,10 +89452,10 @@ router7.get("/technicians", async (req, res) => {
       const completed = t.inspections.filter((i) => i.status === "completed").length;
       const avgFindings = total > 0 ? t.inspections.reduce((s2, i) => s2 + i.findingsCount, 0) / total : 0;
       const avgConf = t.confidences.length > 0 ? t.confidences.reduce((a, b) => a + b, 0) / t.confidences.length : 0;
-      let badge = null;
-      if (avgConf >= 0.85) badge = "Expert";
-      else if (avgConf >= 0.7) badge = "Senior";
-      else if (total >= 5) badge = "Field Tech";
+      let badge2 = null;
+      if (avgConf >= 0.85) badge2 = "Expert";
+      else if (avgConf >= 0.7) badge2 = "Senior";
+      else if (total >= 5) badge2 = "Field Tech";
       return {
         technicianName: t.name,
         technicianId: t.id,
@@ -89307,7 +89463,7 @@ router7.get("/technicians", async (req, res) => {
         avgFindingsPerInspection: Math.round(avgFindings * 10) / 10,
         avgAiConfidence: Math.round(avgConf * 100) / 100,
         completionRate: total > 0 ? Math.round(completed / total * 100) / 100 : 0,
-        badge
+        badge: badge2
       };
     }).sort((a, b) => b.inspectionCount - a.inspectionCount);
     return res.json(result);

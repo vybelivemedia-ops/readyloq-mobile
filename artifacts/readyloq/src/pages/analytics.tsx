@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   useGetAnalyticsDashboard,
   useGetAnalyticsTrends,
@@ -6,10 +7,18 @@ import {
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { BarChart3, TrendingUp, Users, AlertTriangle, Shield } from "lucide-react";
+
+const PERIOD_OPTIONS = [
+  { value: "7d",  label: "7 days"  },
+  { value: "30d", label: "30 days" },
+  { value: "90d", label: "90 days" },
+] as const;
+type Period = (typeof PERIOD_OPTIONS)[number]["value"];
 
 const COLORS = ["#0ea5e9", "#06b6d4", "#22d3ee", "#38bdf8", "#7dd3fc", "#bae6fd"];
 
@@ -38,8 +47,9 @@ function RiskGauge({ score }: { score: number }) {
 }
 
 export default function AnalyticsDashboard() {
+  const [period, setPeriod] = useState<Period>("30d");
   const { data: dashboard, isLoading: loadingDash } = useGetAnalyticsDashboard();
-  const { data: trends, isLoading: loadingTrends } = useGetAnalyticsTrends({ period: "30d" });
+  const { data: trends, isLoading: loadingTrends } = useGetAnalyticsTrends({ period });
   const { data: technicians, isLoading: loadingTech } = useGetTechnicianPerformance();
   const { data: risk, isLoading: loadingRisk } = useGetInfestationRisk();
 
@@ -131,7 +141,24 @@ export default function AnalyticsDashboard() {
       {/* Daily Trends */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Inspection Trends (30 days)</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">
+              Inspection Trends ({PERIOD_OPTIONS.find(p => p.value === period)?.label})
+            </CardTitle>
+            <div className="flex gap-1">
+              {PERIOD_OPTIONS.map(opt => (
+                <Button
+                  key={opt.value}
+                  variant={period === opt.value ? "default" : "ghost"}
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setPeriod(opt.value)}
+                >
+                  {opt.value}
+                </Button>
+              ))}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loadingTrends ? <Skeleton className="h-40 w-full" /> : trendData.length === 0 ? (

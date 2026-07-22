@@ -237,7 +237,7 @@ export async function runInspectionFinalization(input: {
         });
         await db
           .update(reportsTable)
-          .set({ aiNarrative: narrative })
+          .set({ aiNarrative: narrative, pdfUrl: `/api/reports/${reportId}/html` })
           .where(and(eq(reportsTable.id, reportId), eq(reportsTable.companyId, companyId)));
       }
     } catch {
