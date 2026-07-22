@@ -12,6 +12,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { AuthedImage } from "@/components/AuthedImage";
 import { FindingCard } from "@/components/FindingCard";
+import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -258,6 +259,9 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
             </Card>
           )}
         </View>
+
+        {/* Measurement devices */}
+        <MeasurementDevicePanel />
 
         {/* Generate report */}
         <Button

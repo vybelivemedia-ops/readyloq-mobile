@@ -663,6 +663,9 @@ importers:
       '@platform/device-core':
         specifier: workspace:*
         version: link:../../repos/platform/packages/device-core
+      '@platform/measurement-core':
+        specifier: workspace:*
+        version: link:../../repos/platform/packages/measurement-core
       '@platform/provider-registry':
         specifier: workspace:*
         version: link:../../repos/platform/packages/provider-registry
