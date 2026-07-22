@@ -8,6 +8,10 @@ import {
   updateInspection,
 } from "@/lib/api-client";
 import {
+  createBaitStation,
+  updateBaitStation,
+} from "@/lib/api-client/bait-stations";
+import {
   getLocalInspection,
   hasPendingWork,
   listLocalInspections,
@@ -299,6 +303,34 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
       notes: composedNotes || undefined,
       pestTypes: rec.pestTypes.length ? rec.pestTypes : undefined,
     });
+
+    // 5.5. Bait station sync — each station is created once on the server
+    // (tracked by serverId) and subsequently kept up-to-date via PATCH.
+    // Idempotent: POST only fires for stations without a serverId; PATCH
+    // always overwrites so a status change made offline is never lost.
+    const stations = (rec.baitStations ?? []).slice();
+    for (const station of stations) {
+      try {
+        const input = {
+          label: station.label,
+          locationType: station.locationType,
+          status: station.status,
+          notes: station.notes,
+          lastCheckedAt: station.lastCheckedAt,
+        };
+        if (!station.serverId) {
+          const created = await createBaitStation(serverId, input);
+          await merge((r) => {
+            const s = r.baitStations?.find((b) => b.id === station.id);
+            if (s) s.serverId = created.id;
+          });
+        } else {
+          await updateBaitStation(serverId, station.serverId, input);
+        }
+      } catch {
+        // Non-fatal: bait station errors must never block the main sync path.
+      }
+    }
 
     // 6. Explicit completion — idempotent server-side; runs the full
     // finalization pipeline (report, narrative, summary, opportunities,

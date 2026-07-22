@@ -5,6 +5,7 @@ import {
   inspectionsTable,
   analysisResultsTable,
   inspectionMediaTable,
+  customerSummariesTable,
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
@@ -257,6 +258,43 @@ router.post("/:id/generate-narrative", async (req, res) => {
       context: { stage: "generate_narrative" },
     });
     return res.status(502).json({ error: "Failed to generate AI report" });
+  }
+});
+
+// POST /reports/:id/share
+// Returns a share URL if the inspection has an approved customer summary with a
+// share token; 404 if no approved, shareable summary exists yet.
+router.post("/:id/share", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid report id" });
+
+    const [report] = await db
+      .select()
+      .from(reportsTable)
+      .where(and(eq(reportsTable.id, id), eq(reportsTable.companyId, companyId)));
+    if (!report) return res.status(404).json({ error: "Not found" });
+
+    const [summary] = await db
+      .select()
+      .from(customerSummariesTable)
+      .where(
+        and(
+          eq(customerSummariesTable.inspectionId, report.inspectionId),
+          eq(customerSummariesTable.companyId, companyId),
+        ),
+      )
+      .limit(1);
+
+    if (!summary?.shareToken) {
+      return res.status(404).json({ error: "No approved summary available for sharing yet" });
+    }
+
+    const baseUrl = process.env.PUBLIC_BASE_URL ?? `https://${process.env.REPLIT_DEV_DOMAIN ?? "localhost"}`;
+    return res.json({ shareUrl: `${baseUrl}/share/summary/${summary.shareToken}` });
+  } catch {
+    return res.status(500).json({ error: "Failed to generate share URL" });
   }
 });
 

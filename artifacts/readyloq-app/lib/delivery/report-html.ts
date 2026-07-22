@@ -20,6 +20,10 @@ export interface ReportData {
   /** True once the server finished analysis, so empty findings means "clean". */
   analysisComplete: boolean;
   companyName: string | null;
+  /** AI-generated narrative section: conditions that sustain/attract pests. */
+  conduciveConditions?: string | null;
+  /** AI-generated plain-language actions the customer should take themselves. */
+  customerRecommendations?: string[] | null;
 }
 
 function esc(text: string): string {
@@ -107,6 +111,24 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
       ? `<div class="section">
           <h2>Recommendations</h2>
           <ul>${recommendations.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+        </div>`
+      : "";
+
+  const { conduciveConditions, customerRecommendations } = data;
+
+  const conduciveSection =
+    conduciveConditions
+      ? `<div class="section">
+          <h2>Conducive conditions</h2>
+          <p>${esc(conduciveConditions)}</p>
+        </div>`
+      : "";
+
+  const customerRecsSection =
+    customerRecommendations && customerRecommendations.length > 0
+      ? `<div class="section">
+          <h2>Actions for you (the client)</h2>
+          <ul>${customerRecommendations.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
         </div>`
       : "";
 
@@ -201,6 +223,10 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
   </div>
 
   ${recsSection}
+
+  ${conduciveSection}
+
+  ${customerRecsSection}
 
   <div class="section">
     <h2>Photo evidence (${record.photos.length})</h2>

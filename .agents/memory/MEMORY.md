@@ -11,6 +11,7 @@
 - [Offline sync two-writer rule](offline-sync-two-writers.md) — all local-record writes must be serialized merge-updates; sync single-flight; inspections finish "completed" but reports "complete"
 - [Camera/vision extensibility](readyloq-camera-extensibility.md) — abstraction IMPLEMENTED: wifi-camera provider now LIVE (HTTP still capture, ProbeResult discriminated union); stub replaced in future-source-providers.ts
 - [Co-Pilot feature gaps](copilot-feature-gaps.md) — zoom lerp (rAF cubic ease-out), bait_stations table + CRUD API, useNetworkStatus hook + offline banner, WifiCameraModal + wifi-camera-provider.ts
+- [Bait station persistence](readyloq-bait-station-persistence.md) — LocalBaitStation type, write-through persist, sync step 5.5 (POST new / PATCH existing), non-generated API client in bait-stations.ts
 - [Gemini AI integration wiring](gemini-ai-wiring.md) — Replit-managed proxy (no user key); @google/genai must be a direct api-server dep because esbuild externalizes @google/* and pnpm doesn't hoist it
 - [Platform OS architecture](platform-os-architecture.md) — 12-package platform in repos/platform/; platform-intelligence is the OS kernel; asset-core (not property-core); GOVERNANCE.md enforces the boundary
 - [Platform migration state](platform-migration-state.md) — ALL 15 PACKAGES COMPLETE (Phases 0–14); device-core adopted in camera-core, voice-intelligence, measurement-core, meta-wearables (Phase 15 DONE)

@@ -15,6 +15,22 @@ import * as FileSystem from "expo-file-system/legacy";
  *    can never create duplicate server inspections.
  */
 
+/**
+ * Bait station as stored locally — superset of the UI BaitStation type, adding
+ * the server row id so the sync engine can PATCH instead of double-creating.
+ */
+export type LocalBaitStation = {
+  /** Client-generated UUID — stable identifier for UI keying. */
+  id: string;
+  label: string;
+  locationType?: string;
+  status: "active" | "missing" | "damaged" | "removed";
+  notes?: string;
+  lastCheckedAt?: string;
+  /** Server row id once synced via POST /inspections/:id/bait-stations. */
+  serverId?: number;
+};
+
 export type LocalPhoto = {
   /** Durable file:// URI under documentDirectory — always renderable. */
   localUri: string;
@@ -63,6 +79,12 @@ export type LocalInspection = {
   pestTypes: string[];
   notes: string;
   photos: LocalPhoto[];
+  /**
+   * Bait stations logged during this inspection.
+   * Persisted here so a crash or resume never loses station data.
+   * `serverId` on each station tracks what has been synced to the server.
+   */
+  baitStations: LocalBaitStation[];
 
   /** Technician tapped "Complete Inspection" (possibly offline). */
   completed: boolean;
@@ -142,6 +164,7 @@ export function newLocalInspection(
     updatedAt: now,
     ...fields,
     photos: [],
+    baitStations: [],
     completed: false,
     completedAt: null,
     serverCompleted: false,
@@ -287,6 +310,7 @@ function parseRecord(raw: string): LocalInspection | null {
     rec.lastSyncSuccess ??= null;
     rec.allFindingsReviewed ??= false;
     rec.pendingCorrections ??= [];
+    rec.baitStations ??= [];
     return rec;
   } catch {
     return null;

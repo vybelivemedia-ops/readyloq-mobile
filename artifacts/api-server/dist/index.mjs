@@ -68775,7 +68775,12 @@ var inspectionsTable = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     completedAt: timestamp("completed_at")
   },
-  (t) => [uniqueIndex("inspections_company_client_key_uq").on(t.companyId, t.clientKey)]
+  (t) => [
+    uniqueIndex("inspections_company_client_key_uq").on(t.companyId, t.clientKey),
+    index("inspections_technician_id_idx").on(t.technicianId),
+    index("inspections_status_idx").on(t.status),
+    index("inspections_company_status_idx").on(t.companyId, t.status)
+  ]
 );
 var inspectionMediaTable = pgTable("inspection_media", {
   id: serial("id").primaryKey(),
@@ -89127,6 +89132,28 @@ router6.post("/:id/generate-narrative", async (req, res) => {
       context: { stage: "generate_narrative" }
     });
     return res.status(502).json({ error: "Failed to generate AI report" });
+  }
+});
+router6.post("/:id/share", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid report id" });
+    const [report] = await db.select().from(reportsTable).where(and(eq(reportsTable.id, id), eq(reportsTable.companyId, companyId)));
+    if (!report) return res.status(404).json({ error: "Not found" });
+    const [summary] = await db.select().from(customerSummariesTable).where(
+      and(
+        eq(customerSummariesTable.inspectionId, report.inspectionId),
+        eq(customerSummariesTable.companyId, companyId)
+      )
+    ).limit(1);
+    if (!summary?.shareToken) {
+      return res.status(404).json({ error: "No approved summary available for sharing yet" });
+    }
+    const baseUrl = process.env.PUBLIC_BASE_URL ?? `https://${process.env.REPLIT_DEV_DOMAIN ?? "localhost"}`;
+    return res.json({ shareUrl: `${baseUrl}/share/summary/${summary.shareToken}` });
+  } catch {
+    return res.status(500).json({ error: "Failed to generate share URL" });
   }
 });
 router6.delete("/:id", async (req, res) => {

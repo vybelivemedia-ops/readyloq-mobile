@@ -7,6 +7,7 @@ import {
   jsonb,
   boolean,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -34,7 +35,12 @@ export const inspectionsTable = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     completedAt: timestamp("completed_at"),
   },
-  (t) => [uniqueIndex("inspections_company_client_key_uq").on(t.companyId, t.clientKey)],
+  (t) => [
+    uniqueIndex("inspections_company_client_key_uq").on(t.companyId, t.clientKey),
+    index("inspections_technician_id_idx").on(t.technicianId),
+    index("inspections_status_idx").on(t.status),
+    index("inspections_company_status_idx").on(t.companyId, t.status),
+  ],
 );
 
 export const inspectionMediaTable = pgTable("inspection_media", {

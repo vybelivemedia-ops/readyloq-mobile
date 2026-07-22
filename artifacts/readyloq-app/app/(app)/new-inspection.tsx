@@ -26,7 +26,8 @@ import {
 
 import { AiInsightsPanel } from "@/components/AiInsightsPanel";
 import { CoPilotHUD } from "@/components/CoPilotHUD";
-import { BaitStationPanel, type BaitStation } from "@/components/BaitStationPanel";
+import { BaitStationPanel } from "@/components/BaitStationPanel";
+import { type LocalBaitStation } from "@/lib/local/inspection-store";
 import { WifiCameraModal } from "@/components/WifiCameraModal";
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
@@ -182,22 +183,36 @@ export default function NewInspectionScreen() {
   const sessionManagerRef = useRef<AudioSessionManager | null>(null);
 
   // ── Bait station tracking (T002) ──────────────────────────────────────────
-  const [baitStations, setBaitStations] = useState<BaitStation[]>([]);
+  const [baitStations, setBaitStations] = useState<LocalBaitStation[]>([]);
   const [showBaitPanel, setShowBaitPanel] = useState(false);
 
-  function addBaitStation(station: Omit<BaitStation, "id">) {
-    setBaitStations((prev) => [
-      ...prev,
-      { ...station, id: Math.random().toString(36).slice(2) },
-    ]);
+  function addBaitStation(station: Omit<LocalBaitStation, "id">) {
+    const next: LocalBaitStation = { ...station, id: Math.random().toString(36).slice(2) };
+    setBaitStations((prev) => {
+      const updated = [...prev, next];
+      void updateLocalInspection(recordRef.current?.localId ?? "", (r) => {
+        r.baitStations = updated;
+      });
+      return updated;
+    });
   }
-  function updateBaitStation(id: string, update: Partial<BaitStation>) {
-    setBaitStations((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...update } : s)),
-    );
+  function updateBaitStation(id: string, update: Partial<LocalBaitStation>) {
+    setBaitStations((prev) => {
+      const updated = prev.map((s) => (s.id === id ? { ...s, ...update } : s));
+      void updateLocalInspection(recordRef.current?.localId ?? "", (r) => {
+        r.baitStations = updated;
+      });
+      return updated;
+    });
   }
   function removeBaitStation(id: string) {
-    setBaitStations((prev) => prev.filter((s) => s.id !== id));
+    setBaitStations((prev) => {
+      const updated = prev.filter((s) => s.id !== id);
+      void updateLocalInspection(recordRef.current?.localId ?? "", (r) => {
+        r.baitStations = updated;
+      });
+      return updated;
+    });
   }
 
   // ── Wi-Fi camera (T004) ───────────────────────────────────────────────────
@@ -385,6 +400,7 @@ export default function NewInspectionScreen() {
         setUploadedCount(rec.photos.filter((p) => p.storagePath).length);
         analyzedCount.current = rec.analyzedCount;
         if (rec.serverId != null) setWsInspectionId(rec.serverId);
+        if (rec.baitStations?.length) setBaitStations(rec.baitStations);
         setStep(rec.photos.length > 0 ? "capture" : "setup");
       }
       setHydrated(true);
@@ -430,8 +446,15 @@ export default function NewInspectionScreen() {
     if (updated) recordRef.current = updated;
   };
 
+  const [pestTypeError, setPestTypeError] = useState(false);
+
   // Entering the camera creates the durable local record (idempotent).
   const goToCapture = async () => {
+    if (pestTypes.length === 0) {
+      setPestTypeError(true);
+      return;
+    }
+    setPestTypeError(false);
     if (!recordRef.current) {
       recordRef.current = newLocalInspection({
         siteAddress,
@@ -557,8 +580,10 @@ export default function NewInspectionScreen() {
 
   const canContinueSetup = siteAddress.trim().length > 0 && technicianName.trim().length > 0;
 
-  const togglePest = (p: string) =>
+  const togglePest = (p: string) => {
+    setPestTypeError(false);
     setPestTypes((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  };
 
   // Shared ingest path for ALL vision providers: copy each file out of any
   // cache dir IMMEDIATELY (the OS can purge caches at any time — evidence must
@@ -1966,6 +1991,11 @@ export default function NewInspectionScreen() {
               <Pill key={p} label={p} active={pestTypes.includes(p)} onPress={() => togglePest(p)} colors={colors} />
             ))}
           </View>
+          {pestTypeError && (
+            <Text style={{ color: "#ef4444", fontSize: 12, marginTop: 4 }}>
+              Select at least one pest type before continuing.
+            </Text>
+          )}
         </View>
 
         <View style={{ gap: 6 }}>
