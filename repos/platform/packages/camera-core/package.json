@@ -2,10 +2,13 @@
   "name": "@platform/camera-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Universal camera abstraction — pull/session/push capability model, provider contracts.",
-  "main": "./src/index.ts",
+  "description": "Universal camera abstraction \u2014 pull/session/push capability model, provider contracts.",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -17,5 +20,6 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

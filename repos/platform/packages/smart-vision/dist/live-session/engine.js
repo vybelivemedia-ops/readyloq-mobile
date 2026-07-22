@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/live-session — LiveSessionEngine contract.
  *
@@ -24,4 +23,4 @@
  * GOVERNANCE: Zero domain logic. All behaviour injected via dependencies.
  * See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

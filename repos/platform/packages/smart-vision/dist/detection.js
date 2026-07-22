@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — AI detection engine contracts.
  *
@@ -13,4 +12,4 @@
  *   application layer. No domain strings appear in this file.
  *   See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

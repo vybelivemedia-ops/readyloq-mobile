@@ -2,10 +2,13 @@
   "name": "@platform/ui-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Platform UI primitives — design tokens, component contracts, theming.",
-  "main": "./src/index.ts",
+  "description": "Platform UI primitives \u2014 design tokens, component contracts, theming.",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -16,5 +19,6 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

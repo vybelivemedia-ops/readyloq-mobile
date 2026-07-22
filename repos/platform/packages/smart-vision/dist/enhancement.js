@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — image enhancement provider contracts.
  *
@@ -12,4 +11,4 @@
  * No domain logic — enhancement is a pure signal-processing concern.
  * GOVERNANCE: See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

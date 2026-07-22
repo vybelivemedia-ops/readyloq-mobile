@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — top-level engine configuration.
  *
@@ -14,8 +13,6 @@
  * feature flags. Domain-specific tuning lives in the application layer.
  * See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_SMART_VISION_CONFIG = void 0;
 // ─── Default configuration ────────────────────────────────────────────────────
 /**
  * Sensible out-of-the-box defaults for the SmartVisionEngine.
@@ -27,7 +24,7 @@ exports.DEFAULT_SMART_VISION_CONFIG = void 0;
  *     autoCapture: { ...DEFAULT_SMART_VISION_CONFIG.autoCapture, minQualityScore: 70 },
  *   };
  */
-exports.DEFAULT_SMART_VISION_CONFIG = {
+export const DEFAULT_SMART_VISION_CONFIG = {
     features: {
         objectTracking: true,
         subjectLocking: true,

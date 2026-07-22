@@ -2,10 +2,13 @@
   "name": "@platform/sync-engine",
   "version": "0.1.0",
   "private": true,
-  "description": "Offline-first sync engine — queue, retry, conflict resolution contracts.",
-  "main": "./src/index.ts",
+  "description": "Offline-first sync engine \u2014 queue, retry, conflict resolution contracts.",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -17,5 +20,6 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

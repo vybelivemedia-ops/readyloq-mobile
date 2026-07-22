@@ -83,4 +83,3 @@ export const LOCAL_AI_EVENT_KINDS = {
     MEMORY_LOW: "local_ai.resource.memory_low",
     NETWORK_CHANGED: "local_ai.resource.network_changed",
 };
-//# sourceMappingURL=index.js.map

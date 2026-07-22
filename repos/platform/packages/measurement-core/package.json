@@ -2,10 +2,13 @@
   "name": "@platform/measurement-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Measurement and metrics abstractions — units, conversions, aggregations.",
-  "main": "./src/index.ts",
+  "description": "Measurement and metrics abstractions \u2014 units, conversions, aggregations.",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -17,5 +20,6 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "description": "On-device AI runtime \u2014 model registry, inference engine, vision, OCR, embedding, image quality, duplicate/blur/motion detection, battery/thermal awareness, hybrid provider selection",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -23,5 +26,6 @@
   "devDependencies": {
     "typescript": "^5.4.0",
     "vitest": "^4.1.8"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

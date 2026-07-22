@@ -2,10 +2,13 @@
   "name": "@platform/ai-core",
   "version": "0.1.0",
   "private": true,
-  "description": "AI provider abstraction — model-agnostic request/response contracts.",
-  "main": "./src/index.ts",
+  "description": "AI provider abstraction \u2014 model-agnostic request/response contracts.",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -16,5 +19,6 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

@@ -38,4 +38,3 @@
  *   ui-core must NOT depend on camera-core, streaming-core, etc.
  */
 export {};
-//# sourceMappingURL=index.js.map

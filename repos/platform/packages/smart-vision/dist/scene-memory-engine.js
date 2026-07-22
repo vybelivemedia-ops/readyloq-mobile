@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — SceneMemoryEngine: first-class scene understanding.
  *
@@ -29,9 +28,7 @@
  * GOVERNANCE: No domain logic. classId values and measurement unit strings
  * are application-defined. See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_SCENE_MEMORY_ENGINE_CONFIG = void 0;
-exports.DEFAULT_SCENE_MEMORY_ENGINE_CONFIG = {
+export const DEFAULT_SCENE_MEMORY_ENGINE_CONFIG = {
     observationTtlMs: 30 * 60 * 1000,
     objectMergeIouThreshold: 0.3,
     maxObjectsPerClass: 0,

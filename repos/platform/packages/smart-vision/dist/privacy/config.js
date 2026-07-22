@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/privacy — configuration.
  *
@@ -10,10 +9,8 @@
  * GOVERNANCE: No domain logic. No class-specific defaults.
  * See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_PRIVACY_CONFIGURATION = void 0;
 // ─── Defaults ────────────────────────────────────────────────────────────────
-exports.DEFAULT_PRIVACY_CONFIGURATION = {
+export const DEFAULT_PRIVACY_CONFIGURATION = {
     enabled: true,
     liveVideo: true,
     capturedImages: true,

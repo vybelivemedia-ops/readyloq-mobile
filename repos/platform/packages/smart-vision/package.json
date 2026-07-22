@@ -2,10 +2,13 @@
   "name": "@platform/smart-vision",
   "version": "0.1.0",
   "private": true,
-  "description": "Platform vision intelligence — live frame processing, object tracking, smart zoom/crop, auto-capture, super-resolution, quality scoring, subject locking, motion prediction, device capability negotiation. Zero domain logic.",
-  "main": "./src/index.ts",
+  "description": "Platform vision intelligence \u2014 live frame processing, object tracking, smart zoom/crop, auto-capture, super-resolution, quality scoring, subject locking, motion prediction, device capability negotiation. Zero domain logic.",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -18,5 +21,6 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

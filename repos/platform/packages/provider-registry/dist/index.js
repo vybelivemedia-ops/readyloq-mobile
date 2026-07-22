@@ -29,4 +29,3 @@
  *     extend their own base types without inheritance conflicts.
  */
 export {};
-//# sourceMappingURL=index.js.map

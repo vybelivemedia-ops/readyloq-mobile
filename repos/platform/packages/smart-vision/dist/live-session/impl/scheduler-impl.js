@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/live-session — LiveFrameScheduler implementation.
  *
@@ -8,17 +7,14 @@
  * is within the token interval, the incoming frame still proceeds to let
  * the caller drop the queued frame instead.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createLiveFrameScheduler = createLiveFrameScheduler;
-function createLiveFrameScheduler(opts) {
-    var targetFps = opts.targetFps;
-    var maxFrameAgeMs = opts.maxFrameAgeMs;
-    var lastAcceptMs = 0;
-    var recentAcceptTimes = [];
+export function createLiveFrameScheduler(opts) {
+    let targetFps = opts.targetFps;
+    const maxFrameAgeMs = opts.maxFrameAgeMs;
+    let lastAcceptMs = 0;
+    const recentAcceptTimes = [];
     function pruneRecentTimes() {
-        var _a;
-        var cutoff = Date.now() - 1000;
-        while (recentAcceptTimes.length > 0 && ((_a = recentAcceptTimes[0]) !== null && _a !== void 0 ? _a : 0) < cutoff) {
+        const cutoff = Date.now() - 1000;
+        while (recentAcceptTimes.length > 0 && (recentAcceptTimes[0] ?? 0) < cutoff) {
             recentAcceptTimes.shift();
         }
     }
@@ -33,31 +29,31 @@ function createLiveFrameScheduler(opts) {
             pruneRecentTimes();
             return recentAcceptTimes.length;
         },
-        accept: function (frame, queueDepth) {
-            var now = Date.now();
-            var frameAge = now - frame.meta.timestamp;
+        accept(frame, queueDepth) {
+            const now = Date.now();
+            const frameAge = now - frame.meta.timestamp;
             // 1. Staleness check — drop frames that are too old to be useful.
             if (maxFrameAgeMs > 0 && frameAge > maxFrameAgeMs) {
-                return { decision: "drop_stale", frameAgeMs: frameAge, queueDepth: queueDepth };
+                return { decision: "drop_stale", frameAgeMs: frameAge, queueDepth };
             }
             // 2. Token bucket — enforce target FPS.
             //    Allow one accepted frame per (1000/targetFps) ms.
             //    If we're within the interval AND there is already a queued frame,
             //    drop the incoming one (the queued frame is fresher in the pipeline).
-            var minIntervalMs = 1000 / Math.max(1, targetFps);
-            var sinceLast = now - lastAcceptMs;
+            const minIntervalMs = 1000 / Math.max(1, targetFps);
+            const sinceLast = now - lastAcceptMs;
             if (sinceLast < minIntervalMs && queueDepth > 0) {
-                return { decision: "drop_full", frameAgeMs: frameAge, queueDepth: queueDepth };
+                return { decision: "drop_full", frameAgeMs: frameAge, queueDepth };
             }
             // Accept
             lastAcceptMs = now;
             recentAcceptTimes.push(now);
-            return { decision: "process", frameAgeMs: frameAge, queueDepth: queueDepth };
+            return { decision: "process", frameAgeMs: frameAge, queueDepth };
         },
-        updateTargetFps: function (fps) {
+        updateTargetFps(fps) {
             targetFps = Math.max(1, fps);
         },
-        reset: function () {
+        reset() {
             lastAcceptMs = 0;
             recentAcceptTimes.length = 0;
         },

@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/privacy — policy contracts.
  *
@@ -11,4 +10,4 @@
  * GOVERNANCE: No class-specific logic. No application-specific presets.
  * See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

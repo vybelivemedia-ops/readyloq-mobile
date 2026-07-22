@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/privacy — detection contracts.
  *
@@ -10,4 +9,4 @@
  * domain. All values are generic computer-vision concepts.
  * See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

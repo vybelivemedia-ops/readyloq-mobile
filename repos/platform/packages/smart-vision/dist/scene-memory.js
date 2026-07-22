@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — scene memory contracts.
  *
@@ -49,4 +48,4 @@
  *
  * GOVERNANCE: See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

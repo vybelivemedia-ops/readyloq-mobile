@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — domain-agnostic frame quality scoring contracts.
  *
@@ -19,4 +18,4 @@
  *
  * GOVERNANCE: See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

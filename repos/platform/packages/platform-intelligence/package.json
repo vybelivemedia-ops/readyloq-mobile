@@ -3,17 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "description": "Platform OS kernel — orchestrates intelligence services across the platform.",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@platform/ai-core": "workspace:*",
+    "@platform/camera-core": "workspace:*",
     "@platform/core": "workspace:*",
-    "@platform/shared-types": "workspace:*"
+    "@platform/evidence-core": "workspace:*",
+    "@platform/shared-types": "workspace:*",
+    "@platform/voice-intelligence": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.4.0"

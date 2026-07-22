@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — policy-based auto-capture contracts.
  *
@@ -23,4 +22,4 @@
  *
  * GOVERNANCE: See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/privacy — core types.
  *
@@ -8,4 +7,4 @@
  * GOVERNANCE: Zero application-specific identifiers.
  * See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

@@ -4,5 +4,26 @@
     "composite": true,
     "declaration": true,
     "declarationMap": true
-  }
+  },
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/shared-types" },
+    { "path": "./packages/ai-core" },
+    { "path": "./packages/asset-core" },
+    { "path": "./packages/camera-core" },
+    { "path": "./packages/device-core" },
+    { "path": "./packages/evidence-core" },
+    { "path": "./packages/live-session-core" },
+    { "path": "./packages/local-intelligence" },
+    { "path": "./packages/measurement-core" },
+    { "path": "./packages/meta-wearables" },
+    { "path": "./packages/platform-intelligence" },
+    { "path": "./packages/provider-registry" },
+    { "path": "./packages/smart-vision" },
+    { "path": "./packages/storage-core" },
+    { "path": "./packages/sync-engine" },
+    { "path": "./packages/ui-core" },
+    { "path": "./packages/voice-intelligence" }
+  ]
 }

@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/live-session — VisionSession contract.
  *
@@ -11,4 +10,4 @@
  *
  * GOVERNANCE: See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

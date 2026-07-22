@@ -2,10 +2,13 @@
   "name": "@platform/meta-wearables",
   "version": "0.1.0",
   "private": true,
-  "description": "Meta wearables integration — Ray-Ban smart glasses provider contracts.",
-  "main": "./src/index.ts",
+  "description": "Meta wearables integration \u2014 Ray-Ban smart glasses provider contracts.",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -18,5 +21,6 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

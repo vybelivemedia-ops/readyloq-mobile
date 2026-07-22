@@ -2,10 +2,13 @@
   "name": "@platform/provider-registry",
   "version": "0.1.0",
   "private": true,
-  "description": "Generic provider registration, discovery, health checks, capability matching, and lifecycle management — the common pattern all provider-based packages implement",
-  "main": "./src/index.ts",
+  "description": "Generic provider registration, discovery, health checks, capability matching, and lifecycle management \u2014 the common pattern all provider-based packages implement",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -17,5 +20,6 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

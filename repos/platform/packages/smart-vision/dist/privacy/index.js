@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/privacy — public contract barrel.
  *
@@ -9,8 +8,5 @@
  *   import type { PrivacyPolicy, PrivacyObjectClass } from "@platform/smart-vision/privacy";
  *   import { createPrivacyFactory } from "@platform/smart-vision/privacy/impl";
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_PRIVACY_CONFIGURATION = void 0;
 // ─── Configuration ────────────────────────────────────────────────────────────
-var config_1 = require("./config");
-Object.defineProperty(exports, "DEFAULT_PRIVACY_CONFIGURATION", { enumerable: true, get: function () { return config_1.DEFAULT_PRIVACY_CONFIGURATION; } });
+export { DEFAULT_PRIVACY_CONFIGURATION } from "./config";

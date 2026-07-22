@@ -39,9 +39,10 @@
 /**
  * Replit object storage sidecar endpoint.
  * Both applications hardcode this value — it is a Replit-platform constant.
- * Override via environment variable in non-Replit deployments.
+ * Override this constant at the application level (e.g. via process.env in Node.js)
+ * when deploying outside of Replit.
  */
-export declare const REPLIT_SIDECAR_ENDPOINT: string;
+export declare const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 /**
  * Thrown when a requested object does not exist in storage.
  * Canonical — identical class in both ReadyLoq and VYBE.

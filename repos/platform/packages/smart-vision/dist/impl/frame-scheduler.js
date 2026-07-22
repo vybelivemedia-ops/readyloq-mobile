@@ -1,35 +1,29 @@
-"use strict";
 /**
  * @platform/smart-vision — concrete FrameScheduler implementation.
  *
  * Decouples the hardware camera rate (e.g. 60 fps) from the analysis rate
  * (e.g. 15 fps). Priority-queue backed; adaptive to processing load.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createFrameScheduler = createFrameScheduler;
-var PRIORITY_RANK = {
+const PRIORITY_RANK = {
     critical: 0,
     high: 1,
     normal: 2,
     low: 3,
     background: 4,
 };
-function createFrameScheduler(initialTargetFps, options) {
-    var _a, _b, _c;
-    if (initialTargetFps === void 0) { initialTargetFps = 15; }
-    if (options === void 0) { options = {}; }
-    var maxQueueDepth = (_a = options.maxQueueDepth) !== null && _a !== void 0 ? _a : 4;
-    var dropPolicy = (_b = options.dropPolicy) !== null && _b !== void 0 ? _b : "drop_oldest";
-    var detectionStride = (_c = options.detectionStride) !== null && _c !== void 0 ? _c : 3;
-    var targetFps = initialTargetFps;
-    var minIntervalMs = 1000 / targetFps;
-    var lastAcceptedMs = 0;
-    var strideCounter = 0;
-    var submitted = 0;
-    var dropped = 0;
-    var queue = [];
+export function createFrameScheduler(initialTargetFps = 15, options = {}) {
+    const maxQueueDepth = options.maxQueueDepth ?? 4;
+    const dropPolicy = options.dropPolicy ?? "drop_oldest";
+    const detectionStride = options.detectionStride ?? 3;
+    let targetFps = initialTargetFps;
+    let minIntervalMs = 1000 / targetFps;
+    let lastAcceptedMs = 0;
+    let strideCounter = 0;
+    let submitted = 0;
+    let dropped = 0;
+    const queue = [];
     function shouldAcceptFrame() {
-        var now = Date.now();
+        const now = Date.now();
         // Accept if enough time has elapsed since the last accepted frame.
         // Allow 10% slack so real 15fps hardware doesn't constantly miss the window.
         return now - lastAcceptedMs >= minIntervalMs * 0.9;
@@ -42,8 +36,7 @@ function createFrameScheduler(initialTargetFps, options) {
         get queueDepth() { return queue.length; },
         get submittedFrames() { return submitted; },
         get droppedFrames() { return dropped; },
-        submit: function (frame) {
-            var _a, _b, _c, _d;
+        submit(frame) {
             submitted++;
             if (!shouldAcceptFrame()) {
                 dropped++;
@@ -51,10 +44,10 @@ function createFrameScheduler(initialTargetFps, options) {
             }
             lastAcceptedMs = Date.now();
             strideCounter++;
-            var isDetectionFrame = strideCounter % detectionStride === 0;
-            var priority = assignPriority(isDetectionFrame);
-            var deadlineMs = Date.now() + minIntervalMs * 3;
-            var scheduled = { frame: frame, priority: priority, deadlineMs: deadlineMs, isDetectionFrame: isDetectionFrame };
+            const isDetectionFrame = strideCounter % detectionStride === 0;
+            const priority = assignPriority(isDetectionFrame);
+            const deadlineMs = Date.now() + minIntervalMs * 3;
+            const scheduled = { frame, priority, deadlineMs, isDetectionFrame };
             if (queue.length < maxQueueDepth) {
                 queue.push(scheduled);
                 return;
@@ -67,16 +60,16 @@ function createFrameScheduler(initialTargetFps, options) {
                     queue.push(scheduled);
                     break;
                 case "drop_lowest_priority": {
-                    var worstIdx = 0;
-                    var worstRank = PRIORITY_RANK[(_b = (_a = queue[0]) === null || _a === void 0 ? void 0 : _a.priority) !== null && _b !== void 0 ? _b : "background"];
-                    for (var i = 1; i < queue.length; i++) {
-                        var rank = PRIORITY_RANK[(_d = (_c = queue[i]) === null || _c === void 0 ? void 0 : _c.priority) !== null && _d !== void 0 ? _d : "background"];
+                    let worstIdx = 0;
+                    let worstRank = PRIORITY_RANK[queue[0]?.priority ?? "background"];
+                    for (let i = 1; i < queue.length; i++) {
+                        const rank = PRIORITY_RANK[queue[i]?.priority ?? "background"];
                         if (rank > worstRank) {
                             worstRank = rank;
                             worstIdx = i;
                         }
                     }
-                    var incomingRank = PRIORITY_RANK[priority];
+                    const incomingRank = PRIORITY_RANK[priority];
                     if (incomingRank > worstRank) {
                         // Incoming is lower priority than everything — drop it
                         dropped++;
@@ -93,15 +86,14 @@ function createFrameScheduler(initialTargetFps, options) {
                     break;
             }
         },
-        dequeue: function () {
-            var _a;
-            return (_a = queue.shift()) !== null && _a !== void 0 ? _a : null;
+        dequeue() {
+            return queue.shift() ?? null;
         },
-        setTargetFps: function (fps) {
+        setTargetFps(fps) {
             targetFps = Math.max(1, fps);
             minIntervalMs = 1000 / targetFps;
         },
-        reset: function () {
+        reset() {
             queue.length = 0;
             submitted = 0;
             dropped = 0;

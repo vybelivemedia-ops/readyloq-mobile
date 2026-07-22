@@ -2,14 +2,8 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "lib": ["es2022", "dom"]
   },
-  "include": [
-    "src"
-  ],
-  "references": [
-    { "path": "../core" },
-    { "path": "../shared-types" },
-    { "path": "../camera-core" }
-  ]
+  "include": ["src"]
 }

@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/live-session — unified pipeline event system.
  *
@@ -14,4 +13,4 @@
  * GOVERNANCE: Payloads carry no domain strings.
  * See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

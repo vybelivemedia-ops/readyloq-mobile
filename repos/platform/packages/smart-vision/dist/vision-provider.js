@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — VisionProvider abstraction.
  *
@@ -25,4 +24,4 @@
  * ObjectDetectionAnalysis are application-defined integers — the platform
  * never assigns meaning to them. See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision/privacy — engine + session contracts.
  *
@@ -16,4 +15,4 @@
  * GOVERNANCE: Zero domain logic. All behaviour injected via deps + policy.
  * See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

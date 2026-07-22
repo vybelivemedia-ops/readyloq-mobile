@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — super-resolution (upscaling) contracts.
  *
@@ -10,13 +9,11 @@
  *
  * GOVERNANCE: See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SCALE_MULTIPLIER = void 0;
 /**
  * Maps each ScalePreset to its numeric multiplier.
  * Exported as a plain value so callers can avoid hardcoding the numbers.
  */
-exports.SCALE_MULTIPLIER = {
+export const SCALE_MULTIPLIER = {
     "2x": 2,
     "4x": 4,
     "8x": 8,

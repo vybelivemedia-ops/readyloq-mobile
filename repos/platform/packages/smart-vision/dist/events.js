@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — typed event system.
  *
@@ -13,4 +12,4 @@
  *   classId values in detection payloads are still app-defined integers.
  *   See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

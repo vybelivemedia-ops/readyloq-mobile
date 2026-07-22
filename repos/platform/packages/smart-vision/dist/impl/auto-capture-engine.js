@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — concrete AutoCaptureEngine implementation.
  *
@@ -8,45 +7,44 @@
  *   - Hold           — operator-initiated pause
  *   - Policy registry — named policies, switchable at runtime
  */
-var __assign = (this && this.__assign) || function () {
-    __assign = Object.assign || function(t) {
-        for (var s, i = 1, n = arguments.length; i < n; i++) {
-            s = arguments[i];
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                t[p] = s[p];
-        }
-        return t;
-    };
-    return __assign.apply(this, arguments);
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createAutoCaptureEngine = createAutoCaptureEngine;
-var capture_policies_1 = require("./capture-policies");
-function createAutoCaptureEngine(policyId, initialPolicy, cfg) {
-    var registry = new Map();
-    var activePolicy = initialPolicy;
-    var _isOnHold = false;
-    var _captureCount = 0;
-    var _lastCaptureMs = 0;
+import { createBuiltInPolicy } from "./capture-policies";
+export function createAutoCaptureEngine(policyId, initialPolicy, cfg) {
+    const registry = new Map();
+    let activePolicy = initialPolicy;
+    let _isOnHold = false;
+    let _captureCount = 0;
+    let _lastCaptureMs = 0;
     function isRateLimited() {
         if (_lastCaptureMs === 0)
             return false;
-        var elapsed = Date.now() - _lastCaptureMs;
+        const elapsed = Date.now() - _lastCaptureMs;
         // Enforce both minInterval AND cooldown — whichever is larger
-        var required = Math.max(cfg.minIntervalMs, cfg.postCaptureCooldownMs);
+        const required = Math.max(cfg.minIntervalMs, cfg.postCaptureCooldownMs);
         return elapsed < required;
     }
     function enforce(decision, ctx) {
         // Engine-level overrides (safety layer on top of policy)
         if (_isOnHold) {
-            return __assign(__assign({}, decision), { action: "wait", reasons: [{ code: "manual_hold", detail: "Engine is on hold" }] });
+            return {
+                ...decision,
+                action: "wait",
+                reasons: [{ code: "manual_hold", detail: "Engine is on hold" }],
+            };
         }
         if (ctx.captureLimitReached) {
-            return __assign(__assign({}, decision), { action: "skip", reasons: [{ code: "capture_limit_reached", detail: "Session capture limit reached" }] });
+            return {
+                ...decision,
+                action: "skip",
+                reasons: [{ code: "capture_limit_reached", detail: "Session capture limit reached" }],
+            };
         }
         if (decision.action === "capture" && isRateLimited()) {
-            var remaining = Math.max(cfg.minIntervalMs, cfg.postCaptureCooldownMs) - (Date.now() - _lastCaptureMs);
-            return __assign(__assign({}, decision), { action: "wait", reasons: [{ code: "rate_limited", detail: "".concat(Math.ceil(remaining), "ms remaining"), observedValue: Date.now() - _lastCaptureMs, requiredValue: cfg.minIntervalMs }] });
+            const remaining = Math.max(cfg.minIntervalMs, cfg.postCaptureCooldownMs) - (Date.now() - _lastCaptureMs);
+            return {
+                ...decision,
+                action: "wait",
+                reasons: [{ code: "rate_limited", detail: `${Math.ceil(remaining)}ms remaining`, observedValue: Date.now() - _lastCaptureMs, requiredValue: cfg.minIntervalMs }],
+            };
         }
         return decision;
     }
@@ -54,38 +52,38 @@ function createAutoCaptureEngine(policyId, initialPolicy, cfg) {
         get policy() { return activePolicy; },
         get isOnHold() { return _isOnHold; },
         get captureCount() { return _captureCount; },
-        evaluate: function (ctx) {
-            var raw = activePolicy.evaluate(ctx);
+        evaluate(ctx) {
+            const raw = activePolicy.evaluate(ctx);
             return enforce(raw, ctx);
         },
-        setPolicy: function (policy) {
+        setPolicy(policy) {
             activePolicy.reset();
             if (typeof policy === "string") {
-                var existing = registry.get(policy);
+                const existing = registry.get(policy);
                 if (existing) {
                     activePolicy = existing;
                 }
                 else {
                     // Try built-in
-                    activePolicy = (0, capture_policies_1.createBuiltInPolicy)(policy);
+                    activePolicy = createBuiltInPolicy(policy);
                 }
             }
             else {
                 activePolicy = policy;
             }
         },
-        notifyCaptured: function (timestamp) {
+        notifyCaptured(timestamp) {
             _captureCount++;
             _lastCaptureMs = timestamp;
         },
-        hold: function () { _isOnHold = true; },
-        resume: function () { _isOnHold = false; },
-        registerPolicy: function (policy) {
+        hold() { _isOnHold = true; },
+        resume() { _isOnHold = false; },
+        registerPolicy(policy) {
             if (!registry.has(policy.id)) {
                 registry.set(policy.id, policy);
             }
         },
-        reset: function () {
+        reset() {
             _captureCount = 0;
             _lastCaptureMs = 0;
             _isOnHold = false;

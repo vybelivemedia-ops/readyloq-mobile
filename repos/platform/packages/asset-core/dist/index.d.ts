@@ -10,11 +10,23 @@
  *   Any inspectable, manageable, or visitable entity
  *
  * CANONICAL SOURCE:
- *   ReadyLoq (primary — richest asset schema):
+ *   ReadyLoq (primary):
  *     repos/readyloq-mobile/lib/db/src/schema/properties.ts
- *       — properties table: id, companyId, address (full structured),
- *         lat/lng, squareFootage, yearBuilt, propertyType, accessInstructions,
- *         contactName, contactPhone, contactEmail, notes, isActive
+ *       — propertyProfilesTable: id (serial), companyId, addressKey (text,
+ *         normalised), siteAddress (text, free-form), clientName, propertyType
+ *         (free-text, no enum), technicianKnowledge, hotspots[] (zone+severity)
+ *       — propertyNotesTable: id, companyId, addressKey, note, zone, category,
+ *         authorName (separate table, not a simple text field)
+ *     IMPORTANT — gap between canonical and stub:
+ *       ReadyLoq does NOT have squareFootage, yearBuilt, lat/lng, isActive, or
+ *       a structured AddressComponents. It uses free-text siteAddress + a
+ *       normalised addressKey string as the primary lookup key.
+ *       AssetRecord.address (AddressComponents) is a platform-forward design
+ *       that ReadyLoq would derive from its siteAddress text.
+ *       AssetType is a platform design decision — ReadyLoq uses a free-text
+ *       propertyType field with no typed enum.
+ *       AssetContact is a forward abstraction — ReadyLoq stores clientName
+ *       inline on propertyProfilesTable, not in a separate contacts table.
  *     repos/readyloq-mobile/lib/db/src/schema/companies.ts
  *       — company (owner/manager) associated with properties
  *

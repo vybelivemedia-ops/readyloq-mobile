@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — SmartVisionEngine orchestrator.
  *
@@ -24,4 +23,4 @@
  * behaviour is injected by the application via SmartVisionDependencies.
  * See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

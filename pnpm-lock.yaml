@@ -1274,12 +1274,24 @@ importers:
 
   repos/platform/packages/platform-intelligence:
     dependencies:
+      '@platform/ai-core':
+        specifier: workspace:*
+        version: link:../ai-core
+      '@platform/camera-core':
+        specifier: workspace:*
+        version: link:../camera-core
       '@platform/core':
         specifier: workspace:*
         version: link:../core
+      '@platform/evidence-core':
+        specifier: workspace:*
+        version: link:../evidence-core
       '@platform/shared-types':
         specifier: workspace:*
         version: link:../shared-types
+      '@platform/voice-intelligence':
+        specifier: workspace:*
+        version: link:../voice-intelligence
     devDependencies:
       typescript:
         specifier: ^5.4.0

@@ -1,4 +1,3 @@
-"use strict";
 /**
  * @platform/smart-vision — object tracking and motion prediction contracts.
  *
@@ -7,4 +6,4 @@
  *
  * GOVERNANCE: See repos/platform/GOVERNANCE.md.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+export {};

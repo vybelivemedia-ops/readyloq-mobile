@@ -2,10 +2,13 @@
   "name": "@platform/asset-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Asset management abstractions — storage, retrieval, and lifecycle contracts.",
-  "main": "./src/index.ts",
+  "description": "Asset management abstractions \u2014 storage, retrieval, and lifecycle contracts.",
+  "main": "./dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -16,5 +19,6 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  }
+  },
+  "types": "./dist/index.d.ts"
 }

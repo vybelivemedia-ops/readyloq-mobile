@@ -28,4 +28,3 @@
  * `export type { ... } from "@platform/shared-types"`.
  */
 export {};
-//# sourceMappingURL=index.js.map
