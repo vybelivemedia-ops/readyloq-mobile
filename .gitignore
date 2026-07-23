@@ -1,1 +1,3 @@
 artifacts/readyloq-app/.tsbuildinfo
+*.zip
+*.tar.gz
