@@ -27,6 +27,7 @@ import briefingRouter from "./briefing";
 import shareRouter from "./share";
 import geminiRouter from "./gemini";
 import baitStationsRouter from "./bait-stations";
+import crmRouter from "./crm";
 
 const router: IRouter = Router();
 
@@ -122,6 +123,16 @@ router.use(
   requireCompany,
   requireBetaAccess,
   baitStationsRouter,
+);
+// CRM Integration — manager+ only: fetching client lists and pushing
+// completed inspections to FieldRoutes or PestPac.
+router.use(
+  "/crm",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  crmRouter,
 );
 
 export default router;

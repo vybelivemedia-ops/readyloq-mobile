@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router24;
+    module.exports = Router25;
     module.exports.Route = Route;
-    function Router24(options) {
-      if (!(this instanceof Router24)) {
-        return new Router24(options);
+    function Router25(options) {
+      if (!(this instanceof Router25)) {
+        return new Router25(options);
       }
       const opts = options || {};
-      function router24(req, res, next) {
-        router24.handle(req, res, next);
+      function router25(req, res, next) {
+        router25.handle(req, res, next);
       }
-      Object.setPrototypeOf(router24, this);
-      router24.caseSensitive = opts.caseSensitive;
-      router24.mergeParams = opts.mergeParams;
-      router24.params = {};
-      router24.strict = opts.strict;
-      router24.stack = [];
-      return router24;
+      Object.setPrototypeOf(router25, this);
+      router25.caseSensitive = opts.caseSensitive;
+      router25.mergeParams = opts.mergeParams;
+      router25.params = {};
+      router25.strict = opts.strict;
+      router25.stack = [];
+      return router25;
     }
-    Router24.prototype = function() {
+    Router25.prototype = function() {
     };
-    Router24.prototype.param = function param(name, fn) {
+    Router25.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router24.prototype.handle = function handle(req, res, callback) {
+    Router25.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router24.prototype.use = function use(handler) {
+    Router25.prototype.use = function use(handler) {
       let offset = 0;
       let path2 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router24.prototype.route = function route(path2) {
+    Router25.prototype.route = function route(path2) {
       const route2 = new Route(path2);
       const layer = new Layer(path2, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router24.prototype[method] = function(path2) {
+      Router25.prototype[method] = function(path2) {
         const route = this.route(path2);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router24 = require_router();
+    var Router25 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router24 = null;
+      var router25 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router24 === null) {
-            router24 = new Router24({
+          if (router25 === null) {
+            router25 = new Router25({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router24;
+          return router25;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router24 = this.router;
+      var router25 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router24.use(path2, fn2);
+          return router25.use(path2, fn2);
         }
         debug7(".use app under %s", path2);
         fn2.mountpath = path2;
         fn2.parent = this;
-        router24.use(path2, function mounted_app(req, res, next) {
+        router25.use(path2, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter2 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router24 = require_router();
+    var Router25 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router24.Route;
-    exports.Router = Router24;
+    exports.Route = Router25.Route;
+    exports.Router = Router25;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express25 = __toESM(require_express2(), 1);
+var import_express26 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router24 = config2.router;
-  if (isPlainObject(router24)) {
-    newTarget = getTargetFromProxyTable(req, router24);
-  } else if (typeof router24 === "function") {
-    newTarget = await router24(req, res, config2);
+  const router25 = config2.router;
+  if (isPlainObject(router25)) {
+    newTarget = getTargetFromProxyTable(req, router25);
+  } else if (typeof router25 === "function") {
+    newTarget = await router25(req, res, config2);
   }
   return newTarget;
 }
@@ -50181,7 +50181,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express24 = __toESM(require_express2(), 1);
+var import_express25 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -92971,19 +92971,288 @@ router22.delete("/:stationId", async (req, res) => {
 });
 var bait_stations_default = router22;
 
-// src/routes/index.ts
+// src/routes/crm.ts
+var import_express24 = __toESM(require_express2(), 1);
+
+// src/services/integration/adapters/fieldRoutesAdapter.ts
+var FieldRoutesAdapter = class {
+  apiKey;
+  apiToken;
+  baseUrl;
+  officeId;
+  constructor(apiKey, apiToken, baseUrl, officeId = 1) {
+    this.apiKey = apiKey;
+    this.apiToken = apiToken;
+    this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.officeId = officeId;
+  }
+  get headers() {
+    return {
+      authenticationKey: this.apiKey,
+      authenticationToken: this.apiToken,
+      "Content-Type": "application/json"
+    };
+  }
+  async fetchClients() {
+    const res = await fetch(`${this.baseUrl}/customer/search`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify({ officeIDs: [this.officeId], status: 1, includeData: 1 })
+    });
+    if (!res.ok) {
+      throw new Error(`FieldRoutes fetchClients failed: ${res.status} ${await res.text()}`);
+    }
+    const data = await res.json();
+    const raw = data.customers ? Object.values(data.customers) : [];
+    return raw.map((c) => ({
+      id: String(c.customerID),
+      name: [c.fname, c.lname].filter(Boolean).join(" "),
+      address: [c.address, c.city, c.state, c.zip].filter(Boolean).join(", "),
+      serviceNotes: c.serviceNotes ?? void 0
+    }));
+  }
+  async pushInspection(payload) {
+    const body = buildFieldRoutesNote(payload, this.officeId);
+    const res = await fetch(`${this.baseUrl}/note/create`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      throw new Error(`FieldRoutes pushInspection failed: ${res.status} ${await res.text()}`);
+    }
+    const json3 = await res.json();
+    if (json3.success === false) {
+      throw new Error(`FieldRoutes pushInspection error: ${json3.errorMessage}`);
+    }
+    return true;
+  }
+};
+function buildFieldRoutesNote(payload, officeId) {
+  const lines = [
+    `ReadyLoq Inspection \u2014 ${new Date(payload.timestamp).toLocaleString()}`,
+    ""
+  ];
+  for (const f of payload.findings) {
+    lines.push(`[${f.zone}] ${f.species} \u2014 ${f.severity}`);
+    if (f.notes) lines.push(`  ${f.notes}`);
+  }
+  if (payload.mediaUrls.length) {
+    lines.push("");
+    lines.push("Attached media:");
+    payload.mediaUrls.forEach((url2) => lines.push(`  ${url2}`));
+  }
+  return {
+    officeID: officeId,
+    customerID: Number(payload.clientId),
+    notes: lines.join("\n"),
+    type: "Service",
+    dateAdded: new Date(payload.timestamp).toISOString().slice(0, 10),
+    referenceID: payload.inspectionId
+  };
+}
+
+// src/services/integration/adapters/pestPacAdapter.ts
+var PestPacAdapter = class {
+  apiKey;
+  baseUrl;
+  constructor(apiKey, baseUrl) {
+    this.apiKey = apiKey;
+    this.baseUrl = baseUrl.replace(/\/$/, "");
+  }
+  get headers() {
+    return {
+      "X-WorkWave-Key": this.apiKey,
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    };
+  }
+  async fetchClients() {
+    const res = await fetch(`${this.baseUrl}/customers`, { headers: this.headers });
+    if (!res.ok) {
+      throw new Error(`PestPac fetchClients failed: ${res.status} ${await res.text()}`);
+    }
+    const data = await res.json();
+    const raw = Array.isArray(data) ? data : data.customers ?? [];
+    return raw.map((c) => ({
+      id: String(c.id ?? c.customerId),
+      name: [c.firstName, c.lastName].filter(Boolean).join(" ") || c.companyName || "",
+      address: formatPestPacAddress(c),
+      serviceNotes: c.notes ?? void 0
+    }));
+  }
+  async pushInspection(payload) {
+    const body = buildPestPacNote(payload);
+    const res = await fetch(`${this.baseUrl}/customers/${payload.clientId}/notes`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify(body)
+    });
+    if (res.status === 202) {
+      return true;
+    }
+    if (!res.ok) {
+      throw new Error(`PestPac pushInspection failed: ${res.status} ${await res.text()}`);
+    }
+    return true;
+  }
+};
+function formatPestPacAddress(c) {
+  if (c.address) {
+    const { street, city, state, zip } = c.address;
+    return [street, city, state, zip].filter(Boolean).join(", ");
+  }
+  return "";
+}
+function buildPestPacNote(payload) {
+  const lines = [
+    `ReadyLoq Inspection \u2014 ${new Date(payload.timestamp).toLocaleString()}`,
+    ""
+  ];
+  for (const f of payload.findings) {
+    lines.push(`[${f.zone}] ${f.species} \u2014 ${f.severity}`);
+    if (f.notes) lines.push(`  ${f.notes}`);
+  }
+  if (payload.mediaUrls.length) {
+    lines.push("");
+    lines.push("Attached media:");
+    payload.mediaUrls.forEach((url2) => lines.push(`  ${url2}`));
+  }
+  return {
+    text: lines.join("\n"),
+    type: "Service",
+    referenceId: payload.inspectionId,
+    date: new Date(payload.timestamp).toISOString().slice(0, 10)
+  };
+}
+
+// src/services/integration/crmFactory.ts
+var FIELDROUTES_DEFAULT_URL = "https://api.fieldroutes.com";
+var PESTPAC_DEFAULT_URL = "https://api.workwave.com/pestpac/v1";
+function getCRMAdapter(provider, apiKey, baseUrl, apiToken) {
+  switch (provider) {
+    case "fieldroutes": {
+      if (!apiToken) throw new Error("FieldRoutes requires apiToken (authenticationToken)");
+      const officeId = Number(process.env.FIELDROUTES_OFFICE_ID ?? 1);
+      return new FieldRoutesAdapter(apiKey, apiToken, baseUrl, officeId);
+    }
+    case "pestpac":
+      return new PestPacAdapter(apiKey, baseUrl);
+    default:
+      throw new Error(`Unsupported CRM provider: ${provider}`);
+  }
+}
+function getEnvCRMAdapter() {
+  if (process.env.FIELDROUTES_API_KEY && process.env.FIELDROUTES_API_TOKEN) {
+    return getCRMAdapter(
+      "fieldroutes",
+      process.env.FIELDROUTES_API_KEY,
+      process.env.FIELDROUTES_BASE_URL ?? FIELDROUTES_DEFAULT_URL,
+      process.env.FIELDROUTES_API_TOKEN
+    );
+  }
+  if (process.env.PESTPAC_API_KEY) {
+    return getCRMAdapter(
+      "pestpac",
+      process.env.PESTPAC_API_KEY,
+      process.env.PESTPAC_BASE_URL ?? PESTPAC_DEFAULT_URL
+    );
+  }
+  return null;
+}
+
+// src/routes/crm.ts
 var router23 = (0, import_express24.Router)();
-router23.use(health_default);
-router23.use("/auth", auth_default);
-router23.use(storage_default);
-router23.use("/leads", leads_default);
-router23.use("/share", share_default);
-router23.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router23.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router23.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router23.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router23.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router23.use(
+router23.get("/clients", async (req, res) => {
+  const adapter = getEnvCRMAdapter();
+  if (!adapter) {
+    return res.status(503).json({
+      error: "No CRM configured. Set FIELDROUTES_API_KEY / FIELDROUTES_API_TOKEN or PESTPAC_API_KEY."
+    });
+  }
+  try {
+    const clients = await adapter.fetchClients();
+    return res.json({ clients });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return res.status(502).json({ error: `CRM request failed: ${message}` });
+  }
+});
+router23.post("/inspections/:inspectionId/push", async (req, res) => {
+  const adapter = getEnvCRMAdapter();
+  if (!adapter) {
+    return res.status(503).json({
+      error: "No CRM configured. Set FIELDROUTES_API_KEY / FIELDROUTES_API_TOKEN or PESTPAC_API_KEY."
+    });
+  }
+  const companyId = getCompanyId(req);
+  const { inspectionId } = req.params;
+  const { clientId } = req.body;
+  const inspectionIdNum = parseInt(inspectionId, 10);
+  if (!clientId) {
+    return res.status(400).json({ error: "clientId is required in the request body." });
+  }
+  if (isNaN(inspectionIdNum)) {
+    return res.status(400).json({ error: "Invalid inspectionId." });
+  }
+  const [inspection] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, inspectionIdNum), eq(inspectionsTable.companyId, companyId))).limit(1);
+  if (!inspection) {
+    return res.status(404).json({ error: "Inspection not found." });
+  }
+  const [result] = await db.select().from(analysisResultsTable).where(eq(analysisResultsTable.inspectionId, inspectionIdNum)).limit(1);
+  const media = await db.select({ url: inspectionMediaTable.url }).from(inspectionMediaTable).where(eq(inspectionMediaTable.inspectionId, inspectionIdNum));
+  const findings = extractFindings(result?.findings);
+  const mediaUrls = media.map((m) => m.url).filter(Boolean);
+  const payload = {
+    inspectionId,
+    clientId,
+    timestamp: inspection.createdAt?.toISOString() ?? (/* @__PURE__ */ new Date()).toISOString(),
+    findings,
+    mediaUrls
+  };
+  try {
+    const success2 = await adapter.pushInspection(payload);
+    return res.json({ success: success2, inspectionId, clientId });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return res.status(502).json({ error: `CRM push failed: ${message}` });
+  }
+});
+router23.get("/status", (_req, res) => {
+  const hasFieldRoutes = !!process.env.FIELDROUTES_API_KEY && !!process.env.FIELDROUTES_API_TOKEN;
+  const hasPestPac = !!process.env.PESTPAC_API_KEY;
+  if (hasFieldRoutes) {
+    return res.json({ configured: true, provider: "fieldroutes" });
+  }
+  if (hasPestPac) {
+    return res.json({ configured: true, provider: "pestpac" });
+  }
+  return res.json({ configured: false, provider: null });
+});
+function extractFindings(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((f) => typeof f === "object" && f !== null).map((f) => ({
+    zone: String(f.zone ?? f.location ?? ""),
+    species: String(f.species ?? f.pest ?? ""),
+    severity: String(f.severity ?? f.confidence ?? ""),
+    notes: String(f.notes ?? f.description ?? "")
+  }));
+}
+var crm_default = router23;
+
+// src/routes/index.ts
+var router24 = (0, import_express25.Router)();
+router24.use(health_default);
+router24.use("/auth", auth_default);
+router24.use(storage_default);
+router24.use("/leads", leads_default);
+router24.use("/share", share_default);
+router24.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router24.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router24.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router24.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router24.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router24.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -92991,17 +93260,17 @@ router23.use(
   requireRole("manager"),
   intelligence_default
 );
-router23.use(
+router24.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router23.use("/branding", branding_default);
-router23.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router23.use("/beta", requireAuth, requireCompany, beta_default);
-router23.use(
+router24.use("/branding", branding_default);
+router24.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router24.use("/beta", requireAuth, requireCompany, beta_default);
+router24.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -93009,7 +93278,7 @@ router23.use(
   requireRole("sales"),
   opportunities_default
 );
-router23.use(
+router24.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -93017,7 +93286,7 @@ router23.use(
   requireRole("manager"),
   scorecards_default
 );
-router23.use(
+router24.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -93025,8 +93294,8 @@ router23.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router23.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router23.use(
+router24.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router24.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -93034,15 +93303,23 @@ router23.use(
   requireRole("sales"),
   proposals_default
 );
-router23.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router23.use(
+router24.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router24.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-var routes_default = router23;
+router24.use(
+  "/crm",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  crm_default
+);
+var routes_default = router24;
 
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
@@ -93063,7 +93340,7 @@ var logger2 = (0, import_pino.default)({
 });
 
 // src/app.ts
-var app = (0, import_express25.default)();
+var app = (0, import_express26.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -93114,8 +93391,8 @@ app.use(
     }
   })
 );
-app.use(import_express25.default.json());
-app.use(import_express25.default.urlencoded({ extended: true }));
+app.use(import_express26.default.json());
+app.use(import_express26.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
