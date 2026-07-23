@@ -3,10 +3,17 @@
     "version": ">= 12.0.0"
   },
   "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
     "production": {
       "developmentClient": false,
       "distribution": "store",
       "channel": "production"
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
