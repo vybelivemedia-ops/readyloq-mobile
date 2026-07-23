@@ -3,12 +3,7 @@ module.exports = function (api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      [
-        require.resolve('react-native-reanimated/plugin'),
-        {
-          relativeSourceLocation: true,
-        },
-      ],
+      '@babel/plugin-transform-export-namespace-from',
     ],
   };
 };
