@@ -4,7 +4,7 @@ module.exports = function (api) {
     presets: ['babel-preset-expo'],
     plugins: [
       [
-        'react-native-reanimated/plugin',
+        require.resolve('react-native-reanimated/plugin'),
         {
           relativeSourceLocation: true,
         },
