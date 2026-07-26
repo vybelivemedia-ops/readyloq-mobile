@@ -19,6 +19,8 @@ const PACKAGES = [
   { name: "shared-types", useDist: false },
   { name: "provider-registry", useDist: false },
   { name: "smart-vision", useDist: false },
+  { name: "device-core", useDist: true },
+  { name: "measurement-core", useDist: true },
 ];
 
 function copyDir(src, dest) {
@@ -93,6 +95,8 @@ const PLATFORM_DEPS = [
   "@platform/provider-registry",
   "@platform/shared-types",
   "@platform/smart-vision",
+  "@platform/device-core",
+  "@platform/measurement-core",
 ];
 for (const dep of PLATFORM_DEPS) {
   if (appPkg.dependencies?.[dep]) {
