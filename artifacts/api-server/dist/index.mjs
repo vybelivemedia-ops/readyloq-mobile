@@ -50152,11 +50152,8 @@ function getClerkProxyHost(req) {
   return firstHop || req.headers.host?.trim() || void 0;
 }
 function clerkProxyMiddleware() {
-  if (process.env.NODE_ENV !== "production") {
-    return (_req, _res, next) => next();
-  }
   const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) {
+  if (!secretKey || secretKey.startsWith("sk_test_")) {
     return (_req, _res, next) => next();
   }
   return createProxyMiddleware({

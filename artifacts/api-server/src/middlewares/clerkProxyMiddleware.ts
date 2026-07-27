@@ -53,13 +53,12 @@ export function getClerkProxyHost(req: {
 }
 
 export function clerkProxyMiddleware(): RequestHandler {
-  // Only run proxy in production — Clerk proxying doesn't work for dev instances
-  if (process.env.NODE_ENV !== "production") {
-    return (_req, _res, next) => next();
-  }
-
+  // Only proxy when a live Clerk secret key is present.
+  // A live key (sk_live_*) means we're running behind readyloq.com and Clerk
+  // proxying is required. A test key (sk_test_*) or no key means local dev —
+  // skip the proxy so the Expo tunnel / Replit preview keeps working.
   const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) {
+  if (!secretKey || secretKey.startsWith("sk_test_")) {
     return (_req, _res, next) => next();
   }
 
