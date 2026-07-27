@@ -7,6 +7,12 @@
     },
     "android": {
       "package": "com.hgwashingllc.workspace"
+    },
+    "ios": {
+      "bundleIdentifier": "com.hgwashingllc.workspace",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     }
   }
 }
