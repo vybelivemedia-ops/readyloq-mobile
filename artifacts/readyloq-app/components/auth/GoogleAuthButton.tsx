@@ -1,5 +1,5 @@
 import { useSSO } from "@clerk/expo";
-import * as AuthSession from "expo-auth-session";
+import * as Linking from "expo-linking";
 import { type Href, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useCallback, useEffect, useState } from "react";
@@ -34,16 +34,14 @@ export function GoogleAuthButton({
   const onPress = useCallback(async () => {
     try {
       setLoading(true);
+      // Linking.createURL is the reliable way to build a deep-link redirect
+      // for native (standalone/preview) builds — it uses the scheme registered
+      // in app.json directly and avoids the malformed-URI edge cases that
+      // AuthSession.makeRedirectUri can produce in expo-auth-session v7.
+      const redirectUrl = Linking.createURL("/sso-callback");
       const { createdSessionId, setActive, signUp } = await startSSOFlow({
         strategy: "oauth_google",
-        // In a standalone (release) build the redirect must carry the app's
-        // custom scheme explicitly — a bare makeRedirectUri() produces a
-        // scheme-only URI that Android can hand to the wrong app (e.g. an
-        // email client) instead of returning here.
-        redirectUrl: AuthSession.makeRedirectUri({
-          scheme: "readyloq-app",
-          path: "sso-callback",
-        }),
+        redirectUrl,
       });
 
       if (createdSessionId && setActive) {
