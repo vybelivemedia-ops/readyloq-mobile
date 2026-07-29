@@ -59,30 +59,140 @@ export const INSPECTION_DICTIONARY = {
     "treated",
     "monitored",
   ],
+
+  /**
+   * Alias map: informal / multilingual / phonetic → canonical dictionary term.
+   *
+   * These run AFTER phonetic normalization in SpeechIntentEngine, so by the
+   * time aliases are resolved the text is already pluralized and split-word
+   * quirks are collapsed.  Entries here cover:
+   *  - Common informal names ("roaches", "blue blocks")
+   *  - Spanish/bilingual field terms
+   *  - Whisper transcription quirks that slip past regex normalization
+   *  - Abbreviated product names technicians use on the job
+   *  - Action synonyms so "spray" maps to "applied", etc.
+   */
   aliases: {
-    "blue blocks": "Contrac Blox",
-    "contract": "Contrac Blox",
-    "bug juice": "Alpine WSG",
-    "gel bait": "Advion Gel",
-    "roaches": "German Cockroaches",
-    "cockroaches": "German Cockroaches",
-    "mice": "Rodents",
-    "rats": "Rodents",
-    "gnats": "Drain Flies",
-    "cucarachas": "German Cockroaches",
-    "ratones": "Rodents",
-    "moscas": "Drain Flies",
-    "hormigas": "Ants",
-    "chinches": "Bed Bugs",
-    "pulgas": "Fleas",
-    "avispas": "Wasps",
+    // ── Pest informal / bilingual names ───────────────────────────────────
+    "roaches":              "German Cockroaches",
+    "cockroaches":          "German Cockroaches",
+    "german cockroach":     "German Cockroaches",
+    "german roach":         "German Cockroaches",
+    "german roaches":       "German Cockroaches",
+    "american roach":       "American Cockroaches",
+    "american roaches":     "American Cockroaches",
+    "american cockroach":   "American Cockroaches",
+    "bed bug":              "Bed Bugs",
+    "fruit fly":            "Fruit Flies",
+    "drain fly":            "Drain Flies",
+    "carpenter ant":        "Carpenter Ants",
+    "mice":                 "Rodents",
+    "rats":                 "Rodents",
+    "mouse":                "Rodents",
+    "gnats":                "Drain Flies",
+    "gnat":                 "Drain Flies",
+    "sewer fly":            "Drain Flies",
+    "sewer flies":          "Drain Flies",
+    "phorid fly":           "Drain Flies",
+    "phorid flies":         "Drain Flies",
+    "sugar ant":            "Ants",
+    "sugar ants":           "Ants",
+    "odorous ant":          "Ants",
+    "odorous ants":         "Ants",
+    "fire ant":             "Ants",
+    "fire ants":            "Ants",
+    "yellow jacket":        "Wasps",
+    "yellow jackets":       "Wasps",
+    "hornets":              "Wasps",
+    "hornet":               "Wasps",
+
+    // ── Spanish & bilingual pest terms ────────────────────────────────────
+    "cucarachas":           "German Cockroaches",
+    "cucaracha":            "German Cockroaches",
+    "ratones":              "Rodents",
+    "moscas":               "Drain Flies",
+    "hormigas":             "Ants",
+    "chinches":             "Bed Bugs",
+    "pulgas":               "Fleas",
+    "avispas":              "Wasps",
+    "mosquitos":            "Mosquitoes",
+    "moscos":               "Mosquitoes",   // colloquial MX/CA Spanish
+    "pulguitas":            "Fleas",
+    "plagas":               "Rodents",      // "plagas" (plagues/pests) → Rodents as default
+    "ratonas":              "Rodents",
+    "ratón":                "Rodents",
+
+    // ── Product informal / abbreviated names ──────────────────────────────
+    "blue blocks":          "Contrac Blox",
+    "contract":             "Contrac Blox",
+    "contrac":              "Contrac Blox",
+    "contrac blocks":       "Contrac Blox",
+    "bug juice":            "Alpine WSG",
+    "alpine":               "Alpine WSG",
+    "gel bait":             "Advion Gel",
+    "advion":               "Advion Gel",
+    "advance gel":          "Advion Gel",
+    "advance":              "Advion Gel",
+    "temprid":              "Temprid FX",
+    "temprid fx":           "Temprid FX",
+    "demand":               "Demand CS",
+    "demand cs":            "Demand CS",
+    "talstar":              "Talstar Pro",
+    "gentrol":              "Gentrol IGR",
+    "igr":                  "Gentrol IGR",
+    "tafgor":               "Tafgor",
+
+    // ── Action synonyms ───────────────────────────────────────────────────
+    "spray":                "applied",
+    "sprayed":              "applied",
+    "spraying":             "applied",
+    "baited":               "applied",
+    "dusted":               "applied",
+    "put down":             "placed",
+    "setting down":         "placed",
+    "laying down":          "placed",
+    "set down":             "placed",
+    "found":                "inspected",
+    "noticed":              "inspected",
+    "spotted":              "inspected",
+    "observed":             "inspected",
+    "seeing":               "inspected",
+    "fixed":                "sealed",
+    "closed up":            "sealed",
+    "patched":              "sealed",
+    "blocked off":          "excluded",
+    "blocked":              "excluded",
+    "screened":             "excluded",
+    "trapped":              "monitored",
+    "checking":             "monitored",
+
+    // ── Evidence synonyms ─────────────────────────────────────────────────
+    "poop":                 "Droppings",
+    "feces":                "Droppings",
+    "poo":                  "Droppings",
+    "droppings":            "Droppings",
+    "dropping":             "Droppings",
+    "pellets":              "Droppings",
+    "live":                 "Live activity",
+    "dead":                 "Dead activity",
+    "rub mark":             "Rub marks",
+    "grease marks":         "Rub marks",
+    "smear":                "Rub marks",
+    "nest":                 "Nesting material",
+    "nesting":              "Nesting material",
+    "gnaw":                 "Gnaw marks",
+    "chewing":              "Gnaw marks",
+    "egg casing":           "Egg casings",
+    "ootheca":              "Egg casings",
+    "cast skin":            "Cast skins",
+    "shed skin":            "Cast skins",
   } as Record<string, string>,
 
   severity: {
-    low: ["minor", "low", "low severity", "slight", "minimal", "small", "a little"],
-    medium: ["moderate", "medium", "medium severity", "some", "some activity"],
-    high: ["high", "high severity", "significant", "major", "heavy", "severe", "bad", "bad activity"],
-    critical: ["critical", "extreme", "urgent", "emergency", "very high", "critical level", "infestation"],
+    low: ["minor", "low", "low severity", "slight", "minimal", "small", "a little", "light", "few", "light activity", "poco", "poquito"],
+    medium: ["moderate", "medium", "medium severity", "some", "some activity", "regular", "medio", "regular activity"],
+    high: ["high", "high severity", "significant", "major", "heavy", "severe", "bad", "bad activity", "heavy activity", "a lot", "mucho", "bastante"],
+    critical: ["critical", "extreme", "urgent", "emergency", "very high", "critical level", "infestation", "infested", "overrun", "everywhere", "all over", "demasiado"],
   } as Record<string, string[]>,
 
   captureCommands: [
@@ -97,6 +207,12 @@ export const INSPECTION_DICTIONARY = {
     "take a picture",
     "get a photo",
     "log photo",
+    "foto",           // Spanish
+    "toma foto",      // Spanish imperative
+    "take it",
+    "get it",
+    "document this",
+    "document it",
   ],
 
   baitStationTriggers: [
@@ -107,6 +223,8 @@ export const INSPECTION_DICTIONARY = {
     "add station",
     "bait here",
     "rodent station",
+    "estacion",       // Spanish approx.
+    "caja de cebo",   // Spanish: bait box
   ],
 
   fieldPrefixes: {
@@ -119,6 +237,8 @@ export const INSPECTION_DICTIONARY = {
       "customer name",
       "account name is",
       "account is",
+      "the client is",
+      "this client is",
     ],
     siteAddress: [
       "site address is",
@@ -128,12 +248,22 @@ export const INSPECTION_DICTIONARY = {
       "location is",
       "property at",
       "site at",
+      "the address is",
+      "located at",
+      "we're at",
+      "we are at",
     ],
     notes: [
       "add note",
       "note that",
       "field note",
       "observation is",
+      "add a note",
+      "write down",
+      "log that",
+      "log this",
+      "make note",
+      "nota",           // Spanish
     ],
   } as Record<string, string[]>,
 };
