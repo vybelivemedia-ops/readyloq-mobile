@@ -372,10 +372,66 @@ export default function NewInspectionScreen() {
             }
             break;
           }
-          case ConfidenceAction.CONFIRM:
-            setFaiePendingConfirm(event);
-            setFaieStatus(`Confirm: "${event.rawText}" (${Math.round(event.confidence * 100)}%)`);
+          case ConfidenceAction.CONFIRM: {
+            // Auto-commit low-confidence events immediately — no tap required.
+            // A "~" marker in the status line signals the uncertainty level
+            // passively without blocking the technician's capture flow.
+            if (event.capturePhoto) {
+              void takePhoto();
+              setFaieStatus("Capturing photo…");
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setTimeout(() => setFaieStatus("Listening…"), 2500);
+              break;
+            }
+            if (event.targetField === "clientName" && event.fieldValue) {
+              setClientName(event.fieldValue);
+              setFaieStatus(`Client: "${event.fieldValue}" ~`);
+              Speech.speak("Client name set", { rate: 1.1 });
+              setTimeout(() => setFaieStatus("Listening…"), 2500);
+              break;
+            }
+            if (event.targetField === "siteAddress" && event.fieldValue) {
+              setSiteAddress(event.fieldValue);
+              setFaieStatus(`Site: "${event.fieldValue}" ~`);
+              Speech.speak("Site address set", { rate: 1.1 });
+              setTimeout(() => setFaieStatus("Listening…"), 2500);
+              break;
+            }
+            if (
+              event.targetField === "baitStation" ||
+              ((event.action === "placed" || event.action === "applied") && event.product)
+            ) {
+              const where = event.room ?? "Unknown location";
+              addBaitStation({
+                label: event.product ?? "Bait station",
+                locationType: event.room,
+                status: "active",
+                notes: event.severity ? `Severity: ${event.severity}` : undefined,
+              });
+              setFaieStatus(`Bait ~: ${event.product ?? "station"} @ ${where}`);
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              setTimeout(() => setFaieStatus("Listening…"), 3000);
+              break;
+            }
+            {
+              if (event.pest) {
+                const pestLower = event.pest.toLowerCase();
+                const match = PEST_TYPES.find(
+                  (p) => p.toLowerCase().includes(pestLower) || pestLower.includes(p.toLowerCase()),
+                );
+                if (match) {
+                  setPestTypes((prev) => (prev.includes(match) ? prev : [...prev, match]));
+                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+              }
+              const severityTag = event.severity ? ` [${event.severity}]` : "";
+              const line = `${formatEvent(event)}${severityTag}`;
+              setNotes((prev) => (prev.trim() ? `${prev.trim()}\n${line}` : line));
+              setFaieStatus(`Auto-logged ~: ${line}`);
+              setTimeout(() => setFaieStatus("Listening…"), 3000);
+            }
             break;
+          }
           case ConfidenceAction.ASK_AGAIN:
             setFaieStatus("Didn't catch that — please repeat.");
             setTimeout(() => setFaieStatus("Listening…"), 2500);
@@ -1158,46 +1214,28 @@ export default function NewInspectionScreen() {
       </Pressable>
     ) : null;
 
-    // FAIE: status / confirmation banner shown during a live voice session.
-    const faieBanner = (isFaieListening || faiePendingConfirm) ? (
+    // FAIE: live status banner — purely informational, no action required.
+    // Low-confidence events are auto-committed (marked with "~"); the banner
+    // just echoes what was logged so the technician can glance and keep moving.
+    const faieBanner = isFaieListening ? (
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           gap: 8,
-          backgroundColor: faiePendingConfirm ? "rgba(37,99,235,0.92)" : "rgba(0,0,0,0.72)",
+          backgroundColor: "rgba(0,0,0,0.72)",
           paddingHorizontal: 12,
           paddingVertical: 8,
           borderRadius: 10,
           maxWidth: 440,
           borderWidth: 1,
-          borderColor: faiePendingConfirm ? "rgba(96,165,250,0.8)" : "rgba(255,255,255,0.15)",
+          borderColor: "rgba(255,255,255,0.15)",
         }}
       >
-        <Ionicons
-          name={faiePendingConfirm ? "checkmark-circle-outline" : "mic"}
-          size={15}
-          color="#fff"
-        />
+        <Ionicons name="mic" size={15} color="#fff" />
         <Text style={{ color: "#fff", fontFamily: "Inter_500Medium", fontSize: 12, flex: 1, flexShrink: 1 }}>
           {faieStatus}
         </Text>
-        {faiePendingConfirm ? (
-          <View style={{ flexDirection: "row", gap: 6 }}>
-            <Pressable
-              onPress={confirmFaieEvent}
-              style={{ backgroundColor: "#fff", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
-            >
-              <Text style={{ color: "#1d4ed8", fontFamily: "Inter_700Bold", fontSize: 11 }}>Log it</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => { setFaiePendingConfirm(null); setFaieStatus("Listening…"); }}
-              style={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}
-            >
-              <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>Skip</Text>
-            </Pressable>
-          </View>
-        ) : null}
       </View>
     ) : null;
 
@@ -1900,7 +1938,7 @@ export default function NewInspectionScreen() {
             </View>
           </View>
 
-          {/* RLQ-008: AI findings review gate */}
+          {/* AI findings review — optional, never blocks completion */}
           {hasReviewGate ? (
             <View
               style={{
@@ -1922,7 +1960,7 @@ export default function NewInspectionScreen() {
                       fontSize: 15,
                     }}
                   >
-                    Review AI Findings
+                    AI Findings Available
                   </Text>
                   <Text
                     style={{
@@ -1931,20 +1969,37 @@ export default function NewInspectionScreen() {
                       fontSize: 13,
                     }}
                   >
-                    {unreviewedCount} finding{unreviewedCount !== 1 ? "s" : ""} need
-                    {unreviewedCount === 1 ? "s" : ""} review before completing
+                    {unreviewedCount} finding{unreviewedCount !== 1 ? "s" : ""} — review
+                    is optional, you can complete now and correct later
                   </Text>
                 </View>
               </View>
-              <Button
-                title={`Review Findings (${unreviewedCount})`}
-                variant="outline"
-                icon="sparkles"
-                onPress={() => {
-                  const rec = recordRef.current;
-                  if (rec) router.push(`/findings-review/${rec.localId}` as Href);
-                }}
-              />
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <Button
+                  title={`Review (${unreviewedCount})`}
+                  variant="outline"
+                  icon="sparkles"
+                  style={{ flex: 1 }}
+                  onPress={() => {
+                    const rec = recordRef.current;
+                    if (rec) router.push(`/findings-review/${rec.localId}` as Href);
+                  }}
+                />
+                <Button
+                  title="Skip"
+                  variant="ghost"
+                  style={{ flex: 1 }}
+                  onPress={async () => {
+                    const rec = recordRef.current;
+                    if (rec) {
+                      await updateLocalInspection(rec.localId, (r) => {
+                        r.allFindingsReviewed = true;
+                      });
+                      setReviewTick((t) => t + 1);
+                    }
+                  }}
+                />
+              </View>
             </View>
           ) : showReviewedBadge ? (
             <View
@@ -1988,18 +2043,15 @@ export default function NewInspectionScreen() {
               textAlign: "center",
             }}
           >
-            {hasReviewGate
-              ? "Review AI findings above before completing."
-              : "Completing locks in your evidence and generates the report, summary, and insights. Works offline — everything syncs automatically."}
+            Evidence is saved on-device and syncs automatically. The report, summary, and insights generate in the background.
           </Text>
           <Button
-            title="Complete Inspection"
+            title="Quick Submit & Save"
             size="lg"
             icon="checkmark-circle"
-            disabled={hasReviewGate}
             onPress={completeNow}
           />
-          <Button title="Add more photos" variant="ghost" onPress={() => setStep("capture")} />
+          <Button title="← Back to camera" variant="ghost" onPress={() => setStep("capture")} />
         </View>
       </Screen>
     );
