@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   AppState,
   BackHandler,
   Pressable,
@@ -185,6 +186,18 @@ export default function NewInspectionScreen() {
   const [faiePendingConfirm, setFaiePendingConfirm] = useState<StructuredInspectionEvent | null>(null);
   const sessionManagerRef = useRef<AudioSessionManager | null>(null);
 
+  // ── FAIE frame-buffer state ────────────────────────────────────────────────
+  // A rolling background snapshot captured every 1 500 ms while the FAIE
+  // session is live.  getFrameWithBuffer() uses it as a guaranteed fallback when
+  // the on-demand takePictureAsync() is busy or fails (e.g. Android pipeline
+  // contention, cameraRef not yet ready).
+  const lastFrameUriRef = useRef<string | null>(null);
+  const frameBufferIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Animated value for the frame-capture flash overlay (0 = transparent, 1 = white).
+  const frameCaptureAnim = useRef(new Animated.Value(0)).current;
+  // True when the most-recently dispatched voice event carried an imageUri.
+  const [lastEventHadFrame, setLastEventHadFrame] = useState(false);
+
   // ── Per-field voice dictation (setup form) ─────────────────────────────────
   const voiceSiteAddress = useVoiceField({
     onTranscript: (text) => setSiteAddress((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text)),
@@ -236,6 +249,11 @@ export default function NewInspectionScreen() {
   // Clean up any live recording if the screen is dismissed mid-dictation.
   useEffect(() => {
     return () => {
+      // Stop the rolling frame buffer first so no further snapshots fire.
+      if (frameBufferIntervalRef.current != null) {
+        clearInterval(frameBufferIntervalRef.current);
+        frameBufferIntervalRef.current = null;
+      }
       stopDictationRef.current?.();
       stopDictationRef.current = null;
       void sessionManagerRef.current?.cancelSession();
@@ -273,12 +291,77 @@ export default function NewInspectionScreen() {
     }
   };
 
+  // ── FAIE frame-buffer helpers ──────────────────────────────────────────────
+
+  /**
+   * Starts a rolling 1 500 ms background snapshot loop that silently stores the
+   * latest low-quality camera frame while the FAIE session is active.
+   * Idempotent — a second call while the interval is already running is a no-op.
+   */
+  const startFrameBuffer = () => {
+    if (frameBufferIntervalRef.current != null) return;
+    frameBufferIntervalRef.current = setInterval(() => {
+      void (async () => {
+        try {
+          const pic = await cameraRef.current?.takePictureAsync({
+            quality: 0.1,
+            skipProcessing: true,
+          });
+          if (pic?.uri) lastFrameUriRef.current = pic.uri;
+        } catch {
+          // Silently skip — keep the last successful frame URI in the buffer.
+        }
+      })();
+    }, 1_500);
+  };
+
+  /** Stops the rolling frame-buffer interval and clears stored state. */
+  const stopFrameBuffer = () => {
+    if (frameBufferIntervalRef.current != null) {
+      clearInterval(frameBufferIntervalRef.current);
+      frameBufferIntervalRef.current = null;
+    }
+  };
+
+  /**
+   * Best-effort frame capture for getFrame injection into AudioSessionManager.
+   *
+   * Strategy:
+   * 1. Try a fresh on-demand takePictureAsync() — most current view of the room.
+   *    Race it against a 500 ms deadline so a stalled camera never delays dispatch.
+   * 2. If the fresh capture fails, times out, or returns null — fall back to the
+   *    last rolling-buffer frame (up to ~1.5 s old but still useful for spatial context).
+   * 3. If the buffer is empty (session just started) return null; the event is
+   *    dispatched without an imageUri and the banner shows no camera icon.
+   */
+  const getFrameWithBuffer = async (): Promise<string | null> => {
+    try {
+      const deadline = new Promise<null>((resolve) => setTimeout(() => resolve(null), 500));
+      const capture = (async () => {
+        const pic = await cameraRef.current?.takePictureAsync({
+          quality: 0.1,
+          skipProcessing: true,
+        });
+        return pic?.uri ?? null;
+      })();
+      const fresh = await Promise.race([capture, deadline]);
+      if (fresh) {
+        lastFrameUriRef.current = fresh;
+        return fresh;
+      }
+    } catch {
+      // fall through to buffer
+    }
+    return lastFrameUriRef.current ?? null;
+  };
+
   // ── FAIE handlers ──────────────────────────────────────────────────────────
   const handleFaiePress = async () => {
     if (isFaieListening) {
       setIsFaieListening(false);
       setFaieStatus(null);
       setFaiePendingConfirm(null);
+      stopFrameBuffer();
       await sessionManagerRef.current?.stopSession();
       return;
     }
@@ -299,9 +382,26 @@ export default function NewInspectionScreen() {
       setIsFaieListening(true);
       setFaieStatus("Listening for commands…");
       setFaiePendingConfirm(null);
+      setLastEventHadFrame(false);
+      // Start rolling background snapshots so getFrameWithBuffer always has a
+      // recent frame ready even if the on-demand capture is slow or fails.
+      startFrameBuffer();
       // Stamp the session start time so the session manager can timestamp events.
       sessionManagerRef.current.setVisionContext({ timestamp: Date.now() });
       await sessionManagerRef.current.startSession(({ event, action }) => {
+        // Flash the camera overlay and update the banner icon whenever the
+        // session manager successfully attached a room snapshot to this event.
+        if (event.imageUri) {
+          setLastEventHadFrame(true);
+          frameCaptureAnim.setValue(0.5);
+          Animated.timing(frameCaptureAnim, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }).start();
+        } else {
+          setLastEventHadFrame(false);
+        }
         switch (action) {
           case ConfidenceAction.AUTO_COMMIT: {
             // 1. Voice-triggered photo capture ("snap", "take a photo", "capture")
@@ -438,22 +538,13 @@ export default function NewInspectionScreen() {
             break;
         }
       }, {
-        // Capture a lightweight reference frame at the moment of each command.
-        // The URI is merged into the StructuredInspectionEvent as imageUri so
-        // spatial findings ("Seal this gap") carry a camera snapshot.
-        getFrame: async () => {
-          try {
-            const pic = await cameraRef.current?.takePictureAsync({
-              quality: 0.1,
-              skipProcessing: true,
-            });
-            return pic?.uri ?? null;
-          } catch {
-            return null;
-          }
-        },
+        // getFrameWithBuffer: tries a fresh on-demand capture (500 ms deadline),
+        // falls back to the rolling 1.5 s background buffer so imageUri is
+        // populated even when the camera pipeline is momentarily busy.
+        getFrame: getFrameWithBuffer,
       });
     } catch (e) {
+      stopFrameBuffer();
       setIsFaieListening(false);
       setFaieStatus(null);
       Alert.alert(
@@ -1216,7 +1307,8 @@ export default function NewInspectionScreen() {
 
     // FAIE: live status banner — purely informational, no action required.
     // Low-confidence events are auto-committed (marked with "~"); the banner
-    // just echoes what was logged so the technician can glance and keep moving.
+    // echoes what was logged and shows a camera icon when a room snapshot was
+    // captured alongside the audio note.
     const faieBanner = isFaieListening ? (
       <View
         style={{
@@ -1236,6 +1328,11 @@ export default function NewInspectionScreen() {
         <Text style={{ color: "#fff", fontFamily: "Inter_500Medium", fontSize: 12, flex: 1, flexShrink: 1 }}>
           {faieStatus}
         </Text>
+        {lastEventHadFrame ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+            <Ionicons name="camera" size={12} color="rgba(255,255,255,0.6)" />
+          </View>
+        ) : null}
       </View>
     ) : null;
 
@@ -1384,6 +1481,19 @@ export default function NewInspectionScreen() {
                   zoom={zoom}
                   flash={flash}
                 />
+                {/* Frame-capture flash overlay for wide-screen layout */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: "#fff",
+                    opacity: frameCaptureAnim,
+                  }}
+                />
               </View>
 
               <View style={{ padding: 16, gap: 14, alignItems: "center" }}>
@@ -1512,6 +1622,19 @@ export default function NewInspectionScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: "#000" }}>
         <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" zoom={zoom} flash={flash} />
+        {/* Frame-capture flash: briefly pulses white when a voice note grabs a room snapshot */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "#fff",
+            opacity: frameCaptureAnim,
+          }}
+        />
         <View style={{ position: "absolute", top: 0, left: 0, right: isLandscape ? 116 : 0 }}>
           <Screen edges={["top"]} style={{ backgroundColor: "transparent" }}>
             <View

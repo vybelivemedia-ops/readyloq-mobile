@@ -61,6 +61,13 @@ export class AudioSessionManager {
   /** Latest partial transcript waiting for isFinal (or the flush timer). */
   private pendingPartial?: { text: string; confidence: number };
 
+  /**
+   * Stored references so stopSession's force-flush can dispatch properly.
+   * Cleared on cancelSession so a stale callback never fires after the screen unmounts.
+   */
+  private _onStateUpdate?: (update: SessionStateUpdate) => void;
+  private _getFrame?: () => Promise<string | null | undefined>;
+
   constructor(private readonly provider: SpeechProvider) {}
 
   /**
@@ -76,6 +83,9 @@ export class AudioSessionManager {
     options: SessionOptions = {},
   ): Promise<void> {
     const { getFrame, ...providerOptions } = options;
+    // Store for use by stopSession's force-flush path.
+    this._onStateUpdate = onStateUpdate;
+    this._getFrame = getFrame;
     await this.provider.initialize(providerOptions);
     await this.provider.start();
 
@@ -152,6 +162,9 @@ export class AudioSessionManager {
   async cancelSession(): Promise<void> {
     this._clearFlushTimer();
     this.pendingPartial = undefined;
+    // Clear stored callbacks so a stale reference never fires after unmount.
+    this._onStateUpdate = undefined;
+    this._getFrame = undefined;
     await this.provider.cancel();
   }
 
@@ -167,15 +180,23 @@ export class AudioSessionManager {
   }
 
   /**
-   * Used by stopSession to synchronously flush the last partial without a
-   * callback reference.  Parses the text and logs it — callers should wire
-   * onStateUpdate before calling stopSession if they need the last event.
+   * Used by stopSession to flush the last partial.  Dispatches properly via
+   * the stored _onStateUpdate and _getFrame so the final utterance is never
+   * silently lost and still gets a room-frame attachment if the buffer has one.
    */
   private async _dispatchImmediate(text: string, confidence: number): Promise<void> {
+    if (!this._onStateUpdate) return;
     const effectiveConfidence = Math.min(confidence, FORCE_FLUSH_CONFIDENCE_CAP);
-    this.intentEngine.parse(text, effectiveConfidence, this.visionContext);
-    // Note: no onStateUpdate reference here — the session has already ended.
-    // Callers that need the last event should call stopSession before removing
-    // their listener.
+    const action = AudioConfidence.evaluate(effectiveConfidence);
+    const event = this.intentEngine.parse(text, effectiveConfidence, this.visionContext);
+    if (this._getFrame) {
+      try {
+        const uri = await this._getFrame();
+        if (uri) event.imageUri = uri;
+      } catch {
+        // best-effort; never block dispatch
+      }
+    }
+    this._onStateUpdate({ event, action, forceFlushed: true });
   }
 }
