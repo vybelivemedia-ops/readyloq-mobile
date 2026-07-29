@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { type Href, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
   Alert,
@@ -621,6 +622,7 @@ function PhotoViewer({
   onClose: () => void;
 }) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(initialIndex);
 
@@ -648,7 +650,7 @@ function PhotoViewer({
             alignItems: "center",
             justifyContent: "space-between",
             paddingHorizontal: 16,
-            paddingTop: 54,
+            paddingTop: Math.max(insets.top, 16),
             paddingBottom: 10,
           }}
         >

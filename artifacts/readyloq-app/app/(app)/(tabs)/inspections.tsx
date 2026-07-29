@@ -47,10 +47,11 @@ export default function InspectionsScreen() {
   // or completed inspections waiting on connectivity). Shown above the server
   // list with live sync badges so nothing ever looks lost.
   const { records: localRecords, phaseOf } = useLocalInspections();
-  const pendingLocal = useMemo(
-    () => localRecords.filter((r) => hasPendingWork(r) || !r.completed),
-    [localRecords],
-  );
+  // Show ALL local records — not just pending ones — so technicians can
+  // always reach the inspection-summary screen (which has Share PDF) even
+  // after an inspection has fully synced. The pendingServerIds dedup below
+  // ensures completed+synced inspections don't appear twice in the list.
+  const pendingLocal = useMemo(() => localRecords, [localRecords]);
   const pendingServerIds = useMemo(
     () => new Set(pendingLocal.map((r) => r.serverId).filter((id) => id != null)),
     [pendingLocal],

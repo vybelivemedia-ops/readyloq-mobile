@@ -61,15 +61,40 @@ const SEVERITY_COLORS: Record<string, string> = {
   low: "#65a30d",
 };
 
+/** Human-readable label for a capture source code. */
+function captureSourceLabel(source: string | undefined): string {
+  if (!source) return "Photo";
+  const LABELS: Record<string, string> = {
+    phone_camera: "Photo",
+    media_import: "Imported photo",
+    wifi_stream: "Wi-Fi camera",
+    usb_camera: "USB scope",
+    smart_glasses: "Smart glasses",
+    wearable_camera: "Wearable cam",
+  };
+  return LABELS[source] ?? "Photo";
+}
+
+/** Quality score below which a photo is excluded from the PDF report. */
+const REPORT_QUALITY_MIN = 50;
+
 export async function buildReportHtml(data: ReportData): Promise<string> {
   const { record, findings, recommendations, riskLevel, analysisComplete, companyName } = data;
 
-  const photoUris = await Promise.all(record.photos.map((p) => photoDataUri(p.localUri)));
+  // Exclude photos that were explicitly scored below the acceptance threshold.
+  // Photos with no score (ungated capture) are always included — a blurry
+  // photo of a real finding is better than no photo.
+  const goodPhotos = record.photos.filter(
+    (p) => typeof p.qualityScore !== "number" || p.qualityScore >= REPORT_QUALITY_MIN,
+  );
+  const skippedCount = record.photos.length - goodPhotos.length;
+
+  const photoUris = await Promise.all(goodPhotos.map((p) => photoDataUri(p.localUri)));
 
   // Findings keyed to photos by storage path (the AI reports imageUrl =
   // storage path of the analyzed photo).
   const findingsForPhoto = (index: number): Finding[] => {
-    const sp = record.photos[index]?.storagePath;
+    const sp = goodPhotos[index]?.storagePath;
     if (!sp) return [];
     return findings.filter((f) => f.imageUrl && f.imageUrl === sp);
   };
@@ -132,29 +157,34 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
         </div>`
       : "";
 
-  const photosSection = record.photos
+  const photosSection = goodPhotos
     .map((photo, i) => {
       const uri = photoUris[i];
       const photoFindings = findingsForPhoto(i);
+      const srcLabel = captureSourceLabel(photo.captureSource);
+      const timeStr = photo.capturedAt
+        ? new Date(photo.capturedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+        : null;
+      const isNonDefault = photo.captureSource && photo.captureSource !== "phone_camera";
       return `
         <div class="photo-block">
           ${
             uri
-              ? `<img src="${uri}" alt="Photo ${i + 1}" />`
-              : `<div class="photo-missing">Photo ${i + 1} unavailable</div>`
+              ? `<img src="${uri}" alt="${esc(srcLabel)} ${i + 1}" />`
+              : `<div class="photo-missing">${esc(srcLabel)} ${i + 1} unavailable</div>`
           }
           <div class="photo-caption">
-            <strong>Photo ${i + 1}</strong>${
-              photo.capturedAt
-                ? ` — ${new Date(photo.capturedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
-                : ""
-            }
+            <div class="cap-row">
+              <strong>${esc(srcLabel)} ${i + 1}</strong>
+              ${timeStr ? `<span class="cap-time">${timeStr}</span>` : ""}
+              ${isNonDefault ? `<span class="cap-src">${esc(srcLabel)}</span>` : ""}
+            </div>
             ${
               photoFindings.length > 0
                 ? `<ul class="photo-findings">${photoFindings
-                    .map((f) => `<li>${fmt(f.category)}: ${esc(f.description)}</li>`)
+                    .map((f) => `<li><strong>${fmt(f.category)}</strong>${f.location ? ` · ${esc(f.location)}` : ""}: ${esc(f.description)}</li>`)
                     .join("")}</ul>`
-                : ""
+                : `<p class="cap-none">No AI findings on this photo.</p>`
             }
           </div>
         </div>`;
@@ -190,8 +220,13 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
   .photo-block { page-break-inside: avoid; margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
   .photo-block img { width: 100%; max-height: 380px; object-fit: contain; background: #f1f5f9; display: block; }
   .photo-missing { padding: 40px; text-align: center; color: #94a3b8; background: #f8fafc; }
-  .photo-caption { padding: 8px 12px; }
-  .photo-findings { margin-top: 4px; color: #334155; }
+  .photo-caption { padding: 10px 14px; }
+  .cap-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .cap-time { color: #64748b; font-size: 11px; }
+  .cap-src { background: #0f766e1a; color: #0f766e; border: 1px solid #0f766e33; border-radius: 999px; padding: 1px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .cap-none { color: #94a3b8; font-size: 11px; margin-top: 2px; }
+  .photo-findings { margin-top: 4px; color: #334155; font-size: 12px; line-height: 1.6; }
+  .photo-skipped { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 14px; color: #92400e; font-size: 12px; margin-bottom: 16px; }
   footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 10px; }
 </style>
 </head>
@@ -205,7 +240,7 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
     <div><div class="k">Client</div><div class="v">${esc(record.clientName || "—")}</div></div>
     <div><div class="k">Technician</div><div class="v">${esc(record.technicianName || "—")}</div></div>
     <div><div class="k">Completed</div><div class="v">${dateStr} at ${timeStr}</div></div>
-    <div><div class="k">Photos</div><div class="v">${record.photos.length}</div></div>
+    <div><div class="k">Photos</div><div class="v">${goodPhotos.length}${skippedCount > 0 ? ` <span style="color:#94a3b8;font-weight:400;font-size:11px">(${skippedCount} low-quality excluded)</span>` : ""}</div></div>
     ${
       riskLevel
         ? `<div><div class="k">Risk level</div><div class="v"><span class="risk" style="background:${
@@ -229,7 +264,8 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
   ${customerRecsSection}
 
   <div class="section">
-    <h2>Photo evidence (${record.photos.length})</h2>
+    <h2>Photo evidence (${goodPhotos.length}${skippedCount > 0 ? ` of ${record.photos.length}` : ""})</h2>
+    ${skippedCount > 0 ? `<div class="photo-skipped">⚠ ${skippedCount} photo${skippedCount > 1 ? "s were" : " was"} excluded from this report due to low image quality (blurry, too dark, or near-uniform). All evidence is preserved in the inspection record.</div>` : ""}
     ${photosSection}
   </div>
 
