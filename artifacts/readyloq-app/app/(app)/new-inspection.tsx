@@ -2344,7 +2344,7 @@ const MODE_CONFIG: {
     label: "Co-Pilot",
     sub: "Live · 5G",
     icon: "sparkles-outline",
-    available: false,
+    available: true,
   },
 ];
 
