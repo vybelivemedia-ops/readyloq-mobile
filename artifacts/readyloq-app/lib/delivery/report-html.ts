@@ -179,6 +179,7 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
               ${timeStr ? `<span class="cap-time">${timeStr}</span>` : ""}
               ${isNonDefault ? `<span class="cap-src">${esc(srcLabel)}</span>` : ""}
             </div>
+            ${photo.description ? `<p class="cap-desc">${esc(photo.description)}</p>` : ""}
             ${
               photoFindings.length > 0
                 ? `<ul class="photo-findings">${photoFindings
@@ -225,6 +226,7 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
   .cap-time { color: #64748b; font-size: 11px; }
   .cap-src { background: #0f766e1a; color: #0f766e; border: 1px solid #0f766e33; border-radius: 999px; padding: 1px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
   .cap-none { color: #94a3b8; font-size: 11px; margin-top: 2px; }
+  .cap-desc { color: #1e293b; font-size: 12px; line-height: 1.6; margin: 6px 0 4px; padding: 6px 10px; background: #f8fafc; border-left: 3px solid #0f766e; border-radius: 0 4px 4px 0; }
   .photo-findings { margin-top: 4px; color: #334155; font-size: 12px; line-height: 1.6; }
   .photo-skipped { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 14px; color: #92400e; font-size: 12px; margin-bottom: 16px; }
   footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 10px; }

@@ -50,6 +50,12 @@ export type LocalPhoto = {
   /** Provider/EXIF context, passed through to the server verbatim. */
   captureMetadata?: Record<string, unknown>;
   /**
+   * Technician-authored description for this photo — added manually when AI
+   * has not yet run or when the tech wants to add specific context that the
+   * model may not capture (room label, station number, customer concern, etc.).
+   */
+  description?: string;
+  /**
    * True while the sync engine is actively uploading this photo to object
    * storage (between the network request start and the `storagePath` write).
    * Checked by `removePhoto` to prevent deleting a photo that is mid-flight,
@@ -222,6 +228,22 @@ export function updateLocalInspection(
     () => undefined,
   );
   return result;
+}
+
+/**
+ * Update the technician description for a single photo.
+ * Uses the serialised update chain so it is safe to call concurrently with
+ * other mutations (e.g. the sync engine writing `storagePath`).
+ */
+export function updatePhotoDescription(
+  localId: string,
+  photoLocalUri: string,
+  description: string,
+): Promise<LocalInspection | null> {
+  return updateLocalInspection(localId, (r) => {
+    const photo = r.photos.find((p) => p.localUri === photoLocalUri);
+    if (photo) photo.description = description.trim() || undefined;
+  });
 }
 
 export async function listLocalInspections(): Promise<LocalInspection[]> {

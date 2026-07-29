@@ -14,10 +14,14 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -37,6 +41,7 @@ import {
   type DeliveryMethod,
 } from "@/lib/delivery/registry";
 import type { LocalInspection, LocalSyncPhase } from "@/lib/local/inspection-store";
+import { updatePhotoDescription } from "@/lib/local/inspection-store";
 import { syncNow } from "@/lib/sync/engine";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
 
@@ -104,6 +109,23 @@ export default function InspectionSummaryScreen() {
   }, [record, findings]);
 
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // Imported photos that haven't gone through server AI yet.
+  const hasUnanalyzed =
+    record != null &&
+    record.photos.some((p) => p.captureSource === "media_import") &&
+    record.photos.length > record.analyzedCount;
+
+  const handleAnalyze = async () => {
+    if (!record || analyzing) return;
+    setAnalyzing(true);
+    try {
+      await syncNow(record.localId);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   if (!loaded) {
     return <Screen edges={["top", "bottom"]} />;
@@ -264,6 +286,7 @@ export default function InspectionSummaryScreen() {
               const photoFindings = findingsByPhoto.get(i) ?? [];
               const sourceInfo = describeCaptureSource(photo.captureSource);
               const lowQ = isLowQuality(photo.qualityScore);
+              const hasNote = !!photo.description;
               return (
                 <Pressable key={photo.localUri} onPress={() => setViewerIndex(i)}>
                   <Image
@@ -323,6 +346,21 @@ export default function InspectionSummaryScreen() {
                       {i + 1}
                     </Text>
                   </View>
+                  {/* Note badge — bottom-right when no AI findings, else stacked above findings badge */}
+                  {hasNote && photoFindings.length === 0 ? (
+                    <View
+                      style={{
+                        position: "absolute",
+                        bottom: 4,
+                        right: 4,
+                        backgroundColor: "#0f766e",
+                        borderRadius: 999,
+                        padding: 3,
+                      }}
+                    >
+                      <Ionicons name="create-outline" size={10} color="#fff" />
+                    </View>
+                  ) : null}
                   {photoFindings.length > 0 ? (
                     <View
                       style={{
@@ -333,8 +371,12 @@ export default function InspectionSummaryScreen() {
                         borderRadius: 999,
                         paddingHorizontal: 6,
                         paddingVertical: 1,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 3,
                       }}
                     >
+                      {hasNote ? <Ionicons name="create-outline" size={9} color={colors.primaryForeground} /> : null}
                       <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 10 }}>
                         {photoFindings.length}
                       </Text>
@@ -344,6 +386,32 @@ export default function InspectionSummaryScreen() {
               );
             })}
           </View>
+          {/* Analyze imported photos with AI */}
+          {hasUnanalyzed ? (
+            <Pressable
+              onPress={() => { void handleAnalyze(); }}
+              disabled={analyzing}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                backgroundColor: analyzing ? colors.muted : colors.primary,
+                borderRadius: 10,
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                marginTop: 2,
+              }}
+            >
+              {analyzing ? (
+                <ActivityIndicator size="small" color={colors.primaryForeground} />
+              ) : (
+                <Ionicons name="sparkles-outline" size={16} color={colors.primaryForeground} />
+              )}
+              <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                {analyzing ? "Analyzing photos…" : "Analyze photos with AI"}
+              </Text>
+            </Pressable>
+          ) : null}
         </Card>
 
         <DeliverySection
@@ -374,16 +442,21 @@ export default function InspectionSummaryScreen() {
         </View>
       </ScrollView>
 
-      {/* Full-screen photo viewer with per-photo AI findings. */}
+      {/* Full-screen photo viewer with per-photo AI findings + description editor. */}
       <PhotoViewer
         visible={viewerIndex != null}
         photos={record.photos.map((p) => p.localUri)}
         meta={record.photos.map((p) => ({
           source: p.captureSource,
           quality: p.qualityScore ?? null,
+          uri: p.localUri,
+          description: p.description,
         }))}
         initialIndex={viewerIndex ?? 0}
         findingsByPhoto={findingsByPhoto}
+        onDescriptionChange={(photoUri, text) => {
+          void updatePhotoDescription(record.localId, photoUri, text);
+        }}
         onClose={() => setViewerIndex(null)}
       />
     </Screen>
@@ -612,19 +685,23 @@ function PhotoViewer({
   meta,
   initialIndex,
   findingsByPhoto,
+  onDescriptionChange,
   onClose,
 }: {
   visible: boolean;
   photos: string[];
-  meta?: { source?: string; quality?: number | null }[];
+  meta?: { source?: string; quality?: number | null; uri?: string; description?: string }[];
   initialIndex: number;
   findingsByPhoto: Map<number, Finding[]>;
+  onDescriptionChange?: (photoUri: string, text: string) => void;
   onClose: () => void;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(initialIndex);
+  // Local draft for the description TextInput — reset when the viewed photo changes.
+  const [descDraft, setDescDraft] = useState("");
 
   // Reset paging position each time the viewer opens on a new photo.
   const [openKey, setOpenKey] = useState(0);
@@ -635,6 +712,11 @@ function PhotoViewer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, initialIndex]);
+
+  // Sync description draft whenever we land on a new photo.
+  React.useEffect(() => {
+    setDescDraft(meta?.[index]?.description ?? "");
+  }, [index, meta]);
 
   const findings = findingsByPhoto.get(index) ?? [];
   const current = meta?.[index];
@@ -714,44 +796,94 @@ function PhotoViewer({
           )}
         />
 
-        {findings.length > 0 ? (
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <ScrollView
-            style={{ maxHeight: 220, backgroundColor: "rgba(0,0,0,0.85)" }}
-            contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 32 }}
+            style={{ maxHeight: 280, backgroundColor: "rgba(0,0,0,0.88)" }}
+            contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: Math.max(insets.bottom, 16) }}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
-              AI findings on this photo
-            </Text>
-            {findings.map((f) => (
-              <View key={f.id} style={{ gap: 2 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Badge label={formatStatus(f.category)} tone={severityTone(f.severity)} />
-                  {f.severity ? (
-                    <Text style={{ color: "rgba(255,255,255,0.7)", fontFamily: "Inter_500Medium", fontSize: 12 }}>
-                      {formatStatus(f.severity)}
-                    </Text>
-                  ) : null}
-                </View>
-                <Text style={{ color: "#fff", fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19 }}>
-                  {f.description}
+            {/* Technician description editor */}
+            <View style={{ gap: 6 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="create-outline" size={13} color="rgba(255,255,255,0.6)" />
+                <Text style={{ color: "rgba(255,255,255,0.6)", fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                  Technician notes
                 </Text>
               </View>
-            ))}
+              <TextInput
+                value={descDraft}
+                onChangeText={setDescDraft}
+                onBlur={() => {
+                  if (current?.uri) {
+                    onDescriptionChange?.(current.uri, descDraft);
+                  }
+                }}
+                placeholder="Describe what this photo shows — location, concern, context…"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                multiline
+                style={{
+                  color: "#fff",
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 13,
+                  lineHeight: 20,
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  minHeight: 60,
+                  borderWidth: 1,
+                  borderColor: descDraft ? "rgba(20,184,166,0.6)" : "rgba(255,255,255,0.12)",
+                }}
+                returnKeyType="done"
+                blurOnSubmit
+                onSubmitEditing={() => {
+                  Keyboard.dismiss();
+                  if (current?.uri) {
+                    onDescriptionChange?.(current.uri, descDraft);
+                  }
+                }}
+              />
+            </View>
+
+            {/* AI findings */}
+            {findings.length > 0 ? (
+              <View style={{ gap: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="sparkles-outline" size={13} color="rgba(255,255,255,0.6)" />
+                  <Text style={{ color: "rgba(255,255,255,0.6)", fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                    AI findings on this photo
+                  </Text>
+                </View>
+                {findings.map((f) => (
+                  <View key={f.id} style={{ gap: 2 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Badge label={formatStatus(f.category)} tone={severityTone(f.severity)} />
+                      {f.severity ? (
+                        <Text style={{ color: "rgba(255,255,255,0.7)", fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                          {formatStatus(f.severity)}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={{ color: "#fff", fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19 }}>
+                      {f.description}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.4)",
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 12,
+                  textAlign: "center",
+                }}
+              >
+                No AI findings on this photo yet.
+              </Text>
+            )}
           </ScrollView>
-        ) : (
-          <View style={{ padding: 16, paddingBottom: 32, backgroundColor: "rgba(0,0,0,0.85)" }}>
-            <Text
-              style={{
-                color: "rgba(255,255,255,0.6)",
-                fontFamily: "Inter_400Regular",
-                fontSize: 13,
-                textAlign: "center",
-              }}
-            >
-              No AI findings on this photo.
-            </Text>
-          </View>
-        )}
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
