@@ -28,13 +28,31 @@ This redirects ble-plx's expo dep to the already-installed expo@54, avoiding the
 
 ## Metro ENOSPC fix
 
-The inotify watcher limit (65536) in the Replit container cannot be raised (write to `/proc/sys/fs/inotify/max_user_watches` is permission-denied). Metro exhausts the limit when watching `node_modules/.pnpm` (thousands of static directories).
+The inotify watcher limit (65536) in the Replit container cannot be raised. Metro exhausts the limit when watching `node_modules/.pnpm` (thousands of static directories).
 
 **Fix** in `metro.config.js`:
 - Remove `workspaceRoot` from `watchFolders` — only add specific source dirs (`lib/`, platform packages).
-- Add `node_modules/.pnpm` to `blockList` so Metro uses it for resolution only (not watching).
+- Do NOT add `node_modules/.pnpm` to `blockList` — see below.
 
-**Why:** The pnpm virtual store is static at runtime; no files in it change during development. Metro only needs to watch source packages.
+**Why:** Metro only watches `projectRoot` + `watchFolders`. Since `.pnpm` is in neither, it won't be watched. The blockList is unnecessary for ENOSPC and harmful for EAS.
+
+## CRITICAL: watchFolders must include workspaceRoot on EAS (not on Replit)
+
+Metro refuses to bundle files whose symlink-resolved real path lands **outside** `projectRoot + watchFolders`. All pnpm packages are symlinked into `node_modules/.pnpm` at the monorepo root. Without `workspaceRoot` in `watchFolders`, Metro throws "Unable to resolve module expo-router/entry.js" in the EAGER_BUNDLE phase.
+
+**Replit constraint:** Watching workspaceRoot hits the inotify limit (~65k watches) because `.pnpm` has 200k+ entries → ENOSPC.
+
+**EAS:** No meaningful inotify cap — watching workspaceRoot is safe.
+
+**Fix (verified working):** Gate on `REPLIT_DEV_DOMAIN` (always set in Replit dev, never on EAS):
+```js
+const isReplit = !!process.env.REPLIT_DEV_DOMAIN;
+if (!isReplit && fs.existsSync(workspaceRoot)) {
+  extraWatchFolders.push(workspaceRoot);
+}
+```
+
+**Do NOT put `node_modules/.pnpm` in `blockList`** — blockList prevents file reads (not just watching), breaking symlink resolution for all pnpm-managed packages.
 
 ## react-native-ble-plx symlink
 
