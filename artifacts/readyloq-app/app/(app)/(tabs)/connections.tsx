@@ -1,13 +1,23 @@
+/**
+ * Connections tab — ReadyLoq
+ *
+ * Live BLE pairing screen for Meta Ray-Ban smart glasses and future hardware.
+ * Uses smartGlassesBle (react-native-ble-plx) for scanning, pairing, and
+ * connection lifecycle. Other device slots remain "coming soon".
+ */
+
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, type Href } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
   Text,
   View,
 } from "react-native";
+import { State as BleHwState } from "react-native-ble-plx";
 
 import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
@@ -17,42 +27,23 @@ import {
   ANDROID_VERSION_CODE,
   CODENAME,
 } from "@/constants/version";
+import {
+  smartGlassesBle,
+  type SmartGlassesBleState,
+  type DiscoveredGlasses,
+} from "@/lib/ble";
 
-// ─── Device catalogue ────────────────────────────────────────────────────────
-//
-// Source of truth: @platform/meta-wearables FUTURE_WEARABLE_PROVIDERS.
-// smart-glasses availability was flipped to true in meta-wearables;
-// the remaining entries stay "coming_soon" until their BLE/USB/WiFi drivers
-// are implemented in future-source-providers.ts.
+// ─── Static device catalogue (Coming Soon entries) ───────────────────────────
 
-type DeviceStatus = "available" | "coming_soon" | "connected";
-
-interface DeviceEntry {
+interface ComingSoonDevice {
   id: string;
   name: string;
   description: string;
-  /** Ionicons glyph */
   icon: string;
   transport: string;
-  status: DeviceStatus;
-  /** audioPipeline binding, if applicable */
-  audioPipeline?: string;
-  /** snapshotRoutine binding, if applicable */
-  snapshotRoutine?: string;
 }
 
-const DEVICES: DeviceEntry[] = [
-  {
-    id: "smart-glasses",
-    name: "Meta Ray-Ban Glasses",
-    description:
-      "Hands-free evidence capture. Frames arrive over the companion app via BLE. Audio routes to the AI voice pipeline.",
-    icon: "glasses-outline",
-    transport: "BLE",
-    status: "available",
-    audioPipeline: "faie",
-    snapshotRoutine: "auto_snapshot",
-  },
+const COMING_SOON_DEVICES: ComingSoonDevice[] = [
   {
     id: "wifi-camera",
     name: "Wi-Fi IP Camera",
@@ -60,7 +51,6 @@ const DEVICES: DeviceEntry[] = [
       "Action cam or IP camera over the local network. Tap to configure the camera URL and capture stills on demand.",
     icon: "wifi-outline",
     transport: "Wi-Fi",
-    status: "coming_soon",
   },
   {
     id: "usb-camera",
@@ -69,7 +59,6 @@ const DEVICES: DeviceEntry[] = [
       "UVC borescope or endoscope over USB-OTG. Live feed with still capture — ideal for wall cavities and crawl spaces.",
     icon: "hardware-chip-outline",
     transport: "USB",
-    status: "coming_soon",
   },
   {
     id: "wearable-camera",
@@ -78,7 +67,6 @@ const DEVICES: DeviceEntry[] = [
       "Body-cam or sport wearable. Frames push in as they're recorded and are automatically ingested as evidence.",
     icon: "watch-outline",
     transport: "BLE",
-    status: "coming_soon",
   },
 ];
 
@@ -87,35 +75,101 @@ const DEVICES: DeviceEntry[] = [
 export default function ConnectionsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const [scanning, setScanning] = useState(false);
 
-  const connected = DEVICES.filter((d) => d.status === "connected");
-  const available = DEVICES.filter((d) => d.status === "available");
-  const comingSoon = DEVICES.filter((d) => d.status === "coming_soon");
+  const [ble, setBle] = useState<SmartGlassesBleState>(() =>
+    smartGlassesBle.getState(),
+  );
 
-  const handleConnect = (device: DeviceEntry) => {
-    if (device.id === "smart-glasses") {
+  // Subscribe to BLE state changes
+  useEffect(() => {
+    const unsub = smartGlassesBle.subscribe(setBle);
+    return unsub;
+  }, []);
+
+  // Clean up scan on unmount (don't leave an active scan running)
+  useEffect(() => {
+    return () => {
+      if (smartGlassesBle.getState().connectionState === "scanning") {
+        smartGlassesBle.stopScan();
+      }
+    };
+  }, []);
+
+  const isScanning = ble.connectionState === "scanning";
+  const isConnecting = ble.connectionState === "connecting";
+  const isConnected = ble.connectionState === "connected";
+  const isDisconnecting = ble.connectionState === "disconnecting";
+  const btOff = ble.hwState !== BleHwState.PoweredOn;
+  const busy = isConnecting || isDisconnecting;
+
+  const handleScan = useCallback(() => {
+    if (btOff) {
       Alert.alert(
-        "Meta Ray-Ban Glasses",
-        "BLE pairing will be available in the next build once the react-native-ble-plx driver is wired. The device is registered and its pipelines are configured.",
-        [{ text: "Got it" }],
+        "Bluetooth is off",
+        "Enable Bluetooth in device settings to scan for glasses.",
+        [{ text: "OK" }],
       );
       return;
     }
-    Alert.alert("Coming soon", `${device.name} support is in development.`, [
-      { text: "OK" },
-    ]);
-  };
+    if (isScanning) {
+      smartGlassesBle.stopScan();
+    } else {
+      smartGlassesBle.startScan();
+    }
+  }, [btOff, isScanning]);
 
-  const handleScan = () => {
-    setScanning(true);
-    setTimeout(() => setScanning(false), 2000);
+  const handleConnect = useCallback(
+    async (device: DiscoveredGlasses) => {
+      try {
+        await smartGlassesBle.connect(device.id, device.name);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Connection failed.";
+        Alert.alert("Connection failed", msg, [{ text: "OK" }]);
+      }
+    },
+    [],
+  );
+
+  const handleReconnect = useCallback(async () => {
+    const { pairedDeviceId, pairedDeviceName } = ble;
+    if (!pairedDeviceId || !pairedDeviceName) return;
+    try {
+      await smartGlassesBle.connect(pairedDeviceId, pairedDeviceName);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Reconnection failed.";
+      Alert.alert("Reconnection failed", msg, [{ text: "OK" }]);
+    }
+  }, [ble]);
+
+  const handleDisconnect = useCallback(async () => {
     Alert.alert(
-      "Scanning for devices",
-      "BLE scanning will be active once hardware drivers are installed.",
-      [{ text: "OK", onPress: () => setScanning(false) }],
+      "Disconnect glasses?",
+      "The glasses will stop streaming frames and audio until reconnected.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Disconnect",
+          style: "destructive",
+          onPress: () => void smartGlassesBle.disconnect(),
+        },
+      ],
     );
-  };
+  }, []);
+
+  const handleForget = useCallback(() => {
+    Alert.alert(
+      "Forget glasses?",
+      "The saved pairing will be cleared. You'll need to scan and connect again.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Forget",
+          style: "destructive",
+          onPress: () => void smartGlassesBle.forgetPairedDevice(),
+        },
+      ],
+    );
+  }, []);
 
   return (
     <Screen>
@@ -151,41 +205,138 @@ export default function ConnectionsScreen() {
           </Text>
         </View>
 
-        {/* Scan button */}
-        <Pressable
-          onPress={handleScan}
-          style={({ pressed }) => ({
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 10,
-            backgroundColor: scanning ? colors.muted : colors.primary,
-            borderRadius: colors.radius,
-            paddingVertical: 14,
-            opacity: pressed ? 0.88 : 1,
-          })}
-        >
-          <Ionicons
-            name={scanning ? "radio-outline" : "bluetooth-outline"}
-            size={18}
-            color={colors.primaryForeground}
-          />
-          <Text
+        {/* Bluetooth off warning */}
+        {btOff && (
+          <Card
             style={{
-              color: colors.primaryForeground,
-              fontFamily: "Inter_600SemiBold",
-              fontSize: 15,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              backgroundColor: `${colors.destructive}18`,
+              borderColor: `${colors.destructive}40`,
+              borderWidth: 1,
             }}
           >
-            {scanning ? "Scanning for devices…" : "Scan for nearby devices"}
-          </Text>
-        </Pressable>
+            <Ionicons
+              name="bluetooth-outline"
+              size={18}
+              color={colors.destructive}
+            />
+            <Text
+              style={{
+                color: colors.destructive,
+                fontFamily: "Inter_500Medium",
+                fontSize: 13,
+                flex: 1,
+              }}
+            >
+              Bluetooth is{" "}
+              {ble.hwState === BleHwState.Unauthorized
+                ? "not authorized"
+                : "off"}{" "}
+              — enable it to scan for glasses.
+            </Text>
+          </Card>
+        )}
 
-        {/* Connected devices — empty state */}
+        {/* Scan / Stop button */}
+        {!isConnected && !busy && (
+          <Pressable
+            onPress={handleScan}
+            disabled={busy}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              backgroundColor: isScanning ? colors.muted : colors.primary,
+              borderRadius: colors.radius,
+              paddingVertical: 14,
+              opacity: pressed ? 0.88 : 1,
+            })}
+          >
+            {isScanning ? (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            ) : (
+              <Ionicons
+                name="bluetooth-outline"
+                size={18}
+                color={colors.primaryForeground}
+              />
+            )}
+            <Text
+              style={{
+                color: isScanning
+                  ? colors.mutedForeground
+                  : colors.primaryForeground,
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 15,
+              }}
+            >
+              {isScanning ? "Scanning… (tap to stop)" : "Scan for nearby devices"}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* Last BLE error */}
+        {ble.error && ble.connectionState !== "connected" && (
+          <Card
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              backgroundColor: `${colors.destructive}12`,
+            }}
+          >
+            <Ionicons
+              name="warning-outline"
+              size={16}
+              color={colors.destructive}
+            />
+            <Text
+              style={{
+                color: colors.destructive,
+                fontFamily: "Inter_400Regular",
+                fontSize: 13,
+                flex: 1,
+              }}
+            >
+              {ble.error}
+            </Text>
+          </Card>
+        )}
+
+        {/* ── Connected device ── */}
         <Section title="Connected" icon="radio-outline">
-          {connected.length === 0 ? (
+          {isConnected && ble.connectedDeviceId ? (
+            <ConnectedGlassesCard
+              deviceId={ble.connectedDeviceId}
+              deviceName={ble.connectedDeviceName ?? "Meta Ray-Ban Glasses"}
+              colors={colors}
+              onDisconnect={handleDisconnect}
+            />
+          ) : busy ? (
             <Card>
-              <View style={{ alignItems: "center", gap: 8, paddingVertical: 12 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text
+                  style={{
+                    color: colors.mutedForeground,
+                    fontFamily: "Inter_400Regular",
+                    fontSize: 14,
+                  }}
+                >
+                  {isConnecting ? "Connecting…" : "Disconnecting…"}
+                </Text>
+              </View>
+            </Card>
+          ) : (
+            <Card>
+              <View
+                style={{ alignItems: "center", gap: 8, paddingVertical: 12 }}
+              >
                 <Ionicons
                   name="bluetooth-outline"
                   size={32}
@@ -203,39 +354,45 @@ export default function ConnectionsScreen() {
                 </Text>
               </View>
             </Card>
-          ) : (
-            connected.map((d) => (
-              <DeviceCard
-                key={d.id}
-                device={d}
-                colors={colors}
-                onPress={() => handleConnect(d)}
-              />
-            ))
           )}
         </Section>
 
-        {/* Available to connect */}
+        {/* ── Discovered devices (scan results) ── */}
+        {ble.discovered.length > 0 && (
+          <Section title="Discovered nearby" icon="search-outline">
+            {ble.discovered.map((device) => (
+              <DiscoveredCard
+                key={device.id}
+                device={device}
+                colors={colors}
+                onConnect={(): void => { void handleConnect(device); }}
+                disabled={busy || isConnected}
+              />
+            ))}
+          </Section>
+        )}
+
+        {/* ── Available devices (known, not yet connected) ── */}
         <Section title="Available" icon="checkmark-circle-outline">
-          {available.map((d) => (
-            <DeviceCard
-              key={d.id}
-              device={d}
+          {/* Meta Ray-Ban — always shown as available unless connected */}
+          {!isConnected && (
+            <GlassesAvailableCard
               colors={colors}
-              onPress={() => handleConnect(d)}
+              pairedDeviceId={ble.pairedDeviceId}
+              pairedDeviceName={ble.pairedDeviceName}
+              btOff={btOff}
+              onScan={handleScan}
+              onReconnect={handleReconnect}
+              onForget={handleForget}
+              isConnecting={isConnecting}
             />
-          ))}
+          )}
         </Section>
 
-        {/* Coming soon */}
+        {/* ── Coming soon ── */}
         <Section title="Coming soon" icon="time-outline">
-          {comingSoon.map((d) => (
-            <DeviceCard
-              key={d.id}
-              device={d}
-              colors={colors}
-              onPress={() => handleConnect(d)}
-            />
+          {COMING_SOON_DEVICES.map((d) => (
+            <ComingSoonCard key={d.id} device={d} colors={colors} />
           ))}
         </Section>
 
@@ -297,7 +454,7 @@ export default function ConnectionsScreen() {
   );
 }
 
-// ─── Subcomponents ───────────────────────────────────────────────────────────
+// ─── Section wrapper ──────────────────────────────────────────────────────────
 
 function Section({
   title,
@@ -328,47 +485,430 @@ function Section({
   );
 }
 
-function DeviceCard({
-  device,
+// ─── Connected glasses card ───────────────────────────────────────────────────
+
+function ConnectedGlassesCard({
+  deviceName,
   colors,
-  onPress,
+  onDisconnect,
 }: {
-  device: DeviceEntry;
+  deviceId: string;
+  deviceName: string;
   colors: ReturnType<typeof useColors>;
-  onPress: () => void;
+  onDisconnect: () => void;
 }) {
-  const isAvailable = device.status === "available";
-  const isConnected = device.status === "connected";
-  const isComingSoon = device.status === "coming_soon";
-
-  const statusLabel = isConnected
-    ? "Connected"
-    : isAvailable
-    ? "Ready to pair"
-    : "Coming soon";
-
-  const statusColor = isConnected
-    ? colors.success
-    : isAvailable
-    ? colors.primary
-    : colors.mutedForeground;
-
-  const statusBg = isConnected
-    ? `${colors.success}22`
-    : isAvailable
-    ? `${colors.primary}18`
-    : `${colors.mutedForeground}14`;
-
   return (
     <Card style={{ gap: 12 }}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-        {/* Device icon */}
         <View
           style={{
             width: 48,
             height: 48,
             borderRadius: 14,
-            backgroundColor: isComingSoon ? colors.muted : colors.accent,
+            backgroundColor: `${colors.success}22`,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="glasses-outline" size={24} color={colors.success} />
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text
+            style={{
+              color: colors.foreground,
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 15,
+            }}
+          >
+            {deviceName}
+          </Text>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            <Badge label="BLE" colors={colors} />
+            <Badge
+              label="Connected"
+              colors={colors}
+              color={colors.success}
+              bg={`${colors.success}22`}
+            />
+          </View>
+        </View>
+        {/* Live indicator */}
+        <View style={{ alignItems: "center", gap: 3 }}>
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: colors.success,
+            }}
+          />
+          <Text
+            style={{
+              color: colors.success,
+              fontFamily: "Inter_500Medium",
+              fontSize: 10,
+            }}
+          >
+            LIVE
+          </Text>
+        </View>
+      </View>
+
+      {/* Pipeline bindings */}
+      <PipelineBindings colors={colors} />
+
+      {/* Disconnect button */}
+      <Pressable
+        onPress={onDisconnect}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          backgroundColor: colors.muted,
+          borderRadius: colors.radius,
+          paddingVertical: 10,
+          opacity: pressed ? 0.85 : 1,
+        })}
+      >
+        <Ionicons
+          name="unlink-outline"
+          size={16}
+          color={colors.mutedForeground}
+        />
+        <Text
+          style={{
+            color: colors.mutedForeground,
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 14,
+          }}
+        >
+          Disconnect
+        </Text>
+      </Pressable>
+    </Card>
+  );
+}
+
+// ─── Discovered device card ───────────────────────────────────────────────────
+
+function DiscoveredCard({
+  device,
+  colors,
+  onConnect,
+  disabled,
+}: {
+  device: DiscoveredGlasses;
+  colors: ReturnType<typeof useColors>;
+  onConnect: () => void;
+  disabled: boolean;
+}) {
+  const rssiPercent = Math.max(0, Math.min(100, ((device.rssi + 100) / 60) * 100));
+
+  return (
+    <Card style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            backgroundColor: colors.accent,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="glasses-outline" size={22} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text
+            style={{
+              color: colors.foreground,
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 14,
+            }}
+          >
+            {device.name}
+          </Text>
+          {/* RSSI bar */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View
+              style={{
+                flex: 1,
+                height: 4,
+                backgroundColor: colors.muted,
+                borderRadius: 2,
+              }}
+            >
+              <View
+                style={{
+                  width: `${rssiPercent}%`,
+                  height: 4,
+                  backgroundColor:
+                    rssiPercent > 60
+                      ? colors.success
+                      : rssiPercent > 30
+                      ? colors.primary
+                      : colors.destructive,
+                  borderRadius: 2,
+                }}
+              />
+            </View>
+            <Text
+              style={{
+                color: colors.mutedForeground,
+                fontFamily: "Inter_400Regular",
+                fontSize: 11,
+              }}
+            >
+              {device.rssi} dBm
+            </Text>
+          </View>
+        </View>
+        <Pressable
+          onPress={onConnect}
+          disabled={disabled}
+          style={({ pressed }) => ({
+            backgroundColor: colors.primary,
+            borderRadius: colors.radius,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            opacity: pressed || disabled ? 0.6 : 1,
+          })}
+        >
+          <Text
+            style={{
+              color: colors.primaryForeground,
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 13,
+            }}
+          >
+            Connect
+          </Text>
+        </Pressable>
+      </View>
+    </Card>
+  );
+}
+
+// ─── Available glasses card (not yet connected) ───────────────────────────────
+
+function GlassesAvailableCard({
+  colors,
+  pairedDeviceId,
+  pairedDeviceName,
+  btOff,
+  onScan,
+  onReconnect,
+  onForget,
+  isConnecting,
+}: {
+  colors: ReturnType<typeof useColors>;
+  pairedDeviceId: string | null;
+  pairedDeviceName: string | null;
+  btOff: boolean;
+  onScan: () => void;
+  onReconnect: () => void;
+  onForget: () => void;
+  isConnecting: boolean;
+}) {
+  return (
+    <Card style={{ gap: 12 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            backgroundColor: colors.accent,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="glasses-outline" size={24} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text
+            style={{
+              color: colors.foreground,
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 15,
+            }}
+          >
+            Meta Ray-Ban Glasses
+          </Text>
+          <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+            <Badge label="BLE" colors={colors} />
+            <Badge
+              label="Ready to pair"
+              colors={colors}
+              color={colors.primary}
+              bg={`${colors.primary}18`}
+            />
+          </View>
+        </View>
+      </View>
+
+      <Text
+        style={{
+          color: colors.mutedForeground,
+          fontFamily: "Inter_400Regular",
+          fontSize: 13,
+          lineHeight: 19,
+        }}
+      >
+        Hands-free evidence capture. Frames arrive via BLE and route through
+        the auto-snapshot pipeline. Audio streams to the FAIE voice pipeline.
+      </Text>
+
+      <PipelineBindings colors={colors} />
+
+      {/* Previously paired device — quick reconnect */}
+      {pairedDeviceId && pairedDeviceName && (
+        <View
+          style={{
+            backgroundColor: `${colors.primary}0C`,
+            borderRadius: 8,
+            padding: 10,
+            gap: 6,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontFamily: "Inter_400Regular",
+              fontSize: 12,
+            }}
+          >
+            Last paired:
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text
+              style={{
+                color: colors.foreground,
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 13,
+              }}
+            >
+              {pairedDeviceName}
+            </Text>
+            <Pressable onPress={onForget}>
+              <Text
+                style={{
+                  color: colors.destructive,
+                  fontFamily: "Inter_500Medium",
+                  fontSize: 12,
+                }}
+              >
+                Forget
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* Action buttons */}
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        {pairedDeviceId && (
+          <Pressable
+            onPress={onReconnect}
+            disabled={isConnecting || btOff}
+            style={({ pressed }) => ({
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 7,
+              backgroundColor: colors.primary,
+              borderRadius: colors.radius,
+              paddingVertical: 10,
+              opacity: pressed || isConnecting || btOff ? 0.6 : 1,
+            })}
+          >
+            {isConnecting ? (
+              <ActivityIndicator size="small" color={colors.primaryForeground} />
+            ) : (
+              <Ionicons
+                name="bluetooth-outline"
+                size={15}
+                color={colors.primaryForeground}
+              />
+            )}
+            <Text
+              style={{
+                color: colors.primaryForeground,
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 14,
+              }}
+            >
+              Reconnect
+            </Text>
+          </Pressable>
+        )}
+        <Pressable
+          onPress={onScan}
+          disabled={btOff}
+          style={({ pressed }) => ({
+            flex: pairedDeviceId ? 0 : 1,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 7,
+            backgroundColor: pairedDeviceId ? colors.muted : colors.primary,
+            borderRadius: colors.radius,
+            paddingVertical: 10,
+            paddingHorizontal: pairedDeviceId ? 16 : undefined,
+            opacity: pressed || btOff ? 0.6 : 1,
+          })}
+        >
+          <Ionicons
+            name="search-outline"
+            size={15}
+            color={
+              pairedDeviceId ? colors.mutedForeground : colors.primaryForeground
+            }
+          />
+          <Text
+            style={{
+              color: pairedDeviceId
+                ? colors.mutedForeground
+                : colors.primaryForeground,
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 14,
+            }}
+          >
+            Scan
+          </Text>
+        </Pressable>
+      </View>
+    </Card>
+  );
+}
+
+// ─── Coming soon card ─────────────────────────────────────────────────────────
+
+function ComingSoonCard({
+  device,
+  colors,
+}: {
+  device: ComingSoonDevice;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <Card style={{ gap: 10, opacity: 0.7 }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            backgroundColor: colors.muted,
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -376,65 +916,25 @@ function DeviceCard({
           <Ionicons
             name={device.icon as keyof typeof Ionicons.glyphMap}
             size={24}
-            color={isComingSoon ? colors.mutedForeground : colors.primary}
+            color={colors.mutedForeground}
           />
         </View>
-
-        {/* Name + badges */}
         <View style={{ flex: 1, gap: 4 }}>
           <Text
             style={{
-              color: isComingSoon ? colors.mutedForeground : colors.foreground,
+              color: colors.mutedForeground,
               fontFamily: "Inter_600SemiBold",
               fontSize: 15,
             }}
           >
             {device.name}
           </Text>
-          <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-            {/* Transport badge */}
-            <View
-              style={{
-                backgroundColor: colors.muted,
-                borderRadius: 999,
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.mutedForeground,
-                  fontFamily: "Inter_500Medium",
-                  fontSize: 11,
-                }}
-              >
-                {device.transport}
-              </Text>
-            </View>
-            {/* Status badge */}
-            <View
-              style={{
-                backgroundColor: statusBg,
-                borderRadius: 999,
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-              }}
-            >
-              <Text
-                style={{
-                  color: statusColor,
-                  fontFamily: "Inter_600SemiBold",
-                  fontSize: 11,
-                }}
-              >
-                {statusLabel}
-              </Text>
-            </View>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+            <Badge label={device.transport} colors={colors} />
+            <Badge label="Coming soon" colors={colors} />
           </View>
         </View>
       </View>
-
-      {/* Description */}
       <Text
         style={{
           color: colors.mutedForeground,
@@ -445,70 +945,72 @@ function DeviceCard({
       >
         {device.description}
       </Text>
-
-      {/* Pipeline bindings — shown only for smart glasses */}
-      {(device.audioPipeline || device.snapshotRoutine) ? (
-        <View
-          style={{
-            backgroundColor: `${colors.primary}10`,
-            borderRadius: 8,
-            padding: 10,
-            gap: 5,
-          }}
-        >
-          {device.audioPipeline ? (
-            <PipelineRow
-              icon="mic-outline"
-              label="Audio stream"
-              value="FAIE voice pipeline"
-              colors={colors}
-            />
-          ) : null}
-          {device.snapshotRoutine ? (
-            <PipelineRow
-              icon="camera-outline"
-              label="Camera frames"
-              value="Auto-snapshot routine"
-              colors={colors}
-            />
-          ) : null}
-        </View>
-      ) : null}
-
-      {/* Action button */}
-      {!isComingSoon ? (
-        <Pressable
-          onPress={onPress}
-          style={({ pressed }) => ({
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            backgroundColor: isConnected ? colors.muted : colors.primary,
-            borderRadius: colors.radius,
-            paddingVertical: 10,
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          <Ionicons
-            name={isConnected ? "unlink-outline" : "bluetooth-outline"}
-            size={16}
-            color={isConnected ? colors.mutedForeground : colors.primaryForeground}
-          />
-          <Text
-            style={{
-              color: isConnected
-                ? colors.mutedForeground
-                : colors.primaryForeground,
-              fontFamily: "Inter_600SemiBold",
-              fontSize: 14,
-            }}
-          >
-            {isConnected ? "Disconnect" : "Connect"}
-          </Text>
-        </Pressable>
-      ) : null}
     </Card>
+  );
+}
+
+// ─── Shared sub-components ────────────────────────────────────────────────────
+
+function Badge({
+  label,
+  colors,
+  color,
+  bg,
+}: {
+  label: string;
+  colors: ReturnType<typeof useColors>;
+  color?: string;
+  bg?: string;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: bg ?? colors.muted,
+        borderRadius: 999,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+      }}
+    >
+      <Text
+        style={{
+          color: color ?? colors.mutedForeground,
+          fontFamily: color ? "Inter_600SemiBold" : "Inter_500Medium",
+          fontSize: 11,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function PipelineBindings({
+  colors,
+}: {
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: `${colors.primary}10`,
+        borderRadius: 8,
+        padding: 10,
+        gap: 5,
+      }}
+    >
+      <PipelineRow
+        icon="mic-outline"
+        label="Audio stream"
+        value="FAIE voice pipeline"
+        colors={colors}
+      />
+      <PipelineRow
+        icon="camera-outline"
+        label="Camera frames"
+        value="Auto-snapshot routine"
+        colors={colors}
+      />
+    </View>
   );
 }
 

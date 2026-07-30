@@ -21,7 +21,9 @@
         "NSCameraUsageDescription": "ReadyLoq uses the camera to capture inspection photos of pest activity and conducive conditions for AI analysis.",
         "NSPhotoLibraryUsageDescription": "ReadyLoq saves and attaches inspection photos to your reports.",
         "NSLocationWhenInUseUsageDescription": "ReadyLoq records the inspection site location to tag your reports.",
-        "NSMicrophoneUsageDescription": "Allow ReadyLoq to use the microphone for hands-free inspection notes."
+        "NSMicrophoneUsageDescription": "Allow ReadyLoq to use the microphone for hands-free inspection notes.",
+        "NSBluetoothAlwaysUsageDescription": "ReadyLoq connects to Meta Ray-Ban smart glasses over Bluetooth to receive hands-free inspection photos.",
+        "NSBluetoothPeripheralUsageDescription": "ReadyLoq uses Bluetooth to pair with Meta Ray-Ban smart glasses for evidence capture."
       }
     },
     "android": {
@@ -31,7 +33,12 @@
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADVERTISE"
       ]
     },
     "web": {
@@ -79,6 +86,7 @@
         }
       ],
       "expo-mail-composer",
+      "react-native-ble-plx",
       "./plugins/withFoldableConfigChanges.js"
     ],
     "experiments": {

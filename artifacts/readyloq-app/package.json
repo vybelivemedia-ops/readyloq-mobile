@@ -66,6 +66,7 @@
   },
   "dependencies": {
     "@platform/camera-core": "workspace:*",
+    "react-native-ble-plx": "3.2.1",
     "@platform/device-core": "workspace:*",
     "@platform/measurement-core": "workspace:*",
     "@platform/provider-registry": "workspace:*",

@@ -20,6 +20,7 @@ import {
   createWifiCameraProvider,
   getWifiCameraConfig,
 } from "./wifi-camera-provider";
+import { smartGlassesBle } from "../ble";
 
 const COMING_SOON =
   "Hardware support is planned — this build has no driver for it yet.";
@@ -33,7 +34,7 @@ export const FUTURE_PROVIDER_DEFINITIONS: CaptureProviderDefinition[] = [
     id: "smart-glasses",
     source: "smart_glasses",
     name: "Meta Ray-Ban glasses",
-    description: "Hands-free capture; frames arrive over the companion app / BLE.",
+    description: "Hands-free capture; frames arrive via BLE → auto-snapshot pipeline.",
     capabilities: {
       mode: "async_push",
       transport: "ble",
@@ -42,8 +43,59 @@ export const FUTURE_PROVIDER_DEFINITIONS: CaptureProviderDefinition[] = [
       requiresPairing: true,
     },
     previewKind: "none",
-    probe: async () => ({ available: false, reason: COMING_SOON }),
-    create: () => notImplemented("Smart glasses"),
+    probe: async () => {
+      const { connectionState } = smartGlassesBle.getState();
+      if (connectionState === "connected") return { available: true };
+      return {
+        available: false,
+        reason:
+          "Connect glasses via the Connections tab to start receiving frames.",
+      };
+    },
+    create: () => {
+      const { connectionState, connectedDeviceId } = smartGlassesBle.getState();
+      if (connectionState !== "connected" || !connectedDeviceId) {
+        throw new Error(
+          "Glasses are not connected. Pair via the Connections tab first.",
+        );
+      }
+      // Return a minimal push provider that routes JPEG frames from the BLE
+      // driver into the inspection capture pipeline.
+      return {
+        id: "smart-glasses",
+        source: "smart_glasses" as const,
+        label: "Meta Ray-Ban Glasses",
+        priority: 80,
+        capabilities: {
+          mode: "async_push" as const,
+          transport: "ble" as const,
+          hasLivePreview: false,
+          producesVideo: true,
+          requiresPairing: true,
+        },
+        onFrame: (cb: (jpeg: Uint8Array) => void) => smartGlassesBle.onFrame(cb),
+        capture: async () => {
+          // Trigger a single snapshot from the glasses and wait for the frame.
+          return new Promise<never>((_, reject) => {
+            const timeout = setTimeout(
+              () => reject(new Error("Snapshot timed out — no frame received.")),
+              10_000,
+            );
+            const unsub = smartGlassesBle.onFrame(() => {
+              clearTimeout(timeout);
+              unsub();
+              // Frame is delivered to consumers via onFrame; resolve void here.
+              reject(new Error("Use onFrame to receive frames from glasses."));
+            });
+            void smartGlassesBle.requestSnapshot().catch((err) => {
+              clearTimeout(timeout);
+              unsub();
+              reject(err as Error);
+            });
+          });
+        },
+      } as unknown as ReturnType<CaptureProviderDefinition["create"]>;
+    },
   },
   {
     id: "usb-camera",
