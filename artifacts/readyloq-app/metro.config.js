@@ -23,6 +23,13 @@ if (fs.existsSync(platformPackagesRoot)) {
 }
 config.watchFolders = extraWatchFolders;
 
+// NOTE: do NOT add node_modules/.pnpm to blockedPaths.  Metro resolves
+// pnpm-managed packages by following symlinks into .pnpm/; blocking that
+// path prevents Metro from reading the real files behind those symlinks and
+// causes "Unable to resolve module" errors on EAS (EAGER_BUNDLE phase).
+// The ENOSPC watcher fix is handled by keeping .pnpm out of watchFolders
+// (above), which is sufficient — Metro doesn't watch paths outside of
+// watchFolders and the projectRoot regardless.
 const homeDir = process.env.HOME || "/home/runner";
 const blockedPaths = [
   path.join(homeDir, ".config"),
@@ -33,9 +40,6 @@ const blockedPaths = [
   path.join(workspaceRoot, ".cache"),
   path.join(workspaceRoot, ".git"),
   path.join(workspaceRoot, "artifacts/readyloq-app/.expo"),
-  // Exclude the pnpm content-addressable store — Metro resolves from it via
-  // nodeModulesPaths but doesn't need to watch it for file changes.
-  path.join(workspaceRoot, "node_modules/.pnpm"),
 ];
 
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
