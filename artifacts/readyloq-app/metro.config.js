@@ -9,7 +9,15 @@ const rootNodeModules = path.resolve(workspaceRoot, "node_modules");
 
 const config = getDefaultConfig(projectRoot);
 
-const extraWatchFolders = [workspaceRoot];
+// Watch source packages in the monorepo but NOT the pnpm store — the store
+// contains thousands of static directories that push Metro past the inotify
+// watcher limit (ENOSPC) in constrained environments.  node_modules/.pnpm is
+// added to the blockList below so Metro uses it for resolution only.
+const extraWatchFolders = [];
+// Watch shared lib packages (source only)
+const libRoot = path.resolve(workspaceRoot, "lib");
+if (fs.existsSync(libRoot)) extraWatchFolders.push(libRoot);
+// Watch platform packages (source only)
 if (fs.existsSync(platformPackagesRoot)) {
   extraWatchFolders.push(platformPackagesRoot);
 }
@@ -25,6 +33,9 @@ const blockedPaths = [
   path.join(workspaceRoot, ".cache"),
   path.join(workspaceRoot, ".git"),
   path.join(workspaceRoot, "artifacts/readyloq-app/.expo"),
+  // Exclude the pnpm content-addressable store — Metro resolves from it via
+  // nodeModulesPaths but doesn't need to watch it for file changes.
+  path.join(workspaceRoot, "node_modules/.pnpm"),
 ];
 
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
