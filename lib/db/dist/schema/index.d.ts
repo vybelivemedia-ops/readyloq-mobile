@@ -18,4 +18,6 @@ export * from "./proposals";
 export * from "./conversations";
 export * from "./messages";
 export * from "./bait-stations";
+export * from "./products";
+export * from "./treatment-logs";
 //# sourceMappingURL=index.d.ts.map

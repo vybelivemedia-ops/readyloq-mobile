@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureClerkNativeRedirectUrls } from "./lib/clerk-redirect-urls";
+import { ensureProductsSeed } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -23,6 +24,12 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Idempotent product catalogue seed — inserts any missing seed products on
+  // startup. Safe to run every boot; skips rows that already exist.
+  void ensureProductsSeed().catch((seedErr) => {
+    logger.warn({ err: seedErr }, "Product seed failed — catalogue may be incomplete");
+  });
 
   // Fire-and-forget: register native OAuth redirect URLs with Clerk so
   // Google sign-in works in the standalone mobile app (production

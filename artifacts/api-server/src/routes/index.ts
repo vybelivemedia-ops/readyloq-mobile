@@ -27,6 +27,8 @@ import briefingRouter from "./briefing";
 import shareRouter from "./share";
 import geminiRouter from "./gemini";
 import baitStationsRouter from "./bait-stations";
+import productsRouter from "./products";
+import treatmentLogsRouter from "./treatment-logs";
 import crmRouter from "./crm";
 
 const router: IRouter = Router();
@@ -123,6 +125,16 @@ router.use(
   requireCompany,
   requireBetaAccess,
   baitStationsRouter,
+);
+// Chemical product catalogue — available to all authenticated beta users.
+// Products are platform-wide (no company scope); treatment logs are scoped.
+router.use("/products", requireAuth, requireBetaAccess, productsRouter);
+router.use(
+  "/inspections/:inspectionId/treatment-logs",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  treatmentLogsRouter,
 );
 // CRM Integration — manager+ only: fetching client lists and pushing
 // completed inspections to FieldRoutes or PestPac.
