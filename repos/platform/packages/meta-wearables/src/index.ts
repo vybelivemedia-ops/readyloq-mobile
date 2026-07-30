@@ -10,10 +10,15 @@
  *     usb-camera, wifi-camera, wearable-camera
  *
  * CURRENT STATUS:
- *   All providers in this package are STUBS — they appear in the ReadyLoq
- *   provider registry as "future" availability. None are connected to real
- *   hardware SDKs yet. The stubs exist to validate the provider interface and
- *   to let the UI list upcoming supported devices.
+ *   Meta Ray-Ban smart glasses: AVAILABLE — availability flipped to true.
+ *   Pipeline bindings declared in SmartGlassesCapabilities:
+ *     audioPipeline: "faie"        → FAIE voice inspection pipeline
+ *     snapshotRoutine: "auto_snapshot" → rolling frame-buffer auto-capture
+ *
+ *   All other providers in this package are STUBS — they appear in the
+ *   ReadyLoq provider registry as "future" availability. None are connected
+ *   to real hardware SDKs yet. The stubs exist to validate the provider
+ *   interface and to let the UI list upcoming supported devices.
  *
  *   VYBE LIVE has no wearables code at all — it uses Agora for streaming
  *   which runs on the device camera. Meta wearables could eventually be used
@@ -126,8 +131,28 @@ export interface WearableRegistry extends DeviceDiscovery {
 // ─── Smart Glasses (Meta Ray-Ban) — async_push / BLE ────────────────────────
 
 /**
- * STUB — not yet connected to real hardware.
+ * Extended capabilities for smart-glasses providers.
  *
+ * Adds two pipeline-binding fields on top of CaptureCapabilities so that the
+ * inspection screen knows exactly where to route the two BLE data streams:
+ *
+ *   audioPipeline    — the BLE audio stream feeds the FAIE (Field AI Inspection
+ *                      Engine) voice pipeline for real-time voice-command
+ *                      recognition and hands-free evidence dispatch.
+ *
+ *   snapshotRoutine  — BLE camera frames (async_push) are handed to the
+ *                      auto-snapshot routine (rolling frame-buffer in
+ *                      new-inspection.tsx) which slots them into `imageUri` on
+ *                      the current FAIE voice event.
+ */
+export interface SmartGlassesCapabilities extends CaptureCapabilities {
+  /** Key of the voice pipeline that consumes BLE audio frames. */
+  readonly audioPipeline: "faie";
+  /** Key of the snapshot routine that consumes BLE camera frames. */
+  readonly snapshotRoutine: "auto_snapshot";
+}
+
+/**
  * Target SDK: react-native-ble-plx
  * Transport:  BLE notify characteristic → JPEG frame chunks reassembled on RN
  * Mode:       async_push — glasses trigger a photo on hardware button press;
@@ -137,12 +162,16 @@ export interface WearableRegistry extends DeviceDiscovery {
  *
  * DeviceCapabilities: categories: ["wearable", "camera"], transports: ["ble"]
  */
-export const SMART_GLASSES_CAPABILITIES: CaptureCapabilities = {
+export const SMART_GLASSES_CAPABILITIES: SmartGlassesCapabilities = {
   mode: "async_push",
   transport: "ble",
   hasLivePreview: false,
   producesVideo: true,
   requiresPairing: true,
+  /** Routes BLE audio to the FAIE voice inspection pipeline. */
+  audioPipeline: "faie",
+  /** Routes BLE camera frames to the inspection auto-snapshot routine. */
+  snapshotRoutine: "auto_snapshot",
 };
 
 export const SMART_GLASSES_SOURCE: CaptureSource = "smart_glasses";
@@ -243,8 +272,7 @@ export const FUTURE_WEARABLE_PROVIDERS: Array<{
     label: "Smart Glasses (Meta Ray-Ban)",
     source: "smart_glasses",
     capabilities: SMART_GLASSES_CAPABILITIES,
-    availability: { available: false, reason: "Hardware support is planned — no driver yet." },
-    estimatedRelease: "Q3 2025",
+    availability: { available: true },
   },
   {
     id: "usb-camera",
