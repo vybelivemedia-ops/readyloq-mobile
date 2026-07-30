@@ -9,17 +9,34 @@ const rootNodeModules = path.resolve(workspaceRoot, "node_modules");
 
 const config = getDefaultConfig(projectRoot);
 
-// Watch source packages in the monorepo but NOT the pnpm store — the store
-// contains thousands of static directories that push Metro past the inotify
-// watcher limit (ENOSPC) in constrained environments.  node_modules/.pnpm is
-// added to the blockList below so Metro uses it for resolution only.
+// ── watchFolders: different strategy for Replit dev vs EAS cloud build ────────
+//
+// Problem: pnpm symlinks packages through node_modules/.pnpm (the virtual
+// store). When Metro follows a symlink, the real file's absolute path lands
+// inside .pnpm. Metro silently refuses to bundle files whose real path is
+// outside all watched directories (projectRoot + watchFolders), so if the
+// workspace root isn't watched, any pnpm-linked module fails to resolve.
+//
+// Replit constraint: the Replit container's inotify limit is ~65 536 watches.
+// Watching the full workspace root (including node_modules/.pnpm which has
+// ~200k+ entries) exhausts that limit immediately → ENOSPC / build hang.
+//
+// Solution: on Replit (REPLIT_DEV_DOMAIN is always set), only watch specific
+// source dirs; on EAS (no REPLIT_DEV_DOMAIN), watch the workspace root so
+// Metro can follow .pnpm symlinks. EAS VMs have no meaningful inotify cap.
+const isReplit = !!process.env.REPLIT_DEV_DOMAIN;
 const extraWatchFolders = [];
-// Watch shared lib packages (source only)
+// Always watch shared lib packages (source only)
 const libRoot = path.resolve(workspaceRoot, "lib");
 if (fs.existsSync(libRoot)) extraWatchFolders.push(libRoot);
-// Watch platform packages (source only)
+// Always watch platform packages (source only)
 if (fs.existsSync(platformPackagesRoot)) {
   extraWatchFolders.push(platformPackagesRoot);
+}
+// On EAS: watch workspace root so Metro can resolve pnpm virtual-store symlinks.
+// On Replit: omit to stay within the inotify limit.
+if (!isReplit && fs.existsSync(workspaceRoot)) {
+  extraWatchFolders.push(workspaceRoot);
 }
 config.watchFolders = extraWatchFolders;
 
