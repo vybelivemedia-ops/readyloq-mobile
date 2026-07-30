@@ -312,8 +312,10 @@ export function TreatmentLogWizard({
         productId: selectedProduct.id,
         targetPest: selectedPest,
         siteClassification: selectedSite,
-        areaSqft: areaSqft ? parseFloat(areaSqft) : undefined,
-        linearFt: linearFt ? parseFloat(linearFt) : undefined,
+        // Only send the active area mode's measurement — prevents stale data
+        // from a previous mode selection being submitted alongside the new one.
+        areaSqft: areaMode === "sqft" && areaSqft ? parseFloat(areaSqft) : undefined,
+        linearFt: areaMode === "linear" && linearFt ? parseFloat(linearFt) : undefined,
         dilutionOzPerGallon: dilutionOzPerGallon ? parseFloat(dilutionOzPerGallon) : undefined,
         totalProductOz: totalProductOz ? parseFloat(totalProductOz) : undefined,
         equipmentUsed: labelRules?.requiredEquipmentTypes?.[0] ?? undefined,
@@ -631,7 +633,12 @@ export function TreatmentLogWizard({
           {(["sqft", "linear"] as const).map((mode) => (
             <Pressable
               key={mode}
-              onPress={() => setAreaMode(mode)}
+              onPress={() => {
+                setAreaMode(mode);
+                // Clear the inactive area field so stale data is never sent.
+                if (mode === "sqft") setLinearFt("");
+                else setAreaSqft("");
+              }}
               style={[
                 s.segmentOption,
                 areaMode === mode && { backgroundColor: colors.card },

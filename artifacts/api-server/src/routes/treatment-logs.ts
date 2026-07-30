@@ -124,6 +124,77 @@ router.post("/", async (req: Request<Params>, res) => {
       }
     }
 
+    // ── Pest validation ───────────────────────────────────────────────────────
+    // Reject off-label pest submissions so the compliance record is always
+    // backed by the product label.
+    const approvedPests = labelRules.approvedPestTypes ?? [];
+    if (approvedPests.length > 0 && !approvedPests.includes(data.targetPest)) {
+      return res.status(422).json({
+        error: "pest_not_approved",
+        message:
+          `${product.name} is not labelled for "${data.targetPest}". ` +
+          `Approved pests: ${approvedPests.join(", ")}.`,
+      });
+    }
+
+    // ── Site classification validation ────────────────────────────────────────
+    const approvedSites = labelRules.approvedSiteClassifications ?? [];
+    if (approvedSites.length > 0 && !approvedSites.includes(data.siteClassification)) {
+      return res.status(422).json({
+        error: "site_not_approved",
+        message:
+          `${product.name} is not labelled for site "${data.siteClassification}". ` +
+          `Approved sites: ${approvedSites.join(", ")}.`,
+      });
+    }
+
+    // ── Pre-mix checklist completion ──────────────────────────────────────────
+    // Reconstruct the expected checklist length from label rules and verify the
+    // client submitted at least that many items, all checked.
+    const expectedChecklistCount =
+      (labelRules.ppeRequired?.length ?? 0) +
+      (labelRules.requiresSuit ? 1 : 0) +
+      (labelRules.requiresRespirator ? 1 : 0) +
+      (labelRules.mixingSteps?.length ?? 0);
+
+    if (expectedChecklistCount > 0) {
+      const submitted = data.checklistItems ?? [];
+      if (submitted.length < expectedChecklistCount) {
+        return res.status(422).json({
+          error: "checklist_incomplete",
+          message:
+            `Pre-mix safety checklist is incomplete. ` +
+            `${submitted.length} of ${expectedChecklistCount} required items submitted.`,
+        });
+      }
+      const allChecked = submitted.every((item) => item.checked);
+      if (!allChecked) {
+        return res.status(422).json({
+          error: "checklist_items_unchecked",
+          message:
+            "All pre-mix safety checklist items must be checked before recording an application.",
+        });
+      }
+    }
+
+    // ── Environmental warning acknowledgement ─────────────────────────────────
+    // If the application temperature exceeds the label maximum, or the product
+    // carries phytotoxicity notes, the technician must explicitly acknowledge
+    // the warning before the log can be recorded.
+    const tempExceeded =
+      labelRules.maxTempF !== null &&
+      data.tempAtApplicationF !== undefined &&
+      data.tempAtApplicationF > labelRules.maxTempF;
+    const hasPhytoRisk = labelRules.phytotoxicityNotes !== null;
+    if ((tempExceeded || hasPhytoRisk) && !data.environmentalWarningAcknowledged) {
+      return res.status(422).json({
+        error: "environmental_warning_not_acknowledged",
+        message:
+          "Environmental conditions exceed label guidance. " +
+          "Technician must acknowledge the warning before this application can be recorded.",
+      });
+    }
+
     if (
       maxRate !== null &&
       data.totalProductOz !== undefined &&

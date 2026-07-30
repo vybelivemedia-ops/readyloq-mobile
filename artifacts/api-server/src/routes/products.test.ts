@@ -269,11 +269,14 @@ describe("POST /inspections/:id/treatment-logs", () => {
         totalProductOz: 0.5,
         dilutionOzPerGallon: 0.5,
         equipmentUsed: "compressed_air_sprayer",
+        // TestCide Pro: ppeRequired=null, requiresSuit=null, requiresRespirator=null,
+        // mixingSteps=3 → expected checklist count = 3
         checklistItems: [
-          { label: "Nitrile gloves worn", checked: true },
-          { label: "Eye protection worn", checked: true },
+          { label: "Add half water", checked: true },
+          { label: "Add product", checked: true },
+          { label: "Fill remainder", checked: true },
         ],
-        tempAtApplicationF: 72,
+        tempAtApplicationF: 72,          // ← below maxTempF 90; no env warning
         environmentalWarningAcknowledged: false,
       });
     expect(res.status).toBe(201);
@@ -294,6 +297,12 @@ describe("POST /inspections/:id/treatment-logs", () => {
         areaSqft: 1000,
         totalProductOz: 5.0, // ← 5× over the label maximum
         equipmentUsed: "compressed_air_sprayer",
+        checklistItems: [
+          { label: "Add half water", checked: true },
+          { label: "Add product", checked: true },
+          { label: "Fill remainder", checked: true },
+        ],
+        environmentalWarningAcknowledged: false,
       });
     expect(res.status).toBe(422);
     expect(res.body.error).toBe("rate_exceeds_label_maximum");
@@ -313,6 +322,12 @@ describe("POST /inspections/:id/treatment-logs", () => {
         siteClassification: "commercial_exterior",
         areaSqft: 1000,
         totalProductOz: 1.001,
+        checklistItems: [
+          { label: "Add half water", checked: true },
+          { label: "Add product", checked: true },
+          { label: "Fill remainder", checked: true },
+        ],
+        environmentalWarningAcknowledged: false,
       });
     expect(res.status).toBe(422);
     expect(res.body.error).toBe("rate_exceeds_label_maximum");
@@ -330,6 +345,12 @@ describe("POST /inspections/:id/treatment-logs", () => {
         siteClassification: "residential_interior",
         totalProductOz: 99, // high, but sqft-based rate check doesn't run for linearFt
         linearFt: 50,
+        checklistItems: [
+          { label: "Add half water", checked: true },
+          { label: "Add product", checked: true },
+          { label: "Fill remainder", checked: true },
+        ],
+        environmentalWarningAcknowledged: false,
       });
     expect(res.status).toBe(201);
   });
@@ -364,6 +385,129 @@ describe("POST /inspections/:id/treatment-logs", () => {
       });
     expect(res.status).toBe(422);
     expect(res.body.error).toBe("rate_inputs_required");
+  });
+
+  // ── Pest / site / checklist / env guardrails ──────────────────────────────
+
+  it("returns 422 when targetPest is not in the product's approved pest list", async () => {
+    asUser(TECH_ID);
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/treatment-logs`)
+      .send({
+        productId: testProductId,
+        targetPest: "Termites", // ← NOT in approvedPestTypes ["Rodents","Cockroaches"]
+        siteClassification: "residential_interior",
+        areaSqft: 500,
+        totalProductOz: 0.3,
+        checklistItems: [
+          { label: "Add half water", checked: true },
+          { label: "Add product", checked: true },
+          { label: "Fill remainder", checked: true },
+        ],
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("pest_not_approved");
+  });
+
+  it("returns 422 when siteClassification is not in the product's approved site list", async () => {
+    asUser(TECH_ID);
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/treatment-logs`)
+      .send({
+        productId: testProductId,
+        targetPest: "Rodents",
+        siteClassification: "food_handling_area", // ← NOT in approvedSiteClassifications
+        areaSqft: 500,
+        totalProductOz: 0.3,
+        checklistItems: [
+          { label: "Add half water", checked: true },
+          { label: "Add product", checked: true },
+          { label: "Fill remainder", checked: true },
+        ],
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("site_not_approved");
+  });
+
+  it("returns 422 when checklist has fewer items than required by the label", async () => {
+    asUser(TECH_ID);
+    // TestCide Pro requires 3 mixing-step checklist items — only 1 provided.
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/treatment-logs`)
+      .send({
+        productId: testProductId,
+        targetPest: "Rodents",
+        siteClassification: "residential_interior",
+        areaSqft: 500,
+        totalProductOz: 0.3,
+        checklistItems: [{ label: "Add half water", checked: true }], // ← only 1 of 3
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("checklist_incomplete");
+  });
+
+  it("returns 422 when one or more checklist items are not checked", async () => {
+    asUser(TECH_ID);
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/treatment-logs`)
+      .send({
+        productId: testProductId,
+        targetPest: "Rodents",
+        siteClassification: "residential_interior",
+        areaSqft: 500,
+        totalProductOz: 0.3,
+        checklistItems: [
+          { label: "Add half water", checked: true },
+          { label: "Add product", checked: false }, // ← unchecked
+          { label: "Fill remainder", checked: true },
+        ],
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("checklist_items_unchecked");
+  });
+
+  it("returns 422 when application temperature exceeds label max and warning not acknowledged", async () => {
+    asUser(TECH_ID);
+    // TestCide Pro maxTempF = 90; submitting at 95°F without acknowledgement.
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/treatment-logs`)
+      .send({
+        productId: testProductId,
+        targetPest: "Rodents",
+        siteClassification: "residential_interior",
+        areaSqft: 1000,
+        totalProductOz: 0.5,
+        checklistItems: [
+          { label: "Add half water", checked: true },
+          { label: "Add product", checked: true },
+          { label: "Fill remainder", checked: true },
+        ],
+        tempAtApplicationF: 95, // ← exceeds maxTempF 90
+        environmentalWarningAcknowledged: false, // ← not acknowledged
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("environmental_warning_not_acknowledged");
+  });
+
+  it("allows over-temp application when environmental warning is acknowledged", async () => {
+    asUser(TECH_ID);
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/treatment-logs`)
+      .send({
+        productId: testProductId,
+        targetPest: "Rodents",
+        siteClassification: "residential_interior",
+        areaSqft: 1000,
+        totalProductOz: 0.5,
+        checklistItems: [
+          { label: "Add half water", checked: true },
+          { label: "Add product", checked: true },
+          { label: "Fill remainder", checked: true },
+        ],
+        tempAtApplicationF: 95, // ← exceeds maxTempF 90
+        environmentalWarningAcknowledged: true, // ← acknowledged
+      });
+    expect(res.status).toBe(201);
   });
 
   it("returns 404 for an inspection in another company", async () => {
