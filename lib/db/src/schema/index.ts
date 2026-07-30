@@ -20,3 +20,4 @@ export * from "./messages";
 export * from "./bait-stations";
 export * from "./products";
 export * from "./treatment-logs";
+export * from "./daily-rigs";

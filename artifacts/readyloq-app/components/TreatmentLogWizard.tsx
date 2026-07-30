@@ -40,6 +40,7 @@ import {
   type ChecklistItem,
   type Product,
 } from "@/lib/api-client/products";
+import { getRecentMixes, type RecentMix } from "@/lib/api-client/daily-rig";
 import { useColors } from "@/hooks/useColors";
 import { PEST_TYPES } from "@/constants/inspection";
 
@@ -90,6 +91,13 @@ interface Props {
   pestTypes: string[];
   /** Called on successful submission so the parent can refetch treatment logs. */
   onLogged: () => void;
+  /**
+   * IDs of products currently on the technician's daily rig.
+   * When provided (non-empty), Step 0 gains a "Today's Rig" tab that shows a
+   * grid of rig products for one-tap selection, plus a "Recent Mixes" section
+   * that can pre-fill the rest of the wizard fields.
+   */
+  dailyRigProductIds?: number[];
 }
 
 // ─── Step-level progress ──────────────────────────────────────────────────────
@@ -112,6 +120,7 @@ export function TreatmentLogWizard({
   inspectionId,
   pestTypes,
   onLogged,
+  dailyRigProductIds = [],
 }: Props) {
   const colors = useColors();
 
@@ -124,6 +133,11 @@ export function TreatmentLogWizard({
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  // Step 0 quick-pick tabs — only visible when dailyRigProductIds is non-empty
+  const hasRig = dailyRigProductIds.length > 0;
+  const [step0Tab, setStep0Tab] = useState<"rig" | "all">(hasRig ? "rig" : "all");
+  const [recentMixes, setRecentMixes] = useState<RecentMix[]>([]);
+  const [loadingRecentMixes, setLoadingRecentMixes] = useState(false);
 
   // ── Step 1: Site ───────────────────────────────────────────────────────────
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
@@ -169,7 +183,11 @@ export function TreatmentLogWizard({
     setApplicationNotes("");
     setSubmitting(false);
     setSubmitError(null);
-  }, []);
+    // Quick-pick state
+    setStep0Tab(dailyRigProductIds.length > 0 ? "rig" : "all");
+    setRecentMixes([]);
+    setLoadingRecentMixes(false);
+  }, [dailyRigProductIds.length]);
 
   useEffect(() => {
     if (visible) resetAll();
@@ -185,6 +203,16 @@ export function TreatmentLogWizard({
       .catch(() => setProductError("Failed to load products. Check your connection."))
       .finally(() => setLoadingProducts(false));
   }, [visible]);
+
+  // ── Recent mixes fetch (Today's Rig tab) ──────────────────────────────────
+  useEffect(() => {
+    if (!visible || !hasRig) return;
+    setLoadingRecentMixes(true);
+    getRecentMixes()
+      .then(setRecentMixes)
+      .catch(() => setRecentMixes([]))
+      .finally(() => setLoadingRecentMixes(false));
+  }, [visible, hasRig]);
 
   // ── Checklist builder ──────────────────────────────────────────────────────
   // Rebuilds the checklist whenever a product is selected (Step 4 prep).
@@ -346,6 +374,32 @@ export function TreatmentLogWizard({
     );
   };
 
+  // ── Use-mix: pre-fill state from a recent mix and jump to site step ────────
+
+  const handleUseMix = useCallback(
+    (mix: RecentMix) => {
+      const product = products.find((p) => p.id === mix.productId) ?? null;
+      if (product) setSelectedProduct(product);
+      setSelectedPest(mix.targetPest);
+      setSelectedSite(mix.siteClassification);
+      if (mix.areaSqft != null) {
+        setAreaMode("sqft");
+        setAreaSqft(String(mix.areaSqft));
+      } else if (mix.linearFt != null) {
+        setAreaMode("linear");
+        setLinearFt(String(mix.linearFt));
+      }
+      if (mix.totalProductOz != null) {
+        setTotalProductOz(String(mix.totalProductOz));
+      }
+      // Advance past the product-selection step — technician still confirms
+      // site (Step 1), equipment (Step 2), rate (Step 3), checklist (Step 4),
+      // and environmental check (Step 5) before the log is submitted.
+      setStep(1);
+    },
+    [products],
+  );
+
   // ── Render helpers ─────────────────────────────────────────────────────────
 
   const pestList =
@@ -353,12 +407,172 @@ export function TreatmentLogWizard({
 
   // ── Steps ──────────────────────────────────────────────────────────────────
 
+  // ── Shared product-card renderer (used by both tabs) ─────────────────────
+  function renderProductCard(product: Product, approvedIds: Set<number>) {
+    const approved = approvedIds.has(product.id);
+    return (
+      <Pressable
+        key={product.id}
+        onPress={() => approved && setSelectedProduct(product)}
+        style={[
+          s.productCard,
+          { borderColor: colors.border, backgroundColor: colors.card },
+          selectedProduct?.id === product.id && {
+            borderColor: colors.primary,
+            backgroundColor: "rgba(23,196,211,0.08)",
+          },
+          !approved && { opacity: 0.4 },
+        ]}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.productName, { color: colors.foreground }]}>{product.name}</Text>
+            <Text style={[s.productMeta, { color: colors.mutedForeground }]}>
+              {product.activeIngredients}
+            </Text>
+            {product.epaRegistrationNumber ? (
+              <Text style={[s.productMeta, { color: colors.mutedForeground }]}>
+                EPA {product.epaRegistrationNumber}
+              </Text>
+            ) : null}
+          </View>
+          <View style={{ gap: 4, alignItems: "flex-end" }}>
+            {product.signalWord ? (
+              <View
+                style={[
+                  s.signalBadge,
+                  { backgroundColor: SIGNAL_COLORS[product.signalWord] ?? "#6b7280" },
+                ]}
+              >
+                <Text style={s.signalText}>{product.signalWord}</Text>
+              </View>
+            ) : null}
+            <View
+              style={[
+                s.typeBadge,
+                {
+                  backgroundColor:
+                    product.productType === "restricted-use"
+                      ? "rgba(248,81,73,0.15)"
+                      : "rgba(63,185,80,0.15)",
+                  borderColor:
+                    product.productType === "restricted-use" ? "#f85149" : "#3fb950",
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  s.typeText,
+                  {
+                    color:
+                      product.productType === "restricted-use" ? "#f85149" : "#3fb950",
+                  },
+                ]}
+              >
+                {product.productType === "restricted-use" ? "RUP" : "General Use"}
+              </Text>
+            </View>
+          </View>
+        </View>
+        {!approved && selectedPest ? (
+          <Text
+            style={{ color: "#f59e0b", fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 4 }}
+          >
+            Not approved for {selectedPest}
+          </Text>
+        ) : null}
+      </Pressable>
+    );
+  }
+
+  // ── Recent-mix card ────────────────────────────────────────────────────────
+  function renderRecentMixCard(mix: RecentMix) {
+    const siteLabel =
+      SITE_CLASSIFICATIONS.find((s) => s.value === mix.siteClassification)?.label ??
+      mix.siteClassification;
+    const rateStr =
+      mix.totalProductOz != null && (mix.areaSqft != null || mix.linearFt != null)
+        ? `${mix.totalProductOz} oz · ${mix.areaSqft != null ? `${mix.areaSqft} sq ft` : `${mix.linearFt} ft`}`
+        : mix.totalProductOz != null
+          ? `${mix.totalProductOz} oz`
+          : null;
+    return (
+      <View
+        key={`${mix.productId}-${mix.siteClassification}`}
+        style={{
+          borderWidth: 1,
+          borderRadius: 12,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+          padding: 12,
+          gap: 6,
+        }}
+      >
+        <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}
+            >
+              {mix.productName}
+            </Text>
+            <Text
+              style={{
+                color: colors.mutedForeground,
+                fontFamily: "Inter_400Regular",
+                fontSize: 12,
+                marginTop: 2,
+              }}
+            >
+              {mix.targetPest} · {siteLabel}
+            </Text>
+            {rateStr ? (
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 12,
+                }}
+              >
+                {rateStr}
+              </Text>
+            ) : null}
+          </View>
+          <Pressable
+            onPress={() => handleUseMix(mix)}
+            style={{
+              alignSelf: "center",
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              borderRadius: 8,
+              backgroundColor: colors.primary,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.primaryForeground,
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 12,
+              }}
+            >
+              Use mix
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   function renderStep0() {
     const approvedIds = new Set(
       products
         .filter((p) => p.labelRules?.approvedPestTypes?.includes(selectedPest ?? ""))
         .map((p) => p.id),
     );
+
+    // Products on today's rig (filtered from already-loaded catalogue).
+    const rigProducts = hasRig
+      ? products.filter((p) => dailyRigProductIds.includes(p.id))
+      : [];
 
     return (
       <ScrollView contentContainerStyle={{ gap: 20, paddingBottom: 20 }}>
@@ -375,13 +589,19 @@ export function TreatmentLogWizard({
                 }}
                 style={[
                   s.chip,
-                  selectedPest === pest && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  selectedPest === pest && {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.primary,
+                  },
                 ]}
               >
                 <Text
                   style={[
                     s.chipText,
-                    { color: selectedPest === pest ? colors.primaryForeground : colors.foreground },
+                    {
+                      color:
+                        selectedPest === pest ? colors.primaryForeground : colors.foreground,
+                    },
                   ]}
                 >
                   {pest}
@@ -391,97 +611,134 @@ export function TreatmentLogWizard({
           </View>
         </View>
 
-        {/* Product list */}
-        {selectedPest ? (
-          <View style={{ gap: 10 }}>
-            <StepLabel text="Select product" />
-            {loadingProducts ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : productError ? (
-              <ErrorBanner text={productError} />
-            ) : (
-              products.map((product) => {
-                const approved = approvedIds.has(product.id);
-                return (
-                  <Pressable
-                    key={product.id}
-                    onPress={() => approved && setSelectedProduct(product)}
-                    style={[
-                      s.productCard,
-                      { borderColor: colors.border, backgroundColor: colors.card },
-                      selectedProduct?.id === product.id && {
-                        borderColor: colors.primary,
-                        backgroundColor: "rgba(23,196,211,0.08)",
-                      },
-                      !approved && { opacity: 0.4 },
-                    ]}
+        {/* Quick-pick tab bar — only when a rig is loaded */}
+        {hasRig ? (
+          <View
+            style={{
+              flexDirection: "row",
+              borderRadius: 10,
+              backgroundColor: colors.muted,
+              padding: 3,
+              gap: 3,
+            }}
+          >
+            {(["rig", "all"] as const).map((tab) => {
+              const active = step0Tab === tab;
+              return (
+                <Pressable
+                  key={tab}
+                  onPress={() => setStep0Tab(tab)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    alignItems: "center",
+                    backgroundColor: active ? colors.card : "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "Inter_600SemiBold",
+                      fontSize: 13,
+                      color: active ? colors.foreground : colors.mutedForeground,
+                    }}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.productName, { color: colors.foreground }]}>
-                          {product.name}
-                        </Text>
-                        <Text style={[s.productMeta, { color: colors.mutedForeground }]}>
-                          {product.activeIngredients}
-                        </Text>
-                        {product.epaRegistrationNumber ? (
-                          <Text style={[s.productMeta, { color: colors.mutedForeground }]}>
-                            EPA {product.epaRegistrationNumber}
-                          </Text>
-                        ) : null}
-                      </View>
-                      <View style={{ gap: 4, alignItems: "flex-end" }}>
-                        {product.signalWord ? (
-                          <View
-                            style={[
-                              s.signalBadge,
-                              { backgroundColor: SIGNAL_COLORS[product.signalWord] ?? "#6b7280" },
-                            ]}
-                          >
-                            <Text style={s.signalText}>{product.signalWord}</Text>
-                          </View>
-                        ) : null}
-                        <View
-                          style={[
-                            s.typeBadge,
-                            {
-                              backgroundColor:
-                                product.productType === "restricted-use"
-                                  ? "rgba(248,81,73,0.15)"
-                                  : "rgba(63,185,80,0.15)",
-                              borderColor:
-                                product.productType === "restricted-use"
-                                  ? "#f85149"
-                                  : "#3fb950",
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              s.typeText,
-                              {
-                                color:
-                                  product.productType === "restricted-use"
-                                    ? "#f85149"
-                                    : "#3fb950",
-                              },
-                            ]}
-                          >
-                            {product.productType === "restricted-use" ? "RUP" : "General Use"}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                    {!approved ? (
-                      <Text style={{ color: "#f59e0b", fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 4 }}>
-                        Not approved for {selectedPest}
-                      </Text>
-                    ) : null}
-                  </Pressable>
-                );
-              })
-            )}
+                    {tab === "rig"
+                      ? `Today's Rig (${rigProducts.length})`
+                      : "All Products"}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
+        ) : null}
+
+        {/* ── Today's Rig tab ─────────────────────────────────────────────── */}
+        {step0Tab === "rig" && hasRig ? (
+          <View style={{ gap: 14 }}>
+            {/* Rig product cards */}
+            <View style={{ gap: 10 }}>
+              <StepLabel text="Select product" />
+              {loadingProducts ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : rigProducts.length === 0 ? (
+                <View
+                  style={{
+                    padding: 16,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.mutedForeground,
+                      fontFamily: "Inter_400Regular",
+                      fontSize: 13,
+                      textAlign: "center",
+                    }}
+                  >
+                    Your rig products haven't loaded yet. Switch to All Products to browse the full catalogue.
+                  </Text>
+                </View>
+              ) : (
+                rigProducts.map((p) => renderProductCard(p, approvedIds))
+              )}
+            </View>
+
+            {/* Recent Mixes */}
+            {hasRig && selectedPest ? (
+              <View style={{ gap: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
+                  <Text
+                    style={{
+                      color: colors.mutedForeground,
+                      fontFamily: "Inter_600SemiBold",
+                      fontSize: 13,
+                    }}
+                  >
+                    Recent Mixes — tap to pre-fill
+                  </Text>
+                </View>
+                {loadingRecentMixes ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : recentMixes.length === 0 ? (
+                  <Text
+                    style={{
+                      color: colors.mutedForeground,
+                      fontFamily: "Inter_400Regular",
+                      fontSize: 12,
+                    }}
+                  >
+                    No recent mixes in the past 30 days.
+                  </Text>
+                ) : (
+                  recentMixes.map((mix) => renderRecentMixCard(mix))
+                )}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* ── All Products tab (original flat list) ───────────────────────── */}
+        {step0Tab === "all" || !hasRig ? (
+          <>
+            {selectedPest ? (
+              <View style={{ gap: 10 }}>
+                <StepLabel text="Select product" />
+                {loadingProducts ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : productError ? (
+                  <ErrorBanner text={productError} />
+                ) : (
+                  products.map((product) => renderProductCard(product, approvedIds))
+                )}
+              </View>
+            ) : null}
+          </>
         ) : null}
       </ScrollView>
     );

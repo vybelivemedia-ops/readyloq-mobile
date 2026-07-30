@@ -34,6 +34,7 @@ import { useVoiceField } from "@/hooks/useVoiceField";
 import { type LocalBaitStation } from "@/lib/local/inspection-store";
 import { WifiCameraModal } from "@/components/WifiCameraModal";
 import { TreatmentLogWizard } from "@/components/TreatmentLogWizard";
+import { useDailyRig } from "@/hooks/useDailyRig";
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
@@ -246,6 +247,7 @@ export default function NewInspectionScreen() {
 
   // ── Chemical treatment log wizard ─────────────────────────────────────────
   const [showTreatmentWizard, setShowTreatmentWizard] = useState(false);
+  const { rigProductIds } = useDailyRig();
 
   // ── Offline status (T003) ─────────────────────────────────────────────────
   const { isConnected } = useNetworkStatus();
@@ -1896,6 +1898,7 @@ export default function NewInspectionScreen() {
             onClose={() => setShowTreatmentWizard(false)}
             inspectionId={wsInspectionId}
             pestTypes={pestTypes}
+            dailyRigProductIds={rigProductIds}
             onLogged={() => {
               setShowTreatmentWizard(false);
             }}

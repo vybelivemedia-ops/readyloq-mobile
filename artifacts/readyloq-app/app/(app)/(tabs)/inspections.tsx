@@ -4,6 +4,8 @@ import type { Inspection } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
+import { DailyRigSetupModal } from "@/components/DailyRigSetupModal";
+import { useDailyRig } from "@/hooks/useDailyRig";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 
 import { InspectionDetail } from "@/components/InspectionDetail";
@@ -38,6 +40,16 @@ export default function InspectionsScreen() {
   const { sizeClass, isExpanded } = useWindowSizeClass();
   const [filter, setFilter] = useState<string>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  const {
+    isSetupToday,
+    rigCount,
+    rigProductIds,
+    saveRig,
+    showSetupModal,
+    openSetupModal,
+    closeSetupModal,
+  } = useDailyRig();
 
   const { data, isLoading, isRefetching, refetch } = useQuery(
     getListInspectionsQueryOptions(),
@@ -171,6 +183,58 @@ export default function InspectionsScreen() {
         </Pressable>
       </View>
 
+      {/* Daily rig banner */}
+      {isSetupToday ? (
+        <Pressable
+          onPress={openSetupModal}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginHorizontal: 16,
+            marginBottom: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 9,
+            borderRadius: 10,
+            backgroundColor: "rgba(23,196,211,0.10)",
+            borderWidth: 1,
+            borderColor: colors.primary + "44",
+            gap: 8,
+          }}
+        >
+          <Ionicons name="flask-outline" size={16} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 13, flex: 1 }}>
+            {rigCount} product{rigCount !== 1 ? "s" : ""} on your rig today
+          </Text>
+          <Text style={{ color: colors.primary, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+            Change
+          </Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={openSetupModal}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginHorizontal: 16,
+            marginBottom: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 9,
+            borderRadius: 10,
+            backgroundColor: "rgba(245,158,11,0.08)",
+            borderWidth: 1,
+            borderColor: "#f59e0b44",
+            gap: 8,
+          }}
+        >
+          <Ionicons name="flask-outline" size={16} color="#f59e0b" />
+          <Text style={{ color: "#f59e0b", fontFamily: "Inter_600SemiBold", fontSize: 13, flex: 1 }}>
+            Set up today's rig
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color="#f59e0b" />
+        </Pressable>
+      )}
+
+      {/* Filter chips */}
       <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexWrap: "wrap" }}>
         {FILTERS.map((f) => {
           const active = filter === f.value;
@@ -233,6 +297,19 @@ export default function InspectionsScreen() {
     </View>
   );
 
+  // ── Daily rig setup modal (accessible from the inspections tab) ───────────
+  const rigSetupModal = (
+    <DailyRigSetupModal
+      visible={showSetupModal}
+      initialProductIds={rigProductIds}
+      onClose={closeSetupModal}
+      onSave={(ids) => {
+        void saveRig(ids);
+        closeSetupModal();
+      }}
+    />
+  );
+
   if (isExpanded) {
     return (
       <Screen>
@@ -253,11 +330,12 @@ export default function InspectionsScreen() {
             )}
           </View>
         </View>
+        {rigSetupModal}
       </Screen>
     );
   }
 
-  return <Screen>{listPane}</Screen>;
+  return <Screen>{listPane}{rigSetupModal}</Screen>;
 }
 
 /**

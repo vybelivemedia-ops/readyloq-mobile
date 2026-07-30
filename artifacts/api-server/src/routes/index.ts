@@ -30,6 +30,7 @@ import baitStationsRouter from "./bait-stations";
 import productsRouter from "./products";
 import treatmentLogsRouter from "./treatment-logs";
 import crmRouter from "./crm";
+import dailyRigRouter from "./daily-rig";
 
 const router: IRouter = Router();
 
@@ -146,5 +147,9 @@ router.use(
   requireRole("manager"),
   crmRouter,
 );
+// Daily rig + recent mixes — all authenticated beta users (technicians included).
+// Sub-routes:  POST/GET /technician/daily-rig
+//              GET      /technician/daily-rig/recent-mixes
+router.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, dailyRigRouter);
 
 export default router;
