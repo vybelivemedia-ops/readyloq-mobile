@@ -107,6 +107,23 @@ router.post("/", async (req: Request<Params>, res) => {
     const { labelRules, product } = labelRulesRow;
     const maxRate = labelRules.maxRateOzPer1000Sqft;
 
+    // ── Required-inputs guard ─────────────────────────────────────────────────
+    // When the product label defines a maximum application rate, require at
+    // least one area measurement (sq ft or linear ft) AND product volume.
+    // This prevents incomplete compliance records and bypassed rate validation.
+    if (maxRate !== null) {
+      const hasArea = data.areaSqft !== undefined || data.linearFt !== undefined;
+      const hasVolume = data.totalProductOz !== undefined;
+      if (!hasArea || !hasVolume) {
+        return res.status(422).json({
+          error: "rate_inputs_required",
+          message:
+            `${product.name} has a label-defined maximum application rate. ` +
+            `At least one area measurement (sq ft or linear ft) and total product volume (fl oz) are required.`,
+        });
+      }
+    }
+
     if (
       maxRate !== null &&
       data.totalProductOz !== undefined &&

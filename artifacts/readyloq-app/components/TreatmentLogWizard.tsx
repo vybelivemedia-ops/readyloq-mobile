@@ -242,11 +242,32 @@ export function TreatmentLogWizard({
   const allChecked =
     checklistItems.length > 0 && checklistItems.every((item) => item.checked);
 
+  /**
+   * Step 3 is valid when:
+   * - No rate-limit error
+   * - If the product has a label max rate: at least one area measurement and
+   *   a product volume must be entered (otherwise the compliance record is
+   *   incomplete and the server will reject it with rate_inputs_required).
+   */
+  const step3Valid: boolean = (() => {
+    if (rateErrorText) return false;
+    if (!labelRules?.maxRateOzPer1000Sqft) return true; // no rate constraint — fields optional
+    const ozNum = parseFloat(totalProductOz);
+    if (!ozNum || ozNum <= 0) return false;
+    if (areaMode === "sqft") {
+      const areaNum = parseFloat(areaSqft);
+      return !!(areaNum && areaNum > 0);
+    } else {
+      const ftNum = parseFloat(linearFt);
+      return !!(ftNum && ftNum > 0);
+    }
+  })();
+
   const canProceedStep: Record<number, boolean> = {
     0: !!selectedPest && !!selectedProduct,
     1: siteApproved,
     2: equipmentConfirmed,
-    3: !rateErrorText,
+    3: step3Valid,
     4: allChecked,
     5: envWarnings.length === 0 || envWarningAcknowledged,
   };
@@ -718,6 +739,23 @@ export function TreatmentLogWizard({
               value={dilutionOzPerGallon}
               onChangeText={setDilutionOzPerGallon}
             />
+          </View>
+        ) : null}
+
+        {/* Required-inputs hint — shown when maxRate product has blank fields */}
+        {labelRules?.maxRateOzPer1000Sqft != null && !step3Valid && !rateErrorText ? (
+          <View
+            style={[
+              s.warningBanner,
+              { borderColor: colors.border, backgroundColor: colors.card, marginTop: 0 },
+            ]}
+          >
+            <Ionicons name="information-circle-outline" size={14} color={colors.mutedForeground} />
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, flex: 1 }}>
+              {areaMode === "sqft"
+                ? "Enter treatment area (sq ft) and product volume to continue."
+                : "Enter linear footage and product volume to continue."}
+            </Text>
           </View>
         ) : null}
       </ScrollView>

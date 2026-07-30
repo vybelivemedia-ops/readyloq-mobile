@@ -318,19 +318,52 @@ describe("POST /inspections/:id/treatment-logs", () => {
     expect(res.body.error).toBe("rate_exceeds_label_maximum");
   });
 
-  it("allows submission when areaSqft is absent (no rate validation possible)", async () => {
+  it("allows submission when linearFt is provided in place of areaSqft (area-based rate check skipped)", async () => {
     asUser(TECH_ID);
-    // No areaSqft → rate calculation is impossible → skip guard and accept.
+    // linearFt counts as an area measurement, and totalProductOz is provided,
+    // so the required-inputs guard passes. No sqft-based rate check runs.
     const res = await request(app)
       .post(`/api/inspections/${inspectionId}/treatment-logs`)
       .send({
         productId: testProductId,
         targetPest: "Rodents",
         siteClassification: "residential_interior",
-        totalProductOz: 99, // high, but can't validate without area
+        totalProductOz: 99, // high, but sqft-based rate check doesn't run for linearFt
         linearFt: 50,
       });
     expect(res.status).toBe(201);
+  });
+
+  it("returns 422 when area is omitted for a product with a label max rate", async () => {
+    asUser(TECH_ID);
+    // Neither areaSqft nor linearFt is provided — compliance record is incomplete.
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/treatment-logs`)
+      .send({
+        productId: testProductId,
+        targetPest: "Rodents",
+        siteClassification: "residential_interior",
+        totalProductOz: 0.5,
+        // ← no areaSqft or linearFt
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("rate_inputs_required");
+  });
+
+  it("returns 422 when totalProductOz is omitted for a product with a label max rate", async () => {
+    asUser(TECH_ID);
+    // areaSqft provided but totalProductOz omitted — can't verify rate compliance.
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/treatment-logs`)
+      .send({
+        productId: testProductId,
+        targetPest: "Rodents",
+        siteClassification: "residential_interior",
+        areaSqft: 500,
+        // ← no totalProductOz
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("rate_inputs_required");
   });
 
   it("returns 404 for an inspection in another company", async () => {
