@@ -150,7 +150,12 @@ export function createNativeCameraProvider(
     capture: async (): Promise<EvidenceItem[]> => {
       const camera = cameraRef.current;
       if (!camera) throw new Error("Camera is not ready");
-      const pic = await camera.takePictureAsync({ quality: 0.6 });
+      // skipProcessing: true — return the camera hardware's own JPEG directly,
+      // bypassing the software post-capture compression pass that causes 3–8 s
+      // of shutter lag on full-resolution sensors.  The hardware encoder
+      // produces equivalent quality at native speed (~150–300 ms).  The quality
+      // parameter has no effect when skipProcessing is true so it is omitted.
+      const pic = await camera.takePictureAsync({ skipProcessing: true });
       if (!pic?.uri) return [];
       return [
         {

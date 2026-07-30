@@ -827,21 +827,43 @@ export default function NewInspectionScreen() {
     setPestTypes((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
   };
 
-  // Shared ingest path for ALL vision providers: copy each file out of any
-  // cache dir IMMEDIATELY (the OS can purge caches at any time — evidence must
-  // survive an app restart), score it with the quality gate, and append it to
-  // the local record with full provenance.
+  // Shared ingest path for ALL vision providers.
+  //
+  // Performance contract:
+  //   1. Optimistic thumbnail — the cache URI is appended to `photos` state
+  //      immediately (before any I/O) so the user sees the shot at once.
+  //   2. Durable copy — the file is copied out of the volatile camera cache
+  //      into documentDirectory in the background; the optimistic entry is
+  //      then swapped to the durable URI via a targeted functional update
+  //      (never a full list rebuild, so concurrent captures are safe).
+  //   3. Store write — `updateLocalInspection` serialises through the update
+  //      chain and only tracks `recordRef`; it does NOT call `setPhotos` again
+  //      so concurrent-capture optimistic entries are never clobbered.
+  //   4. Pixel analysis — runs deferred, well off the capture path.
   const ingestEvidence = async (items: EvidenceItem[]) => {
     const rec = recordRef.current;
     if (!rec || items.length === 0) return;
-    // Fast pass: persist each file and add it with the INSTANT metadata score
-    // so the thumbnail appears immediately — the camera never waits on a decode.
     const warnings: string[] = [];
     const added: { localUri: string; item: EvidenceItem }[] = [];
+
     for (const item of items) {
-      const durableUri = await persistPhoto(rec.localId, item.uri);
+      const cacheUri = item.uri;
+
+      // ── Step 1: optimistic thumbnail (instant, no I/O) ────────────────────
+      setPhotos((prev) => [...prev, { uri: cacheUri }]);
+
+      // ── Step 2: copy out of cache → durable directory ─────────────────────
+      const durableUri = await persistPhoto(rec.localId, cacheUri);
       const quality = assessEvidence(item);
       if (!quality.acceptable && quality.reasons.length > 0) warnings.push(quality.reasons[0]);
+
+      // Swap the optimistic cache URI for the durable one.  Functional updater
+      // is safe even when another capture added its own cache entry in the gap.
+      setPhotos((prev) =>
+        prev.map((p) => (p.uri === cacheUri ? { uri: durableUri } : p)),
+      );
+
+      // ── Step 3: persist record to AsyncStorage ────────────────────────────
       const updated = await updateLocalInspection(rec.localId, (r) => {
         r.photos.push({
           localUri: durableUri,
@@ -856,12 +878,14 @@ export default function NewInspectionScreen() {
           },
         });
       });
-      if (updated) {
-        recordRef.current = updated;
-        setPhotos(updated.photos.map((p) => ({ uri: p.localUri })));
-      }
+      // Keep recordRef in sync; do NOT call setPhotos here — the targeted swap
+      // above already reflects the correct URI, and a full rebuild would drop
+      // optimistic entries from concurrent captures still in-flight.
+      if (updated) recordRef.current = updated;
+
       added.push({ localUri: durableUri, item });
     }
+
     setQualityNotice(warnings.length > 0 ? warnings[0] : null);
     // A fresh capture re-arms auto-run analysis after a prior failure.
     setWsError(null);
@@ -908,13 +932,20 @@ export default function NewInspectionScreen() {
   const takePhoto = async () => {
     const rec = recordRef.current;
     if (!cameraRef.current || capturing || importing || !rec) return;
+    // Fire haptic immediately on press (before the async pipeline starts) so
+    // the technician feels confirmation the moment they tap, not seconds later.
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       setCapturing(true);
-      await ingestEvidence(await cameraProvider.capture());
-    } catch {
-      setError("Couldn't capture photo. Please try again.");
-    } finally {
+      const items = await cameraProvider.capture();
+      // ── Release the camera lock as soon as we have the captured URIs. ──────
+      // File copy and AsyncStorage write continue in the background so the
+      // shutter is ready for the next shot in ~200 ms instead of ~8 s.
       setCapturing(false);
+      void ingestEvidence(items);
+    } catch {
+      setCapturing(false);
+      setError("Couldn't capture photo. Please try again.");
     }
   };
 
