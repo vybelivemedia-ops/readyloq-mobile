@@ -12,6 +12,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
+  Linking,
   Pressable,
   ScrollView,
   Text,
@@ -29,6 +31,9 @@ import {
 } from "@/constants/version";
 import {
   smartGlassesBle,
+  checkBlePermissions,
+  requestBlePermissions,
+  type BlePermissionStatus,
   type SmartGlassesBleState,
   type DiscoveredGlasses,
 } from "@/lib/ble";
@@ -80,6 +85,29 @@ export default function ConnectionsScreen() {
     smartGlassesBle.getState(),
   );
 
+  // ── BLE runtime permission state ───────────────────────────────────────────
+  const [blePermStatus, setBlePermStatus] =
+    useState<BlePermissionStatus>("checking");
+
+  // Check permissions on mount and whenever the app returns to foreground
+  // (covers the case where the user grants/revokes from the Settings app).
+  useEffect(() => {
+    let mounted = true;
+    const check = () => {
+      void checkBlePermissions().then((s) => {
+        if (mounted) setBlePermStatus(s);
+      });
+    };
+    check();
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") check();
+    });
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, []);
+
   // Subscribe to BLE state changes
   useEffect(() => {
     const unsub = smartGlassesBle.subscribe(setBle);
@@ -102,7 +130,14 @@ export default function ConnectionsScreen() {
   const btOff = ble.hwState !== BleHwState.PoweredOn;
   const busy = isConnecting || isDisconnecting;
 
-  const handleScan = useCallback(() => {
+  const handleScan = useCallback(async () => {
+    // ── Step 1: ensure runtime permissions are granted ──────────────────────
+    if (blePermStatus !== "granted") {
+      const result = await requestBlePermissions();
+      setBlePermStatus(result);
+      if (result !== "granted") return; // PermissionBanner explains next steps
+    }
+    // ── Step 2: ensure the radio is on ──────────────────────────────────────
     if (btOff) {
       Alert.alert(
         "Bluetooth is off",
@@ -111,12 +146,13 @@ export default function ConnectionsScreen() {
       );
       return;
     }
+    // ── Step 3: toggle scan ──────────────────────────────────────────────────
     if (isScanning) {
       smartGlassesBle.stopScan();
     } else {
       smartGlassesBle.startScan();
     }
-  }, [btOff, isScanning]);
+  }, [blePermStatus, btOff, isScanning]);
 
   const handleConnect = useCallback(
     async (device: DiscoveredGlasses) => {
@@ -205,8 +241,20 @@ export default function ConnectionsScreen() {
           </Text>
         </View>
 
-        {/* Bluetooth off warning */}
-        {btOff && (
+        {/* ── Permission banner — Android runtime permissions not yet granted ── */}
+        {blePermStatus !== "checking" && blePermStatus !== "granted" && (
+          <BlePermissionBanner
+            status={blePermStatus}
+            colors={colors}
+            onRequest={async () => {
+              const result = await requestBlePermissions();
+              setBlePermStatus(result);
+            }}
+          />
+        )}
+
+        {/* ── Bluetooth hardware state banner (only once permissions are OK) ── */}
+        {blePermStatus === "granted" && btOff && (
           <Card
             style={{
               flexDirection: "row",
@@ -222,28 +270,60 @@ export default function ConnectionsScreen() {
               size={18}
               color={colors.destructive}
             />
-            <Text
-              style={{
-                color: colors.destructive,
-                fontFamily: "Inter_500Medium",
-                fontSize: 13,
-                flex: 1,
-              }}
-            >
-              Bluetooth is{" "}
-              {ble.hwState === BleHwState.Unauthorized
-                ? "not authorized"
-                : "off"}{" "}
-              — enable it to scan for glasses.
-            </Text>
+            <View style={{ flex: 1, gap: 1 }}>
+              <Text
+                style={{
+                  color: colors.destructive,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 13,
+                }}
+              >
+                {ble.hwState === BleHwState.Unauthorized
+                  ? "Bluetooth access denied"
+                  : "Bluetooth is off"}
+              </Text>
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 12,
+                }}
+              >
+                {ble.hwState === BleHwState.Unauthorized
+                  ? "Allow ReadyLoq to use Bluetooth in Settings."
+                  : "Enable Bluetooth to scan for glasses."}
+              </Text>
+            </View>
+            {ble.hwState === BleHwState.Unauthorized && (
+              <Pressable
+                onPress={() => void Linking.openSettings()}
+                style={({ pressed }) => ({
+                  backgroundColor: colors.primary,
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    color: colors.primaryForeground,
+                    fontFamily: "Inter_600SemiBold",
+                    fontSize: 12,
+                  }}
+                >
+                  Settings
+                </Text>
+              </Pressable>
+            )}
           </Card>
         )}
 
         {/* Scan / Stop button */}
         {!isConnected && !busy && (
           <Pressable
-            onPress={handleScan}
-            disabled={busy}
+            onPress={(): void => { void handleScan(); }}
+            disabled={busy || blePermStatus === "checking"}
             style={({ pressed }) => ({
               flexDirection: "row",
               alignItems: "center",
@@ -1048,5 +1128,117 @@ function PipelineRow({
         {value}
       </Text>
     </View>
+  );
+}
+
+// ─── BLE permission banner ─────────────────────────────────────────────────────
+//
+// Shown when Android runtime BLE permissions have been denied or permanently
+// blocked.  Offers a "Grant Permissions" button for the denied case and an
+// "Open Settings" button for the permanently-blocked case.
+
+function BlePermissionBanner({
+  status,
+  colors,
+  onRequest,
+}: {
+  status: "denied" | "blocked";
+  colors: ReturnType<typeof useColors>;
+  onRequest: () => Promise<void>;
+}) {
+  const [requesting, setRequesting] = React.useState(false);
+
+  const isBlocked = status === "blocked";
+
+  const handlePress = async () => {
+    if (isBlocked) {
+      await Linking.openSettings();
+    } else {
+      setRequesting(true);
+      try {
+        await onRequest();
+      } finally {
+        setRequesting(false);
+      }
+    }
+  };
+
+  return (
+    <Card
+      style={{
+        gap: 12,
+        backgroundColor: `${colors.warning}12`,
+        borderColor: `${colors.warning}35`,
+        borderWidth: 1,
+      }}
+    >
+      {/* Header row */}
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+        <Ionicons
+          name="shield-outline"
+          size={18}
+          color={colors.warning}
+          style={{ marginTop: 1 }}
+        />
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text
+            style={{
+              color: colors.foreground,
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 13,
+            }}
+          >
+            Bluetooth permission required
+          </Text>
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontFamily: "Inter_400Regular",
+              fontSize: 12,
+              lineHeight: 17,
+            }}
+          >
+            {isBlocked
+              ? "Permission was permanently denied. Open Settings → Permissions → Nearby devices and allow ReadyLoq."
+              : "ReadyLoq needs Bluetooth permission to scan for and connect to nearby glasses."}
+          </Text>
+        </View>
+      </View>
+
+      {/* Action button */}
+      <Pressable
+        onPress={(): void => { void handlePress(); }}
+        disabled={requesting}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          backgroundColor: colors.primary,
+          borderRadius: colors.radius,
+          paddingVertical: 10,
+          opacity: pressed || requesting ? 0.7 : 1,
+        })}
+      >
+        {requesting ? (
+          <ActivityIndicator size="small" color={colors.primaryForeground} />
+        ) : (
+          <Ionicons
+            name={isBlocked ? "settings-outline" : "shield-checkmark-outline"}
+            size={15}
+            color={colors.primaryForeground}
+          />
+        )}
+        <Text
+          style={{
+            color: colors.primaryForeground,
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 14,
+          }}
+        >
+          {isBlocked ? "Open Settings" : "Grant Permissions"}
+        </Text>
+      </Pressable>
+    </Card>
   );
 }

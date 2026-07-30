@@ -24,3 +24,6 @@ export type {
   AudioCallback,
   StateChangeCallback,
 } from "./smart-glasses-ble";
+
+export { checkBlePermissions, requestBlePermissions } from "./permissions";
+export type { BlePermissionStatus } from "./permissions";
