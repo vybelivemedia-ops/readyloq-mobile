@@ -25,4 +25,5 @@
 - [whisper.rn integration](whisper-rn-integration.md) — v0.6.0 quirks: no root exports entry (add tsconfig paths), transcribeRealtime removed (use expo-av + transcribe(file)), expo-file-system legacy import
 - [EAS build from Replit sandbox](eas-sandbox-build.md) — workflow trick to bypass 120s bash timeout for eas build + pnpm install
 - [Capture screen production wiring](capture-screen-production.md) — DeviceHealthStrip + useSmartGuidance + MeasurementDevicePanel wired into new-inspection.tsx; AppState permission recheck; Expo ENOSPC fix = clear .expo + node_modules/.cache
+- [Camera capture latency](camera-capture-latency.md) — skipProcessing:true eliminates 3–8s JPEG compression; release setCapturing before ingest; optimistic thumbnail via targeted setPhotos functional updater (never full rebuild mid-ingest)
 - [BLE smart glasses driver](ble-smart-glasses.md) — react-native-ble-plx wiring; ReadyLoq GATT UUIDs; frame chunk protocol; tar@6.2.1 firewall workaround; monitorCharacteristicForService returns Subscription not Promise
