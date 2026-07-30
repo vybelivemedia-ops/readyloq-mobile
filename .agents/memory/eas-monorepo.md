@@ -1,66 +1,41 @@
 ---
-name: EAS build setup for ReadyLoq monorepo
-description: How to trigger EAS cloud builds when @platform/* workspace deps can't resolve on EAS servers
+name: EAS build setup
+description: Monorepo EAS build quirks — vendor script, EAS_NO_VCS, metro watchFolders, ENOSPC fix
 ---
 
-## The Problem
-`artifacts/readyloq-app` has four `workspace:*` deps (`@platform/camera-core`, `@platform/provider-registry`, `@platform/shared-types`, `@platform/smart-vision`). EAS archives only the app subdirectory by default (with `EAS_NO_VCS=1`), so EAS servers can't resolve those deps and the build fails in ~22 seconds.
+## Key constraints
 
-## The Solution: Vendor Script + Workflow
+- **Vendor script**: workspace `*` deps must be vendored before EAS upload; the upload contains node_modules.
+- **EAS_NO_VCS=1**: required because the sandbox has no git remote reachable by EAS.
+- **EAS_SKIP_AUTO_FINGERPRINT=1**: prevents EAS from re-fingerprinting the build.
+- **metro transformIgnorePatterns**: `@platform/*` packages must be included (not excluded) in the Metro transform list.
+- **EAS Build workflow 120s bash timeout**: use `--no-wait` flag to submit and exit; the build runs async on EAS servers.
 
-**`artifacts/readyloq-app/scripts/eas-vendor-setup.js`**
-- Copies src/ (or dist/ for `core`) of all 5 platform packages into `vendor/@platform/`
-- Creates `package.json` for packages that don't have one
-- Patches internal `workspace:*` deps to `file:../X`
-- Patches the app's `package.json` to use `file:vendor/@platform/X`
-- Backs up original `package.json` as `package.json.bak`
+## pnpm override for react-native-ble-plx
 
-**`artifacts/readyloq-app/scripts/eas-vendor-restore.js`**
-- Restores `package.json` from backup
-- Removes the `vendor/` directory
+`react-native-ble-plx@3.2.1` ships `"expo": "^51.0.14"` as a runtime dep, which pulls `@expo/cli@0.18 → tar@6.2.1`. The Replit firewall blocks `tar-6.2.1`.
 
-**Metro config** (`metro.config.js`) must include `@platform/.*` in `transformIgnorePatterns` exclusion so Metro transpiles the vendored TypeScript source files.
-
-## Build Command (via Replit Workflow)
-```
-cd /home/runner/workspace/artifacts/readyloq-app && node scripts/eas-vendor-setup.js && rm -rf /tmp/rl_eas_build && cp -r . /tmp/rl_eas_build/ && rm -rf /tmp/rl_eas_build/node_modules /tmp/rl_eas_build/.git /tmp/rl_eas_build/.expo && ln -s /home/runner/workspace/artifacts/readyloq-app/node_modules /tmp/rl_eas_build/node_modules && cd /tmp/rl_eas_build && PATH="/home/runner/workspace/node_modules/.bin:$PATH" EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile development --non-interactive --no-wait; cd /home/runner/workspace/artifacts/readyloq-app && node scripts/eas-vendor-restore.js && rm -rf /tmp/rl_eas_build
+**Fix** (root `package.json`):
+```json
+"pnpm": {
+  "overrides": {
+    "react-native-ble-plx>expo": "54.0.36"
+  }
+}
 ```
 
-Run this via a Replit workflow (not bare bash — the bash tool times out in 2 min and background processes are reaped when it returns).
+This redirects ble-plx's expo dep to the already-installed expo@54, avoiding the old CLI chain.
 
-**Why `EAS_NO_VCS=1`**: Without it, EAS runs git commands (including write ops like `git stash`) which are blocked by the Replit bash interceptor.
-**Why `EAS_SKIP_AUTO_FINGERPRINT=1`**: EAS fingerprint scanner walks into pnpm's `.pnpm` store and crashes on missing native C++ dirs inside `react-native-reanimated`. Always set this flag.
-**Why a Workflow**: The compression + upload takes >2 min; the bash tool's 120s limit isn't enough.
+## Metro ENOSPC fix
 
-## Required Package Versions for SDK 54 + RN 0.81.5
+The inotify watcher limit (65536) in the Replit container cannot be raised (write to `/proc/sys/fs/inotify/max_user_watches` is permission-denied). Metro exhausts the limit when watching `node_modules/.pnpm` (thousands of static directories).
 
-**Critical**: `react-native-reanimated ~4.1.1` (NOT 3.x) + `react-native-worklets 0.5.1` (separate peer dep).
+**Fix** in `metro.config.js`:
+- Remove `workspaceRoot` from `watchFolders` — only add specific source dirs (`lib/`, platform packages).
+- Add `node_modules/.pnpm` to `blockList` so Metro uses it for resolution only (not watching).
 
-- reanimated 3.x removed `Systrace.TRACE_TAG_REACT_JAVA_BRIDGE` (removed in RN 0.81) and uses old `LengthPercentage.resolve(int,int)` signature (changed to `resolve(float)` in RN 0.81) → Java compile failure at ~4 min.
-- reanimated 4.x requires `newArchEnabled=true` and the companion `react-native-worklets` package.
-- `expo/bundledNativeModules.json` (SDK 54.0.35) authoritative: `react-native-reanimated ~4.1.1`, `react-native-worklets 0.5.1`.
+**Why:** The pnpm virtual store is static at runtime; no files in it change during development. Metro only needs to watch source packages.
 
-## New Architecture
+## react-native-ble-plx symlink
 
-`newArchEnabled=true` in `android/gradle.properties` — **required** for reanimated v4. The old note about "New Arch + expo-dev-client causes launch crash" was outdated; expo-dev-client 6.0.21 + SDK 54.0.35 + RN 0.81.5 work correctly with New Architecture. All key native modules (whisper.rn 0.7.0 has `codegenConfig`, react-native-keyboard-controller 1.18.5, etc.) support New Arch.
-
-## Getting Build Logs from EAS GraphQL
-
-EAS logs are NOT returned by `eas build --wait`. To get actual Gradle errors:
-1. `builds { byId(buildId: "...") { logFileUrls } }` — returns GCS signed URL (valid 15 min)
-2. `curl -s --compressed "$URL"` — file is brotli-compressed, curl auto-decompresses
-3. Parse as NDJSON: each line is `{"phase":"RUN_GRADLEW","level":30,"msg":"...","time":"..."}`
-4. Filter by `phase == "RUN_GRADLEW"` and `level >= 40` or search for "error"/"FAILED"
-
-## eas.json profiles
-- `development`: APK with dev client (`"developmentClient": true`) — NOT Expo Go
-- `preview`: standalone APK for internal testing
-- `production`: AAB for Play Store, with `autoIncrement`
-
-## .easignore
-Root-level `.easignore` at workspace root excludes `**/node_modules`, `.git`, `**/.git`.
-App-level `artifacts/readyloq-app/.easignore` excludes `node_modules`, `.git`.
-
-## EAS Project
-- Project ID: `7927cf86-2cbd-4c14-9bd5-d43f2beabec8`, Account: `hgwashingllc`
-- EAS CLI at: `/home/runner/workspace/node_modules/.bin/eas`
+The package is in the pnpm virtual store at `node_modules/.pnpm/react-native-ble-plx@3.2.1_<hash>/node_modules/react-native-ble-plx`. Symlink it to `artifacts/readyloq-app/node_modules/react-native-ble-plx` for TypeScript resolution. The EAS cloud build installs it natively.
