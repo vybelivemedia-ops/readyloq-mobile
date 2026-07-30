@@ -33,6 +33,7 @@ import { VoiceMicButton } from "@/components/VoiceMicButton";
 import { useVoiceField } from "@/hooks/useVoiceField";
 import { type LocalBaitStation } from "@/lib/local/inspection-store";
 import { WifiCameraModal } from "@/components/WifiCameraModal";
+import { TreatmentLogWizard } from "@/components/TreatmentLogWizard";
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
@@ -242,6 +243,9 @@ export default function NewInspectionScreen() {
   // ── Wi-Fi camera (T004) ───────────────────────────────────────────────────
   const [showWifiCamera, setShowWifiCamera] = useState(false);
   const [wifiCameraConnected, setWifiCameraConnected] = useState(false);
+
+  // ── Chemical treatment log wizard ─────────────────────────────────────────
+  const [showTreatmentWizard, setShowTreatmentWizard] = useState(false);
 
   // ── Offline status (T003) ─────────────────────────────────────────────────
   const { isConnected } = useNetworkStatus();
@@ -1759,6 +1763,19 @@ export default function NewInspectionScreen() {
               {captureButton}
               {doneButton}
               {faieButton}
+              <Pressable
+                onPress={() => {
+                  if (!wsInspectionId) {
+                    Alert.alert("Not ready", "Inspection is still saving. Wait a moment.");
+                    return;
+                  }
+                  setShowTreatmentWizard(true);
+                }}
+                style={{ alignItems: "center", gap: 3 }}
+              >
+                <Ionicons name="flask-outline" size={22} color="#fff" />
+                <Text style={{ color: "#fff", fontFamily: "Inter_400Regular", fontSize: 9 }}>Log Chem</Text>
+              </Pressable>
             </View>
             <View
               style={{
@@ -1846,6 +1863,22 @@ export default function NewInspectionScreen() {
                 <Pressable onPress={() => setShowWifiCamera(true)} style={{ alignItems: "center" }}>
                   <Ionicons name="wifi" size={22} color={wifiCameraConnected ? "#17c4d3" : "#fff"} />
                 </Pressable>
+                <Pressable
+                  onPress={() => {
+                    if (!wsInspectionId) {
+                      Alert.alert(
+                        "Not ready",
+                        "Inspection is still saving to the server. Wait a moment and try again.",
+                      );
+                      return;
+                    }
+                    setShowTreatmentWizard(true);
+                  }}
+                  style={{ alignItems: "center", gap: 3 }}
+                >
+                  <Ionicons name="flask-outline" size={22} color="#fff" />
+                  <Text style={{ color: "#fff", fontFamily: "Inter_400Regular", fontSize: 9 }}>Log Chem</Text>
+                </Pressable>
               </View>
               {captureButton}
               {doneButton}
@@ -1857,6 +1890,17 @@ export default function NewInspectionScreen() {
           onClose={() => setShowWifiCamera(false)}
           onConnected={() => setWifiCameraConnected(true)}
         />
+        {wsInspectionId != null && (
+          <TreatmentLogWizard
+            visible={showTreatmentWizard}
+            onClose={() => setShowTreatmentWizard(false)}
+            inspectionId={wsInspectionId}
+            pestTypes={pestTypes}
+            onLogged={() => {
+              setShowTreatmentWizard(false);
+            }}
+          />
+        )}
 
         {/* Compact/medium overlay — Co-Pilot mode shows as a bottom sheet that
             sits over the bottom 42% of the camera; AI Insights takes full screen.

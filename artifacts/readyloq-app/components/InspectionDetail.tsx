@@ -9,12 +9,14 @@ import {
 } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { AuthedImage } from "@/components/AuthedImage";
 import { FindingCard } from "@/components/FindingCard";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
+import { TreatmentLogWizard } from "@/components/TreatmentLogWizard";
+import { listTreatmentLogs, type TreatmentLog } from "@/lib/api-client/products";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -50,6 +52,19 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
 
   const inspectionQ = useQuery(getGetInspectionQueryOptions(id));
   const analysisQ = useQuery(getListAnalysisResultsQueryOptions({ inspectionId: id }));
+
+  // ── Treatment logs ─────────────────────────────────────────────────────────
+  const [showTreatmentWizard, setShowTreatmentWizard] = useState(false);
+  const treatmentLogsQ = useQuery({
+    queryKey: ["treatment-logs", id],
+    queryFn: () => listTreatmentLogs(id),
+    staleTime: 30_000,
+    enabled: id > 0,
+  });
+  const handleTreatmentLogged = useCallback(() => {
+    void treatmentLogsQ.refetch();
+    setShowTreatmentWizard(false);
+  }, [treatmentLogsQ]);
 
   const analyze = useAnalyzeInspection();
   const genReport = useGenerateReport();
@@ -379,6 +394,23 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
         {/* Measurement devices */}
         <MeasurementDevicePanel />
 
+        {/* Treatments Applied */}
+        <TreatmentsAppliedSection
+          logs={treatmentLogsQ.data ?? []}
+          loading={treatmentLogsQ.isLoading}
+          colors={colors}
+        />
+
+        {/* Log Treatment — only for active inspections */}
+        {(inspection as unknown as Record<string, unknown>).status !== "completed" ? (
+          <Button
+            title="Log Treatment"
+            variant="outline"
+            icon="flask-outline"
+            onPress={() => setShowTreatmentWizard(true)}
+          />
+        ) : null}
+
         {/* Generate report */}
         <Button
           title="Generate report"
@@ -412,6 +444,19 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
           {body}
         </Screen>
       )}
+
+      {/* Treatment log compliance wizard */}
+      <TreatmentLogWizard
+        visible={showTreatmentWizard}
+        onClose={() => setShowTreatmentWizard(false)}
+        inspectionId={id}
+        pestTypes={
+          Array.isArray((inspection as unknown as Record<string, unknown>)?.pestTypes)
+            ? ((inspection as unknown as Record<string, unknown>).pestTypes as string[])
+            : []
+        }
+        onLogged={handleTreatmentLogged}
+      />
 
       {/* ── Species correction modal ─────────────────────────────────────────
           Slides up from the bottom when the technician taps "Correct" on a
@@ -615,6 +660,167 @@ function BulletRow({ text, colors }: { text: string; colors: ReturnType<typeof u
       <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20, flex: 1 }}>
         {text}
       </Text>
+    </View>
+  );
+}
+
+/** Convert a site-classification slug to a readable label. */
+function siteLabel(slug: string): string {
+  const map: Record<string, string> = {
+    residential_interior: "Residential — Interior",
+    residential_exterior: "Residential — Exterior",
+    commercial_interior: "Commercial — Interior",
+    commercial_exterior: "Commercial — Exterior",
+    food_handling_area: "Food Handling Area",
+    structural_void: "Structural Void",
+    ornamental: "Ornamental Plants",
+    turf_lawn: "Turf / Lawn",
+    perimeter: "Building Perimeter",
+  };
+  return map[slug] ?? slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function TreatmentsAppliedSection({
+  logs,
+  loading,
+  colors,
+}: {
+  logs: TreatmentLog[];
+  loading: boolean;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  if (loading) {
+    return (
+      <View style={{ gap: 8 }}>
+        <SectionTitle title="Treatments applied" colors={colors} />
+        <Card>
+          <Text style={{ color: colors.mutedForeground, textAlign: "center", fontFamily: "Inter_400Regular", fontSize: 14 }}>
+            Loading…
+          </Text>
+        </Card>
+      </View>
+    );
+  }
+
+  if (logs.length === 0) return null;
+
+  return (
+    <View style={{ gap: 10 }}>
+      <Pressable
+        onPress={() => setExpanded((v) => !v)}
+        style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+      >
+        <SectionTitle title={`Treatments applied (${logs.length})`} colors={colors} />
+        <Ionicons
+          name={expanded ? "chevron-up" : "chevron-down"}
+          size={16}
+          color={colors.mutedForeground}
+        />
+      </Pressable>
+
+      {expanded &&
+        logs.map((log) => {
+          const checkedCount = log.checklistItems.filter((i) => i.checked).length;
+          const totalCount = log.checklistItems.length;
+          const allChecked = totalCount > 0 && checkedCount === totalCount;
+          return (
+            <Card key={log.id} style={{ gap: 10 }}>
+              {/* Product name + pest */}
+              <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+                    {log.product?.name ?? `Product #${log.productId}`}
+                  </Text>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                    {log.targetPest} · {siteLabel(log.siteClassification)}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 8,
+                    backgroundColor: allChecked
+                      ? "rgba(63,185,80,0.15)"
+                      : "rgba(210,153,34,0.15)",
+                    borderWidth: 1,
+                    borderColor: allChecked ? "#3fb950" : "#d29922",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "Inter_600SemiBold",
+                      fontSize: 11,
+                      color: allChecked ? "#3fb950" : "#d29922",
+                    }}
+                  >
+                    {allChecked ? "✓ Checklist done" : `${checkedCount}/${totalCount} checked`}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Rate + area */}
+              {(log.totalProductOz != null || log.areaSqft != null || log.linearFt != null) ? (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}>
+                  {log.totalProductOz != null ? (
+                    <View>
+                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                        PRODUCT USED
+                      </Text>
+                      <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                        {log.totalProductOz} fl oz
+                      </Text>
+                    </View>
+                  ) : null}
+                  {log.areaSqft != null ? (
+                    <View>
+                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                        AREA COVERED
+                      </Text>
+                      <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                        {log.areaSqft.toLocaleString()} sq ft
+                      </Text>
+                    </View>
+                  ) : null}
+                  {log.linearFt != null ? (
+                    <View>
+                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                        LINEAR FT
+                      </Text>
+                      <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                        {log.linearFt} ft
+                      </Text>
+                    </View>
+                  ) : null}
+                  {log.totalProductOz != null && log.areaSqft != null && log.areaSqft > 0 ? (
+                    <View>
+                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                        RATE
+                      </Text>
+                      <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                        {((log.totalProductOz / log.areaSqft) * 1000).toFixed(2)} oz/1k sqft
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* Notes */}
+              {log.notes ? (
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, fontStyle: "italic" }}>
+                  {log.notes}
+                </Text>
+              ) : null}
+
+              {/* Timestamp */}
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                Applied {new Date(log.appliedAt).toLocaleString()}
+              </Text>
+            </Card>
+          );
+        })}
     </View>
   );
 }
