@@ -1,7 +1,7 @@
 - [ReadyLoq Architecture](readyloq-architecture.md) — stack, conventions, API routes, real-capture/no-simulation beta model (0–1 confidence, batched AI), Wouter base path fix
 - [ReadyLoq multi-tenancy](readyloq-multitenancy.md) — per-company isolation rules, reserved platform/legacy companies, storage scoping, vitest harness, frontend typecheck gotcha
 - [API Server Testing](api-server-testing.md) — vitest + isolated `<db>_test` DB + Clerk getAuth mock; pre-existing TS7030 typecheck failures are baseline
-- [EAS build setup](eas-monorepo.md) — vendor script approach for workspace:* deps; EAS_NO_VCS=1; workflow-based submission; metro transformIgnorePatterns for @platform/*
+- [EAS build setup](eas-monorepo.md) — EAS_NO_VCS=1; ble-plx>expo override avoids tar@6.2.1 firewall block; metro watchFolders excludes .pnpm to fix ENOSPC
 - [ReadyLoq native Windows/EAS build](readyloq-native-windows-build.md) — "build.ninja still dirty" is a Windows toolchain issue not a repo bug; EAS cloud build bypasses it; standalone eas.json setup
 - [Clerk Expo SSO redirect](clerk-expo-sso-redirect.md) — release APKs need makeRedirectUri({scheme, path}) + a callback route; bare makeRedirectUri() misroutes the OAuth return (opens email app)
 - [Inspection Memory](inspection-memory.md) — prior-visit compare: null-zone priors never highlight, no fabricated station #s, strict company+same-address scope, memory_* guidance priorities, old-client safe
@@ -25,3 +25,4 @@
 - [whisper.rn integration](whisper-rn-integration.md) — v0.6.0 quirks: no root exports entry (add tsconfig paths), transcribeRealtime removed (use expo-av + transcribe(file)), expo-file-system legacy import
 - [EAS build from Replit sandbox](eas-sandbox-build.md) — workflow trick to bypass 120s bash timeout for eas build + pnpm install
 - [Capture screen production wiring](capture-screen-production.md) — DeviceHealthStrip + useSmartGuidance + MeasurementDevicePanel wired into new-inspection.tsx; AppState permission recheck; Expo ENOSPC fix = clear .expo + node_modules/.cache
+- [BLE smart glasses driver](ble-smart-glasses.md) — react-native-ble-plx wiring; ReadyLoq GATT UUIDs; frame chunk protocol; tar@6.2.1 firewall workaround; monitorCharacteristicForService returns Subscription not Promise
