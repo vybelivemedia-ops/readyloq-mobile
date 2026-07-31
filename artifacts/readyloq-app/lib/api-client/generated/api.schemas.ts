@@ -1889,6 +1889,10 @@ export type OwnerBriefingKpis = {
 export interface OwnerBriefing {
   kpis: OwnerBriefingKpis;
   alerts: BriefingAlert[];
+  /** Total number of active team members (including the owner). */
+  teamSize: number;
+  /** True when the owner is the only member of the company — triggers solo command-center layout. */
+  isSoloOperator: boolean;
 }
 
 export type RoleBriefingRole = typeof RoleBriefingRole[keyof typeof RoleBriefingRole];

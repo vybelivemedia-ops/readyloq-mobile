@@ -5,6 +5,7 @@ import {
   salesProposalsTable,
   inspectionScorecardsTable,
   customerSummariesTable,
+  usersTable,
   type UserRole,
 } from "@workspace/db";
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt, lte, ne, sql } from "drizzle-orm";
@@ -120,6 +121,10 @@ export interface OwnerBriefing {
     message: string;
     count: number;
   }[];
+  /** Total active team members in this company (including the owner). */
+  teamSize: number;
+  /** True when the owner is the only company member — triggers solo command-center UI. */
+  isSoloOperator: boolean;
 }
 
 export interface RoleBriefing {
@@ -349,7 +354,7 @@ async function buildOwnerSection(companyId: number): Promise<OwnerBriefing> {
   const nowDate = new Date();
   const weekAhead = new Date(Date.now() + 7 * DAY_MS);
 
-  const [[insp], [opp], [quality], [summaries], [staleValued], [expiring]] = await Promise.all([
+  const [[insp], [opp], [quality], [summaries], [staleValued], [expiring], [team]] = await Promise.all([
     db
       .select({
         completions7d: sql<number>`count(*) filter (where ${inspectionsTable.completedAt} >= ${weekAgo})::int`,
@@ -412,6 +417,10 @@ async function buildOwnerSection(companyId: number): Promise<OwnerBriefing> {
           lte(customerSummariesTable.shareExpiresAt, weekAhead),
         ),
       ),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(usersTable)
+      .where(eq(usersTable.companyId, companyId)),
   ]);
 
   const alerts: OwnerBriefing["alerts"] = [];
@@ -461,6 +470,7 @@ async function buildOwnerSection(companyId: number): Promise<OwnerBriefing> {
     });
   }
 
+  const teamSize = team?.count ?? 1;
   return {
     kpis: {
       completions7d: insp?.completions7d ?? 0,
@@ -471,6 +481,8 @@ async function buildOwnerSection(companyId: number): Promise<OwnerBriefing> {
       approvedSummaries30d: summaries?.approved30d ?? 0,
     },
     alerts,
+    teamSize,
+    isSoloOperator: teamSize <= 1,
   };
 }
 

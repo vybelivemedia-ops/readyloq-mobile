@@ -282,13 +282,13 @@ function ManagerTools({
   );
 }
 
-/** Owner comms quick-dial strip. */
+/** Owner comms quick-dial strip — multi-operator only. */
 function OwnerCommsStrip() {
   const colors = useColors();
   const contacts = [
-    { label: "Manager",      icon: "shield-outline"   as const },
+    { label: "Manager",      icon: "shield-outline"      as const },
     { label: "Sales Lead",   icon: "trending-up-outline" as const },
-    { label: "Tech Sup.",    icon: "construct-outline" as const },
+    { label: "Tech Sup.",    icon: "construct-outline"   as const },
   ];
   return (
     <View style={{ gap: 8 }}>
@@ -332,6 +332,41 @@ function OwnerCommsStrip() {
   );
 }
 
+/** Solo-operator personal command tiles. */
+function SoloOwnerTools({ router }: { router: ReturnType<typeof useRouter> }) {
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <ToolTile
+          icon="camera-outline"
+          title="New Inspection"
+          subtitle="Capture, AI-analyse, report"
+          onPress={() => router.push("/new-inspection" as Href)}
+        />
+        <ToolTile
+          icon="briefcase-outline"
+          title="Pipeline"
+          subtitle="Open opportunities"
+          onPress={() => router.push("/(tabs)/reports" as Href)}
+        />
+      </View>
+      <ToolTile
+        icon="document-text-outline"
+        title="All Reports"
+        subtitle="Customer-ready summaries & share links"
+        onPress={() => router.push("/(tabs)/reports" as Href)}
+      />
+    </View>
+  );
+}
+
+/** Format a dollar amount compactly: $1.2k, $34k, $1.1M. */
+function formatPipelineValue(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000)     return `$${Math.round(v / 1_000)}k`;
+  return `$${v}`;
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
@@ -359,36 +394,70 @@ export default function DashboardScreen() {
   // Manager pending approvals count (from briefing).
   const pendingApprovals = briefing.data?.manager?.pendingApprovals ?? 0;
 
-  // Owner KPI strip values.
+  // Owner mode flags.
+  const isSoloOperator = briefing.data?.owner?.isSoloOperator ?? false;
+
+  // Owner KPI strip — different sets for solo vs multi-operator.
   const ownerKpis = briefing.data?.owner
-    ? [
-        {
-          icon: "checkmark-done-outline" as const,
-          value: briefing.data.owner.kpis.completions30d,
-          label: "Completions\n(30 days)",
-          tone: colors.success ?? "#16a34a",
-        },
-        {
-          icon: "ribbon-outline" as const,
-          value: briefing.data.owner.kpis.avgQualityScore30d != null
-            ? Math.round(briefing.data.owner.kpis.avgQualityScore30d)
-            : "—",
-          label: "Avg quality\n(30 days)",
-          tone: colors.primary,
-        },
-        {
-          icon: "trending-up-outline" as const,
-          value: briefing.data.owner.kpis.openOpportunities,
-          label: "Open\nopportunities",
-          tone: colors.info ?? "#3b82f6",
-        },
-        {
-          icon: "stats-chart-outline" as const,
-          value: briefing.data.owner.kpis.approvedSummaries30d,
-          label: "Approved\nsummaries",
-          tone: colors.primary,
-        },
-      ]
+    ? isSoloOperator
+      ? /* Solo: personal field-execution metrics */
+        [
+          {
+            icon: "today-outline" as const,
+            value: briefing.data.owner.kpis.completions7d,
+            label: "Done this\nweek",
+            tone: colors.success ?? "#16a34a",
+          },
+          {
+            icon: "trending-up-outline" as const,
+            value: briefing.data.owner.kpis.openOpportunities,
+            label: "Open\nopps",
+            tone: colors.info ?? "#3b82f6",
+          },
+          {
+            icon: "cash-outline" as const,
+            value: formatPipelineValue(briefing.data.owner.kpis.pipelineValue),
+            label: "Pipeline\nvalue",
+            tone: colors.primary,
+          },
+          {
+            icon: "ribbon-outline" as const,
+            value: briefing.data.owner.kpis.avgQualityScore30d != null
+              ? Math.round(briefing.data.owner.kpis.avgQualityScore30d)
+              : "—",
+            label: "Avg quality\n(30d)",
+            tone: colors.primary,
+          },
+        ]
+      : /* Multi-operator: executive summary metrics */
+        [
+          {
+            icon: "checkmark-done-outline" as const,
+            value: briefing.data.owner.kpis.completions30d,
+            label: "Completions\n(30 days)",
+            tone: colors.success ?? "#16a34a",
+          },
+          {
+            icon: "ribbon-outline" as const,
+            value: briefing.data.owner.kpis.avgQualityScore30d != null
+              ? Math.round(briefing.data.owner.kpis.avgQualityScore30d)
+              : "—",
+            label: "Avg quality\n(30 days)",
+            tone: colors.primary,
+          },
+          {
+            icon: "trending-up-outline" as const,
+            value: briefing.data.owner.kpis.openOpportunities,
+            label: "Open\nopportunities",
+            tone: colors.info ?? "#3b82f6",
+          },
+          {
+            icon: "stats-chart-outline" as const,
+            value: briefing.data.owner.kpis.approvedSummaries30d,
+            label: "Approved\nsummaries",
+            tone: colors.primary,
+          },
+        ]
     : [];
 
   // Role-specific greeting suffix.
@@ -479,8 +548,16 @@ export default function DashboardScreen() {
             }
             onPress={() => router.push("/(tabs)/review" as Href)}
           />
+        ) : isSoloOperator ? (
+          /* Owner — solo operator: field-execution first */
+          <HeroCTA
+            icon="camera"
+            title="Start Today's Work"
+            subtitle="Run an AI inspection · your business grows one job at a time"
+            onPress={() => router.push("/new-inspection" as Href)}
+          />
         ) : (
-          /* Owner */
+          /* Owner — multi-operator: executive summary */
           <HeroCTA
             icon="stats-chart-outline"
             title="Daily Executive Briefing"
@@ -504,13 +581,14 @@ export default function DashboardScreen() {
           </View>
         ) : null}
 
-        {/* ── Owner comms strip ───────────────────────────────────────────── */}
-        {isOwner ? <OwnerCommsStrip /> : null}
+        {/* ── Owner comms strip (multi-operator only) ─────────────────────── */}
+        {isOwner && !isSoloOperator ? <OwnerCommsStrip /> : null}
 
         {/* ── Role-specific quick tools ───────────────────────────────────── */}
         {isTech    ? <TechnicianTools router={router} /> : null}
         {isSales   ? <SalesTools router={router} /> : null}
         {isManager ? <ManagerTools pendingCount={pendingApprovals} router={router} /> : null}
+        {isOwner && isSoloOperator ? <SoloOwnerTools router={router} /> : null}
 
         {/* ── Role-adaptive briefing (server-shaped stats + lists) ─────────── */}
         {briefing.data ? (
