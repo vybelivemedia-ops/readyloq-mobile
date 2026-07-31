@@ -30,3 +30,4 @@
 - [BLE runtime permissions](ble-runtime-permissions.md) — Android 12+: BLUETOOTH_SCAN+CONNECT; Android 6-11: ACCESS_FINE_LOCATION via expo-location; iOS: noop (system dialog); AppState recheck on foreground; lib/ble/permissions.ts
 - [Role-Based UI](role-based-ui.md) — tab bar per role via href:null; new screens: scan/review/team/leads; /api/review-queue; customFetch pattern; BadgeTone/OwnerBriefing.kpis type notes
 - [Meta glasses Live AI wiring](meta-glasses-wiring.md) — webhook transport (not BLE); in-memory session store; toFile from "openai" not integrations; AiPrediction field names; logErrorEvent 2-arg signature
+- [Stripe billing integration](stripe-billing.md) — connector field is `secret` (not `secret_key`); StripeSync param is `stripeSecretKey`; must externalize from esbuild; syncBackfill needs `{object:'all'}`

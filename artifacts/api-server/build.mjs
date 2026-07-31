@@ -96,6 +96,9 @@ async function buildAll() {
       "wrangler",
       "zeromq",
       "zeromq-prebuilt",
+      // stripe-replit-sync reads migration .sql files relative to its own __dirname;
+      // bundling it replaces __dirname with a build-time path that breaks at runtime.
+      "stripe-replit-sync",
       "playwright",
       "puppeteer",
       "puppeteer-core",

@@ -72,6 +72,76 @@ export declare const companiesTable: import("drizzle-orm/pg-core").PgTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        stripeCustomerId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "stripe_customer_id";
+            tableName: "companies";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        stripeSubscriptionId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "stripe_subscription_id";
+            tableName: "companies";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        subscriptionTier: import("drizzle-orm/pg-core").PgColumn<{
+            name: "subscription_tier";
+            tableName: "companies";
+            dataType: "string";
+            columnType: "PgText";
+            data: "solo" | "growth";
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: "solo" | "growth";
+        }>;
+        subscriptionStatus: import("drizzle-orm/pg-core").PgColumn<{
+            name: "subscription_status";
+            tableName: "companies";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "companies";
@@ -275,6 +345,10 @@ export declare const insertCompanySchema: z.ZodObject<{
     name: z.ZodString;
     slug: z.ZodString;
     intelligenceSharingEnabled: z.ZodOptional<z.ZodBoolean>;
+    stripeCustomerId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    stripeSubscriptionId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    subscriptionTier: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    subscriptionStatus: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, {
     out: {};
     in: {};

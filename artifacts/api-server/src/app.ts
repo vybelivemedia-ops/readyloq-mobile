@@ -12,6 +12,7 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { WebhookHandlers } from "./lib/webhookHandlers";
 
 const app: Express = express();
 
@@ -91,6 +92,32 @@ app.use(
       return callback(null, false);
     },
   }),
+);
+
+// ── Stripe webhook — MUST be registered before express.json() ────────────────
+// stripe-replit-sync requires the raw Buffer body; express.json() would parse
+// it and break HMAC signature verification.
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const signature = req.headers["stripe-signature"];
+    if (!signature) {
+      return res.status(400).json({ error: "Missing stripe-signature" });
+    }
+    const sig = Array.isArray(signature) ? signature[0] : signature;
+    if (!Buffer.isBuffer(req.body)) {
+      logger.error("Stripe webhook: body is not a Buffer — express.json() ran first");
+      return res.status(500).json({ error: "Webhook processing error" });
+    }
+    try {
+      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+      return res.status(200).json({ received: true });
+    } catch (err) {
+      logger.error({ err }, "Stripe webhook processing failed");
+      return res.status(400).json({ error: "Webhook processing error" });
+    }
+  },
 );
 
 app.use(express.json());

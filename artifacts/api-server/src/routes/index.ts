@@ -33,6 +33,7 @@ import crmRouter from "./crm";
 import dailyRigRouter from "./daily-rig";
 import reviewQueueRouter from "./review-queue";
 import metaGlassesRouter from "./meta-glasses";
+import billingRouter from "./billing";
 
 const router: IRouter = Router();
 
@@ -167,5 +168,9 @@ router.use(
 // Meta Live AI glasses — mixed auth: session + events are auth-gated internally;
 // webhook endpoints are public but HMAC-verified with META_APP_SECRET.
 router.use("/meta-glasses", metaGlassesRouter);
+
+// Billing — Stripe subscription management.
+// /plans is public; subscription/checkout/portal are Owner-only (enforced inside billingRouter).
+router.use("/billing", billingRouter);
 
 export default router;

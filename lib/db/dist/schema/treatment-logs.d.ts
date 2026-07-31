@@ -321,10 +321,10 @@ export declare const treatmentLogsTable: import("drizzle-orm/pg-core").PgTableWi
     dialect: "pg";
 }>;
 export declare const insertTreatmentLogSchema: z.ZodObject<{
-    productId: z.ZodInt;
     technicianId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     notes: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     inspectionId: z.ZodInt;
+    productId: z.ZodInt;
     targetPest: z.ZodString;
     siteClassification: z.ZodString;
     areaSqft: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;

@@ -28,6 +28,7 @@ import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useLicenseStatus } from "@/hooks/useLicenseStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -385,6 +386,8 @@ export default function DashboardScreen() {
 
   const briefing = useQuery(getGetBriefingQueryOptions());
   const dash     = useQuery(getGetAnalyticsDashboardQueryOptions());
+  // License status — loaded for owners to surface subscription prompts/warnings.
+  const { data: license } = useLicenseStatus(isOwner);
 
   const refreshing = briefing.isRefetching || dash.isRefetching;
   const onRefresh  = () => { briefing.refetch(); dash.refetch(); };
@@ -579,6 +582,90 @@ export default function DashboardScreen() {
               />
             ))}
           </View>
+        ) : null}
+
+        {/* ── Subscription status card (Owner only) ───────────────────────── */}
+        {isOwner ? (
+          license && !license.isActive ? (
+            /* No active subscription — prompt to subscribe */
+            <Pressable
+              onPress={() => router.push("/billing" as Href)}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                padding: 14,
+                borderRadius: 12,
+                backgroundColor: colors.warning + "14",
+                borderWidth: 1,
+                borderColor: colors.warning + "44",
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Ionicons name="card-outline" size={20} color={colors.warning ?? "#d97706"} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  No active subscription
+                </Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                  Tap to choose a plan and unlock full access
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+            </Pressable>
+          ) : license?.seatOverage != null && license.seatOverage > 0 ? (
+            /* Seat overage warning for Growth Team */
+            <Pressable
+              onPress={() => router.push("/billing" as Href)}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                padding: 14,
+                borderRadius: 12,
+                backgroundColor: colors.warning + "14",
+                borderWidth: 1,
+                borderColor: colors.warning + "44",
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Ionicons name="people-outline" size={20} color={colors.warning ?? "#d97706"} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  {license.seatOverage} unbilled seat{license.seatOverage === 1 ? "" : "s"}
+                </Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                  Tap to update your seat count
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+            </Pressable>
+          ) : license?.isActive ? (
+            /* Active subscription — manage link */
+            <Pressable
+              onPress={() => router.push("/billing" as Href)}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                padding: 12,
+                borderRadius: 10,
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Ionicons name="card-outline" size={16} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontFamily: "Inter_500Medium", fontSize: 13, flex: 1 }}>
+                {license.tier === "solo" ? "Solo Operator plan active" : "Growth Team plan active"}
+                {license.tier === "growth"
+                  ? ` · ${license.billedSeats} additional seat${license.billedSeats === 1 ? "" : "s"}`
+                  : ""}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null
         ) : null}
 
         {/* ── Owner comms strip (multi-operator only) ─────────────────────── */}
