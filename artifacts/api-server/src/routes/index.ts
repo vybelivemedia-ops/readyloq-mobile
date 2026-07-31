@@ -32,6 +32,7 @@ import treatmentLogsRouter from "./treatment-logs";
 import crmRouter from "./crm";
 import dailyRigRouter from "./daily-rig";
 import reviewQueueRouter from "./review-queue";
+import metaGlassesRouter from "./meta-glasses";
 
 const router: IRouter = Router();
 
@@ -162,5 +163,9 @@ router.use(
   requireRole("manager"),
   reviewQueueRouter,
 );
+
+// Meta Live AI glasses — mixed auth: session + events are auth-gated internally;
+// webhook endpoints are public but HMAC-verified with META_APP_SECRET.
+router.use("/meta-glasses", metaGlassesRouter);
 
 export default router;

@@ -39,6 +39,7 @@ import { verifyEquipmentUsage } from "@/lib/audio/intelligence/EquipmentVerifier
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
+import { useMetaGlassesSession, type GlassesEvent } from "@/hooks/useMetaGlassesSession";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
@@ -632,6 +633,24 @@ export default function NewInspectionScreen() {
   // photos are uploaded once and never re-uploaded or re-analyzed at submit.
   const [wsInspectionId, setWsInspectionId] = useState<number | null>(null);
   const [wsAnalyzing, setWsAnalyzing] = useState(false);
+
+  // ── Meta glasses session (Ray-Ban Live AI hands-free integration) ──────────
+  // Registers a session with the API when an inspection is persisted so the
+  // tech's glasses can forward voice + camera events in real-time. The 6-char
+  // code is shown in the glasses strip below so the tech can pair the glasses.
+  const glassesSession = useMetaGlassesSession({
+    inspectionId: wsInspectionId,
+    active: wsInspectionId != null,
+    onFinding: useCallback(
+      (event: GlassesEvent) => {
+        setFaieStatus(`🕶 ${event.text}`);
+        setTimeout(() => setFaieStatus(null), 5_000);
+      },
+      // setFaieStatus is stable (React setState); intentionally empty dep array.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [],
+    ),
+  });
   const [wsError, setWsError] = useState<string | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const analyzedCount = useRef(0);
@@ -1398,6 +1417,30 @@ export default function NewInspectionScreen() {
       </View>
     ) : null;
 
+    // Meta glasses activity strip — shown when a Live AI session is active.
+    const glassesStrip = glassesSession.isActive ? (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          backgroundColor: "rgba(124,58,237,0.88)",
+          paddingHorizontal: 12,
+          paddingVertical: 7,
+          borderRadius: 10,
+          maxWidth: 440,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.2)",
+        }}
+      >
+        <Ionicons name="glasses-outline" size={15} color="#fff" />
+        <Text style={{ color: "#fff", fontFamily: "Inter_500Medium", fontSize: 12, flex: 1, flexShrink: 1 }}>
+          {glassesSession.status ?? "Glasses active"}
+          {glassesSession.code ? `  ·  Code: ${glassesSession.code}` : ""}
+        </Text>
+      </View>
+    ) : null;
+
     const qualityBanner = qualityNotice ? (
       <View
         style={{
@@ -1569,6 +1612,7 @@ export default function NewInspectionScreen() {
                 )}
                 {qualityBanner}
                 {faieBanner}
+                {glassesStrip}
                 {zoomChips}
                 <DeviceHealthStrip />
                 {guidance.text ? (
@@ -1816,6 +1860,7 @@ export default function NewInspectionScreen() {
             >
               {qualityBanner}
               {faieBanner}
+              {glassesStrip}
               {zoomChips}
             </View>
             {thumbs}
@@ -1839,6 +1884,9 @@ export default function NewInspectionScreen() {
             ) : null}
             {faieBanner ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{faieBanner}</View>
+            ) : null}
+            {glassesStrip ? (
+              <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{glassesStrip}</View>
             ) : null}
             {!isConnected && (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(239,68,68,0.15)", marginHorizontal: 16, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>

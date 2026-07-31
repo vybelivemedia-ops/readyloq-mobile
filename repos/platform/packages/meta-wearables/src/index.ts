@@ -247,6 +247,101 @@ export const WEARABLE_CAMERA_CAPABILITIES: CaptureCapabilities = {
 
 export const WEARABLE_CAMERA_SOURCE: CaptureSource = "wearable_camera";
 
+// ─── Meta Live AI — webhook transport ────────────────────────────────────────
+
+/**
+ * Meta Live AI provider — server-side webhook transport.
+ *
+ * Unlike the BLE smart-glasses entry above (which streams raw camera frames
+ * via react-native-ble-plx), this provider routes through Meta's Live AI
+ * infrastructure: the glasses transcribe speech on-device, then POST the
+ * text and an optional camera JPEG to the ReadyLoq webhook endpoint.
+ *
+ * Transport: "wifi" (webhook over cellular/WiFi internet — closest DeviceTransport
+ * analog; no local BLE involved).
+ * Mode: async_push — the glasses push events when the tech speaks or taps.
+ *
+ * Session pairing:
+ *   1. Mobile app calls POST /api/meta-glasses/session → { sessionId, code }
+ *   2. Tech enters the 6-char code in the Meta Glasses companion app.
+ *   3. Glasses POST to https://<domain>/api/meta-glasses/webhook?session=<id>
+ *   4. Mobile polls GET /api/meta-glasses/events/:sessionId for findings.
+ *
+ * Canonical: artifacts/api-server/src/routes/meta-glasses.ts
+ *            artifacts/readyloq-app/hooks/useMetaGlassesSession.ts
+ */
+export const META_LIVE_AI_CAPABILITIES: CaptureCapabilities = {
+  mode: "async_push",
+  transport: "wifi", // webhook over internet; no local BLE
+  hasLivePreview: false,
+  producesVideo: false, // stills only (JPEG frames from glasses camera)
+  requiresPairing: true, // 6-char code session pairing required
+};
+
+export const META_LIVE_AI_SOURCE: CaptureSource = "smart_glasses";
+
+/**
+ * MetaLiveAIProvider — stub implementing WearableProvider for the webhook
+ * transport path.  The concrete implementation lives in
+ * `useMetaGlassesSession` (mobile hook) and `meta-glasses.ts` (API route).
+ * This class exists to satisfy the WearableRegistry type contract and to
+ * document the provider interface for future native-SDK migration.
+ */
+/**
+ * NOTE: Stub — does not formally `implements WearableProvider` to avoid
+ * requiring all DeviceProvider abstract method signatures in a stub.
+ * Cast to WearableProvider where registry compliance is needed.
+ */
+export class MetaLiveAIProvider {
+  readonly meta: WearableProviderMeta = {
+    hardwareModel: "Meta Ray-Ban (Live AI webhook)",
+    firmwareVersion: undefined,
+    batteryLevel: undefined,
+    connectionAddress: undefined,
+  };
+
+  readonly captureCapabilities = META_LIVE_AI_CAPABILITIES;
+  readonly source: CaptureSource = META_LIVE_AI_SOURCE;
+
+  get isConnected(): boolean {
+    // Connection state is managed by the mobile hook (session polling).
+    return false;
+  }
+
+  // DeviceProvider contract — minimal stubs for registry compliance.
+  // The concrete lifecycle is managed by useMetaGlassesSession (mobile hook).
+  async connect(): Promise<void> { /* session registration handled by hook */ }
+  async disconnect(): Promise<void> { /* session cleanup handled by hook */ }
+  async getStatus() {
+    return {
+      operational: "unavailable" as const,
+      connection: {
+        state: "disconnected" as const,
+        transport: "wifi" as const,
+      },
+      lastSeenAt: new Date(0).toISOString(),
+    };
+  }
+  async checkHealth() {
+    return {
+      status: "unknown" as const,
+      message: "MetaLiveAIProvider — lifecycle managed by useMetaGlassesSession hook",
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  getPermissions() {
+    return {
+      granted: true,
+      required: [] as string[],
+      async request() { return true; },
+    };
+  }
+  async initialize() { /* no-op */ }
+  async teardown() { /* no-op */ }
+  on() { return () => {}; }
+  emit() { /* no-op */ }
+}
+
 // ─── Future provider definitions map ────────────────────────────────────────
 
 /**

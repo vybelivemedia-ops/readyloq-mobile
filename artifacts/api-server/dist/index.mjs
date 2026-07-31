@@ -63,13 +63,13 @@ var require_ms = __commonJS({
         "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
       );
     };
-    function parse4(str3) {
-      str3 = String(str3);
-      if (str3.length > 100) {
+    function parse4(str4) {
+      str4 = String(str4);
+      if (str4.length > 100) {
         return;
       }
       var match2 = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
-        str3
+        str4
       );
       if (!match2) {
         return;
@@ -494,8 +494,8 @@ var require_browser = __commonJS({
       }
     }
     module.exports = require_common()(exports);
-    var { formatters: formatters2 } = module.exports;
-    formatters2.j = function(v) {
+    var { formatters: formatters3 } = module.exports;
+    formatters3.j = function(v) {
       try {
         return JSON.stringify(v);
       } catch (error40) {
@@ -782,12 +782,12 @@ var require_node = __commonJS({
       }
     }
     module.exports = require_common()(exports);
-    var { formatters: formatters2 } = module.exports;
-    formatters2.o = function(v) {
+    var { formatters: formatters3 } = module.exports;
+    formatters3.o = function(v) {
       this.inspectOpts.colors = this.useColors;
-      return util2.inspect(v, this.inspectOpts).split("\n").map((str3) => str3.trim()).join(" ");
+      return util2.inspect(v, this.inspectOpts).split("\n").map((str4) => str4.trim()).join(" ");
     };
-    formatters2.O = function(v) {
+    formatters3.O = function(v) {
       this.inspectOpts.colors = this.useColors;
       return util2.inspect(v, this.inspectOpts);
     };
@@ -811,8 +811,8 @@ var require_depd = __commonJS({
     var relative = __require("path").relative;
     module.exports = depd;
     var basePath36 = process.cwd();
-    function containsNamespace(str3, namespace) {
-      var vals = str3.split(/[ ,]+/);
+    function containsNamespace(str4, namespace) {
+      var vals = str4.split(/[ ,]+/);
       var ns = String(namespace).toLowerCase();
       for (var i = 0; i < vals.length; i++) {
         var val = vals[i];
@@ -839,21 +839,21 @@ var require_depd = __commonJS({
       return descriptor;
     }
     function createArgumentsString(arity) {
-      var str3 = "";
+      var str4 = "";
       for (var i = 0; i < arity; i++) {
-        str3 += ", arg" + i;
+        str4 += ", arg" + i;
       }
-      return str3.substr(2);
+      return str4.substr(2);
     }
     function createStackString(stack) {
-      var str3 = this.name + ": " + this.namespace;
+      var str4 = this.name + ": " + this.namespace;
       if (this.message) {
-        str3 += " deprecated " + this.message;
+        str4 += " deprecated " + this.message;
       }
       for (var i = 0; i < stack.length; i++) {
-        str3 += "\n    at " + stack[i].toString();
+        str4 += "\n    at " + stack[i].toString();
       }
-      return str3;
+      return str4;
     }
     function depd(namespace) {
       if (!namespace) {
@@ -882,15 +882,15 @@ var require_depd = __commonJS({
       if (process.noDeprecation) {
         return true;
       }
-      var str3 = process.env.NO_DEPRECATION || "";
-      return containsNamespace(str3, namespace);
+      var str4 = process.env.NO_DEPRECATION || "";
+      return containsNamespace(str4, namespace);
     }
     function istraced(namespace) {
       if (process.traceDeprecation) {
         return true;
       }
-      var str3 = process.env.TRACE_DEPRECATION || "";
-      return containsNamespace(str3, namespace);
+      var str4 = process.env.TRACE_DEPRECATION || "";
+      return containsNamespace(str4, namespace);
     }
     function log(message, site) {
       var haslisteners = eehaslisteners(process, "deprecation");
@@ -1003,15 +1003,15 @@ var require_depd = __commonJS({
       return relative(basePath36, callSite[0]) + ":" + callSite[1] + ":" + callSite[2];
     }
     function getStack() {
-      var limit2 = Error.stackTraceLimit;
+      var limit3 = Error.stackTraceLimit;
       var obj = {};
       var prep = Error.prepareStackTrace;
       Error.prepareStackTrace = prepareObjectStackTrace;
-      Error.stackTraceLimit = Math.max(10, limit2);
+      Error.stackTraceLimit = Math.max(10, limit3);
       Error.captureStackTrace(obj);
       var stack = obj.stack.slice(1);
       Error.prepareStackTrace = prep;
-      Error.stackTraceLimit = limit2;
+      Error.stackTraceLimit = limit3;
       return stack;
     }
     function prepareObjectStackTrace(obj, stack) {
@@ -1324,8 +1324,8 @@ var require_toidentifier = __commonJS({
   "../../node_modules/.pnpm/toidentifier@1.0.1/node_modules/toidentifier/index.js"(exports, module) {
     "use strict";
     module.exports = toIdentifier;
-    function toIdentifier(str3) {
-      return str3.split(" ").map(function(token) {
+    function toIdentifier(str4) {
+      return str4.split(" ").map(function(token) {
         return token.slice(0, 1).toUpperCase() + token.slice(1);
       }).join("").replace(/[^ _0-9a-z]/gi, "");
     }
@@ -1549,16 +1549,16 @@ var require_bytes = __commonJS({
         }
       }
       var val = value / map2[unit.toLowerCase()];
-      var str3 = val.toFixed(decimalPlaces);
+      var str4 = val.toFixed(decimalPlaces);
       if (!fixedDecimals) {
-        str3 = str3.replace(formatDecimalsRegExp, "$1");
+        str4 = str4.replace(formatDecimalsRegExp, "$1");
       }
       if (thousandsSeparator) {
-        str3 = str3.split(".").map(function(s2, i) {
+        str4 = str4.split(".").map(function(s2, i) {
           return i === 0 ? s2.replace(formatThousandsRegExp, thousandsSeparator) : s2;
         }).join(".");
       }
-      return str3 + unitSeparator + unit;
+      return str4 + unitSeparator + unit;
     }
     function parse4(val) {
       if (typeof val === "number" && !isNaN(val)) {
@@ -1663,12 +1663,12 @@ var require_bom_handling = __commonJS({
       this.encoder = encoder;
       this.addBOM = true;
     }
-    PrependBOMWrapper.prototype.write = function(str3) {
+    PrependBOMWrapper.prototype.write = function(str4) {
       if (this.addBOM) {
-        str3 = BOMChar + str3;
+        str4 = BOMChar + str4;
         this.addBOM = false;
       }
-      return this.encoder.write(str3);
+      return this.encoder.write(str4);
     };
     PrependBOMWrapper.prototype.end = function() {
       return this.encoder.end();
@@ -1703,10 +1703,10 @@ var require_bom_handling = __commonJS({
 var require_merge_exports = __commonJS({
   "../../node_modules/.pnpm/iconv-lite@0.7.2/node_modules/iconv-lite/lib/helpers/merge-exports.js"(exports, module) {
     "use strict";
-    var hasOwn2 = typeof Object.hasOwn === "undefined" ? Function.call.bind(Object.prototype.hasOwnProperty) : Object.hasOwn;
+    var hasOwn3 = typeof Object.hasOwn === "undefined" ? Function.call.bind(Object.prototype.hasOwnProperty) : Object.hasOwn;
     function mergeModules(target, module2) {
       for (var key in module2) {
-        if (hasOwn2(module2, key)) {
+        if (hasOwn3(module2, key)) {
           target[key] = module2[key];
         }
       }
@@ -1767,31 +1767,31 @@ var require_internal = __commonJS({
     function InternalEncoder(options, codec) {
       this.enc = codec.enc;
     }
-    InternalEncoder.prototype.write = function(str3) {
-      return Buffer3.from(str3, this.enc);
+    InternalEncoder.prototype.write = function(str4) {
+      return Buffer3.from(str4, this.enc);
     };
     InternalEncoder.prototype.end = function() {
     };
     function InternalEncoderBase64(options, codec) {
       this.prevStr = "";
     }
-    InternalEncoderBase64.prototype.write = function(str3) {
-      str3 = this.prevStr + str3;
-      var completeQuads = str3.length - str3.length % 4;
-      this.prevStr = str3.slice(completeQuads);
-      str3 = str3.slice(0, completeQuads);
-      return Buffer3.from(str3, "base64");
+    InternalEncoderBase64.prototype.write = function(str4) {
+      str4 = this.prevStr + str4;
+      var completeQuads = str4.length - str4.length % 4;
+      this.prevStr = str4.slice(completeQuads);
+      str4 = str4.slice(0, completeQuads);
+      return Buffer3.from(str4, "base64");
     };
     InternalEncoderBase64.prototype.end = function() {
       return Buffer3.from(this.prevStr, "base64");
     };
     function InternalEncoderCesu8(options, codec) {
     }
-    InternalEncoderCesu8.prototype.write = function(str3) {
-      var buf = Buffer3.alloc(str3.length * 3);
+    InternalEncoderCesu8.prototype.write = function(str4) {
+      var buf = Buffer3.alloc(str4.length * 3);
       var bufIdx = 0;
-      for (var i = 0; i < str3.length; i++) {
-        var charCode = str3.charCodeAt(i);
+      for (var i = 0; i < str4.length; i++) {
+        var charCode = str4.charCodeAt(i);
         if (charCode < 128) {
           buf[bufIdx++] = charCode;
         } else if (charCode < 2048) {
@@ -1872,25 +1872,25 @@ var require_internal = __commonJS({
     function InternalEncoderUtf8(options, codec) {
       this.highSurrogate = "";
     }
-    InternalEncoderUtf8.prototype.write = function(str3) {
+    InternalEncoderUtf8.prototype.write = function(str4) {
       if (this.highSurrogate) {
-        str3 = this.highSurrogate + str3;
+        str4 = this.highSurrogate + str4;
         this.highSurrogate = "";
       }
-      if (str3.length > 0) {
-        var charCode = str3.charCodeAt(str3.length - 1);
+      if (str4.length > 0) {
+        var charCode = str4.charCodeAt(str4.length - 1);
         if (charCode >= 55296 && charCode < 56320) {
-          this.highSurrogate = str3[str3.length - 1];
-          str3 = str3.slice(0, str3.length - 1);
+          this.highSurrogate = str4[str4.length - 1];
+          str4 = str4.slice(0, str4.length - 1);
         }
       }
-      return Buffer3.from(str3, this.enc);
+      return Buffer3.from(str4, this.enc);
     };
     InternalEncoderUtf8.prototype.end = function() {
       if (this.highSurrogate) {
-        var str3 = this.highSurrogate;
+        var str4 = this.highSurrogate;
         this.highSurrogate = "";
-        return Buffer3.from(str3, this.enc);
+        return Buffer3.from(str4, this.enc);
       }
     };
   }
@@ -1917,8 +1917,8 @@ var require_utf32 = __commonJS({
       this.isLE = codec.isLE;
       this.highSurrogate = 0;
     }
-    Utf32Encoder.prototype.write = function(str3) {
-      var src = Buffer3.from(str3, "ucs2");
+    Utf32Encoder.prototype.write = function(str4) {
+      var src = Buffer3.from(str4, "ucs2");
       var dst = Buffer3.alloc(src.length * 2);
       var write32 = this.isLE ? dst.writeUInt32LE : dst.writeUInt32BE;
       var offset = 0;
@@ -2039,8 +2039,8 @@ var require_utf32 = __commonJS({
       }
       this.encoder = codec.iconv.getEncoder(options.defaultEncoding || "utf-32le", options);
     }
-    Utf32AutoEncoder.prototype.write = function(str3) {
-      return this.encoder.write(str3);
+    Utf32AutoEncoder.prototype.write = function(str4) {
+      return this.encoder.write(str4);
     };
     Utf32AutoEncoder.prototype.end = function() {
       return this.encoder.end();
@@ -2140,8 +2140,8 @@ var require_utf16 = __commonJS({
     Utf16BECodec.prototype.bomAware = true;
     function Utf16BEEncoder() {
     }
-    Utf16BEEncoder.prototype.write = function(str3) {
-      var buf = Buffer3.from(str3, "ucs2");
+    Utf16BEEncoder.prototype.write = function(str4) {
+      var buf = Buffer3.from(str4, "ucs2");
       for (var i = 0; i < buf.length; i += 2) {
         var tmp = buf[i];
         buf[i] = buf[i + 1];
@@ -2190,8 +2190,8 @@ var require_utf16 = __commonJS({
       }
       this.encoder = codec.iconv.getEncoder("utf-16le", options);
     }
-    Utf16Encoder.prototype.write = function(str3) {
-      return this.encoder.write(str3);
+    Utf16Encoder.prototype.write = function(str4) {
+      return this.encoder.write(str4);
     };
     Utf16Encoder.prototype.end = function() {
       return this.encoder.end();
@@ -2287,8 +2287,8 @@ var require_utf7 = __commonJS({
     function Utf7Encoder(options, codec) {
       this.iconv = codec.iconv;
     }
-    Utf7Encoder.prototype.write = function(str3) {
-      return Buffer3.from(str3.replace(nonDirectChars, function(chunk) {
+    Utf7Encoder.prototype.write = function(str4) {
+      return Buffer3.from(str4.replace(nonDirectChars, function(chunk) {
         return "+" + (chunk === "+" ? "" : this.iconv.encode(chunk, "utf16-be").toString("base64").replace(/=+$/, "")) + "-";
       }.bind(this)));
     };
@@ -2372,14 +2372,14 @@ var require_utf7 = __commonJS({
       this.base64Accum = Buffer3.alloc(6);
       this.base64AccumIdx = 0;
     }
-    Utf7IMAPEncoder.prototype.write = function(str3) {
+    Utf7IMAPEncoder.prototype.write = function(str4) {
       var inBase64 = this.inBase64;
       var base64Accum = this.base64Accum;
       var base64AccumIdx = this.base64AccumIdx;
-      var buf = Buffer3.alloc(str3.length * 5 + 10);
+      var buf = Buffer3.alloc(str4.length * 5 + 10);
       var bufIdx = 0;
-      for (var i2 = 0; i2 < str3.length; i2++) {
-        var uChar = str3.charCodeAt(i2);
+      for (var i2 = 0; i2 < str4.length; i2++) {
+        var uChar = str4.charCodeAt(i2);
         if (uChar >= 32 && uChar <= 126) {
           if (inBase64) {
             if (base64AccumIdx > 0) {
@@ -2520,10 +2520,10 @@ var require_sbcs_codec = __commonJS({
     function SBCSEncoder(options, codec) {
       this.encodeBuf = codec.encodeBuf;
     }
-    SBCSEncoder.prototype.write = function(str3) {
-      var buf = Buffer3.alloc(str3.length);
-      for (var i = 0; i < str3.length; i++) {
-        buf[i] = this.encodeBuf[str3.charCodeAt(i)];
+    SBCSEncoder.prototype.write = function(str4) {
+      var buf = Buffer3.alloc(str4.length);
+      for (var i = 0; i < str4.length; i++) {
+        buf[i] = this.encodeBuf[str4.charCodeAt(i)];
       }
       return buf;
     };
@@ -3397,8 +3397,8 @@ var require_dbcs_codec = __commonJS({
       this.defaultCharSingleByte = codec.defCharSB;
       this.gb18030 = codec.gb18030;
     }
-    DBCSEncoder.prototype.write = function(str3) {
-      var newBuf = Buffer3.alloc(str3.length * (this.gb18030 ? 4 : 3));
+    DBCSEncoder.prototype.write = function(str4) {
+      var newBuf = Buffer3.alloc(str4.length * (this.gb18030 ? 4 : 3));
       var leadSurrogate = this.leadSurrogate;
       var seqObj = this.seqObj;
       var nextChar = -1;
@@ -3406,8 +3406,8 @@ var require_dbcs_codec = __commonJS({
       var j = 0;
       while (true) {
         if (nextChar === -1) {
-          if (i2 == str3.length) break;
-          var uCode = str3.charCodeAt(i2++);
+          if (i2 == str4.length) break;
+          var uCode = str4.charCodeAt(i2++);
         } else {
           var uCode = nextChar;
           nextChar = -1;
@@ -5245,10 +5245,10 @@ var require_lib = __commonJS({
     module.exports.encodings = null;
     module.exports.defaultCharUnicode = "\uFFFD";
     module.exports.defaultCharSingleByte = "?";
-    module.exports.encode = function encode2(str3, encoding, options) {
-      str3 = "" + (str3 || "");
+    module.exports.encode = function encode3(str4, encoding, options) {
+      str4 = "" + (str4 || "");
       var encoder = module.exports.getEncoder(encoding, options);
-      var res = encoder.write(str3);
+      var res = encoder.write(str4);
       var trail = encoder.end();
       return trail && trail.length > 0 ? Buffer3.concat([res, trail]) : res;
     };
@@ -5452,13 +5452,13 @@ var require_raw_body = __commonJS({
         throw new TypeError("argument callback is required");
       }
       var encoding = opts.encoding !== true ? opts.encoding : "utf-8";
-      var limit2 = bytes.parse(opts.limit);
+      var limit3 = bytes.parse(opts.limit);
       var length = opts.length != null && !isNaN(opts.length) ? parseInt(opts.length, 10) : null;
       if (done) {
-        return readStream(stream, encoding, length, limit2, wrap(done));
+        return readStream(stream, encoding, length, limit3, wrap(done));
       }
       return new Promise(function executor(resolve, reject) {
-        readStream(stream, encoding, length, limit2, function onRead(err, buf) {
+        readStream(stream, encoding, length, limit3, function onRead(err, buf) {
           if (err) return reject(err);
           resolve(buf);
         });
@@ -5470,14 +5470,14 @@ var require_raw_body = __commonJS({
         stream.pause();
       }
     }
-    function readStream(stream, encoding, length, limit2, callback) {
+    function readStream(stream, encoding, length, limit3, callback) {
       var complete = false;
       var sync = true;
-      if (limit2 !== null && length !== null && length > limit2) {
+      if (limit3 !== null && length !== null && length > limit3) {
         return done(createError(413, "request entity too large", {
           expected: length,
           length,
-          limit: limit2,
+          limit: limit3,
           type: "entity.too.large"
         }));
       }
@@ -5538,9 +5538,9 @@ var require_raw_body = __commonJS({
       function onData(chunk) {
         if (complete) return;
         received += chunk.length;
-        if (limit2 !== null && received > limit2) {
+        if (limit3 !== null && received > limit3) {
           done(createError(413, "request entity too large", {
-            limit: limit2,
+            limit: limit3,
             received,
             type: "entity.too.large"
           }));
@@ -5842,14 +5842,14 @@ var require_content_type = __commonJS({
       return header;
     }
     function qstring(val) {
-      var str3 = String(val);
-      if (TOKEN_REGEXP.test(str3)) {
-        return str3;
+      var str4 = String(val);
+      if (TOKEN_REGEXP.test(str4)) {
+        return str4;
       }
-      if (str3.length > 0 && !TEXT_REGEXP.test(str3)) {
+      if (str4.length > 0 && !TEXT_REGEXP.test(str4)) {
         throw new TypeError("invalid parameter value");
       }
-      return '"' + str3.replace(QUOTE_REGEXP, "\\$1") + '"';
+      return '"' + str4.replace(QUOTE_REGEXP, "\\$1") + '"';
     }
     function ContentType(type) {
       this.parameters = /* @__PURE__ */ Object.create(null);
@@ -15289,11 +15289,11 @@ var require_mime_types = __commonJS({
       }
       return false;
     }
-    function contentType(str3) {
-      if (!str3 || typeof str3 !== "string") {
+    function contentType(str4) {
+      if (!str4 || typeof str4 !== "string") {
         return false;
       }
-      var mime = str3.indexOf("/") === -1 ? exports.lookup(str3) : str3;
+      var mime = str4.indexOf("/") === -1 ? exports.lookup(str4) : str4;
       if (!mime) {
         return false;
       }
@@ -15314,11 +15314,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path2) {
-      if (!path2 || typeof path2 !== "string") {
+    function lookup(path3) {
+      if (!path3 || typeof path3 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path2).toLowerCase().slice(1);
+      var extension2 = extname("x." + path3).toLowerCase().slice(1);
       if (!extension2) {
         return false;
       }
@@ -15556,7 +15556,7 @@ var require_utils = __commonJS({
         throw new TypeError("defaultType must be provided");
       }
       var inflate = options?.inflate !== false;
-      var limit2 = typeof options?.limit !== "number" ? bytes.parse(options?.limit || "100kb") : options?.limit;
+      var limit3 = typeof options?.limit !== "number" ? bytes.parse(options?.limit || "100kb") : options?.limit;
       var type = options?.type || defaultType;
       var verify = options?.verify || false;
       var defaultCharset = options?.defaultCharset || "utf-8";
@@ -15566,7 +15566,7 @@ var require_utils = __commonJS({
       var shouldParse = typeof type !== "function" ? typeChecker(type) : type;
       return {
         inflate,
-        limit: limit2,
+        limit: limit3,
         verify,
         defaultCharset,
         shouldParse
@@ -15674,14 +15674,14 @@ var require_read = __commonJS({
             return;
           }
         }
-        var str3 = body;
+        var str4 = body;
         try {
           debug7("parse body");
-          str3 = typeof body !== "string" && encoding !== null ? iconv.decode(body, encoding) : body;
-          req.body = parse4(str3, encoding);
+          str4 = typeof body !== "string" && encoding !== null ? iconv.decode(body, encoding) : body;
+          req.body = parse4(str4, encoding);
         } catch (err) {
           next(createError(400, err, {
-            body: str3,
+            body: str4,
             type: err.type || "entity.parse.failed"
           }));
           return;
@@ -15781,11 +15781,11 @@ var require_json = __commonJS({
         read(req, res, next, parse4, debug7, readOptions);
       };
     }
-    function createStrictSyntaxError(str3, char2) {
-      var index2 = str3.indexOf(char2);
+    function createStrictSyntaxError(str4, char2) {
+      var index2 = str4.indexOf(char2);
       var partial2 = "";
       if (index2 !== -1) {
-        partial2 = str3.substring(0, index2) + JSON_SYNTAX_CHAR.repeat(str3.length - index2);
+        partial2 = str4.substring(0, index2) + JSON_SYNTAX_CHAR.repeat(str4.length - index2);
       }
       try {
         JSON.parse(partial2);
@@ -15793,14 +15793,14 @@ var require_json = __commonJS({
       } catch (e) {
         return normalizeJsonSyntaxError(e, {
           message: e.message.replace(JSON_SYNTAX_REGEXP, function(placeholder) {
-            return str3.substring(index2, index2 + placeholder.length);
+            return str4.substring(index2, index2 + placeholder.length);
           }),
           stack: e.stack
         });
       }
     }
-    function firstchar(str3) {
-      var match2 = FIRST_CHAR_REGEXP.exec(str3);
+    function firstchar(str4) {
+      var match2 = FIRST_CHAR_REGEXP.exec(str4);
       return match2 ? match2[1] : void 0;
     }
     function normalizeJsonSyntaxError(error40, obj) {
@@ -15911,20 +15911,20 @@ var require_object_inspect = __commonJS({
     var gPO = (typeof Reflect === "function" ? Reflect.getPrototypeOf : Object.getPrototypeOf) || ([].__proto__ === Array.prototype ? function(O) {
       return O.__proto__;
     } : null);
-    function addNumericSeparator(num, str3) {
-      if (num === Infinity || num === -Infinity || num !== num || num && num > -1e3 && num < 1e3 || $test.call(/e/, str3)) {
-        return str3;
+    function addNumericSeparator(num, str4) {
+      if (num === Infinity || num === -Infinity || num !== num || num && num > -1e3 && num < 1e3 || $test.call(/e/, str4)) {
+        return str4;
       }
       var sepRegex = /[0-9](?=(?:[0-9]{3})+(?![0-9]))/g;
       if (typeof num === "number") {
         var int2 = num < 0 ? -$floor(-num) : $floor(num);
         if (int2 !== num) {
           var intStr = String(int2);
-          var dec = $slice.call(str3, intStr.length + 1);
+          var dec = $slice.call(str4, intStr.length + 1);
           return $replace.call(intStr, sepRegex, "$&_") + "." + $replace.call($replace.call(dec, /([0-9]{3})/g, "$&_"), /_$/, "");
         }
       }
-      return $replace.call(str3, sepRegex, "$&_");
+      return $replace.call(str4, sepRegex, "$&_");
     }
     var utilInspect = require_util_inspect();
     var inspectCustom = utilInspect.custom;
@@ -15941,20 +15941,20 @@ var require_object_inspect = __commonJS({
     };
     module.exports = function inspect_(obj, options, depth, seen) {
       var opts = options || {};
-      if (has2(opts, "quoteStyle") && !has2(quotes, opts.quoteStyle)) {
+      if (has3(opts, "quoteStyle") && !has3(quotes, opts.quoteStyle)) {
         throw new TypeError('option "quoteStyle" must be "single" or "double"');
       }
-      if (has2(opts, "maxStringLength") && (typeof opts.maxStringLength === "number" ? opts.maxStringLength < 0 && opts.maxStringLength !== Infinity : opts.maxStringLength !== null)) {
+      if (has3(opts, "maxStringLength") && (typeof opts.maxStringLength === "number" ? opts.maxStringLength < 0 && opts.maxStringLength !== Infinity : opts.maxStringLength !== null)) {
         throw new TypeError('option "maxStringLength", if provided, must be a positive integer, Infinity, or `null`');
       }
-      var customInspect = has2(opts, "customInspect") ? opts.customInspect : true;
+      var customInspect = has3(opts, "customInspect") ? opts.customInspect : true;
       if (typeof customInspect !== "boolean" && customInspect !== "symbol") {
         throw new TypeError("option \"customInspect\", if provided, must be `true`, `false`, or `'symbol'`");
       }
-      if (has2(opts, "indent") && opts.indent !== null && opts.indent !== "	" && !(parseInt(opts.indent, 10) === opts.indent && opts.indent > 0)) {
+      if (has3(opts, "indent") && opts.indent !== null && opts.indent !== "	" && !(parseInt(opts.indent, 10) === opts.indent && opts.indent > 0)) {
         throw new TypeError('option "indent" must be "\\t", an integer > 0, or `null`');
       }
-      if (has2(opts, "numericSeparator") && typeof opts.numericSeparator !== "boolean") {
+      if (has3(opts, "numericSeparator") && typeof opts.numericSeparator !== "boolean") {
         throw new TypeError('option "numericSeparator", if provided, must be `true` or `false`');
       }
       var numericSeparator = opts.numericSeparator;
@@ -15974,8 +15974,8 @@ var require_object_inspect = __commonJS({
         if (obj === 0) {
           return Infinity / obj > 0 ? "0" : "-0";
         }
-        var str3 = String(obj);
-        return numericSeparator ? addNumericSeparator(obj, str3) : str3;
+        var str4 = String(obj);
+        return numericSeparator ? addNumericSeparator(obj, str4) : str4;
       }
       if (typeof obj === "bigint") {
         var bigIntStr = String(obj) + "n";
@@ -15986,7 +15986,7 @@ var require_object_inspect = __commonJS({
         depth = 0;
       }
       if (depth >= maxDepth && maxDepth > 0 && typeof obj === "object") {
-        return isArray2(obj) ? "[Array]" : "[Object]";
+        return isArray3(obj) ? "[Array]" : "[Object]";
       }
       var indent = getIndent(opts, depth);
       if (typeof seen === "undefined") {
@@ -16003,7 +16003,7 @@ var require_object_inspect = __commonJS({
           var newOpts = {
             depth: opts.depth
           };
-          if (has2(opts, "quoteStyle")) {
+          if (has3(opts, "quoteStyle")) {
             newOpts.quoteStyle = opts.quoteStyle;
           }
           return inspect_(value, newOpts, depth + 1, seen);
@@ -16032,7 +16032,7 @@ var require_object_inspect = __commonJS({
         s2 += "</" + $toLowerCase.call(String(obj.nodeName)) + ">";
         return s2;
       }
-      if (isArray2(obj)) {
+      if (isArray3(obj)) {
         if (obj.length === 0) {
           return "[]";
         }
@@ -16132,7 +16132,7 @@ var require_object_inspect = __commonJS({
     function canTrustToString(obj) {
       return !toStringTag || !(typeof obj === "object" && (toStringTag in obj || typeof obj[toStringTag] !== "undefined"));
     }
-    function isArray2(obj) {
+    function isArray3(obj) {
       return toStr(obj) === "[object Array]" && canTrustToString(obj);
     }
     function isDate(obj) {
@@ -16181,11 +16181,11 @@ var require_object_inspect = __commonJS({
       }
       return false;
     }
-    var hasOwn2 = Object.prototype.hasOwnProperty || function(key) {
+    var hasOwn3 = Object.prototype.hasOwnProperty || function(key) {
       return key in this;
     };
-    function has2(obj, key) {
-      return hasOwn2.call(obj, key);
+    function has3(obj, key) {
+      return hasOwn3.call(obj, key);
     }
     function toStr(obj) {
       return objectToString.call(obj);
@@ -16295,15 +16295,15 @@ var require_object_inspect = __commonJS({
       }
       return typeof x.nodeName === "string" && typeof x.getAttribute === "function";
     }
-    function inspectString(str3, opts) {
-      if (str3.length > opts.maxStringLength) {
-        var remaining = str3.length - opts.maxStringLength;
+    function inspectString(str4, opts) {
+      if (str4.length > opts.maxStringLength) {
+        var remaining = str4.length - opts.maxStringLength;
         var trailer = "... " + remaining + " more character" + (remaining > 1 ? "s" : "");
-        return inspectString($slice.call(str3, 0, opts.maxStringLength), opts) + trailer;
+        return inspectString($slice.call(str4, 0, opts.maxStringLength), opts) + trailer;
       }
       var quoteRE = quoteREs[opts.quoteStyle || "single"];
       quoteRE.lastIndex = 0;
-      var s2 = $replace.call($replace.call(str3, quoteRE, "\\$1"), /[\x00-\x1f]/g, lowbyte);
+      var s2 = $replace.call($replace.call(str4, quoteRE, "\\$1"), /[\x00-\x1f]/g, lowbyte);
       return wrapQuotes(s2, "single", opts);
     }
     function lowbyte(c) {
@@ -16320,8 +16320,8 @@ var require_object_inspect = __commonJS({
       }
       return "\\x" + (n < 16 ? "0" : "") + $toUpperCase.call(n.toString(16));
     }
-    function markBoxed(str3) {
-      return "Object(" + str3 + ")";
+    function markBoxed(str4) {
+      return "Object(" + str4 + ")";
     }
     function weakCollectionOf(type) {
       return type + " { ? }";
@@ -16360,12 +16360,12 @@ var require_object_inspect = __commonJS({
       return lineJoiner + $join.call(xs, "," + lineJoiner) + "\n" + indent.prev;
     }
     function arrObjKeys(obj, inspect) {
-      var isArr = isArray2(obj);
+      var isArr = isArray3(obj);
       var xs = [];
       if (isArr) {
         xs.length = obj.length;
         for (var i = 0; i < obj.length; i++) {
-          xs[i] = has2(obj, i) ? inspect(obj[i], obj) : "";
+          xs[i] = has3(obj, i) ? inspect(obj[i], obj) : "";
         }
       }
       var syms = typeof gOPS === "function" ? gOPS(obj) : [];
@@ -16377,7 +16377,7 @@ var require_object_inspect = __commonJS({
         }
       }
       for (var key in obj) {
-        if (!has2(obj, key)) {
+        if (!has3(obj, key)) {
           continue;
         }
         if (isArr && String(Number(key)) === key && key < obj.length) {
@@ -16786,14 +16786,14 @@ var require_implementation = __commonJS({
       return arr;
     };
     var joiny = function(arr, joiner) {
-      var str3 = "";
+      var str4 = "";
       for (var i = 0; i < arr.length; i += 1) {
-        str3 += arr[i];
+        str4 += arr[i];
         if (i + 1 < arr.length) {
-          str3 += joiner;
+          str4 += joiner;
         }
       }
-      return str3;
+      return str4;
     };
     module.exports = function bind(that) {
       var target = this;
@@ -17182,7 +17182,7 @@ var require_get_intrinsic = __commonJS({
       "%WeakSetPrototype%": ["WeakSet", "prototype"]
     };
     var bind = require_function_bind();
-    var hasOwn2 = require_hasown();
+    var hasOwn3 = require_hasown();
     var $concat = bind.call($call, Array.prototype.concat);
     var $spliceApply = bind.call($apply, Array.prototype.splice);
     var $replace = bind.call($call, String.prototype.replace);
@@ -17207,11 +17207,11 @@ var require_get_intrinsic = __commonJS({
     var getBaseIntrinsic = function getBaseIntrinsic2(name, allowMissing) {
       var intrinsicName = name;
       var alias;
-      if (hasOwn2(LEGACY_ALIASES, intrinsicName)) {
+      if (hasOwn3(LEGACY_ALIASES, intrinsicName)) {
         alias = LEGACY_ALIASES[intrinsicName];
         intrinsicName = "%" + alias[0] + "%";
       }
-      if (hasOwn2(INTRINSICS, intrinsicName)) {
+      if (hasOwn3(INTRINSICS, intrinsicName)) {
         var value = INTRINSICS[intrinsicName];
         if (value === needsEval) {
           value = doEval(intrinsicName);
@@ -17260,7 +17260,7 @@ var require_get_intrinsic = __commonJS({
         }
         intrinsicBaseName += "." + part;
         intrinsicRealName = "%" + intrinsicBaseName + "%";
-        if (hasOwn2(INTRINSICS, intrinsicRealName)) {
+        if (hasOwn3(INTRINSICS, intrinsicRealName)) {
           value = INTRINSICS[intrinsicRealName];
         } else if (value != null) {
           if (!(part in value)) {
@@ -17278,7 +17278,7 @@ var require_get_intrinsic = __commonJS({
               value = value[part];
             }
           } else {
-            isOwn = hasOwn2(value, part);
+            isOwn = hasOwn3(value, part);
             value = value[part];
           }
           if (isOwn && !skipFurtherCaching) {
@@ -17514,8 +17514,8 @@ var require_utils2 = __commonJS({
     "use strict";
     var formats = require_formats();
     var getSideChannel = require_side_channel();
-    var has2 = Object.prototype.hasOwnProperty;
-    var isArray2 = Array.isArray;
+    var has3 = Object.prototype.hasOwnProperty;
+    var isArray3 = Array.isArray;
     var overflowChannel = getSideChannel();
     var markOverflow = function markOverflow2(obj, maxIndex) {
       overflowChannel.set(obj, maxIndex);
@@ -17541,7 +17541,7 @@ var require_utils2 = __commonJS({
       while (queue.length > 1) {
         var item = queue.pop();
         var obj = item.obj[item.prop];
-        if (isArray2(obj)) {
+        if (isArray3(obj)) {
           var compacted = [];
           for (var j = 0; j < obj.length; ++j) {
             if (typeof obj[j] !== "undefined") {
@@ -17566,7 +17566,7 @@ var require_utils2 = __commonJS({
         return target;
       }
       if (typeof source !== "object" && typeof source !== "function") {
-        if (isArray2(target)) {
+        if (isArray3(target)) {
           var nextIndex = target.length;
           if (options && typeof options.arrayLimit === "number" && nextIndex > options.arrayLimit) {
             return markOverflow(arrayToObject(target.concat(source), options), nextIndex);
@@ -17579,7 +17579,7 @@ var require_utils2 = __commonJS({
             setMaxIndex(target, newIndex);
           } else if (options && options.strictMerge) {
             return [target, source];
-          } else if (options && (options.plainObjects || options.allowPrototypes) || !has2.call(Object.prototype, source)) {
+          } else if (options && (options.plainObjects || options.allowPrototypes) || !has3.call(Object.prototype, source)) {
             target[source] = true;
           }
         } else {
@@ -17604,12 +17604,12 @@ var require_utils2 = __commonJS({
         return combined;
       }
       var mergeTarget = target;
-      if (isArray2(target) && !isArray2(source)) {
+      if (isArray3(target) && !isArray3(source)) {
         mergeTarget = arrayToObject(target, options);
       }
-      if (isArray2(target) && isArray2(source)) {
+      if (isArray3(target) && isArray3(source)) {
         source.forEach(function(item, i) {
-          if (has2.call(target, i)) {
+          if (has3.call(target, i)) {
             var targetItem = target[i];
             if (targetItem && typeof targetItem === "object" && item && typeof item === "object") {
               target[i] = merge3(targetItem, item, options);
@@ -17624,7 +17624,7 @@ var require_utils2 = __commonJS({
       }
       return Object.keys(source).reduce(function(acc, key) {
         var value = source[key];
-        if (has2.call(acc, key)) {
+        if (has3.call(acc, key)) {
           acc[key] = merge3(acc[key], value, options);
         } else {
           acc[key] = value;
@@ -17647,8 +17647,8 @@ var require_utils2 = __commonJS({
         return acc;
       }, target);
     };
-    var decode = function(str3, defaultDecoder, charset) {
-      var strWithoutPlus = str3.replace(/\+/g, " ");
+    var decode = function(str4, defaultDecoder, charset) {
+      var strWithoutPlus = str4.replace(/\+/g, " ");
       if (charset === "iso-8859-1") {
         return strWithoutPlus.replace(/%[0-9a-f]{2}/gi, unescape);
       }
@@ -17658,16 +17658,16 @@ var require_utils2 = __commonJS({
         return strWithoutPlus;
       }
     };
-    var limit2 = 1024;
-    var encode2 = function encode3(str3, defaultEncoder, charset, kind, format) {
-      if (str3.length === 0) {
-        return str3;
+    var limit3 = 1024;
+    var encode3 = function encode4(str4, defaultEncoder, charset, kind, format) {
+      if (str4.length === 0) {
+        return str4;
       }
-      var string4 = str3;
-      if (typeof str3 === "symbol") {
-        string4 = Symbol.prototype.toString.call(str3);
-      } else if (typeof str3 !== "string") {
-        string4 = String(str3);
+      var string4 = str4;
+      if (typeof str4 === "symbol") {
+        string4 = Symbol.prototype.toString.call(str4);
+      } else if (typeof str4 !== "string") {
+        string4 = String(str4);
       }
       if (charset === "iso-8859-1") {
         return escape(string4).replace(/%u[0-9a-f]{4}/gi, function($0) {
@@ -17675,8 +17675,8 @@ var require_utils2 = __commonJS({
         });
       }
       var out = "";
-      for (var j = 0; j < string4.length; j += limit2) {
-        var segment = string4.length >= limit2 ? string4.slice(j, j + limit2) : string4;
+      for (var j = 0; j < string4.length; j += limit3) {
+        var segment = string4.length >= limit3 ? string4.slice(j, j + limit3) : string4;
         var arr = [];
         for (var i = 0; i < segment.length; ++i) {
           var c = segment.charCodeAt(i);
@@ -17746,7 +17746,7 @@ var require_utils2 = __commonJS({
       return result;
     };
     var maybeMap = function maybeMap2(val, fn) {
-      if (isArray2(val)) {
+      if (isArray3(val)) {
         var mapped = [];
         for (var i = 0; i < val.length; i += 1) {
           mapped[mapped.length] = fn(val[i]);
@@ -17761,7 +17761,7 @@ var require_utils2 = __commonJS({
       combine: combine2,
       compact,
       decode,
-      encode: encode2,
+      encode: encode3,
       isBuffer,
       isOverflow,
       isRegExp,
@@ -17779,7 +17779,7 @@ var require_stringify = __commonJS({
     var getSideChannel = require_side_channel();
     var utils = require_utils2();
     var formats = require_formats();
-    var has2 = Object.prototype.hasOwnProperty;
+    var has3 = Object.prototype.hasOwnProperty;
     var arrayPrefixGenerators = {
       brackets: function brackets(prefix) {
         return prefix + "[]";
@@ -17792,14 +17792,14 @@ var require_stringify = __commonJS({
         return prefix;
       }
     };
-    var isArray2 = Array.isArray;
+    var isArray3 = Array.isArray;
     var push = Array.prototype.push;
     var pushToArray = function(arr, valueOrArray) {
-      push.apply(arr, isArray2(valueOrArray) ? valueOrArray : [valueOrArray]);
+      push.apply(arr, isArray3(valueOrArray) ? valueOrArray : [valueOrArray]);
     };
     var toISO = Date.prototype.toISOString;
     var defaultFormat = formats["default"];
-    var defaults3 = {
+    var defaults4 = {
       addQueryPrefix: false,
       allowDots: false,
       allowEmptyArrays: false,
@@ -17826,13 +17826,13 @@ var require_stringify = __commonJS({
     var isNonNullishPrimitive = function isNonNullishPrimitive2(v) {
       return typeof v === "string" || typeof v === "number" || typeof v === "boolean" || typeof v === "symbol" || typeof v === "bigint";
     };
-    var sentinel2 = {};
-    var stringify3 = function stringify4(object2, prefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, sideChannel) {
+    var sentinel3 = {};
+    var stringify4 = function stringify5(object2, prefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, sideChannel) {
       var obj = object2;
       var tmpSc = sideChannel;
       var step = 0;
       var findFlag = false;
-      while ((tmpSc = tmpSc.get(sentinel2)) !== void 0 && !findFlag) {
+      while ((tmpSc = tmpSc.get(sentinel3)) !== void 0 && !findFlag) {
         var pos = tmpSc.get(object2);
         step += 1;
         if (typeof pos !== "undefined") {
@@ -17842,7 +17842,7 @@ var require_stringify = __commonJS({
             findFlag = true;
           }
         }
-        if (typeof tmpSc.get(sentinel2) === "undefined") {
+        if (typeof tmpSc.get(sentinel3) === "undefined") {
           step = 0;
         }
       }
@@ -17850,7 +17850,7 @@ var require_stringify = __commonJS({
         obj = filter(prefix, obj);
       } else if (obj instanceof Date) {
         obj = serializeDate(obj);
-      } else if (generateArrayPrefix === "comma" && isArray2(obj)) {
+      } else if (generateArrayPrefix === "comma" && isArray3(obj)) {
         obj = utils.maybeMap(obj, function(value2) {
           if (value2 instanceof Date) {
             return serializeDate(value2);
@@ -17860,14 +17860,14 @@ var require_stringify = __commonJS({
       }
       if (obj === null) {
         if (strictNullHandling) {
-          return encoder && !encodeValuesOnly ? encoder(prefix, defaults3.encoder, charset, "key", format) : prefix;
+          return encoder && !encodeValuesOnly ? encoder(prefix, defaults4.encoder, charset, "key", format) : prefix;
         }
         obj = "";
       }
       if (isNonNullishPrimitive(obj) || utils.isBuffer(obj)) {
         if (encoder) {
-          var keyValue = encodeValuesOnly ? prefix : encoder(prefix, defaults3.encoder, charset, "key", format);
-          return [formatter(keyValue) + "=" + formatter(encoder(obj, defaults3.encoder, charset, "value", format))];
+          var keyValue = encodeValuesOnly ? prefix : encoder(prefix, defaults4.encoder, charset, "key", format);
+          return [formatter(keyValue) + "=" + formatter(encoder(obj, defaults4.encoder, charset, "value", format))];
         }
         return [formatter(prefix) + "=" + formatter(String(obj))];
       }
@@ -17876,20 +17876,20 @@ var require_stringify = __commonJS({
         return values;
       }
       var objKeys;
-      if (generateArrayPrefix === "comma" && isArray2(obj)) {
+      if (generateArrayPrefix === "comma" && isArray3(obj)) {
         if (encodeValuesOnly && encoder) {
           obj = utils.maybeMap(obj, encoder);
         }
         objKeys = [{ value: obj.length > 0 ? obj.join(",") || null : void 0 }];
-      } else if (isArray2(filter)) {
+      } else if (isArray3(filter)) {
         objKeys = filter;
       } else {
         var keys = Object.keys(obj);
         objKeys = sort ? keys.sort(sort) : keys;
       }
       var encodedPrefix = encodeDotInKeys ? String(prefix).replace(/\./g, "%2E") : String(prefix);
-      var adjustedPrefix = commaRoundTrip && isArray2(obj) && obj.length === 1 ? encodedPrefix + "[]" : encodedPrefix;
-      if (allowEmptyArrays && isArray2(obj) && obj.length === 0) {
+      var adjustedPrefix = commaRoundTrip && isArray3(obj) && obj.length === 1 ? encodedPrefix + "[]" : encodedPrefix;
+      if (allowEmptyArrays && isArray3(obj) && obj.length === 0) {
         return adjustedPrefix + "[]";
       }
       for (var j = 0; j < objKeys.length; ++j) {
@@ -17899,11 +17899,11 @@ var require_stringify = __commonJS({
           continue;
         }
         var encodedKey = allowDots && encodeDotInKeys ? String(key).replace(/\./g, "%2E") : String(key);
-        var keyPrefix = isArray2(obj) ? typeof generateArrayPrefix === "function" ? generateArrayPrefix(adjustedPrefix, encodedKey) : adjustedPrefix : adjustedPrefix + (allowDots ? "." + encodedKey : "[" + encodedKey + "]");
+        var keyPrefix = isArray3(obj) ? typeof generateArrayPrefix === "function" ? generateArrayPrefix(adjustedPrefix, encodedKey) : adjustedPrefix : adjustedPrefix + (allowDots ? "." + encodedKey : "[" + encodedKey + "]");
         sideChannel.set(object2, step);
         var valueSideChannel = getSideChannel();
-        valueSideChannel.set(sentinel2, sideChannel);
-        pushToArray(values, stringify4(
+        valueSideChannel.set(sentinel3, sideChannel);
+        pushToArray(values, stringify5(
           value,
           keyPrefix,
           generateArrayPrefix,
@@ -17912,7 +17912,7 @@ var require_stringify = __commonJS({
           strictNullHandling,
           skipNulls,
           encodeDotInKeys,
-          generateArrayPrefix === "comma" && encodeValuesOnly && isArray2(obj) ? null : encoder,
+          generateArrayPrefix === "comma" && encodeValuesOnly && isArray3(obj) ? null : encoder,
           filter,
           sort,
           allowDots,
@@ -17928,7 +17928,7 @@ var require_stringify = __commonJS({
     };
     var normalizeStringifyOptions = function normalizeStringifyOptions2(opts) {
       if (!opts) {
-        return defaults3;
+        return defaults4;
       }
       if (typeof opts.allowEmptyArrays !== "undefined" && typeof opts.allowEmptyArrays !== "boolean") {
         throw new TypeError("`allowEmptyArrays` option can only be `true` or `false`, when provided");
@@ -17939,20 +17939,20 @@ var require_stringify = __commonJS({
       if (opts.encoder !== null && typeof opts.encoder !== "undefined" && typeof opts.encoder !== "function") {
         throw new TypeError("Encoder has to be a function.");
       }
-      var charset = opts.charset || defaults3.charset;
+      var charset = opts.charset || defaults4.charset;
       if (typeof opts.charset !== "undefined" && opts.charset !== "utf-8" && opts.charset !== "iso-8859-1") {
         throw new TypeError("The charset option must be either utf-8, iso-8859-1, or undefined");
       }
       var format = formats["default"];
       if (typeof opts.format !== "undefined") {
-        if (!has2.call(formats.formatters, opts.format)) {
+        if (!has3.call(formats.formatters, opts.format)) {
           throw new TypeError("Unknown format option provided.");
         }
         format = opts.format;
       }
       var formatter = formats.formatters[format];
-      var filter = defaults3.filter;
-      if (typeof opts.filter === "function" || isArray2(opts.filter)) {
+      var filter = defaults4.filter;
+      if (typeof opts.filter === "function" || isArray3(opts.filter)) {
         filter = opts.filter;
       }
       var arrayFormat;
@@ -17961,32 +17961,32 @@ var require_stringify = __commonJS({
       } else if ("indices" in opts) {
         arrayFormat = opts.indices ? "indices" : "repeat";
       } else {
-        arrayFormat = defaults3.arrayFormat;
+        arrayFormat = defaults4.arrayFormat;
       }
       if ("commaRoundTrip" in opts && typeof opts.commaRoundTrip !== "boolean") {
         throw new TypeError("`commaRoundTrip` must be a boolean, or absent");
       }
-      var allowDots = typeof opts.allowDots === "undefined" ? opts.encodeDotInKeys === true ? true : defaults3.allowDots : !!opts.allowDots;
+      var allowDots = typeof opts.allowDots === "undefined" ? opts.encodeDotInKeys === true ? true : defaults4.allowDots : !!opts.allowDots;
       return {
-        addQueryPrefix: typeof opts.addQueryPrefix === "boolean" ? opts.addQueryPrefix : defaults3.addQueryPrefix,
+        addQueryPrefix: typeof opts.addQueryPrefix === "boolean" ? opts.addQueryPrefix : defaults4.addQueryPrefix,
         allowDots,
-        allowEmptyArrays: typeof opts.allowEmptyArrays === "boolean" ? !!opts.allowEmptyArrays : defaults3.allowEmptyArrays,
+        allowEmptyArrays: typeof opts.allowEmptyArrays === "boolean" ? !!opts.allowEmptyArrays : defaults4.allowEmptyArrays,
         arrayFormat,
         charset,
-        charsetSentinel: typeof opts.charsetSentinel === "boolean" ? opts.charsetSentinel : defaults3.charsetSentinel,
+        charsetSentinel: typeof opts.charsetSentinel === "boolean" ? opts.charsetSentinel : defaults4.charsetSentinel,
         commaRoundTrip: !!opts.commaRoundTrip,
-        delimiter: typeof opts.delimiter === "undefined" ? defaults3.delimiter : opts.delimiter,
-        encode: typeof opts.encode === "boolean" ? opts.encode : defaults3.encode,
-        encodeDotInKeys: typeof opts.encodeDotInKeys === "boolean" ? opts.encodeDotInKeys : defaults3.encodeDotInKeys,
-        encoder: typeof opts.encoder === "function" ? opts.encoder : defaults3.encoder,
-        encodeValuesOnly: typeof opts.encodeValuesOnly === "boolean" ? opts.encodeValuesOnly : defaults3.encodeValuesOnly,
+        delimiter: typeof opts.delimiter === "undefined" ? defaults4.delimiter : opts.delimiter,
+        encode: typeof opts.encode === "boolean" ? opts.encode : defaults4.encode,
+        encodeDotInKeys: typeof opts.encodeDotInKeys === "boolean" ? opts.encodeDotInKeys : defaults4.encodeDotInKeys,
+        encoder: typeof opts.encoder === "function" ? opts.encoder : defaults4.encoder,
+        encodeValuesOnly: typeof opts.encodeValuesOnly === "boolean" ? opts.encodeValuesOnly : defaults4.encodeValuesOnly,
         filter,
         format,
         formatter,
-        serializeDate: typeof opts.serializeDate === "function" ? opts.serializeDate : defaults3.serializeDate,
-        skipNulls: typeof opts.skipNulls === "boolean" ? opts.skipNulls : defaults3.skipNulls,
+        serializeDate: typeof opts.serializeDate === "function" ? opts.serializeDate : defaults4.serializeDate,
+        skipNulls: typeof opts.skipNulls === "boolean" ? opts.skipNulls : defaults4.skipNulls,
         sort: typeof opts.sort === "function" ? opts.sort : null,
-        strictNullHandling: typeof opts.strictNullHandling === "boolean" ? opts.strictNullHandling : defaults3.strictNullHandling
+        strictNullHandling: typeof opts.strictNullHandling === "boolean" ? opts.strictNullHandling : defaults4.strictNullHandling
       };
     };
     module.exports = function(object2, opts) {
@@ -17997,7 +17997,7 @@ var require_stringify = __commonJS({
       if (typeof options.filter === "function") {
         filter = options.filter;
         obj = filter("", obj);
-      } else if (isArray2(options.filter)) {
+      } else if (isArray3(options.filter)) {
         filter = options.filter;
         objKeys = filter;
       }
@@ -18020,7 +18020,7 @@ var require_stringify = __commonJS({
         if (options.skipNulls && value === null) {
           continue;
         }
-        pushToArray(keys, stringify3(
+        pushToArray(keys, stringify4(
           value,
           key,
           generateArrayPrefix,
@@ -18060,9 +18060,9 @@ var require_parse = __commonJS({
   "../../node_modules/.pnpm/qs@6.15.1/node_modules/qs/lib/parse.js"(exports, module) {
     "use strict";
     var utils = require_utils2();
-    var has2 = Object.prototype.hasOwnProperty;
-    var isArray2 = Array.isArray;
-    var defaults3 = {
+    var has3 = Object.prototype.hasOwnProperty;
+    var isArray3 = Array.isArray;
+    var defaults4 = {
       allowDots: false,
       allowEmptyArrays: false,
       allowPrototypes: false,
@@ -18086,8 +18086,8 @@ var require_parse = __commonJS({
       strictNullHandling: false,
       throwOnLimitExceeded: false
     };
-    var interpretNumericEntities = function(str3) {
-      return str3.replace(/&#(\d+);/g, function($0, numberStr) {
+    var interpretNumericEntities = function(str4) {
+      return str4.replace(/&#(\d+);/g, function($0, numberStr) {
         return String.fromCharCode(parseInt(numberStr, 10));
       });
     };
@@ -18102,17 +18102,17 @@ var require_parse = __commonJS({
     };
     var isoSentinel = "utf8=%26%2310003%3B";
     var charsetSentinel = "utf8=%E2%9C%93";
-    var parseValues = function parseQueryStringValues(str3, options) {
+    var parseValues = function parseQueryStringValues(str4, options) {
       var obj = { __proto__: null };
-      var cleanStr = options.ignoreQueryPrefix ? str3.replace(/^\?/, "") : str3;
+      var cleanStr = options.ignoreQueryPrefix ? str4.replace(/^\?/, "") : str4;
       cleanStr = cleanStr.replace(/%5B/gi, "[").replace(/%5D/gi, "]");
-      var limit2 = options.parameterLimit === Infinity ? void 0 : options.parameterLimit;
+      var limit3 = options.parameterLimit === Infinity ? void 0 : options.parameterLimit;
       var parts = cleanStr.split(
         options.delimiter,
-        options.throwOnLimitExceeded && typeof limit2 !== "undefined" ? limit2 + 1 : limit2
+        options.throwOnLimitExceeded && typeof limit3 !== "undefined" ? limit3 + 1 : limit3
       );
-      if (options.throwOnLimitExceeded && typeof limit2 !== "undefined" && parts.length > limit2) {
-        throw new RangeError("Parameter limit exceeded. Only " + limit2 + " parameter" + (limit2 === 1 ? "" : "s") + " allowed.");
+      if (options.throwOnLimitExceeded && typeof limit3 !== "undefined" && parts.length > limit3) {
+        throw new RangeError("Parameter limit exceeded. Only " + limit3 + " parameter" + (limit3 === 1 ? "" : "s") + " allowed.");
       }
       var skipIndex = -1;
       var i;
@@ -18140,19 +18140,19 @@ var require_parse = __commonJS({
         var key;
         var val;
         if (pos === -1) {
-          key = options.decoder(part, defaults3.decoder, charset, "key");
+          key = options.decoder(part, defaults4.decoder, charset, "key");
           val = options.strictNullHandling ? null : "";
         } else {
-          key = options.decoder(part.slice(0, pos), defaults3.decoder, charset, "key");
+          key = options.decoder(part.slice(0, pos), defaults4.decoder, charset, "key");
           if (key !== null) {
             val = utils.maybeMap(
               parseArrayValue(
                 part.slice(pos + 1),
                 options,
-                isArray2(obj[key]) ? obj[key].length : 0
+                isArray3(obj[key]) ? obj[key].length : 0
               ),
               function(encodedVal) {
-                return options.decoder(encodedVal, defaults3.decoder, charset, "value");
+                return options.decoder(encodedVal, defaults4.decoder, charset, "value");
               }
             );
           }
@@ -18161,16 +18161,16 @@ var require_parse = __commonJS({
           val = interpretNumericEntities(String(val));
         }
         if (part.indexOf("[]=") > -1) {
-          val = isArray2(val) ? [val] : val;
+          val = isArray3(val) ? [val] : val;
         }
-        if (options.comma && isArray2(val) && val.length > options.arrayLimit) {
+        if (options.comma && isArray3(val) && val.length > options.arrayLimit) {
           if (options.throwOnLimitExceeded) {
             throw new RangeError("Array limit exceeded. Only " + options.arrayLimit + " element" + (options.arrayLimit === 1 ? "" : "s") + " allowed in an array.");
           }
           val = utils.combine([], val, options.arrayLimit, options.plainObjects);
         }
         if (key !== null) {
-          var existing = has2.call(obj, key);
+          var existing = has3.call(obj, key);
           if (existing && (options.duplicates === "combine" || part.indexOf("[]=") > -1)) {
             obj[key] = utils.combine(
               obj[key],
@@ -18233,7 +18233,7 @@ var require_parse = __commonJS({
     var splitKeyIntoSegments = function splitKeyIntoSegments2(givenKey, options) {
       var key = options.allowDots ? givenKey.replace(/\.([^.[]+)/g, "[$1]") : givenKey;
       if (options.depth <= 0) {
-        if (!options.plainObjects && has2.call(Object.prototype, key)) {
+        if (!options.plainObjects && has3.call(Object.prototype, key)) {
           if (!options.allowPrototypes) {
             return;
           }
@@ -18246,7 +18246,7 @@ var require_parse = __commonJS({
       var parent = segment ? key.slice(0, segment.index) : key;
       var keys = [];
       if (parent) {
-        if (!options.plainObjects && has2.call(Object.prototype, parent)) {
+        if (!options.plainObjects && has3.call(Object.prototype, parent)) {
           if (!options.allowPrototypes) {
             return;
           }
@@ -18257,7 +18257,7 @@ var require_parse = __commonJS({
       while ((segment = child.exec(key)) !== null && i < options.depth) {
         i += 1;
         var segmentContent = segment[1].slice(1, -1);
-        if (!options.plainObjects && has2.call(Object.prototype, segmentContent)) {
+        if (!options.plainObjects && has3.call(Object.prototype, segmentContent)) {
           if (!options.allowPrototypes) {
             return;
           }
@@ -18284,7 +18284,7 @@ var require_parse = __commonJS({
     };
     var normalizeParseOptions = function normalizeParseOptions2(opts) {
       if (!opts) {
-        return defaults3;
+        return defaults4;
       }
       if (typeof opts.allowEmptyArrays !== "undefined" && typeof opts.allowEmptyArrays !== "boolean") {
         throw new TypeError("`allowEmptyArrays` option can only be `true` or `false`, when provided");
@@ -18301,49 +18301,49 @@ var require_parse = __commonJS({
       if (typeof opts.throwOnLimitExceeded !== "undefined" && typeof opts.throwOnLimitExceeded !== "boolean") {
         throw new TypeError("`throwOnLimitExceeded` option must be a boolean");
       }
-      var charset = typeof opts.charset === "undefined" ? defaults3.charset : opts.charset;
-      var duplicates = typeof opts.duplicates === "undefined" ? defaults3.duplicates : opts.duplicates;
+      var charset = typeof opts.charset === "undefined" ? defaults4.charset : opts.charset;
+      var duplicates = typeof opts.duplicates === "undefined" ? defaults4.duplicates : opts.duplicates;
       if (duplicates !== "combine" && duplicates !== "first" && duplicates !== "last") {
         throw new TypeError("The duplicates option must be either combine, first, or last");
       }
-      var allowDots = typeof opts.allowDots === "undefined" ? opts.decodeDotInKeys === true ? true : defaults3.allowDots : !!opts.allowDots;
+      var allowDots = typeof opts.allowDots === "undefined" ? opts.decodeDotInKeys === true ? true : defaults4.allowDots : !!opts.allowDots;
       return {
         allowDots,
-        allowEmptyArrays: typeof opts.allowEmptyArrays === "boolean" ? !!opts.allowEmptyArrays : defaults3.allowEmptyArrays,
-        allowPrototypes: typeof opts.allowPrototypes === "boolean" ? opts.allowPrototypes : defaults3.allowPrototypes,
-        allowSparse: typeof opts.allowSparse === "boolean" ? opts.allowSparse : defaults3.allowSparse,
-        arrayLimit: typeof opts.arrayLimit === "number" ? opts.arrayLimit : defaults3.arrayLimit,
+        allowEmptyArrays: typeof opts.allowEmptyArrays === "boolean" ? !!opts.allowEmptyArrays : defaults4.allowEmptyArrays,
+        allowPrototypes: typeof opts.allowPrototypes === "boolean" ? opts.allowPrototypes : defaults4.allowPrototypes,
+        allowSparse: typeof opts.allowSparse === "boolean" ? opts.allowSparse : defaults4.allowSparse,
+        arrayLimit: typeof opts.arrayLimit === "number" ? opts.arrayLimit : defaults4.arrayLimit,
         charset,
-        charsetSentinel: typeof opts.charsetSentinel === "boolean" ? opts.charsetSentinel : defaults3.charsetSentinel,
-        comma: typeof opts.comma === "boolean" ? opts.comma : defaults3.comma,
-        decodeDotInKeys: typeof opts.decodeDotInKeys === "boolean" ? opts.decodeDotInKeys : defaults3.decodeDotInKeys,
-        decoder: typeof opts.decoder === "function" ? opts.decoder : defaults3.decoder,
-        delimiter: typeof opts.delimiter === "string" || utils.isRegExp(opts.delimiter) ? opts.delimiter : defaults3.delimiter,
+        charsetSentinel: typeof opts.charsetSentinel === "boolean" ? opts.charsetSentinel : defaults4.charsetSentinel,
+        comma: typeof opts.comma === "boolean" ? opts.comma : defaults4.comma,
+        decodeDotInKeys: typeof opts.decodeDotInKeys === "boolean" ? opts.decodeDotInKeys : defaults4.decodeDotInKeys,
+        decoder: typeof opts.decoder === "function" ? opts.decoder : defaults4.decoder,
+        delimiter: typeof opts.delimiter === "string" || utils.isRegExp(opts.delimiter) ? opts.delimiter : defaults4.delimiter,
         // eslint-disable-next-line no-implicit-coercion, no-extra-parens
-        depth: typeof opts.depth === "number" || opts.depth === false ? +opts.depth : defaults3.depth,
+        depth: typeof opts.depth === "number" || opts.depth === false ? +opts.depth : defaults4.depth,
         duplicates,
         ignoreQueryPrefix: opts.ignoreQueryPrefix === true,
-        interpretNumericEntities: typeof opts.interpretNumericEntities === "boolean" ? opts.interpretNumericEntities : defaults3.interpretNumericEntities,
-        parameterLimit: typeof opts.parameterLimit === "number" ? opts.parameterLimit : defaults3.parameterLimit,
+        interpretNumericEntities: typeof opts.interpretNumericEntities === "boolean" ? opts.interpretNumericEntities : defaults4.interpretNumericEntities,
+        parameterLimit: typeof opts.parameterLimit === "number" ? opts.parameterLimit : defaults4.parameterLimit,
         parseArrays: opts.parseArrays !== false,
-        plainObjects: typeof opts.plainObjects === "boolean" ? opts.plainObjects : defaults3.plainObjects,
-        strictDepth: typeof opts.strictDepth === "boolean" ? !!opts.strictDepth : defaults3.strictDepth,
-        strictMerge: typeof opts.strictMerge === "boolean" ? !!opts.strictMerge : defaults3.strictMerge,
-        strictNullHandling: typeof opts.strictNullHandling === "boolean" ? opts.strictNullHandling : defaults3.strictNullHandling,
+        plainObjects: typeof opts.plainObjects === "boolean" ? opts.plainObjects : defaults4.plainObjects,
+        strictDepth: typeof opts.strictDepth === "boolean" ? !!opts.strictDepth : defaults4.strictDepth,
+        strictMerge: typeof opts.strictMerge === "boolean" ? !!opts.strictMerge : defaults4.strictMerge,
+        strictNullHandling: typeof opts.strictNullHandling === "boolean" ? opts.strictNullHandling : defaults4.strictNullHandling,
         throwOnLimitExceeded: typeof opts.throwOnLimitExceeded === "boolean" ? opts.throwOnLimitExceeded : false
       };
     };
-    module.exports = function(str3, opts) {
+    module.exports = function(str4, opts) {
       var options = normalizeParseOptions(opts);
-      if (str3 === "" || str3 === null || typeof str3 === "undefined") {
+      if (str4 === "" || str4 === null || typeof str4 === "undefined") {
         return options.plainObjects ? { __proto__: null } : {};
       }
-      var tempObj = typeof str3 === "string" ? parseValues(str3, options) : str3;
+      var tempObj = typeof str4 === "string" ? parseValues(str4, options) : str4;
       var obj = options.plainObjects ? { __proto__: null } : {};
       var keys = Object.keys(tempObj);
       for (var i = 0; i < keys.length; ++i) {
         var key = keys[i];
-        var newObj = parseKeys(key, tempObj[key], options, typeof str3 === "string");
+        var newObj = parseKeys(key, tempObj[key], options, typeof str4 === "string");
         obj = utils.merge(obj, newObj, options);
       }
       if (options.allowSparse === true) {
@@ -18358,13 +18358,13 @@ var require_parse = __commonJS({
 var require_lib2 = __commonJS({
   "../../node_modules/.pnpm/qs@6.15.1/node_modules/qs/lib/index.js"(exports, module) {
     "use strict";
-    var stringify3 = require_stringify();
+    var stringify4 = require_stringify();
     var parse4 = require_parse();
     var formats = require_formats();
     module.exports = {
       formats,
       parse: parse4,
-      stringify: stringify3
+      stringify: stringify4
     };
   }
 });
@@ -18444,12 +18444,12 @@ var require_urlencoded = __commonJS({
         }
       };
     }
-    function parameterCount(body, limit2) {
+    function parameterCount(body, limit3) {
       let count = 0;
       let index2 = -1;
       do {
         count++;
-        if (count > limit2) return void 0;
+        if (count > limit3) return void 0;
         index2 = body.indexOf("&", index2 + 1);
       } while (index2 !== -1);
       return count;
@@ -18533,17 +18533,17 @@ var require_escape_html = __commonJS({
     var matchHtmlRegExp = /["'&<>]/;
     module.exports = escapeHtml;
     function escapeHtml(string4) {
-      var str3 = "" + string4;
-      var match2 = matchHtmlRegExp.exec(str3);
+      var str4 = "" + string4;
+      var match2 = matchHtmlRegExp.exec(str4);
       if (!match2) {
-        return str3;
+        return str4;
       }
       var escape2;
       var html = "";
       var index2 = 0;
       var lastIndex = 0;
-      for (index2 = match2.index; index2 < str3.length; index2++) {
-        switch (str3.charCodeAt(index2)) {
+      for (index2 = match2.index; index2 < str4.length; index2++) {
+        switch (str4.charCodeAt(index2)) {
           case 34:
             escape2 = "&quot;";
             break;
@@ -18563,12 +18563,12 @@ var require_escape_html = __commonJS({
             continue;
         }
         if (lastIndex !== index2) {
-          html += str3.substring(lastIndex, index2);
+          html += str4.substring(lastIndex, index2);
         }
         lastIndex = index2 + 1;
         html += escape2;
       }
-      return lastIndex !== index2 ? html + str3.substring(lastIndex, index2) : html;
+      return lastIndex !== index2 ? html + str4.substring(lastIndex, index2) : html;
     }
   }
 });
@@ -18608,20 +18608,20 @@ var require_parseurl = __commonJS({
       parsed._raw = url3;
       return req._parsedOriginalUrl = parsed;
     }
-    function fastparse(str3) {
-      if (typeof str3 !== "string" || str3.charCodeAt(0) !== 47) {
-        return parse4(str3);
+    function fastparse(str4) {
+      if (typeof str4 !== "string" || str4.charCodeAt(0) !== 47) {
+        return parse4(str4);
       }
-      var pathname = str3;
+      var pathname = str4;
       var query = null;
       var search = null;
-      for (var i = 1; i < str3.length; i++) {
-        switch (str3.charCodeAt(i)) {
+      for (var i = 1; i < str4.length; i++) {
+        switch (str4.charCodeAt(i)) {
           case 63:
             if (search === null) {
-              pathname = str3.substring(0, i);
-              query = str3.substring(i + 1);
-              search = str3.substring(i);
+              pathname = str4.substring(0, i);
+              query = str4.substring(i + 1);
+              search = str4.substring(i);
             }
             break;
           case 9:
@@ -18638,12 +18638,12 @@ var require_parseurl = __commonJS({
           /* #  */
           case 160:
           case 65279:
-            return parse4(str3);
+            return parse4(str4);
         }
       }
       var url3 = Url !== void 0 ? new Url() : {};
-      url3.path = str3;
-      url3.href = str3;
+      url3.path = str4;
+      url3.href = str4;
       url3.pathname = pathname;
       if (search !== null) {
         url3.query = query;
@@ -18789,13 +18789,13 @@ var require_view = __commonJS({
   "../../node_modules/.pnpm/express@5.2.1/node_modules/express/lib/view.js"(exports, module) {
     "use strict";
     var debug7 = require_src()("express:view");
-    var path2 = __require("node:path");
+    var path3 = __require("node:path");
     var fs = __require("node:fs");
-    var dirname = path2.dirname;
-    var basename = path2.basename;
-    var extname = path2.extname;
-    var join = path2.join;
-    var resolve = path2.resolve;
+    var dirname = path3.dirname;
+    var basename = path3.basename;
+    var extname = path3.extname;
+    var join = path3.join;
+    var resolve = path3.resolve;
     module.exports = View2;
     function View2(name, options) {
       var opts = options || {};
@@ -18824,17 +18824,17 @@ var require_view = __commonJS({
       this.path = this.lookup(fileName);
     }
     View2.prototype.lookup = function lookup(name) {
-      var path3;
+      var path4;
       var roots = [].concat(this.root);
       debug7('lookup "%s"', name);
-      for (var i = 0; i < roots.length && !path3; i++) {
+      for (var i = 0; i < roots.length && !path4; i++) {
         var root = roots[i];
         var loc = resolve(root, name);
         var dir = dirname(loc);
         var file2 = basename(loc);
-        path3 = this.resolve(dir, file2);
+        path4 = this.resolve(dir, file2);
       }
-      return path3;
+      return path4;
     };
     View2.prototype.render = function render(options, callback) {
       var sync = true;
@@ -18856,21 +18856,21 @@ var require_view = __commonJS({
     };
     View2.prototype.resolve = function resolve2(dir, file2) {
       var ext = this.ext;
-      var path3 = join(dir, file2);
-      var stat = tryStat(path3);
+      var path4 = join(dir, file2);
+      var stat = tryStat(path4);
       if (stat && stat.isFile()) {
-        return path3;
+        return path4;
       }
-      path3 = join(dir, basename(file2, ext), "index" + ext);
-      stat = tryStat(path3);
+      path4 = join(dir, basename(file2, ext), "index" + ext);
+      stat = tryStat(path4);
       if (stat && stat.isFile()) {
-        return path3;
+        return path4;
       }
     };
-    function tryStat(path3) {
-      debug7('stat "%s"', path3);
+    function tryStat(path4) {
+      debug7('stat "%s"', path4);
       try {
-        return fs.statSync(path3);
+        return fs.statSync(path4);
       } catch (e) {
         return void 0;
       }
@@ -18883,14 +18883,14 @@ var require_etag = __commonJS({
   "../../node_modules/.pnpm/etag@1.8.1/node_modules/etag/index.js"(exports, module) {
     "use strict";
     module.exports = etag;
-    var crypto2 = __require("crypto");
+    var crypto3 = __require("crypto");
     var Stats = __require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto2.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto3.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -19656,11 +19656,11 @@ var require_proxy_addr = __commonJS({
     }
     function parseipNotation(note) {
       var pos = note.lastIndexOf("/");
-      var str3 = pos !== -1 ? note.substring(0, pos) : note;
-      if (!isip(str3)) {
-        throw new TypeError("invalid IP address: " + str3);
+      var str4 = pos !== -1 ? note.substring(0, pos) : note;
+      if (!isip(str4)) {
+        throw new TypeError("invalid IP address: " + str4);
       }
-      var ip = parseip(str3);
+      var ip = parseip(str4);
       if (pos === -1 && ip.kind() === "ipv6" && ip.isIPv4MappedAddress()) {
         ip = ip.toIPv4Address();
       }
@@ -19769,22 +19769,22 @@ var require_utils3 = __commonJS({
     exports.normalizeTypes = function(types3) {
       return types3.map(exports.normalizeType);
     };
-    function acceptParams(str3) {
-      var length = str3.length;
-      var colonIndex = str3.indexOf(";");
+    function acceptParams(str4) {
+      var length = str4.length;
+      var colonIndex = str4.indexOf(";");
       var index2 = colonIndex === -1 ? length : colonIndex;
-      var ret = { value: str3.slice(0, index2).trim(), quality: 1, params: {} };
+      var ret = { value: str4.slice(0, index2).trim(), quality: 1, params: {} };
       while (index2 < length) {
-        var splitIndex = str3.indexOf("=", index2);
+        var splitIndex = str4.indexOf("=", index2);
         if (splitIndex === -1) break;
-        var colonIndex = str3.indexOf(";", index2);
+        var colonIndex = str4.indexOf(";", index2);
         var endIndex = colonIndex === -1 ? length : colonIndex;
         if (splitIndex > endIndex) {
-          index2 = str3.lastIndexOf(";", splitIndex - 1) + 1;
+          index2 = str4.lastIndexOf(";", splitIndex - 1) + 1;
           continue;
         }
-        var key = str3.slice(index2, splitIndex).trim();
-        var value = str3.slice(splitIndex + 1, endIndex).trim();
+        var key = str4.slice(index2, splitIndex).trim();
+        var value = str4.slice(splitIndex + 1, endIndex).trim();
         if (key === "q") {
           ret.quality = parseFloat(value);
         } else {
@@ -19867,8 +19867,8 @@ var require_utils3 = __commonJS({
         return etag(buf, options);
       };
     }
-    function parseExtendedQueryString(str3) {
-      return qs.parse(str3, {
+    function parseExtendedQueryString(str4) {
+      return qs.parse(str4, {
         allowPrototypes: true
       });
     }
@@ -19970,17 +19970,17 @@ var require_dist = __commonJS({
     exports.compile = compile;
     exports.match = match2;
     exports.pathToRegexp = pathToRegexp2;
-    exports.stringify = stringify3;
+    exports.stringify = stringify4;
     var DEFAULT_DELIMITER = "/";
     var NOOP_VALUE = (value) => value;
     var ID_START = /^[$_\p{ID_Start}]$/u;
     var ID_CONTINUE = /^[$\u200c\u200d\p{ID_Continue}]$/u;
     var ID = /^[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*$/u;
-    function escapeText(str3) {
-      return str3.replace(/[{}()\[\]+?!:*\\]/g, "\\$&");
+    function escapeText(str4) {
+      return str4.replace(/[{}()\[\]+?!:*\\]/g, "\\$&");
     }
-    function escape2(str3) {
-      return str3.replace(/[.+*?^${}()[\]|/\\]/g, "\\$&");
+    function escape2(str4) {
+      return str4.replace(/[.+*?^${}()[\]|/\\]/g, "\\$&");
     }
     var TokenData = class {
       constructor(tokens, originalPath) {
@@ -20000,21 +20000,21 @@ var require_dist = __commonJS({
       }
     };
     exports.PathError = PathError;
-    function parse4(str3, options = {}) {
+    function parse4(str4, options = {}) {
       const { encodePath = NOOP_VALUE } = options;
-      const chars = [...str3];
+      const chars = [...str4];
       let index2 = 0;
       function consumeUntil(end) {
         const output = [];
-        let path2 = "";
+        let path3 = "";
         function writePath() {
-          if (!path2)
+          if (!path3)
             return;
           output.push({
             type: "text",
-            value: encodePath(path2)
+            value: encodePath(path3)
           });
-          path2 = "";
+          path3 = "";
         }
         while (index2 < chars.length) {
           const value = chars[index2++];
@@ -20024,9 +20024,9 @@ var require_dist = __commonJS({
           }
           if (value === "\\") {
             if (index2 === chars.length) {
-              throw new PathError(`Unexpected end after \\ at index ${index2}`, str3);
+              throw new PathError(`Unexpected end after \\ at index ${index2}`, str4);
             }
-            path2 += chars[index2++];
+            path3 += chars[index2++];
             continue;
           }
           if (value === ":" || value === "*") {
@@ -20049,11 +20049,11 @@ var require_dist = __commonJS({
                 name += chars[index2];
               }
               if (quoteStart) {
-                throw new PathError(`Unterminated quote at index ${quoteStart}`, str3);
+                throw new PathError(`Unterminated quote at index ${quoteStart}`, str4);
               }
             }
             if (!name) {
-              throw new PathError(`Missing parameter name at index ${index2}`, str3);
+              throw new PathError(`Missing parameter name at index ${index2}`, str4);
             }
             writePath();
             output.push({ type, name });
@@ -20068,33 +20068,33 @@ var require_dist = __commonJS({
             continue;
           }
           if (value === "}" || value === "(" || value === ")" || value === "[" || value === "]" || value === "+" || value === "?" || value === "!") {
-            throw new PathError(`Unexpected ${value} at index ${index2 - 1}`, str3);
+            throw new PathError(`Unexpected ${value} at index ${index2 - 1}`, str4);
           }
-          path2 += value;
+          path3 += value;
         }
         if (end) {
-          throw new PathError(`Unexpected end at index ${index2}, expected ${end}`, str3);
+          throw new PathError(`Unexpected end at index ${index2}, expected ${end}`, str4);
         }
         writePath();
         return output;
       }
-      return new TokenData(consumeUntil(""), str3);
+      return new TokenData(consumeUntil(""), str4);
     }
-    function compile(path2, options = {}) {
-      const { encode: encode2 = encodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
-      const data = typeof path2 === "object" ? path2 : parse4(path2, options);
-      const fn = tokensToFunction(data.tokens, delimiter, encode2);
-      return function path3(params = {}) {
+    function compile(path3, options = {}) {
+      const { encode: encode3 = encodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
+      const data = typeof path3 === "object" ? path3 : parse4(path3, options);
+      const fn = tokensToFunction(data.tokens, delimiter, encode3);
+      return function path4(params = {}) {
         const missing = [];
-        const path4 = fn(params, missing);
+        const path5 = fn(params, missing);
         if (missing.length) {
           throw new TypeError(`Missing parameters: ${missing.join(", ")}`);
         }
-        return path4;
+        return path5;
       };
     }
-    function tokensToFunction(tokens, delimiter, encode2) {
-      const encoders = tokens.map((token) => tokenToFunction(token, delimiter, encode2));
+    function tokensToFunction(tokens, delimiter, encode3) {
+      const encoders = tokens.map((token) => tokenToFunction(token, delimiter, encode3));
       return (data, missing) => {
         let result = "";
         for (const encoder of encoders) {
@@ -20103,11 +20103,11 @@ var require_dist = __commonJS({
         return result;
       };
     }
-    function tokenToFunction(token, delimiter, encode2) {
+    function tokenToFunction(token, delimiter, encode3) {
       if (token.type === "text")
         return () => token.value;
       if (token.type === "group") {
-        const fn = tokensToFunction(token.tokens, delimiter, encode2);
+        const fn = tokensToFunction(token.tokens, delimiter, encode3);
         return (data, missing) => {
           const len = missing.length;
           const value = fn(data, missing);
@@ -20117,8 +20117,8 @@ var require_dist = __commonJS({
           return "";
         };
       }
-      const encodeValue = encode2 || NOOP_VALUE;
-      if (token.type === "wildcard" && encode2 !== false) {
+      const encodeValue = encode3 || NOOP_VALUE;
+      if (token.type === "wildcard" && encode3 !== false) {
         return (data, missing) => {
           const value = data[token.name];
           if (value == null) {
@@ -20152,9 +20152,9 @@ var require_dist = __commonJS({
         return encodeValue(value);
       };
     }
-    function match2(path2, options = {}) {
+    function match2(path3, options = {}) {
       const { decode = decodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
-      const { regexp, keys } = pathToRegexp2(path2, options);
+      const { regexp, keys } = pathToRegexp2(path3, options);
       const decoders = keys.map((key) => {
         if (decode === false)
           return NOOP_VALUE;
@@ -20166,7 +20166,7 @@ var require_dist = __commonJS({
         const m = regexp.exec(input);
         if (!m)
           return false;
-        const path3 = m[0];
+        const path4 = m[0];
         const params = /* @__PURE__ */ Object.create(null);
         for (let i = 1; i < m.length; i++) {
           if (m[i] === void 0)
@@ -20175,21 +20175,21 @@ var require_dist = __commonJS({
           const decoder = decoders[i - 1];
           params[key.name] = decoder(m[i]);
         }
-        return { path: path3, params };
+        return { path: path4, params };
       };
     }
-    function pathToRegexp2(path2, options = {}) {
+    function pathToRegexp2(path3, options = {}) {
       const { delimiter = DEFAULT_DELIMITER, end = true, sensitive = false, trailing = true } = options;
       const keys = [];
       let source = "";
       let combinations = 0;
-      function process2(path3) {
-        if (Array.isArray(path3)) {
-          for (const p of path3)
+      function process2(path4) {
+        if (Array.isArray(path4)) {
+          for (const p of path4)
             process2(p);
           return;
         }
-        const data = typeof path3 === "object" ? path3 : parse4(path3, options);
+        const data = typeof path4 === "object" ? path4 : parse4(path4, options);
         flatten(data.tokens, 0, [], (tokens) => {
           if (combinations >= 256) {
             throw new PathError("Too many path combinations", data.originalPath);
@@ -20200,7 +20200,7 @@ var require_dist = __commonJS({
           combinations++;
         });
       }
-      process2(path2);
+      process2(path3);
       let pattern = `^(?:${source})`;
       if (trailing)
         pattern += "(?:" + escape2(delimiter) + "$)?";
@@ -20315,7 +20315,7 @@ var require_dist = __commonJS({
       }
       return value;
     }
-    function stringify3(data) {
+    function stringify4(data) {
       return stringifyTokens(data.tokens, 0);
     }
     function stringifyName(name, next) {
@@ -20340,18 +20340,18 @@ var require_layer = __commonJS({
     var TRAILING_SLASH_REGEXP = /\/+$/;
     var MATCHING_GROUP_REGEXP = /\((?:\?<(.*?)>)?(?!\?)/g;
     module.exports = Layer;
-    function Layer(path2, options, fn) {
+    function Layer(path3, options, fn) {
       if (!(this instanceof Layer)) {
-        return new Layer(path2, options, fn);
+        return new Layer(path3, options, fn);
       }
-      debug7("new %o", path2);
+      debug7("new %o", path3);
       const opts = options || {};
       this.handle = fn;
       this.keys = [];
       this.name = fn.name || "<anonymous>";
       this.params = void 0;
       this.path = void 0;
-      this.slash = path2 === "/" && opts.end === false;
+      this.slash = path3 === "/" && opts.end === false;
       function matcher(_path) {
         if (_path instanceof RegExp) {
           const keys = [];
@@ -20390,7 +20390,7 @@ var require_layer = __commonJS({
           decode: decodeParam
         });
       }
-      this.matchers = Array.isArray(path2) ? path2.map(matcher) : [matcher(path2)];
+      this.matchers = Array.isArray(path3) ? path3.map(matcher) : [matcher(path3)];
     }
     Layer.prototype.handleError = function handleError(error40, req, res, next) {
       const fn = this.handle;
@@ -20430,9 +20430,9 @@ var require_layer = __commonJS({
         next(err);
       }
     };
-    Layer.prototype.match = function match2(path2) {
+    Layer.prototype.match = function match2(path3) {
       let match3;
-      if (path2 != null) {
+      if (path3 != null) {
         if (this.slash) {
           this.params = {};
           this.path = "";
@@ -20440,7 +20440,7 @@ var require_layer = __commonJS({
         }
         let i = 0;
         while (!match3 && i < this.matchers.length) {
-          match3 = this.matchers[i](path2);
+          match3 = this.matchers[i](path3);
           i++;
         }
       }
@@ -20468,13 +20468,13 @@ var require_layer = __commonJS({
         throw err;
       }
     }
-    function loosen(path2) {
-      if (path2 instanceof RegExp || path2 === "/") {
-        return path2;
+    function loosen(path3) {
+      if (path3 instanceof RegExp || path3 === "/") {
+        return path3;
       }
-      return Array.isArray(path2) ? path2.map(function(p) {
+      return Array.isArray(path3) ? path3.map(function(p) {
         return loosen(p);
-      }) : String(path2).replace(TRAILING_SLASH_REGEXP, "");
+      }) : String(path3).replace(TRAILING_SLASH_REGEXP, "");
     }
   }
 });
@@ -20490,9 +20490,9 @@ var require_route = __commonJS({
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
     module.exports = Route;
-    function Route(path2) {
-      debug7("new %o", path2);
-      this.path = path2;
+    function Route(path3) {
+      debug7("new %o", path3);
+      this.path = path3;
       this.stack = [];
       this.methods = /* @__PURE__ */ Object.create(null);
     }
@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router29;
+    module.exports = Router30;
     module.exports.Route = Route;
-    function Router29(options) {
-      if (!(this instanceof Router29)) {
-        return new Router29(options);
+    function Router30(options) {
+      if (!(this instanceof Router30)) {
+        return new Router30(options);
       }
       const opts = options || {};
-      function router29(req, res, next) {
-        router29.handle(req, res, next);
+      function router30(req, res, next) {
+        router30.handle(req, res, next);
       }
-      Object.setPrototypeOf(router29, this);
-      router29.caseSensitive = opts.caseSensitive;
-      router29.mergeParams = opts.mergeParams;
-      router29.params = {};
-      router29.strict = opts.strict;
-      router29.stack = [];
-      return router29;
+      Object.setPrototypeOf(router30, this);
+      router30.caseSensitive = opts.caseSensitive;
+      router30.mergeParams = opts.mergeParams;
+      router30.params = {};
+      router30.strict = opts.strict;
+      router30.stack = [];
+      return router30;
     }
-    Router29.prototype = function() {
+    Router30.prototype = function() {
     };
-    Router29.prototype.param = function param(name, fn) {
+    Router30.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router29.prototype.handle = function handle(req, res, callback) {
+    Router30.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20700,8 +20700,8 @@ var require_router = __commonJS({
         if (++sync > 100) {
           return setImmediate(next, err);
         }
-        const path2 = getPathname(req);
-        if (path2 == null) {
+        const path3 = getPathname(req);
+        if (path3 == null) {
           return done(layerError);
         }
         let layer;
@@ -20709,7 +20709,7 @@ var require_router = __commonJS({
         let route;
         while (match2 !== true && idx < stack.length) {
           layer = stack[idx++];
-          match2 = matchLayer(layer, path2);
+          match2 = matchLayer(layer, path3);
           route = layer.route;
           if (typeof match2 !== "boolean") {
             layerError = layerError || match2;
@@ -20747,18 +20747,18 @@ var require_router = __commonJS({
           } else if (route) {
             layer.handleRequest(req, res, next);
           } else {
-            trimPrefix(layer, layerError, layerPath, path2);
+            trimPrefix(layer, layerError, layerPath, path3);
           }
           sync = 0;
         });
       }
-      function trimPrefix(layer, layerError, layerPath, path2) {
+      function trimPrefix(layer, layerError, layerPath, path3) {
         if (layerPath.length !== 0) {
-          if (layerPath !== path2.substring(0, layerPath.length)) {
+          if (layerPath !== path3.substring(0, layerPath.length)) {
             next(layerError);
             return;
           }
-          const c = path2[layerPath.length];
+          const c = path3[layerPath.length];
           if (c && c !== "/") {
             next(layerError);
             return;
@@ -20780,9 +20780,9 @@ var require_router = __commonJS({
         }
       }
     };
-    Router29.prototype.use = function use(handler) {
+    Router30.prototype.use = function use(handler) {
       let offset = 0;
-      let path2 = "/";
+      let path3 = "/";
       if (typeof handler !== "function") {
         let arg = handler;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -20790,7 +20790,7 @@ var require_router = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path2 = handler;
+          path3 = handler;
         }
       }
       const callbacks = flatten.call(slice.call(arguments, offset), Infinity);
@@ -20802,8 +20802,8 @@ var require_router = __commonJS({
         if (typeof fn !== "function") {
           throw new TypeError("argument handler must be a function");
         }
-        debug7("use %o %s", path2, fn.name || "<anonymous>");
-        const layer = new Layer(path2, {
+        debug7("use %o %s", path3, fn.name || "<anonymous>");
+        const layer = new Layer(path3, {
           sensitive: this.caseSensitive,
           strict: false,
           end: false
@@ -20813,9 +20813,9 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router29.prototype.route = function route(path2) {
-      const route2 = new Route(path2);
-      const layer = new Layer(path2, {
+    Router30.prototype.route = function route(path3) {
+      const route2 = new Route(path3);
+      const layer = new Layer(path3, {
         sensitive: this.caseSensitive,
         strict: this.strict,
         end: true
@@ -20828,8 +20828,8 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router29.prototype[method] = function(path2) {
-        const route = this.route(path2);
+      Router30.prototype[method] = function(path3) {
+        const route = this.route(path3);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
       };
@@ -20858,9 +20858,9 @@ var require_router = __commonJS({
       const fqdnIndex = url2.substring(0, pathLength).indexOf("://");
       return fqdnIndex !== -1 ? url2.substring(0, url2.indexOf("/", 3 + fqdnIndex)) : void 0;
     }
-    function matchLayer(layer, path2) {
+    function matchLayer(layer, path3) {
       try {
-        return layer.match(path2);
+        return layer.match(path3);
       } catch (err) {
         return err;
       }
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router29 = require_router();
+    var Router30 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router29 = null;
+      var router30 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router29 === null) {
-            router29 = new Router29({
+          if (router30 === null) {
+            router30 = new Router30({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router29;
+          return router30;
         }
       });
     };
@@ -21088,7 +21088,7 @@ var require_application = __commonJS({
     };
     app2.use = function use(fn) {
       var offset = 0;
-      var path2 = "/";
+      var path3 = "/";
       if (typeof fn !== "function") {
         var arg = fn;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -21096,22 +21096,22 @@ var require_application = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path2 = fn;
+          path3 = fn;
         }
       }
       var fns = flatten.call(slice.call(arguments, offset), Infinity);
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router29 = this.router;
+      var router30 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router29.use(path2, fn2);
+          return router30.use(path3, fn2);
         }
-        debug7(".use app under %s", path2);
-        fn2.mountpath = path2;
+        debug7(".use app under %s", path3);
+        fn2.mountpath = path3;
         fn2.parent = this;
-        router29.use(path2, function mounted_app(req, res, next) {
+        router30.use(path3, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -21123,8 +21123,8 @@ var require_application = __commonJS({
       }, this);
       return this;
     };
-    app2.route = function route(path2) {
-      return this.router.route(path2);
+    app2.route = function route(path3) {
+      return this.router.route(path3);
     };
     app2.engine = function engine(ext, fn) {
       if (typeof fn !== "function") {
@@ -21167,7 +21167,7 @@ var require_application = __commonJS({
       }
       return this;
     };
-    app2.path = function path2() {
+    app2.path = function path3() {
       return this.parent ? this.parent.path() + this.mountpath : "";
     };
     app2.enabled = function enabled(setting) {
@@ -21183,17 +21183,17 @@ var require_application = __commonJS({
       return this.set(setting, false);
     };
     methods.forEach(function(method) {
-      app2[method] = function(path2) {
+      app2[method] = function(path3) {
         if (method === "get" && arguments.length === 1) {
-          return this.set(path2);
+          return this.set(path3);
         }
-        var route = this.route(path2);
+        var route = this.route(path3);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
       };
     });
-    app2.all = function all(path2) {
-      var route = this.route(path2);
+    app2.all = function all(path3) {
+      var route = this.route(path3);
       var args = slice.call(arguments, 1);
       for (var i = 0; i < methods.length; i++) {
         route[methods[i]].apply(route, args);
@@ -21276,8 +21276,8 @@ var require_charset = __commonJS({
       accepts.length = j;
       return accepts;
     }
-    function parseCharset(str3, i) {
-      var match2 = simpleCharsetRegExp.exec(str3);
+    function parseCharset(str4, i) {
+      var match2 = simpleCharsetRegExp.exec(str4);
       if (!match2) return null;
       var charset = match2[1];
       var q = 1;
@@ -21374,8 +21374,8 @@ var require_encoding = __commonJS({
       accepts.length = j;
       return accepts;
     }
-    function parseEncoding(str3, i) {
-      var match2 = simpleEncodingRegExp.exec(str3);
+    function parseEncoding(str4, i) {
+      var match2 = simpleEncodingRegExp.exec(str4);
       if (!match2) return null;
       var encoding = match2[1];
       var q = 1;
@@ -21476,8 +21476,8 @@ var require_language = __commonJS({
       accepts.length = j;
       return accepts;
     }
-    function parseLanguage(str3, i) {
-      var match2 = simpleLanguageRegExp.exec(str3);
+    function parseLanguage(str4, i) {
+      var match2 = simpleLanguageRegExp.exec(str4);
       if (!match2) return null;
       var prefix = match2[1];
       var suffix = match2[2];
@@ -21571,8 +21571,8 @@ var require_mediaType = __commonJS({
       accepts.length = j;
       return accepts;
     }
-    function parseMediaType(str3, i) {
-      var match2 = simpleMediaTypeRegExp.exec(str3);
+    function parseMediaType(str4, i) {
+      var match2 = simpleMediaTypeRegExp.exec(str4);
       if (!match2) return null;
       var params = /* @__PURE__ */ Object.create(null);
       var q = 1;
@@ -21673,15 +21673,15 @@ var require_mediaType = __commonJS({
       }
       return count;
     }
-    function splitKeyValuePair(str3) {
-      var index2 = str3.indexOf("=");
+    function splitKeyValuePair(str4) {
+      var index2 = str4.indexOf("=");
       var key;
       var val;
       if (index2 === -1) {
-        key = str3;
+        key = str4;
       } else {
-        key = str3.slice(0, index2);
-        val = str3.slice(index2 + 1);
+        key = str4.slice(0, index2);
+        val = str4.slice(index2 + 1);
       }
       return [key, val];
     }
@@ -21697,8 +21697,8 @@ var require_mediaType = __commonJS({
       accepts.length = j + 1;
       return accepts;
     }
-    function splitParameters(str3) {
-      var parameters = str3.split(";");
+    function splitParameters(str4) {
+      var parameters = str4.split(";");
       for (var i = 1, j = 0; i < parameters.length; i++) {
         if (quoteCount(parameters[j]) % 2 == 0) {
           parameters[++j] = parameters[i];
@@ -21898,19 +21898,19 @@ var require_fresh = __commonJS({
       var timestamp2 = date6 && Date.parse(date6);
       return typeof timestamp2 === "number" ? timestamp2 : NaN;
     }
-    function parseTokenList(str3) {
+    function parseTokenList(str4) {
       var end = 0;
       var list = [];
       var start = 0;
-      for (var i = 0, len = str3.length; i < len; i++) {
-        switch (str3.charCodeAt(i)) {
+      for (var i = 0, len = str4.length; i < len; i++) {
+        switch (str4.charCodeAt(i)) {
           case 32:
             if (start === end) {
               start = end = i + 1;
             }
             break;
           case 44:
-            list.push(str3.substring(start, end));
+            list.push(str4.substring(start, end));
             start = end = i + 1;
             break;
           default:
@@ -21918,7 +21918,7 @@ var require_fresh = __commonJS({
             break;
         }
       }
-      list.push(str3.substring(start, end));
+      list.push(str4.substring(start, end));
       return list;
     }
   }
@@ -21929,17 +21929,17 @@ var require_range_parser = __commonJS({
   "../../node_modules/.pnpm/range-parser@1.2.1/node_modules/range-parser/index.js"(exports, module) {
     "use strict";
     module.exports = rangeParser;
-    function rangeParser(size, str3, options) {
-      if (typeof str3 !== "string") {
+    function rangeParser(size, str4, options) {
+      if (typeof str4 !== "string") {
         throw new TypeError("argument str must be a string");
       }
-      var index2 = str3.indexOf("=");
+      var index2 = str4.indexOf("=");
       if (index2 === -1) {
         return -2;
       }
-      var arr = str3.slice(index2 + 1).split(",");
+      var arr = str4.slice(index2 + 1).split(",");
       var ranges = [];
-      ranges.type = str3.slice(0, index2);
+      ranges.type = str4.slice(0, index2);
       for (var i = 0; i < arr.length; i++) {
         var range = arr[i].split("-");
         var start = parseInt(range[0], 10);
@@ -22103,7 +22103,7 @@ var require_request = __commonJS({
       var subdomains2 = !isIP2(hostname2) ? hostname2.split(".").reverse() : [hostname2];
       return subdomains2.slice(offset);
     });
-    defineGetter(req, "path", function path2() {
+    defineGetter(req, "path", function path3() {
       return parse4(this).pathname;
     });
     defineGetter(req, "host", function host() {
@@ -22222,8 +22222,8 @@ var require_content_disposition = __commonJS({
       }
       return string4;
     }
-    function decodefield(str3) {
-      const match2 = EXT_VALUE_REGEXP.exec(str3);
+    function decodefield(str4) {
+      const match2 = EXT_VALUE_REGEXP.exec(str4);
       if (!match2) {
         throw new TypeError("invalid extended field value");
       }
@@ -22302,20 +22302,20 @@ var require_content_disposition = __commonJS({
       return "%" + String(char2).charCodeAt(0).toString(16).toUpperCase();
     }
     function qstring(val) {
-      var str3 = String(val);
-      return '"' + str3.replace(QUOTE_REGEXP, "\\$1") + '"';
+      var str4 = String(val);
+      return '"' + str4.replace(QUOTE_REGEXP, "\\$1") + '"';
     }
     function ustring(val) {
-      var str3 = String(val);
-      var encoded = encodeURIComponent(str3).replace(ENCODE_URL_ATTR_CHAR_REGEXP, pencode);
+      var str4 = String(val);
+      var encoded = encodeURIComponent(str4).replace(ENCODE_URL_ATTR_CHAR_REGEXP, pencode);
       return "UTF-8''" + encoded;
     }
     function ContentDisposition(type, parameters) {
       this.type = type;
       this.parameters = parameters;
     }
-    function basename(path2) {
-      const normalized = path2.replaceAll("\\", "/");
+    function basename(path3) {
+      const normalized = path3.replaceAll("\\", "/");
       let end = normalized.length;
       while (end > 0 && normalized[end - 1] === "/") {
         end--;
@@ -22335,26 +22335,26 @@ var require_content_disposition = __commonJS({
       code >= 65 && code <= 70 || // A-F
       code >= 97 && code <= 102;
     }
-    function hasHexEscape(str3) {
-      const maxIndex = str3.length - 3;
+    function hasHexEscape(str4) {
+      const maxIndex = str4.length - 3;
       let lastIndex = -1;
-      while ((lastIndex = str3.indexOf("%", lastIndex + 1)) !== -1 && lastIndex <= maxIndex) {
-        if (isHexDigit(str3[lastIndex + 1]) && isHexDigit(str3[lastIndex + 2])) {
+      while ((lastIndex = str4.indexOf("%", lastIndex + 1)) !== -1 && lastIndex <= maxIndex) {
+        if (isHexDigit(str4[lastIndex + 1]) && isHexDigit(str4[lastIndex + 2])) {
           return true;
         }
       }
       return false;
     }
-    function decodeHexEscapes(str3) {
-      const firstEscape = str3.indexOf("%");
-      if (firstEscape === -1) return str3;
-      let result = str3.slice(0, firstEscape);
-      for (let idx = firstEscape; idx < str3.length; idx++) {
-        if (str3[idx] === "%" && idx + 2 < str3.length && isHexDigit(str3[idx + 1]) && isHexDigit(str3[idx + 2])) {
-          result += String.fromCharCode(Number.parseInt(str3[idx + 1] + str3[idx + 2], 16));
+    function decodeHexEscapes(str4) {
+      const firstEscape = str4.indexOf("%");
+      if (firstEscape === -1) return str4;
+      let result = str4.slice(0, firstEscape);
+      for (let idx = firstEscape; idx < str4.length; idx++) {
+        if (str4[idx] === "%" && idx + 2 < str4.length && isHexDigit(str4[idx + 1]) && isHexDigit(str4[idx + 2])) {
+          result += String.fromCharCode(Number.parseInt(str4[idx + 1] + str4[idx + 2], 16));
           idx += 2;
         } else {
-          result += str3[idx];
+          result += str4[idx];
         }
       }
       return result;
@@ -22365,17 +22365,17 @@ var require_content_disposition = __commonJS({
 // ../../node_modules/.pnpm/cookie-signature@1.2.2/node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "../../node_modules/.pnpm/cookie-signature@1.2.2/node_modules/cookie-signature/index.js"(exports) {
-    var crypto2 = __require("crypto");
+    var crypto3 = __require("crypto");
     exports.sign = function(val, secret) {
       if ("string" != typeof val) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val + "." + crypto2.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
+      return val + "." + crypto3.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
     };
     exports.unsign = function(input, secret) {
       if ("string" != typeof input) throw new TypeError("Signed cookie string must be provided.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
       var tentativeValue = input.slice(0, input.lastIndexOf(".")), expectedInput = exports.sign(tentativeValue, secret), expectedBuffer = Buffer.from(expectedInput), inputBuffer = Buffer.from(input);
-      return expectedBuffer.length === inputBuffer.length && crypto2.timingSafeEqual(expectedBuffer, inputBuffer) ? tentativeValue : false;
+      return expectedBuffer.length === inputBuffer.length && crypto3.timingSafeEqual(expectedBuffer, inputBuffer) ? tentativeValue : false;
     };
   }
 });
@@ -22392,54 +22392,54 @@ var require_cookie = __commonJS({
     var cookieValueRegExp = /^("?)[\u0021\u0023-\u002B\u002D-\u003A\u003C-\u005B\u005D-\u007E]*\1$/;
     var domainValueRegExp = /^([.]?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
     var pathValueRegExp = /^[\u0020-\u003A\u003D-\u007E]*$/;
-    function parse4(str3, opt) {
-      if (typeof str3 !== "string") {
+    function parse4(str4, opt) {
+      if (typeof str4 !== "string") {
         throw new TypeError("argument str must be a string");
       }
       var obj = {};
-      var len = str3.length;
+      var len = str4.length;
       if (len < 2) return obj;
       var dec = opt && opt.decode || decode;
       var index2 = 0;
       var eqIdx = 0;
       var endIdx = 0;
       do {
-        eqIdx = str3.indexOf("=", index2);
+        eqIdx = str4.indexOf("=", index2);
         if (eqIdx === -1) break;
-        endIdx = str3.indexOf(";", index2);
+        endIdx = str4.indexOf(";", index2);
         if (endIdx === -1) {
           endIdx = len;
         } else if (eqIdx > endIdx) {
-          index2 = str3.lastIndexOf(";", eqIdx - 1) + 1;
+          index2 = str4.lastIndexOf(";", eqIdx - 1) + 1;
           continue;
         }
-        var keyStartIdx = startIndex(str3, index2, eqIdx);
-        var keyEndIdx = endIndex(str3, eqIdx, keyStartIdx);
-        var key = str3.slice(keyStartIdx, keyEndIdx);
+        var keyStartIdx = startIndex(str4, index2, eqIdx);
+        var keyEndIdx = endIndex(str4, eqIdx, keyStartIdx);
+        var key = str4.slice(keyStartIdx, keyEndIdx);
         if (!__hasOwnProperty.call(obj, key)) {
-          var valStartIdx = startIndex(str3, eqIdx + 1, endIdx);
-          var valEndIdx = endIndex(str3, endIdx, valStartIdx);
-          if (str3.charCodeAt(valStartIdx) === 34 && str3.charCodeAt(valEndIdx - 1) === 34) {
+          var valStartIdx = startIndex(str4, eqIdx + 1, endIdx);
+          var valEndIdx = endIndex(str4, endIdx, valStartIdx);
+          if (str4.charCodeAt(valStartIdx) === 34 && str4.charCodeAt(valEndIdx - 1) === 34) {
             valStartIdx++;
             valEndIdx--;
           }
-          var val = str3.slice(valStartIdx, valEndIdx);
+          var val = str4.slice(valStartIdx, valEndIdx);
           obj[key] = tryDecode(val, dec);
         }
         index2 = endIdx + 1;
       } while (index2 < len);
       return obj;
     }
-    function startIndex(str3, index2, max) {
+    function startIndex(str4, index2, max) {
       do {
-        var code = str3.charCodeAt(index2);
+        var code = str4.charCodeAt(index2);
         if (code !== 32 && code !== 9) return index2;
       } while (++index2 < max);
       return max;
     }
-    function endIndex(str3, index2, min) {
+    function endIndex(str4, index2, min) {
       while (index2 > min) {
-        var code = str3.charCodeAt(--index2);
+        var code = str4.charCodeAt(--index2);
         if (code !== 32 && code !== 9) return index2 + 1;
       }
       return min;
@@ -22456,54 +22456,54 @@ var require_cookie = __commonJS({
       if (!cookieValueRegExp.test(value)) {
         throw new TypeError("argument val is invalid");
       }
-      var str3 = name + "=" + value;
-      if (!opt) return str3;
+      var str4 = name + "=" + value;
+      if (!opt) return str4;
       if (null != opt.maxAge) {
         var maxAge = Math.floor(opt.maxAge);
         if (!isFinite(maxAge)) {
           throw new TypeError("option maxAge is invalid");
         }
-        str3 += "; Max-Age=" + maxAge;
+        str4 += "; Max-Age=" + maxAge;
       }
       if (opt.domain) {
         if (!domainValueRegExp.test(opt.domain)) {
           throw new TypeError("option domain is invalid");
         }
-        str3 += "; Domain=" + opt.domain;
+        str4 += "; Domain=" + opt.domain;
       }
       if (opt.path) {
         if (!pathValueRegExp.test(opt.path)) {
           throw new TypeError("option path is invalid");
         }
-        str3 += "; Path=" + opt.path;
+        str4 += "; Path=" + opt.path;
       }
       if (opt.expires) {
         var expires = opt.expires;
         if (!isDate(expires) || isNaN(expires.valueOf())) {
           throw new TypeError("option expires is invalid");
         }
-        str3 += "; Expires=" + expires.toUTCString();
+        str4 += "; Expires=" + expires.toUTCString();
       }
       if (opt.httpOnly) {
-        str3 += "; HttpOnly";
+        str4 += "; HttpOnly";
       }
       if (opt.secure) {
-        str3 += "; Secure";
+        str4 += "; Secure";
       }
       if (opt.partitioned) {
-        str3 += "; Partitioned";
+        str4 += "; Partitioned";
       }
       if (opt.priority) {
         var priority = typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority;
         switch (priority) {
           case "low":
-            str3 += "; Priority=Low";
+            str4 += "; Priority=Low";
             break;
           case "medium":
-            str3 += "; Priority=Medium";
+            str4 += "; Priority=Medium";
             break;
           case "high":
-            str3 += "; Priority=High";
+            str4 += "; Priority=High";
             break;
           default:
             throw new TypeError("option priority is invalid");
@@ -22513,34 +22513,34 @@ var require_cookie = __commonJS({
         var sameSite = typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite;
         switch (sameSite) {
           case true:
-            str3 += "; SameSite=Strict";
+            str4 += "; SameSite=Strict";
             break;
           case "lax":
-            str3 += "; SameSite=Lax";
+            str4 += "; SameSite=Lax";
             break;
           case "strict":
-            str3 += "; SameSite=Strict";
+            str4 += "; SameSite=Strict";
             break;
           case "none":
-            str3 += "; SameSite=None";
+            str4 += "; SameSite=None";
             break;
           default:
             throw new TypeError("option sameSite is invalid");
         }
       }
-      return str3;
+      return str4;
     }
-    function decode(str3) {
-      return str3.indexOf("%") !== -1 ? decodeURIComponent(str3) : str3;
+    function decode(str4) {
+      return str4.indexOf("%") !== -1 ? decodeURIComponent(str4) : str4;
     }
     function isDate(val) {
       return __toString.call(val) === "[object Date]";
     }
-    function tryDecode(str3, decode2) {
+    function tryDecode(str4, decode2) {
       try {
-        return decode2(str3);
+        return decode2(str4);
       } catch (e) {
-        return str3;
+        return str4;
       }
     }
   }
@@ -22561,27 +22561,27 @@ var require_send = __commonJS({
     var ms = require_ms();
     var onFinished = require_on_finished();
     var parseRange = require_range_parser();
-    var path2 = __require("path");
+    var path3 = __require("path");
     var statuses = require_statuses();
-    var Stream2 = __require("stream");
+    var Stream3 = __require("stream");
     var util2 = __require("util");
-    var extname = path2.extname;
-    var join = path2.join;
-    var normalize2 = path2.normalize;
-    var resolve = path2.resolve;
-    var sep = path2.sep;
+    var extname = path3.extname;
+    var join = path3.join;
+    var normalize2 = path3.normalize;
+    var resolve = path3.resolve;
+    var sep = path3.sep;
     var BYTES_RANGE_REGEXP = /^ *bytes=/;
     var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1e3;
     var UP_PATH_REGEXP = /(?:^|[\\/])\.\.(?:[\\/]|$)/;
     module.exports = send;
-    function send(req, path3, options) {
-      return new SendStream(req, path3, options);
+    function send(req, path4, options) {
+      return new SendStream(req, path4, options);
     }
-    function SendStream(req, path3, options) {
-      Stream2.call(this);
+    function SendStream(req, path4, options) {
+      Stream3.call(this);
       var opts = options || {};
       this.options = opts;
-      this.path = path3;
+      this.path = path4;
       this.req = req;
       this._acceptRanges = opts.acceptRanges !== void 0 ? Boolean(opts.acceptRanges) : true;
       this._cacheControl = opts.cacheControl !== void 0 ? Boolean(opts.cacheControl) : true;
@@ -22599,7 +22599,7 @@ var require_send = __commonJS({
       this._maxage = !isNaN(this._maxage) ? Math.min(Math.max(0, this._maxage), MAX_MAXAGE) : 0;
       this._root = opts.root ? resolve(opts.root) : null;
     }
-    util2.inherits(SendStream, Stream2);
+    util2.inherits(SendStream, Stream3);
     SendStream.prototype.error = function error40(status, err) {
       if (hasListeners(this, "error")) {
         return this.emit("error", createHttpError(status, err));
@@ -22695,10 +22695,10 @@ var require_send = __commonJS({
       var lastModified = this.res.getHeader("Last-Modified");
       return parseHttpDate(lastModified) <= parseHttpDate(ifRange);
     };
-    SendStream.prototype.redirect = function redirect(path3) {
+    SendStream.prototype.redirect = function redirect(path4) {
       var res = this.res;
       if (hasListeners(this, "directory")) {
-        this.emit("directory", res, path3);
+        this.emit("directory", res, path4);
         return;
       }
       if (this.hasTrailingSlash()) {
@@ -22718,38 +22718,38 @@ var require_send = __commonJS({
     SendStream.prototype.pipe = function pipe2(res) {
       var root = this._root;
       this.res = res;
-      var path3 = decode(this.path);
-      if (path3 === -1) {
+      var path4 = decode(this.path);
+      if (path4 === -1) {
         this.error(400);
         return res;
       }
-      if (~path3.indexOf("\0")) {
+      if (~path4.indexOf("\0")) {
         this.error(400);
         return res;
       }
       var parts;
       if (root !== null) {
-        if (path3) {
-          path3 = normalize2("." + sep + path3);
+        if (path4) {
+          path4 = normalize2("." + sep + path4);
         }
-        if (UP_PATH_REGEXP.test(path3)) {
-          debug7('malicious path "%s"', path3);
+        if (UP_PATH_REGEXP.test(path4)) {
+          debug7('malicious path "%s"', path4);
           this.error(403);
           return res;
         }
-        parts = path3.split(sep);
-        path3 = normalize2(join(root, path3));
+        parts = path4.split(sep);
+        path4 = normalize2(join(root, path4));
       } else {
-        if (UP_PATH_REGEXP.test(path3)) {
-          debug7('malicious path "%s"', path3);
+        if (UP_PATH_REGEXP.test(path4)) {
+          debug7('malicious path "%s"', path4);
           this.error(403);
           return res;
         }
-        parts = normalize2(path3).split(sep);
-        path3 = resolve(path3);
+        parts = normalize2(path4).split(sep);
+        path4 = resolve(path4);
       }
       if (containsDotFile(parts)) {
-        debug7('%s dotfile "%s"', this._dotfiles, path3);
+        debug7('%s dotfile "%s"', this._dotfiles, path4);
         switch (this._dotfiles) {
           case "allow":
             break;
@@ -22763,13 +22763,13 @@ var require_send = __commonJS({
         }
       }
       if (this._index.length && this.hasTrailingSlash()) {
-        this.sendIndex(path3);
+        this.sendIndex(path4);
         return res;
       }
-      this.sendFile(path3);
+      this.sendFile(path4);
       return res;
     };
-    SendStream.prototype.send = function send2(path3, stat) {
+    SendStream.prototype.send = function send2(path4, stat) {
       var len = stat.size;
       var options = this.options;
       var opts = {};
@@ -22781,9 +22781,9 @@ var require_send = __commonJS({
         this.headersAlreadySent();
         return;
       }
-      debug7('pipe "%s"', path3);
-      this.setHeader(path3, stat);
-      this.type(path3);
+      debug7('pipe "%s"', path4);
+      this.setHeader(path4, stat);
+      this.type(path4);
       if (this.isConditionalGET()) {
         if (this.isPreconditionFailure()) {
           this.error(412);
@@ -22832,28 +22832,28 @@ var require_send = __commonJS({
         res.end();
         return;
       }
-      this.stream(path3, opts);
+      this.stream(path4, opts);
     };
-    SendStream.prototype.sendFile = function sendFile(path3) {
+    SendStream.prototype.sendFile = function sendFile(path4) {
       var i = 0;
       var self = this;
-      debug7('stat "%s"', path3);
-      fs.stat(path3, function onstat(err, stat) {
-        var pathEndsWithSep = path3[path3.length - 1] === sep;
-        if (err && err.code === "ENOENT" && !extname(path3) && !pathEndsWithSep) {
+      debug7('stat "%s"', path4);
+      fs.stat(path4, function onstat(err, stat) {
+        var pathEndsWithSep = path4[path4.length - 1] === sep;
+        if (err && err.code === "ENOENT" && !extname(path4) && !pathEndsWithSep) {
           return next(err);
         }
         if (err) return self.onStatError(err);
-        if (stat.isDirectory()) return self.redirect(path3);
+        if (stat.isDirectory()) return self.redirect(path4);
         if (pathEndsWithSep) return self.error(404);
-        self.emit("file", path3, stat);
-        self.send(path3, stat);
+        self.emit("file", path4, stat);
+        self.send(path4, stat);
       });
       function next(err) {
         if (self._extensions.length <= i) {
           return err ? self.onStatError(err) : self.error(404);
         }
-        var p = path3 + "." + self._extensions[i++];
+        var p = path4 + "." + self._extensions[i++];
         debug7('stat "%s"', p);
         fs.stat(p, function(err2, stat) {
           if (err2) return next(err2);
@@ -22863,7 +22863,7 @@ var require_send = __commonJS({
         });
       }
     };
-    SendStream.prototype.sendIndex = function sendIndex(path3) {
+    SendStream.prototype.sendIndex = function sendIndex(path4) {
       var i = -1;
       var self = this;
       function next(err) {
@@ -22871,7 +22871,7 @@ var require_send = __commonJS({
           if (err) return self.onStatError(err);
           return self.error(404);
         }
-        var p = join(path3, self._index[i]);
+        var p = join(path4, self._index[i]);
         debug7('stat "%s"', p);
         fs.stat(p, function(err2, stat) {
           if (err2) return next(err2);
@@ -22882,10 +22882,10 @@ var require_send = __commonJS({
       }
       next();
     };
-    SendStream.prototype.stream = function stream(path3, options) {
+    SendStream.prototype.stream = function stream(path4, options) {
       var self = this;
       var res = this.res;
-      var stream2 = fs.createReadStream(path3, options);
+      var stream2 = fs.createReadStream(path4, options);
       this.emit("stream", stream2);
       stream2.pipe(res);
       function cleanup() {
@@ -22900,17 +22900,17 @@ var require_send = __commonJS({
         self.emit("end");
       });
     };
-    SendStream.prototype.type = function type(path3) {
+    SendStream.prototype.type = function type(path4) {
       var res = this.res;
       if (res.getHeader("Content-Type")) return;
-      var ext = extname(path3);
+      var ext = extname(path4);
       var type2 = mime.contentType(ext) || "application/octet-stream";
       debug7("content-type %s", type2);
       res.setHeader("Content-Type", type2);
     };
-    SendStream.prototype.setHeader = function setHeader(path3, stat) {
+    SendStream.prototype.setHeader = function setHeader(path4, stat) {
       var res = this.res;
-      this.emit("headers", res, path3, stat);
+      this.emit("headers", res, path4, stat);
       if (this._acceptRanges && !res.getHeader("Accept-Ranges")) {
         debug7("accept ranges");
         res.setHeader("Accept-Ranges", "bytes");
@@ -22939,13 +22939,13 @@ var require_send = __commonJS({
         res.removeHeader(header);
       }
     }
-    function collapseLeadingSlashes(str3) {
-      for (var i = 0; i < str3.length; i++) {
-        if (str3[i] !== "/") {
+    function collapseLeadingSlashes(str4) {
+      for (var i = 0; i < str4.length; i++) {
+        if (str4[i] !== "/") {
           break;
         }
       }
-      return i > 1 ? "/" + str3.substr(i) : str3;
+      return i > 1 ? "/" + str4.substr(i) : str4;
     }
     function containsDotFile(parts) {
       for (var i = 0; i < parts.length; i++) {
@@ -22968,9 +22968,9 @@ var require_send = __commonJS({
       }
       return err instanceof Error ? createError(status, err, { expose: false }) : createError(status, err);
     }
-    function decode(path3) {
+    function decode(path4) {
       try {
-        return decodeURIComponent(path3);
+        return decodeURIComponent(path4);
       } catch (err) {
         return -1;
       }
@@ -22992,12 +22992,12 @@ var require_send = __commonJS({
       var timestamp2 = date6 && Date.parse(date6);
       return typeof timestamp2 === "number" ? timestamp2 : NaN;
     }
-    function parseTokenList(str3) {
+    function parseTokenList(str4) {
       var end = 0;
       var list = [];
       var start = 0;
-      for (var i = 0, len = str3.length; i < len; i++) {
-        switch (str3.charCodeAt(i)) {
+      for (var i = 0, len = str4.length; i < len; i++) {
+        switch (str4.charCodeAt(i)) {
           case 32:
             if (start === end) {
               start = end = i + 1;
@@ -23005,7 +23005,7 @@ var require_send = __commonJS({
             break;
           case 44:
             if (start !== end) {
-              list.push(str3.substring(start, end));
+              list.push(str4.substring(start, end));
             }
             start = end = i + 1;
             break;
@@ -23015,7 +23015,7 @@ var require_send = __commonJS({
         }
       }
       if (start !== end) {
-        list.push(str3.substring(start, end));
+        list.push(str4.substring(start, end));
       }
       return list;
     }
@@ -23114,7 +23114,7 @@ var require_response = __commonJS({
     var http3 = __require("node:http");
     var onFinished = require_on_finished();
     var mime = require_mime_types();
-    var path2 = __require("node:path");
+    var path3 = __require("node:path");
     var pathIsAbsolute = __require("node:path").isAbsolute;
     var statuses = require_statuses();
     var sign = require_cookie_signature().sign;
@@ -23123,8 +23123,8 @@ var require_response = __commonJS({
     var setCharset = require_utils3().setCharset;
     var cookie = require_cookie();
     var send = require_send();
-    var extname = path2.extname;
-    var resolve = path2.resolve;
+    var extname = path3.extname;
+    var resolve = path3.resolve;
     var vary = require_vary();
     var { Buffer: Buffer3 } = __require("node:buffer");
     var res = Object.create(http3.ServerResponse.prototype);
@@ -23231,7 +23231,7 @@ var require_response = __commonJS({
       var escape2 = app2.get("json escape");
       var replacer = app2.get("json replacer");
       var spaces = app2.get("json spaces");
-      var body = stringify3(obj, replacer, spaces, escape2);
+      var body = stringify4(obj, replacer, spaces, escape2);
       if (!this.get("Content-Type")) {
         this.set("Content-Type", "application/json");
       }
@@ -23242,7 +23242,7 @@ var require_response = __commonJS({
       var escape2 = app2.get("json escape");
       var replacer = app2.get("json replacer");
       var spaces = app2.get("json spaces");
-      var body = stringify3(obj, replacer, spaces, escape2);
+      var body = stringify4(obj, replacer, spaces, escape2);
       var callback = this.req.query[app2.get("jsonp callback name")];
       if (!this.get("Content-Type")) {
         this.set("X-Content-Type-Options", "nosniff");
@@ -23270,26 +23270,26 @@ var require_response = __commonJS({
       this.type("txt");
       return this.send(body);
     };
-    res.sendFile = function sendFile(path3, options, callback) {
+    res.sendFile = function sendFile(path4, options, callback) {
       var done = callback;
       var req = this.req;
       var res2 = this;
       var next = req.next;
       var opts = options || {};
-      if (!path3) {
+      if (!path4) {
         throw new TypeError("path argument is required to res.sendFile");
       }
-      if (typeof path3 !== "string") {
+      if (typeof path4 !== "string") {
         throw new TypeError("path must be a string to res.sendFile");
       }
       if (typeof options === "function") {
         done = options;
         opts = {};
       }
-      if (!opts.root && !pathIsAbsolute(path3)) {
+      if (!opts.root && !pathIsAbsolute(path4)) {
         throw new TypeError("path must be absolute or specify root to res.sendFile");
       }
-      var pathname = encodeURI(path3);
+      var pathname = encodeURI(path4);
       opts.etag = this.app.enabled("etag");
       var file2 = send(req, pathname, opts);
       sendfile(res2, file2, opts, function(err) {
@@ -23300,7 +23300,7 @@ var require_response = __commonJS({
         }
       });
     };
-    res.download = function download(path3, filename, options, callback) {
+    res.download = function download(path4, filename, options, callback) {
       var done = callback;
       var name = filename;
       var opts = options || null;
@@ -23317,7 +23317,7 @@ var require_response = __commonJS({
         opts = filename;
       }
       var headers = {
-        "Content-Disposition": contentDisposition(name || path3)
+        "Content-Disposition": contentDisposition(name || path4)
       };
       if (opts && opts.headers) {
         var keys = Object.keys(opts.headers);
@@ -23330,7 +23330,7 @@ var require_response = __commonJS({
       }
       opts = Object.create(opts);
       opts.headers = headers;
-      var fullPath = !opts.root ? resolve(path3) : path3;
+      var fullPath = !opts.root ? resolve(path4) : path4;
       return this.sendFile(fullPath, opts, done);
     };
     res.contentType = res.type = function contentType(type) {
@@ -23479,9 +23479,9 @@ var require_response = __commonJS({
         opts = {};
       }
       opts._locals = self.locals;
-      done = done || function(err, str3) {
+      done = done || function(err, str4) {
         if (err) return req.next(err);
-        self.send(str3);
+        self.send(str4);
       };
       app2.render(view, opts, done);
     };
@@ -23550,7 +23550,7 @@ var require_response = __commonJS({
       }
       file2.pipe(res2);
     }
-    function stringify3(value, replacer, spaces, escape2) {
+    function stringify4(value, replacer, spaces, escape2) {
       var json3 = replacer || spaces ? JSON.stringify(value, replacer, spaces) : JSON.stringify(value);
       if (escape2 && typeof json3 === "string") {
         json3 = json3.replace(/[<>&]/g, function(c) {
@@ -23613,11 +23613,11 @@ var require_serve_static = __commonJS({
         }
         var forwardError = !fallthrough;
         var originalUrl = parseUrl.original(req);
-        var path2 = parseUrl(req).pathname;
-        if (path2 === "/" && originalUrl.pathname.substr(-1) !== "/") {
-          path2 = "";
+        var path3 = parseUrl(req).pathname;
+        if (path3 === "/" && originalUrl.pathname.substr(-1) !== "/") {
+          path3 = "";
         }
-        var stream = send(req, path2, opts);
+        var stream = send(req, path3, opts);
         stream.on("directory", onDirectory);
         if (setHeaders) {
           stream.on("headers", setHeaders);
@@ -23637,13 +23637,13 @@ var require_serve_static = __commonJS({
         stream.pipe(res);
       };
     }
-    function collapseLeadingSlashes(str3) {
-      for (var i = 0; i < str3.length; i++) {
-        if (str3.charCodeAt(i) !== 47) {
+    function collapseLeadingSlashes(str4) {
+      for (var i = 0; i < str4.length; i++) {
+        if (str4.charCodeAt(i) !== 47) {
           break;
         }
       }
-      return i > 1 ? "/" + str3.substr(i) : str3;
+      return i > 1 ? "/" + str4.substr(i) : str4;
     }
     function createHtmlDocument(title, body) {
       return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>' + title + "</title>\n</head>\n<body>\n<pre>" + body + "</pre>\n</body>\n</html>\n";
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter2 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router29 = require_router();
+    var Router30 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router29.Route;
-    exports.Router = Router29;
+    exports.Route = Router30.Route;
+    exports.Router = Router30;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -23801,7 +23801,7 @@ var require_lib3 = __commonJS({
       "use strict";
       var assign = require_object_assign();
       var vary = require_vary();
-      var defaults3 = {
+      var defaults4 = {
         origin: "*",
         methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
         preflightContinue: false,
@@ -23972,7 +23972,7 @@ var require_lib3 = __commonJS({
             if (err) {
               next(err);
             } else {
-              var corsOptions = assign({}, defaults3, options);
+              var corsOptions = assign({}, defaults4, options);
               var originCallback = null;
               if (corsOptions.origin && typeof corsOptions.origin === "function") {
                 originCallback = corsOptions.origin;
@@ -26183,8 +26183,8 @@ var require_req = __commonJS({
       if (req.originalUrl) {
         _req.url = req.originalUrl;
       } else {
-        const path2 = req.path;
-        _req.url = typeof path2 === "string" ? path2 : req.url ? req.url.path || req.url : void 0;
+        const path3 = req.path;
+        _req.url = typeof path3 === "string" ? path3 : req.url ? req.url.path || req.url : void 0;
       }
       if (req.query) {
         _req.query = req.query;
@@ -26349,14 +26349,14 @@ var require_redact = __commonJS({
       }
       return obj;
     }
-    function parsePath(path2) {
+    function parsePath(path3) {
       const parts = [];
       let current = "";
       let inBrackets = false;
       let inQuotes = false;
       let quoteChar = "";
-      for (let i = 0; i < path2.length; i++) {
-        const char2 = path2[i];
+      for (let i = 0; i < path3.length; i++) {
+        const char2 = path3[i];
         if (!inBrackets && char2 === ".") {
           if (current) {
             parts.push(current);
@@ -26487,10 +26487,10 @@ var require_redact = __commonJS({
       return current;
     }
     function redactPaths(obj, paths, censor, remove = false) {
-      for (const path2 of paths) {
-        const parts = parsePath(path2);
+      for (const path3 of paths) {
+        const parts = parsePath(path3);
         if (parts.includes("*")) {
-          redactWildcardPath(obj, parts, censor, path2, remove);
+          redactWildcardPath(obj, parts, censor, path3, remove);
         } else {
           if (remove) {
             removeKey(obj, parts);
@@ -26575,8 +26575,8 @@ var require_redact = __commonJS({
           }
         } else {
           if (afterWildcard.includes("*")) {
-            const wrappedCensor = typeof censor === "function" ? (value, path2) => {
-              const fullPath = [...pathArray.slice(0, pathLength), ...path2];
+            const wrappedCensor = typeof censor === "function" ? (value, path3) => {
+              const fullPath = [...pathArray.slice(0, pathLength), ...path3];
               return censor(value, fullPath);
             } : censor;
             redactWildcardPath(current, afterWildcard, wrappedCensor, originalPath, remove);
@@ -26611,8 +26611,8 @@ var require_redact = __commonJS({
         return null;
       }
       const pathStructure = /* @__PURE__ */ new Map();
-      for (const path2 of pathsToClone) {
-        const parts = parsePath(path2);
+      for (const path3 of pathsToClone) {
+        const parts = parsePath(path3);
         let current = pathStructure;
         for (let i = 0; i < parts.length; i++) {
           const part = parts[i];
@@ -26664,24 +26664,24 @@ var require_redact = __commonJS({
       }
       return cloneSelectively(obj, pathStructure);
     }
-    function validatePath(path2) {
-      if (typeof path2 !== "string") {
+    function validatePath(path3) {
+      if (typeof path3 !== "string") {
         throw new Error("Paths must be (non-empty) strings");
       }
-      if (path2 === "") {
+      if (path3 === "") {
         throw new Error("Invalid redaction path ()");
       }
-      if (path2.includes("..")) {
-        throw new Error(`Invalid redaction path (${path2})`);
+      if (path3.includes("..")) {
+        throw new Error(`Invalid redaction path (${path3})`);
       }
-      if (path2.includes(",")) {
-        throw new Error(`Invalid redaction path (${path2})`);
+      if (path3.includes(",")) {
+        throw new Error(`Invalid redaction path (${path3})`);
       }
       let bracketCount = 0;
       let inQuotes = false;
       let quoteChar = "";
-      for (let i = 0; i < path2.length; i++) {
-        const char2 = path2[i];
+      for (let i = 0; i < path3.length; i++) {
+        const char2 = path3[i];
         if ((char2 === '"' || char2 === "'") && bracketCount > 0) {
           if (!inQuotes) {
             inQuotes = true;
@@ -26695,20 +26695,20 @@ var require_redact = __commonJS({
         } else if (char2 === "]" && !inQuotes) {
           bracketCount--;
           if (bracketCount < 0) {
-            throw new Error(`Invalid redaction path (${path2})`);
+            throw new Error(`Invalid redaction path (${path3})`);
           }
         }
       }
       if (bracketCount !== 0) {
-        throw new Error(`Invalid redaction path (${path2})`);
+        throw new Error(`Invalid redaction path (${path3})`);
       }
     }
     function validatePaths(paths) {
       if (!Array.isArray(paths)) {
         throw new TypeError("paths must be an array");
       }
-      for (const path2 of paths) {
-        validatePath(path2);
+      for (const path3 of paths) {
+        validatePath(path3);
       }
     }
     function slowRedact(options = {}) {
@@ -26835,10 +26835,10 @@ var require_redaction = __commonJS({
     var strict = false;
     function redaction(opts, serialize6) {
       const { paths, censor, remove } = handle(opts);
-      const shape = paths.reduce((o, str3) => {
+      const shape = paths.reduce((o, str4) => {
         rx.lastIndex = 0;
-        const first = rx.exec(str3);
-        const next = rx.exec(str3);
+        const first = rx.exec(str4);
+        const next = rx.exec(str4);
         let ns = first[1] !== void 0 ? first[1].replace(/^(?:"|'|`)(.*)(?:"|'|`)$/, "$1") : first[0];
         if (ns === "*") {
           ns = wildcardFirstSym;
@@ -26851,7 +26851,7 @@ var require_redaction = __commonJS({
           return o;
         }
         const { index: index2 } = next;
-        const nextPath = `${str3.substr(index2, str3.length - 1)}`;
+        const nextPath = `${str4.substr(index2, str4.length - 1)}`;
         o[ns] = o[ns] || [];
         if (ns !== wildcardFirstSym && o[ns].length === 0) {
           o[ns].push(...o[wildcardFirstSym] || []);
@@ -26876,8 +26876,8 @@ var require_redaction = __commonJS({
         if (shape[k] === null) {
           o[k] = (value) => topCensor(value, [k]);
         } else {
-          const wrappedCensor = typeof censor === "function" ? (value, path2) => {
-            return censor(value, [k, ...path2]);
+          const wrappedCensor = typeof censor === "function" ? (value, path3) => {
+            return censor(value, [k, ...path3]);
           } : censor;
           o[k] = Redact({
             paths: shape[k],
@@ -26967,7 +26967,7 @@ var require_quick_format_unescaped = __commonJS({
       }
       var argLen = args.length;
       if (argLen === 0) return f;
-      var str3 = "";
+      var str4 = "";
       var a = 1 - offset;
       var lastPos = -1;
       var flen = f && f.length || 0;
@@ -26982,8 +26982,8 @@ var require_quick_format_unescaped = __commonJS({
                 break;
               if (args[a] == null) break;
               if (lastPos < i)
-                str3 += f.slice(lastPos, i);
-              str3 += Number(args[a]);
+                str4 += f.slice(lastPos, i);
+              str4 += Number(args[a]);
               lastPos = i + 2;
               i++;
               break;
@@ -26992,8 +26992,8 @@ var require_quick_format_unescaped = __commonJS({
                 break;
               if (args[a] == null) break;
               if (lastPos < i)
-                str3 += f.slice(lastPos, i);
-              str3 += Math.floor(Number(args[a]));
+                str4 += f.slice(lastPos, i);
+              str4 += Math.floor(Number(args[a]));
               lastPos = i + 2;
               i++;
               break;
@@ -27006,21 +27006,21 @@ var require_quick_format_unescaped = __commonJS({
                 break;
               if (args[a] === void 0) break;
               if (lastPos < i)
-                str3 += f.slice(lastPos, i);
+                str4 += f.slice(lastPos, i);
               var type = typeof args[a];
               if (type === "string") {
-                str3 += "'" + args[a] + "'";
+                str4 += "'" + args[a] + "'";
                 lastPos = i + 2;
                 i++;
                 break;
               }
               if (type === "function") {
-                str3 += args[a].name || "<anonymous>";
+                str4 += args[a].name || "<anonymous>";
                 lastPos = i + 2;
                 i++;
                 break;
               }
-              str3 += ss(args[a]);
+              str4 += ss(args[a]);
               lastPos = i + 2;
               i++;
               break;
@@ -27028,15 +27028,15 @@ var require_quick_format_unescaped = __commonJS({
               if (a >= argLen)
                 break;
               if (lastPos < i)
-                str3 += f.slice(lastPos, i);
-              str3 += String(args[a]);
+                str4 += f.slice(lastPos, i);
+              str4 += String(args[a]);
               lastPos = i + 2;
               i++;
               break;
             case 37:
               if (lastPos < i)
-                str3 += f.slice(lastPos, i);
-              str3 += "%";
+                str4 += f.slice(lastPos, i);
+              str4 += "%";
               lastPos = i + 2;
               i++;
               a--;
@@ -27049,9 +27049,9 @@ var require_quick_format_unescaped = __commonJS({
       if (lastPos === -1)
         return f;
       else if (lastPos < flen) {
-        str3 += f.slice(lastPos);
+        str4 += f.slice(lastPos);
       }
-      return str3;
+      return str4;
     }
   }
 });
@@ -27061,7 +27061,7 @@ var require_atomic_sleep = __commonJS({
   "../../node_modules/.pnpm/atomic-sleep@1.0.0/node_modules/atomic-sleep/index.js"(exports, module) {
     "use strict";
     if (typeof SharedArrayBuffer !== "undefined" && typeof Atomics !== "undefined") {
-      let sleep3 = function(ms) {
+      let sleep4 = function(ms) {
         const valid = ms > 0 && ms < Infinity;
         if (valid === false) {
           if (typeof ms !== "number" && typeof ms !== "bigint") {
@@ -27072,9 +27072,9 @@ var require_atomic_sleep = __commonJS({
         Atomics.wait(nil, 0, 0, Number(ms));
       };
       const nil = new Int32Array(new SharedArrayBuffer(4));
-      module.exports = sleep3;
+      module.exports = sleep4;
     } else {
-      let sleep3 = function(ms) {
+      let sleep4 = function(ms) {
         const valid = ms > 0 && ms < Infinity;
         if (valid === false) {
           if (typeof ms !== "number" && typeof ms !== "bigint") {
@@ -27086,7 +27086,7 @@ var require_atomic_sleep = __commonJS({
         while (target > Date.now()) {
         }
       };
-      module.exports = sleep3;
+      module.exports = sleep4;
     }
   }
 });
@@ -27098,8 +27098,8 @@ var require_sonic_boom = __commonJS({
     var fs = __require("fs");
     var EventEmitter2 = __require("events");
     var inherits = __require("util").inherits;
-    var path2 = __require("path");
-    var sleep3 = require_atomic_sleep();
+    var path3 = __require("path");
+    var sleep4 = require_atomic_sleep();
     var assert2 = __require("assert");
     var BUSY_WRITE_TIMEOUT = 100;
     var kEmptyBuffer = Buffer.allocUnsafe(0);
@@ -27152,7 +27152,7 @@ var require_sonic_boom = __commonJS({
       const mode = sonic.mode;
       if (sonic.sync) {
         try {
-          if (sonic.mkdir) fs.mkdirSync(path2.dirname(file2), { recursive: true });
+          if (sonic.mkdir) fs.mkdirSync(path3.dirname(file2), { recursive: true });
           const fd = fs.openSync(file2, flags, mode);
           fileOpened(null, fd);
         } catch (err) {
@@ -27160,7 +27160,7 @@ var require_sonic_boom = __commonJS({
           throw err;
         }
       } else if (sonic.mkdir) {
-        fs.mkdir(path2.dirname(file2), { recursive: true }, (err) => {
+        fs.mkdir(path3.dirname(file2), { recursive: true }, (err) => {
           if (err) return fileOpened(err);
           fs.open(file2, flags, mode, fileOpened);
         });
@@ -27245,7 +27245,7 @@ var require_sonic_boom = __commonJS({
           if ((err.code === "EAGAIN" || err.code === "EBUSY") && this.retryEAGAIN(err, this._writingBuf.length, this._len - this._writingBuf.length)) {
             if (this.sync) {
               try {
-                sleep3(BUSY_WRITE_TIMEOUT);
+                sleep4(BUSY_WRITE_TIMEOUT);
                 this.release(void 0, 0);
               } catch (err2) {
                 this.release(err2);
@@ -27558,7 +27558,7 @@ var require_sonic_boom = __commonJS({
           if (shouldRetry && !this.retryEAGAIN(err, buf.length, this._len - buf.length)) {
             throw err;
           }
-          sleep3(BUSY_WRITE_TIMEOUT);
+          sleep4(BUSY_WRITE_TIMEOUT);
         }
       }
       try {
@@ -27595,7 +27595,7 @@ var require_sonic_boom = __commonJS({
           if (shouldRetry && !this.retryEAGAIN(err, buf.length, this._len - buf.length)) {
             throw err;
           }
-          sleep3(BUSY_WRITE_TIMEOUT);
+          sleep4(BUSY_WRITE_TIMEOUT);
         }
       }
     }
@@ -28336,7 +28336,7 @@ var require_transport = __commonJS({
     var { createRequire } = __require("module");
     var getCallers = require_caller();
     var { join, isAbsolute, sep } = __require("node:path");
-    var sleep3 = require_atomic_sleep();
+    var sleep4 = require_atomic_sleep();
     var onExit = require_on_exit_leak_free();
     var ThreadStream = require_thread_stream();
     function setupOnExit(stream) {
@@ -28370,7 +28370,7 @@ var require_transport = __commonJS({
           return;
         }
         stream.flushSync();
-        sleep3(100);
+        sleep4(100);
         stream.end();
       }
       return stream;
@@ -28500,7 +28500,7 @@ var require_tools = __commonJS({
         }
       };
     }
-    function noop3() {
+    function noop4() {
     }
     function genLog(level, hook) {
       if (!hook) return LOG;
@@ -28537,29 +28537,29 @@ var require_tools = __commonJS({
         }
       }
     }
-    function asString2(str3) {
+    function asString2(str4) {
       let result = "";
       let last = 0;
       let found = false;
       let point2 = 255;
-      const l = str3.length;
+      const l = str4.length;
       if (l > 100) {
-        return JSON.stringify(str3);
+        return JSON.stringify(str4);
       }
       for (var i = 0; i < l && point2 >= 32; i++) {
-        point2 = str3.charCodeAt(i);
+        point2 = str4.charCodeAt(i);
         if (point2 === 34 || point2 === 92) {
-          result += str3.slice(last, i) + "\\";
+          result += str4.slice(last, i) + "\\";
           last = i;
           found = true;
         }
       }
       if (!found) {
-        result = str3;
+        result = str4;
       } else {
-        result += str3.slice(last);
+        result += str4.slice(last);
       }
-      return point2 < 32 ? JSON.stringify(str3) : '"' + result + '"';
+      return point2 < 32 ? JSON.stringify(str4) : '"' + result + '"';
     }
     function asJson(obj, msg, num, time4) {
       if (asJsonChan.hasSubscribers === false) {
@@ -28569,20 +28569,20 @@ var require_tools = __commonJS({
       return asJsonChan.traceSync(_asJson, store, this, obj, msg, num, time4);
     }
     function _asJson(obj, msg, num, time4) {
-      const stringify4 = this[stringifySym];
+      const stringify5 = this[stringifySym];
       const stringifySafe = this[stringifySafeSym];
       const stringifiers = this[stringifiersSym];
       const end = this[endSym];
       const chindings = this[chindingsSym];
       const serializers = this[serializersSym];
-      const formatters2 = this[formattersSym];
+      const formatters3 = this[formattersSym];
       const messageKey = this[messageKeySym];
       const errorKey = this[errorKeySym];
       let data = this[lsCacheSym][num] + time4;
       data = data + chindings;
       let value;
-      if (formatters2.log) {
-        obj = formatters2.log(obj);
+      if (formatters3.log) {
+        obj = formatters3.log(obj);
       }
       const wildcardStringifier = stringifiers[wildcardFirstSym];
       let propStr = "";
@@ -28611,7 +28611,7 @@ var require_tools = __commonJS({
               value = (stringifier || asString2)(value);
               break;
             default:
-              value = (stringifier || stringify4)(value, stringifySafe);
+              value = (stringifier || stringify5)(value, stringifySafe);
           }
           if (value === void 0) continue;
           const strKey = asString2(key);
@@ -28639,7 +28639,7 @@ var require_tools = __commonJS({
             msgStr = ',"' + messageKey + '":' + value;
             break;
           default:
-            value = (stringifier || stringify4)(value, stringifySafe);
+            value = (stringifier || stringify5)(value, stringifySafe);
             msgStr = ',"' + messageKey + '":' + value;
         }
       }
@@ -28652,7 +28652,7 @@ var require_tools = __commonJS({
     function asChindings(instance, bindings) {
       let value;
       let data = instance[chindingsSym];
-      const stringify4 = instance[stringifySym];
+      const stringify5 = instance[stringifySym];
       const stringifySafe = instance[stringifySafeSym];
       const stringifiers = instance[stringifiersSym];
       const wildcardStringifier = stringifiers[wildcardFirstSym];
@@ -28664,7 +28664,7 @@ var require_tools = __commonJS({
         const valid = (key.length < 5 || key !== "level" && key !== "serializers" && key !== "formatters" && key !== "customLevels") && bindings.hasOwnProperty(key) && value !== void 0;
         if (valid === true) {
           value = serializers[key] ? serializers[key](value) : value;
-          value = (stringifiers[key] || wildcardStringifier || stringify4)(value, stringifySafe);
+          value = (stringifiers[key] || wildcardStringifier || stringify5)(value, stringifySafe);
           if (value === void 0) continue;
           data += ',"' + key + '":' + value;
         }
@@ -28686,10 +28686,10 @@ var require_tools = __commonJS({
       return stream;
       function filterBrokenPipe(err) {
         if (err.code === "EPIPE") {
-          stream.write = noop3;
-          stream.end = noop3;
-          stream.flushSync = noop3;
-          stream.destroy = noop3;
+          stream.write = noop4;
+          stream.end = noop4;
+          stream.flushSync = noop4;
+          stream.destroy = noop4;
           return;
         }
         stream.removeListener("error", filterBrokenPipe);
@@ -28743,7 +28743,7 @@ var require_tools = __commonJS({
         }
         const { enabled, onChild } = opts;
         if (enabled === false) opts.level = "silent";
-        if (!onChild) opts.onChild = noop3;
+        if (!onChild) opts.onChild = noop4;
         if (!stream) {
           if (!hasBeenTampered(process.stdout)) {
             stream = buildSafeSonicBoom({ fd: process.stdout.fd || 1 });
@@ -28754,13 +28754,13 @@ var require_tools = __commonJS({
         return { opts, stream };
       };
     }
-    function stringify3(obj, stringifySafeFn) {
+    function stringify4(obj, stringifySafeFn) {
       try {
         return JSON.stringify(obj);
       } catch (_2) {
         try {
-          const stringify4 = stringifySafeFn || this[stringifySafeSym];
-          return stringify4(obj);
+          const stringify5 = stringifySafeFn || this[stringifySafeSym];
+          return stringify5(obj);
         } catch (_3) {
           return '"[unable to serialize, circular reference is too complex to analyze]"';
         }
@@ -28784,13 +28784,13 @@ var require_tools = __commonJS({
       return destination;
     }
     module.exports = {
-      noop: noop3,
+      noop: noop4,
       buildSafeSonicBoom,
       asChindings,
       asJson,
       genLog,
       createArgsNormalizer,
-      stringify: stringify3,
+      stringify: stringify4,
       buildFormatters,
       normalizeDestFileDescriptor
     };
@@ -28832,7 +28832,7 @@ var require_levels = __commonJS({
       hooksSym,
       levelCompSym
     } = require_symbols();
-    var { noop: noop3, genLog } = require_tools();
+    var { noop: noop4, genLog } = require_tools();
     var { DEFAULT_LEVELS, SORTING_ORDER } = require_constants3();
     var levelMethods = {
       fatal: (hook) => {
@@ -28903,7 +28903,7 @@ var require_levels = __commonJS({
       const hook = this[hooksSym].logMethod;
       for (const key in values) {
         if (levelComparison(values[key], levelVal) === false) {
-          this[key] = noop3;
+          this[key] = noop4;
           continue;
         }
         this[key] = isStandardLevel(key, useOnlyCustomLevelsVal) ? levelMethods[key](hook) : genLog(values[key], hook);
@@ -29065,8 +29065,8 @@ var require_proto = __commonJS({
       asChindings,
       asJson,
       buildFormatters,
-      stringify: stringify3,
-      noop: noop3
+      stringify: stringify4,
+      noop: noop4
     } = require_tools();
     var {
       version: version3
@@ -29116,19 +29116,19 @@ var require_proto = __commonJS({
         throw Error("missing bindings for child Pino");
       }
       const serializers = this[serializersSym];
-      const formatters2 = this[formattersSym];
+      const formatters3 = this[formattersSym];
       const instance = Object.create(this);
       if (options == null) {
         if (instance[formattersSym].bindings !== resetChildingsFormatter) {
           instance[formattersSym] = buildFormatters(
-            formatters2.level,
+            formatters3.level,
             resetChildingsFormatter,
-            formatters2.log
+            formatters3.log
           );
         }
         instance[chindingsSym] = asChindings(instance, bindings2);
         instance[setLevelSym](this.level);
-        if (this.onChild !== noop3) {
+        if (this.onChild !== noop4) {
           this.onChild(instance);
         }
         return instance;
@@ -29155,15 +29155,15 @@ var require_proto = __commonJS({
       if (options.hasOwnProperty("formatters")) {
         const { level, bindings: chindings, log } = options.formatters;
         instance[formattersSym] = buildFormatters(
-          level || formatters2.level,
+          level || formatters3.level,
           chindings || resetChildingsFormatter,
-          log || formatters2.log
+          log || formatters3.log
         );
       } else {
         instance[formattersSym] = buildFormatters(
-          formatters2.level,
+          formatters3.level,
           resetChildingsFormatter,
-          formatters2.log
+          formatters3.log
         );
       }
       if (options.hasOwnProperty("customLevels") === true) {
@@ -29173,9 +29173,9 @@ var require_proto = __commonJS({
       }
       if (typeof options.redact === "object" && options.redact !== null || Array.isArray(options.redact)) {
         instance.redact = options.redact;
-        const stringifiers = redaction(instance.redact, stringify3);
+        const stringifiers = redaction(instance.redact, stringify4);
         const formatOpts = { stringify: stringifiers[redactFmtSym] };
-        instance[stringifySym] = stringify3;
+        instance[stringifySym] = stringify4;
         instance[stringifiersSym] = stringifiers;
         instance[formatOptsSym] = formatOpts;
       }
@@ -29245,7 +29245,7 @@ var require_proto = __commonJS({
       }
       const stream = this[streamSym];
       if (typeof stream.flush === "function") {
-        stream.flush(cb || noop3);
+        stream.flush(cb || noop4);
       } else if (cb) cb();
     }
   }
@@ -29256,19 +29256,19 @@ var require_safe_stable_stringify = __commonJS({
   "../../node_modules/.pnpm/safe-stable-stringify@2.5.0/node_modules/safe-stable-stringify/index.js"(exports, module) {
     "use strict";
     var { hasOwnProperty } = Object.prototype;
-    var stringify3 = configure();
-    stringify3.configure = configure;
-    stringify3.stringify = stringify3;
-    stringify3.default = stringify3;
-    exports.stringify = stringify3;
+    var stringify4 = configure();
+    stringify4.configure = configure;
+    stringify4.stringify = stringify4;
+    stringify4.default = stringify4;
+    exports.stringify = stringify4;
     exports.configure = configure;
-    module.exports = stringify3;
+    module.exports = stringify4;
     var strEscapeSequencesRegExp = /[\u0000-\u001f\u0022\u005c\ud800-\udfff]/;
-    function strEscape(str3) {
-      if (str3.length < 5e3 && !strEscapeSequencesRegExp.test(str3)) {
-        return `"${str3}"`;
+    function strEscape(str4) {
+      if (str4.length < 5e3 && !strEscapeSequencesRegExp.test(str4)) {
+        return `"${str4}"`;
       }
-      return JSON.stringify(str3);
+      return JSON.stringify(str4);
     }
     function sort(array2, comparator) {
       if (array2.length > 200 || comparator) {
@@ -29820,7 +29820,7 @@ ${originalIndentation}`;
             return fail ? fail(value) : void 0;
         }
       }
-      function stringify4(value, replacer, space) {
+      function stringify5(value, replacer, space) {
         if (arguments.length > 1) {
           let spacer = "";
           if (typeof space === "number") {
@@ -29842,7 +29842,7 @@ ${originalIndentation}`;
         }
         return stringifySimple("", value, []);
       }
-      return stringify4;
+      return stringify5;
     }
   }
 });
@@ -30020,9 +30020,9 @@ var require_pino = __commonJS({
   "../../node_modules/.pnpm/pino@9.14.0/node_modules/pino/pino.js"(exports, module) {
     function pinoBundlerAbsolutePath(p) {
       try {
-        const path2 = __require("path");
+        const path3 = __require("path");
         const outputDir = "/home/runner/workspace/artifacts/api-server/dist";
-        return path2.resolve(outputDir, p.replace(/^\.\//, ""));
+        return path3.resolve(outputDir, p.replace(/^\.\//, ""));
       } catch (e) {
         const f = new Function("p", "return new URL(p, import.meta.url).pathname");
         return f(p);
@@ -30044,9 +30044,9 @@ var require_pino = __commonJS({
       asChindings,
       buildSafeSonicBoom,
       buildFormatters,
-      stringify: stringify3,
+      stringify: stringify4,
       normalizeDestFileDescriptor,
-      noop: noop3
+      noop: noop4
     } = require_tools();
     var { version: version3 } = require_meta();
     var {
@@ -30132,7 +30132,7 @@ var require_pino = __commonJS({
         mixin,
         mixinMergeStrategy,
         useOnlyCustomLevels,
-        formatters: formatters2,
+        formatters: formatters3,
         hooks,
         depthLimit,
         edgeLimit,
@@ -30144,11 +30144,11 @@ var require_pino = __commonJS({
         maximumBreadth: edgeLimit
       });
       const allFormatters = buildFormatters(
-        formatters2.level,
-        formatters2.bindings,
-        formatters2.log
+        formatters3.level,
+        formatters3.bindings,
+        formatters3.log
       );
-      const stringifyFn = stringify3.bind({
+      const stringifyFn = stringify4.bind({
         [stringifySafeSym]: stringifySafe
       });
       const stringifiers = redact ? redaction(redact, stringifyFn) : {};
@@ -30158,7 +30158,7 @@ var require_pino = __commonJS({
         [chindingsSym]: "",
         [serializersSym]: serializers2,
         [stringifiersSym]: stringifiers,
-        [stringifySym]: stringify3,
+        [stringifySym]: stringify4,
         [stringifySafeSym]: stringifySafe,
         [formattersSym]: allFormatters
       });
@@ -30189,7 +30189,7 @@ var require_pino = __commonJS({
         [streamSym]: stream,
         [timeSym]: time5,
         [timeSliceIndexSym]: timeSliceIndex,
-        [stringifySym]: stringify3,
+        [stringifySym]: stringify4,
         [stringifySafeSym]: stringifySafe,
         [stringifiersSym]: stringifiers,
         [endSym]: end,
@@ -30205,7 +30205,7 @@ var require_pino = __commonJS({
         [chindingsSym]: chindings,
         [formattersSym]: allFormatters,
         [hooksSym]: hooks,
-        silent: noop3,
+        silent: noop4,
         onChild,
         [msgPrefixSym]: msgPrefix
       });
@@ -30486,14 +30486,14 @@ var require_logger = __commonJS({
 // ../../node_modules/.pnpm/is-extglob@2.1.1/node_modules/is-extglob/index.js
 var require_is_extglob = __commonJS({
   "../../node_modules/.pnpm/is-extglob@2.1.1/node_modules/is-extglob/index.js"(exports, module) {
-    module.exports = function isExtglob(str3) {
-      if (typeof str3 !== "string" || str3 === "") {
+    module.exports = function isExtglob(str4) {
+      if (typeof str4 !== "string" || str4 === "") {
         return false;
       }
       var match2;
-      while (match2 = /(\\).|([@?!+*]\(.*\))/g.exec(str3)) {
+      while (match2 = /(\\).|([@?!+*]\(.*\))/g.exec(str4)) {
         if (match2[2]) return true;
-        str3 = str3.slice(match2.index + match2[0].length);
+        str4 = str4.slice(match2.index + match2[0].length);
       }
       return false;
     };
@@ -30505,8 +30505,8 @@ var require_is_glob = __commonJS({
   "../../node_modules/.pnpm/is-glob@4.0.3/node_modules/is-glob/index.js"(exports, module) {
     var isExtglob = require_is_extglob();
     var chars = { "{": "}", "(": ")", "[": "]" };
-    var strictCheck = function(str3) {
-      if (str3[0] === "!") {
+    var strictCheck = function(str4) {
+      if (str4[0] === "!") {
         return true;
       }
       var index2 = 0;
@@ -30515,70 +30515,70 @@ var require_is_glob = __commonJS({
       var closeCurlyIndex = -2;
       var closeParenIndex = -2;
       var backSlashIndex = -2;
-      while (index2 < str3.length) {
-        if (str3[index2] === "*") {
+      while (index2 < str4.length) {
+        if (str4[index2] === "*") {
           return true;
         }
-        if (str3[index2 + 1] === "?" && /[\].+)]/.test(str3[index2])) {
+        if (str4[index2 + 1] === "?" && /[\].+)]/.test(str4[index2])) {
           return true;
         }
-        if (closeSquareIndex !== -1 && str3[index2] === "[" && str3[index2 + 1] !== "]") {
+        if (closeSquareIndex !== -1 && str4[index2] === "[" && str4[index2 + 1] !== "]") {
           if (closeSquareIndex < index2) {
-            closeSquareIndex = str3.indexOf("]", index2);
+            closeSquareIndex = str4.indexOf("]", index2);
           }
           if (closeSquareIndex > index2) {
             if (backSlashIndex === -1 || backSlashIndex > closeSquareIndex) {
               return true;
             }
-            backSlashIndex = str3.indexOf("\\", index2);
+            backSlashIndex = str4.indexOf("\\", index2);
             if (backSlashIndex === -1 || backSlashIndex > closeSquareIndex) {
               return true;
             }
           }
         }
-        if (closeCurlyIndex !== -1 && str3[index2] === "{" && str3[index2 + 1] !== "}") {
-          closeCurlyIndex = str3.indexOf("}", index2);
+        if (closeCurlyIndex !== -1 && str4[index2] === "{" && str4[index2 + 1] !== "}") {
+          closeCurlyIndex = str4.indexOf("}", index2);
           if (closeCurlyIndex > index2) {
-            backSlashIndex = str3.indexOf("\\", index2);
+            backSlashIndex = str4.indexOf("\\", index2);
             if (backSlashIndex === -1 || backSlashIndex > closeCurlyIndex) {
               return true;
             }
           }
         }
-        if (closeParenIndex !== -1 && str3[index2] === "(" && str3[index2 + 1] === "?" && /[:!=]/.test(str3[index2 + 2]) && str3[index2 + 3] !== ")") {
-          closeParenIndex = str3.indexOf(")", index2);
+        if (closeParenIndex !== -1 && str4[index2] === "(" && str4[index2 + 1] === "?" && /[:!=]/.test(str4[index2 + 2]) && str4[index2 + 3] !== ")") {
+          closeParenIndex = str4.indexOf(")", index2);
           if (closeParenIndex > index2) {
-            backSlashIndex = str3.indexOf("\\", index2);
+            backSlashIndex = str4.indexOf("\\", index2);
             if (backSlashIndex === -1 || backSlashIndex > closeParenIndex) {
               return true;
             }
           }
         }
-        if (pipeIndex !== -1 && str3[index2] === "(" && str3[index2 + 1] !== "|") {
+        if (pipeIndex !== -1 && str4[index2] === "(" && str4[index2 + 1] !== "|") {
           if (pipeIndex < index2) {
-            pipeIndex = str3.indexOf("|", index2);
+            pipeIndex = str4.indexOf("|", index2);
           }
-          if (pipeIndex !== -1 && str3[pipeIndex + 1] !== ")") {
-            closeParenIndex = str3.indexOf(")", pipeIndex);
+          if (pipeIndex !== -1 && str4[pipeIndex + 1] !== ")") {
+            closeParenIndex = str4.indexOf(")", pipeIndex);
             if (closeParenIndex > pipeIndex) {
-              backSlashIndex = str3.indexOf("\\", pipeIndex);
+              backSlashIndex = str4.indexOf("\\", pipeIndex);
               if (backSlashIndex === -1 || backSlashIndex > closeParenIndex) {
                 return true;
               }
             }
           }
         }
-        if (str3[index2] === "\\") {
-          var open = str3[index2 + 1];
+        if (str4[index2] === "\\") {
+          var open = str4[index2 + 1];
           index2 += 2;
           var close = chars[open];
           if (close) {
-            var n = str3.indexOf(close, index2);
+            var n = str4.indexOf(close, index2);
             if (n !== -1) {
               index2 = n + 1;
             }
           }
-          if (str3[index2] === "!") {
+          if (str4[index2] === "!") {
             return true;
           }
         } else {
@@ -30587,26 +30587,26 @@ var require_is_glob = __commonJS({
       }
       return false;
     };
-    var relaxedCheck = function(str3) {
-      if (str3[0] === "!") {
+    var relaxedCheck = function(str4) {
+      if (str4[0] === "!") {
         return true;
       }
       var index2 = 0;
-      while (index2 < str3.length) {
-        if (/[*?{}()[\]]/.test(str3[index2])) {
+      while (index2 < str4.length) {
+        if (/[*?{}()[\]]/.test(str4[index2])) {
           return true;
         }
-        if (str3[index2] === "\\") {
-          var open = str3[index2 + 1];
+        if (str4[index2] === "\\") {
+          var open = str4[index2 + 1];
           index2 += 2;
           var close = chars[open];
           if (close) {
-            var n = str3.indexOf(close, index2);
+            var n = str4.indexOf(close, index2);
             if (n !== -1) {
               index2 = n + 1;
             }
           }
-          if (str3[index2] === "!") {
+          if (str4[index2] === "!") {
             return true;
           }
         } else {
@@ -30615,18 +30615,18 @@ var require_is_glob = __commonJS({
       }
       return false;
     };
-    module.exports = function isGlob2(str3, options) {
-      if (typeof str3 !== "string" || str3 === "") {
+    module.exports = function isGlob2(str4, options) {
+      if (typeof str4 !== "string" || str4 === "") {
         return false;
       }
-      if (isExtglob(str3)) {
+      if (isExtglob(str4)) {
         return true;
       }
       var check2 = strictCheck;
       if (options && options.strict === false) {
         check2 = relaxedCheck;
       }
-      return check2(str3);
+      return check2(str4);
     };
   }
 });
@@ -30645,10 +30645,10 @@ var require_utils4 = __commonJS({
       return false;
     };
     exports.find = (node, type) => node.nodes.find((node2) => node2.type === type);
-    exports.exceedsLimit = (min, max, step = 1, limit2) => {
-      if (limit2 === false) return false;
+    exports.exceedsLimit = (min, max, step = 1, limit3) => {
+      if (limit3 === false) return false;
       if (!exports.isInteger(min) || !exports.isInteger(max)) return false;
-      return (Number(max) - Number(min)) / Number(step) >= limit2;
+      return (Number(max) - Number(min)) / Number(step) >= limit3;
     };
     exports.escapeNode = (block, n = 0, type) => {
       const node = block.nodes[n];
@@ -30719,7 +30719,7 @@ var require_stringify2 = __commonJS({
     "use strict";
     var utils = require_utils4();
     module.exports = (ast, options = {}) => {
-      const stringify3 = (node, parent = {}) => {
+      const stringify4 = (node, parent = {}) => {
         const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
         const invalidNode = node.invalid === true && options.escapeInvalid === true;
         let output = "";
@@ -30734,12 +30734,12 @@ var require_stringify2 = __commonJS({
         }
         if (node.nodes) {
           for (const child of node.nodes) {
-            output += stringify3(child);
+            output += stringify4(child);
           }
         }
         return output;
       };
-      return stringify3(ast);
+      return stringify4(ast);
     };
   }
 });
@@ -30944,8 +30944,8 @@ var require_to_regex_range = __commonJS({
     function toCharacterClass(a, b, options) {
       return `[${a}${b - a === 1 ? "" : "-"}${b}]`;
     }
-    function hasPadding(str3) {
-      return /^-?(0+)\d/.test(str3);
+    function hasPadding(str4) {
+      return /^-?(0+)\d/.test(str4);
     }
     function padZeros(value, tok, options) {
       if (!tok.isPadded) {
@@ -30993,7 +30993,7 @@ var require_fill_range = __commonJS({
       while (value[++index2] === "0") ;
       return index2 > 0;
     };
-    var stringify3 = (start, end, options) => {
+    var stringify4 = (start, end, options) => {
       if (typeof start === "string" || typeof end === "string") {
         return true;
       }
@@ -31088,7 +31088,7 @@ var require_fill_range = __commonJS({
       step = Math.max(Math.abs(step), 1);
       let padded = zeros(startString) || zeros(endString) || zeros(stepString);
       let maxLen = padded ? Math.max(startString.length, endString.length, stepString.length) : 0;
-      let toNumber = padded === false && stringify3(start, end, options) === false;
+      let toNumber = padded === false && stringify4(start, end, options) === false;
       let format = options.transform || transform2(toNumber);
       if (options.toRegex && step === 1) {
         return toRange(toMaxLen(start, maxLen), toMaxLen(end, maxLen), true, options);
@@ -31222,7 +31222,7 @@ var require_expand = __commonJS({
   "../../node_modules/.pnpm/braces@3.0.3/node_modules/braces/lib/expand.js"(exports, module) {
     "use strict";
     var fill = require_fill_range();
-    var stringify3 = require_stringify2();
+    var stringify4 = require_stringify2();
     var utils = require_utils4();
     var append = (queue = "", stash = "", enclose = false) => {
       const result = [];
@@ -31257,7 +31257,7 @@ var require_expand = __commonJS({
           q = p.queue;
         }
         if (node.invalid || node.dollar) {
-          q.push(append(q.pop(), stringify3(node, options)));
+          q.push(append(q.pop(), stringify4(node, options)));
           return;
         }
         if (node.type === "brace" && node.invalid !== true && node.nodes.length === 2) {
@@ -31271,7 +31271,7 @@ var require_expand = __commonJS({
           }
           let range = fill(...args, options);
           if (range.length === 0) {
-            range = stringify3(node, options);
+            range = stringify4(node, options);
           }
           q.push(append(q.pop(), range));
           node.nodes = [];
@@ -31416,7 +31416,7 @@ var require_constants4 = __commonJS({
 var require_parse2 = __commonJS({
   "../../node_modules/.pnpm/braces@3.0.3/node_modules/braces/lib/parse.js"(exports, module) {
     "use strict";
-    var stringify3 = require_stringify2();
+    var stringify4 = require_stringify2();
     var {
       MAX_LENGTH,
       CHAR_BACKSLASH,
@@ -31588,7 +31588,7 @@ var require_parse2 = __commonJS({
           if (block.ranges > 0) {
             block.ranges = 0;
             const open = block.nodes.shift();
-            block.nodes = [open, { type: "text", value: stringify3(block) }];
+            block.nodes = [open, { type: "text", value: stringify4(block) }];
           }
           push({ type: "comma", value });
           block.commas++;
@@ -31654,7 +31654,7 @@ var require_parse2 = __commonJS({
 var require_braces = __commonJS({
   "../../node_modules/.pnpm/braces@3.0.3/node_modules/braces/index.js"(exports, module) {
     "use strict";
-    var stringify3 = require_stringify2();
+    var stringify4 = require_stringify2();
     var compile = require_compile();
     var expand = require_expand();
     var parse4 = require_parse2();
@@ -31680,9 +31680,9 @@ var require_braces = __commonJS({
     braces.parse = (input, options = {}) => parse4(input, options);
     braces.stringify = (input, options = {}) => {
       if (typeof input === "string") {
-        return stringify3(braces.parse(input, options), options);
+        return stringify4(braces.parse(input, options), options);
       }
-      return stringify3(input, options);
+      return stringify4(input, options);
     };
     braces.compile = (input, options = {}) => {
       if (typeof input === "string") {
@@ -31717,7 +31717,7 @@ var require_braces = __commonJS({
 var require_constants5 = __commonJS({
   "../../node_modules/.pnpm/picomatch@2.3.2/node_modules/picomatch/lib/constants.js"(exports, module) {
     "use strict";
-    var path2 = __require("path");
+    var path3 = __require("path");
     var WIN_SLASH = "\\\\/";
     var WIN_NO_SLASH = `[^${WIN_SLASH}]`;
     var DEFAULT_MAX_EXTGLOB_RECURSION = 0;
@@ -31891,7 +31891,7 @@ var require_constants5 = __commonJS({
       /* | */
       CHAR_ZERO_WIDTH_NOBREAK_SPACE: 65279,
       /* \uFEFF */
-      SEP: path2.sep,
+      SEP: path3.sep,
       /**
        * Create EXTGLOB_CHARS
        */
@@ -31918,7 +31918,7 @@ var require_constants5 = __commonJS({
 var require_utils5 = __commonJS({
   "../../node_modules/.pnpm/picomatch@2.3.2/node_modules/picomatch/lib/utils.js"(exports) {
     "use strict";
-    var path2 = __require("path");
+    var path3 = __require("path");
     var win32 = process.platform === "win32";
     var {
       REGEX_BACKSLASH,
@@ -31927,12 +31927,12 @@ var require_utils5 = __commonJS({
       REGEX_SPECIAL_CHARS_GLOBAL
     } = require_constants5();
     exports.isObject = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
-    exports.hasRegexChars = (str3) => REGEX_SPECIAL_CHARS.test(str3);
-    exports.isRegexChar = (str3) => str3.length === 1 && exports.hasRegexChars(str3);
-    exports.escapeRegex = (str3) => str3.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
-    exports.toPosixSlashes = (str3) => str3.replace(REGEX_BACKSLASH, "/");
-    exports.removeBackslashes = (str3) => {
-      return str3.replace(REGEX_REMOVE_BACKSLASH, (match2) => {
+    exports.hasRegexChars = (str4) => REGEX_SPECIAL_CHARS.test(str4);
+    exports.isRegexChar = (str4) => str4.length === 1 && exports.hasRegexChars(str4);
+    exports.escapeRegex = (str4) => str4.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
+    exports.toPosixSlashes = (str4) => str4.replace(REGEX_BACKSLASH, "/");
+    exports.removeBackslashes = (str4) => {
+      return str4.replace(REGEX_REMOVE_BACKSLASH, (match2) => {
         return match2 === "\\" ? "" : match2;
       });
     };
@@ -31947,7 +31947,7 @@ var require_utils5 = __commonJS({
       if (options && typeof options.windows === "boolean") {
         return options.windows;
       }
-      return win32 === true || path2.sep === "\\";
+      return win32 === true || path3.sep === "\\";
     };
     exports.escapeLast = (input, char2, lastIdx) => {
       const idx = input.lastIndexOf(char2, lastIdx);
@@ -32027,7 +32027,7 @@ var require_scan = __commonJS({
       const slashes = [];
       const tokens = [];
       const parts = [];
-      let str3 = input;
+      let str4 = input;
       let index2 = -1;
       let start = 0;
       let lastIndex = 0;
@@ -32046,10 +32046,10 @@ var require_scan = __commonJS({
       let code;
       let token = { value: "", depth: 0, isGlob: false };
       const eos = () => index2 >= length;
-      const peek = () => str3.charCodeAt(index2 + 1);
+      const peek = () => str4.charCodeAt(index2 + 1);
       const advance = () => {
         prev = code;
-        return str3.charCodeAt(++index2);
+        return str4.charCodeAt(++index2);
       };
       while (index2 < length) {
         code = advance();
@@ -32217,24 +32217,24 @@ var require_scan = __commonJS({
         isExtglob = false;
         isGlob2 = false;
       }
-      let base = str3;
+      let base = str4;
       let prefix = "";
       let glob = "";
       if (start > 0) {
-        prefix = str3.slice(0, start);
-        str3 = str3.slice(start);
+        prefix = str4.slice(0, start);
+        str4 = str4.slice(start);
         lastIndex -= start;
       }
       if (base && isGlob2 === true && lastIndex > 0) {
-        base = str3.slice(0, lastIndex);
-        glob = str3.slice(lastIndex);
+        base = str4.slice(0, lastIndex);
+        glob = str4.slice(lastIndex);
       } else if (isGlob2 === true) {
         base = "";
-        glob = str3;
+        glob = str4;
       } else {
-        base = str3;
+        base = str4;
       }
-      if (base && base !== "" && base !== "/" && base !== str3) {
+      if (base && base !== "" && base !== "/" && base !== str4) {
         if (isPathSeparator(base.charCodeAt(base.length - 1))) {
           base = base.slice(0, -1);
         }
@@ -33269,8 +33269,8 @@ var require_parse3 = __commonJS({
         if (opts2.noglobstar === true) return star;
         return `(${capture}(?:(?!${START_ANCHOR}${opts2.dot ? DOTS_SLASH : DOT_LITERAL}).)*?)`;
       };
-      const create = (str3) => {
-        switch (str3) {
+      const create = (str4) => {
+        switch (str4) {
           case "*":
             return `${nodot}${ONE_CHAR}${star}`;
           case ".*":
@@ -33288,7 +33288,7 @@ var require_parse3 = __commonJS({
           case "**/.*":
             return `(?:${nodot}${globstar(opts)}${SLASH_LITERAL})?${DOT_LITERAL}${ONE_CHAR}${star}`;
           default: {
-            const match2 = /^(.*?)\.(\w+)$/.exec(str3);
+            const match2 = /^(.*?)\.(\w+)$/.exec(str4);
             if (!match2) return;
             const source2 = create(match2[1]);
             if (!source2) return;
@@ -33311,7 +33311,7 @@ var require_parse3 = __commonJS({
 var require_picomatch = __commonJS({
   "../../node_modules/.pnpm/picomatch@2.3.2/node_modules/picomatch/lib/picomatch.js"(exports, module) {
     "use strict";
-    var path2 = __require("path");
+    var path3 = __require("path");
     var scan = require_scan();
     var parse4 = require_parse3();
     var utils = require_utils5();
@@ -33320,9 +33320,9 @@ var require_picomatch = __commonJS({
     var picomatch = (glob, options, returnState = false) => {
       if (Array.isArray(glob)) {
         const fns = glob.map((input) => picomatch(input, options, returnState));
-        const arrayMatcher = (str3) => {
+        const arrayMatcher = (str4) => {
           for (const isMatch of fns) {
-            const state2 = isMatch(str3);
+            const state2 = isMatch(str4);
             if (state2) return state2;
           }
           return false;
@@ -33396,9 +33396,9 @@ var require_picomatch = __commonJS({
     };
     picomatch.matchBase = (input, glob, options, posix = utils.isWindows(options)) => {
       const regex = glob instanceof RegExp ? glob : picomatch.makeRe(glob, options);
-      return regex.test(path2.basename(input));
+      return regex.test(path3.basename(input));
     };
-    picomatch.isMatch = (str3, patterns, options) => picomatch(patterns, options)(str3);
+    picomatch.isMatch = (str4, patterns, options) => picomatch(patterns, options)(str4);
     picomatch.parse = (pattern, options) => {
       if (Array.isArray(pattern)) return pattern.map((p) => picomatch.parse(p, options));
       return parse4(pattern, { ...options, fastpaths: false });
@@ -33512,7 +33512,7 @@ var require_micromatch = __commonJS({
     };
     micromatch2.match = micromatch2;
     micromatch2.matcher = (pattern, options) => picomatch(pattern, options);
-    micromatch2.isMatch = (str3, patterns, options) => picomatch(patterns, options)(str3);
+    micromatch2.isMatch = (str4, patterns, options) => picomatch(patterns, options)(str4);
     micromatch2.any = micromatch2.isMatch;
     micromatch2.not = (list, patterns, options = {}) => {
       patterns = [].concat(patterns).map(String);
@@ -33530,22 +33530,22 @@ var require_micromatch = __commonJS({
       }
       return [...result];
     };
-    micromatch2.contains = (str3, pattern, options) => {
-      if (typeof str3 !== "string") {
-        throw new TypeError(`Expected a string: "${util2.inspect(str3)}"`);
+    micromatch2.contains = (str4, pattern, options) => {
+      if (typeof str4 !== "string") {
+        throw new TypeError(`Expected a string: "${util2.inspect(str4)}"`);
       }
       if (Array.isArray(pattern)) {
-        return pattern.some((p) => micromatch2.contains(str3, p, options));
+        return pattern.some((p) => micromatch2.contains(str4, p, options));
       }
       if (typeof pattern === "string") {
-        if (isEmptyString(str3) || isEmptyString(pattern)) {
+        if (isEmptyString(str4) || isEmptyString(pattern)) {
           return false;
         }
-        if (str3.includes(pattern) || str3.startsWith("./") && str3.slice(2).includes(pattern)) {
+        if (str4.includes(pattern) || str4.startsWith("./") && str4.slice(2).includes(pattern)) {
           return true;
         }
       }
-      return micromatch2.isMatch(str3, pattern, { ...options, contains: true });
+      return micromatch2.isMatch(str4, pattern, { ...options, contains: true });
     };
     micromatch2.matchKeys = (obj, patterns, options) => {
       if (!utils.isObject(obj)) {
@@ -33576,11 +33576,11 @@ var require_micromatch = __commonJS({
       }
       return true;
     };
-    micromatch2.all = (str3, patterns, options) => {
-      if (typeof str3 !== "string") {
-        throw new TypeError(`Expected a string: "${util2.inspect(str3)}"`);
+    micromatch2.all = (str4, patterns, options) => {
+      if (typeof str4 !== "string") {
+        throw new TypeError(`Expected a string: "${util2.inspect(str4)}"`);
       }
-      return [].concat(patterns).every((p) => picomatch(p, options)(str3));
+      return [].concat(patterns).every((p) => picomatch(p, options)(str4));
     };
     micromatch2.capture = (glob, input, options) => {
       let posix = utils.isWindows(options);
@@ -33595,8 +33595,8 @@ var require_micromatch = __commonJS({
     micromatch2.parse = (patterns, options) => {
       let res = [];
       for (let pattern of [].concat(patterns || [])) {
-        for (let str3 of braces(String(pattern), options)) {
-          res.push(picomatch.parse(str3, options));
+        for (let str4 of braces(String(pattern), options)) {
+          res.push(picomatch.parse(str4, options));
         }
       }
       return res;
@@ -33734,9 +33734,9 @@ var require_postgres_date = __commonJS({
     var DATE_TIME = /(\d{1,})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\.\d{1,})?.*?( BC)?$/;
     var DATE = /^(\d{1,})-(\d{2})-(\d{2})( BC)?$/;
     var TIME_ZONE = /([Z+-])(\d{2})?:?(\d{2})?:?(\d{2})?/;
-    var INFINITY2 = /^-?infinity$/;
+    var INFINITY3 = /^-?infinity$/;
     module.exports = function parseDate(isoDate) {
-      if (INFINITY2.test(isoDate)) {
+      if (INFINITY3.test(isoDate)) {
         return Number(isoDate.replace("i", "I"));
       }
       var matches2 = DATE_TIME.exec(isoDate);
@@ -34620,7 +34620,7 @@ var require_defaults = __commonJS({
 var require_utils6 = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/utils.js"(exports, module) {
     "use strict";
-    var defaults3 = require_defaults();
+    var defaults4 = require_defaults();
     var util2 = __require("util");
     var { isDate } = util2.types || util2;
     function escapeElement(elementRepresentation) {
@@ -34671,7 +34671,7 @@ var require_utils6 = __commonJS({
           return buf.slice(val.byteOffset, val.byteOffset + val.byteLength);
         }
         if (isDate(val)) {
-          if (defaults3.parseInputDatesAsUTC) {
+          if (defaults4.parseInputDatesAsUTC) {
             return dateToStringUTC(val);
           } else {
             return dateToString(val);
@@ -34734,20 +34734,20 @@ var require_utils6 = __commonJS({
       }
       return config2;
     }
-    var escapeIdentifier2 = function(str3) {
-      return '"' + str3.replace(/"/g, '""') + '"';
+    var escapeIdentifier2 = function(str4) {
+      return '"' + str4.replace(/"/g, '""') + '"';
     };
-    var escapeLiteral2 = function(str3) {
+    var escapeLiteral2 = function(str4) {
       let hasBackslash = false;
       let escaped = "'";
-      if (str3 == null) {
+      if (str4 == null) {
         return "''";
       }
-      if (typeof str3 !== "string") {
+      if (typeof str4 !== "string") {
         return "''";
       }
-      for (let i = 0; i < str3.length; i++) {
-        const c = str3[i];
+      for (let i = 0; i < str4.length; i++) {
+        const c = str4[i];
         if (c === "'") {
           escaped += c + c;
         } else if (c === "\\") {
@@ -34993,7 +34993,7 @@ var require_cert_signatures = __commonJS({
 var require_sasl = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/crypto/sasl.js"(exports, module) {
     "use strict";
-    var crypto2 = require_utils7();
+    var crypto3 = require_utils7();
     var { signatureAlgorithmHashFromCertificate } = require_cert_signatures();
     function startSession(mechanisms, stream) {
       const candidates = ["SCRAM-SHA-256"];
@@ -35005,7 +35005,7 @@ var require_sasl = __commonJS({
       if (mechanism === "SCRAM-SHA-256-PLUS" && typeof stream.getPeerCertificate !== "function") {
         throw new Error("SASL: Mechanism SCRAM-SHA-256-PLUS requires a certificate");
       }
-      const clientNonce = crypto2.randomBytes(18).toString("base64");
+      const clientNonce = crypto3.randomBytes(18).toString("base64");
       const gs2Header = mechanism === "SCRAM-SHA-256-PLUS" ? "p=tls-server-end-point" : stream ? "y" : "n";
       return {
         mechanism,
@@ -35040,20 +35040,20 @@ var require_sasl = __commonJS({
         const peerCert = stream.getPeerCertificate().raw;
         let hashName = signatureAlgorithmHashFromCertificate(peerCert);
         if (hashName === "MD5" || hashName === "SHA-1") hashName = "SHA-256";
-        const certHash = await crypto2.hashByName(hashName, peerCert);
+        const certHash = await crypto3.hashByName(hashName, peerCert);
         const bindingData = Buffer.concat([Buffer.from("p=tls-server-end-point,,"), Buffer.from(certHash)]);
         channelBinding = bindingData.toString("base64");
       }
       const clientFinalMessageWithoutProof = "c=" + channelBinding + ",r=" + sv.nonce;
       const authMessage = clientFirstMessageBare + "," + serverFirstMessage + "," + clientFinalMessageWithoutProof;
       const saltBytes = Buffer.from(sv.salt, "base64");
-      const saltedPassword = await crypto2.deriveKey(password, saltBytes, sv.iteration);
-      const clientKey = await crypto2.hmacSha256(saltedPassword, "Client Key");
-      const storedKey = await crypto2.sha256(clientKey);
-      const clientSignature = await crypto2.hmacSha256(storedKey, authMessage);
+      const saltedPassword = await crypto3.deriveKey(password, saltBytes, sv.iteration);
+      const clientKey = await crypto3.hmacSha256(saltedPassword, "Client Key");
+      const storedKey = await crypto3.sha256(clientKey);
+      const clientSignature = await crypto3.hmacSha256(storedKey, authMessage);
       const clientProof = xorBuffers(Buffer.from(clientKey), Buffer.from(clientSignature)).toString("base64");
-      const serverKey = await crypto2.hmacSha256(saltedPassword, "Server Key");
-      const serverSignatureBytes = await crypto2.hmacSha256(serverKey, authMessage);
+      const serverKey = await crypto3.hmacSha256(saltedPassword, "Server Key");
+      const serverSignatureBytes = await crypto3.hmacSha256(serverKey, authMessage);
       session.message = "SASLResponse";
       session.serverSignature = Buffer.from(serverSignatureBytes).toString("base64");
       session.response = clientFinalMessageWithoutProof + ",p=" + clientProof;
@@ -35195,22 +35195,22 @@ var require_type_overrides = __commonJS({
 var require_pg_connection_string = __commonJS({
   "../../node_modules/.pnpm/pg-connection-string@2.12.0/node_modules/pg-connection-string/index.js"(exports, module) {
     "use strict";
-    function parse4(str3, options = {}) {
-      if (str3.charAt(0) === "/") {
-        const config3 = str3.split(" ");
+    function parse4(str4, options = {}) {
+      if (str4.charAt(0) === "/") {
+        const config3 = str4.split(" ");
         return { host: config3[0], database: config3[1] };
       }
       const config2 = {};
       let result;
       let dummyHost = false;
-      if (/ |%[^a-f0-9]|%[a-f0-9][^a-f0-9]/i.test(str3)) {
-        str3 = encodeURI(str3).replace(/%25(\d\d)/g, "%$1");
+      if (/ |%[^a-f0-9]|%[a-f0-9][^a-f0-9]/i.test(str4)) {
+        str4 = encodeURI(str4).replace(/%25(\d\d)/g, "%$1");
       }
       try {
         try {
-          result = new URL(str3, "postgres://base");
+          result = new URL(str4, "postgres://base");
         } catch (e) {
-          result = new URL(str3.replace("@/", "@___DUMMY___/"), "postgres://base");
+          result = new URL(str4.replace("@/", "@___DUMMY___/"), "postgres://base");
           dummyHost = true;
         }
       } catch (err) {
@@ -35353,8 +35353,8 @@ var require_pg_connection_string = __commonJS({
       }, {});
       return poolConfig;
     }
-    function parseIntoClientConfig(str3) {
-      return toClientConfig(parse4(str3));
+    function parseIntoClientConfig(str4) {
+      return toClientConfig(parse4(str4));
     }
     function deprecatedSslModeWarning(sslmode) {
       if (!deprecatedSslModeWarning.warned && typeof process !== "undefined" && process.emitWarning) {
@@ -35381,7 +35381,7 @@ var require_connection_parameters = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/connection-parameters.js"(exports, module) {
     "use strict";
     var dns = __require("dns");
-    var defaults3 = require_defaults();
+    var defaults4 = require_defaults();
     var parse4 = require_pg_connection_string().parse;
     var val = function(key, config2, envVar) {
       if (config2[key]) {
@@ -35393,7 +35393,7 @@ var require_connection_parameters = __commonJS({
       } else {
         envVar = process.env[envVar];
       }
-      return envVar || defaults3[key];
+      return envVar || defaults4[key];
     };
     var readSSLConfigFromEnvironment = function() {
       switch (process.env.PGSSLMODE) {
@@ -35407,7 +35407,7 @@ var require_connection_parameters = __commonJS({
         case "no-verify":
           return { rejectUnauthorized: false };
       }
-      return defaults3.ssl;
+      return defaults4.ssl;
     };
     var quoteParamValue = function(value) {
       return "'" + ("" + value).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
@@ -36967,12 +36967,12 @@ var require_split2 = __commonJS({
         self.push(val);
       }
     }
-    function noop3(incoming) {
+    function noop4(incoming) {
       return incoming;
     }
     function split2(matcher, mapper, options) {
       matcher = matcher || /\r?\n/;
-      mapper = mapper || noop3;
+      mapper = mapper || noop4;
       options = options || {};
       switch (arguments.length) {
         case 1:
@@ -36991,7 +36991,7 @@ var require_split2 = __commonJS({
             matcher = /\r?\n/;
           } else if (typeof mapper === "object") {
             options = mapper;
-            mapper = noop3;
+            mapper = noop4;
           }
       }
       options = Object.assign({}, options);
@@ -37021,8 +37021,8 @@ var require_split2 = __commonJS({
 var require_helper = __commonJS({
   "../../node_modules/.pnpm/pgpass@1.0.5/node_modules/pgpass/lib/helper.js"(exports, module) {
     "use strict";
-    var path2 = __require("path");
-    var Stream2 = __require("stream").Stream;
+    var path3 = __require("path");
+    var Stream3 = __require("stream").Stream;
     var split2 = require_split2();
     var util2 = __require("util");
     var defaultPort = 5432;
@@ -37039,7 +37039,7 @@ var require_helper = __commonJS({
     var nrOfFields = fieldNames.length;
     var passKey = fieldNames[nrOfFields - 1];
     function warn() {
-      var isWritable = warnStream instanceof Stream2 && true === warnStream.writable;
+      var isWritable = warnStream instanceof Stream3 && true === warnStream.writable;
       if (isWritable) {
         var args = Array.prototype.slice.call(arguments).concat("\n");
         warnStream.write(util2.format.apply(util2, args));
@@ -37060,7 +37060,7 @@ var require_helper = __commonJS({
     };
     module.exports.getFileName = function(rawEnv) {
       var env = rawEnv || process.env;
-      var file2 = env.PGPASSFILE || (isWin ? path2.join(env.APPDATA || "./", "postgresql", "pgpass.conf") : path2.join(env.HOME || "./", ".pgpass"));
+      var file2 = env.PGPASSFILE || (isWin ? path3.join(env.APPDATA || "./", "postgresql", "pgpass.conf") : path3.join(env.HOME || "./", ".pgpass"));
       return file2;
     };
     module.exports.usePgPass = function(stats, fname) {
@@ -37192,7 +37192,7 @@ var require_helper = __commonJS({
 var require_lib4 = __commonJS({
   "../../node_modules/.pnpm/pgpass@1.0.5/node_modules/pgpass/lib/index.js"(exports, module) {
     "use strict";
-    var path2 = __require("path");
+    var path3 = __require("path");
     var fs = __require("fs");
     var helper = require_helper();
     module.exports = function(connInfo, cb) {
@@ -37219,9 +37219,9 @@ var require_client = __commonJS({
     var TypeOverrides2 = require_type_overrides();
     var ConnectionParameters = require_connection_parameters();
     var Query2 = require_query();
-    var defaults3 = require_defaults();
+    var defaults4 = require_defaults();
     var Connection2 = require_connection();
-    var crypto2 = require_utils7();
+    var crypto3 = require_utils7();
     var activeQueryDeprecationNotice = nodeUtils.deprecate(
       () => {
       },
@@ -37284,7 +37284,7 @@ var require_client = __commonJS({
           encoding: this.connectionParameters.client_encoding || "utf8"
         });
         this._queryQueue = [];
-        this.binary = c.binary || defaults3.binary;
+        this.binary = c.binary || defaults4.binary;
         this.processID = null;
         this.secretKey = null;
         this.ssl = this.connectionParameters.ssl || false;
@@ -37456,7 +37456,7 @@ var require_client = __commonJS({
       _handleAuthMD5Password(msg) {
         this._getPassword(async () => {
           try {
-            const hashedPassword = await crypto2.postgresMd5PasswordHash(this.user, this.password, msg.salt);
+            const hashedPassword = await crypto3.postgresMd5PasswordHash(this.user, this.password, msg.salt);
             this.connection.password(hashedPassword);
           } catch (e) {
             this.emit("error", e);
@@ -37685,11 +37685,11 @@ var require_client = __commonJS({
       // escapeIdentifier and escapeLiteral moved to utility functions & exported
       // on PG
       // re-exported here for backwards compatibility
-      escapeIdentifier(str3) {
-        return utils.escapeIdentifier(str3);
+      escapeIdentifier(str4) {
+        return utils.escapeIdentifier(str4);
       }
-      escapeLiteral(str3) {
-        return utils.escapeLiteral(str3);
+      escapeLiteral(str4) {
+        return utils.escapeLiteral(str4);
       }
       _pulseQueryQueue() {
         if (this.readyForQuery === true) {
@@ -38660,7 +38660,7 @@ var require_lib5 = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/index.js"(exports, module) {
     "use strict";
     var Client3 = require_client();
-    var defaults3 = require_defaults();
+    var defaults4 = require_defaults();
     var Connection2 = require_connection();
     var Result2 = require_result();
     var utils = require_utils6();
@@ -38676,7 +38676,7 @@ var require_lib5 = __commonJS({
       };
     };
     var PG = function(clientConstructor2) {
-      this.defaults = defaults3;
+      this.defaults = defaults4;
       this.Client = clientConstructor2;
       this.Query = this.Client.Query;
       this.Pool = poolFactory(this.Client);
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express30 = __toESM(require_express2(), 1);
+var import_express31 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -38741,7 +38741,7 @@ var getDefaultDirectives = () => ({
   "style-src": ["'self'", "https:", "'unsafe-inline'"],
   "upgrade-insecure-requests": []
 });
-var dashify = (str3) => str3.replace(/[A-Z]/g, (capitalLetter) => "-" + capitalLetter.toLowerCase());
+var dashify = (str4) => str4.replace(/[A-Z]/g, (capitalLetter) => "-" + capitalLetter.toLowerCase());
 var assertDirectiveValueIsValid = (directiveName, directiveValue) => {
   if (/;|,/.test(directiveValue)) {
     throw new Error(`Content-Security-Policy received an invalid directive value for ${JSON.stringify(directiveName)}`);
@@ -39677,8 +39677,8 @@ var validations = {
    *
    * @returns {void}
    */
-  limit(limit2) {
-    if (limit2 === 0) {
+  limit(limit3) {
+    if (limit3 === 0) {
       throw new ChangeWarning(
         "WRN_ERL_MAX_ZERO",
         "Setting limit or max to 0 disables rate limiting in express-rate-limit v6 and older, but will cause all requests to be blocked in v7"
@@ -40001,7 +40001,7 @@ var parseOptions = (passedOptions) => {
     identifier(request2, _response) {
       let duration3 = "";
       const property = config2.requestPropertyName;
-      const { limit: limit2 } = request2[property];
+      const { limit: limit3 } = request2[property];
       const seconds = config2.windowMs / 1e3;
       const minutes = config2.windowMs / (1e3 * 60);
       const hours = config2.windowMs / (1e3 * 60 * 60);
@@ -40010,7 +40010,7 @@ var parseOptions = (passedOptions) => {
       else if (minutes < 60) duration3 = `${minutes}min`;
       else if (hours < 24) duration3 = `${hours}hr${hours > 1 ? "s" : ""}`;
       else duration3 = `${days}day${days > 1 ? "s" : ""}`;
-      return `${limit2}-in-${duration3}`;
+      return `${limit3}-in-${duration3}`;
     },
     requestPropertyName: "rateLimit",
     skipFailedRequests: false,
@@ -40123,12 +40123,12 @@ var rateLimit = (passedOptions) => {
       config2.validations.positiveHits(totalHits);
       config2.validations.singleCount(request2, config2.store, key);
       const retrieveLimit = typeof config2.limit === "function" ? config2.limit(request2, response) : config2.limit;
-      const limit2 = await retrieveLimit;
-      config2.validations.limit(limit2);
+      const limit3 = await retrieveLimit;
+      config2.validations.limit(limit3);
       const info = {
-        limit: limit2,
+        limit: limit3,
         used: totalHits,
-        remaining: Math.max(limit2 - totalHits, 0),
+        remaining: Math.max(limit3 - totalHits, 0),
         resetTime,
         key
       };
@@ -40201,7 +40201,7 @@ var rateLimit = (passedOptions) => {
         }
       }
       config2.validations.disable();
-      if (totalHits > limit2) {
+      if (totalHits > limit3) {
         if (config2.legacyHeaders || config2.standardHeaders) {
           setRetryAfterHeader(response, info, config2.windowMs);
         }
@@ -40224,11 +40224,11 @@ var rate_limit_default = rateLimit;
 var import_pino_http = __toESM(require_logger(), 1);
 
 // ../../node_modules/.pnpm/@clerk+shared@4.22.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/shared/dist/underscore.mjs
-function snakeToCamel(str3) {
-  return str3 ? str3.replace(/([-_][a-z])/g, (match2) => match2.toUpperCase().replace(/-|_/, "")) : "";
+function snakeToCamel(str4) {
+  return str4 ? str4.replace(/([-_][a-z])/g, (match2) => match2.toUpperCase().replace(/-|_/, "")) : "";
 }
-function camelToSnake(str3) {
-  return str3 ? str3.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`) : "";
+function camelToSnake(str4) {
+  return str4 ? str4.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`) : "";
 }
 var createDeepObjectTransformer = (transform2) => {
   const deepTransform = (obj) => {
@@ -41785,9 +41785,9 @@ function U(r, n, e) {
 function P(r, n, e) {
   return r instanceof RegExp ? $(r, n) : Array.isArray(r) ? W(r, n, e) : L(r, n, e);
 }
-function match(str3, options) {
+function match(str4, options) {
   try {
-    return H(str3, options);
+    return H(str4, options);
   } catch (e) {
     throw new Error(`Invalid path and options: Consult the documentation of path-to-regexp here: https://github.com/pillarjs/path-to-regexp/tree/6.x
 ${e.message}`);
@@ -41819,25 +41819,25 @@ var require_dist2 = __commonJS2({
       C.prototype = /* @__PURE__ */ Object.create(null);
       return C;
     })();
-    function parseCookie(str3, options) {
+    function parseCookie(str4, options) {
       const obj = new NullObject();
-      const len = str3.length;
+      const len = str4.length;
       if (len < 2)
         return obj;
       const dec = options?.decode || decode;
       let index2 = 0;
       do {
-        const eqIdx = eqIndex(str3, index2, len);
+        const eqIdx = eqIndex(str4, index2, len);
         if (eqIdx === -1)
           break;
-        const endIdx = endIndex(str3, index2, len);
+        const endIdx = endIndex(str4, index2, len);
         if (eqIdx > endIdx) {
-          index2 = str3.lastIndexOf(";", eqIdx - 1) + 1;
+          index2 = str4.lastIndexOf(";", eqIdx - 1) + 1;
           continue;
         }
-        const key = valueSlice(str3, index2, eqIdx);
+        const key = valueSlice(str4, index2, eqIdx);
         if (obj[key] === void 0) {
-          obj[key] = dec(valueSlice(str3, eqIdx + 1, endIdx));
+          obj[key] = dec(valueSlice(str4, eqIdx + 1, endIdx));
         }
         index2 = endIdx + 1;
       } while (index2 < len);
@@ -41872,51 +41872,51 @@ var require_dist2 = __commonJS2({
       if (!cookieValueRegExp.test(value)) {
         throw new TypeError(`argument val is invalid: ${cookie.value}`);
       }
-      let str3 = cookie.name + "=" + value;
+      let str4 = cookie.name + "=" + value;
       if (cookie.maxAge !== void 0) {
         if (!Number.isInteger(cookie.maxAge)) {
           throw new TypeError(`option maxAge is invalid: ${cookie.maxAge}`);
         }
-        str3 += "; Max-Age=" + cookie.maxAge;
+        str4 += "; Max-Age=" + cookie.maxAge;
       }
       if (cookie.domain) {
         if (!domainValueRegExp.test(cookie.domain)) {
           throw new TypeError(`option domain is invalid: ${cookie.domain}`);
         }
-        str3 += "; Domain=" + cookie.domain;
+        str4 += "; Domain=" + cookie.domain;
       }
       if (cookie.path) {
         if (!pathValueRegExp.test(cookie.path)) {
           throw new TypeError(`option path is invalid: ${cookie.path}`);
         }
-        str3 += "; Path=" + cookie.path;
+        str4 += "; Path=" + cookie.path;
       }
       if (cookie.expires) {
         if (!isDate(cookie.expires) || !Number.isFinite(cookie.expires.valueOf())) {
           throw new TypeError(`option expires is invalid: ${cookie.expires}`);
         }
-        str3 += "; Expires=" + cookie.expires.toUTCString();
+        str4 += "; Expires=" + cookie.expires.toUTCString();
       }
       if (cookie.httpOnly) {
-        str3 += "; HttpOnly";
+        str4 += "; HttpOnly";
       }
       if (cookie.secure) {
-        str3 += "; Secure";
+        str4 += "; Secure";
       }
       if (cookie.partitioned) {
-        str3 += "; Partitioned";
+        str4 += "; Partitioned";
       }
       if (cookie.priority) {
         const priority = typeof cookie.priority === "string" ? cookie.priority.toLowerCase() : void 0;
         switch (priority) {
           case "low":
-            str3 += "; Priority=Low";
+            str4 += "; Priority=Low";
             break;
           case "medium":
-            str3 += "; Priority=Medium";
+            str4 += "; Priority=Medium";
             break;
           case "high":
-            str3 += "; Priority=High";
+            str4 += "; Priority=High";
             break;
           default:
             throw new TypeError(`option priority is invalid: ${cookie.priority}`);
@@ -41927,35 +41927,35 @@ var require_dist2 = __commonJS2({
         switch (sameSite) {
           case true:
           case "strict":
-            str3 += "; SameSite=Strict";
+            str4 += "; SameSite=Strict";
             break;
           case "lax":
-            str3 += "; SameSite=Lax";
+            str4 += "; SameSite=Lax";
             break;
           case "none":
-            str3 += "; SameSite=None";
+            str4 += "; SameSite=None";
             break;
           default:
             throw new TypeError(`option sameSite is invalid: ${cookie.sameSite}`);
         }
       }
-      return str3;
+      return str4;
     }
-    function parseSetCookie(str3, options) {
+    function parseSetCookie(str4, options) {
       const dec = options?.decode || decode;
-      const len = str3.length;
-      const endIdx = endIndex(str3, 0, len);
-      const eqIdx = eqIndex(str3, 0, endIdx);
-      const setCookie = eqIdx === -1 ? { name: "", value: dec(valueSlice(str3, 0, endIdx)) } : {
-        name: valueSlice(str3, 0, eqIdx),
-        value: dec(valueSlice(str3, eqIdx + 1, endIdx))
+      const len = str4.length;
+      const endIdx = endIndex(str4, 0, len);
+      const eqIdx = eqIndex(str4, 0, endIdx);
+      const setCookie = eqIdx === -1 ? { name: "", value: dec(valueSlice(str4, 0, endIdx)) } : {
+        name: valueSlice(str4, 0, eqIdx),
+        value: dec(valueSlice(str4, eqIdx + 1, endIdx))
       };
       let index2 = endIdx + 1;
       while (index2 < len) {
-        const endIdx2 = endIndex(str3, index2, len);
-        const eqIdx2 = eqIndex(str3, index2, endIdx2);
-        const attr = eqIdx2 === -1 ? valueSlice(str3, index2, endIdx2) : valueSlice(str3, index2, eqIdx2);
-        const val = eqIdx2 === -1 ? void 0 : valueSlice(str3, eqIdx2 + 1, endIdx2);
+        const endIdx2 = endIndex(str4, index2, len);
+        const eqIdx2 = eqIndex(str4, index2, endIdx2);
+        const attr = eqIdx2 === -1 ? valueSlice(str4, index2, endIdx2) : valueSlice(str4, index2, eqIdx2);
+        const val = eqIdx2 === -1 ? void 0 : valueSlice(str4, eqIdx2 + 1, endIdx2);
         switch (attr.toLowerCase()) {
           case "httponly":
             setCookie.httpOnly = true;
@@ -42004,37 +42004,37 @@ var require_dist2 = __commonJS2({
       }
       return setCookie;
     }
-    function endIndex(str3, min, len) {
-      const index2 = str3.indexOf(";", min);
+    function endIndex(str4, min, len) {
+      const index2 = str4.indexOf(";", min);
       return index2 === -1 ? len : index2;
     }
-    function eqIndex(str3, min, max) {
-      const index2 = str3.indexOf("=", min);
+    function eqIndex(str4, min, max) {
+      const index2 = str4.indexOf("=", min);
       return index2 < max ? index2 : -1;
     }
-    function valueSlice(str3, min, max) {
+    function valueSlice(str4, min, max) {
       let start = min;
       let end = max;
       do {
-        const code = str3.charCodeAt(start);
+        const code = str4.charCodeAt(start);
         if (code !== 32 && code !== 9)
           break;
       } while (++start < end);
       while (end > start) {
-        const code = str3.charCodeAt(end - 1);
+        const code = str4.charCodeAt(end - 1);
         if (code !== 32 && code !== 9)
           break;
         end--;
       }
-      return str3.slice(start, end);
+      return str4.slice(start, end);
     }
-    function decode(str3) {
-      if (str3.indexOf("%") === -1)
-        return str3;
+    function decode(str4) {
+      if (str4.indexOf("%") === -1)
+        return str4;
       try {
-        return decodeURIComponent(str3);
+        return decodeURIComponent(str4);
       } catch (e) {
-        return str3;
+        return str4;
       }
     }
     function isDate(val) {
@@ -44018,10 +44018,10 @@ var SessionAPI = class extends AbstractAPI {
    */
   async getToken(sessionId, template, expiresInSeconds) {
     this.requireId(sessionId);
-    const path2 = template ? joinPaths(basePath28, sessionId, "tokens", template) : joinPaths(basePath28, sessionId, "tokens");
+    const path3 = template ? joinPaths(basePath28, sessionId, "tokens", template) : joinPaths(basePath28, sessionId, "tokens");
     const requestOptions = {
       method: "POST",
-      path: path2
+      path: path3
     };
     if (expiresInSeconds !== void 0) {
       requestOptions.bodyParams = { expires_in_seconds: expiresInSeconds };
@@ -44086,7 +44086,7 @@ var TestingTokenAPI = class extends AbstractAPI {
 var basePath32 = "/users";
 var UserAPI = class extends AbstractAPI {
   async getUserList(params = {}) {
-    const { limit: limit2, offset, orderBy, ...userCountParams } = params;
+    const { limit: limit3, offset, orderBy, ...userCountParams } = params;
     const [data, totalCount] = await Promise.all([
       this.request({
         method: "GET",
@@ -44191,12 +44191,12 @@ var UserAPI = class extends AbstractAPI {
     });
   }
   async getOrganizationMembershipList(params) {
-    const { userId, limit: limit2, offset } = params;
+    const { userId, limit: limit3, offset } = params;
     this.requireId(userId);
     return this.request({
       method: "GET",
       path: joinPaths(basePath32, userId, "organization_memberships"),
-      queryParams: { limit: limit2, offset }
+      queryParams: { limit: limit3, offset }
     });
   }
   async getOrganizationInvitationList(params) {
@@ -44810,10 +44810,10 @@ var Session = class _Session {
   }
 };
 var Client = class _Client {
-  constructor(id, sessionIds, sessions, signInId, signUpId, lastActiveSessionId, lastAuthenticationStrategy, createdAt, updatedAt) {
+  constructor(id, sessionIds, sessions2, signInId, signUpId, lastActiveSessionId, lastAuthenticationStrategy, createdAt, updatedAt) {
     this.id = id;
     this.sessionIds = sessionIds;
-    this.sessions = sessions;
+    this.sessions = sessions2;
     this.signInId = signInId;
     this.signUpId = signUpId;
     this.lastActiveSessionId = lastActiveSessionId;
@@ -46404,12 +46404,12 @@ function buildRequest(options) {
       userAgent = USER_AGENT,
       skipApiVersionInUrl = false
     } = options;
-    const { path: path2, method, queryParams, headerParams, bodyParams, formData, options: opts } = requestOptions;
+    const { path: path3, method, queryParams, headerParams, bodyParams, formData, options: opts } = requestOptions;
     const { deepSnakecaseBodyParamKeys = false } = opts || {};
     if (requireSecretKey) {
       assertValidSecretKey(secretKey);
     }
-    const url2 = skipApiVersionInUrl ? joinPaths(apiUrl, path2) : joinPaths(apiUrl, apiVersion, path2);
+    const url2 = skipApiVersionInUrl ? joinPaths(apiUrl, path3) : joinPaths(apiUrl, apiVersion, path3);
     const finalUrl = new URL(url2);
     if (queryParams) {
       const snakecasedQueryParams = snakecase_keys_default({ ...queryParams });
@@ -47033,8 +47033,8 @@ var ClerkRequest = class extends Request {
     const cookiesRecord = (0, import_cookie.parse)(this.decodeCookieValue(req.headers.get("cookie") || ""));
     return new Map(Object.entries(cookiesRecord));
   }
-  decodeCookieValue(str3) {
-    return str3 ? str3.replace(/(%[0-9A-Z]{2})+/g, decodeURIComponent) : str3;
+  decodeCookieValue(str4) {
+    return str4 ? str4.replace(/(%[0-9A-Z]{2})+/g, decodeURIComponent) : str4;
   }
 };
 var createClerkRequest = (...args) => {
@@ -48591,11 +48591,11 @@ function fapiUrlFromPublishableKey(publishableKey) {
   }
   return PROD_FAPI_URL;
 }
-function stripTrailingSlashes(str3) {
-  while (str3.endsWith("/")) {
-    str3 = str3.slice(0, -1);
+function stripTrailingSlashes(str4) {
+  while (str4.endsWith("/")) {
+    str4 = str4.slice(0, -1);
   }
-  return str3;
+  return str4;
 }
 function createErrorResponse(code, message, status) {
   const error40 = { code, message };
@@ -49059,14 +49059,14 @@ function setupOutgoing(outgoing, options, req, forward) {
   if (options.changeOrigin) outgoing.headers.host = requiresPort(outgoing.port, options[forward || "target"].protocol) && !hasPort(outgoing.host) ? outgoing.host + ":" + outgoing.port : outgoing.host ?? void 0;
   return outgoing;
 }
-function joinURL(base, path2) {
-  if (!base || base === "/") return path2 || "/";
-  if (!path2 || path2 === "/") return base || "/";
+function joinURL(base, path3) {
+  if (!base || base === "/") return path3 || "/";
+  if (!path3 || path3 === "/") return base || "/";
   const baseHasTrailing = base[base.length - 1] === "/";
-  const pathHasLeading = path2[0] === "/";
-  if (baseHasTrailing && pathHasLeading) return base + path2.slice(1);
-  if (!baseHasTrailing && !pathHasLeading) return base + "/" + path2;
-  return base + path2;
+  const pathHasLeading = path3[0] === "/";
+  if (baseHasTrailing && pathHasLeading) return base + path3.slice(1);
+  if (!baseHasTrailing && !pathHasLeading) return base + "/" + path3;
+  return base + path3;
 }
 function setupSocket(socket) {
   socket.setTimeout(0);
@@ -49686,15 +49686,15 @@ function getLogger(options) {
 
 // ../../node_modules/.pnpm/http-proxy-middleware@4.1.0/node_modules/http-proxy-middleware/dist/utils/create-url.js
 import { URL as URL2 } from "url";
-function createUrl({ protocol, host, port: port2, path: path2 }) {
+function createUrl({ protocol, host, port: port2, path: path3 }) {
   const ipv6Host = host?.includes(":") ? `[${host}]` : host;
   const base = `${protocol || "undefined:"}//${ipv6Host || "[::]"}`;
   const url2 = new URL2(base);
   if (port2) {
     url2.port = port2;
   }
-  if (path2) {
-    url2.pathname = path2;
+  if (path3) {
+    url2.pathname = path3;
   }
   return url2;
 }
@@ -49720,8 +49720,8 @@ var loggerPlugin = definePlugin((proxyServer, options) => {
     let target;
     try {
       const port2 = getPort2(proxyRes.req?.agent?.sockets);
-      const { protocol, host, path: path2 } = proxyRes.req;
-      target = createUrl({ protocol, host, port: port2, path: path2 });
+      const { protocol, host, path: path3 } = proxyRes.req;
+      target = createUrl({ protocol, host, port: port2, path: path3 });
     } catch (err) {
       console.error("[HPM] Unexpected error while creating target URL", err);
       target = new URL3(options.target);
@@ -49851,12 +49851,12 @@ function createPathRewriter(rewriteConfig) {
     rulesCache = parsePathRewriteRules(rewriteConfig);
     return rewritePath;
   }
-  function rewritePath(path2) {
-    let result = path2;
+  function rewritePath(path3) {
+    let result = path3;
     for (const rule of rulesCache) {
-      if (rule.regex.test(path2)) {
+      if (rule.regex.test(path3)) {
         result = result.replace(rule.regex, rule.value);
-        debug3('rewriting path from "%s" to "%s"', path2, result);
+        debug3('rewriting path from "%s" to "%s"', path3, result);
         break;
       }
     }
@@ -49892,29 +49892,29 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router29 = config2.router;
-  if (isPlainObject(router29)) {
-    newTarget = getTargetFromProxyTable(req, router29);
-  } else if (typeof router29 === "function") {
-    newTarget = await router29(req, res, config2);
+  const router30 = config2.router;
+  if (isPlainObject(router30)) {
+    newTarget = getTargetFromProxyTable(req, router30);
+  } else if (typeof router30 === "function") {
+    newTarget = await router30(req, res, config2);
   }
   return newTarget;
 }
 function getTargetFromProxyTable(req, table) {
   let result;
   const host = req.headers.host ?? "";
-  const path2 = req.url ?? "";
+  const path3 = req.url ?? "";
   for (const [key, value] of Object.entries(table)) {
     if (containsPath(key)) {
       if (isHostAndPathKey(key)) {
         const [keyHost, keyPath] = splitHostAndPathKey(key);
-        if (host === keyHost && path2.startsWith(keyPath)) {
+        if (host === keyHost && path3.startsWith(keyPath)) {
           result = value;
           debug4('match: "%s" -> "%s"', key, result);
           break;
         }
       } else {
-        if (path2.startsWith(key)) {
+        if (path3.startsWith(key)) {
           result = value;
           debug4('match: "%s" -> "%s"', key, result);
           break;
@@ -50122,10 +50122,10 @@ var HttpProxyMiddleware = class {
   // rewrite path
   applyPathRewrite = async (req, res, pathRewriter, options) => {
     if (req.url && pathRewriter) {
-      const path2 = await pathRewriter(req.url, req, res, options);
-      if (typeof path2 === "string") {
-        Debug("pathRewrite new path: %s", path2);
-        req.url = path2;
+      const path3 = await pathRewriter(req.url, req, res, options);
+      if (typeof path3 === "string") {
+        Debug("pathRewrite new path: %s", path3);
+        req.url = path3;
       } else {
         Debug("pathRewrite: no rewritten path found: %s", req.url);
       }
@@ -50159,7 +50159,7 @@ function clerkProxyMiddleware() {
   return createProxyMiddleware({
     target: CLERK_FAPI,
     changeOrigin: true,
-    pathRewrite: (path2) => path2.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ""),
+    pathRewrite: (path3) => path3.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ""),
     on: {
       proxyReq: (proxyReq, req) => {
         const protocol = req.headers["x-forwarded-proto"] || "https";
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express29 = __toESM(require_express2(), 1);
+var import_express30 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -51279,8 +51279,8 @@ function sql(strings, ...params) {
     return new SQL(list);
   }
   sql2.fromList = fromList;
-  function raw(str3) {
-    return new SQL([new StringChunk(str3)]);
+  function raw(str4) {
+    return new SQL([new StringChunk(str4)]);
   }
   sql2.raw = raw;
   function join(chunks, separator) {
@@ -51555,7 +51555,7 @@ var SelectionProxyHandler = class _SelectionProxyHandler {
 function mapResultRow(columns, row, joinsNotNullableMap) {
   const nullifyMap = {};
   const result = columns.reduce(
-    (result2, { path: path2, field }, columnIndex) => {
+    (result2, { path: path3, field }, columnIndex) => {
       let decoder;
       if (is(field, Column)) {
         decoder = field;
@@ -51567,8 +51567,8 @@ function mapResultRow(columns, row, joinsNotNullableMap) {
         decoder = field.sql.decoder;
       }
       let node = result2;
-      for (const [pathChunkIndex, pathChunk] of path2.entries()) {
-        if (pathChunkIndex < path2.length - 1) {
+      for (const [pathChunkIndex, pathChunk] of path3.entries()) {
+        if (pathChunkIndex < path3.length - 1) {
           if (!(pathChunk in node)) {
             node[pathChunk] = {};
           }
@@ -51576,8 +51576,8 @@ function mapResultRow(columns, row, joinsNotNullableMap) {
         } else {
           const rawValue = row[columnIndex];
           const value = node[pathChunk] = rawValue === null ? null : decoder.mapFromDriverValue(rawValue);
-          if (joinsNotNullableMap && is(field, Column) && path2.length === 2) {
-            const objectName = path2[0];
+          if (joinsNotNullableMap && is(field, Column) && path3.length === 2) {
+            const objectName = path3[0];
             if (!(objectName in nullifyMap)) {
               nullifyMap[objectName] = value === null ? getTableName(field.table) : false;
             } else if (typeof nullifyMap[objectName] === "string" && nullifyMap[objectName] !== getTableName(field.table)) {
@@ -53770,8 +53770,8 @@ var PgDialect = class {
   escapeParam(num) {
     return `$${num + 1}`;
   }
-  escapeString(str3) {
-    return `'${str3.replace(/'/g, "''")}'`;
+  escapeString(str4) {
+    return `'${str4.replace(/'/g, "''")}'`;
   }
   buildWithCTE(queries) {
     if (!queries?.length) return void 0;
@@ -53941,7 +53941,7 @@ var PgDialect = class {
     joins,
     orderBy,
     groupBy,
-    limit: limit2,
+    limit: limit3,
     offset,
     lockingClause,
     distinct,
@@ -53977,7 +53977,7 @@ var PgDialect = class {
     if (groupBy && groupBy.length > 0) {
       groupBySql = sql` group by ${sql.join(groupBy, sql`, `)}`;
     }
-    const limitSql = typeof limit2 === "object" || typeof limit2 === "number" && limit2 >= 0 ? sql` limit ${limit2}` : void 0;
+    const limitSql = typeof limit3 === "object" || typeof limit3 === "number" && limit3 >= 0 ? sql` limit ${limit3}` : void 0;
     const offsetSql = offset ? sql` offset ${offset}` : void 0;
     const lockingClauseSql = sql.empty();
     if (lockingClause) {
@@ -54018,7 +54018,7 @@ var PgDialect = class {
   }
   buildSetOperationQuery({
     leftSelect,
-    setOperator: { type, isAll, rightSelect, limit: limit2, orderBy, offset }
+    setOperator: { type, isAll, rightSelect, limit: limit3, orderBy, offset }
   }) {
     const leftChunk = sql`(${leftSelect.getSQL()}) `;
     const rightChunk = sql`(${rightSelect.getSQL()})`;
@@ -54042,7 +54042,7 @@ var PgDialect = class {
       }
       orderBySql = sql` order by ${sql.join(orderByValues, sql`, `)} `;
     }
-    const limitSql = typeof limit2 === "object" || typeof limit2 === "number" && limit2 >= 0 ? sql` limit ${limit2}` : void 0;
+    const limitSql = typeof limit3 === "object" || typeof limit3 === "number" && limit3 >= 0 ? sql` limit ${limit3}` : void 0;
     const operatorChunk = sql.raw(`${type} ${isAll ? "all " : ""}`);
     const offsetSql = offset ? sql` offset ${offset}` : void 0;
     return sql`${leftChunk}${operatorChunk}${rightChunk}${orderBySql}${limitSql}${offsetSql}`;
@@ -54622,7 +54622,7 @@ var PgDialect = class {
     joinOn
   }) {
     let selection = [];
-    let limit2, offset, orderBy = [], where;
+    let limit3, offset, orderBy = [], where;
     const joins = [];
     if (config2 === true) {
       const selectionEntries = Object.entries(tableConfig.columns);
@@ -54701,7 +54701,7 @@ var PgDialect = class {
         }
         return mapColumnsInSQLToAlias(orderByValue, tableAlias);
       });
-      limit2 = config2.limit;
+      limit3 = config2.limit;
       offset = config2.offset;
       for (const {
         tsKey: selectedRelationTsKey,
@@ -54772,7 +54772,7 @@ var PgDialect = class {
         relationTableTsKey: tableConfig.tsName,
         selection
       }];
-      const needsSubquery = limit2 !== void 0 || offset !== void 0 || orderBy.length > 0;
+      const needsSubquery = limit3 !== void 0 || offset !== void 0 || orderBy.length > 0;
       if (needsSubquery) {
         result = this.buildSelectQuery({
           table: aliasedTable(table, tableAlias),
@@ -54782,13 +54782,13 @@ var PgDialect = class {
             field: sql.raw("*")
           }],
           where,
-          limit: limit2,
+          limit: limit3,
           offset,
           orderBy,
           setOperators: []
         });
         where = void 0;
-        limit2 = void 0;
+        limit3 = void 0;
         offset = void 0;
         orderBy = [];
       } else {
@@ -54803,7 +54803,7 @@ var PgDialect = class {
         })),
         joins,
         where,
-        limit: limit2,
+        limit: limit3,
         offset,
         orderBy,
         setOperators: []
@@ -54818,7 +54818,7 @@ var PgDialect = class {
         })),
         joins,
         where,
-        limit: limit2,
+        limit: limit3,
         offset,
         orderBy,
         setOperators: []
@@ -55503,11 +55503,11 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    * await db.select().from(people).limit(10);
    * ```
    */
-  limit(limit2) {
+  limit(limit3) {
     if (this.config.setOperators.length > 0) {
-      this.config.setOperators.at(-1).limit = limit2;
+      this.config.setOperators.at(-1).limit = limit3;
     } else {
-      this.config.limit = limit2;
+      this.config.limit = limit3;
     }
     return this;
   }
@@ -57797,12 +57797,12 @@ var NEVER = Object.freeze({
 // @__NO_SIDE_EFFECTS__
 function $constructor(name, initializer3, params) {
   function init(inst, def) {
-    var _a3;
+    var _a5;
     Object.defineProperty(inst, "_zod", {
       value: inst._zod ?? {},
       enumerable: false
     });
-    (_a3 = inst._zod).traits ?? (_a3.traits = /* @__PURE__ */ new Set());
+    (_a5 = inst._zod).traits ?? (_a5.traits = /* @__PURE__ */ new Set());
     inst._zod.traits.add(name);
     initializer3(inst, def);
     for (const k in _2.prototype) {
@@ -57817,10 +57817,10 @@ function $constructor(name, initializer3, params) {
   }
   Object.defineProperty(Definition, "name", { value: name });
   function _2(def) {
-    var _a3;
+    var _a5;
     const inst = params?.Parent ? new Definition() : this;
     init(inst, def);
-    (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
+    (_a5 = inst._zod).deferred ?? (_a5.deferred = []);
     for (const fn of inst._zod.deferred) {
       fn();
     }
@@ -57986,10 +57986,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path2) {
-  if (!path2)
+function getElementAtPath(obj, path3) {
+  if (!path3)
     return obj;
-  return path2.reduce((acc, key) => acc?.[key], obj);
+  return path3.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -58004,14 +58004,14 @@ function promiseAllObject(promisesObj) {
 }
 function randomString(length = 10) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
-  let str3 = "";
+  let str4 = "";
   for (let i = 0; i < length; i++) {
-    str3 += chars[Math.floor(Math.random() * chars.length)];
+    str4 += chars[Math.floor(Math.random() * chars.length)];
   }
-  return str3;
+  return str4;
 }
-function esc(str3) {
-  return JSON.stringify(str3);
+function esc(str4) {
+  return JSON.stringify(str4);
 }
 var captureStackTrace = Error.captureStackTrace ? Error.captureStackTrace : (..._args) => {
 };
@@ -58099,8 +58099,8 @@ var getParsedType = (data) => {
 };
 var propertyKeyTypes = /* @__PURE__ */ new Set(["string", "number", "symbol"]);
 var primitiveTypes = /* @__PURE__ */ new Set(["string", "number", "bigint", "boolean", "symbol", "undefined"]);
-function escapeRegex(str3) {
-  return str3.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegex(str4) {
+  return str4.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function clone(inst, def, params) {
   const cl = new inst._zod.constr(def ?? inst._zod.def);
@@ -58309,11 +58309,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path2, issues) {
+function prefixIssues(path3, issues) {
   return issues.map((iss) => {
-    var _a3;
-    (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path2);
+    var _a5;
+    (_a5 = iss).path ?? (_a5.path = []);
+    iss.path.unshift(path3);
     return iss;
   });
 }
@@ -58450,8 +58450,8 @@ function treeifyError(error40, _mapper) {
     return issue2.message;
   };
   const result = { errors: [] };
-  const processError = (error41, path2 = []) => {
-    var _a3, _b;
+  const processError = (error41, path3 = []) => {
+    var _a5, _b;
     for (const issue2 of error41.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
         issue2.errors.map((issues) => processError({ issues }, issue2.path));
@@ -58460,7 +58460,7 @@ function treeifyError(error40, _mapper) {
       } else if (issue2.code === "invalid_element") {
         processError({ issues: issue2.issues }, issue2.path);
       } else {
-        const fullpath = [...path2, ...issue2.path];
+        const fullpath = [...path3, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -58472,7 +58472,7 @@ function treeifyError(error40, _mapper) {
           const terminal = i === fullpath.length - 1;
           if (typeof el === "string") {
             curr.properties ?? (curr.properties = {});
-            (_a3 = curr.properties)[el] ?? (_a3[el] = { errors: [] });
+            (_a5 = curr.properties)[el] ?? (_a5[el] = { errors: [] });
             curr = curr.properties[el];
           } else {
             curr.items ?? (curr.items = []);
@@ -58490,9 +58490,9 @@ function treeifyError(error40, _mapper) {
   processError(error40);
   return result;
 }
-function toDotPath(path2) {
+function toDotPath(path3) {
   const segs = [];
-  for (const seg of path2) {
+  for (const seg of path3) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -58685,10 +58685,10 @@ var uppercase = /^[^a-z]*$/;
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
-  var _a3;
+  var _a5;
   inst._zod ?? (inst._zod = {});
   inst._zod.def = def;
-  (_a3 = inst._zod).onattach ?? (_a3.onattach = []);
+  (_a5 = inst._zod).onattach ?? (_a5.onattach = []);
 });
 var numericOriginMap = {
   number: "number",
@@ -58754,8 +58754,8 @@ var $ZodCheckGreaterThan = /* @__PURE__ */ $constructor("$ZodCheckGreaterThan", 
 var $ZodCheckMultipleOf = /* @__PURE__ */ $constructor("$ZodCheckMultipleOf", (inst, def) => {
   $ZodCheck.init(inst, def);
   inst._zod.onattach.push((inst2) => {
-    var _a3;
-    (_a3 = inst2._zod.bag).multipleOf ?? (_a3.multipleOf = def.value);
+    var _a5;
+    (_a5 = inst2._zod.bag).multipleOf ?? (_a5.multipleOf = def.value);
   });
   inst._zod.check = (payload) => {
     if (typeof payload.value !== typeof def.value)
@@ -58881,9 +58881,9 @@ var $ZodCheckBigIntFormat = /* @__PURE__ */ $constructor("$ZodCheckBigIntFormat"
   };
 });
 var $ZodCheckMaxSize = /* @__PURE__ */ $constructor("$ZodCheckMaxSize", (inst, def) => {
-  var _a3;
+  var _a5;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
+  (_a5 = inst._zod.def).when ?? (_a5.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.size !== void 0;
   });
@@ -58908,9 +58908,9 @@ var $ZodCheckMaxSize = /* @__PURE__ */ $constructor("$ZodCheckMaxSize", (inst, d
   };
 });
 var $ZodCheckMinSize = /* @__PURE__ */ $constructor("$ZodCheckMinSize", (inst, def) => {
-  var _a3;
+  var _a5;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
+  (_a5 = inst._zod.def).when ?? (_a5.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.size !== void 0;
   });
@@ -58935,9 +58935,9 @@ var $ZodCheckMinSize = /* @__PURE__ */ $constructor("$ZodCheckMinSize", (inst, d
   };
 });
 var $ZodCheckSizeEquals = /* @__PURE__ */ $constructor("$ZodCheckSizeEquals", (inst, def) => {
-  var _a3;
+  var _a5;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
+  (_a5 = inst._zod.def).when ?? (_a5.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.size !== void 0;
   });
@@ -58965,9 +58965,9 @@ var $ZodCheckSizeEquals = /* @__PURE__ */ $constructor("$ZodCheckSizeEquals", (i
   };
 });
 var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (inst, def) => {
-  var _a3;
+  var _a5;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
+  (_a5 = inst._zod.def).when ?? (_a5.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.length !== void 0;
   });
@@ -58994,9 +58994,9 @@ var $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (ins
   };
 });
 var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (inst, def) => {
-  var _a3;
+  var _a5;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
+  (_a5 = inst._zod.def).when ?? (_a5.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.length !== void 0;
   });
@@ -59023,9 +59023,9 @@ var $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (ins
   };
 });
 var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals", (inst, def) => {
-  var _a3;
+  var _a5;
   $ZodCheck.init(inst, def);
-  (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
+  (_a5 = inst._zod.def).when ?? (_a5.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.length !== void 0;
   });
@@ -59054,7 +59054,7 @@ var $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals"
   };
 });
 var $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat", (inst, def) => {
-  var _a3, _b;
+  var _a5, _b;
   $ZodCheck.init(inst, def);
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
@@ -59065,7 +59065,7 @@ var $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat"
     }
   });
   if (def.pattern)
-    (_a3 = inst._zod).check ?? (_a3.check = (payload) => {
+    (_a5 = inst._zod).check ?? (_a5.check = (payload) => {
       def.pattern.lastIndex = 0;
       if (def.pattern.test(payload.value))
         return;
@@ -59266,7 +59266,7 @@ var version2 = {
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
-  var _a3;
+  var _a5;
   inst ?? (inst = {});
   inst._zod.def = def;
   inst._zod.bag = inst._zod.bag || {};
@@ -59281,7 +59281,7 @@ var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
     }
   }
   if (checks.length === 0) {
-    (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
+    (_a5 = inst._zod).deferred ?? (_a5.deferred = []);
     inst._zod.deferred?.push(() => {
       inst._zod.run = inst._zod.parse;
     });
@@ -66647,7 +66647,7 @@ var JSONSchemaGenerator = class {
     this.seen = /* @__PURE__ */ new Map();
   }
   process(schema, _params = { path: [], schemaPath: [] }) {
-    var _a3;
+    var _a5;
     const def = schema._zod.def;
     const formatMap = {
       guid: "uuid",
@@ -67109,7 +67109,7 @@ var JSONSchemaGenerator = class {
       delete result.schema.default;
     }
     if (this.io === "input" && result.schema._prefault)
-      (_a3 = result.schema).default ?? (_a3.default = result.schema._prefault);
+      (_a5 = result.schema).default ?? (_a5.default = result.schema._prefault);
     delete result.schema._prefault;
     const _result = this.seen.get(schema);
     return _result.schema;
@@ -70224,10 +70224,10 @@ var util;
   function assertIs2(_arg) {
   }
   util2.assertIs = assertIs2;
-  function assertNever4(_x) {
+  function assertNever6(_x) {
     throw new Error();
   }
-  util2.assertNever = assertNever4;
+  util2.assertNever = assertNever6;
   util2.arrayToEnum = (items) => {
     const obj = {};
     for (const item of items) {
@@ -70575,8 +70575,8 @@ function getErrorMap2() {
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path2, errorMaps, issueData } = params;
-  const fullPath = [...path2, ...issueData.path || []];
+  const { data, path: path3, errorMaps, issueData } = params;
+  const fullPath = [...path3, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -70691,11 +70691,11 @@ var errorUtil;
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path2, key) {
+  constructor(parent, value, path3, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path2;
+    this._path = path3;
     this._key = key;
   }
   get path() {
@@ -76937,13 +76937,13 @@ function __classPrivateFieldGet(receiver, state, kind, f) {
 
 // ../../node_modules/.pnpm/openai@6.44.0_ws@8.21.0_zod@3.25.76/node_modules/openai/internal/utils/uuid.mjs
 var uuid42 = function() {
-  const { crypto: crypto2 } = globalThis;
-  if (crypto2?.randomUUID) {
-    uuid42 = crypto2.randomUUID.bind(crypto2);
-    return crypto2.randomUUID();
+  const { crypto: crypto3 } = globalThis;
+  if (crypto3?.randomUUID) {
+    uuid42 = crypto3.randomUUID.bind(crypto3);
+    return crypto3.randomUUID();
   }
   const u8 = new Uint8Array(1);
-  const randomByte = crypto2 ? () => crypto2.getRandomValues(u8)[0] : () => Math.random() * 255 & 255;
+  const randomByte = crypto3 ? () => crypto3.getRandomValues(u8)[0] : () => Math.random() * 255 & 255;
   return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (+c ^ randomByte() & 15 >> +c / 4).toString(16));
 };
 
@@ -77396,15 +77396,15 @@ var hex_table = /* @__PURE__ */ (() => {
   return array2;
 })();
 var limit = 1024;
-var encode = (str3, _defaultEncoder, charset, _kind, format) => {
-  if (str3.length === 0) {
-    return str3;
+var encode = (str4, _defaultEncoder, charset, _kind, format) => {
+  if (str4.length === 0) {
+    return str4;
   }
-  let string4 = str3;
-  if (typeof str3 === "symbol") {
-    string4 = Symbol.prototype.toString.call(str3);
-  } else if (typeof str3 !== "string") {
-    string4 = String(str3);
+  let string4 = str4;
+  if (typeof str4 === "symbol") {
+    string4 = Symbol.prototype.toString.call(str4);
+  } else if (typeof str4 !== "string") {
+    string4 = String(str4);
   }
   if (charset === "iso-8859-1") {
     return escape(string4).replace(/%u[0-9a-f]{4}/gi, function($0) {
@@ -77763,9 +77763,9 @@ function concatBytes(buffers) {
   return output;
 }
 var encodeUTF8_;
-function encodeUTF8(str3) {
+function encodeUTF8(str4) {
   let encoder;
-  return (encodeUTF8_ ?? (encoder = new globalThis.TextEncoder(), encodeUTF8_ = encoder.encode.bind(encoder)))(str3);
+  return (encodeUTF8_ ?? (encoder = new globalThis.TextEncoder(), encodeUTF8_ = encoder.encode.bind(encoder)))(str4);
 }
 var decodeUTF8_;
 function decodeUTF8(bytes) {
@@ -78173,12 +78173,12 @@ var SSEDecoder = class {
     return null;
   }
 };
-function partition(str3, delimiter) {
-  const index2 = str3.indexOf(delimiter);
+function partition(str4, delimiter) {
+  const index2 = str4.indexOf(delimiter);
   if (index2 !== -1) {
-    return [str3.substring(0, index2), delimiter, str3.substring(index2 + delimiter.length)];
+    return [str4.substring(0, index2), delimiter, str4.substring(index2 + delimiter.length)];
   }
-  return [str3, "", ""];
+  return [str4, "", ""];
 }
 
 // ../../node_modules/.pnpm/openai@6.44.0_ws@8.21.0_zod@3.25.76/node_modules/openai/internal/parse.mjs
@@ -78234,12 +78234,12 @@ function addRequestID(value, response) {
 // ../../node_modules/.pnpm/openai@6.44.0_ws@8.21.0_zod@3.25.76/node_modules/openai/core/api-promise.mjs
 var _APIPromise_client;
 var APIPromise = class _APIPromise extends Promise {
-  constructor(client, responsePromise, parseResponse2 = defaultParseResponse) {
+  constructor(client, responsePromise, parseResponse3 = defaultParseResponse) {
     super((resolve) => {
       resolve(null);
     });
     this.responsePromise = responsePromise;
-    this.parseResponse = parseResponse2;
+    this.parseResponse = parseResponse3;
     _APIPromise_client.set(this, void 0);
     __classPrivateFieldSet(this, _APIPromise_client, client, "f");
   }
@@ -78334,8 +78334,8 @@ var AbstractPage = class {
   }
 };
 var PagePromise = class extends APIPromise {
-  constructor(client, request2, Page2) {
-    super(client, request2, async (client2, props) => new Page2(client2, props.response, await defaultParseResponse(client2, props), props.options));
+  constructor(client, request2, Page3) {
+    super(client, request2, async (client2, props) => new Page3(client2, props.response, await defaultParseResponse(client2, props), props.options));
   }
   /**
    * Allow auto-paginating iteration on an unawaited list call, eg:
@@ -78694,16 +78694,16 @@ var APIResource = class {
 };
 
 // ../../node_modules/.pnpm/openai@6.44.0_ws@8.21.0_zod@3.25.76/node_modules/openai/internal/utils/path.mjs
-function encodeURIPath(str3) {
-  return str3.replace(/[^A-Za-z0-9\-._~!$&'()*+,;=:@]+/g, encodeURIComponent);
+function encodeURIPath(str4) {
+  return str4.replace(/[^A-Za-z0-9\-._~!$&'()*+,;=:@]+/g, encodeURIComponent);
 }
 var EMPTY = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null));
-var createPathTagFunction = (pathEncoder = encodeURIPath) => function path2(statics, ...params) {
+var createPathTagFunction = (pathEncoder = encodeURIPath) => function path3(statics, ...params) {
   if (statics.length === 1)
     return statics[0];
   let postPath = false;
   const invalidSegments = [];
-  const path3 = statics.reduce((previousValue, currentValue, index2) => {
+  const path4 = statics.reduce((previousValue, currentValue, index2) => {
     if (/[?#]/.test(currentValue)) {
       postPath = true;
     }
@@ -78720,7 +78720,7 @@ var createPathTagFunction = (pathEncoder = encodeURIPath) => function path2(stat
     }
     return previousValue + currentValue + (index2 === params.length ? "" : encoded);
   }, "");
-  const pathOnly = path3.split(/[?#]/, 1)[0];
+  const pathOnly = path4.split(/[?#]/, 1)[0];
   const invalidSegmentPattern = /(?<=^|\/)(?:\.|%2e){1,2}(?=\/|$)/gi;
   let match2;
   while ((match2 = invalidSegmentPattern.exec(pathOnly)) !== null) {
@@ -78741,10 +78741,10 @@ var createPathTagFunction = (pathEncoder = encodeURIPath) => function path2(stat
     }, "");
     throw new OpenAIError(`Path parameters result in path with invalid segments:
 ${invalidSegments.map((e) => e.error).join("\n")}
-${path3}
+${path4}
 ${underline}`);
   }
-  return path3;
+  return path4;
 };
 var path = /* @__PURE__ */ createPathTagFunction(encodeURIPath);
 
@@ -79669,11 +79669,11 @@ var ChatCompletionStream = class _ChatCompletionStream extends AbstractChatCompl
     }
     return this._addChatCompletion(__classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_endRequest).call(this));
   }
-  [(_ChatCompletionStream_params = /* @__PURE__ */ new WeakMap(), _ChatCompletionStream_choiceEventStates = /* @__PURE__ */ new WeakMap(), _ChatCompletionStream_currentChatCompletionSnapshot = /* @__PURE__ */ new WeakMap(), _ChatCompletionStream_instances = /* @__PURE__ */ new WeakSet(), _ChatCompletionStream_beginRequest = function _ChatCompletionStream_beginRequest2() {
+  [(_ChatCompletionStream_params = /* @__PURE__ */ new WeakMap(), _ChatCompletionStream_choiceEventStates = /* @__PURE__ */ new WeakMap(), _ChatCompletionStream_currentChatCompletionSnapshot = /* @__PURE__ */ new WeakMap(), _ChatCompletionStream_instances = /* @__PURE__ */ new WeakSet(), _ChatCompletionStream_beginRequest = function _ChatCompletionStream_beginRequest3() {
     if (this.ended)
       return;
     __classPrivateFieldSet(this, _ChatCompletionStream_currentChatCompletionSnapshot, void 0, "f");
-  }, _ChatCompletionStream_getChoiceEventState = function _ChatCompletionStream_getChoiceEventState2(choice) {
+  }, _ChatCompletionStream_getChoiceEventState = function _ChatCompletionStream_getChoiceEventState3(choice) {
     let state = __classPrivateFieldGet(this, _ChatCompletionStream_choiceEventStates, "f")[choice.index];
     if (state) {
       return state;
@@ -79688,7 +79688,7 @@ var ChatCompletionStream = class _ChatCompletionStream extends AbstractChatCompl
     };
     __classPrivateFieldGet(this, _ChatCompletionStream_choiceEventStates, "f")[choice.index] = state;
     return state;
-  }, _ChatCompletionStream_addChunk = function _ChatCompletionStream_addChunk2(chunk) {
+  }, _ChatCompletionStream_addChunk = function _ChatCompletionStream_addChunk3(chunk) {
     if (this.ended)
       return;
     const completion = __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_accumulateChatCompletion).call(this, chunk);
@@ -79755,7 +79755,7 @@ var ChatCompletionStream = class _ChatCompletionStream extends AbstractChatCompl
         }
       }
     }
-  }, _ChatCompletionStream_emitToolCallDoneEvent = function _ChatCompletionStream_emitToolCallDoneEvent2(choiceSnapshot, toolCallIndex) {
+  }, _ChatCompletionStream_emitToolCallDoneEvent = function _ChatCompletionStream_emitToolCallDoneEvent3(choiceSnapshot, toolCallIndex) {
     const state = __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_getChoiceEventState).call(this, choiceSnapshot);
     if (state.done_tool_calls.has(toolCallIndex)) {
       return;
@@ -79778,7 +79778,7 @@ var ChatCompletionStream = class _ChatCompletionStream extends AbstractChatCompl
     } else {
       assertNever2(toolCallSnapshot.type);
     }
-  }, _ChatCompletionStream_emitContentDoneEvents = function _ChatCompletionStream_emitContentDoneEvents2(choiceSnapshot) {
+  }, _ChatCompletionStream_emitContentDoneEvents = function _ChatCompletionStream_emitContentDoneEvents3(choiceSnapshot) {
     const state = __classPrivateFieldGet(this, _ChatCompletionStream_instances, "m", _ChatCompletionStream_getChoiceEventState).call(this, choiceSnapshot);
     if (choiceSnapshot.message.content && !state.content_done) {
       state.content_done = true;
@@ -79800,7 +79800,7 @@ var ChatCompletionStream = class _ChatCompletionStream extends AbstractChatCompl
       state.logprobs_refusal_done = true;
       this._emit("logprobs.refusal.done", { refusal: choiceSnapshot.logprobs.refusal });
     }
-  }, _ChatCompletionStream_endRequest = function _ChatCompletionStream_endRequest2() {
+  }, _ChatCompletionStream_endRequest = function _ChatCompletionStream_endRequest3() {
     if (this.ended) {
       throw new OpenAIError(`stream has ended, this shouldn't happen`);
     }
@@ -79811,14 +79811,14 @@ var ChatCompletionStream = class _ChatCompletionStream extends AbstractChatCompl
     __classPrivateFieldSet(this, _ChatCompletionStream_currentChatCompletionSnapshot, void 0, "f");
     __classPrivateFieldSet(this, _ChatCompletionStream_choiceEventStates, [], "f");
     return finalizeChatCompletion(snapshot, __classPrivateFieldGet(this, _ChatCompletionStream_params, "f"));
-  }, _ChatCompletionStream_getAutoParseableResponseFormat = function _ChatCompletionStream_getAutoParseableResponseFormat2() {
+  }, _ChatCompletionStream_getAutoParseableResponseFormat = function _ChatCompletionStream_getAutoParseableResponseFormat3() {
     const responseFormat = __classPrivateFieldGet(this, _ChatCompletionStream_params, "f")?.response_format;
     if (isAutoParsableResponseFormat(responseFormat)) {
       return responseFormat;
     }
     return null;
-  }, _ChatCompletionStream_accumulateChatCompletion = function _ChatCompletionStream_accumulateChatCompletion2(chunk) {
-    var _a3, _b, _c, _d;
+  }, _ChatCompletionStream_accumulateChatCompletion = function _ChatCompletionStream_accumulateChatCompletion3(chunk) {
+    var _a5, _b, _c, _d;
     let snapshot = __classPrivateFieldGet(this, _ChatCompletionStream_currentChatCompletionSnapshot, "f");
     const { choices, ...rest } = chunk;
     if (!snapshot) {
@@ -79842,7 +79842,7 @@ var ChatCompletionStream = class _ChatCompletionStream extends AbstractChatCompl
           assertIsEmpty(rest3);
           Object.assign(choice.logprobs, rest3);
           if (content2) {
-            (_a3 = choice.logprobs).content ?? (_a3.content = []);
+            (_a5 = choice.logprobs).content ?? (_a5.content = []);
             choice.logprobs.content.push(...content2);
           }
           if (refusal2) {
@@ -84974,11 +84974,11 @@ var ResponseStream = class _ResponseStream extends EventStream {
     }
     return __classPrivateFieldGet(this, _ResponseStream_instances, "m", _ResponseStream_endRequest).call(this);
   }
-  [(_ResponseStream_params = /* @__PURE__ */ new WeakMap(), _ResponseStream_currentResponseSnapshot = /* @__PURE__ */ new WeakMap(), _ResponseStream_finalResponse = /* @__PURE__ */ new WeakMap(), _ResponseStream_instances = /* @__PURE__ */ new WeakSet(), _ResponseStream_beginRequest = function _ResponseStream_beginRequest2() {
+  [(_ResponseStream_params = /* @__PURE__ */ new WeakMap(), _ResponseStream_currentResponseSnapshot = /* @__PURE__ */ new WeakMap(), _ResponseStream_finalResponse = /* @__PURE__ */ new WeakMap(), _ResponseStream_instances = /* @__PURE__ */ new WeakSet(), _ResponseStream_beginRequest = function _ResponseStream_beginRequest3() {
     if (this.ended)
       return;
     __classPrivateFieldSet(this, _ResponseStream_currentResponseSnapshot, void 0, "f");
-  }, _ResponseStream_addEvent = function _ResponseStream_addEvent2(event, starting_after) {
+  }, _ResponseStream_addEvent = function _ResponseStream_addEvent3(event, starting_after) {
     if (this.ended)
       return;
     const maybeEmit = (name, event2) => {
@@ -85026,7 +85026,7 @@ var ResponseStream = class _ResponseStream extends EventStream {
         maybeEmit(event.type, event);
         break;
     }
-  }, _ResponseStream_endRequest = function _ResponseStream_endRequest2() {
+  }, _ResponseStream_endRequest = function _ResponseStream_endRequest3() {
     if (this.ended) {
       throw new OpenAIError(`stream has ended, this shouldn't happen`);
     }
@@ -85038,7 +85038,7 @@ var ResponseStream = class _ResponseStream extends EventStream {
     const parsedResponse = finalizeResponse(snapshot, __classPrivateFieldGet(this, _ResponseStream_params, "f"));
     __classPrivateFieldSet(this, _ResponseStream_finalResponse, parsedResponse, "f");
     return parsedResponse;
-  }, _ResponseStream_accumulateResponse = function _ResponseStream_accumulateResponse2(event) {
+  }, _ResponseStream_accumulateResponse = function _ResponseStream_accumulateResponse3(event) {
     let snapshot = __classPrivateFieldGet(this, _ResponseStream_currentResponseSnapshot, "f");
     if (!snapshot) {
       if (event.type !== "response.created") {
@@ -86261,9 +86261,9 @@ var OpenAI = class {
     this.apiKey = token;
     return true;
   }
-  buildURL(path2, query, defaultBaseURL) {
+  buildURL(path3, query, defaultBaseURL) {
     const baseURL = !__classPrivateFieldGet(this, _OpenAI_instances, "m", _OpenAI_baseURLOverridden).call(this) && defaultBaseURL || this.baseURL;
-    const url2 = isAbsoluteURL(path2) ? new URL(path2) : new URL(baseURL + (baseURL.endsWith("/") && path2.startsWith("/") ? path2.slice(1) : path2));
+    const url2 = isAbsoluteURL(path3) ? new URL(path3) : new URL(baseURL + (baseURL.endsWith("/") && path3.startsWith("/") ? path3.slice(1) : path3));
     const defaultQuery = this.defaultQuery();
     const pathQuery = Object.fromEntries(url2.searchParams);
     if (!isEmptyObj(defaultQuery) || !isEmptyObj(pathQuery)) {
@@ -86291,24 +86291,24 @@ var OpenAI = class {
    */
   async prepareRequest(request2, { url: url2, options }) {
   }
-  get(path2, opts) {
-    return this.methodRequest("get", path2, opts);
+  get(path3, opts) {
+    return this.methodRequest("get", path3, opts);
   }
-  post(path2, opts) {
-    return this.methodRequest("post", path2, opts);
+  post(path3, opts) {
+    return this.methodRequest("post", path3, opts);
   }
-  patch(path2, opts) {
-    return this.methodRequest("patch", path2, opts);
+  patch(path3, opts) {
+    return this.methodRequest("patch", path3, opts);
   }
-  put(path2, opts) {
-    return this.methodRequest("put", path2, opts);
+  put(path3, opts) {
+    return this.methodRequest("put", path3, opts);
   }
-  delete(path2, opts) {
-    return this.methodRequest("delete", path2, opts);
+  delete(path3, opts) {
+    return this.methodRequest("delete", path3, opts);
   }
-  methodRequest(method, path2, opts) {
+  methodRequest(method, path3, opts) {
     return this.request(Promise.resolve(opts).then((opts2) => {
-      return { method, path: path2, ...opts2 };
+      return { method, path: path3, ...opts2 };
     }));
   }
   request(options, remainingRetries = null) {
@@ -86430,12 +86430,12 @@ var OpenAI = class {
     }));
     return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
   }
-  getAPIList(path2, Page2, opts) {
-    return this.requestAPIList(Page2, opts && "then" in opts ? opts.then((opts2) => ({ method: "get", path: path2, ...opts2 })) : { method: "get", path: path2, ...opts });
+  getAPIList(path3, Page3, opts) {
+    return this.requestAPIList(Page3, opts && "then" in opts ? opts.then((opts2) => ({ method: "get", path: path3, ...opts2 })) : { method: "get", path: path3, ...opts });
   }
-  requestAPIList(Page2, options) {
+  requestAPIList(Page3, options) {
     const request2 = this.makeRequest(options, null, void 0);
-    return new PagePromise(this, request2, Page2);
+    return new PagePromise(this, request2, Page3);
   }
   async fetchWithAuth(url2, init, timeout, controller, schemes = {
     bearerAuth: true,
@@ -86525,8 +86525,8 @@ var OpenAI = class {
   }
   async buildRequest(inputOptions, { retryCount = 0 } = {}) {
     const options = { ...inputOptions };
-    const { method, path: path2, query, defaultBaseURL } = options;
-    const url2 = this.buildURL(path2, query, defaultBaseURL);
+    const { method, path: path3, query, defaultBaseURL } = options;
+    const url2 = this.buildURL(path3, query, defaultBaseURL);
     if ("timeout" in options)
       validatePositiveInteger("timeout", options.timeout);
     options.timeout = options.timeout ?? this.timeout;
@@ -88181,7 +88181,7 @@ var ObjectStorageService = class {
     const pathsStr = process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
     const paths = Array.from(
       new Set(
-        pathsStr.split(",").map((path2) => path2.trim()).filter((path2) => path2.length > 0)
+        pathsStr.split(",").map((path3) => path3.trim()).filter((path3) => path3.length > 0)
       )
     );
     if (paths.length === 0) {
@@ -88305,11 +88305,11 @@ var ObjectStorageService = class {
     });
   }
 };
-function parseObjectPath(path2) {
-  if (!path2.startsWith("/")) {
-    path2 = `/${path2}`;
+function parseObjectPath(path3) {
+  if (!path3.startsWith("/")) {
+    path3 = `/${path3}`;
   }
-  const pathParts = path2.split("/");
+  const pathParts = path3.split("/");
   if (pathParts.length < 3) {
     throw new Error("Invalid path: must contain at least a bucket name");
   }
@@ -88514,6 +88514,31 @@ async function analyzePhoto(objectPath) {
 }
 async function generateAiPrediction(objectPath) {
   return await analyzePhoto(objectPath) ?? fallbackPrediction();
+}
+async function analyzePhotoFromBase64(base64Jpeg) {
+  try {
+    const dataUrl = `data:image/jpeg;base64,${base64Jpeg}`;
+    const completion = await openai.chat.completions.create({
+      model: MODEL4,
+      max_completion_tokens: 8192,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT4 },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: userPrompt2() },
+            { type: "image_url", image_url: { url: dataUrl } }
+          ]
+        }
+      ]
+    });
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) return null;
+    return parsePrediction(raw);
+  } catch {
+    return null;
+  }
 }
 
 // src/lib/evidence-summary.ts
@@ -89504,10 +89529,10 @@ router5.get("/", async (req, res) => {
       pestType,
       search,
       page = "1",
-      limit: limit2 = "20"
+      limit: limit3 = "20"
     } = req.query;
     const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(50, parseInt(limit2));
+    const limitNum = Math.min(50, parseInt(limit3));
     const offset = (pageNum - 1) * limitNum;
     let rows = await db.select().from(datasetImagesTable).where(eq(datasetImagesTable.companyId, companyId)).orderBy(desc(datasetImagesTable.createdAt));
     if (category) rows = rows.filter((r) => r.category === category);
@@ -90774,7 +90799,7 @@ router9.get("/records", async (req, res) => {
     }
     const { category, subcategory, status, verificationLevel, mine, search } = parsed.data;
     const page = parsed.data.page ?? 1;
-    const limit2 = parsed.data.limit ?? 20;
+    const limit3 = parsed.data.limit ?? 20;
     let rows = await db.select().from(intelligenceRecordsTable).where(eq(intelligenceRecordsTable.companyId, companyId)).orderBy(desc(intelligenceRecordsTable.createdAt));
     if (category) rows = rows.filter((r) => r.category === category);
     if (subcategory) rows = rows.filter((r) => r.subcategory === subcategory);
@@ -90797,7 +90822,7 @@ router9.get("/records", async (req, res) => {
       });
     }
     const total = rows.length;
-    const pageRows = rows.slice((page - 1) * limit2, (page - 1) * limit2 + limit2);
+    const pageRows = rows.slice((page - 1) * limit3, (page - 1) * limit3 + limit3);
     const { tagsByRecord, votesByRecord } = await fetchExtras(
       companyId,
       pageRows.map((r) => r.id)
@@ -90810,7 +90835,7 @@ router9.get("/records", async (req, res) => {
         myUserId
       )
     );
-    return res.json({ items, total, page, limit: limit2 });
+    return res.json({ items, total, page, limit: limit3 });
   } catch (err) {
     req.log.error({ err }, "Failed to list intelligence records");
     return res.status(500).json({ error: "Failed to list records" });
@@ -92961,7 +92986,7 @@ async function buildOwnerSection(companyId) {
   const approvalsAgingBefore = new Date(Date.now() - 3 * DAY_MS);
   const nowDate = /* @__PURE__ */ new Date();
   const weekAhead = new Date(Date.now() + 7 * DAY_MS);
-  const [[insp], [opp], [quality], [summaries], [staleValued], [expiring]] = await Promise.all([
+  const [[insp], [opp], [quality], [summaries], [staleValued], [expiring], [team]] = await Promise.all([
     db.select({
       completions7d: sql`count(*) filter (where ${inspectionsTable.completedAt} >= ${weekAgo})::int`,
       completions30d: sql`count(*) filter (where ${inspectionsTable.completedAt} >= ${monthAgo})::int`
@@ -93005,7 +93030,8 @@ async function buildOwnerSection(companyId) {
         gte(customerSummariesTable.shareExpiresAt, nowDate),
         lte(customerSummariesTable.shareExpiresAt, weekAhead)
       )
-    )
+    ),
+    db.select({ count: sql`count(*)::int` }).from(usersTable).where(eq(usersTable.companyId, companyId))
   ]);
   const alerts = [];
   const agingDrafts = summaries?.agingDrafts ?? 0;
@@ -93053,6 +93079,7 @@ async function buildOwnerSection(companyId) {
       count: expiringCount
     });
   }
+  const teamSize = team?.count ?? 1;
   return {
     kpis: {
       completions7d: insp?.completions7d ?? 0,
@@ -93062,7 +93089,9 @@ async function buildOwnerSection(companyId) {
       avgQualityScore30d: quality?.avgQuality ?? null,
       approvedSummaries30d: summaries?.approved30d ?? 0
     },
-    alerts
+    alerts,
+    teamSize,
+    isSoloOperator: teamSize <= 1
   };
 }
 async function buildBriefing(role, companyId) {
@@ -94194,19 +94223,10069 @@ router27.post("/:id", async (req, res) => {
 });
 var review_queue_default = router27;
 
-// src/routes/index.ts
+// src/routes/meta-glasses.ts
+var import_express29 = __toESM(require_express2(), 1);
+import crypto2 from "node:crypto";
+
+// ../../node_modules/openai/internal/tslib.mjs
+function __classPrivateFieldSet2(receiver, state, value, kind, f) {
+  if (kind === "m")
+    throw new TypeError("Private method is not writable");
+  if (kind === "a" && !f)
+    throw new TypeError("Private accessor was defined without a setter");
+  if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver))
+    throw new TypeError("Cannot write private member to an object whose class did not declare it");
+  return kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value), value;
+}
+function __classPrivateFieldGet2(receiver, state, kind, f) {
+  if (kind === "a" && !f)
+    throw new TypeError("Private accessor was defined without a getter");
+  if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver))
+    throw new TypeError("Cannot read private member from an object whose class did not declare it");
+  return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
+}
+
+// ../../node_modules/openai/internal/utils/uuid.mjs
+var uuid43 = function() {
+  const { crypto: crypto3 } = globalThis;
+  if (crypto3?.randomUUID) {
+    uuid43 = crypto3.randomUUID.bind(crypto3);
+    return crypto3.randomUUID();
+  }
+  const u8 = new Uint8Array(1);
+  const randomByte = crypto3 ? () => crypto3.getRandomValues(u8)[0] : () => Math.random() * 255 & 255;
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (+c ^ randomByte() & 15 >> +c / 4).toString(16));
+};
+
+// ../../node_modules/openai/internal/errors.mjs
+function isAbortError2(err) {
+  return typeof err === "object" && err !== null && // Spec-compliant fetch implementations
+  ("name" in err && err.name === "AbortError" || // Expo fetch
+  "message" in err && String(err.message).includes("FetchRequestCanceledException"));
+}
+var castToError2 = (err) => {
+  if (err instanceof Error)
+    return err;
+  if (typeof err === "object" && err !== null) {
+    try {
+      if (Object.prototype.toString.call(err) === "[object Error]") {
+        const error40 = new Error(err.message, err.cause ? { cause: err.cause } : {});
+        if (err.stack)
+          error40.stack = err.stack;
+        if (err.cause && !error40.cause)
+          error40.cause = err.cause;
+        if (err.name)
+          error40.name = err.name;
+        return error40;
+      }
+    } catch {
+    }
+    try {
+      return new Error(JSON.stringify(err));
+    } catch {
+    }
+  }
+  return new Error(err);
+};
+
+// ../../node_modules/openai/core/error.mjs
+var OpenAIError2 = class extends Error {
+};
+var APIError2 = class _APIError extends OpenAIError2 {
+  constructor(status, error40, message, headers) {
+    super(`${_APIError.makeMessage(status, error40, message)}`);
+    this.status = status;
+    this.headers = headers;
+    this.requestID = headers?.get("x-request-id");
+    this.error = error40;
+    const data = error40;
+    this.code = data?.["code"];
+    this.param = data?.["param"];
+    this.type = data?.["type"];
+  }
+  static makeMessage(status, error40, message) {
+    const msg = error40?.message ? typeof error40.message === "string" ? error40.message : JSON.stringify(error40.message) : error40 ? JSON.stringify(error40) : message;
+    if (status && msg) {
+      return `${status} ${msg}`;
+    }
+    if (status) {
+      return `${status} status code (no body)`;
+    }
+    if (msg) {
+      return msg;
+    }
+    return "(no status code or body)";
+  }
+  static generate(status, errorResponse, message, headers) {
+    if (!status || !headers) {
+      return new APIConnectionError2({ message, cause: castToError2(errorResponse) });
+    }
+    const error40 = errorResponse?.["error"];
+    if (status === 400) {
+      return new BadRequestError2(status, error40, message, headers);
+    }
+    if (status === 401) {
+      return new AuthenticationError2(status, error40, message, headers);
+    }
+    if (status === 403) {
+      return new PermissionDeniedError2(status, error40, message, headers);
+    }
+    if (status === 404) {
+      return new NotFoundError2(status, error40, message, headers);
+    }
+    if (status === 409) {
+      return new ConflictError2(status, error40, message, headers);
+    }
+    if (status === 422) {
+      return new UnprocessableEntityError2(status, error40, message, headers);
+    }
+    if (status === 429) {
+      return new RateLimitError2(status, error40, message, headers);
+    }
+    if (status >= 500) {
+      return new InternalServerError2(status, error40, message, headers);
+    }
+    return new _APIError(status, error40, message, headers);
+  }
+};
+var APIUserAbortError2 = class extends APIError2 {
+  constructor({ message } = {}) {
+    super(void 0, void 0, message || "Request was aborted.", void 0);
+  }
+};
+var APIConnectionError2 = class extends APIError2 {
+  constructor({ message, cause }) {
+    super(void 0, void 0, message || "Connection error.", void 0);
+    if (cause)
+      this.cause = cause;
+  }
+};
+var APIConnectionTimeoutError2 = class extends APIConnectionError2 {
+  constructor({ message } = {}) {
+    super({ message: message ?? "Request timed out." });
+  }
+};
+var BadRequestError2 = class extends APIError2 {
+};
+var AuthenticationError2 = class extends APIError2 {
+};
+var PermissionDeniedError2 = class extends APIError2 {
+};
+var NotFoundError2 = class extends APIError2 {
+};
+var ConflictError2 = class extends APIError2 {
+};
+var UnprocessableEntityError2 = class extends APIError2 {
+};
+var RateLimitError2 = class extends APIError2 {
+};
+var InternalServerError2 = class extends APIError2 {
+};
+var LengthFinishReasonError2 = class extends OpenAIError2 {
+  constructor() {
+    super(`Could not parse response content as the length limit was reached`);
+  }
+};
+var ContentFilterFinishReasonError2 = class extends OpenAIError2 {
+  constructor() {
+    super(`Could not parse response content as the request was rejected by the content filter`);
+  }
+};
+var InvalidWebhookSignatureError2 = class extends Error {
+  constructor(message) {
+    super(message);
+  }
+};
+var OAuthError2 = class extends APIError2 {
+  constructor(status, error40, headers) {
+    let finalMessage = "OAuth2 authentication error";
+    let error_code = void 0;
+    if (error40 && typeof error40 === "object") {
+      const errorData = error40;
+      error_code = errorData["error"];
+      const description = errorData["error_description"];
+      if (description && typeof description === "string") {
+        finalMessage = description;
+      } else if (error_code) {
+        finalMessage = error_code;
+      }
+    }
+    super(status, error40, finalMessage, headers);
+    this.error_code = error_code;
+  }
+};
+var SubjectTokenProviderError2 = class extends OpenAIError2 {
+  constructor(message, provider, cause) {
+    super(message);
+    this.provider = provider;
+    this.cause = cause;
+  }
+};
+
+// ../../node_modules/openai/internal/utils/values.mjs
+var startsWithSchemeRegexp2 = /^[a-z][a-z0-9+.-]*:/i;
+var isAbsoluteURL2 = (url2) => {
+  return startsWithSchemeRegexp2.test(url2);
+};
+var isArray2 = (val) => (isArray2 = Array.isArray, isArray2(val));
+var isReadonlyArray2 = isArray2;
+function maybeObj2(x) {
+  if (typeof x !== "object") {
+    return {};
+  }
+  return x ?? {};
+}
+function isEmptyObj2(obj) {
+  if (!obj)
+    return true;
+  for (const _k in obj)
+    return false;
+  return true;
+}
+function hasOwn2(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+function isObj2(obj) {
+  return obj != null && typeof obj === "object" && !Array.isArray(obj);
+}
+var validatePositiveInteger2 = (name, n) => {
+  if (typeof n !== "number" || !Number.isInteger(n)) {
+    throw new OpenAIError2(`${name} must be an integer`);
+  }
+  if (n < 0) {
+    throw new OpenAIError2(`${name} must be a positive integer`);
+  }
+  return n;
+};
+var safeJSON2 = (text2) => {
+  try {
+    return JSON.parse(text2);
+  } catch (err) {
+    return void 0;
+  }
+};
+
+// ../../node_modules/openai/internal/utils/sleep.mjs
+var sleep3 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ../../node_modules/openai/version.mjs
+var VERSION2 = "6.44.0";
+
+// ../../node_modules/openai/internal/detect-platform.mjs
+var isRunningInBrowser2 = () => {
+  return (
+    // @ts-ignore
+    typeof window !== "undefined" && // @ts-ignore
+    typeof window.document !== "undefined" && // @ts-ignore
+    typeof navigator !== "undefined"
+  );
+};
+function getDetectedPlatform2() {
+  if (typeof Deno !== "undefined" && Deno.build != null) {
+    return "deno";
+  }
+  if (typeof EdgeRuntime !== "undefined") {
+    return "edge";
+  }
+  if (Object.prototype.toString.call(typeof globalThis.process !== "undefined" ? globalThis.process : 0) === "[object process]") {
+    return "node";
+  }
+  return "unknown";
+}
+var getPlatformProperties2 = () => {
+  const detectedPlatform = getDetectedPlatform2();
+  if (detectedPlatform === "deno") {
+    return {
+      "X-Stainless-Lang": "js",
+      "X-Stainless-Package-Version": VERSION2,
+      "X-Stainless-OS": normalizePlatform2(Deno.build.os),
+      "X-Stainless-Arch": normalizeArch2(Deno.build.arch),
+      "X-Stainless-Runtime": "deno",
+      "X-Stainless-Runtime-Version": typeof Deno.version === "string" ? Deno.version : Deno.version?.deno ?? "unknown"
+    };
+  }
+  if (typeof EdgeRuntime !== "undefined") {
+    return {
+      "X-Stainless-Lang": "js",
+      "X-Stainless-Package-Version": VERSION2,
+      "X-Stainless-OS": "Unknown",
+      "X-Stainless-Arch": `other:${EdgeRuntime}`,
+      "X-Stainless-Runtime": "edge",
+      "X-Stainless-Runtime-Version": globalThis.process.version
+    };
+  }
+  if (detectedPlatform === "node") {
+    return {
+      "X-Stainless-Lang": "js",
+      "X-Stainless-Package-Version": VERSION2,
+      "X-Stainless-OS": normalizePlatform2(globalThis.process.platform ?? "unknown"),
+      "X-Stainless-Arch": normalizeArch2(globalThis.process.arch ?? "unknown"),
+      "X-Stainless-Runtime": "node",
+      "X-Stainless-Runtime-Version": globalThis.process.version ?? "unknown"
+    };
+  }
+  const browserInfo = getBrowserInfo2();
+  if (browserInfo) {
+    return {
+      "X-Stainless-Lang": "js",
+      "X-Stainless-Package-Version": VERSION2,
+      "X-Stainless-OS": "Unknown",
+      "X-Stainless-Arch": "unknown",
+      "X-Stainless-Runtime": `browser:${browserInfo.browser}`,
+      "X-Stainless-Runtime-Version": browserInfo.version
+    };
+  }
+  return {
+    "X-Stainless-Lang": "js",
+    "X-Stainless-Package-Version": VERSION2,
+    "X-Stainless-OS": "Unknown",
+    "X-Stainless-Arch": "unknown",
+    "X-Stainless-Runtime": "unknown",
+    "X-Stainless-Runtime-Version": "unknown"
+  };
+};
+function getBrowserInfo2() {
+  if (typeof navigator === "undefined" || !navigator) {
+    return null;
+  }
+  const browserPatterns = [
+    { key: "edge", pattern: /Edge(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: "ie", pattern: /MSIE(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: "ie", pattern: /Trident(?:.*rv\:(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: "chrome", pattern: /Chrome(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: "firefox", pattern: /Firefox(?:\W+(\d+)\.(\d+)(?:\.(\d+))?)?/ },
+    { key: "safari", pattern: /(?:Version\W+(\d+)\.(\d+)(?:\.(\d+))?)?(?:\W+Mobile\S*)?\W+Safari/ }
+  ];
+  for (const { key, pattern } of browserPatterns) {
+    const match2 = pattern.exec(navigator.userAgent);
+    if (match2) {
+      const major = match2[1] || 0;
+      const minor = match2[2] || 0;
+      const patch = match2[3] || 0;
+      return { browser: key, version: `${major}.${minor}.${patch}` };
+    }
+  }
+  return null;
+}
+var normalizeArch2 = (arch) => {
+  if (arch === "x32")
+    return "x32";
+  if (arch === "x86_64" || arch === "x64")
+    return "x64";
+  if (arch === "arm")
+    return "arm";
+  if (arch === "aarch64" || arch === "arm64")
+    return "arm64";
+  if (arch)
+    return `other:${arch}`;
+  return "unknown";
+};
+var normalizePlatform2 = (platform) => {
+  platform = platform.toLowerCase();
+  if (platform.includes("ios"))
+    return "iOS";
+  if (platform === "android")
+    return "Android";
+  if (platform === "darwin")
+    return "MacOS";
+  if (platform === "win32")
+    return "Windows";
+  if (platform === "freebsd")
+    return "FreeBSD";
+  if (platform === "openbsd")
+    return "OpenBSD";
+  if (platform === "linux")
+    return "Linux";
+  if (platform)
+    return `Other:${platform}`;
+  return "Unknown";
+};
+var _platformHeaders2;
+var getPlatformHeaders2 = () => {
+  return _platformHeaders2 ?? (_platformHeaders2 = getPlatformProperties2());
+};
+
+// ../../node_modules/openai/internal/shims.mjs
+function getDefaultFetch2() {
+  if (typeof fetch !== "undefined") {
+    return fetch;
+  }
+  throw new Error("`fetch` is not defined as a global; Either pass `fetch` to the client, `new OpenAI({ fetch })` or polyfill the global, `globalThis.fetch = fetch`");
+}
+function makeReadableStream2(...args) {
+  const ReadableStream2 = globalThis.ReadableStream;
+  if (typeof ReadableStream2 === "undefined") {
+    throw new Error("`ReadableStream` is not defined as a global; You will need to polyfill it, `globalThis.ReadableStream = ReadableStream`");
+  }
+  return new ReadableStream2(...args);
+}
+function ReadableStreamFrom2(iterable) {
+  let iter = Symbol.asyncIterator in iterable ? iterable[Symbol.asyncIterator]() : iterable[Symbol.iterator]();
+  return makeReadableStream2({
+    start() {
+    },
+    async pull(controller) {
+      const { done, value } = await iter.next();
+      if (done) {
+        controller.close();
+      } else {
+        controller.enqueue(value);
+      }
+    },
+    async cancel() {
+      await iter.return?.();
+    }
+  });
+}
+function ReadableStreamToAsyncIterable2(stream) {
+  if (stream[Symbol.asyncIterator])
+    return stream;
+  const reader = stream.getReader();
+  return {
+    async next() {
+      try {
+        const result = await reader.read();
+        if (result?.done)
+          reader.releaseLock();
+        return result;
+      } catch (e) {
+        reader.releaseLock();
+        throw e;
+      }
+    },
+    async return() {
+      const cancelPromise = reader.cancel();
+      reader.releaseLock();
+      await cancelPromise;
+      return { done: true, value: void 0 };
+    },
+    [Symbol.asyncIterator]() {
+      return this;
+    }
+  };
+}
+async function CancelReadableStream2(stream) {
+  if (stream === null || typeof stream !== "object")
+    return;
+  if (stream[Symbol.asyncIterator]) {
+    await stream[Symbol.asyncIterator]().return?.();
+    return;
+  }
+  const reader = stream.getReader();
+  const cancelPromise = reader.cancel();
+  reader.releaseLock();
+  await cancelPromise;
+}
+
+// ../../node_modules/openai/internal/request-options.mjs
+var FallbackEncoder2 = ({ headers, body }) => {
+  return {
+    bodyHeaders: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(body)
+  };
+};
+
+// ../../node_modules/openai/internal/qs/formats.mjs
+var default_format2 = "RFC3986";
+var default_formatter2 = (v) => String(v);
+var formatters2 = {
+  RFC1738: (v) => String(v).replace(/%20/g, "+"),
+  RFC3986: default_formatter2
+};
+var RFC17382 = "RFC1738";
+
+// ../../node_modules/openai/internal/qs/utils.mjs
+var has2 = (obj, key) => (has2 = Object.hasOwn ?? Function.prototype.call.bind(Object.prototype.hasOwnProperty), has2(obj, key));
+var hex_table2 = /* @__PURE__ */ (() => {
+  const array2 = [];
+  for (let i = 0; i < 256; ++i) {
+    array2.push("%" + ((i < 16 ? "0" : "") + i.toString(16)).toUpperCase());
+  }
+  return array2;
+})();
+var limit2 = 1024;
+var encode2 = (str4, _defaultEncoder, charset, _kind, format) => {
+  if (str4.length === 0) {
+    return str4;
+  }
+  let string4 = str4;
+  if (typeof str4 === "symbol") {
+    string4 = Symbol.prototype.toString.call(str4);
+  } else if (typeof str4 !== "string") {
+    string4 = String(str4);
+  }
+  if (charset === "iso-8859-1") {
+    return escape(string4).replace(/%u[0-9a-f]{4}/gi, function($0) {
+      return "%26%23" + parseInt($0.slice(2), 16) + "%3B";
+    });
+  }
+  let out = "";
+  for (let j = 0; j < string4.length; j += limit2) {
+    const segment = string4.length >= limit2 ? string4.slice(j, j + limit2) : string4;
+    const arr = [];
+    for (let i = 0; i < segment.length; ++i) {
+      let c = segment.charCodeAt(i);
+      if (c === 45 || // -
+      c === 46 || // .
+      c === 95 || // _
+      c === 126 || // ~
+      c >= 48 && c <= 57 || // 0-9
+      c >= 65 && c <= 90 || // a-z
+      c >= 97 && c <= 122 || // A-Z
+      format === RFC17382 && (c === 40 || c === 41)) {
+        arr[arr.length] = segment.charAt(i);
+        continue;
+      }
+      if (c < 128) {
+        arr[arr.length] = hex_table2[c];
+        continue;
+      }
+      if (c < 2048) {
+        arr[arr.length] = hex_table2[192 | c >> 6] + hex_table2[128 | c & 63];
+        continue;
+      }
+      if (c < 55296 || c >= 57344) {
+        arr[arr.length] = hex_table2[224 | c >> 12] + hex_table2[128 | c >> 6 & 63] + hex_table2[128 | c & 63];
+        continue;
+      }
+      i += 1;
+      c = 65536 + ((c & 1023) << 10 | segment.charCodeAt(i) & 1023);
+      arr[arr.length] = hex_table2[240 | c >> 18] + hex_table2[128 | c >> 12 & 63] + hex_table2[128 | c >> 6 & 63] + hex_table2[128 | c & 63];
+    }
+    out += arr.join("");
+  }
+  return out;
+};
+function is_buffer2(obj) {
+  if (!obj || typeof obj !== "object") {
+    return false;
+  }
+  return !!(obj.constructor && obj.constructor.isBuffer && obj.constructor.isBuffer(obj));
+}
+function maybe_map2(val, fn) {
+  if (isArray2(val)) {
+    const mapped = [];
+    for (let i = 0; i < val.length; i += 1) {
+      mapped.push(fn(val[i]));
+    }
+    return mapped;
+  }
+  return fn(val);
+}
+
+// ../../node_modules/openai/internal/qs/stringify.mjs
+var array_prefix_generators2 = {
+  brackets(prefix) {
+    return String(prefix) + "[]";
+  },
+  comma: "comma",
+  indices(prefix, key) {
+    return String(prefix) + "[" + key + "]";
+  },
+  repeat(prefix) {
+    return String(prefix);
+  }
+};
+var push_to_array2 = function(arr, value_or_array) {
+  Array.prototype.push.apply(arr, isArray2(value_or_array) ? value_or_array : [value_or_array]);
+};
+var toISOString2;
+var defaults3 = {
+  addQueryPrefix: false,
+  allowDots: false,
+  allowEmptyArrays: false,
+  arrayFormat: "indices",
+  charset: "utf-8",
+  charsetSentinel: false,
+  delimiter: "&",
+  encode: true,
+  encodeDotInKeys: false,
+  encoder: encode2,
+  encodeValuesOnly: false,
+  format: default_format2,
+  formatter: default_formatter2,
+  /** @deprecated */
+  indices: false,
+  serializeDate(date6) {
+    return (toISOString2 ?? (toISOString2 = Function.prototype.call.bind(Date.prototype.toISOString)))(date6);
+  },
+  skipNulls: false,
+  strictNullHandling: false
+};
+function is_non_nullish_primitive2(v) {
+  return typeof v === "string" || typeof v === "number" || typeof v === "boolean" || typeof v === "symbol" || typeof v === "bigint";
+}
+var sentinel2 = {};
+function inner_stringify2(object2, prefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, sideChannel) {
+  let obj = object2;
+  let tmp_sc = sideChannel;
+  let step = 0;
+  let find_flag = false;
+  while ((tmp_sc = tmp_sc.get(sentinel2)) !== void 0 && !find_flag) {
+    const pos = tmp_sc.get(object2);
+    step += 1;
+    if (typeof pos !== "undefined") {
+      if (pos === step) {
+        throw new RangeError("Cyclic object value");
+      } else {
+        find_flag = true;
+      }
+    }
+    if (typeof tmp_sc.get(sentinel2) === "undefined") {
+      step = 0;
+    }
+  }
+  if (typeof filter === "function") {
+    obj = filter(prefix, obj);
+  } else if (obj instanceof Date) {
+    obj = serializeDate?.(obj);
+  } else if (generateArrayPrefix === "comma" && isArray2(obj)) {
+    obj = maybe_map2(obj, function(value) {
+      if (value instanceof Date) {
+        return serializeDate?.(value);
+      }
+      return value;
+    });
+  }
+  if (obj === null) {
+    if (strictNullHandling) {
+      return encoder && !encodeValuesOnly ? (
+        // @ts-expect-error
+        encoder(prefix, defaults3.encoder, charset, "key", format)
+      ) : prefix;
+    }
+    obj = "";
+  }
+  if (is_non_nullish_primitive2(obj) || is_buffer2(obj)) {
+    if (encoder) {
+      const key_value = encodeValuesOnly ? prefix : encoder(prefix, defaults3.encoder, charset, "key", format);
+      return [
+        formatter?.(key_value) + "=" + // @ts-expect-error
+        formatter?.(encoder(obj, defaults3.encoder, charset, "value", format))
+      ];
+    }
+    return [formatter?.(prefix) + "=" + formatter?.(String(obj))];
+  }
+  const values = [];
+  if (typeof obj === "undefined") {
+    return values;
+  }
+  let obj_keys;
+  if (generateArrayPrefix === "comma" && isArray2(obj)) {
+    if (encodeValuesOnly && encoder) {
+      obj = maybe_map2(obj, encoder);
+    }
+    obj_keys = [{ value: obj.length > 0 ? obj.join(",") || null : void 0 }];
+  } else if (isArray2(filter)) {
+    obj_keys = filter;
+  } else {
+    const keys = Object.keys(obj);
+    obj_keys = sort ? keys.sort(sort) : keys;
+  }
+  const encoded_prefix = encodeDotInKeys ? String(prefix).replace(/\./g, "%2E") : String(prefix);
+  const adjusted_prefix = commaRoundTrip && isArray2(obj) && obj.length === 1 ? encoded_prefix + "[]" : encoded_prefix;
+  if (allowEmptyArrays && isArray2(obj) && obj.length === 0) {
+    return adjusted_prefix + "[]";
+  }
+  for (let j = 0; j < obj_keys.length; ++j) {
+    const key = obj_keys[j];
+    const value = (
+      // @ts-ignore
+      typeof key === "object" && typeof key.value !== "undefined" ? key.value : obj[key]
+    );
+    if (skipNulls && value === null) {
+      continue;
+    }
+    const encoded_key = allowDots && encodeDotInKeys ? key.replace(/\./g, "%2E") : key;
+    const key_prefix = isArray2(obj) ? typeof generateArrayPrefix === "function" ? generateArrayPrefix(adjusted_prefix, encoded_key) : adjusted_prefix : adjusted_prefix + (allowDots ? "." + encoded_key : "[" + encoded_key + "]");
+    sideChannel.set(object2, step);
+    const valueSideChannel = /* @__PURE__ */ new WeakMap();
+    valueSideChannel.set(sentinel2, sideChannel);
+    push_to_array2(values, inner_stringify2(
+      value,
+      key_prefix,
+      generateArrayPrefix,
+      commaRoundTrip,
+      allowEmptyArrays,
+      strictNullHandling,
+      skipNulls,
+      encodeDotInKeys,
+      // @ts-ignore
+      generateArrayPrefix === "comma" && encodeValuesOnly && isArray2(obj) ? null : encoder,
+      filter,
+      sort,
+      allowDots,
+      serializeDate,
+      format,
+      formatter,
+      encodeValuesOnly,
+      charset,
+      valueSideChannel
+    ));
+  }
+  return values;
+}
+function normalize_stringify_options2(opts = defaults3) {
+  if (typeof opts.allowEmptyArrays !== "undefined" && typeof opts.allowEmptyArrays !== "boolean") {
+    throw new TypeError("`allowEmptyArrays` option can only be `true` or `false`, when provided");
+  }
+  if (typeof opts.encodeDotInKeys !== "undefined" && typeof opts.encodeDotInKeys !== "boolean") {
+    throw new TypeError("`encodeDotInKeys` option can only be `true` or `false`, when provided");
+  }
+  if (opts.encoder !== null && typeof opts.encoder !== "undefined" && typeof opts.encoder !== "function") {
+    throw new TypeError("Encoder has to be a function.");
+  }
+  const charset = opts.charset || defaults3.charset;
+  if (typeof opts.charset !== "undefined" && opts.charset !== "utf-8" && opts.charset !== "iso-8859-1") {
+    throw new TypeError("The charset option must be either utf-8, iso-8859-1, or undefined");
+  }
+  let format = default_format2;
+  if (typeof opts.format !== "undefined") {
+    if (!has2(formatters2, opts.format)) {
+      throw new TypeError("Unknown format option provided.");
+    }
+    format = opts.format;
+  }
+  const formatter = formatters2[format];
+  let filter = defaults3.filter;
+  if (typeof opts.filter === "function" || isArray2(opts.filter)) {
+    filter = opts.filter;
+  }
+  let arrayFormat;
+  if (opts.arrayFormat && opts.arrayFormat in array_prefix_generators2) {
+    arrayFormat = opts.arrayFormat;
+  } else if ("indices" in opts) {
+    arrayFormat = opts.indices ? "indices" : "repeat";
+  } else {
+    arrayFormat = defaults3.arrayFormat;
+  }
+  if ("commaRoundTrip" in opts && typeof opts.commaRoundTrip !== "boolean") {
+    throw new TypeError("`commaRoundTrip` must be a boolean, or absent");
+  }
+  const allowDots = typeof opts.allowDots === "undefined" ? !!opts.encodeDotInKeys === true ? true : defaults3.allowDots : !!opts.allowDots;
+  return {
+    addQueryPrefix: typeof opts.addQueryPrefix === "boolean" ? opts.addQueryPrefix : defaults3.addQueryPrefix,
+    // @ts-ignore
+    allowDots,
+    allowEmptyArrays: typeof opts.allowEmptyArrays === "boolean" ? !!opts.allowEmptyArrays : defaults3.allowEmptyArrays,
+    arrayFormat,
+    charset,
+    charsetSentinel: typeof opts.charsetSentinel === "boolean" ? opts.charsetSentinel : defaults3.charsetSentinel,
+    commaRoundTrip: !!opts.commaRoundTrip,
+    delimiter: typeof opts.delimiter === "undefined" ? defaults3.delimiter : opts.delimiter,
+    encode: typeof opts.encode === "boolean" ? opts.encode : defaults3.encode,
+    encodeDotInKeys: typeof opts.encodeDotInKeys === "boolean" ? opts.encodeDotInKeys : defaults3.encodeDotInKeys,
+    encoder: typeof opts.encoder === "function" ? opts.encoder : defaults3.encoder,
+    encodeValuesOnly: typeof opts.encodeValuesOnly === "boolean" ? opts.encodeValuesOnly : defaults3.encodeValuesOnly,
+    filter,
+    format,
+    formatter,
+    serializeDate: typeof opts.serializeDate === "function" ? opts.serializeDate : defaults3.serializeDate,
+    skipNulls: typeof opts.skipNulls === "boolean" ? opts.skipNulls : defaults3.skipNulls,
+    // @ts-ignore
+    sort: typeof opts.sort === "function" ? opts.sort : null,
+    strictNullHandling: typeof opts.strictNullHandling === "boolean" ? opts.strictNullHandling : defaults3.strictNullHandling
+  };
+}
+function stringify3(object2, opts = {}) {
+  let obj = object2;
+  const options = normalize_stringify_options2(opts);
+  let obj_keys;
+  let filter;
+  if (typeof options.filter === "function") {
+    filter = options.filter;
+    obj = filter("", obj);
+  } else if (isArray2(options.filter)) {
+    filter = options.filter;
+    obj_keys = filter;
+  }
+  const keys = [];
+  if (typeof obj !== "object" || obj === null) {
+    return "";
+  }
+  const generateArrayPrefix = array_prefix_generators2[options.arrayFormat];
+  const commaRoundTrip = generateArrayPrefix === "comma" && options.commaRoundTrip;
+  if (!obj_keys) {
+    obj_keys = Object.keys(obj);
+  }
+  if (options.sort) {
+    obj_keys.sort(options.sort);
+  }
+  const sideChannel = /* @__PURE__ */ new WeakMap();
+  for (let i = 0; i < obj_keys.length; ++i) {
+    const key = obj_keys[i];
+    if (options.skipNulls && obj[key] === null) {
+      continue;
+    }
+    push_to_array2(keys, inner_stringify2(
+      obj[key],
+      key,
+      // @ts-expect-error
+      generateArrayPrefix,
+      commaRoundTrip,
+      options.allowEmptyArrays,
+      options.strictNullHandling,
+      options.skipNulls,
+      options.encodeDotInKeys,
+      options.encode ? options.encoder : null,
+      options.filter,
+      options.sort,
+      options.allowDots,
+      options.serializeDate,
+      options.format,
+      options.formatter,
+      options.encodeValuesOnly,
+      options.charset,
+      sideChannel
+    ));
+  }
+  const joined = keys.join(options.delimiter);
+  let prefix = options.addQueryPrefix === true ? "?" : "";
+  if (options.charsetSentinel) {
+    if (options.charset === "iso-8859-1") {
+      prefix += "utf8=%26%2310003%3B&";
+    } else {
+      prefix += "utf8=%E2%9C%93&";
+    }
+  }
+  return joined.length > 0 ? prefix + joined : "";
+}
+
+// ../../node_modules/openai/internal/utils/query.mjs
+function stringifyQuery2(query) {
+  return stringify3(query, { arrayFormat: "brackets" });
+}
+
+// ../../node_modules/openai/internal/utils/bytes.mjs
+function concatBytes2(buffers) {
+  let length = 0;
+  for (const buffer of buffers) {
+    length += buffer.length;
+  }
+  const output = new Uint8Array(length);
+  let index2 = 0;
+  for (const buffer of buffers) {
+    output.set(buffer, index2);
+    index2 += buffer.length;
+  }
+  return output;
+}
+var encodeUTF8_2;
+function encodeUTF82(str4) {
+  let encoder;
+  return (encodeUTF8_2 ?? (encoder = new globalThis.TextEncoder(), encodeUTF8_2 = encoder.encode.bind(encoder)))(str4);
+}
+var decodeUTF8_2;
+function decodeUTF82(bytes) {
+  let decoder;
+  return (decodeUTF8_2 ?? (decoder = new globalThis.TextDecoder(), decodeUTF8_2 = decoder.decode.bind(decoder)))(bytes);
+}
+
+// ../../node_modules/openai/internal/decoders/line.mjs
+var _LineDecoder_buffer2;
+var _LineDecoder_carriageReturnIndex2;
+var LineDecoder2 = class {
+  constructor() {
+    _LineDecoder_buffer2.set(this, void 0);
+    _LineDecoder_carriageReturnIndex2.set(this, void 0);
+    __classPrivateFieldSet2(this, _LineDecoder_buffer2, new Uint8Array(), "f");
+    __classPrivateFieldSet2(this, _LineDecoder_carriageReturnIndex2, null, "f");
+  }
+  decode(chunk) {
+    if (chunk == null) {
+      return [];
+    }
+    const binaryChunk = chunk instanceof ArrayBuffer ? new Uint8Array(chunk) : typeof chunk === "string" ? encodeUTF82(chunk) : chunk;
+    __classPrivateFieldSet2(this, _LineDecoder_buffer2, concatBytes2([__classPrivateFieldGet2(this, _LineDecoder_buffer2, "f"), binaryChunk]), "f");
+    const lines = [];
+    let patternIndex;
+    while ((patternIndex = findNewlineIndex2(__classPrivateFieldGet2(this, _LineDecoder_buffer2, "f"), __classPrivateFieldGet2(this, _LineDecoder_carriageReturnIndex2, "f"))) != null) {
+      if (patternIndex.carriage && __classPrivateFieldGet2(this, _LineDecoder_carriageReturnIndex2, "f") == null) {
+        __classPrivateFieldSet2(this, _LineDecoder_carriageReturnIndex2, patternIndex.index, "f");
+        continue;
+      }
+      if (__classPrivateFieldGet2(this, _LineDecoder_carriageReturnIndex2, "f") != null && (patternIndex.index !== __classPrivateFieldGet2(this, _LineDecoder_carriageReturnIndex2, "f") + 1 || patternIndex.carriage)) {
+        lines.push(decodeUTF82(__classPrivateFieldGet2(this, _LineDecoder_buffer2, "f").subarray(0, __classPrivateFieldGet2(this, _LineDecoder_carriageReturnIndex2, "f") - 1)));
+        __classPrivateFieldSet2(this, _LineDecoder_buffer2, __classPrivateFieldGet2(this, _LineDecoder_buffer2, "f").subarray(__classPrivateFieldGet2(this, _LineDecoder_carriageReturnIndex2, "f")), "f");
+        __classPrivateFieldSet2(this, _LineDecoder_carriageReturnIndex2, null, "f");
+        continue;
+      }
+      const endIndex = __classPrivateFieldGet2(this, _LineDecoder_carriageReturnIndex2, "f") !== null ? patternIndex.preceding - 1 : patternIndex.preceding;
+      const line2 = decodeUTF82(__classPrivateFieldGet2(this, _LineDecoder_buffer2, "f").subarray(0, endIndex));
+      lines.push(line2);
+      __classPrivateFieldSet2(this, _LineDecoder_buffer2, __classPrivateFieldGet2(this, _LineDecoder_buffer2, "f").subarray(patternIndex.index), "f");
+      __classPrivateFieldSet2(this, _LineDecoder_carriageReturnIndex2, null, "f");
+    }
+    return lines;
+  }
+  flush() {
+    if (!__classPrivateFieldGet2(this, _LineDecoder_buffer2, "f").length) {
+      return [];
+    }
+    return this.decode("\n");
+  }
+};
+_LineDecoder_buffer2 = /* @__PURE__ */ new WeakMap(), _LineDecoder_carriageReturnIndex2 = /* @__PURE__ */ new WeakMap();
+LineDecoder2.NEWLINE_CHARS = /* @__PURE__ */ new Set(["\n", "\r"]);
+LineDecoder2.NEWLINE_REGEXP = /\r\n|[\n\r]/g;
+function findNewlineIndex2(buffer, startIndex) {
+  const newline = 10;
+  const carriage = 13;
+  for (let i = startIndex ?? 0; i < buffer.length; i++) {
+    if (buffer[i] === newline) {
+      return { preceding: i, index: i + 1, carriage: false };
+    }
+    if (buffer[i] === carriage) {
+      return { preceding: i, index: i + 1, carriage: true };
+    }
+  }
+  return null;
+}
+function findDoubleNewlineIndex2(buffer) {
+  const newline = 10;
+  const carriage = 13;
+  for (let i = 0; i < buffer.length - 1; i++) {
+    if (buffer[i] === newline && buffer[i + 1] === newline) {
+      return i + 2;
+    }
+    if (buffer[i] === carriage && buffer[i + 1] === carriage) {
+      return i + 2;
+    }
+    if (buffer[i] === carriage && buffer[i + 1] === newline && i + 3 < buffer.length && buffer[i + 2] === carriage && buffer[i + 3] === newline) {
+      return i + 4;
+    }
+  }
+  return -1;
+}
+
+// ../../node_modules/openai/internal/utils/log.mjs
+var levelNumbers2 = {
+  off: 0,
+  error: 200,
+  warn: 300,
+  info: 400,
+  debug: 500
+};
+var parseLogLevel2 = (maybeLevel, sourceName, client) => {
+  if (!maybeLevel) {
+    return void 0;
+  }
+  if (hasOwn2(levelNumbers2, maybeLevel)) {
+    return maybeLevel;
+  }
+  loggerFor2(client).warn(`${sourceName} was set to ${JSON.stringify(maybeLevel)}, expected one of ${JSON.stringify(Object.keys(levelNumbers2))}`);
+  return void 0;
+};
+function noop3() {
+}
+function makeLogFn2(fnLevel, logger3, logLevel) {
+  if (!logger3 || levelNumbers2[fnLevel] > levelNumbers2[logLevel]) {
+    return noop3;
+  } else {
+    return logger3[fnLevel].bind(logger3);
+  }
+}
+var noopLogger3 = {
+  error: noop3,
+  warn: noop3,
+  info: noop3,
+  debug: noop3
+};
+var cachedLoggers2 = /* @__PURE__ */ new WeakMap();
+function loggerFor2(client) {
+  const logger3 = client.logger;
+  const logLevel = client.logLevel ?? "off";
+  if (!logger3) {
+    return noopLogger3;
+  }
+  const cachedLogger = cachedLoggers2.get(logger3);
+  if (cachedLogger && cachedLogger[0] === logLevel) {
+    return cachedLogger[1];
+  }
+  const levelLogger = {
+    error: makeLogFn2("error", logger3, logLevel),
+    warn: makeLogFn2("warn", logger3, logLevel),
+    info: makeLogFn2("info", logger3, logLevel),
+    debug: makeLogFn2("debug", logger3, logLevel)
+  };
+  cachedLoggers2.set(logger3, [logLevel, levelLogger]);
+  return levelLogger;
+}
+var formatRequestDetails2 = (details) => {
+  if (details.options) {
+    details.options = { ...details.options };
+    delete details.options["headers"];
+  }
+  if (details.headers) {
+    details.headers = Object.fromEntries((details.headers instanceof Headers ? [...details.headers] : Object.entries(details.headers)).map(([name, value]) => [
+      name,
+      name.toLowerCase() === "authorization" || name.toLowerCase() === "api-key" || name.toLowerCase() === "x-api-key" || name.toLowerCase() === "cookie" || name.toLowerCase() === "set-cookie" ? "***" : value
+    ]));
+  }
+  if ("retryOfRequestLogID" in details) {
+    if (details.retryOfRequestLogID) {
+      details.retryOf = details.retryOfRequestLogID;
+    }
+    delete details.retryOfRequestLogID;
+  }
+  return details;
+};
+
+// ../../node_modules/openai/core/streaming.mjs
+var _Stream_client2;
+var Stream2 = class _Stream {
+  constructor(iterator, controller, client) {
+    this.iterator = iterator;
+    _Stream_client2.set(this, void 0);
+    this.controller = controller;
+    __classPrivateFieldSet2(this, _Stream_client2, client, "f");
+  }
+  static fromSSEResponse(response, controller, client, synthesizeEventData) {
+    let consumed = false;
+    const logger3 = client ? loggerFor2(client) : console;
+    async function* iterator() {
+      if (consumed) {
+        throw new OpenAIError2("Cannot iterate over a consumed stream, use `.tee()` to split the stream.");
+      }
+      consumed = true;
+      let done = false;
+      try {
+        for await (const sse of _iterSSEMessages2(response, controller)) {
+          if (done)
+            continue;
+          if (sse.data.startsWith("[DONE]")) {
+            done = true;
+            continue;
+          }
+          if (sse.event === null || !sse.event.startsWith("thread.")) {
+            let data;
+            try {
+              data = JSON.parse(sse.data);
+            } catch (e) {
+              logger3.error(`Could not parse message into JSON:`, sse.data);
+              logger3.error(`From chunk:`, sse.raw);
+              throw e;
+            }
+            if (data && data.error) {
+              throw new APIError2(void 0, data.error, void 0, response.headers);
+            }
+            yield synthesizeEventData ? { event: sse.event, data } : data;
+          } else {
+            let data;
+            try {
+              data = JSON.parse(sse.data);
+            } catch (e) {
+              console.error(`Could not parse message into JSON:`, sse.data);
+              console.error(`From chunk:`, sse.raw);
+              throw e;
+            }
+            if (sse.event == "error") {
+              throw new APIError2(void 0, data.error, data.message, void 0);
+            }
+            yield { event: sse.event, data };
+          }
+        }
+        done = true;
+      } catch (e) {
+        if (isAbortError2(e))
+          return;
+        throw e;
+      } finally {
+        if (!done)
+          controller.abort();
+      }
+    }
+    return new _Stream(iterator, controller, client);
+  }
+  /**
+   * Generates a Stream from a newline-separated ReadableStream
+   * where each item is a JSON value.
+   */
+  static fromReadableStream(readableStream, controller, client) {
+    let consumed = false;
+    async function* iterLines() {
+      const lineDecoder = new LineDecoder2();
+      const iter = ReadableStreamToAsyncIterable2(readableStream);
+      for await (const chunk of iter) {
+        for (const line2 of lineDecoder.decode(chunk)) {
+          yield line2;
+        }
+      }
+      for (const line2 of lineDecoder.flush()) {
+        yield line2;
+      }
+    }
+    async function* iterator() {
+      if (consumed) {
+        throw new OpenAIError2("Cannot iterate over a consumed stream, use `.tee()` to split the stream.");
+      }
+      consumed = true;
+      let done = false;
+      try {
+        for await (const line2 of iterLines()) {
+          if (done)
+            continue;
+          if (line2)
+            yield JSON.parse(line2);
+        }
+        done = true;
+      } catch (e) {
+        if (isAbortError2(e))
+          return;
+        throw e;
+      } finally {
+        if (!done)
+          controller.abort();
+      }
+    }
+    return new _Stream(iterator, controller, client);
+  }
+  [(_Stream_client2 = /* @__PURE__ */ new WeakMap(), Symbol.asyncIterator)]() {
+    return this.iterator();
+  }
+  /**
+   * Splits the stream into two streams which can be
+   * independently read from at different speeds.
+   */
+  tee() {
+    const left = [];
+    const right = [];
+    const iterator = this.iterator();
+    const teeIterator = (queue) => {
+      return {
+        next: () => {
+          if (queue.length === 0) {
+            const result = iterator.next();
+            left.push(result);
+            right.push(result);
+          }
+          return queue.shift();
+        }
+      };
+    };
+    return [
+      new _Stream(() => teeIterator(left), this.controller, __classPrivateFieldGet2(this, _Stream_client2, "f")),
+      new _Stream(() => teeIterator(right), this.controller, __classPrivateFieldGet2(this, _Stream_client2, "f"))
+    ];
+  }
+  /**
+   * Converts this stream to a newline-separated ReadableStream of
+   * JSON stringified values in the stream
+   * which can be turned back into a Stream with `Stream.fromReadableStream()`.
+   */
+  toReadableStream() {
+    const self = this;
+    let iter;
+    return makeReadableStream2({
+      async start() {
+        iter = self[Symbol.asyncIterator]();
+      },
+      async pull(ctrl) {
+        try {
+          const { value, done } = await iter.next();
+          if (done)
+            return ctrl.close();
+          const bytes = encodeUTF82(JSON.stringify(value) + "\n");
+          ctrl.enqueue(bytes);
+        } catch (err) {
+          ctrl.error(err);
+        }
+      },
+      async cancel() {
+        await iter.return?.();
+      }
+    });
+  }
+};
+async function* _iterSSEMessages2(response, controller) {
+  if (!response.body) {
+    controller.abort();
+    if (typeof globalThis.navigator !== "undefined" && globalThis.navigator.product === "ReactNative") {
+      throw new OpenAIError2(`The default react-native fetch implementation does not support streaming. Please use expo/fetch: https://docs.expo.dev/versions/latest/sdk/expo/#expofetch-api`);
+    }
+    throw new OpenAIError2(`Attempted to iterate over a response with no body`);
+  }
+  const sseDecoder = new SSEDecoder2();
+  const lineDecoder = new LineDecoder2();
+  const iter = ReadableStreamToAsyncIterable2(response.body);
+  for await (const sseChunk of iterSSEChunks2(iter)) {
+    for (const line2 of lineDecoder.decode(sseChunk)) {
+      const sse = sseDecoder.decode(line2);
+      if (sse)
+        yield sse;
+    }
+  }
+  for (const line2 of lineDecoder.flush()) {
+    const sse = sseDecoder.decode(line2);
+    if (sse)
+      yield sse;
+  }
+}
+async function* iterSSEChunks2(iterator) {
+  let data = new Uint8Array();
+  for await (const chunk of iterator) {
+    if (chunk == null) {
+      continue;
+    }
+    const binaryChunk = chunk instanceof ArrayBuffer ? new Uint8Array(chunk) : typeof chunk === "string" ? encodeUTF82(chunk) : chunk;
+    let newData = new Uint8Array(data.length + binaryChunk.length);
+    newData.set(data);
+    newData.set(binaryChunk, data.length);
+    data = newData;
+    let patternIndex;
+    while ((patternIndex = findDoubleNewlineIndex2(data)) !== -1) {
+      yield data.slice(0, patternIndex);
+      data = data.slice(patternIndex);
+    }
+  }
+  if (data.length > 0) {
+    yield data;
+  }
+}
+var SSEDecoder2 = class {
+  constructor() {
+    this.event = null;
+    this.data = [];
+    this.chunks = [];
+  }
+  decode(line2) {
+    if (line2.endsWith("\r")) {
+      line2 = line2.substring(0, line2.length - 1);
+    }
+    if (!line2) {
+      if (!this.event && !this.data.length)
+        return null;
+      const sse = {
+        event: this.event,
+        data: this.data.join("\n"),
+        raw: this.chunks
+      };
+      this.event = null;
+      this.data = [];
+      this.chunks = [];
+      return sse;
+    }
+    this.chunks.push(line2);
+    if (line2.startsWith(":")) {
+      return null;
+    }
+    let [fieldname, _2, value] = partition2(line2, ":");
+    if (value.startsWith(" ")) {
+      value = value.substring(1);
+    }
+    if (fieldname === "event") {
+      this.event = value;
+    } else if (fieldname === "data") {
+      this.data.push(value);
+    }
+    return null;
+  }
+};
+function partition2(str4, delimiter) {
+  const index2 = str4.indexOf(delimiter);
+  if (index2 !== -1) {
+    return [str4.substring(0, index2), delimiter, str4.substring(index2 + delimiter.length)];
+  }
+  return [str4, "", ""];
+}
+
+// ../../node_modules/openai/internal/parse.mjs
+async function defaultParseResponse2(client, props) {
+  const { response, requestLogID, retryOfRequestLogID, startTime } = props;
+  const body = await (async () => {
+    if (props.options.stream) {
+      loggerFor2(client).debug("response", response.status, response.url, response.headers, response.body);
+      if (props.options.__streamClass) {
+        return props.options.__streamClass.fromSSEResponse(response, props.controller, client, props.options.__synthesizeEventData);
+      }
+      return Stream2.fromSSEResponse(response, props.controller, client, props.options.__synthesizeEventData);
+    }
+    if (response.status === 204) {
+      return null;
+    }
+    if (props.options.__binaryResponse) {
+      return response;
+    }
+    const contentType = response.headers.get("content-type");
+    const mediaType = contentType?.split(";")[0]?.trim();
+    const isJSON = mediaType?.includes("application/json") || mediaType?.endsWith("+json");
+    if (isJSON) {
+      const contentLength = response.headers.get("content-length");
+      if (contentLength === "0") {
+        return void 0;
+      }
+      const json3 = await response.json();
+      return addRequestID2(json3, response);
+    }
+    const text2 = await response.text();
+    return text2;
+  })();
+  loggerFor2(client).debug(`[${requestLogID}] response parsed`, formatRequestDetails2({
+    retryOfRequestLogID,
+    url: response.url,
+    status: response.status,
+    body,
+    durationMs: Date.now() - startTime
+  }));
+  return body;
+}
+function addRequestID2(value, response) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+  return Object.defineProperty(value, "_request_id", {
+    value: response.headers.get("x-request-id"),
+    enumerable: false
+  });
+}
+
+// ../../node_modules/openai/core/api-promise.mjs
+var _APIPromise_client2;
+var APIPromise2 = class _APIPromise extends Promise {
+  constructor(client, responsePromise, parseResponse3 = defaultParseResponse2) {
+    super((resolve) => {
+      resolve(null);
+    });
+    this.responsePromise = responsePromise;
+    this.parseResponse = parseResponse3;
+    _APIPromise_client2.set(this, void 0);
+    __classPrivateFieldSet2(this, _APIPromise_client2, client, "f");
+  }
+  _thenUnwrap(transform2) {
+    return new _APIPromise(__classPrivateFieldGet2(this, _APIPromise_client2, "f"), this.responsePromise, async (client, props) => addRequestID2(transform2(await this.parseResponse(client, props), props), props.response));
+  }
+  /**
+   * Gets the raw `Response` instance instead of parsing the response
+   * data.
+   *
+   * If you want to parse the response body but still get the `Response`
+   * instance, you can use {@link withResponse()}.
+   *
+   * 👋 Getting the wrong TypeScript type for `Response`?
+   * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
+   * to your `tsconfig.json`.
+   */
+  asResponse() {
+    return this.responsePromise.then((p) => p.response);
+  }
+  /**
+   * Gets the parsed response data, the raw `Response` instance and the ID of the request,
+   * returned via the X-Request-ID header which is useful for debugging requests and reporting
+   * issues to OpenAI.
+   *
+   * If you just want to get the raw `Response` instance without parsing it,
+   * you can use {@link asResponse()}.
+   *
+   * 👋 Getting the wrong TypeScript type for `Response`?
+   * Try setting `"moduleResolution": "NodeNext"` or add `"lib": ["DOM"]`
+   * to your `tsconfig.json`.
+   */
+  async withResponse() {
+    const [data, response] = await Promise.all([this.parse(), this.asResponse()]);
+    return { data, response, request_id: response.headers.get("x-request-id") };
+  }
+  parse() {
+    if (!this.parsedPromise) {
+      this.parsedPromise = this.responsePromise.then((data) => this.parseResponse(__classPrivateFieldGet2(this, _APIPromise_client2, "f"), data));
+    }
+    return this.parsedPromise;
+  }
+  then(onfulfilled, onrejected) {
+    return this.parse().then(onfulfilled, onrejected);
+  }
+  catch(onrejected) {
+    return this.parse().catch(onrejected);
+  }
+  finally(onfinally) {
+    return this.parse().finally(onfinally);
+  }
+};
+_APIPromise_client2 = /* @__PURE__ */ new WeakMap();
+
+// ../../node_modules/openai/core/pagination.mjs
+var _AbstractPage_client2;
+var AbstractPage2 = class {
+  constructor(client, response, body, options) {
+    _AbstractPage_client2.set(this, void 0);
+    __classPrivateFieldSet2(this, _AbstractPage_client2, client, "f");
+    this.options = options;
+    this.response = response;
+    this.body = body;
+  }
+  hasNextPage() {
+    const items = this.getPaginatedItems();
+    if (!items.length)
+      return false;
+    return this.nextPageRequestOptions() != null;
+  }
+  async getNextPage() {
+    const nextOptions = this.nextPageRequestOptions();
+    if (!nextOptions) {
+      throw new OpenAIError2("No next page expected; please check `.hasNextPage()` before calling `.getNextPage()`.");
+    }
+    return await __classPrivateFieldGet2(this, _AbstractPage_client2, "f").requestAPIList(this.constructor, nextOptions);
+  }
+  async *iterPages() {
+    let page = this;
+    yield page;
+    while (page.hasNextPage()) {
+      page = await page.getNextPage();
+      yield page;
+    }
+  }
+  async *[(_AbstractPage_client2 = /* @__PURE__ */ new WeakMap(), Symbol.asyncIterator)]() {
+    for await (const page of this.iterPages()) {
+      for (const item of page.getPaginatedItems()) {
+        yield item;
+      }
+    }
+  }
+};
+var PagePromise2 = class extends APIPromise2 {
+  constructor(client, request2, Page3) {
+    super(client, request2, async (client2, props) => new Page3(client2, props.response, await defaultParseResponse2(client2, props), props.options));
+  }
+  /**
+   * Allow auto-paginating iteration on an unawaited list call, eg:
+   *
+   *    for await (const item of client.items.list()) {
+   *      console.log(item)
+   *    }
+   */
+  async *[Symbol.asyncIterator]() {
+    const page = await this;
+    for await (const item of page) {
+      yield item;
+    }
+  }
+};
+var Page2 = class extends AbstractPage2 {
+  constructor(client, response, body, options) {
+    super(client, response, body, options);
+    this.data = body.data || [];
+    this.object = body.object;
+  }
+  getPaginatedItems() {
+    return this.data ?? [];
+  }
+  nextPageRequestOptions() {
+    return null;
+  }
+};
+var CursorPage2 = class extends AbstractPage2 {
+  constructor(client, response, body, options) {
+    super(client, response, body, options);
+    this.data = body.data || [];
+    this.has_more = body.has_more || false;
+  }
+  getPaginatedItems() {
+    return this.data ?? [];
+  }
+  hasNextPage() {
+    if (this.has_more === false) {
+      return false;
+    }
+    return super.hasNextPage();
+  }
+  nextPageRequestOptions() {
+    const data = this.getPaginatedItems();
+    const id = data[data.length - 1]?.id;
+    if (!id) {
+      return null;
+    }
+    return {
+      ...this.options,
+      query: {
+        ...maybeObj2(this.options.query),
+        after: id
+      }
+    };
+  }
+};
+var ConversationCursorPage2 = class extends AbstractPage2 {
+  constructor(client, response, body, options) {
+    super(client, response, body, options);
+    this.data = body.data || [];
+    this.has_more = body.has_more || false;
+    this.last_id = body.last_id || "";
+  }
+  getPaginatedItems() {
+    return this.data ?? [];
+  }
+  hasNextPage() {
+    if (this.has_more === false) {
+      return false;
+    }
+    return super.hasNextPage();
+  }
+  nextPageRequestOptions() {
+    const cursor = this.last_id;
+    if (!cursor) {
+      return null;
+    }
+    return {
+      ...this.options,
+      query: {
+        ...maybeObj2(this.options.query),
+        after: cursor
+      }
+    };
+  }
+};
+var NextCursorPage2 = class extends AbstractPage2 {
+  constructor(client, response, body, options) {
+    super(client, response, body, options);
+    this.data = body.data || [];
+    this.has_more = body.has_more || false;
+    this.next = body.next || null;
+  }
+  getPaginatedItems() {
+    return this.data ?? [];
+  }
+  hasNextPage() {
+    if (this.has_more === false) {
+      return false;
+    }
+    return super.hasNextPage();
+  }
+  nextPageRequestOptions() {
+    const cursor = this.next;
+    if (!cursor) {
+      return null;
+    }
+    return {
+      ...this.options,
+      query: {
+        ...maybeObj2(this.options.query),
+        after: cursor
+      }
+    };
+  }
+};
+
+// ../../node_modules/openai/auth/workload-identity-auth.mjs
+var SUBJECT_TOKEN_TYPES2 = {
+  jwt: "urn:ietf:params:oauth:token-type:jwt",
+  id: "urn:ietf:params:oauth:token-type:id_token"
+};
+var TOKEN_EXCHANGE_GRANT_TYPE2 = "urn:ietf:params:oauth:grant-type:token-exchange";
+var WorkloadIdentityAuth2 = class {
+  constructor(config2, fetch2) {
+    this.cachedToken = null;
+    this.refreshPromise = null;
+    this.tokenExchangeUrl = "https://auth.openai.com/oauth/token";
+    this.config = config2;
+    this.fetch = fetch2 ?? getDefaultFetch2();
+  }
+  async getToken() {
+    if (!this.cachedToken || this.isTokenExpired(this.cachedToken)) {
+      if (this.refreshPromise) {
+        return await this.refreshPromise;
+      }
+      this.refreshPromise = this.refreshToken();
+      try {
+        const token = await this.refreshPromise;
+        return token;
+      } finally {
+        this.refreshPromise = null;
+      }
+    }
+    if (this.needsRefresh(this.cachedToken) && !this.refreshPromise) {
+      this.refreshPromise = this.refreshToken().finally(() => {
+        this.refreshPromise = null;
+      });
+    }
+    return this.cachedToken.token;
+  }
+  async refreshToken() {
+    const subjectToken = await this.config.provider.getToken();
+    const body = {
+      grant_type: TOKEN_EXCHANGE_GRANT_TYPE2,
+      subject_token: subjectToken,
+      subject_token_type: SUBJECT_TOKEN_TYPES2[this.config.provider.tokenType],
+      identity_provider_id: this.config.identityProviderId,
+      service_account_id: this.config.serviceAccountId
+    };
+    if (this.config.clientId) {
+      body["client_id"] = this.config.clientId;
+    }
+    const response = await this.fetch(this.tokenExchangeUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      let body2 = void 0;
+      try {
+        body2 = JSON.parse(errorText);
+      } catch {
+      }
+      if (response.status === 400 || response.status === 401 || response.status === 403) {
+        throw new OAuthError2(response.status, body2, response.headers);
+      }
+      throw APIError2.generate(response.status, body2, `Token exchange failed with status ${response.status}`, response.headers);
+    }
+    const tokenResponse = await response.json();
+    const expiresIn = tokenResponse.expires_in || 3600;
+    const expiresAt = Date.now() + expiresIn * 1e3;
+    this.cachedToken = {
+      token: tokenResponse.access_token,
+      expiresAt
+    };
+    return tokenResponse.access_token;
+  }
+  isTokenExpired(cachedToken) {
+    return Date.now() >= cachedToken.expiresAt;
+  }
+  needsRefresh(cachedToken) {
+    const bufferSeconds = this.config.refreshBufferSeconds ?? 1200;
+    const bufferMs = bufferSeconds * 1e3;
+    return Date.now() >= cachedToken.expiresAt - bufferMs;
+  }
+  invalidateToken() {
+    this.cachedToken = null;
+    this.refreshPromise = null;
+  }
+};
+
+// ../../node_modules/openai/internal/uploads.mjs
+var checkFileSupport2 = () => {
+  if (typeof File === "undefined") {
+    const { process: process2 } = globalThis;
+    const isOldNode = typeof process2?.versions?.node === "string" && parseInt(process2.versions.node.split(".")) < 20;
+    throw new Error("`File` is not defined as a global, which is required for file uploads." + (isOldNode ? " Update to Node 20 LTS or newer, or set `globalThis.File` to `import('node:buffer').File`." : ""));
+  }
+};
+function makeFile2(fileBits, fileName, options) {
+  checkFileSupport2();
+  return new File(fileBits, fileName ?? "unknown_file", options);
+}
+function getName2(value) {
+  return (typeof value === "object" && value !== null && ("name" in value && value.name && String(value.name) || "url" in value && value.url && String(value.url) || "filename" in value && value.filename && String(value.filename) || "path" in value && value.path && String(value.path)) || "").split(/[\\/]/).pop() || void 0;
+}
+var isAsyncIterable2 = (value) => value != null && typeof value === "object" && typeof value[Symbol.asyncIterator] === "function";
+var maybeMultipartFormRequestOptions2 = async (opts, fetch2) => {
+  if (!hasUploadableValue2(opts.body))
+    return opts;
+  return { ...opts, body: await createForm2(opts.body, fetch2) };
+};
+var multipartFormRequestOptions2 = async (opts, fetch2) => {
+  return { ...opts, body: await createForm2(opts.body, fetch2) };
+};
+var supportsFormDataMap2 = /* @__PURE__ */ new WeakMap();
+function supportsFormData2(fetchObject) {
+  const fetch2 = typeof fetchObject === "function" ? fetchObject : fetchObject.fetch;
+  const cached2 = supportsFormDataMap2.get(fetch2);
+  if (cached2)
+    return cached2;
+  const promise2 = (async () => {
+    try {
+      const FetchResponse = "Response" in fetch2 ? fetch2.Response : (await fetch2("data:,")).constructor;
+      const data = new FormData();
+      if (data.toString() === await new FetchResponse(data).text()) {
+        return false;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  })();
+  supportsFormDataMap2.set(fetch2, promise2);
+  return promise2;
+}
+var createForm2 = async (body, fetch2) => {
+  if (!await supportsFormData2(fetch2)) {
+    throw new TypeError("The provided fetch function does not support file uploads with the current global FormData class.");
+  }
+  const form = new FormData();
+  await Promise.all(Object.entries(body || {}).map(([key, value]) => addFormValue2(form, key, value)));
+  return form;
+};
+var isNamedBlob2 = (value) => value instanceof Blob && "name" in value;
+var isUploadable2 = (value) => typeof value === "object" && value !== null && (value instanceof Response || isAsyncIterable2(value) || isNamedBlob2(value));
+var hasUploadableValue2 = (value) => {
+  if (isUploadable2(value))
+    return true;
+  if (Array.isArray(value))
+    return value.some(hasUploadableValue2);
+  if (value && typeof value === "object") {
+    for (const k in value) {
+      if (hasUploadableValue2(value[k]))
+        return true;
+    }
+  }
+  return false;
+};
+var addFormValue2 = async (form, key, value) => {
+  if (value === void 0)
+    return;
+  if (value == null) {
+    throw new TypeError(`Received null for "${key}"; to pass null in FormData, you must use the string 'null'`);
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    form.append(key, String(value));
+  } else if (value instanceof Response) {
+    form.append(key, makeFile2([await value.blob()], getName2(value)));
+  } else if (isAsyncIterable2(value)) {
+    form.append(key, makeFile2([await new Response(ReadableStreamFrom2(value)).blob()], getName2(value)));
+  } else if (isNamedBlob2(value)) {
+    form.append(key, value, getName2(value));
+  } else if (Array.isArray(value)) {
+    await Promise.all(value.map((entry) => addFormValue2(form, key + "[]", entry)));
+  } else if (typeof value === "object") {
+    await Promise.all(Object.entries(value).map(([name, prop]) => addFormValue2(form, `${key}[${name}]`, prop)));
+  } else {
+    throw new TypeError(`Invalid value given to form, expected a string, number, boolean, object, Array, File or Blob but got ${value} instead`);
+  }
+};
+
+// ../../node_modules/openai/internal/to-file.mjs
+var isBlobLike2 = (value) => value != null && typeof value === "object" && typeof value.size === "number" && typeof value.type === "string" && typeof value.text === "function" && typeof value.slice === "function" && typeof value.arrayBuffer === "function";
+var isFileLike2 = (value) => value != null && typeof value === "object" && typeof value.name === "string" && typeof value.lastModified === "number" && isBlobLike2(value);
+var isResponseLike3 = (value) => value != null && typeof value === "object" && typeof value.url === "string" && typeof value.blob === "function";
+async function toFile2(value, name, options) {
+  checkFileSupport2();
+  value = await value;
+  if (isFileLike2(value)) {
+    if (value instanceof File) {
+      return value;
+    }
+    return makeFile2([await value.arrayBuffer()], value.name);
+  }
+  if (isResponseLike3(value)) {
+    const blob = await value.blob();
+    name || (name = new URL(value.url).pathname.split(/[\\/]/).pop());
+    return makeFile2(await getBytes2(blob), name, options);
+  }
+  const parts = await getBytes2(value);
+  name || (name = getName2(value));
+  if (!options?.type) {
+    const type = parts.find((part) => typeof part === "object" && "type" in part && part.type);
+    if (typeof type === "string") {
+      options = { ...options, type };
+    }
+  }
+  return makeFile2(parts, name, options);
+}
+async function getBytes2(value) {
+  let parts = [];
+  if (typeof value === "string" || ArrayBuffer.isView(value) || // includes Uint8Array, Buffer, etc.
+  value instanceof ArrayBuffer) {
+    parts.push(value);
+  } else if (isBlobLike2(value)) {
+    parts.push(value instanceof Blob ? value : await value.arrayBuffer());
+  } else if (isAsyncIterable2(value)) {
+    for await (const chunk of value) {
+      parts.push(...await getBytes2(chunk));
+    }
+  } else {
+    const constructor = value?.constructor?.name;
+    throw new Error(`Unexpected data type: ${typeof value}${constructor ? `; constructor: ${constructor}` : ""}${propsForError2(value)}`);
+  }
+  return parts;
+}
+function propsForError2(value) {
+  if (typeof value !== "object" || value === null)
+    return "";
+  const props = Object.getOwnPropertyNames(value);
+  return `; props: [${props.map((p) => `"${p}"`).join(", ")}]`;
+}
+
+// ../../node_modules/openai/core/resource.mjs
+var APIResource2 = class {
+  constructor(client) {
+    this._client = client;
+  }
+};
+
+// ../../node_modules/openai/internal/utils/path.mjs
+function encodeURIPath2(str4) {
+  return str4.replace(/[^A-Za-z0-9\-._~!$&'()*+,;=:@]+/g, encodeURIComponent);
+}
+var EMPTY2 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.create(null));
+var createPathTagFunction2 = (pathEncoder = encodeURIPath2) => function path3(statics, ...params) {
+  if (statics.length === 1)
+    return statics[0];
+  let postPath = false;
+  const invalidSegments = [];
+  const path4 = statics.reduce((previousValue, currentValue, index2) => {
+    if (/[?#]/.test(currentValue)) {
+      postPath = true;
+    }
+    const value = params[index2];
+    let encoded = (postPath ? encodeURIComponent : pathEncoder)("" + value);
+    if (index2 !== params.length && (value == null || typeof value === "object" && // handle values from other realms
+    value.toString === Object.getPrototypeOf(Object.getPrototypeOf(value.hasOwnProperty ?? EMPTY2) ?? EMPTY2)?.toString)) {
+      encoded = value + "";
+      invalidSegments.push({
+        start: previousValue.length + currentValue.length,
+        length: encoded.length,
+        error: `Value of type ${Object.prototype.toString.call(value).slice(8, -1)} is not a valid path parameter`
+      });
+    }
+    return previousValue + currentValue + (index2 === params.length ? "" : encoded);
+  }, "");
+  const pathOnly = path4.split(/[?#]/, 1)[0];
+  const invalidSegmentPattern = /(?<=^|\/)(?:\.|%2e){1,2}(?=\/|$)/gi;
+  let match2;
+  while ((match2 = invalidSegmentPattern.exec(pathOnly)) !== null) {
+    invalidSegments.push({
+      start: match2.index,
+      length: match2[0].length,
+      error: `Value "${match2[0]}" can't be safely passed as a path parameter`
+    });
+  }
+  invalidSegments.sort((a, b) => a.start - b.start);
+  if (invalidSegments.length > 0) {
+    let lastEnd = 0;
+    const underline = invalidSegments.reduce((acc, segment) => {
+      const spaces = " ".repeat(segment.start - lastEnd);
+      const arrows = "^".repeat(segment.length);
+      lastEnd = segment.start + segment.length;
+      return acc + spaces + arrows;
+    }, "");
+    throw new OpenAIError2(`Path parameters result in path with invalid segments:
+${invalidSegments.map((e) => e.error).join("\n")}
+${path4}
+${underline}`);
+  }
+  return path4;
+};
+var path2 = /* @__PURE__ */ createPathTagFunction2(encodeURIPath2);
+
+// ../../node_modules/openai/resources/chat/completions/messages.mjs
+var Messages3 = class extends APIResource2 {
+  /**
+   * Get the messages in a stored chat completion. Only Chat Completions that have
+   * been created with the `store` parameter set to `true` will be returned.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const chatCompletionStoreMessage of client.chat.completions.messages.list(
+   *   'completion_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(completionID, query = {}, options) {
+    return this._client.getAPIList(path2`/chat/completions/${completionID}/messages`, CursorPage2, { query, ...options, __security: { bearerAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/lib/parser.mjs
+function isChatCompletionFunctionTool2(tool) {
+  return tool !== void 0 && "function" in tool && tool.function !== void 0;
+}
+function isAutoParsableResponseFormat2(response_format) {
+  return response_format?.["$brand"] === "auto-parseable-response-format";
+}
+function isAutoParsableTool3(tool) {
+  return tool?.["$brand"] === "auto-parseable-tool";
+}
+function maybeParseChatCompletion2(completion, params) {
+  if (!params || !hasAutoParseableInput3(params)) {
+    return {
+      ...completion,
+      choices: completion.choices.map((choice) => {
+        assertToolCallsAreChatCompletionFunctionToolCalls2(choice.message.tool_calls);
+        return {
+          ...choice,
+          message: {
+            ...choice.message,
+            parsed: null,
+            ...choice.message.tool_calls ? {
+              tool_calls: choice.message.tool_calls
+            } : void 0
+          }
+        };
+      })
+    };
+  }
+  return parseChatCompletion2(completion, params);
+}
+function parseChatCompletion2(completion, params) {
+  const choices = completion.choices.map((choice) => {
+    if (choice.finish_reason === "length") {
+      throw new LengthFinishReasonError2();
+    }
+    if (choice.finish_reason === "content_filter") {
+      throw new ContentFilterFinishReasonError2();
+    }
+    assertToolCallsAreChatCompletionFunctionToolCalls2(choice.message.tool_calls);
+    return {
+      ...choice,
+      message: {
+        ...choice.message,
+        ...choice.message.tool_calls ? {
+          tool_calls: choice.message.tool_calls?.map((toolCall) => parseToolCall3(params, toolCall)) ?? void 0
+        } : void 0,
+        parsed: choice.message.content && !choice.message.refusal ? parseResponseFormat2(params, choice.message.content) : null
+      }
+    };
+  });
+  return { ...completion, choices };
+}
+function parseResponseFormat2(params, content) {
+  if (params.response_format?.type !== "json_schema") {
+    return null;
+  }
+  if (params.response_format?.type === "json_schema") {
+    if ("$parseRaw" in params.response_format) {
+      const response_format = params.response_format;
+      return response_format.$parseRaw(content);
+    }
+    return JSON.parse(content);
+  }
+  return null;
+}
+function parseToolCall3(params, toolCall) {
+  const inputTool = params.tools?.find((inputTool2) => isChatCompletionFunctionTool2(inputTool2) && inputTool2.function?.name === toolCall.function.name);
+  return {
+    ...toolCall,
+    function: {
+      ...toolCall.function,
+      parsed_arguments: isAutoParsableTool3(inputTool) ? inputTool.$parseRaw(toolCall.function.arguments) : inputTool?.function.strict ? JSON.parse(toolCall.function.arguments) : null
+    }
+  };
+}
+function shouldParseToolCall2(params, toolCall) {
+  if (!params || !("tools" in params) || !params.tools) {
+    return false;
+  }
+  const inputTool = params.tools?.find((inputTool2) => isChatCompletionFunctionTool2(inputTool2) && inputTool2.function?.name === toolCall.function.name);
+  return isChatCompletionFunctionTool2(inputTool) && (isAutoParsableTool3(inputTool) || inputTool?.function.strict || false);
+}
+function hasAutoParseableInput3(params) {
+  if (isAutoParsableResponseFormat2(params.response_format)) {
+    return true;
+  }
+  return params.tools?.some((t) => isAutoParsableTool3(t) || t.type === "function" && t.function.strict === true) ?? false;
+}
+function assertToolCallsAreChatCompletionFunctionToolCalls2(toolCalls) {
+  for (const toolCall of toolCalls || []) {
+    if (toolCall.type !== "function") {
+      throw new OpenAIError2(`Currently only \`function\` tool calls are supported; Received \`${toolCall.type}\``);
+    }
+  }
+}
+function validateInputTools2(tools) {
+  for (const tool of tools ?? []) {
+    if (tool.type !== "function") {
+      throw new OpenAIError2(`Currently only \`function\` tool types support auto-parsing; Received \`${tool.type}\``);
+    }
+    if (tool.function.strict !== true) {
+      throw new OpenAIError2(`The \`${tool.function.name}\` tool is not marked with \`strict: true\`. Only strict function tools can be auto-parsed`);
+    }
+  }
+}
+
+// ../../node_modules/openai/lib/chatCompletionUtils.mjs
+var isAssistantMessage2 = (message) => {
+  return message?.role === "assistant";
+};
+var isToolMessage2 = (message) => {
+  return message?.role === "tool";
+};
+
+// ../../node_modules/openai/lib/EventStream.mjs
+var _EventStream_instances2;
+var _EventStream_connectedPromise2;
+var _EventStream_resolveConnectedPromise2;
+var _EventStream_rejectConnectedPromise2;
+var _EventStream_endPromise2;
+var _EventStream_resolveEndPromise2;
+var _EventStream_rejectEndPromise2;
+var _EventStream_listeners2;
+var _EventStream_ended2;
+var _EventStream_errored2;
+var _EventStream_aborted2;
+var _EventStream_catchingPromiseCreated2;
+var _EventStream_handleError3;
+var EventStream2 = class {
+  constructor() {
+    _EventStream_instances2.add(this);
+    this.controller = new AbortController();
+    _EventStream_connectedPromise2.set(this, void 0);
+    _EventStream_resolveConnectedPromise2.set(this, () => {
+    });
+    _EventStream_rejectConnectedPromise2.set(this, () => {
+    });
+    _EventStream_endPromise2.set(this, void 0);
+    _EventStream_resolveEndPromise2.set(this, () => {
+    });
+    _EventStream_rejectEndPromise2.set(this, () => {
+    });
+    _EventStream_listeners2.set(this, {});
+    _EventStream_ended2.set(this, false);
+    _EventStream_errored2.set(this, false);
+    _EventStream_aborted2.set(this, false);
+    _EventStream_catchingPromiseCreated2.set(this, false);
+    __classPrivateFieldSet2(this, _EventStream_connectedPromise2, new Promise((resolve, reject) => {
+      __classPrivateFieldSet2(this, _EventStream_resolveConnectedPromise2, resolve, "f");
+      __classPrivateFieldSet2(this, _EventStream_rejectConnectedPromise2, reject, "f");
+    }), "f");
+    __classPrivateFieldSet2(this, _EventStream_endPromise2, new Promise((resolve, reject) => {
+      __classPrivateFieldSet2(this, _EventStream_resolveEndPromise2, resolve, "f");
+      __classPrivateFieldSet2(this, _EventStream_rejectEndPromise2, reject, "f");
+    }), "f");
+    __classPrivateFieldGet2(this, _EventStream_connectedPromise2, "f").catch(() => {
+    });
+    __classPrivateFieldGet2(this, _EventStream_endPromise2, "f").catch(() => {
+    });
+  }
+  _run(executor) {
+    setTimeout(() => {
+      executor().then(() => {
+        this._emitFinal();
+        this._emit("end");
+      }, __classPrivateFieldGet2(this, _EventStream_instances2, "m", _EventStream_handleError3).bind(this));
+    }, 0);
+  }
+  _connected() {
+    if (this.ended)
+      return;
+    __classPrivateFieldGet2(this, _EventStream_resolveConnectedPromise2, "f").call(this);
+    this._emit("connect");
+  }
+  get ended() {
+    return __classPrivateFieldGet2(this, _EventStream_ended2, "f");
+  }
+  get errored() {
+    return __classPrivateFieldGet2(this, _EventStream_errored2, "f");
+  }
+  get aborted() {
+    return __classPrivateFieldGet2(this, _EventStream_aborted2, "f");
+  }
+  abort() {
+    this.controller.abort();
+  }
+  /**
+   * Adds the listener function to the end of the listeners array for the event.
+   * No checks are made to see if the listener has already been added. Multiple calls passing
+   * the same combination of event and listener will result in the listener being added, and
+   * called, multiple times.
+   * @returns this ChatCompletionStream, so that calls can be chained
+   */
+  on(event, listener) {
+    const listeners = __classPrivateFieldGet2(this, _EventStream_listeners2, "f")[event] || (__classPrivateFieldGet2(this, _EventStream_listeners2, "f")[event] = []);
+    listeners.push({ listener });
+    return this;
+  }
+  /**
+   * Removes the specified listener from the listener array for the event.
+   * off() will remove, at most, one instance of a listener from the listener array. If any single
+   * listener has been added multiple times to the listener array for the specified event, then
+   * off() must be called multiple times to remove each instance.
+   * @returns this ChatCompletionStream, so that calls can be chained
+   */
+  off(event, listener) {
+    const listeners = __classPrivateFieldGet2(this, _EventStream_listeners2, "f")[event];
+    if (!listeners)
+      return this;
+    const index2 = listeners.findIndex((l) => l.listener === listener);
+    if (index2 >= 0)
+      listeners.splice(index2, 1);
+    return this;
+  }
+  /**
+   * Adds a one-time listener function for the event. The next time the event is triggered,
+   * this listener is removed and then invoked.
+   * @returns this ChatCompletionStream, so that calls can be chained
+   */
+  once(event, listener) {
+    const listeners = __classPrivateFieldGet2(this, _EventStream_listeners2, "f")[event] || (__classPrivateFieldGet2(this, _EventStream_listeners2, "f")[event] = []);
+    listeners.push({ listener, once: true });
+    return this;
+  }
+  /**
+   * This is similar to `.once()`, but returns a Promise that resolves the next time
+   * the event is triggered, instead of calling a listener callback.
+   * @returns a Promise that resolves the next time given event is triggered,
+   * or rejects if an error is emitted.  (If you request the 'error' event,
+   * returns a promise that resolves with the error).
+   *
+   * Example:
+   *
+   *   const message = await stream.emitted('message') // rejects if the stream errors
+   */
+  emitted(event) {
+    return new Promise((resolve, reject) => {
+      __classPrivateFieldSet2(this, _EventStream_catchingPromiseCreated2, true, "f");
+      if (event !== "error")
+        this.once("error", reject);
+      this.once(event, resolve);
+    });
+  }
+  async done() {
+    __classPrivateFieldSet2(this, _EventStream_catchingPromiseCreated2, true, "f");
+    await __classPrivateFieldGet2(this, _EventStream_endPromise2, "f");
+  }
+  _emit(event, ...args) {
+    if (__classPrivateFieldGet2(this, _EventStream_ended2, "f")) {
+      return;
+    }
+    if (event === "end") {
+      __classPrivateFieldSet2(this, _EventStream_ended2, true, "f");
+      __classPrivateFieldGet2(this, _EventStream_resolveEndPromise2, "f").call(this);
+    }
+    const listeners = __classPrivateFieldGet2(this, _EventStream_listeners2, "f")[event];
+    if (listeners) {
+      __classPrivateFieldGet2(this, _EventStream_listeners2, "f")[event] = listeners.filter((l) => !l.once);
+      listeners.forEach(({ listener }) => listener(...args));
+    }
+    if (event === "abort") {
+      const error40 = args[0];
+      if (!__classPrivateFieldGet2(this, _EventStream_catchingPromiseCreated2, "f") && !listeners?.length) {
+        Promise.reject(error40);
+      }
+      __classPrivateFieldGet2(this, _EventStream_rejectConnectedPromise2, "f").call(this, error40);
+      __classPrivateFieldGet2(this, _EventStream_rejectEndPromise2, "f").call(this, error40);
+      this._emit("end");
+      return;
+    }
+    if (event === "error") {
+      const error40 = args[0];
+      if (!__classPrivateFieldGet2(this, _EventStream_catchingPromiseCreated2, "f") && !listeners?.length) {
+        Promise.reject(error40);
+      }
+      __classPrivateFieldGet2(this, _EventStream_rejectConnectedPromise2, "f").call(this, error40);
+      __classPrivateFieldGet2(this, _EventStream_rejectEndPromise2, "f").call(this, error40);
+      this._emit("end");
+    }
+  }
+  _emitFinal() {
+  }
+};
+_EventStream_connectedPromise2 = /* @__PURE__ */ new WeakMap(), _EventStream_resolveConnectedPromise2 = /* @__PURE__ */ new WeakMap(), _EventStream_rejectConnectedPromise2 = /* @__PURE__ */ new WeakMap(), _EventStream_endPromise2 = /* @__PURE__ */ new WeakMap(), _EventStream_resolveEndPromise2 = /* @__PURE__ */ new WeakMap(), _EventStream_rejectEndPromise2 = /* @__PURE__ */ new WeakMap(), _EventStream_listeners2 = /* @__PURE__ */ new WeakMap(), _EventStream_ended2 = /* @__PURE__ */ new WeakMap(), _EventStream_errored2 = /* @__PURE__ */ new WeakMap(), _EventStream_aborted2 = /* @__PURE__ */ new WeakMap(), _EventStream_catchingPromiseCreated2 = /* @__PURE__ */ new WeakMap(), _EventStream_instances2 = /* @__PURE__ */ new WeakSet(), _EventStream_handleError3 = function _EventStream_handleError4(error40) {
+  __classPrivateFieldSet2(this, _EventStream_errored2, true, "f");
+  if (error40 instanceof Error && error40.name === "AbortError") {
+    error40 = new APIUserAbortError2();
+  }
+  if (error40 instanceof APIUserAbortError2) {
+    __classPrivateFieldSet2(this, _EventStream_aborted2, true, "f");
+    return this._emit("abort", error40);
+  }
+  if (error40 instanceof OpenAIError2) {
+    return this._emit("error", error40);
+  }
+  if (error40 instanceof Error) {
+    const openAIError = new OpenAIError2(error40.message);
+    openAIError.cause = error40;
+    return this._emit("error", openAIError);
+  }
+  return this._emit("error", new OpenAIError2(String(error40)));
+};
+
+// ../../node_modules/openai/lib/RunnableFunction.mjs
+function isRunnableFunctionWithParse2(fn) {
+  return typeof fn.parse === "function";
+}
+
+// ../../node_modules/openai/lib/AbstractChatCompletionRunner.mjs
+var _AbstractChatCompletionRunner_instances2;
+var _AbstractChatCompletionRunner_getFinalContent3;
+var _AbstractChatCompletionRunner_getFinalMessage3;
+var _AbstractChatCompletionRunner_getFinalFunctionToolCall3;
+var _AbstractChatCompletionRunner_getFinalFunctionToolCallResult3;
+var _AbstractChatCompletionRunner_calculateTotalUsage3;
+var _AbstractChatCompletionRunner_validateParams3;
+var _AbstractChatCompletionRunner_stringifyFunctionCallResult3;
+var DEFAULT_MAX_CHAT_COMPLETIONS2 = 10;
+var AbstractChatCompletionRunner2 = class extends EventStream2 {
+  constructor() {
+    super(...arguments);
+    _AbstractChatCompletionRunner_instances2.add(this);
+    this._chatCompletions = [];
+    this.messages = [];
+  }
+  _addChatCompletion(chatCompletion) {
+    this._chatCompletions.push(chatCompletion);
+    this._emit("chatCompletion", chatCompletion);
+    const message = chatCompletion.choices[0]?.message;
+    if (message)
+      this._addMessage(message);
+    return chatCompletion;
+  }
+  _addMessage(message, emit = true) {
+    if (!("content" in message))
+      message.content = null;
+    this.messages.push(message);
+    if (emit) {
+      this._emit("message", message);
+      if (isToolMessage2(message) && message.content) {
+        this._emit("functionToolCallResult", message.content);
+      } else if (isAssistantMessage2(message) && message.tool_calls) {
+        for (const tool_call of message.tool_calls) {
+          if (tool_call.type === "function") {
+            this._emit("functionToolCall", tool_call.function);
+          }
+        }
+      }
+    }
+  }
+  /**
+   * @returns a promise that resolves with the final ChatCompletion, or rejects
+   * if an error occurred or the stream ended prematurely without producing a ChatCompletion.
+   */
+  async finalChatCompletion() {
+    await this.done();
+    const completion = this._chatCompletions[this._chatCompletions.length - 1];
+    if (!completion)
+      throw new OpenAIError2("stream ended without producing a ChatCompletion");
+    return completion;
+  }
+  /**
+   * @returns a promise that resolves with the content of the final ChatCompletionMessage, or rejects
+   * if an error occurred or the stream ended prematurely without producing a ChatCompletionMessage.
+   */
+  async finalContent() {
+    await this.done();
+    return __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_getFinalContent3).call(this);
+  }
+  /**
+   * @returns a promise that resolves with the the final assistant ChatCompletionMessage response,
+   * or rejects if an error occurred or the stream ended prematurely without producing a ChatCompletionMessage.
+   */
+  async finalMessage() {
+    await this.done();
+    return __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_getFinalMessage3).call(this);
+  }
+  /**
+   * @returns a promise that resolves with the content of the final FunctionCall, or rejects
+   * if an error occurred or the stream ended prematurely without producing a ChatCompletionMessage.
+   */
+  async finalFunctionToolCall() {
+    await this.done();
+    return __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_getFinalFunctionToolCall3).call(this);
+  }
+  async finalFunctionToolCallResult() {
+    await this.done();
+    return __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_getFinalFunctionToolCallResult3).call(this);
+  }
+  async totalUsage() {
+    await this.done();
+    return __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_calculateTotalUsage3).call(this);
+  }
+  allChatCompletions() {
+    return [...this._chatCompletions];
+  }
+  _emitFinal() {
+    const completion = this._chatCompletions[this._chatCompletions.length - 1];
+    if (completion)
+      this._emit("finalChatCompletion", completion);
+    const finalMessage = __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_getFinalMessage3).call(this);
+    if (finalMessage)
+      this._emit("finalMessage", finalMessage);
+    const finalContent = __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_getFinalContent3).call(this);
+    if (finalContent)
+      this._emit("finalContent", finalContent);
+    const finalFunctionCall = __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_getFinalFunctionToolCall3).call(this);
+    if (finalFunctionCall)
+      this._emit("finalFunctionToolCall", finalFunctionCall);
+    const finalFunctionCallResult = __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_getFinalFunctionToolCallResult3).call(this);
+    if (finalFunctionCallResult != null)
+      this._emit("finalFunctionToolCallResult", finalFunctionCallResult);
+    if (this._chatCompletions.some((c) => c.usage)) {
+      this._emit("totalUsage", __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_calculateTotalUsage3).call(this));
+    }
+  }
+  async _createChatCompletion(client, params, options) {
+    const signal = options?.signal;
+    if (signal) {
+      if (signal.aborted)
+        this.controller.abort();
+      signal.addEventListener("abort", () => this.controller.abort());
+    }
+    __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_validateParams3).call(this, params);
+    const chatCompletion = await client.chat.completions.create({ ...params, stream: false }, { ...options, signal: this.controller.signal });
+    this._connected();
+    return this._addChatCompletion(parseChatCompletion2(chatCompletion, params));
+  }
+  async _runChatCompletion(client, params, options) {
+    for (const message of params.messages) {
+      this._addMessage(message, false);
+    }
+    return await this._createChatCompletion(client, params, options);
+  }
+  async _runTools(client, params, options) {
+    const role = "tool";
+    const { tool_choice = "auto", stream, ...restParams } = params;
+    const singleFunctionToCall = typeof tool_choice !== "string" && tool_choice.type === "function" && tool_choice?.function?.name;
+    const { maxChatCompletions = DEFAULT_MAX_CHAT_COMPLETIONS2 } = options || {};
+    const inputTools = params.tools.map((tool) => {
+      if (isAutoParsableTool3(tool)) {
+        if (!tool.$callback) {
+          throw new OpenAIError2("Tool given to `.runTools()` that does not have an associated function");
+        }
+        return {
+          type: "function",
+          function: {
+            function: tool.$callback,
+            name: tool.function.name,
+            description: tool.function.description || "",
+            parameters: tool.function.parameters,
+            parse: tool.$parseRaw,
+            strict: true
+          }
+        };
+      }
+      return tool;
+    });
+    const functionsByName = {};
+    for (const f of inputTools) {
+      if (f.type === "function") {
+        functionsByName[f.function.name || f.function.function.name] = f.function;
+      }
+    }
+    const tools = "tools" in params ? inputTools.map((t) => t.type === "function" ? {
+      type: "function",
+      function: {
+        name: t.function.name || t.function.function.name,
+        parameters: t.function.parameters,
+        description: t.function.description,
+        strict: t.function.strict
+      }
+    } : t) : void 0;
+    for (const message of params.messages) {
+      this._addMessage(message, false);
+    }
+    for (let i = 0; i < maxChatCompletions; ++i) {
+      const chatCompletion = await this._createChatCompletion(client, {
+        ...restParams,
+        tool_choice,
+        tools,
+        messages: [...this.messages]
+      }, options);
+      const message = chatCompletion.choices[0]?.message;
+      if (!message) {
+        throw new OpenAIError2(`missing message in ChatCompletion response`);
+      }
+      if (!message.tool_calls?.length) {
+        return;
+      }
+      for (const tool_call of message.tool_calls) {
+        if (tool_call.type !== "function")
+          continue;
+        const tool_call_id = tool_call.id;
+        const { name, arguments: args } = tool_call.function;
+        const fn = functionsByName[name];
+        if (!fn) {
+          const content2 = `Invalid tool_call: ${JSON.stringify(name)}. Available options are: ${Object.keys(functionsByName).map((name2) => JSON.stringify(name2)).join(", ")}. Please try again`;
+          this._addMessage({ role, tool_call_id, content: content2 });
+          continue;
+        } else if (singleFunctionToCall && singleFunctionToCall !== name) {
+          const content2 = `Invalid tool_call: ${JSON.stringify(name)}. ${JSON.stringify(singleFunctionToCall)} requested. Please try again`;
+          this._addMessage({ role, tool_call_id, content: content2 });
+          continue;
+        }
+        let parsed;
+        try {
+          parsed = isRunnableFunctionWithParse2(fn) ? await fn.parse(args) : args;
+        } catch (error40) {
+          const content2 = error40 instanceof Error ? error40.message : String(error40);
+          this._addMessage({ role, tool_call_id, content: content2 });
+          continue;
+        }
+        const rawContent = await fn.function(parsed, this);
+        const content = __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_stringifyFunctionCallResult3).call(this, rawContent);
+        this._addMessage({ role, tool_call_id, content });
+        if (singleFunctionToCall) {
+          return;
+        }
+      }
+    }
+    return;
+  }
+};
+_AbstractChatCompletionRunner_instances2 = /* @__PURE__ */ new WeakSet(), _AbstractChatCompletionRunner_getFinalContent3 = function _AbstractChatCompletionRunner_getFinalContent4() {
+  return __classPrivateFieldGet2(this, _AbstractChatCompletionRunner_instances2, "m", _AbstractChatCompletionRunner_getFinalMessage3).call(this).content ?? null;
+}, _AbstractChatCompletionRunner_getFinalMessage3 = function _AbstractChatCompletionRunner_getFinalMessage4() {
+  let i = this.messages.length;
+  while (i-- > 0) {
+    const message = this.messages[i];
+    if (isAssistantMessage2(message)) {
+      const ret = {
+        ...message,
+        content: message.content ?? null,
+        refusal: message.refusal ?? null
+      };
+      return ret;
+    }
+  }
+  throw new OpenAIError2("stream ended without producing a ChatCompletionMessage with role=assistant");
+}, _AbstractChatCompletionRunner_getFinalFunctionToolCall3 = function _AbstractChatCompletionRunner_getFinalFunctionToolCall4() {
+  for (let i = this.messages.length - 1; i >= 0; i--) {
+    const message = this.messages[i];
+    if (isAssistantMessage2(message) && message?.tool_calls?.length) {
+      for (let j = message.tool_calls.length - 1; j >= 0; j--) {
+        const toolCall = message.tool_calls[j];
+        if (toolCall?.type === "function") {
+          return toolCall.function;
+        }
+      }
+    }
+  }
+  return;
+}, _AbstractChatCompletionRunner_getFinalFunctionToolCallResult3 = function _AbstractChatCompletionRunner_getFinalFunctionToolCallResult4() {
+  for (let i = this.messages.length - 1; i >= 0; i--) {
+    const message = this.messages[i];
+    if (isToolMessage2(message) && message.content != null && typeof message.content === "string" && this.messages.some((x) => x.role === "assistant" && x.tool_calls?.some((y) => y.type === "function" && y.id === message.tool_call_id))) {
+      return message.content;
+    }
+  }
+  return;
+}, _AbstractChatCompletionRunner_calculateTotalUsage3 = function _AbstractChatCompletionRunner_calculateTotalUsage4() {
+  const total = {
+    completion_tokens: 0,
+    prompt_tokens: 0,
+    total_tokens: 0
+  };
+  for (const { usage } of this._chatCompletions) {
+    if (usage) {
+      total.completion_tokens += usage.completion_tokens;
+      total.prompt_tokens += usage.prompt_tokens;
+      total.total_tokens += usage.total_tokens;
+    }
+  }
+  return total;
+}, _AbstractChatCompletionRunner_validateParams3 = function _AbstractChatCompletionRunner_validateParams4(params) {
+  if (params.n != null && params.n > 1) {
+    throw new OpenAIError2("ChatCompletion convenience helpers only support n=1 at this time. To use n>1, please use chat.completions.create() directly.");
+  }
+}, _AbstractChatCompletionRunner_stringifyFunctionCallResult3 = function _AbstractChatCompletionRunner_stringifyFunctionCallResult4(rawContent) {
+  return typeof rawContent === "string" ? rawContent : rawContent === void 0 ? "undefined" : JSON.stringify(rawContent);
+};
+
+// ../../node_modules/openai/lib/ChatCompletionRunner.mjs
+var ChatCompletionRunner2 = class _ChatCompletionRunner extends AbstractChatCompletionRunner2 {
+  static runTools(client, params, options) {
+    const runner = new _ChatCompletionRunner();
+    const opts = {
+      ...options,
+      headers: { ...options?.headers, "X-Stainless-Helper-Method": "runTools" }
+    };
+    runner._run(() => runner._runTools(client, params, opts));
+    return runner;
+  }
+  _addMessage(message, emit = true) {
+    super._addMessage(message, emit);
+    if (isAssistantMessage2(message) && message.content) {
+      this._emit("content", message.content);
+    }
+  }
+};
+
+// ../../node_modules/openai/_vendor/partial-json-parser/parser.mjs
+var STR2 = 1;
+var NUM2 = 2;
+var ARR2 = 4;
+var OBJ2 = 8;
+var NULL2 = 16;
+var BOOL2 = 32;
+var NAN2 = 64;
+var INFINITY2 = 128;
+var MINUS_INFINITY2 = 256;
+var INF2 = INFINITY2 | MINUS_INFINITY2;
+var SPECIAL2 = NULL2 | BOOL2 | INF2 | NAN2;
+var ATOM2 = STR2 | NUM2 | SPECIAL2;
+var COLLECTION2 = ARR2 | OBJ2;
+var ALL2 = ATOM2 | COLLECTION2;
+var Allow2 = {
+  STR: STR2,
+  NUM: NUM2,
+  ARR: ARR2,
+  OBJ: OBJ2,
+  NULL: NULL2,
+  BOOL: BOOL2,
+  NAN: NAN2,
+  INFINITY: INFINITY2,
+  MINUS_INFINITY: MINUS_INFINITY2,
+  INF: INF2,
+  SPECIAL: SPECIAL2,
+  ATOM: ATOM2,
+  COLLECTION: COLLECTION2,
+  ALL: ALL2
+};
+var PartialJSON2 = class extends Error {
+};
+var MalformedJSON2 = class extends Error {
+};
+function parseJSON2(jsonString, allowPartial = Allow2.ALL) {
+  if (typeof jsonString !== "string") {
+    throw new TypeError(`expecting str, got ${typeof jsonString}`);
+  }
+  if (!jsonString.trim()) {
+    throw new Error(`${jsonString} is empty`);
+  }
+  return _parseJSON2(jsonString.trim(), allowPartial);
+}
+var _parseJSON2 = (jsonString, allow) => {
+  const length = jsonString.length;
+  let index2 = 0;
+  const markPartialJSON = (msg) => {
+    throw new PartialJSON2(`${msg} at position ${index2}`);
+  };
+  const throwMalformedError = (msg) => {
+    throw new MalformedJSON2(`${msg} at position ${index2}`);
+  };
+  const parseAny = () => {
+    skipBlank();
+    if (index2 >= length)
+      markPartialJSON("Unexpected end of input");
+    if (jsonString[index2] === '"')
+      return parseStr();
+    if (jsonString[index2] === "{")
+      return parseObj();
+    if (jsonString[index2] === "[")
+      return parseArr();
+    if (jsonString.substring(index2, index2 + 4) === "null" || Allow2.NULL & allow && length - index2 < 4 && "null".startsWith(jsonString.substring(index2))) {
+      index2 += 4;
+      return null;
+    }
+    if (jsonString.substring(index2, index2 + 4) === "true" || Allow2.BOOL & allow && length - index2 < 4 && "true".startsWith(jsonString.substring(index2))) {
+      index2 += 4;
+      return true;
+    }
+    if (jsonString.substring(index2, index2 + 5) === "false" || Allow2.BOOL & allow && length - index2 < 5 && "false".startsWith(jsonString.substring(index2))) {
+      index2 += 5;
+      return false;
+    }
+    if (jsonString.substring(index2, index2 + 8) === "Infinity" || Allow2.INFINITY & allow && length - index2 < 8 && "Infinity".startsWith(jsonString.substring(index2))) {
+      index2 += 8;
+      return Infinity;
+    }
+    if (jsonString.substring(index2, index2 + 9) === "-Infinity" || Allow2.MINUS_INFINITY & allow && 1 < length - index2 && length - index2 < 9 && "-Infinity".startsWith(jsonString.substring(index2))) {
+      index2 += 9;
+      return -Infinity;
+    }
+    if (jsonString.substring(index2, index2 + 3) === "NaN" || Allow2.NAN & allow && length - index2 < 3 && "NaN".startsWith(jsonString.substring(index2))) {
+      index2 += 3;
+      return NaN;
+    }
+    return parseNum();
+  };
+  const parseStr = () => {
+    const start = index2;
+    let escape2 = false;
+    index2++;
+    while (index2 < length && (jsonString[index2] !== '"' || escape2 && jsonString[index2 - 1] === "\\")) {
+      escape2 = jsonString[index2] === "\\" ? !escape2 : false;
+      index2++;
+    }
+    if (jsonString.charAt(index2) == '"') {
+      try {
+        return JSON.parse(jsonString.substring(start, ++index2 - Number(escape2)));
+      } catch (e) {
+        throwMalformedError(String(e));
+      }
+    } else if (Allow2.STR & allow) {
+      try {
+        return JSON.parse(jsonString.substring(start, index2 - Number(escape2)) + '"');
+      } catch (e) {
+        return JSON.parse(jsonString.substring(start, jsonString.lastIndexOf("\\")) + '"');
+      }
+    }
+    markPartialJSON("Unterminated string literal");
+  };
+  const parseObj = () => {
+    index2++;
+    skipBlank();
+    const obj = {};
+    try {
+      while (jsonString[index2] !== "}") {
+        skipBlank();
+        if (index2 >= length && Allow2.OBJ & allow)
+          return obj;
+        const key = parseStr();
+        skipBlank();
+        index2++;
+        try {
+          const value = parseAny();
+          Object.defineProperty(obj, key, { value, writable: true, enumerable: true, configurable: true });
+        } catch (e) {
+          if (Allow2.OBJ & allow)
+            return obj;
+          else
+            throw e;
+        }
+        skipBlank();
+        if (jsonString[index2] === ",")
+          index2++;
+      }
+    } catch (e) {
+      if (Allow2.OBJ & allow)
+        return obj;
+      else
+        markPartialJSON("Expected '}' at end of object");
+    }
+    index2++;
+    return obj;
+  };
+  const parseArr = () => {
+    index2++;
+    const arr = [];
+    try {
+      while (jsonString[index2] !== "]") {
+        arr.push(parseAny());
+        skipBlank();
+        if (jsonString[index2] === ",") {
+          index2++;
+        }
+      }
+    } catch (e) {
+      if (Allow2.ARR & allow) {
+        return arr;
+      }
+      markPartialJSON("Expected ']' at end of array");
+    }
+    index2++;
+    return arr;
+  };
+  const parseNum = () => {
+    if (index2 === 0) {
+      if (jsonString === "-" && Allow2.NUM & allow)
+        markPartialJSON("Not sure what '-' is");
+      try {
+        return JSON.parse(jsonString);
+      } catch (e) {
+        if (Allow2.NUM & allow) {
+          try {
+            if ("." === jsonString[jsonString.length - 1])
+              return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf(".")));
+            return JSON.parse(jsonString.substring(0, jsonString.lastIndexOf("e")));
+          } catch (e2) {
+          }
+        }
+        throwMalformedError(String(e));
+      }
+    }
+    const start = index2;
+    if (jsonString[index2] === "-")
+      index2++;
+    while (jsonString[index2] && !",]}".includes(jsonString[index2]))
+      index2++;
+    if (index2 == length && !(Allow2.NUM & allow))
+      markPartialJSON("Unterminated number literal");
+    try {
+      return JSON.parse(jsonString.substring(start, index2));
+    } catch (e) {
+      if (jsonString.substring(start, index2) === "-" && Allow2.NUM & allow)
+        markPartialJSON("Not sure what '-' is");
+      try {
+        return JSON.parse(jsonString.substring(start, jsonString.lastIndexOf("e")));
+      } catch (e2) {
+        throwMalformedError(String(e2));
+      }
+    }
+  };
+  const skipBlank = () => {
+    while (index2 < length && " \n\r	".includes(jsonString[index2])) {
+      index2++;
+    }
+  };
+  return parseAny();
+};
+var partialParse2 = (input) => parseJSON2(input, Allow2.ALL ^ Allow2.NUM);
+
+// ../../node_modules/openai/lib/ChatCompletionStream.mjs
+var _ChatCompletionStream_instances2;
+var _ChatCompletionStream_params2;
+var _ChatCompletionStream_choiceEventStates2;
+var _ChatCompletionStream_currentChatCompletionSnapshot2;
+var _ChatCompletionStream_beginRequest2;
+var _ChatCompletionStream_getChoiceEventState2;
+var _ChatCompletionStream_addChunk2;
+var _ChatCompletionStream_emitToolCallDoneEvent2;
+var _ChatCompletionStream_emitContentDoneEvents2;
+var _ChatCompletionStream_endRequest2;
+var _ChatCompletionStream_getAutoParseableResponseFormat2;
+var _ChatCompletionStream_accumulateChatCompletion2;
+var ChatCompletionStream2 = class _ChatCompletionStream extends AbstractChatCompletionRunner2 {
+  constructor(params) {
+    super();
+    _ChatCompletionStream_instances2.add(this);
+    _ChatCompletionStream_params2.set(this, void 0);
+    _ChatCompletionStream_choiceEventStates2.set(this, void 0);
+    _ChatCompletionStream_currentChatCompletionSnapshot2.set(this, void 0);
+    __classPrivateFieldSet2(this, _ChatCompletionStream_params2, params, "f");
+    __classPrivateFieldSet2(this, _ChatCompletionStream_choiceEventStates2, [], "f");
+  }
+  get currentChatCompletionSnapshot() {
+    return __classPrivateFieldGet2(this, _ChatCompletionStream_currentChatCompletionSnapshot2, "f");
+  }
+  /**
+   * Intended for use on the frontend, consuming a stream produced with
+   * `.toReadableStream()` on the backend.
+   *
+   * Note that messages sent to the model do not appear in `.on('message')`
+   * in this context.
+   */
+  static fromReadableStream(stream) {
+    const runner = new _ChatCompletionStream(null);
+    runner._run(() => runner._fromReadableStream(stream));
+    return runner;
+  }
+  static createChatCompletion(client, params, options) {
+    const runner = new _ChatCompletionStream(params);
+    runner._run(() => runner._runChatCompletion(client, { ...params, stream: true }, { ...options, headers: { ...options?.headers, "X-Stainless-Helper-Method": "stream" } }));
+    return runner;
+  }
+  async _createChatCompletion(client, params, options) {
+    super._createChatCompletion;
+    const signal = options?.signal;
+    if (signal) {
+      if (signal.aborted)
+        this.controller.abort();
+      signal.addEventListener("abort", () => this.controller.abort());
+    }
+    __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_beginRequest2).call(this);
+    const stream = await client.chat.completions.create({ ...params, stream: true }, { ...options, signal: this.controller.signal });
+    this._connected();
+    for await (const chunk of stream) {
+      __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_addChunk2).call(this, chunk);
+    }
+    if (stream.controller.signal?.aborted) {
+      throw new APIUserAbortError2();
+    }
+    return this._addChatCompletion(__classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_endRequest2).call(this));
+  }
+  async _fromReadableStream(readableStream, options) {
+    const signal = options?.signal;
+    if (signal) {
+      if (signal.aborted)
+        this.controller.abort();
+      signal.addEventListener("abort", () => this.controller.abort());
+    }
+    __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_beginRequest2).call(this);
+    this._connected();
+    const stream = Stream2.fromReadableStream(readableStream, this.controller);
+    let chatId;
+    for await (const chunk of stream) {
+      if (chatId && chatId !== chunk.id) {
+        this._addChatCompletion(__classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_endRequest2).call(this));
+      }
+      __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_addChunk2).call(this, chunk);
+      chatId = chunk.id;
+    }
+    if (stream.controller.signal?.aborted) {
+      throw new APIUserAbortError2();
+    }
+    return this._addChatCompletion(__classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_endRequest2).call(this));
+  }
+  [(_ChatCompletionStream_params2 = /* @__PURE__ */ new WeakMap(), _ChatCompletionStream_choiceEventStates2 = /* @__PURE__ */ new WeakMap(), _ChatCompletionStream_currentChatCompletionSnapshot2 = /* @__PURE__ */ new WeakMap(), _ChatCompletionStream_instances2 = /* @__PURE__ */ new WeakSet(), _ChatCompletionStream_beginRequest2 = function _ChatCompletionStream_beginRequest3() {
+    if (this.ended)
+      return;
+    __classPrivateFieldSet2(this, _ChatCompletionStream_currentChatCompletionSnapshot2, void 0, "f");
+  }, _ChatCompletionStream_getChoiceEventState2 = function _ChatCompletionStream_getChoiceEventState3(choice) {
+    let state = __classPrivateFieldGet2(this, _ChatCompletionStream_choiceEventStates2, "f")[choice.index];
+    if (state) {
+      return state;
+    }
+    state = {
+      content_done: false,
+      refusal_done: false,
+      logprobs_content_done: false,
+      logprobs_refusal_done: false,
+      done_tool_calls: /* @__PURE__ */ new Set(),
+      current_tool_call_index: null
+    };
+    __classPrivateFieldGet2(this, _ChatCompletionStream_choiceEventStates2, "f")[choice.index] = state;
+    return state;
+  }, _ChatCompletionStream_addChunk2 = function _ChatCompletionStream_addChunk3(chunk) {
+    if (this.ended)
+      return;
+    const completion = __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_accumulateChatCompletion2).call(this, chunk);
+    this._emit("chunk", chunk, completion);
+    for (const choice of chunk.choices) {
+      const choiceSnapshot = completion.choices[choice.index];
+      if (choice.delta.content != null && choiceSnapshot.message?.role === "assistant" && choiceSnapshot.message?.content) {
+        this._emit("content", choice.delta.content, choiceSnapshot.message.content);
+        this._emit("content.delta", {
+          delta: choice.delta.content,
+          snapshot: choiceSnapshot.message.content,
+          parsed: choiceSnapshot.message.parsed
+        });
+      }
+      if (choice.delta.refusal != null && choiceSnapshot.message?.role === "assistant" && choiceSnapshot.message?.refusal) {
+        this._emit("refusal.delta", {
+          delta: choice.delta.refusal,
+          snapshot: choiceSnapshot.message.refusal
+        });
+      }
+      if (choice.logprobs?.content != null && choiceSnapshot.message?.role === "assistant") {
+        this._emit("logprobs.content.delta", {
+          content: choice.logprobs?.content,
+          snapshot: choiceSnapshot.logprobs?.content ?? []
+        });
+      }
+      if (choice.logprobs?.refusal != null && choiceSnapshot.message?.role === "assistant") {
+        this._emit("logprobs.refusal.delta", {
+          refusal: choice.logprobs?.refusal,
+          snapshot: choiceSnapshot.logprobs?.refusal ?? []
+        });
+      }
+      const state = __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_getChoiceEventState2).call(this, choiceSnapshot);
+      if (choiceSnapshot.finish_reason) {
+        __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_emitContentDoneEvents2).call(this, choiceSnapshot);
+        if (state.current_tool_call_index != null) {
+          __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_emitToolCallDoneEvent2).call(this, choiceSnapshot, state.current_tool_call_index);
+        }
+      }
+      for (const toolCall of choice.delta.tool_calls ?? []) {
+        if (state.current_tool_call_index !== toolCall.index) {
+          __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_emitContentDoneEvents2).call(this, choiceSnapshot);
+          if (state.current_tool_call_index != null) {
+            __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_emitToolCallDoneEvent2).call(this, choiceSnapshot, state.current_tool_call_index);
+          }
+        }
+        state.current_tool_call_index = toolCall.index;
+      }
+      for (const toolCallDelta of choice.delta.tool_calls ?? []) {
+        const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallDelta.index];
+        if (!toolCallSnapshot?.type) {
+          continue;
+        }
+        if (toolCallSnapshot?.type === "function") {
+          this._emit("tool_calls.function.arguments.delta", {
+            name: toolCallSnapshot.function?.name,
+            index: toolCallDelta.index,
+            arguments: toolCallSnapshot.function.arguments,
+            parsed_arguments: toolCallSnapshot.function.parsed_arguments,
+            arguments_delta: toolCallDelta.function?.arguments ?? ""
+          });
+        } else {
+          assertNever4(toolCallSnapshot?.type);
+        }
+      }
+    }
+  }, _ChatCompletionStream_emitToolCallDoneEvent2 = function _ChatCompletionStream_emitToolCallDoneEvent3(choiceSnapshot, toolCallIndex) {
+    const state = __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_getChoiceEventState2).call(this, choiceSnapshot);
+    if (state.done_tool_calls.has(toolCallIndex)) {
+      return;
+    }
+    const toolCallSnapshot = choiceSnapshot.message.tool_calls?.[toolCallIndex];
+    if (!toolCallSnapshot) {
+      throw new Error("no tool call snapshot");
+    }
+    if (!toolCallSnapshot.type) {
+      throw new Error("tool call snapshot missing `type`");
+    }
+    if (toolCallSnapshot.type === "function") {
+      const inputTool = __classPrivateFieldGet2(this, _ChatCompletionStream_params2, "f")?.tools?.find((tool) => isChatCompletionFunctionTool2(tool) && tool.function.name === toolCallSnapshot.function.name);
+      this._emit("tool_calls.function.arguments.done", {
+        name: toolCallSnapshot.function.name,
+        index: toolCallIndex,
+        arguments: toolCallSnapshot.function.arguments,
+        parsed_arguments: isAutoParsableTool3(inputTool) ? inputTool.$parseRaw(toolCallSnapshot.function.arguments) : inputTool?.function.strict ? JSON.parse(toolCallSnapshot.function.arguments) : null
+      });
+    } else {
+      assertNever4(toolCallSnapshot.type);
+    }
+  }, _ChatCompletionStream_emitContentDoneEvents2 = function _ChatCompletionStream_emitContentDoneEvents3(choiceSnapshot) {
+    const state = __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_getChoiceEventState2).call(this, choiceSnapshot);
+    if (choiceSnapshot.message.content && !state.content_done) {
+      state.content_done = true;
+      const responseFormat = __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_getAutoParseableResponseFormat2).call(this);
+      this._emit("content.done", {
+        content: choiceSnapshot.message.content,
+        parsed: responseFormat ? responseFormat.$parseRaw(choiceSnapshot.message.content) : null
+      });
+    }
+    if (choiceSnapshot.message.refusal && !state.refusal_done) {
+      state.refusal_done = true;
+      this._emit("refusal.done", { refusal: choiceSnapshot.message.refusal });
+    }
+    if (choiceSnapshot.logprobs?.content && !state.logprobs_content_done) {
+      state.logprobs_content_done = true;
+      this._emit("logprobs.content.done", { content: choiceSnapshot.logprobs.content });
+    }
+    if (choiceSnapshot.logprobs?.refusal && !state.logprobs_refusal_done) {
+      state.logprobs_refusal_done = true;
+      this._emit("logprobs.refusal.done", { refusal: choiceSnapshot.logprobs.refusal });
+    }
+  }, _ChatCompletionStream_endRequest2 = function _ChatCompletionStream_endRequest3() {
+    if (this.ended) {
+      throw new OpenAIError2(`stream has ended, this shouldn't happen`);
+    }
+    const snapshot = __classPrivateFieldGet2(this, _ChatCompletionStream_currentChatCompletionSnapshot2, "f");
+    if (!snapshot) {
+      throw new OpenAIError2(`request ended without sending any chunks`);
+    }
+    __classPrivateFieldSet2(this, _ChatCompletionStream_currentChatCompletionSnapshot2, void 0, "f");
+    __classPrivateFieldSet2(this, _ChatCompletionStream_choiceEventStates2, [], "f");
+    return finalizeChatCompletion2(snapshot, __classPrivateFieldGet2(this, _ChatCompletionStream_params2, "f"));
+  }, _ChatCompletionStream_getAutoParseableResponseFormat2 = function _ChatCompletionStream_getAutoParseableResponseFormat3() {
+    const responseFormat = __classPrivateFieldGet2(this, _ChatCompletionStream_params2, "f")?.response_format;
+    if (isAutoParsableResponseFormat2(responseFormat)) {
+      return responseFormat;
+    }
+    return null;
+  }, _ChatCompletionStream_accumulateChatCompletion2 = function _ChatCompletionStream_accumulateChatCompletion3(chunk) {
+    var _a5, _b, _c, _d;
+    let snapshot = __classPrivateFieldGet2(this, _ChatCompletionStream_currentChatCompletionSnapshot2, "f");
+    const { choices, ...rest } = chunk;
+    if (!snapshot) {
+      snapshot = __classPrivateFieldSet2(this, _ChatCompletionStream_currentChatCompletionSnapshot2, {
+        ...rest,
+        choices: []
+      }, "f");
+    } else {
+      Object.assign(snapshot, rest);
+    }
+    for (const { delta, finish_reason, index: index2, logprobs = null, ...other } of chunk.choices) {
+      let choice = snapshot.choices[index2];
+      if (!choice) {
+        choice = snapshot.choices[index2] = { finish_reason, index: index2, message: {}, logprobs, ...other };
+      }
+      if (logprobs) {
+        if (!choice.logprobs) {
+          choice.logprobs = Object.assign({}, logprobs);
+        } else {
+          const { content: content2, refusal: refusal2, ...rest3 } = logprobs;
+          assertIsEmpty2(rest3);
+          Object.assign(choice.logprobs, rest3);
+          if (content2) {
+            (_a5 = choice.logprobs).content ?? (_a5.content = []);
+            choice.logprobs.content.push(...content2);
+          }
+          if (refusal2) {
+            (_b = choice.logprobs).refusal ?? (_b.refusal = []);
+            choice.logprobs.refusal.push(...refusal2);
+          }
+        }
+      }
+      if (finish_reason) {
+        choice.finish_reason = finish_reason;
+        if (__classPrivateFieldGet2(this, _ChatCompletionStream_params2, "f") && hasAutoParseableInput3(__classPrivateFieldGet2(this, _ChatCompletionStream_params2, "f"))) {
+          if (finish_reason === "length") {
+            throw new LengthFinishReasonError2();
+          }
+          if (finish_reason === "content_filter") {
+            throw new ContentFilterFinishReasonError2();
+          }
+        }
+      }
+      Object.assign(choice, other);
+      if (!delta)
+        continue;
+      const { content, refusal, function_call, role, tool_calls, ...rest2 } = delta;
+      assertIsEmpty2(rest2);
+      Object.assign(choice.message, rest2);
+      if (refusal) {
+        choice.message.refusal = (choice.message.refusal || "") + refusal;
+      }
+      if (role)
+        choice.message.role = role;
+      if (function_call) {
+        if (!choice.message.function_call) {
+          choice.message.function_call = function_call;
+        } else {
+          if (function_call.name)
+            choice.message.function_call.name = function_call.name;
+          if (function_call.arguments) {
+            (_c = choice.message.function_call).arguments ?? (_c.arguments = "");
+            choice.message.function_call.arguments += function_call.arguments;
+          }
+        }
+      }
+      if (content) {
+        choice.message.content = (choice.message.content || "") + content;
+        if (!choice.message.refusal && __classPrivateFieldGet2(this, _ChatCompletionStream_instances2, "m", _ChatCompletionStream_getAutoParseableResponseFormat2).call(this)) {
+          choice.message.parsed = partialParse2(choice.message.content);
+        }
+      }
+      if (tool_calls) {
+        if (!choice.message.tool_calls)
+          choice.message.tool_calls = [];
+        for (const { index: index3, id, type, function: fn, ...rest3 } of tool_calls) {
+          const tool_call = (_d = choice.message.tool_calls)[index3] ?? (_d[index3] = {});
+          Object.assign(tool_call, rest3);
+          if (id)
+            tool_call.id = id;
+          if (type)
+            tool_call.type = type;
+          if (fn)
+            tool_call.function ?? (tool_call.function = { name: fn.name ?? "", arguments: "" });
+          if (fn?.name)
+            tool_call.function.name = fn.name;
+          if (fn?.arguments) {
+            tool_call.function.arguments += fn.arguments;
+            if (shouldParseToolCall2(__classPrivateFieldGet2(this, _ChatCompletionStream_params2, "f"), tool_call)) {
+              tool_call.function.parsed_arguments = partialParse2(tool_call.function.arguments);
+            }
+          }
+        }
+      }
+    }
+    return snapshot;
+  }, Symbol.asyncIterator)]() {
+    const pushQueue = [];
+    const readQueue = [];
+    let done = false;
+    this.on("chunk", (chunk) => {
+      const reader = readQueue.shift();
+      if (reader) {
+        reader.resolve(chunk);
+      } else {
+        pushQueue.push(chunk);
+      }
+    });
+    this.on("end", () => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.resolve(void 0);
+      }
+      readQueue.length = 0;
+    });
+    this.on("abort", (err) => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.reject(err);
+      }
+      readQueue.length = 0;
+    });
+    this.on("error", (err) => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.reject(err);
+      }
+      readQueue.length = 0;
+    });
+    return {
+      next: async () => {
+        if (!pushQueue.length) {
+          if (done) {
+            return { value: void 0, done: true };
+          }
+          return new Promise((resolve, reject) => readQueue.push({ resolve, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
+        }
+        const chunk = pushQueue.shift();
+        return { value: chunk, done: false };
+      },
+      return: async () => {
+        this.abort();
+        return { value: void 0, done: true };
+      }
+    };
+  }
+  toReadableStream() {
+    const stream = new Stream2(this[Symbol.asyncIterator].bind(this), this.controller);
+    return stream.toReadableStream();
+  }
+};
+function finalizeChatCompletion2(snapshot, params) {
+  const { id, choices, created, model, system_fingerprint, ...rest } = snapshot;
+  const completion = {
+    ...rest,
+    id,
+    choices: choices.map(({ message, finish_reason, index: index2, logprobs, ...choiceRest }) => {
+      if (!finish_reason) {
+        throw new OpenAIError2(`missing finish_reason for choice ${index2}`);
+      }
+      const { content = null, function_call, tool_calls, ...messageRest } = message;
+      const role = message.role;
+      if (!role) {
+        throw new OpenAIError2(`missing role for choice ${index2}`);
+      }
+      if (function_call) {
+        const { arguments: args, name } = function_call;
+        if (args == null) {
+          throw new OpenAIError2(`missing function_call.arguments for choice ${index2}`);
+        }
+        if (!name) {
+          throw new OpenAIError2(`missing function_call.name for choice ${index2}`);
+        }
+        return {
+          ...choiceRest,
+          message: {
+            content,
+            function_call: { arguments: args, name },
+            role,
+            refusal: message.refusal ?? null
+          },
+          finish_reason,
+          index: index2,
+          logprobs
+        };
+      }
+      if (tool_calls) {
+        return {
+          ...choiceRest,
+          index: index2,
+          finish_reason,
+          logprobs,
+          message: {
+            ...messageRest,
+            role,
+            content,
+            refusal: message.refusal ?? null,
+            tool_calls: tool_calls.map((tool_call, i) => {
+              const { function: fn, type, id: id2, ...toolRest } = tool_call;
+              const { arguments: args, name, ...fnRest } = fn || {};
+              if (id2 == null) {
+                throw new OpenAIError2(`missing choices[${index2}].tool_calls[${i}].id
+${str3(snapshot)}`);
+              }
+              if (type == null) {
+                throw new OpenAIError2(`missing choices[${index2}].tool_calls[${i}].type
+${str3(snapshot)}`);
+              }
+              if (name == null) {
+                throw new OpenAIError2(`missing choices[${index2}].tool_calls[${i}].function.name
+${str3(snapshot)}`);
+              }
+              if (args == null) {
+                throw new OpenAIError2(`missing choices[${index2}].tool_calls[${i}].function.arguments
+${str3(snapshot)}`);
+              }
+              return { ...toolRest, id: id2, type, function: { ...fnRest, name, arguments: args } };
+            })
+          }
+        };
+      }
+      return {
+        ...choiceRest,
+        message: { ...messageRest, content, role, refusal: message.refusal ?? null },
+        finish_reason,
+        index: index2,
+        logprobs
+      };
+    }),
+    created,
+    model,
+    object: "chat.completion",
+    ...system_fingerprint ? { system_fingerprint } : {}
+  };
+  return maybeParseChatCompletion2(completion, params);
+}
+function str3(x) {
+  return JSON.stringify(x);
+}
+function assertIsEmpty2(obj) {
+  return;
+}
+function assertNever4(_x) {
+}
+
+// ../../node_modules/openai/lib/ChatCompletionStreamingRunner.mjs
+var ChatCompletionStreamingRunner2 = class _ChatCompletionStreamingRunner extends ChatCompletionStream2 {
+  static fromReadableStream(stream) {
+    const runner = new _ChatCompletionStreamingRunner(null);
+    runner._run(() => runner._fromReadableStream(stream));
+    return runner;
+  }
+  static runTools(client, params, options) {
+    const runner = new _ChatCompletionStreamingRunner(
+      // @ts-expect-error TODO these types are incompatible
+      params
+    );
+    const opts = {
+      ...options,
+      headers: { ...options?.headers, "X-Stainless-Helper-Method": "runTools" }
+    };
+    runner._run(() => runner._runTools(client, params, opts));
+    return runner;
+  }
+};
+
+// ../../node_modules/openai/resources/chat/completions/completions.mjs
+var Completions3 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.messages = new Messages3(this._client);
+  }
+  create(body, options) {
+    return this._client.post("/chat/completions", {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Get a stored chat completion. Only Chat Completions that have been created with
+   * the `store` parameter set to `true` will be returned.
+   *
+   * @example
+   * ```ts
+   * const chatCompletion =
+   *   await client.chat.completions.retrieve('completion_id');
+   * ```
+   */
+  retrieve(completionID, options) {
+    return this._client.get(path2`/chat/completions/${completionID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Modify a stored chat completion. Only Chat Completions that have been created
+   * with the `store` parameter set to `true` can be modified. Currently, the only
+   * supported modification is to update the `metadata` field.
+   *
+   * @example
+   * ```ts
+   * const chatCompletion = await client.chat.completions.update(
+   *   'completion_id',
+   *   { metadata: { foo: 'string' } },
+   * );
+   * ```
+   */
+  update(completionID, body, options) {
+    return this._client.post(path2`/chat/completions/${completionID}`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * List stored Chat Completions. Only Chat Completions that have been stored with
+   * the `store` parameter set to `true` will be returned.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const chatCompletion of client.chat.completions.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/chat/completions", CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete a stored chat completion. Only Chat Completions that have been created
+   * with the `store` parameter set to `true` can be deleted.
+   *
+   * @example
+   * ```ts
+   * const chatCompletionDeleted =
+   *   await client.chat.completions.delete('completion_id');
+   * ```
+   */
+  delete(completionID, options) {
+    return this._client.delete(path2`/chat/completions/${completionID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  parse(body, options) {
+    validateInputTools2(body.tools);
+    return this._client.chat.completions.create(body, {
+      ...options,
+      headers: {
+        ...options?.headers,
+        "X-Stainless-Helper-Method": "chat.completions.parse"
+      }
+    })._thenUnwrap((completion) => parseChatCompletion2(completion, body));
+  }
+  runTools(body, options) {
+    if (body.stream) {
+      return ChatCompletionStreamingRunner2.runTools(this._client, body, options);
+    }
+    return ChatCompletionRunner2.runTools(this._client, body, options);
+  }
+  /**
+   * Creates a chat completion stream
+   */
+  stream(body, options) {
+    return ChatCompletionStream2.createChatCompletion(this._client, body, options);
+  }
+};
+Completions3.Messages = Messages3;
+
+// ../../node_modules/openai/resources/chat/chat.mjs
+var Chat2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.completions = new Completions3(this._client);
+  }
+};
+Chat2.Completions = Completions3;
+
+// ../../node_modules/openai/resources/admin/organization/admin-api-keys.mjs
+var AdminAPIKeys2 = class extends APIResource2 {
+  /**
+   * Create an organization admin API key
+   *
+   * @example
+   * ```ts
+   * const adminAPIKey =
+   *   await client.admin.organization.adminAPIKeys.create({
+   *     name: 'New Admin Key',
+   *   });
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/organization/admin_api_keys", {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieve a single organization API key
+   *
+   * @example
+   * ```ts
+   * const adminAPIKey =
+   *   await client.admin.organization.adminAPIKeys.retrieve(
+   *     'key_id',
+   *   );
+   * ```
+   */
+  retrieve(keyID, options) {
+    return this._client.get(path2`/organization/admin_api_keys/${keyID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * List organization API keys
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const adminAPIKey of client.admin.organization.adminAPIKeys.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/organization/admin_api_keys", CursorPage2, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Delete an organization admin API key
+   *
+   * @example
+   * ```ts
+   * const adminAPIKey =
+   *   await client.admin.organization.adminAPIKeys.delete(
+   *     'key_id',
+   *   );
+   * ```
+   */
+  delete(keyID, options) {
+    return this._client.delete(path2`/organization/admin_api_keys/${keyID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/audit-logs.mjs
+var AuditLogs2 = class extends APIResource2 {
+  /**
+   * List user actions and configuration changes within this organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const auditLogListResponse of client.admin.organization.auditLogs.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/organization/audit_logs", ConversationCursorPage2, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/certificates.mjs
+var Certificates3 = class extends APIResource2 {
+  /**
+   * Upload a certificate to the organization. This does **not** automatically
+   * activate the certificate.
+   *
+   * Organizations can upload up to 50 certificates.
+   *
+   * @example
+   * ```ts
+   * const certificate =
+   *   await client.admin.organization.certificates.create({
+   *     certificate: 'certificate',
+   *   });
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/organization/certificates", {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get a certificate that has been uploaded to the organization.
+   *
+   * You can get a certificate regardless of whether it is active or not.
+   *
+   * @example
+   * ```ts
+   * const certificate =
+   *   await client.admin.organization.certificates.retrieve(
+   *     'certificate_id',
+   *   );
+   * ```
+   */
+  retrieve(certificateID, query = {}, options) {
+    return this._client.get(path2`/organization/certificates/${certificateID}`, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Modify a certificate. Note that only the name can be modified.
+   *
+   * @example
+   * ```ts
+   * const certificate =
+   *   await client.admin.organization.certificates.update(
+   *     'certificate_id',
+   *   );
+   * ```
+   */
+  update(certificateID, body, options) {
+    return this._client.post(path2`/organization/certificates/${certificateID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * List uploaded certificates for this organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const certificateListResponse of client.admin.organization.certificates.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/organization/certificates", ConversationCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Delete a certificate from the organization.
+   *
+   * The certificate must be inactive for the organization and all projects.
+   *
+   * @example
+   * ```ts
+   * const certificate =
+   *   await client.admin.organization.certificates.delete(
+   *     'certificate_id',
+   *   );
+   * ```
+   */
+  delete(certificateID, options) {
+    return this._client.delete(path2`/organization/certificates/${certificateID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Activate certificates at the organization level.
+   *
+   * You can atomically and idempotently activate up to 10 certificates at a time.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const certificateActivateResponse of client.admin.organization.certificates.activate(
+   *   { certificate_ids: ['cert_abc'] },
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  activate(body, options) {
+    return this._client.getAPIList("/organization/certificates/activate", Page2, {
+      body,
+      method: "post",
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Deactivate certificates at the organization level.
+   *
+   * You can atomically and idempotently deactivate up to 10 certificates at a time.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const certificateDeactivateResponse of client.admin.organization.certificates.deactivate(
+   *   { certificate_ids: ['cert_abc'] },
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  deactivate(body, options) {
+    return this._client.getAPIList("/organization/certificates/deactivate", Page2, { body, method: "post", ...options, __security: { adminAPIKeyAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/data-retention.mjs
+var DataRetention3 = class extends APIResource2 {
+  /**
+   * Retrieves organization data retention controls.
+   *
+   * @example
+   * ```ts
+   * const organizationDataRetention =
+   *   await client.admin.organization.dataRetention.retrieve();
+   * ```
+   */
+  retrieve(options) {
+    return this._client.get("/organization/data_retention", {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates organization data retention controls.
+   *
+   * @example
+   * ```ts
+   * const organizationDataRetention =
+   *   await client.admin.organization.dataRetention.update({
+   *     retention_type: 'zero_data_retention',
+   *   });
+   * ```
+   */
+  update(body, options) {
+    return this._client.post("/organization/data_retention", {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/invites.mjs
+var Invites2 = class extends APIResource2 {
+  /**
+   * Create an invite for a user to the organization. The invite must be accepted by
+   * the user before they have access to the organization.
+   *
+   * @example
+   * ```ts
+   * const invite =
+   *   await client.admin.organization.invites.create({
+   *     email: 'email',
+   *     role: 'reader',
+   *   });
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/organization/invites", {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves an invite.
+   *
+   * @example
+   * ```ts
+   * const invite =
+   *   await client.admin.organization.invites.retrieve(
+   *     'invite_id',
+   *   );
+   * ```
+   */
+  retrieve(inviteID, options) {
+    return this._client.get(path2`/organization/invites/${inviteID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Returns a list of invites in the organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const invite of client.admin.organization.invites.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/organization/invites", ConversationCursorPage2, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Delete an invite. If the invite has already been accepted, it cannot be deleted.
+   *
+   * @example
+   * ```ts
+   * const invite =
+   *   await client.admin.organization.invites.delete(
+   *     'invite_id',
+   *   );
+   * ```
+   */
+  delete(inviteID, options) {
+    return this._client.delete(path2`/organization/invites/${inviteID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/roles.mjs
+var Roles7 = class extends APIResource2 {
+  /**
+   * Creates a custom role for the organization.
+   *
+   * @example
+   * ```ts
+   * const role = await client.admin.organization.roles.create({
+   *   permissions: ['string'],
+   *   role_name: 'role_name',
+   * });
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/organization/roles", {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves an organization role.
+   *
+   * @example
+   * ```ts
+   * const role = await client.admin.organization.roles.retrieve(
+   *   'role_id',
+   * );
+   * ```
+   */
+  retrieve(roleID, options) {
+    return this._client.get(path2`/organization/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates an existing organization role.
+   *
+   * @example
+   * ```ts
+   * const role = await client.admin.organization.roles.update(
+   *   'role_id',
+   * );
+   * ```
+   */
+  update(roleID, body, options) {
+    return this._client.post(path2`/organization/roles/${roleID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists the roles configured for the organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const role of client.admin.organization.roles.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/organization/roles", NextCursorPage2, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Deletes a custom role from the organization.
+   *
+   * @example
+   * ```ts
+   * const role = await client.admin.organization.roles.delete(
+   *   'role_id',
+   * );
+   * ```
+   */
+  delete(roleID, options) {
+    return this._client.delete(path2`/organization/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/spend-alerts.mjs
+var SpendAlerts3 = class extends APIResource2 {
+  /**
+   * Creates an organization spend alert.
+   *
+   * @example
+   * ```ts
+   * const organizationSpendAlert =
+   *   await client.admin.organization.spendAlerts.create({
+   *     currency: 'USD',
+   *     interval: 'month',
+   *     notification_channel: {
+   *       recipients: ['string'],
+   *       type: 'email',
+   *     },
+   *     threshold_amount: 0,
+   *   });
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/organization/spend_alerts", {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves an organization spend alert.
+   *
+   * @example
+   * ```ts
+   * const organizationSpendAlert =
+   *   await client.admin.organization.spendAlerts.retrieve(
+   *     'alert_id',
+   *   );
+   * ```
+   */
+  retrieve(alertID, options) {
+    return this._client.get(path2`/organization/spend_alerts/${alertID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates an organization spend alert.
+   *
+   * @example
+   * ```ts
+   * const organizationSpendAlert =
+   *   await client.admin.organization.spendAlerts.update(
+   *     'alert_id',
+   *     {
+   *       currency: 'USD',
+   *       interval: 'month',
+   *       notification_channel: {
+   *         recipients: ['string'],
+   *         type: 'email',
+   *       },
+   *       threshold_amount: 0,
+   *     },
+   *   );
+   * ```
+   */
+  update(alertID, body, options) {
+    return this._client.post(path2`/organization/spend_alerts/${alertID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists organization spend alerts.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const organizationSpendAlert of client.admin.organization.spendAlerts.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/organization/spend_alerts", ConversationCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Deletes an organization spend alert.
+   *
+   * @example
+   * ```ts
+   * const organizationSpendAlertDeleted =
+   *   await client.admin.organization.spendAlerts.delete(
+   *     'alert_id',
+   *   );
+   * ```
+   */
+  delete(alertID, options) {
+    return this._client.delete(path2`/organization/spend_alerts/${alertID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/usage.mjs
+var Usage2 = class extends APIResource2 {
+  /**
+   * Get audio speeches usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.audioSpeeches({
+   *     start_time: 0,
+   *   });
+   * ```
+   */
+  audioSpeeches(query, options) {
+    return this._client.get("/organization/usage/audio_speeches", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get audio transcriptions usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.audioTranscriptions(
+   *     { start_time: 0 },
+   *   );
+   * ```
+   */
+  audioTranscriptions(query, options) {
+    return this._client.get("/organization/usage/audio_transcriptions", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get code interpreter sessions usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.codeInterpreterSessions(
+   *     { start_time: 0 },
+   *   );
+   * ```
+   */
+  codeInterpreterSessions(query, options) {
+    return this._client.get("/organization/usage/code_interpreter_sessions", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get completions usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.completions({
+   *     start_time: 0,
+   *   });
+   * ```
+   */
+  completions(query, options) {
+    return this._client.get("/organization/usage/completions", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get costs details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.costs({
+   *     start_time: 0,
+   *   });
+   * ```
+   */
+  costs(query, options) {
+    return this._client.get("/organization/costs", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get embeddings usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.embeddings({
+   *     start_time: 0,
+   *   });
+   * ```
+   */
+  embeddings(query, options) {
+    return this._client.get("/organization/usage/embeddings", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get file search calls usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.fileSearchCalls({
+   *     start_time: 0,
+   *   });
+   * ```
+   */
+  fileSearchCalls(query, options) {
+    return this._client.get("/organization/usage/file_search_calls", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get images usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.images({
+   *     start_time: 0,
+   *   });
+   * ```
+   */
+  images(query, options) {
+    return this._client.get("/organization/usage/images", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get moderations usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.moderations({
+   *     start_time: 0,
+   *   });
+   * ```
+   */
+  moderations(query, options) {
+    return this._client.get("/organization/usage/moderations", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get vector stores usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.vectorStores({
+   *     start_time: 0,
+   *   });
+   * ```
+   */
+  vectorStores(query, options) {
+    return this._client.get("/organization/usage/vector_stores", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Get web search calls usage details for the organization.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.admin.organization.usage.webSearchCalls({
+   *     start_time: 0,
+   *   });
+   * ```
+   */
+  webSearchCalls(query, options) {
+    return this._client.get("/organization/usage/web_search_calls", {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/groups/roles.mjs
+var Roles8 = class extends APIResource2 {
+  /**
+   * Assigns an organization role to a group within the organization.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.groups.roles.create(
+   *     'group_id',
+   *     { role_id: 'role_id' },
+   *   );
+   * ```
+   */
+  create(groupID, body, options) {
+    return this._client.post(path2`/organization/groups/${groupID}/roles`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves an organization role assigned to a group.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.groups.roles.retrieve(
+   *     'role_id',
+   *     { group_id: 'group_id' },
+   *   );
+   * ```
+   */
+  retrieve(roleID, params, options) {
+    const { group_id } = params;
+    return this._client.get(path2`/organization/groups/${group_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists the organization roles assigned to a group within the organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const roleListResponse of client.admin.organization.groups.roles.list(
+   *   'group_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(groupID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/groups/${groupID}/roles`, NextCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Unassigns an organization role from a group within the organization.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.groups.roles.delete(
+   *     'role_id',
+   *     { group_id: 'group_id' },
+   *   );
+   * ```
+   */
+  delete(roleID, params, options) {
+    const { group_id } = params;
+    return this._client.delete(path2`/organization/groups/${group_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/groups/users.mjs
+var Users4 = class extends APIResource2 {
+  /**
+   * Adds a user to a group.
+   *
+   * @example
+   * ```ts
+   * const user =
+   *   await client.admin.organization.groups.users.create(
+   *     'group_id',
+   *     { user_id: 'user_id' },
+   *   );
+   * ```
+   */
+  create(groupID, body, options) {
+    return this._client.post(path2`/organization/groups/${groupID}/users`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a user in a group.
+   *
+   * @example
+   * ```ts
+   * const user =
+   *   await client.admin.organization.groups.users.retrieve(
+   *     'user_id',
+   *     { group_id: 'group_id' },
+   *   );
+   * ```
+   */
+  retrieve(userID, params, options) {
+    const { group_id } = params;
+    return this._client.get(path2`/organization/groups/${group_id}/users/${userID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists the users assigned to a group.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const organizationGroupUser of client.admin.organization.groups.users.list(
+   *   'group_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(groupID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/groups/${groupID}/users`, NextCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Removes a user from a group.
+   *
+   * @example
+   * ```ts
+   * const user =
+   *   await client.admin.organization.groups.users.delete(
+   *     'user_id',
+   *     { group_id: 'group_id' },
+   *   );
+   * ```
+   */
+  delete(userID, params, options) {
+    const { group_id } = params;
+    return this._client.delete(path2`/organization/groups/${group_id}/users/${userID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/groups/groups.mjs
+var Groups3 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.users = new Users4(this._client);
+    this.roles = new Roles8(this._client);
+  }
+  /**
+   * Creates a new group in the organization.
+   *
+   * @example
+   * ```ts
+   * const group = await client.admin.organization.groups.create(
+   *   { name: 'x' },
+   * );
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/organization/groups", {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a group.
+   *
+   * @example
+   * ```ts
+   * const group =
+   *   await client.admin.organization.groups.retrieve(
+   *     'group_id',
+   *   );
+   * ```
+   */
+  retrieve(groupID, options) {
+    return this._client.get(path2`/organization/groups/${groupID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates a group's information.
+   *
+   * @example
+   * ```ts
+   * const group = await client.admin.organization.groups.update(
+   *   'group_id',
+   *   { name: 'x' },
+   * );
+   * ```
+   */
+  update(groupID, body, options) {
+    return this._client.post(path2`/organization/groups/${groupID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists all groups in the organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const group of client.admin.organization.groups.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/organization/groups", NextCursorPage2, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Deletes a group from the organization.
+   *
+   * @example
+   * ```ts
+   * const group = await client.admin.organization.groups.delete(
+   *   'group_id',
+   * );
+   * ```
+   */
+  delete(groupID, options) {
+    return this._client.delete(path2`/organization/groups/${groupID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+Groups3.Users = Users4;
+Groups3.Roles = Roles8;
+
+// ../../node_modules/openai/resources/admin/organization/projects/api-keys.mjs
+var APIKeys2 = class extends APIResource2 {
+  /**
+   * Retrieves an API key in the project.
+   *
+   * @example
+   * ```ts
+   * const projectAPIKey =
+   *   await client.admin.organization.projects.apiKeys.retrieve(
+   *     'api_key_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  retrieve(apiKeyID, params, options) {
+    const { project_id } = params;
+    return this._client.get(path2`/organization/projects/${project_id}/api_keys/${apiKeyID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Returns a list of API keys in the project.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const projectAPIKey of client.admin.organization.projects.apiKeys.list(
+   *   'project_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(projectID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/projects/${projectID}/api_keys`, ConversationCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Deletes an API key from the project.
+   *
+   * Returns confirmation of the key deletion, or an error if the key belonged to a
+   * service account.
+   *
+   * @example
+   * ```ts
+   * const apiKey =
+   *   await client.admin.organization.projects.apiKeys.delete(
+   *     'api_key_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  delete(apiKeyID, params, options) {
+    const { project_id } = params;
+    return this._client.delete(path2`/organization/projects/${project_id}/api_keys/${apiKeyID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/certificates.mjs
+var Certificates4 = class extends APIResource2 {
+  /**
+   * List certificates for this project.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const certificateListResponse of client.admin.organization.projects.certificates.list(
+   *   'project_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(projectID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/projects/${projectID}/certificates`, ConversationCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Activate certificates at the project level.
+   *
+   * You can atomically and idempotently activate up to 10 certificates at a time.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const certificateActivateResponse of client.admin.organization.projects.certificates.activate(
+   *   'project_id',
+   *   { certificate_ids: ['cert_abc'] },
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  activate(projectID, body, options) {
+    return this._client.getAPIList(path2`/organization/projects/${projectID}/certificates/activate`, Page2, { body, method: "post", ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Deactivate certificates at the project level. You can atomically and
+   * idempotently deactivate up to 10 certificates at a time.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const certificateDeactivateResponse of client.admin.organization.projects.certificates.deactivate(
+   *   'project_id',
+   *   { certificate_ids: ['cert_abc'] },
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  deactivate(projectID, body, options) {
+    return this._client.getAPIList(path2`/organization/projects/${projectID}/certificates/deactivate`, Page2, { body, method: "post", ...options, __security: { adminAPIKeyAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/data-retention.mjs
+var DataRetention4 = class extends APIResource2 {
+  /**
+   * Retrieves project data retention controls.
+   *
+   * @example
+   * ```ts
+   * const projectDataRetention =
+   *   await client.admin.organization.projects.dataRetention.retrieve(
+   *     'project_id',
+   *   );
+   * ```
+   */
+  retrieve(projectID, options) {
+    return this._client.get(path2`/organization/projects/${projectID}/data_retention`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates project data retention controls.
+   *
+   * @example
+   * ```ts
+   * const projectDataRetention =
+   *   await client.admin.organization.projects.dataRetention.update(
+   *     'project_id',
+   *     { retention_type: 'organization_default' },
+   *   );
+   * ```
+   */
+  update(projectID, body, options) {
+    return this._client.post(path2`/organization/projects/${projectID}/data_retention`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/hosted-tool-permissions.mjs
+var HostedToolPermissions2 = class extends APIResource2 {
+  /**
+   * Returns hosted tool permissions for a project.
+   *
+   * @example
+   * ```ts
+   * const projectHostedToolPermissions =
+   *   await client.admin.organization.projects.hostedToolPermissions.retrieve(
+   *     'project_id',
+   *   );
+   * ```
+   */
+  retrieve(projectID, options) {
+    return this._client.get(path2`/organization/projects/${projectID}/hosted_tool_permissions`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates hosted tool permissions for a project.
+   *
+   * @example
+   * ```ts
+   * const projectHostedToolPermissions =
+   *   await client.admin.organization.projects.hostedToolPermissions.update(
+   *     'project_id',
+   *   );
+   * ```
+   */
+  update(projectID, body, options) {
+    return this._client.post(path2`/organization/projects/${projectID}/hosted_tool_permissions`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/model-permissions.mjs
+var ModelPermissions2 = class extends APIResource2 {
+  /**
+   * Returns model permissions for a project.
+   *
+   * @example
+   * ```ts
+   * const projectModelPermissions =
+   *   await client.admin.organization.projects.modelPermissions.retrieve(
+   *     'project_id',
+   *   );
+   * ```
+   */
+  retrieve(projectID, options) {
+    return this._client.get(path2`/organization/projects/${projectID}/model_permissions`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates model permissions for a project.
+   *
+   * @example
+   * ```ts
+   * const projectModelPermissions =
+   *   await client.admin.organization.projects.modelPermissions.update(
+   *     'project_id',
+   *     { mode: 'allow_list', model_ids: ['string'] },
+   *   );
+   * ```
+   */
+  update(projectID, body, options) {
+    return this._client.post(path2`/organization/projects/${projectID}/model_permissions`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Deletes model permissions for a project.
+   *
+   * @example
+   * ```ts
+   * const projectModelPermissionsDeleted =
+   *   await client.admin.organization.projects.modelPermissions.delete(
+   *     'project_id',
+   *   );
+   * ```
+   */
+  delete(projectID, options) {
+    return this._client.delete(path2`/organization/projects/${projectID}/model_permissions`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/rate-limits.mjs
+var RateLimits2 = class extends APIResource2 {
+  /**
+   * Returns the rate limits per model for a project.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const projectRateLimit of client.admin.organization.projects.rateLimits.listRateLimits(
+   *   'project_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  listRateLimits(projectID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/projects/${projectID}/rate_limits`, ConversationCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Updates a project rate limit.
+   *
+   * @example
+   * ```ts
+   * const projectRateLimit =
+   *   await client.admin.organization.projects.rateLimits.updateRateLimit(
+   *     'rate_limit_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  updateRateLimit(rateLimitID, params, options) {
+    const { project_id, ...body } = params;
+    return this._client.post(path2`/organization/projects/${project_id}/rate_limits/${rateLimitID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/roles.mjs
+var Roles9 = class extends APIResource2 {
+  /**
+   * Creates a custom role for a project.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.roles.create(
+   *     'project_id',
+   *     { permissions: ['string'], role_name: 'role_name' },
+   *   );
+   * ```
+   */
+  create(projectID, body, options) {
+    return this._client.post(path2`/projects/${projectID}/roles`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a project role.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.roles.retrieve(
+   *     'role_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  retrieve(roleID, params, options) {
+    const { project_id } = params;
+    return this._client.get(path2`/projects/${project_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates an existing project role.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.roles.update(
+   *     'role_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  update(roleID, params, options) {
+    const { project_id, ...body } = params;
+    return this._client.post(path2`/projects/${project_id}/roles/${roleID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists the roles configured for a project.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const role of client.admin.organization.projects.roles.list(
+   *   'project_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(projectID, query = {}, options) {
+    return this._client.getAPIList(path2`/projects/${projectID}/roles`, NextCursorPage2, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Deletes a custom role from a project.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.roles.delete(
+   *     'role_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  delete(roleID, params, options) {
+    const { project_id } = params;
+    return this._client.delete(path2`/projects/${project_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/service-accounts.mjs
+var ServiceAccounts2 = class extends APIResource2 {
+  /**
+   * Creates a new service account in the project. This also returns an unredacted
+   * API key for the service account.
+   *
+   * @example
+   * ```ts
+   * const serviceAccount =
+   *   await client.admin.organization.projects.serviceAccounts.create(
+   *     'project_id',
+   *     { name: 'name' },
+   *   );
+   * ```
+   */
+  create(projectID, body, options) {
+    return this._client.post(path2`/organization/projects/${projectID}/service_accounts`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a service account in the project.
+   *
+   * @example
+   * ```ts
+   * const projectServiceAccount =
+   *   await client.admin.organization.projects.serviceAccounts.retrieve(
+   *     'service_account_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  retrieve(serviceAccountID, params, options) {
+    const { project_id } = params;
+    return this._client.get(path2`/organization/projects/${project_id}/service_accounts/${serviceAccountID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates a service account in the project.
+   *
+   * @example
+   * ```ts
+   * const projectServiceAccount =
+   *   await client.admin.organization.projects.serviceAccounts.update(
+   *     'service_account_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  update(serviceAccountID, params, options) {
+    const { project_id, ...body } = params;
+    return this._client.post(path2`/organization/projects/${project_id}/service_accounts/${serviceAccountID}`, { body, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Returns a list of service accounts in the project.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const projectServiceAccount of client.admin.organization.projects.serviceAccounts.list(
+   *   'project_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(projectID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/projects/${projectID}/service_accounts`, ConversationCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Deletes a service account from the project.
+   *
+   * Returns confirmation of service account deletion, or an error if the project is
+   * archived (archived projects have no service accounts).
+   *
+   * @example
+   * ```ts
+   * const serviceAccount =
+   *   await client.admin.organization.projects.serviceAccounts.delete(
+   *     'service_account_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  delete(serviceAccountID, params, options) {
+    const { project_id } = params;
+    return this._client.delete(path2`/organization/projects/${project_id}/service_accounts/${serviceAccountID}`, { ...options, __security: { adminAPIKeyAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/spend-alerts.mjs
+var SpendAlerts4 = class extends APIResource2 {
+  /**
+   * Creates a project spend alert.
+   *
+   * @example
+   * ```ts
+   * const projectSpendAlert =
+   *   await client.admin.organization.projects.spendAlerts.create(
+   *     'project_id',
+   *     {
+   *       currency: 'USD',
+   *       interval: 'month',
+   *       notification_channel: {
+   *         recipients: ['string'],
+   *         type: 'email',
+   *       },
+   *       threshold_amount: 0,
+   *     },
+   *   );
+   * ```
+   */
+  create(projectID, body, options) {
+    return this._client.post(path2`/organization/projects/${projectID}/spend_alerts`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a project spend alert.
+   *
+   * @example
+   * ```ts
+   * const projectSpendAlert =
+   *   await client.admin.organization.projects.spendAlerts.retrieve(
+   *     'alert_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  retrieve(alertID, params, options) {
+    const { project_id } = params;
+    return this._client.get(path2`/organization/projects/${project_id}/spend_alerts/${alertID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Updates a project spend alert.
+   *
+   * @example
+   * ```ts
+   * const projectSpendAlert =
+   *   await client.admin.organization.projects.spendAlerts.update(
+   *     'alert_id',
+   *     {
+   *       project_id: 'project_id',
+   *       currency: 'USD',
+   *       interval: 'month',
+   *       notification_channel: {
+   *         recipients: ['string'],
+   *         type: 'email',
+   *       },
+   *       threshold_amount: 0,
+   *     },
+   *   );
+   * ```
+   */
+  update(alertID, params, options) {
+    const { project_id, ...body } = params;
+    return this._client.post(path2`/organization/projects/${project_id}/spend_alerts/${alertID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists project spend alerts.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const projectSpendAlert of client.admin.organization.projects.spendAlerts.list(
+   *   'project_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(projectID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/projects/${projectID}/spend_alerts`, ConversationCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Deletes a project spend alert.
+   *
+   * @example
+   * ```ts
+   * const projectSpendAlertDeleted =
+   *   await client.admin.organization.projects.spendAlerts.delete(
+   *     'alert_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  delete(alertID, params, options) {
+    const { project_id } = params;
+    return this._client.delete(path2`/organization/projects/${project_id}/spend_alerts/${alertID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/groups/roles.mjs
+var Roles10 = class extends APIResource2 {
+  /**
+   * Assigns a project role to a group within a project.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.groups.roles.create(
+   *     'group_id',
+   *     { project_id: 'project_id', role_id: 'role_id' },
+   *   );
+   * ```
+   */
+  create(groupID, params, options) {
+    const { project_id, ...body } = params;
+    return this._client.post(path2`/projects/${project_id}/groups/${groupID}/roles`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a project role assigned to a group.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.groups.roles.retrieve(
+   *     'role_id',
+   *     { project_id: 'project_id', group_id: 'group_id' },
+   *   );
+   * ```
+   */
+  retrieve(roleID, params, options) {
+    const { project_id, group_id } = params;
+    return this._client.get(path2`/projects/${project_id}/groups/${group_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists the project roles assigned to a group within a project.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const roleListResponse of client.admin.organization.projects.groups.roles.list(
+   *   'group_id',
+   *   { project_id: 'project_id' },
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(groupID, params, options) {
+    const { project_id, ...query } = params;
+    return this._client.getAPIList(path2`/projects/${project_id}/groups/${groupID}/roles`, NextCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Unassigns a project role from a group within a project.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.groups.roles.delete(
+   *     'role_id',
+   *     { project_id: 'project_id', group_id: 'group_id' },
+   *   );
+   * ```
+   */
+  delete(roleID, params, options) {
+    const { project_id, group_id } = params;
+    return this._client.delete(path2`/projects/${project_id}/groups/${group_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/groups/groups.mjs
+var Groups4 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.roles = new Roles10(this._client);
+  }
+  /**
+   * Grants a group access to a project.
+   *
+   * @example
+   * ```ts
+   * const projectGroup =
+   *   await client.admin.organization.projects.groups.create(
+   *     'project_id',
+   *     { group_id: 'group_id', role: 'role' },
+   *   );
+   * ```
+   */
+  create(projectID, body, options) {
+    return this._client.post(path2`/organization/projects/${projectID}/groups`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a project's group.
+   *
+   * @example
+   * ```ts
+   * const projectGroup =
+   *   await client.admin.organization.projects.groups.retrieve(
+   *     'group_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  retrieve(groupID, params, options) {
+    const { project_id, ...query } = params;
+    return this._client.get(path2`/organization/projects/${project_id}/groups/${groupID}`, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists the groups that have access to a project.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const projectGroup of client.admin.organization.projects.groups.list(
+   *   'project_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(projectID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/projects/${projectID}/groups`, NextCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Revokes a group's access to a project.
+   *
+   * @example
+   * ```ts
+   * const group =
+   *   await client.admin.organization.projects.groups.delete(
+   *     'group_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  delete(groupID, params, options) {
+    const { project_id } = params;
+    return this._client.delete(path2`/organization/projects/${project_id}/groups/${groupID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+Groups4.Roles = Roles10;
+
+// ../../node_modules/openai/resources/admin/organization/projects/users/roles.mjs
+var Roles11 = class extends APIResource2 {
+  /**
+   * Assigns a project role to a user within a project.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.users.roles.create(
+   *     'user_id',
+   *     { project_id: 'project_id', role_id: 'role_id' },
+   *   );
+   * ```
+   */
+  create(userID, params, options) {
+    const { project_id, ...body } = params;
+    return this._client.post(path2`/projects/${project_id}/users/${userID}/roles`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a project role assigned to a user.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.users.roles.retrieve(
+   *     'role_id',
+   *     { project_id: 'project_id', user_id: 'user_id' },
+   *   );
+   * ```
+   */
+  retrieve(roleID, params, options) {
+    const { project_id, user_id } = params;
+    return this._client.get(path2`/projects/${project_id}/users/${user_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists the project roles assigned to a user within a project.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const roleListResponse of client.admin.organization.projects.users.roles.list(
+   *   'user_id',
+   *   { project_id: 'project_id' },
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(userID, params, options) {
+    const { project_id, ...query } = params;
+    return this._client.getAPIList(path2`/projects/${project_id}/users/${userID}/roles`, NextCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Unassigns a project role from a user within a project.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.projects.users.roles.delete(
+   *     'role_id',
+   *     { project_id: 'project_id', user_id: 'user_id' },
+   *   );
+   * ```
+   */
+  delete(roleID, params, options) {
+    const { project_id, user_id } = params;
+    return this._client.delete(path2`/projects/${project_id}/users/${user_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/projects/users/users.mjs
+var Users5 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.roles = new Roles11(this._client);
+  }
+  /**
+   * Adds a user to the project. Users must already be members of the organization to
+   * be added to a project.
+   *
+   * @example
+   * ```ts
+   * const projectUser =
+   *   await client.admin.organization.projects.users.create(
+   *     'project_id',
+   *     { role: 'role' },
+   *   );
+   * ```
+   */
+  create(projectID, body, options) {
+    return this._client.post(path2`/organization/projects/${projectID}/users`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a user in the project.
+   *
+   * @example
+   * ```ts
+   * const projectUser =
+   *   await client.admin.organization.projects.users.retrieve(
+   *     'user_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  retrieve(userID, params, options) {
+    const { project_id } = params;
+    return this._client.get(path2`/organization/projects/${project_id}/users/${userID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Modifies a user's role in the project.
+   *
+   * @example
+   * ```ts
+   * const projectUser =
+   *   await client.admin.organization.projects.users.update(
+   *     'user_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  update(userID, params, options) {
+    const { project_id, ...body } = params;
+    return this._client.post(path2`/organization/projects/${project_id}/users/${userID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Returns a list of users in the project.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const projectUser of client.admin.organization.projects.users.list(
+   *   'project_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(projectID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/projects/${projectID}/users`, ConversationCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Deletes a user from the project.
+   *
+   * Returns confirmation of project user deletion, or an error if the project is
+   * archived (archived projects have no users).
+   *
+   * @example
+   * ```ts
+   * const user =
+   *   await client.admin.organization.projects.users.delete(
+   *     'user_id',
+   *     { project_id: 'project_id' },
+   *   );
+   * ```
+   */
+  delete(userID, params, options) {
+    const { project_id } = params;
+    return this._client.delete(path2`/organization/projects/${project_id}/users/${userID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+Users5.Roles = Roles11;
+
+// ../../node_modules/openai/resources/admin/organization/projects/projects.mjs
+var Projects2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.users = new Users5(this._client);
+    this.serviceAccounts = new ServiceAccounts2(this._client);
+    this.apiKeys = new APIKeys2(this._client);
+    this.rateLimits = new RateLimits2(this._client);
+    this.modelPermissions = new ModelPermissions2(this._client);
+    this.hostedToolPermissions = new HostedToolPermissions2(this._client);
+    this.groups = new Groups4(this._client);
+    this.roles = new Roles9(this._client);
+    this.dataRetention = new DataRetention4(this._client);
+    this.spendAlerts = new SpendAlerts4(this._client);
+    this.certificates = new Certificates4(this._client);
+  }
+  /**
+   * Create a new project in the organization. Projects can be created and archived,
+   * but cannot be deleted.
+   *
+   * @example
+   * ```ts
+   * const project =
+   *   await client.admin.organization.projects.create({
+   *     name: 'name',
+   *   });
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/organization/projects", {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves a project.
+   *
+   * @example
+   * ```ts
+   * const project =
+   *   await client.admin.organization.projects.retrieve(
+   *     'project_id',
+   *   );
+   * ```
+   */
+  retrieve(projectID, options) {
+    return this._client.get(path2`/organization/projects/${projectID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Modifies a project in the organization.
+   *
+   * @example
+   * ```ts
+   * const project =
+   *   await client.admin.organization.projects.update(
+   *     'project_id',
+   *   );
+   * ```
+   */
+  update(projectID, body, options) {
+    return this._client.post(path2`/organization/projects/${projectID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Returns a list of projects.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const project of client.admin.organization.projects.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/organization/projects", ConversationCursorPage2, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Archives a project in the organization. Archived projects cannot be used or
+   * updated.
+   *
+   * @example
+   * ```ts
+   * const project =
+   *   await client.admin.organization.projects.archive(
+   *     'project_id',
+   *   );
+   * ```
+   */
+  archive(projectID, options) {
+    return this._client.post(path2`/organization/projects/${projectID}/archive`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+Projects2.Users = Users5;
+Projects2.ServiceAccounts = ServiceAccounts2;
+Projects2.APIKeys = APIKeys2;
+Projects2.RateLimits = RateLimits2;
+Projects2.ModelPermissions = ModelPermissions2;
+Projects2.HostedToolPermissions = HostedToolPermissions2;
+Projects2.Groups = Groups4;
+Projects2.Roles = Roles9;
+Projects2.DataRetention = DataRetention4;
+Projects2.SpendAlerts = SpendAlerts4;
+Projects2.Certificates = Certificates4;
+
+// ../../node_modules/openai/resources/admin/organization/users/roles.mjs
+var Roles12 = class extends APIResource2 {
+  /**
+   * Assigns an organization role to a user within the organization.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.users.roles.create(
+   *     'user_id',
+   *     { role_id: 'role_id' },
+   *   );
+   * ```
+   */
+  create(userID, body, options) {
+    return this._client.post(path2`/organization/users/${userID}/roles`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Retrieves an organization role assigned to a user.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.users.roles.retrieve(
+   *     'role_id',
+   *     { user_id: 'user_id' },
+   *   );
+   * ```
+   */
+  retrieve(roleID, params, options) {
+    const { user_id } = params;
+    return this._client.get(path2`/organization/users/${user_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists the organization roles assigned to a user within the organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const roleListResponse of client.admin.organization.users.roles.list(
+   *   'user_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(userID, query = {}, options) {
+    return this._client.getAPIList(path2`/organization/users/${userID}/roles`, NextCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * Unassigns an organization role from a user within the organization.
+   *
+   * @example
+   * ```ts
+   * const role =
+   *   await client.admin.organization.users.roles.delete(
+   *     'role_id',
+   *     { user_id: 'user_id' },
+   *   );
+   * ```
+   */
+  delete(roleID, params, options) {
+    const { user_id } = params;
+    return this._client.delete(path2`/organization/users/${user_id}/roles/${roleID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/admin/organization/users/users.mjs
+var Users6 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.roles = new Roles12(this._client);
+  }
+  /**
+   * Retrieves a user by their identifier.
+   *
+   * @example
+   * ```ts
+   * const organizationUser =
+   *   await client.admin.organization.users.retrieve('user_id');
+   * ```
+   */
+  retrieve(userID, options) {
+    return this._client.get(path2`/organization/users/${userID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Modifies a user's role in the organization.
+   *
+   * @example
+   * ```ts
+   * const organizationUser =
+   *   await client.admin.organization.users.update('user_id');
+   * ```
+   */
+  update(userID, body, options) {
+    return this._client.post(path2`/organization/users/${userID}`, {
+      body,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Lists all of the users in the organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const organizationUser of client.admin.organization.users.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/organization/users", ConversationCursorPage2, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * Deletes a user from the organization.
+   *
+   * @example
+   * ```ts
+   * const user = await client.admin.organization.users.delete(
+   *   'user_id',
+   * );
+   * ```
+   */
+  delete(userID, options) {
+    return this._client.delete(path2`/organization/users/${userID}`, {
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+};
+Users6.Roles = Roles12;
+
+// ../../node_modules/openai/resources/admin/organization/organization.mjs
+var Organization3 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.auditLogs = new AuditLogs2(this._client);
+    this.adminAPIKeys = new AdminAPIKeys2(this._client);
+    this.usage = new Usage2(this._client);
+    this.invites = new Invites2(this._client);
+    this.users = new Users6(this._client);
+    this.groups = new Groups3(this._client);
+    this.roles = new Roles7(this._client);
+    this.dataRetention = new DataRetention3(this._client);
+    this.spendAlerts = new SpendAlerts3(this._client);
+    this.certificates = new Certificates3(this._client);
+    this.projects = new Projects2(this._client);
+  }
+};
+Organization3.AuditLogs = AuditLogs2;
+Organization3.AdminAPIKeys = AdminAPIKeys2;
+Organization3.Usage = Usage2;
+Organization3.Invites = Invites2;
+Organization3.Users = Users6;
+Organization3.Groups = Groups3;
+Organization3.Roles = Roles7;
+Organization3.DataRetention = DataRetention3;
+Organization3.SpendAlerts = SpendAlerts3;
+Organization3.Certificates = Certificates3;
+Organization3.Projects = Projects2;
+
+// ../../node_modules/openai/resources/admin/admin.mjs
+var Admin2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.organization = new Organization3(this._client);
+  }
+};
+Admin2.Organization = Organization3;
+
+// ../../node_modules/openai/internal/headers.mjs
+var brand_privateNullableHeaders2 = /* @__PURE__ */ Symbol("brand.privateNullableHeaders");
+function* iterateHeaders2(headers) {
+  if (!headers)
+    return;
+  if (brand_privateNullableHeaders2 in headers) {
+    const { values, nulls } = headers;
+    yield* values.entries();
+    for (const name of nulls) {
+      yield [name, null];
+    }
+    return;
+  }
+  let shouldClear = false;
+  let iter;
+  if (headers instanceof Headers) {
+    iter = headers.entries();
+  } else if (isReadonlyArray2(headers)) {
+    iter = headers;
+  } else {
+    shouldClear = true;
+    iter = Object.entries(headers ?? {});
+  }
+  for (let row of iter) {
+    const name = row[0];
+    if (typeof name !== "string")
+      throw new TypeError("expected header name to be a string");
+    const values = isReadonlyArray2(row[1]) ? row[1] : [row[1]];
+    let didClear = false;
+    for (const value of values) {
+      if (value === void 0)
+        continue;
+      if (shouldClear && !didClear) {
+        didClear = true;
+        yield [name, null];
+      }
+      yield [name, value];
+    }
+  }
+}
+var buildHeaders2 = (newHeaders) => {
+  const targetHeaders = new Headers();
+  const nullHeaders = /* @__PURE__ */ new Set();
+  for (const headers of newHeaders) {
+    const seenHeaders = /* @__PURE__ */ new Set();
+    for (const [name, value] of iterateHeaders2(headers)) {
+      const lowerName = name.toLowerCase();
+      if (!seenHeaders.has(lowerName)) {
+        targetHeaders.delete(name);
+        seenHeaders.add(lowerName);
+      }
+      if (value === null) {
+        targetHeaders.delete(name);
+        nullHeaders.add(lowerName);
+      } else {
+        targetHeaders.append(name, value);
+        nullHeaders.delete(lowerName);
+      }
+    }
+  }
+  return { [brand_privateNullableHeaders2]: true, values: targetHeaders, nulls: nullHeaders };
+};
+
+// ../../node_modules/openai/resources/audio/speech.mjs
+var Speech2 = class extends APIResource2 {
+  /**
+   * Generates audio from the input text.
+   *
+   * Returns the audio file content, or a stream of audio events.
+   *
+   * @example
+   * ```ts
+   * const speech = await client.audio.speech.create({
+   *   input: 'input',
+   *   model: 'tts-1',
+   *   voice: 'alloy',
+   * });
+   *
+   * const content = await speech.blob();
+   * console.log(content);
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/audio/speech", {
+      body,
+      ...options,
+      headers: buildHeaders2([{ Accept: "application/octet-stream" }, options?.headers]),
+      __security: { bearerAuth: true },
+      __binaryResponse: true
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/audio/transcriptions.mjs
+var Transcriptions2 = class extends APIResource2 {
+  create(body, options) {
+    return this._client.post("/audio/transcriptions", multipartFormRequestOptions2({
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __metadata: { model: body.model },
+      __security: { bearerAuth: true }
+    }, this._client));
+  }
+};
+
+// ../../node_modules/openai/resources/audio/translations.mjs
+var Translations2 = class extends APIResource2 {
+  create(body, options) {
+    return this._client.post("/audio/translations", multipartFormRequestOptions2({ body, ...options, __metadata: { model: body.model }, __security: { bearerAuth: true } }, this._client));
+  }
+};
+
+// ../../node_modules/openai/resources/audio/audio.mjs
+var Audio2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.transcriptions = new Transcriptions2(this._client);
+    this.translations = new Translations2(this._client);
+    this.speech = new Speech2(this._client);
+  }
+};
+Audio2.Transcriptions = Transcriptions2;
+Audio2.Translations = Translations2;
+Audio2.Speech = Speech2;
+
+// ../../node_modules/openai/resources/batches.mjs
+var Batches2 = class extends APIResource2 {
+  /**
+   * Creates and executes a batch from an uploaded file of requests
+   */
+  create(body, options) {
+    return this._client.post("/batches", { body, ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Retrieves a batch.
+   */
+  retrieve(batchID, options) {
+    return this._client.get(path2`/batches/${batchID}`, { ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * List your organization's batches.
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/batches", CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Cancels an in-progress batch. The batch will be in status `cancelling` for up to
+   * 10 minutes, before changing to `cancelled`, where it will have partial results
+   * (if any) available in the output file.
+   */
+  cancel(batchID, options) {
+    return this._client.post(path2`/batches/${batchID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/beta/assistants.mjs
+var Assistants2 = class extends APIResource2 {
+  /**
+   * Create an assistant with a model and instructions.
+   *
+   * @deprecated
+   */
+  create(body, options) {
+    return this._client.post("/assistants", {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Retrieves an assistant.
+   *
+   * @deprecated
+   */
+  retrieve(assistantID, options) {
+    return this._client.get(path2`/assistants/${assistantID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Modifies an assistant.
+   *
+   * @deprecated
+   */
+  update(assistantID, body, options) {
+    return this._client.post(path2`/assistants/${assistantID}`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Returns a list of assistants.
+   *
+   * @deprecated
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/assistants", CursorPage2, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete an assistant.
+   *
+   * @deprecated
+   */
+  delete(assistantID, options) {
+    return this._client.delete(path2`/assistants/${assistantID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/beta/realtime/sessions.mjs
+var Sessions3 = class extends APIResource2 {
+  /**
+   * Create an ephemeral API token for use in client-side applications with the
+   * Realtime API. Can be configured with the same session parameters as the
+   * `session.update` client event.
+   *
+   * It responds with a session object, plus a `client_secret` key which contains a
+   * usable ephemeral API token that can be used to authenticate browser clients for
+   * the Realtime API.
+   *
+   * @example
+   * ```ts
+   * const session =
+   *   await client.beta.realtime.sessions.create();
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/realtime/sessions", {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/beta/realtime/transcription-sessions.mjs
+var TranscriptionSessions2 = class extends APIResource2 {
+  /**
+   * Create an ephemeral API token for use in client-side applications with the
+   * Realtime API specifically for realtime transcriptions. Can be configured with
+   * the same session parameters as the `transcription_session.update` client event.
+   *
+   * It responds with a session object, plus a `client_secret` key which contains a
+   * usable ephemeral API token that can be used to authenticate browser clients for
+   * the Realtime API.
+   *
+   * @example
+   * ```ts
+   * const transcriptionSession =
+   *   await client.beta.realtime.transcriptionSessions.create();
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/realtime/transcription_sessions", {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/beta/realtime/realtime.mjs
+var Realtime3 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.sessions = new Sessions3(this._client);
+    this.transcriptionSessions = new TranscriptionSessions2(this._client);
+  }
+};
+Realtime3.Sessions = Sessions3;
+Realtime3.TranscriptionSessions = TranscriptionSessions2;
+
+// ../../node_modules/openai/resources/beta/chatkit/sessions.mjs
+var Sessions4 = class extends APIResource2 {
+  /**
+   * Create a ChatKit session.
+   *
+   * @example
+   * ```ts
+   * const chatSession =
+   *   await client.beta.chatkit.sessions.create({
+   *     user: 'x',
+   *     workflow: { id: 'id' },
+   *   });
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/chatkit/sessions", {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "chatkit_beta=v1" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Cancel an active ChatKit session and return its most recent metadata.
+   *
+   * Cancelling prevents new requests from using the issued client secret.
+   *
+   * @example
+   * ```ts
+   * const chatSession =
+   *   await client.beta.chatkit.sessions.cancel('cksess_123');
+   * ```
+   */
+  cancel(sessionID, options) {
+    return this._client.post(path2`/chatkit/sessions/${sessionID}/cancel`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "chatkit_beta=v1" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/beta/chatkit/threads.mjs
+var Threads3 = class extends APIResource2 {
+  /**
+   * Retrieve a ChatKit thread by its identifier.
+   *
+   * @example
+   * ```ts
+   * const chatkitThread =
+   *   await client.beta.chatkit.threads.retrieve('cthr_123');
+   * ```
+   */
+  retrieve(threadID, options) {
+    return this._client.get(path2`/chatkit/threads/${threadID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "chatkit_beta=v1" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * List ChatKit threads with optional pagination and user filters.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const chatkitThread of client.beta.chatkit.threads.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/chatkit/threads", ConversationCursorPage2, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "chatkit_beta=v1" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete a ChatKit thread along with its items and stored attachments.
+   *
+   * @example
+   * ```ts
+   * const thread = await client.beta.chatkit.threads.delete(
+   *   'cthr_123',
+   * );
+   * ```
+   */
+  delete(threadID, options) {
+    return this._client.delete(path2`/chatkit/threads/${threadID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "chatkit_beta=v1" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * List items that belong to a ChatKit thread.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const thread of client.beta.chatkit.threads.listItems(
+   *   'cthr_123',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  listItems(threadID, query = {}, options) {
+    return this._client.getAPIList(path2`/chatkit/threads/${threadID}/items`, ConversationCursorPage2, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "chatkit_beta=v1" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/beta/chatkit/chatkit.mjs
+var ChatKit2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.sessions = new Sessions4(this._client);
+    this.threads = new Threads3(this._client);
+  }
+};
+ChatKit2.Sessions = Sessions4;
+ChatKit2.Threads = Threads3;
+
+// ../../node_modules/openai/resources/beta/threads/messages.mjs
+var Messages4 = class extends APIResource2 {
+  /**
+   * Create a message.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  create(threadID, body, options) {
+    return this._client.post(path2`/threads/${threadID}/messages`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Retrieve a message.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  retrieve(messageID, params, options) {
+    const { thread_id } = params;
+    return this._client.get(path2`/threads/${thread_id}/messages/${messageID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Modifies a message.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  update(messageID, params, options) {
+    const { thread_id, ...body } = params;
+    return this._client.post(path2`/threads/${thread_id}/messages/${messageID}`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Returns a list of messages for a given thread.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  list(threadID, query = {}, options) {
+    return this._client.getAPIList(path2`/threads/${threadID}/messages`, CursorPage2, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Deletes a message.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  delete(messageID, params, options) {
+    const { thread_id } = params;
+    return this._client.delete(path2`/threads/${thread_id}/messages/${messageID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/beta/threads/runs/steps.mjs
+var Steps2 = class extends APIResource2 {
+  /**
+   * Retrieves a run step.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  retrieve(stepID, params, options) {
+    const { thread_id, run_id, ...query } = params;
+    return this._client.get(path2`/threads/${thread_id}/runs/${run_id}/steps/${stepID}`, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Returns a list of run steps belonging to a run.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  list(runID, params, options) {
+    const { thread_id, ...query } = params;
+    return this._client.getAPIList(path2`/threads/${thread_id}/runs/${runID}/steps`, CursorPage2, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/internal/utils/base64.mjs
+var toFloat32Array2 = (base64Str) => {
+  if (typeof Buffer !== "undefined") {
+    const buf = Buffer.from(base64Str, "base64");
+    return Array.from(new Float32Array(buf.buffer, buf.byteOffset, buf.length / Float32Array.BYTES_PER_ELEMENT));
+  } else {
+    const binaryStr = atob(base64Str);
+    const len = binaryStr.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    return Array.from(new Float32Array(bytes.buffer));
+  }
+};
+
+// ../../node_modules/openai/internal/utils/env.mjs
+var readEnv2 = (env) => {
+  if (typeof globalThis.process !== "undefined") {
+    return globalThis.process.env?.[env]?.trim() || void 0;
+  }
+  if (typeof globalThis.Deno !== "undefined") {
+    return globalThis.Deno.env?.get?.(env)?.trim() || void 0;
+  }
+  return void 0;
+};
+
+// ../../node_modules/openai/lib/AssistantStream.mjs
+var _AssistantStream_instances2;
+var _a3;
+var _AssistantStream_events2;
+var _AssistantStream_runStepSnapshots2;
+var _AssistantStream_messageSnapshots2;
+var _AssistantStream_messageSnapshot2;
+var _AssistantStream_finalRun2;
+var _AssistantStream_currentContentIndex2;
+var _AssistantStream_currentContent2;
+var _AssistantStream_currentToolCallIndex2;
+var _AssistantStream_currentToolCall2;
+var _AssistantStream_currentEvent2;
+var _AssistantStream_currentRunSnapshot2;
+var _AssistantStream_currentRunStepSnapshot2;
+var _AssistantStream_addEvent3;
+var _AssistantStream_endRequest3;
+var _AssistantStream_handleMessage3;
+var _AssistantStream_handleRunStep3;
+var _AssistantStream_handleEvent3;
+var _AssistantStream_accumulateRunStep3;
+var _AssistantStream_accumulateMessage3;
+var _AssistantStream_accumulateContent3;
+var _AssistantStream_handleRun3;
+var AssistantStream2 = class extends EventStream2 {
+  constructor() {
+    super(...arguments);
+    _AssistantStream_instances2.add(this);
+    _AssistantStream_events2.set(this, []);
+    _AssistantStream_runStepSnapshots2.set(this, {});
+    _AssistantStream_messageSnapshots2.set(this, {});
+    _AssistantStream_messageSnapshot2.set(this, void 0);
+    _AssistantStream_finalRun2.set(this, void 0);
+    _AssistantStream_currentContentIndex2.set(this, void 0);
+    _AssistantStream_currentContent2.set(this, void 0);
+    _AssistantStream_currentToolCallIndex2.set(this, void 0);
+    _AssistantStream_currentToolCall2.set(this, void 0);
+    _AssistantStream_currentEvent2.set(this, void 0);
+    _AssistantStream_currentRunSnapshot2.set(this, void 0);
+    _AssistantStream_currentRunStepSnapshot2.set(this, void 0);
+  }
+  [(_AssistantStream_events2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_runStepSnapshots2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_messageSnapshots2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_messageSnapshot2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_finalRun2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_currentContentIndex2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_currentContent2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_currentToolCallIndex2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_currentToolCall2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_currentEvent2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_currentRunSnapshot2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_currentRunStepSnapshot2 = /* @__PURE__ */ new WeakMap(), _AssistantStream_instances2 = /* @__PURE__ */ new WeakSet(), Symbol.asyncIterator)]() {
+    const pushQueue = [];
+    const readQueue = [];
+    let done = false;
+    this.on("event", (event) => {
+      const reader = readQueue.shift();
+      if (reader) {
+        reader.resolve(event);
+      } else {
+        pushQueue.push(event);
+      }
+    });
+    this.on("end", () => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.resolve(void 0);
+      }
+      readQueue.length = 0;
+    });
+    this.on("abort", (err) => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.reject(err);
+      }
+      readQueue.length = 0;
+    });
+    this.on("error", (err) => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.reject(err);
+      }
+      readQueue.length = 0;
+    });
+    return {
+      next: async () => {
+        if (!pushQueue.length) {
+          if (done) {
+            return { value: void 0, done: true };
+          }
+          return new Promise((resolve, reject) => readQueue.push({ resolve, reject })).then((chunk2) => chunk2 ? { value: chunk2, done: false } : { value: void 0, done: true });
+        }
+        const chunk = pushQueue.shift();
+        return { value: chunk, done: false };
+      },
+      return: async () => {
+        this.abort();
+        return { value: void 0, done: true };
+      }
+    };
+  }
+  static fromReadableStream(stream) {
+    const runner = new _a3();
+    runner._run(() => runner._fromReadableStream(stream));
+    return runner;
+  }
+  async _fromReadableStream(readableStream, options) {
+    const signal = options?.signal;
+    if (signal) {
+      if (signal.aborted)
+        this.controller.abort();
+      signal.addEventListener("abort", () => this.controller.abort());
+    }
+    this._connected();
+    const stream = Stream2.fromReadableStream(readableStream, this.controller);
+    for await (const event of stream) {
+      __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_addEvent3).call(this, event);
+    }
+    if (stream.controller.signal?.aborted) {
+      throw new APIUserAbortError2();
+    }
+    return this._addRun(__classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_endRequest3).call(this));
+  }
+  toReadableStream() {
+    const stream = new Stream2(this[Symbol.asyncIterator].bind(this), this.controller);
+    return stream.toReadableStream();
+  }
+  static createToolAssistantStream(runId, runs, params, options) {
+    const runner = new _a3();
+    runner._run(() => runner._runToolAssistantStream(runId, runs, params, {
+      ...options,
+      headers: { ...options?.headers, "X-Stainless-Helper-Method": "stream" }
+    }));
+    return runner;
+  }
+  async _createToolAssistantStream(run, runId, params, options) {
+    const signal = options?.signal;
+    if (signal) {
+      if (signal.aborted)
+        this.controller.abort();
+      signal.addEventListener("abort", () => this.controller.abort());
+    }
+    const body = { ...params, stream: true };
+    const stream = await run.submitToolOutputs(runId, body, {
+      ...options,
+      signal: this.controller.signal
+    });
+    this._connected();
+    for await (const event of stream) {
+      __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_addEvent3).call(this, event);
+    }
+    if (stream.controller.signal?.aborted) {
+      throw new APIUserAbortError2();
+    }
+    return this._addRun(__classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_endRequest3).call(this));
+  }
+  static createThreadAssistantStream(params, thread, options) {
+    const runner = new _a3();
+    runner._run(() => runner._threadAssistantStream(params, thread, {
+      ...options,
+      headers: { ...options?.headers, "X-Stainless-Helper-Method": "stream" }
+    }));
+    return runner;
+  }
+  static createAssistantStream(threadId, runs, params, options) {
+    const runner = new _a3();
+    runner._run(() => runner._runAssistantStream(threadId, runs, params, {
+      ...options,
+      headers: { ...options?.headers, "X-Stainless-Helper-Method": "stream" }
+    }));
+    return runner;
+  }
+  currentEvent() {
+    return __classPrivateFieldGet2(this, _AssistantStream_currentEvent2, "f");
+  }
+  currentRun() {
+    return __classPrivateFieldGet2(this, _AssistantStream_currentRunSnapshot2, "f");
+  }
+  currentMessageSnapshot() {
+    return __classPrivateFieldGet2(this, _AssistantStream_messageSnapshot2, "f");
+  }
+  currentRunStepSnapshot() {
+    return __classPrivateFieldGet2(this, _AssistantStream_currentRunStepSnapshot2, "f");
+  }
+  async finalRunSteps() {
+    await this.done();
+    return Object.values(__classPrivateFieldGet2(this, _AssistantStream_runStepSnapshots2, "f"));
+  }
+  async finalMessages() {
+    await this.done();
+    return Object.values(__classPrivateFieldGet2(this, _AssistantStream_messageSnapshots2, "f"));
+  }
+  async finalRun() {
+    await this.done();
+    if (!__classPrivateFieldGet2(this, _AssistantStream_finalRun2, "f"))
+      throw Error("Final run was not received.");
+    return __classPrivateFieldGet2(this, _AssistantStream_finalRun2, "f");
+  }
+  async _createThreadAssistantStream(thread, params, options) {
+    const signal = options?.signal;
+    if (signal) {
+      if (signal.aborted)
+        this.controller.abort();
+      signal.addEventListener("abort", () => this.controller.abort());
+    }
+    const body = { ...params, stream: true };
+    const stream = await thread.createAndRun(body, { ...options, signal: this.controller.signal });
+    this._connected();
+    for await (const event of stream) {
+      __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_addEvent3).call(this, event);
+    }
+    if (stream.controller.signal?.aborted) {
+      throw new APIUserAbortError2();
+    }
+    return this._addRun(__classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_endRequest3).call(this));
+  }
+  async _createAssistantStream(run, threadId, params, options) {
+    const signal = options?.signal;
+    if (signal) {
+      if (signal.aborted)
+        this.controller.abort();
+      signal.addEventListener("abort", () => this.controller.abort());
+    }
+    const body = { ...params, stream: true };
+    const stream = await run.create(threadId, body, { ...options, signal: this.controller.signal });
+    this._connected();
+    for await (const event of stream) {
+      __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_addEvent3).call(this, event);
+    }
+    if (stream.controller.signal?.aborted) {
+      throw new APIUserAbortError2();
+    }
+    return this._addRun(__classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_endRequest3).call(this));
+  }
+  static accumulateDelta(acc, delta) {
+    for (const [key, deltaValue] of Object.entries(delta)) {
+      if (!acc.hasOwnProperty(key)) {
+        acc[key] = deltaValue;
+        continue;
+      }
+      let accValue = acc[key];
+      if (accValue === null || accValue === void 0) {
+        acc[key] = deltaValue;
+        continue;
+      }
+      if (key === "index" || key === "type") {
+        acc[key] = deltaValue;
+        continue;
+      }
+      if (typeof accValue === "string" && typeof deltaValue === "string") {
+        accValue += deltaValue;
+      } else if (typeof accValue === "number" && typeof deltaValue === "number") {
+        accValue += deltaValue;
+      } else if (isObj2(accValue) && isObj2(deltaValue)) {
+        accValue = this.accumulateDelta(accValue, deltaValue);
+      } else if (Array.isArray(accValue) && Array.isArray(deltaValue)) {
+        if (accValue.every((x) => typeof x === "string" || typeof x === "number")) {
+          accValue.push(...deltaValue);
+          continue;
+        }
+        for (const deltaEntry of deltaValue) {
+          if (!isObj2(deltaEntry)) {
+            throw new Error(`Expected array delta entry to be an object but got: ${deltaEntry}`);
+          }
+          const index2 = deltaEntry["index"];
+          if (index2 == null) {
+            console.error(deltaEntry);
+            throw new Error("Expected array delta entry to have an `index` property");
+          }
+          if (typeof index2 !== "number") {
+            throw new Error(`Expected array delta entry \`index\` property to be a number but got ${index2}`);
+          }
+          const accEntry = accValue[index2];
+          if (accEntry == null) {
+            accValue.push(deltaEntry);
+          } else {
+            accValue[index2] = this.accumulateDelta(accEntry, deltaEntry);
+          }
+        }
+        continue;
+      } else {
+        throw Error(`Unhandled record type: ${key}, deltaValue: ${deltaValue}, accValue: ${accValue}`);
+      }
+      acc[key] = accValue;
+    }
+    return acc;
+  }
+  _addRun(run) {
+    return run;
+  }
+  async _threadAssistantStream(params, thread, options) {
+    return await this._createThreadAssistantStream(thread, params, options);
+  }
+  async _runAssistantStream(threadId, runs, params, options) {
+    return await this._createAssistantStream(runs, threadId, params, options);
+  }
+  async _runToolAssistantStream(runId, runs, params, options) {
+    return await this._createToolAssistantStream(runs, runId, params, options);
+  }
+};
+_a3 = AssistantStream2, _AssistantStream_addEvent3 = function _AssistantStream_addEvent4(event) {
+  if (this.ended)
+    return;
+  __classPrivateFieldSet2(this, _AssistantStream_currentEvent2, event, "f");
+  __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_handleEvent3).call(this, event);
+  switch (event.event) {
+    case "thread.created":
+      break;
+    case "thread.run.created":
+    case "thread.run.queued":
+    case "thread.run.in_progress":
+    case "thread.run.requires_action":
+    case "thread.run.completed":
+    case "thread.run.incomplete":
+    case "thread.run.failed":
+    case "thread.run.cancelling":
+    case "thread.run.cancelled":
+    case "thread.run.expired":
+      __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_handleRun3).call(this, event);
+      break;
+    case "thread.run.step.created":
+    case "thread.run.step.in_progress":
+    case "thread.run.step.delta":
+    case "thread.run.step.completed":
+    case "thread.run.step.failed":
+    case "thread.run.step.cancelled":
+    case "thread.run.step.expired":
+      __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_handleRunStep3).call(this, event);
+      break;
+    case "thread.message.created":
+    case "thread.message.in_progress":
+    case "thread.message.delta":
+    case "thread.message.completed":
+    case "thread.message.incomplete":
+      __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_handleMessage3).call(this, event);
+      break;
+    case "error":
+      throw new Error("Encountered an error event in event processing - errors should be processed earlier");
+    default:
+      assertNever5(event);
+  }
+}, _AssistantStream_endRequest3 = function _AssistantStream_endRequest4() {
+  if (this.ended) {
+    throw new OpenAIError2(`stream has ended, this shouldn't happen`);
+  }
+  if (!__classPrivateFieldGet2(this, _AssistantStream_finalRun2, "f"))
+    throw Error("Final run has not been received");
+  return __classPrivateFieldGet2(this, _AssistantStream_finalRun2, "f");
+}, _AssistantStream_handleMessage3 = function _AssistantStream_handleMessage4(event) {
+  const [accumulatedMessage, newContent] = __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_accumulateMessage3).call(this, event, __classPrivateFieldGet2(this, _AssistantStream_messageSnapshot2, "f"));
+  __classPrivateFieldSet2(this, _AssistantStream_messageSnapshot2, accumulatedMessage, "f");
+  __classPrivateFieldGet2(this, _AssistantStream_messageSnapshots2, "f")[accumulatedMessage.id] = accumulatedMessage;
+  for (const content of newContent) {
+    const snapshotContent = accumulatedMessage.content[content.index];
+    if (snapshotContent?.type == "text") {
+      this._emit("textCreated", snapshotContent.text);
+    }
+  }
+  switch (event.event) {
+    case "thread.message.created":
+      this._emit("messageCreated", event.data);
+      break;
+    case "thread.message.in_progress":
+      break;
+    case "thread.message.delta":
+      this._emit("messageDelta", event.data.delta, accumulatedMessage);
+      if (event.data.delta.content) {
+        for (const content of event.data.delta.content) {
+          if (content.type == "text" && content.text) {
+            let textDelta = content.text;
+            let snapshot = accumulatedMessage.content[content.index];
+            if (snapshot && snapshot.type == "text") {
+              this._emit("textDelta", textDelta, snapshot.text);
+            } else {
+              throw Error("The snapshot associated with this text delta is not text or missing");
+            }
+          }
+          if (content.index != __classPrivateFieldGet2(this, _AssistantStream_currentContentIndex2, "f")) {
+            if (__classPrivateFieldGet2(this, _AssistantStream_currentContent2, "f")) {
+              switch (__classPrivateFieldGet2(this, _AssistantStream_currentContent2, "f").type) {
+                case "text":
+                  this._emit("textDone", __classPrivateFieldGet2(this, _AssistantStream_currentContent2, "f").text, __classPrivateFieldGet2(this, _AssistantStream_messageSnapshot2, "f"));
+                  break;
+                case "image_file":
+                  this._emit("imageFileDone", __classPrivateFieldGet2(this, _AssistantStream_currentContent2, "f").image_file, __classPrivateFieldGet2(this, _AssistantStream_messageSnapshot2, "f"));
+                  break;
+              }
+            }
+            __classPrivateFieldSet2(this, _AssistantStream_currentContentIndex2, content.index, "f");
+          }
+          __classPrivateFieldSet2(this, _AssistantStream_currentContent2, accumulatedMessage.content[content.index], "f");
+        }
+      }
+      break;
+    case "thread.message.completed":
+    case "thread.message.incomplete":
+      if (__classPrivateFieldGet2(this, _AssistantStream_currentContentIndex2, "f") !== void 0) {
+        const currentContent = event.data.content[__classPrivateFieldGet2(this, _AssistantStream_currentContentIndex2, "f")];
+        if (currentContent) {
+          switch (currentContent.type) {
+            case "image_file":
+              this._emit("imageFileDone", currentContent.image_file, __classPrivateFieldGet2(this, _AssistantStream_messageSnapshot2, "f"));
+              break;
+            case "text":
+              this._emit("textDone", currentContent.text, __classPrivateFieldGet2(this, _AssistantStream_messageSnapshot2, "f"));
+              break;
+          }
+        }
+      }
+      if (__classPrivateFieldGet2(this, _AssistantStream_messageSnapshot2, "f")) {
+        this._emit("messageDone", event.data);
+      }
+      __classPrivateFieldSet2(this, _AssistantStream_messageSnapshot2, void 0, "f");
+  }
+}, _AssistantStream_handleRunStep3 = function _AssistantStream_handleRunStep4(event) {
+  const accumulatedRunStep = __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_accumulateRunStep3).call(this, event);
+  __classPrivateFieldSet2(this, _AssistantStream_currentRunStepSnapshot2, accumulatedRunStep, "f");
+  switch (event.event) {
+    case "thread.run.step.created":
+      this._emit("runStepCreated", event.data);
+      break;
+    case "thread.run.step.delta":
+      const delta = event.data.delta;
+      if (delta.step_details && delta.step_details.type == "tool_calls" && delta.step_details.tool_calls && accumulatedRunStep.step_details.type == "tool_calls") {
+        for (const toolCall of delta.step_details.tool_calls) {
+          if (toolCall.index == __classPrivateFieldGet2(this, _AssistantStream_currentToolCallIndex2, "f")) {
+            this._emit("toolCallDelta", toolCall, accumulatedRunStep.step_details.tool_calls[toolCall.index]);
+          } else {
+            if (__classPrivateFieldGet2(this, _AssistantStream_currentToolCall2, "f")) {
+              this._emit("toolCallDone", __classPrivateFieldGet2(this, _AssistantStream_currentToolCall2, "f"));
+            }
+            __classPrivateFieldSet2(this, _AssistantStream_currentToolCallIndex2, toolCall.index, "f");
+            __classPrivateFieldSet2(this, _AssistantStream_currentToolCall2, accumulatedRunStep.step_details.tool_calls[toolCall.index], "f");
+            if (__classPrivateFieldGet2(this, _AssistantStream_currentToolCall2, "f"))
+              this._emit("toolCallCreated", __classPrivateFieldGet2(this, _AssistantStream_currentToolCall2, "f"));
+          }
+        }
+      }
+      this._emit("runStepDelta", event.data.delta, accumulatedRunStep);
+      break;
+    case "thread.run.step.completed":
+    case "thread.run.step.failed":
+    case "thread.run.step.cancelled":
+    case "thread.run.step.expired":
+      __classPrivateFieldSet2(this, _AssistantStream_currentRunStepSnapshot2, void 0, "f");
+      const details = event.data.step_details;
+      if (details.type == "tool_calls") {
+        if (__classPrivateFieldGet2(this, _AssistantStream_currentToolCall2, "f")) {
+          this._emit("toolCallDone", __classPrivateFieldGet2(this, _AssistantStream_currentToolCall2, "f"));
+          __classPrivateFieldSet2(this, _AssistantStream_currentToolCall2, void 0, "f");
+        }
+      }
+      this._emit("runStepDone", event.data, accumulatedRunStep);
+      break;
+    case "thread.run.step.in_progress":
+      break;
+  }
+}, _AssistantStream_handleEvent3 = function _AssistantStream_handleEvent4(event) {
+  __classPrivateFieldGet2(this, _AssistantStream_events2, "f").push(event);
+  this._emit("event", event);
+}, _AssistantStream_accumulateRunStep3 = function _AssistantStream_accumulateRunStep4(event) {
+  switch (event.event) {
+    case "thread.run.step.created":
+      __classPrivateFieldGet2(this, _AssistantStream_runStepSnapshots2, "f")[event.data.id] = event.data;
+      return event.data;
+    case "thread.run.step.delta":
+      let snapshot = __classPrivateFieldGet2(this, _AssistantStream_runStepSnapshots2, "f")[event.data.id];
+      if (!snapshot) {
+        throw Error("Received a RunStepDelta before creation of a snapshot");
+      }
+      let data = event.data;
+      if (data.delta) {
+        const accumulated = _a3.accumulateDelta(snapshot, data.delta);
+        __classPrivateFieldGet2(this, _AssistantStream_runStepSnapshots2, "f")[event.data.id] = accumulated;
+      }
+      return __classPrivateFieldGet2(this, _AssistantStream_runStepSnapshots2, "f")[event.data.id];
+    case "thread.run.step.completed":
+    case "thread.run.step.failed":
+    case "thread.run.step.cancelled":
+    case "thread.run.step.expired":
+    case "thread.run.step.in_progress":
+      __classPrivateFieldGet2(this, _AssistantStream_runStepSnapshots2, "f")[event.data.id] = event.data;
+      break;
+  }
+  if (__classPrivateFieldGet2(this, _AssistantStream_runStepSnapshots2, "f")[event.data.id])
+    return __classPrivateFieldGet2(this, _AssistantStream_runStepSnapshots2, "f")[event.data.id];
+  throw new Error("No snapshot available");
+}, _AssistantStream_accumulateMessage3 = function _AssistantStream_accumulateMessage4(event, snapshot) {
+  let newContent = [];
+  switch (event.event) {
+    case "thread.message.created":
+      return [event.data, newContent];
+    case "thread.message.delta":
+      if (!snapshot) {
+        throw Error("Received a delta with no existing snapshot (there should be one from message creation)");
+      }
+      let data = event.data;
+      if (data.delta.content) {
+        for (const contentElement of data.delta.content) {
+          if (contentElement.index in snapshot.content) {
+            let currentContent = snapshot.content[contentElement.index];
+            snapshot.content[contentElement.index] = __classPrivateFieldGet2(this, _AssistantStream_instances2, "m", _AssistantStream_accumulateContent3).call(this, contentElement, currentContent);
+          } else {
+            snapshot.content[contentElement.index] = contentElement;
+            newContent.push(contentElement);
+          }
+        }
+      }
+      return [snapshot, newContent];
+    case "thread.message.in_progress":
+    case "thread.message.completed":
+    case "thread.message.incomplete":
+      if (snapshot) {
+        return [snapshot, newContent];
+      } else {
+        throw Error("Received thread message event with no existing snapshot");
+      }
+  }
+  throw Error("Tried to accumulate a non-message event");
+}, _AssistantStream_accumulateContent3 = function _AssistantStream_accumulateContent4(contentElement, currentContent) {
+  return _a3.accumulateDelta(currentContent, contentElement);
+}, _AssistantStream_handleRun3 = function _AssistantStream_handleRun4(event) {
+  __classPrivateFieldSet2(this, _AssistantStream_currentRunSnapshot2, event.data, "f");
+  switch (event.event) {
+    case "thread.run.created":
+      break;
+    case "thread.run.queued":
+      break;
+    case "thread.run.in_progress":
+      break;
+    case "thread.run.requires_action":
+    case "thread.run.cancelled":
+    case "thread.run.failed":
+    case "thread.run.completed":
+    case "thread.run.expired":
+    case "thread.run.incomplete":
+      __classPrivateFieldSet2(this, _AssistantStream_finalRun2, event.data, "f");
+      if (__classPrivateFieldGet2(this, _AssistantStream_currentToolCall2, "f")) {
+        this._emit("toolCallDone", __classPrivateFieldGet2(this, _AssistantStream_currentToolCall2, "f"));
+        __classPrivateFieldSet2(this, _AssistantStream_currentToolCall2, void 0, "f");
+      }
+      break;
+    case "thread.run.cancelling":
+      break;
+  }
+};
+function assertNever5(_x) {
+}
+
+// ../../node_modules/openai/resources/beta/threads/runs/runs.mjs
+var Runs3 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.steps = new Steps2(this._client);
+  }
+  create(threadID, params, options) {
+    const { include, ...body } = params;
+    return this._client.post(path2`/threads/${threadID}/runs`, {
+      query: { include },
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      stream: params.stream ?? false,
+      __synthesizeEventData: true,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Retrieves a run.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  retrieve(runID, params, options) {
+    const { thread_id } = params;
+    return this._client.get(path2`/threads/${thread_id}/runs/${runID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Modifies a run.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  update(runID, params, options) {
+    const { thread_id, ...body } = params;
+    return this._client.post(path2`/threads/${thread_id}/runs/${runID}`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Returns a list of runs belonging to a thread.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  list(threadID, query = {}, options) {
+    return this._client.getAPIList(path2`/threads/${threadID}/runs`, CursorPage2, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Cancels a run that is `in_progress`.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  cancel(runID, params, options) {
+    const { thread_id } = params;
+    return this._client.post(path2`/threads/${thread_id}/runs/${runID}/cancel`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * A helper to create a run an poll for a terminal state. More information on Run
+   * lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   */
+  async createAndPoll(threadId, body, options) {
+    const run = await this.create(threadId, body, options);
+    return await this.poll(run.id, { thread_id: threadId }, options);
+  }
+  /**
+   * Create a Run stream
+   *
+   * @deprecated use `stream` instead
+   */
+  createAndStream(threadId, body, options) {
+    return AssistantStream2.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
+  }
+  /**
+   * A helper to poll a run status until it reaches a terminal state. More
+   * information on Run lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   */
+  async poll(runId, params, options) {
+    const headers = buildHeaders2([
+      options?.headers,
+      {
+        "X-Stainless-Poll-Helper": "true",
+        "X-Stainless-Custom-Poll-Interval": options?.pollIntervalMs?.toString() ?? void 0
+      }
+    ]);
+    while (true) {
+      const { data: run, response } = await this.retrieve(runId, params, {
+        ...options,
+        headers: { ...options?.headers, ...headers }
+      }).withResponse();
+      switch (run.status) {
+        //If we are in any sort of intermediate state we poll
+        case "queued":
+        case "in_progress":
+        case "cancelling":
+          let sleepInterval = 5e3;
+          if (options?.pollIntervalMs) {
+            sleepInterval = options.pollIntervalMs;
+          } else {
+            const headerInterval = response.headers.get("openai-poll-after-ms");
+            if (headerInterval) {
+              const headerIntervalMs = parseInt(headerInterval);
+              if (!isNaN(headerIntervalMs)) {
+                sleepInterval = headerIntervalMs;
+              }
+            }
+          }
+          await sleep3(sleepInterval);
+          break;
+        //We return the run in any terminal state.
+        case "requires_action":
+        case "incomplete":
+        case "cancelled":
+        case "completed":
+        case "failed":
+        case "expired":
+          return run;
+      }
+    }
+  }
+  /**
+   * Create a Run stream
+   */
+  stream(threadId, body, options) {
+    return AssistantStream2.createAssistantStream(threadId, this._client.beta.threads.runs, body, options);
+  }
+  submitToolOutputs(runID, params, options) {
+    const { thread_id, ...body } = params;
+    return this._client.post(path2`/threads/${thread_id}/runs/${runID}/submit_tool_outputs`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      stream: params.stream ?? false,
+      __synthesizeEventData: true,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * A helper to submit a tool output to a run and poll for a terminal run state.
+   * More information on Run lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   */
+  async submitToolOutputsAndPoll(runId, params, options) {
+    const run = await this.submitToolOutputs(runId, params, options);
+    return await this.poll(run.id, params, options);
+  }
+  /**
+   * Submit the tool outputs from a previous run and stream the run to a terminal
+   * state. More information on Run lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   */
+  submitToolOutputsStream(runId, params, options) {
+    return AssistantStream2.createToolAssistantStream(runId, this._client.beta.threads.runs, params, options);
+  }
+};
+Runs3.Steps = Steps2;
+
+// ../../node_modules/openai/resources/beta/threads/threads.mjs
+var Threads4 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.runs = new Runs3(this._client);
+    this.messages = new Messages4(this._client);
+  }
+  /**
+   * Create a thread.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  create(body = {}, options) {
+    return this._client.post("/threads", {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Retrieves a thread.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  retrieve(threadID, options) {
+    return this._client.get(path2`/threads/${threadID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Modifies a thread.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  update(threadID, body, options) {
+    return this._client.post(path2`/threads/${threadID}`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete a thread.
+   *
+   * @deprecated The Assistants API is deprecated in favor of the Responses API
+   */
+  delete(threadID, options) {
+    return this._client.delete(path2`/threads/${threadID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  createAndRun(body, options) {
+    return this._client.post("/threads/runs", {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      stream: body.stream ?? false,
+      __synthesizeEventData: true,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * A helper to create a thread, start a run and then poll for a terminal state.
+   * More information on Run lifecycles can be found here:
+   * https://platform.openai.com/docs/assistants/how-it-works/runs-and-run-steps
+   */
+  async createAndRunPoll(body, options) {
+    const run = await this.createAndRun(body, options);
+    return await this.runs.poll(run.id, { thread_id: run.thread_id }, options);
+  }
+  /**
+   * Create a thread and stream the run back
+   */
+  createAndRunStream(body, options) {
+    return AssistantStream2.createThreadAssistantStream(body, this._client.beta.threads, options);
+  }
+};
+Threads4.Runs = Runs3;
+Threads4.Messages = Messages4;
+
+// ../../node_modules/openai/resources/beta/beta.mjs
+var Beta2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.realtime = new Realtime3(this._client);
+    this.chatkit = new ChatKit2(this._client);
+    this.assistants = new Assistants2(this._client);
+    this.threads = new Threads4(this._client);
+  }
+};
+Beta2.Realtime = Realtime3;
+Beta2.ChatKit = ChatKit2;
+Beta2.Assistants = Assistants2;
+Beta2.Threads = Threads4;
+
+// ../../node_modules/openai/resources/completions.mjs
+var Completions4 = class extends APIResource2 {
+  create(body, options) {
+    return this._client.post("/completions", {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/containers/files/content.mjs
+var Content4 = class extends APIResource2 {
+  /**
+   * Retrieve Container File Content
+   */
+  retrieve(fileID, params, options) {
+    const { container_id } = params;
+    return this._client.get(path2`/containers/${container_id}/files/${fileID}/content`, {
+      ...options,
+      headers: buildHeaders2([{ Accept: "application/binary" }, options?.headers]),
+      __security: { bearerAuth: true },
+      __binaryResponse: true
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/containers/files/files.mjs
+var Files4 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.content = new Content4(this._client);
+  }
+  /**
+   * Create a Container File
+   *
+   * You can send either a multipart/form-data request with the raw file content, or
+   * a JSON request with a file ID.
+   */
+  create(containerID, body, options) {
+    return this._client.post(path2`/containers/${containerID}/files`, maybeMultipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+  /**
+   * Retrieve Container File
+   */
+  retrieve(fileID, params, options) {
+    const { container_id } = params;
+    return this._client.get(path2`/containers/${container_id}/files/${fileID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * List Container files
+   */
+  list(containerID, query = {}, options) {
+    return this._client.getAPIList(path2`/containers/${containerID}/files`, CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete Container File
+   */
+  delete(fileID, params, options) {
+    const { container_id } = params;
+    return this._client.delete(path2`/containers/${container_id}/files/${fileID}`, {
+      ...options,
+      headers: buildHeaders2([{ Accept: "*/*" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+Files4.Content = Content4;
+
+// ../../node_modules/openai/resources/containers/containers.mjs
+var Containers2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.files = new Files4(this._client);
+  }
+  /**
+   * Create Container
+   */
+  create(body, options) {
+    return this._client.post("/containers", { body, ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Retrieve Container
+   */
+  retrieve(containerID, options) {
+    return this._client.get(path2`/containers/${containerID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * List Containers
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/containers", CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete Container
+   */
+  delete(containerID, options) {
+    return this._client.delete(path2`/containers/${containerID}`, {
+      ...options,
+      headers: buildHeaders2([{ Accept: "*/*" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+Containers2.Files = Files4;
+
+// ../../node_modules/openai/resources/conversations/items.mjs
+var Items2 = class extends APIResource2 {
+  /**
+   * Create items in a conversation with the given ID.
+   */
+  create(conversationID, params, options) {
+    const { include, ...body } = params;
+    return this._client.post(path2`/conversations/${conversationID}/items`, {
+      query: { include },
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Get a single item from a conversation with the given IDs.
+   */
+  retrieve(itemID, params, options) {
+    const { conversation_id, ...query } = params;
+    return this._client.get(path2`/conversations/${conversation_id}/items/${itemID}`, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * List all items for a conversation with the given ID.
+   */
+  list(conversationID, query = {}, options) {
+    return this._client.getAPIList(path2`/conversations/${conversationID}/items`, ConversationCursorPage2, { query, ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Delete an item from a conversation with the given IDs.
+   */
+  delete(itemID, params, options) {
+    const { conversation_id } = params;
+    return this._client.delete(path2`/conversations/${conversation_id}/items/${itemID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/conversations/conversations.mjs
+var Conversations2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.items = new Items2(this._client);
+  }
+  /**
+   * Create a conversation.
+   */
+  create(body = {}, options) {
+    return this._client.post("/conversations", { body, ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Get a conversation
+   */
+  retrieve(conversationID, options) {
+    return this._client.get(path2`/conversations/${conversationID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Update a conversation
+   */
+  update(conversationID, body, options) {
+    return this._client.post(path2`/conversations/${conversationID}`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete a conversation. Items in the conversation will not be deleted.
+   */
+  delete(conversationID, options) {
+    return this._client.delete(path2`/conversations/${conversationID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+Conversations2.Items = Items2;
+
+// ../../node_modules/openai/resources/embeddings.mjs
+var Embeddings2 = class extends APIResource2 {
+  /**
+   * Creates an embedding vector representing the input text.
+   *
+   * @example
+   * ```ts
+   * const createEmbeddingResponse =
+   *   await client.embeddings.create({
+   *     input: 'The quick brown fox jumped over the lazy dog',
+   *     model: 'text-embedding-3-small',
+   *   });
+   * ```
+   */
+  create(body, options) {
+    const hasUserProvidedEncodingFormat = !!body.encoding_format;
+    let encoding_format = hasUserProvidedEncodingFormat ? body.encoding_format : "base64";
+    if (hasUserProvidedEncodingFormat) {
+      loggerFor2(this._client).debug("embeddings/user defined encoding_format:", body.encoding_format);
+    }
+    const response = this._client.post("/embeddings", {
+      body: {
+        ...body,
+        encoding_format
+      },
+      ...options,
+      __security: { bearerAuth: true }
+    });
+    if (hasUserProvidedEncodingFormat) {
+      return response;
+    }
+    loggerFor2(this._client).debug("embeddings/decoding base64 embeddings from base64");
+    return response._thenUnwrap((response2) => {
+      if (response2 && response2.data) {
+        response2.data.forEach((embeddingBase64Obj) => {
+          const embeddingBase64Str = embeddingBase64Obj.embedding;
+          embeddingBase64Obj.embedding = toFloat32Array2(embeddingBase64Str);
+        });
+      }
+      return response2;
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/evals/runs/output-items.mjs
+var OutputItems2 = class extends APIResource2 {
+  /**
+   * Get an evaluation run output item by ID.
+   */
+  retrieve(outputItemID, params, options) {
+    const { eval_id, run_id } = params;
+    return this._client.get(path2`/evals/${eval_id}/runs/${run_id}/output_items/${outputItemID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Get a list of output items for an evaluation run.
+   */
+  list(runID, params, options) {
+    const { eval_id, ...query } = params;
+    return this._client.getAPIList(path2`/evals/${eval_id}/runs/${runID}/output_items`, CursorPage2, { query, ...options, __security: { bearerAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/resources/evals/runs/runs.mjs
+var Runs4 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.outputItems = new OutputItems2(this._client);
+  }
+  /**
+   * Kicks off a new run for a given evaluation, specifying the data source, and what
+   * model configuration to use to test. The datasource will be validated against the
+   * schema specified in the config of the evaluation.
+   */
+  create(evalID, body, options) {
+    return this._client.post(path2`/evals/${evalID}/runs`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Get an evaluation run by ID.
+   */
+  retrieve(runID, params, options) {
+    const { eval_id } = params;
+    return this._client.get(path2`/evals/${eval_id}/runs/${runID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Get a list of runs for an evaluation.
+   */
+  list(evalID, query = {}, options) {
+    return this._client.getAPIList(path2`/evals/${evalID}/runs`, CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete an eval run.
+   */
+  delete(runID, params, options) {
+    const { eval_id } = params;
+    return this._client.delete(path2`/evals/${eval_id}/runs/${runID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Cancel an ongoing evaluation run.
+   */
+  cancel(runID, params, options) {
+    const { eval_id } = params;
+    return this._client.post(path2`/evals/${eval_id}/runs/${runID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+Runs4.OutputItems = OutputItems2;
+
+// ../../node_modules/openai/resources/evals/evals.mjs
+var Evals2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.runs = new Runs4(this._client);
+  }
+  /**
+   * Create the structure of an evaluation that can be used to test a model's
+   * performance. An evaluation is a set of testing criteria and the config for a
+   * data source, which dictates the schema of the data used in the evaluation. After
+   * creating an evaluation, you can run it on different models and model parameters.
+   * We support several types of graders and datasources. For more information, see
+   * the [Evals guide](https://platform.openai.com/docs/guides/evals).
+   */
+  create(body, options) {
+    return this._client.post("/evals", { body, ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Get an evaluation by ID.
+   */
+  retrieve(evalID, options) {
+    return this._client.get(path2`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Update certain properties of an evaluation.
+   */
+  update(evalID, body, options) {
+    return this._client.post(path2`/evals/${evalID}`, { body, ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * List evaluations for a project.
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/evals", CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete an evaluation.
+   */
+  delete(evalID, options) {
+    return this._client.delete(path2`/evals/${evalID}`, { ...options, __security: { bearerAuth: true } });
+  }
+};
+Evals2.Runs = Runs4;
+
+// ../../node_modules/openai/resources/files.mjs
+var Files5 = class extends APIResource2 {
+  /**
+   * Upload a file that can be used across various endpoints. Individual files can be
+   * up to 512 MB, and each project can store up to 2.5 TB of files in total. There
+   * is no organization-wide storage limit. Uploads to this endpoint are rate-limited
+   * to 1,000 requests per minute per authenticated user.
+   *
+   * - The Assistants API supports files up to 2 million tokens and of specific file
+   *   types. See the
+   *   [Assistants Tools guide](https://platform.openai.com/docs/assistants/tools)
+   *   for details.
+   * - The Fine-tuning API only supports `.jsonl` files. The input also has certain
+   *   required formats for fine-tuning
+   *   [chat](https://platform.openai.com/docs/api-reference/fine-tuning/chat-input)
+   *   or
+   *   [completions](https://platform.openai.com/docs/api-reference/fine-tuning/completions-input)
+   *   models.
+   * - The Batch API only supports `.jsonl` files up to 200 MB in size. The input
+   *   also has a specific required
+   *   [format](https://platform.openai.com/docs/api-reference/batch/request-input).
+   * - For Retrieval or `file_search` ingestion, upload files here first. If you need
+   *   to attach multiple uploaded files to the same vector store, use
+   *   [`/vector_stores/{vector_store_id}/file_batches`](https://platform.openai.com/docs/api-reference/vector-stores-file-batches/createBatch)
+   *   instead of attaching them one by one. Vector store attachment has separate
+   *   limits from file upload, including 2,000 attached files per minute per
+   *   organization.
+   *
+   * Please [contact us](https://help.openai.com/) if you need to increase these
+   * storage limits.
+   */
+  create(body, options) {
+    return this._client.post("/files", multipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+  /**
+   * Returns information about a specific file.
+   */
+  retrieve(fileID, options) {
+    return this._client.get(path2`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Returns a list of files.
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/files", CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete a file and remove it from all vector stores.
+   */
+  delete(fileID, options) {
+    return this._client.delete(path2`/files/${fileID}`, { ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Returns the contents of the specified file.
+   */
+  content(fileID, options) {
+    return this._client.get(path2`/files/${fileID}/content`, {
+      ...options,
+      headers: buildHeaders2([{ Accept: "application/binary" }, options?.headers]),
+      __security: { bearerAuth: true },
+      __binaryResponse: true
+    });
+  }
+  /**
+   * Waits for the given file to be processed, default timeout is 30 mins.
+   */
+  async waitForProcessing(id, { pollInterval = 5e3, maxWait = 30 * 60 * 1e3 } = {}) {
+    const TERMINAL_STATES = /* @__PURE__ */ new Set(["processed", "error", "deleted"]);
+    const start = Date.now();
+    let file2 = await this.retrieve(id);
+    while (!file2.status || !TERMINAL_STATES.has(file2.status)) {
+      await sleep3(pollInterval);
+      file2 = await this.retrieve(id);
+      if (Date.now() - start > maxWait) {
+        throw new APIConnectionTimeoutError2({
+          message: `Giving up on waiting for file ${id} to finish processing after ${maxWait} milliseconds.`
+        });
+      }
+    }
+    return file2;
+  }
+};
+
+// ../../node_modules/openai/resources/fine-tuning/methods.mjs
+var Methods2 = class extends APIResource2 {
+};
+
+// ../../node_modules/openai/resources/fine-tuning/alpha/graders.mjs
+var Graders3 = class extends APIResource2 {
+  /**
+   * Run a grader.
+   *
+   * @example
+   * ```ts
+   * const response = await client.fineTuning.alpha.graders.run({
+   *   grader: {
+   *     input: 'input',
+   *     name: 'name',
+   *     operation: 'eq',
+   *     reference: 'reference',
+   *     type: 'string_check',
+   *   },
+   *   model_sample: 'model_sample',
+   * });
+   * ```
+   */
+  run(body, options) {
+    return this._client.post("/fine_tuning/alpha/graders/run", {
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Validate a grader.
+   *
+   * @example
+   * ```ts
+   * const response =
+   *   await client.fineTuning.alpha.graders.validate({
+   *     grader: {
+   *       input: 'input',
+   *       name: 'name',
+   *       operation: 'eq',
+   *       reference: 'reference',
+   *       type: 'string_check',
+   *     },
+   *   });
+   * ```
+   */
+  validate(body, options) {
+    return this._client.post("/fine_tuning/alpha/graders/validate", {
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/fine-tuning/alpha/alpha.mjs
+var Alpha2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.graders = new Graders3(this._client);
+  }
+};
+Alpha2.Graders = Graders3;
+
+// ../../node_modules/openai/resources/fine-tuning/checkpoints/permissions.mjs
+var Permissions2 = class extends APIResource2 {
+  /**
+   * **NOTE:** Calling this endpoint requires an [admin API key](../admin-api-keys).
+   *
+   * This enables organization owners to share fine-tuned models with other projects
+   * in their organization.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const permissionCreateResponse of client.fineTuning.checkpoints.permissions.create(
+   *   'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+   *   { project_ids: ['string'] },
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  create(fineTunedModelCheckpoint, body, options) {
+    return this._client.getAPIList(path2`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, Page2, { body, method: "post", ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * **NOTE:** This endpoint requires an [admin API key](../admin-api-keys).
+   *
+   * Organization owners can use this endpoint to view all permissions for a
+   * fine-tuned model checkpoint.
+   *
+   * @deprecated Retrieve is deprecated. Please swap to the paginated list method instead.
+   */
+  retrieve(fineTunedModelCheckpoint, query = {}, options) {
+    return this._client.get(path2`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, {
+      query,
+      ...options,
+      __security: { adminAPIKeyAuth: true }
+    });
+  }
+  /**
+   * **NOTE:** This endpoint requires an [admin API key](../admin-api-keys).
+   *
+   * Organization owners can use this endpoint to view all permissions for a
+   * fine-tuned model checkpoint.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const permissionListResponse of client.fineTuning.checkpoints.permissions.list(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(fineTunedModelCheckpoint, query = {}, options) {
+    return this._client.getAPIList(path2`/fine_tuning/checkpoints/${fineTunedModelCheckpoint}/permissions`, ConversationCursorPage2, { query, ...options, __security: { adminAPIKeyAuth: true } });
+  }
+  /**
+   * **NOTE:** This endpoint requires an [admin API key](../admin-api-keys).
+   *
+   * Organization owners can use this endpoint to delete a permission for a
+   * fine-tuned model checkpoint.
+   *
+   * @example
+   * ```ts
+   * const permission =
+   *   await client.fineTuning.checkpoints.permissions.delete(
+   *     'cp_zc4Q7MP6XxulcVzj4MZdwsAB',
+   *     {
+   *       fine_tuned_model_checkpoint:
+   *         'ft:gpt-4o-mini-2024-07-18:org:weather:B7R9VjQd',
+   *     },
+   *   );
+   * ```
+   */
+  delete(permissionID, params, options) {
+    const { fine_tuned_model_checkpoint } = params;
+    return this._client.delete(path2`/fine_tuning/checkpoints/${fine_tuned_model_checkpoint}/permissions/${permissionID}`, { ...options, __security: { adminAPIKeyAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/resources/fine-tuning/checkpoints/checkpoints.mjs
+var Checkpoints3 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.permissions = new Permissions2(this._client);
+  }
+};
+Checkpoints3.Permissions = Permissions2;
+
+// ../../node_modules/openai/resources/fine-tuning/jobs/checkpoints.mjs
+var Checkpoints4 = class extends APIResource2 {
+  /**
+   * List checkpoints for a fine-tuning job.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const fineTuningJobCheckpoint of client.fineTuning.jobs.checkpoints.list(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(fineTuningJobID, query = {}, options) {
+    return this._client.getAPIList(path2`/fine_tuning/jobs/${fineTuningJobID}/checkpoints`, CursorPage2, { query, ...options, __security: { bearerAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/resources/fine-tuning/jobs/jobs.mjs
+var Jobs2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.checkpoints = new Checkpoints4(this._client);
+  }
+  /**
+   * Creates a fine-tuning job which begins the process of creating a new model from
+   * a given dataset.
+   *
+   * Response includes details of the enqueued job including job status and the name
+   * of the fine-tuned models once complete.
+   *
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.create({
+   *   model: 'gpt-4o-mini',
+   *   training_file: 'file-abc123',
+   * });
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/fine_tuning/jobs", { body, ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Get info about a fine-tuning job.
+   *
+   * [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.retrieve(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
+   */
+  retrieve(fineTuningJobID, options) {
+    return this._client.get(path2`/fine_tuning/jobs/${fineTuningJobID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * List your organization's fine-tuning jobs
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const fineTuningJob of client.fineTuning.jobs.list()) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/fine_tuning/jobs", CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Immediately cancel a fine-tune job.
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.cancel(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
+   */
+  cancel(fineTuningJobID, options) {
+    return this._client.post(path2`/fine_tuning/jobs/${fineTuningJobID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Get status updates for a fine-tuning job.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const fineTuningJobEvent of client.fineTuning.jobs.listEvents(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  listEvents(fineTuningJobID, query = {}, options) {
+    return this._client.getAPIList(path2`/fine_tuning/jobs/${fineTuningJobID}/events`, CursorPage2, { query, ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Pause a fine-tune job.
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.pause(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
+   */
+  pause(fineTuningJobID, options) {
+    return this._client.post(path2`/fine_tuning/jobs/${fineTuningJobID}/pause`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Resume a fine-tune job.
+   *
+   * @example
+   * ```ts
+   * const fineTuningJob = await client.fineTuning.jobs.resume(
+   *   'ft-AF1WoRqd3aJAHsqc9NY7iL8F',
+   * );
+   * ```
+   */
+  resume(fineTuningJobID, options) {
+    return this._client.post(path2`/fine_tuning/jobs/${fineTuningJobID}/resume`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+Jobs2.Checkpoints = Checkpoints4;
+
+// ../../node_modules/openai/resources/fine-tuning/fine-tuning.mjs
+var FineTuning2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.methods = new Methods2(this._client);
+    this.jobs = new Jobs2(this._client);
+    this.checkpoints = new Checkpoints3(this._client);
+    this.alpha = new Alpha2(this._client);
+  }
+};
+FineTuning2.Methods = Methods2;
+FineTuning2.Jobs = Jobs2;
+FineTuning2.Checkpoints = Checkpoints3;
+FineTuning2.Alpha = Alpha2;
+
+// ../../node_modules/openai/resources/graders/grader-models.mjs
+var GraderModels2 = class extends APIResource2 {
+};
+
+// ../../node_modules/openai/resources/graders/graders.mjs
+var Graders4 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.graderModels = new GraderModels2(this._client);
+  }
+};
+Graders4.GraderModels = GraderModels2;
+
+// ../../node_modules/openai/resources/images.mjs
+var Images2 = class extends APIResource2 {
+  /**
+   * Creates a variation of a given image. This endpoint only supports `dall-e-2`.
+   *
+   * @example
+   * ```ts
+   * const imagesResponse = await client.images.createVariation({
+   *   image: fs.createReadStream('otter.png'),
+   * });
+   * ```
+   */
+  createVariation(body, options) {
+    return this._client.post("/images/variations", multipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+  edit(body, options) {
+    return this._client.post("/images/edits", multipartFormRequestOptions2({ body, ...options, stream: body.stream ?? false, __security: { bearerAuth: true } }, this._client));
+  }
+  generate(body, options) {
+    return this._client.post("/images/generations", {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/models.mjs
+var Models2 = class extends APIResource2 {
+  /**
+   * Retrieves a model instance, providing basic information about the model such as
+   * the owner and permissioning.
+   */
+  retrieve(model, options) {
+    return this._client.get(path2`/models/${model}`, { ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Lists the currently available models, and provides basic information about each
+   * one such as the owner and availability.
+   */
+  list(options) {
+    return this._client.getAPIList("/models", Page2, { ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Delete a fine-tuned model. You must have the Owner role in your organization to
+   * delete a model.
+   */
+  delete(model, options) {
+    return this._client.delete(path2`/models/${model}`, { ...options, __security: { bearerAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/resources/moderations.mjs
+var Moderations2 = class extends APIResource2 {
+  /**
+   * Classifies if text and/or image inputs are potentially harmful. Learn more in
+   * the [moderation guide](https://platform.openai.com/docs/guides/moderation).
+   */
+  create(body, options) {
+    return this._client.post("/moderations", { body, ...options, __security: { bearerAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/resources/realtime/calls.mjs
+var Calls2 = class extends APIResource2 {
+  /**
+   * Accept an incoming SIP call and configure the realtime session that will handle
+   * it.
+   *
+   * @example
+   * ```ts
+   * await client.realtime.calls.accept('call_id', {
+   *   type: 'realtime',
+   * });
+   * ```
+   */
+  accept(callID, body, options) {
+    return this._client.post(path2`/realtime/calls/${callID}/accept`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ Accept: "*/*" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * End an active Realtime API call, whether it was initiated over SIP or WebRTC.
+   *
+   * @example
+   * ```ts
+   * await client.realtime.calls.hangup('call_id');
+   * ```
+   */
+  hangup(callID, options) {
+    return this._client.post(path2`/realtime/calls/${callID}/hangup`, {
+      ...options,
+      headers: buildHeaders2([{ Accept: "*/*" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Transfer an active SIP call to a new destination using the SIP REFER verb.
+   *
+   * @example
+   * ```ts
+   * await client.realtime.calls.refer('call_id', {
+   *   target_uri: 'tel:+14155550123',
+   * });
+   * ```
+   */
+  refer(callID, body, options) {
+    return this._client.post(path2`/realtime/calls/${callID}/refer`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ Accept: "*/*" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Decline an incoming SIP call by returning a SIP status code to the caller.
+   *
+   * @example
+   * ```ts
+   * await client.realtime.calls.reject('call_id');
+   * ```
+   */
+  reject(callID, body = {}, options) {
+    return this._client.post(path2`/realtime/calls/${callID}/reject`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ Accept: "*/*" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/realtime/client-secrets.mjs
+var ClientSecrets2 = class extends APIResource2 {
+  /**
+   * Create a Realtime client secret with an associated session configuration.
+   *
+   * Client secrets are short-lived tokens that can be passed to a client app, such
+   * as a web frontend or mobile client, which grants access to the Realtime API
+   * without leaking your main API key. You can configure a custom TTL for each
+   * client secret.
+   *
+   * You can also attach session configuration options to the client secret, which
+   * will be applied to any sessions created using that client secret, but these can
+   * also be overridden by the client connection.
+   *
+   * [Learn more about authentication with client secrets over WebRTC](https://platform.openai.com/docs/guides/realtime-webrtc).
+   *
+   * Returns the created client secret and the effective session object. The client
+   * secret is a string that looks like `ek_1234`.
+   *
+   * @example
+   * ```ts
+   * const clientSecret =
+   *   await client.realtime.clientSecrets.create();
+   * ```
+   */
+  create(body, options) {
+    return this._client.post("/realtime/client_secrets", {
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/realtime/realtime.mjs
+var Realtime4 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.clientSecrets = new ClientSecrets2(this._client);
+    this.calls = new Calls2(this._client);
+  }
+};
+Realtime4.ClientSecrets = ClientSecrets2;
+Realtime4.Calls = Calls2;
+
+// ../../node_modules/openai/lib/ResponsesParser.mjs
+function maybeParseResponse2(response, params) {
+  if (!params || !hasAutoParseableInput4(params)) {
+    return {
+      ...response,
+      output_parsed: null,
+      output: response.output.map((item) => {
+        if (item.type === "function_call") {
+          return {
+            ...item,
+            parsed_arguments: null
+          };
+        }
+        if (item.type === "message") {
+          return {
+            ...item,
+            content: item.content.map((content) => ({
+              ...content,
+              parsed: null
+            }))
+          };
+        } else {
+          return item;
+        }
+      })
+    };
+  }
+  return parseResponse2(response, params);
+}
+function parseResponse2(response, params) {
+  const output = response.output.map((item) => {
+    if (item.type === "function_call") {
+      return {
+        ...item,
+        parsed_arguments: parseToolCall4(params, item)
+      };
+    }
+    if (item.type === "message") {
+      const content = item.content.map((content2) => {
+        if (content2.type === "output_text") {
+          return {
+            ...content2,
+            parsed: parseTextFormat2(params, content2.text)
+          };
+        }
+        return content2;
+      });
+      return {
+        ...item,
+        content
+      };
+    }
+    return item;
+  });
+  const parsed = Object.assign({}, response, { output });
+  if (!Object.getOwnPropertyDescriptor(response, "output_text")) {
+    addOutputText2(parsed);
+  }
+  Object.defineProperty(parsed, "output_parsed", {
+    enumerable: true,
+    get() {
+      for (const output2 of parsed.output) {
+        if (output2.type !== "message") {
+          continue;
+        }
+        for (const content of output2.content) {
+          if (content.type === "output_text" && content.parsed !== null) {
+            return content.parsed;
+          }
+        }
+      }
+      return null;
+    }
+  });
+  return parsed;
+}
+function parseTextFormat2(params, content) {
+  if (params.text?.format?.type !== "json_schema") {
+    return null;
+  }
+  if ("$parseRaw" in params.text?.format) {
+    const text_format = params.text?.format;
+    return text_format.$parseRaw(content);
+  }
+  return JSON.parse(content);
+}
+function hasAutoParseableInput4(params) {
+  if (isAutoParsableResponseFormat2(params.text?.format)) {
+    return true;
+  }
+  return false;
+}
+function isAutoParsableTool4(tool) {
+  return tool?.["$brand"] === "auto-parseable-tool";
+}
+function getInputToolByName2(input_tools, name) {
+  return input_tools.find((tool) => tool.type === "function" && tool.name === name);
+}
+function parseToolCall4(params, toolCall) {
+  const inputTool = getInputToolByName2(params.tools ?? [], toolCall.name);
+  return {
+    ...toolCall,
+    ...toolCall,
+    parsed_arguments: isAutoParsableTool4(inputTool) ? inputTool.$parseRaw(toolCall.arguments) : inputTool?.strict ? JSON.parse(toolCall.arguments) : null
+  };
+}
+function addOutputText2(rsp) {
+  const texts = [];
+  for (const output of rsp.output) {
+    if (output.type !== "message") {
+      continue;
+    }
+    for (const content of output.content) {
+      if (content.type === "output_text") {
+        texts.push(content.text);
+      }
+    }
+  }
+  rsp.output_text = texts.join("");
+}
+
+// ../../node_modules/openai/lib/responses/ResponseStream.mjs
+var _ResponseStream_instances2;
+var _ResponseStream_params2;
+var _ResponseStream_currentResponseSnapshot2;
+var _ResponseStream_finalResponse2;
+var _ResponseStream_beginRequest2;
+var _ResponseStream_addEvent2;
+var _ResponseStream_endRequest2;
+var _ResponseStream_accumulateResponse2;
+var ResponseStream2 = class _ResponseStream extends EventStream2 {
+  constructor(params) {
+    super();
+    _ResponseStream_instances2.add(this);
+    _ResponseStream_params2.set(this, void 0);
+    _ResponseStream_currentResponseSnapshot2.set(this, void 0);
+    _ResponseStream_finalResponse2.set(this, void 0);
+    __classPrivateFieldSet2(this, _ResponseStream_params2, params, "f");
+  }
+  static createResponse(client, params, options) {
+    const runner = new _ResponseStream(params);
+    runner._run(() => runner._createOrRetrieveResponse(client, params, {
+      ...options,
+      headers: { ...options?.headers, "X-Stainless-Helper-Method": "stream" }
+    }));
+    return runner;
+  }
+  async _createOrRetrieveResponse(client, params, options) {
+    const signal = options?.signal;
+    if (signal) {
+      if (signal.aborted)
+        this.controller.abort();
+      signal.addEventListener("abort", () => this.controller.abort());
+    }
+    __classPrivateFieldGet2(this, _ResponseStream_instances2, "m", _ResponseStream_beginRequest2).call(this);
+    let stream;
+    let starting_after = null;
+    if ("response_id" in params) {
+      stream = await client.responses.retrieve(params.response_id, { stream: true }, { ...options, signal: this.controller.signal, stream: true });
+      starting_after = params.starting_after ?? null;
+    } else {
+      stream = await client.responses.create({ ...params, stream: true }, { ...options, signal: this.controller.signal });
+    }
+    this._connected();
+    for await (const event of stream) {
+      __classPrivateFieldGet2(this, _ResponseStream_instances2, "m", _ResponseStream_addEvent2).call(this, event, starting_after);
+    }
+    if (stream.controller.signal?.aborted) {
+      throw new APIUserAbortError2();
+    }
+    return __classPrivateFieldGet2(this, _ResponseStream_instances2, "m", _ResponseStream_endRequest2).call(this);
+  }
+  [(_ResponseStream_params2 = /* @__PURE__ */ new WeakMap(), _ResponseStream_currentResponseSnapshot2 = /* @__PURE__ */ new WeakMap(), _ResponseStream_finalResponse2 = /* @__PURE__ */ new WeakMap(), _ResponseStream_instances2 = /* @__PURE__ */ new WeakSet(), _ResponseStream_beginRequest2 = function _ResponseStream_beginRequest3() {
+    if (this.ended)
+      return;
+    __classPrivateFieldSet2(this, _ResponseStream_currentResponseSnapshot2, void 0, "f");
+  }, _ResponseStream_addEvent2 = function _ResponseStream_addEvent3(event, starting_after) {
+    if (this.ended)
+      return;
+    const maybeEmit = (name, event2) => {
+      if (starting_after == null || event2.sequence_number > starting_after) {
+        this._emit(name, event2);
+      }
+    };
+    const response = __classPrivateFieldGet2(this, _ResponseStream_instances2, "m", _ResponseStream_accumulateResponse2).call(this, event);
+    maybeEmit("event", event);
+    switch (event.type) {
+      case "response.output_text.delta": {
+        const output = response.output[event.output_index];
+        if (!output) {
+          throw new OpenAIError2(`missing output at index ${event.output_index}`);
+        }
+        if (output.type === "message") {
+          const content = output.content[event.content_index];
+          if (!content) {
+            throw new OpenAIError2(`missing content at index ${event.content_index}`);
+          }
+          if (content.type !== "output_text") {
+            throw new OpenAIError2(`expected content to be 'output_text', got ${content.type}`);
+          }
+          maybeEmit("response.output_text.delta", {
+            ...event,
+            snapshot: content.text
+          });
+        }
+        break;
+      }
+      case "response.function_call_arguments.delta": {
+        const output = response.output[event.output_index];
+        if (!output) {
+          throw new OpenAIError2(`missing output at index ${event.output_index}`);
+        }
+        if (output.type === "function_call") {
+          maybeEmit("response.function_call_arguments.delta", {
+            ...event,
+            snapshot: output.arguments
+          });
+        }
+        break;
+      }
+      default:
+        maybeEmit(event.type, event);
+        break;
+    }
+  }, _ResponseStream_endRequest2 = function _ResponseStream_endRequest3() {
+    if (this.ended) {
+      throw new OpenAIError2(`stream has ended, this shouldn't happen`);
+    }
+    const snapshot = __classPrivateFieldGet2(this, _ResponseStream_currentResponseSnapshot2, "f");
+    if (!snapshot) {
+      throw new OpenAIError2(`request ended without sending any events`);
+    }
+    __classPrivateFieldSet2(this, _ResponseStream_currentResponseSnapshot2, void 0, "f");
+    const parsedResponse = finalizeResponse2(snapshot, __classPrivateFieldGet2(this, _ResponseStream_params2, "f"));
+    __classPrivateFieldSet2(this, _ResponseStream_finalResponse2, parsedResponse, "f");
+    return parsedResponse;
+  }, _ResponseStream_accumulateResponse2 = function _ResponseStream_accumulateResponse3(event) {
+    let snapshot = __classPrivateFieldGet2(this, _ResponseStream_currentResponseSnapshot2, "f");
+    if (!snapshot) {
+      if (event.type !== "response.created") {
+        throw new OpenAIError2(`When snapshot hasn't been set yet, expected 'response.created' event, got ${event.type}`);
+      }
+      snapshot = __classPrivateFieldSet2(this, _ResponseStream_currentResponseSnapshot2, event.response, "f");
+      return snapshot;
+    }
+    switch (event.type) {
+      case "response.output_item.added": {
+        snapshot.output.push(event.item);
+        break;
+      }
+      case "response.content_part.added": {
+        const output = snapshot.output[event.output_index];
+        if (!output) {
+          throw new OpenAIError2(`missing output at index ${event.output_index}`);
+        }
+        const type = output.type;
+        const part = event.part;
+        if (type === "message" && part.type !== "reasoning_text") {
+          output.content.push(part);
+        } else if (type === "reasoning" && part.type === "reasoning_text") {
+          if (!output.content) {
+            output.content = [];
+          }
+          output.content.push(part);
+        }
+        break;
+      }
+      case "response.output_text.delta": {
+        const output = snapshot.output[event.output_index];
+        if (!output) {
+          throw new OpenAIError2(`missing output at index ${event.output_index}`);
+        }
+        if (output.type === "message") {
+          const content = output.content[event.content_index];
+          if (!content) {
+            throw new OpenAIError2(`missing content at index ${event.content_index}`);
+          }
+          if (content.type !== "output_text") {
+            throw new OpenAIError2(`expected content to be 'output_text', got ${content.type}`);
+          }
+          content.text += event.delta;
+        }
+        break;
+      }
+      case "response.function_call_arguments.delta": {
+        const output = snapshot.output[event.output_index];
+        if (!output) {
+          throw new OpenAIError2(`missing output at index ${event.output_index}`);
+        }
+        if (output.type === "function_call") {
+          output.arguments += event.delta;
+        }
+        break;
+      }
+      case "response.reasoning_text.delta": {
+        const output = snapshot.output[event.output_index];
+        if (!output) {
+          throw new OpenAIError2(`missing output at index ${event.output_index}`);
+        }
+        if (output.type === "reasoning") {
+          const content = output.content?.[event.content_index];
+          if (!content) {
+            throw new OpenAIError2(`missing content at index ${event.content_index}`);
+          }
+          if (content.type !== "reasoning_text") {
+            throw new OpenAIError2(`expected content to be 'reasoning_text', got ${content.type}`);
+          }
+          content.text += event.delta;
+        }
+        break;
+      }
+      case "response.completed": {
+        __classPrivateFieldSet2(this, _ResponseStream_currentResponseSnapshot2, event.response, "f");
+        break;
+      }
+    }
+    return snapshot;
+  }, Symbol.asyncIterator)]() {
+    const pushQueue = [];
+    const readQueue = [];
+    let done = false;
+    this.on("event", (event) => {
+      const reader = readQueue.shift();
+      if (reader) {
+        reader.resolve(event);
+      } else {
+        pushQueue.push(event);
+      }
+    });
+    this.on("end", () => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.resolve(void 0);
+      }
+      readQueue.length = 0;
+    });
+    this.on("abort", (err) => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.reject(err);
+      }
+      readQueue.length = 0;
+    });
+    this.on("error", (err) => {
+      done = true;
+      for (const reader of readQueue) {
+        reader.reject(err);
+      }
+      readQueue.length = 0;
+    });
+    return {
+      next: async () => {
+        if (!pushQueue.length) {
+          if (done) {
+            return { value: void 0, done: true };
+          }
+          return new Promise((resolve, reject) => readQueue.push({ resolve, reject })).then((event2) => event2 ? { value: event2, done: false } : { value: void 0, done: true });
+        }
+        const event = pushQueue.shift();
+        return { value: event, done: false };
+      },
+      return: async () => {
+        this.abort();
+        return { value: void 0, done: true };
+      }
+    };
+  }
+  /**
+   * @returns a promise that resolves with the final Response, or rejects
+   * if an error occurred or the stream ended prematurely without producing a REsponse.
+   */
+  async finalResponse() {
+    await this.done();
+    const response = __classPrivateFieldGet2(this, _ResponseStream_finalResponse2, "f");
+    if (!response)
+      throw new OpenAIError2("stream ended without producing a ChatCompletion");
+    return response;
+  }
+};
+function finalizeResponse2(snapshot, params) {
+  return maybeParseResponse2(snapshot, params);
+}
+
+// ../../node_modules/openai/resources/responses/input-items.mjs
+var InputItems2 = class extends APIResource2 {
+  /**
+   * Returns a list of input items for a given response.
+   *
+   * @example
+   * ```ts
+   * // Automatically fetches more pages as needed.
+   * for await (const responseItem of client.responses.inputItems.list(
+   *   'response_id',
+   * )) {
+   *   // ...
+   * }
+   * ```
+   */
+  list(responseID, query = {}, options) {
+    return this._client.getAPIList(path2`/responses/${responseID}/input_items`, CursorPage2, { query, ...options, __security: { bearerAuth: true } });
+  }
+};
+
+// ../../node_modules/openai/resources/responses/input-tokens.mjs
+var InputTokens2 = class extends APIResource2 {
+  /**
+   * Returns input token counts of the request.
+   *
+   * Returns an object with `object` set to `response.input_tokens` and an
+   * `input_tokens` count.
+   *
+   * @example
+   * ```ts
+   * const response = await client.responses.inputTokens.count();
+   * ```
+   */
+  count(body = {}, options) {
+    return this._client.post("/responses/input_tokens", {
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/responses/responses.mjs
+var Responses2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.inputItems = new InputItems2(this._client);
+    this.inputTokens = new InputTokens2(this._client);
+  }
+  create(body, options) {
+    return this._client.post("/responses", {
+      body,
+      ...options,
+      stream: body.stream ?? false,
+      __security: { bearerAuth: true }
+    })._thenUnwrap((rsp) => {
+      if ("object" in rsp && rsp.object === "response") {
+        addOutputText2(rsp);
+      }
+      return rsp;
+    });
+  }
+  retrieve(responseID, query = {}, options) {
+    return this._client.get(path2`/responses/${responseID}`, {
+      query,
+      ...options,
+      stream: query?.stream ?? false,
+      __security: { bearerAuth: true }
+    })._thenUnwrap((rsp) => {
+      if ("object" in rsp && rsp.object === "response") {
+        addOutputText2(rsp);
+      }
+      return rsp;
+    });
+  }
+  /**
+   * Deletes a model response with the given ID.
+   *
+   * @example
+   * ```ts
+   * await client.responses.delete(
+   *   'resp_677efb5139a88190b512bc3fef8e535d',
+   * );
+   * ```
+   */
+  delete(responseID, options) {
+    return this._client.delete(path2`/responses/${responseID}`, {
+      ...options,
+      headers: buildHeaders2([{ Accept: "*/*" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  parse(body, options) {
+    return this._client.responses.create(body, options)._thenUnwrap((response) => parseResponse2(response, body));
+  }
+  /**
+   * Creates a model response stream
+   */
+  stream(body, options) {
+    return ResponseStream2.createResponse(this._client, body, options);
+  }
+  /**
+   * Cancels a model response with the given ID. Only responses created with the
+   * `background` parameter set to `true` can be cancelled.
+   * [Learn more](https://platform.openai.com/docs/guides/background).
+   *
+   * @example
+   * ```ts
+   * const response = await client.responses.cancel(
+   *   'resp_677efb5139a88190b512bc3fef8e535d',
+   * );
+   * ```
+   */
+  cancel(responseID, options) {
+    return this._client.post(path2`/responses/${responseID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Compact a conversation. Returns a compacted response object.
+   *
+   * Learn when and how to compact long-running conversations in the
+   * [conversation state guide](https://platform.openai.com/docs/guides/conversation-state#managing-the-context-window).
+   * For ZDR-compatible compaction details, see
+   * [Compaction (advanced)](https://platform.openai.com/docs/guides/conversation-state#compaction-advanced).
+   *
+   * @example
+   * ```ts
+   * const compactedResponse = await client.responses.compact({
+   *   model: 'gpt-5.4',
+   * });
+   * ```
+   */
+  compact(body, options) {
+    return this._client.post("/responses/compact", { body, ...options, __security: { bearerAuth: true } });
+  }
+};
+Responses2.InputItems = InputItems2;
+Responses2.InputTokens = InputTokens2;
+
+// ../../node_modules/openai/resources/skills/content.mjs
+var Content5 = class extends APIResource2 {
+  /**
+   * Download a skill zip bundle by its ID.
+   */
+  retrieve(skillID, options) {
+    return this._client.get(path2`/skills/${skillID}/content`, {
+      ...options,
+      headers: buildHeaders2([{ Accept: "application/binary" }, options?.headers]),
+      __security: { bearerAuth: true },
+      __binaryResponse: true
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/skills/versions/content.mjs
+var Content6 = class extends APIResource2 {
+  /**
+   * Download a skill version zip bundle.
+   */
+  retrieve(version3, params, options) {
+    const { skill_id } = params;
+    return this._client.get(path2`/skills/${skill_id}/versions/${version3}/content`, {
+      ...options,
+      headers: buildHeaders2([{ Accept: "application/binary" }, options?.headers]),
+      __security: { bearerAuth: true },
+      __binaryResponse: true
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/skills/versions/versions.mjs
+var Versions2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.content = new Content6(this._client);
+  }
+  /**
+   * Create a new immutable skill version.
+   */
+  create(skillID, body = {}, options) {
+    return this._client.post(path2`/skills/${skillID}/versions`, maybeMultipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+  /**
+   * Get a specific skill version.
+   */
+  retrieve(version3, params, options) {
+    const { skill_id } = params;
+    return this._client.get(path2`/skills/${skill_id}/versions/${version3}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * List skill versions for a skill.
+   */
+  list(skillID, query = {}, options) {
+    return this._client.getAPIList(path2`/skills/${skillID}/versions`, CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete a skill version.
+   */
+  delete(version3, params, options) {
+    const { skill_id } = params;
+    return this._client.delete(path2`/skills/${skill_id}/versions/${version3}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+Versions2.Content = Content6;
+
+// ../../node_modules/openai/resources/skills/skills.mjs
+var Skills2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.content = new Content5(this._client);
+    this.versions = new Versions2(this._client);
+  }
+  /**
+   * Create a new skill.
+   */
+  create(body = {}, options) {
+    return this._client.post("/skills", maybeMultipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+  /**
+   * Get a skill by its ID.
+   */
+  retrieve(skillID, options) {
+    return this._client.get(path2`/skills/${skillID}`, { ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Update the default version pointer for a skill.
+   */
+  update(skillID, body, options) {
+    return this._client.post(path2`/skills/${skillID}`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * List all skills for the current project.
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/skills", CursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete a skill by its ID.
+   */
+  delete(skillID, options) {
+    return this._client.delete(path2`/skills/${skillID}`, { ...options, __security: { bearerAuth: true } });
+  }
+};
+Skills2.Content = Content5;
+Skills2.Versions = Versions2;
+
+// ../../node_modules/openai/resources/uploads/parts.mjs
+var Parts2 = class extends APIResource2 {
+  /**
+   * Adds a
+   * [Part](https://platform.openai.com/docs/api-reference/uploads/part-object) to an
+   * [Upload](https://platform.openai.com/docs/api-reference/uploads/object) object.
+   * A Part represents a chunk of bytes from the file you are trying to upload.
+   *
+   * Each Part can be at most 64 MB, and you can add Parts until you hit the Upload
+   * maximum of 8 GB.
+   *
+   * It is possible to add multiple Parts in parallel. You can decide the intended
+   * order of the Parts when you
+   * [complete the Upload](https://platform.openai.com/docs/api-reference/uploads/complete).
+   */
+  create(uploadID, body, options) {
+    return this._client.post(path2`/uploads/${uploadID}/parts`, multipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+};
+
+// ../../node_modules/openai/resources/uploads/uploads.mjs
+var Uploads2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.parts = new Parts2(this._client);
+  }
+  /**
+   * Creates an intermediate
+   * [Upload](https://platform.openai.com/docs/api-reference/uploads/object) object
+   * that you can add
+   * [Parts](https://platform.openai.com/docs/api-reference/uploads/part-object) to.
+   * Currently, an Upload can accept at most 8 GB in total and expires after an hour
+   * after you create it.
+   *
+   * Once you complete the Upload, we will create a
+   * [File](https://platform.openai.com/docs/api-reference/files/object) object that
+   * contains all the parts you uploaded. This File is usable in the rest of our
+   * platform as a regular File object.
+   *
+   * For certain `purpose` values, the correct `mime_type` must be specified. Please
+   * refer to documentation for the
+   * [supported MIME types for your use case](https://platform.openai.com/docs/assistants/tools/file-search#supported-files).
+   *
+   * For guidance on the proper filename extensions for each purpose, please follow
+   * the documentation on
+   * [creating a File](https://platform.openai.com/docs/api-reference/files/create).
+   *
+   * Returns the Upload object with status `pending`.
+   */
+  create(body, options) {
+    return this._client.post("/uploads", { body, ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Cancels the Upload. No Parts may be added after an Upload is cancelled.
+   *
+   * Returns the Upload object with status `cancelled`.
+   */
+  cancel(uploadID, options) {
+    return this._client.post(path2`/uploads/${uploadID}/cancel`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Completes the
+   * [Upload](https://platform.openai.com/docs/api-reference/uploads/object).
+   *
+   * Within the returned Upload object, there is a nested
+   * [File](https://platform.openai.com/docs/api-reference/files/object) object that
+   * is ready to use in the rest of the platform.
+   *
+   * You can specify the order of the Parts by passing in an ordered list of the Part
+   * IDs.
+   *
+   * The number of bytes uploaded upon completion must match the number of bytes
+   * initially specified when creating the Upload object. No Parts may be added after
+   * an Upload is completed. Returns the Upload object with status `completed`,
+   * including an additional `file` property containing the created usable File
+   * object.
+   */
+  complete(uploadID, body, options) {
+    return this._client.post(path2`/uploads/${uploadID}/complete`, {
+      body,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+};
+Uploads2.Parts = Parts2;
+
+// ../../node_modules/openai/lib/Util.mjs
+var allSettledWithThrow2 = async (promises) => {
+  const results = await Promise.allSettled(promises);
+  const rejected = results.filter((result) => result.status === "rejected");
+  if (rejected.length) {
+    for (const result of rejected) {
+      console.error(result.reason);
+    }
+    throw new Error(`${rejected.length} promise(s) failed - see the above errors`);
+  }
+  const values = [];
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      values.push(result.value);
+    }
+  }
+  return values;
+};
+
+// ../../node_modules/openai/resources/vector-stores/file-batches.mjs
+var FileBatches2 = class extends APIResource2 {
+  /**
+   * Create a vector store file batch.
+   */
+  create(vectorStoreID, body, options) {
+    return this._client.post(path2`/vector_stores/${vectorStoreID}/file_batches`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Retrieves a vector store file batch.
+   */
+  retrieve(batchID, params, options) {
+    const { vector_store_id } = params;
+    return this._client.get(path2`/vector_stores/${vector_store_id}/file_batches/${batchID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Cancel a vector store file batch. This attempts to cancel the processing of
+   * files in this batch as soon as possible.
+   */
+  cancel(batchID, params, options) {
+    const { vector_store_id } = params;
+    return this._client.post(path2`/vector_stores/${vector_store_id}/file_batches/${batchID}/cancel`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Create a vector store batch and poll until all files have been processed.
+   */
+  async createAndPoll(vectorStoreId, body, options) {
+    const batch = await this.create(vectorStoreId, body);
+    return await this.poll(vectorStoreId, batch.id, options);
+  }
+  /**
+   * Returns a list of vector store files in a batch.
+   */
+  listFiles(batchID, params, options) {
+    const { vector_store_id, ...query } = params;
+    return this._client.getAPIList(path2`/vector_stores/${vector_store_id}/file_batches/${batchID}/files`, CursorPage2, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Wait for the given file batch to be processed.
+   *
+   * Note: this will return even if one of the files failed to process, you need to
+   * check batch.file_counts.failed_count to handle this case.
+   */
+  async poll(vectorStoreID, batchID, options) {
+    const headers = buildHeaders2([
+      options?.headers,
+      {
+        "X-Stainless-Poll-Helper": "true",
+        "X-Stainless-Custom-Poll-Interval": options?.pollIntervalMs?.toString() ?? void 0
+      }
+    ]);
+    while (true) {
+      const { data: batch, response } = await this.retrieve(batchID, { vector_store_id: vectorStoreID }, {
+        ...options,
+        headers
+      }).withResponse();
+      switch (batch.status) {
+        case "in_progress":
+          let sleepInterval = 5e3;
+          if (options?.pollIntervalMs) {
+            sleepInterval = options.pollIntervalMs;
+          } else {
+            const headerInterval = response.headers.get("openai-poll-after-ms");
+            if (headerInterval) {
+              const headerIntervalMs = parseInt(headerInterval);
+              if (!isNaN(headerIntervalMs)) {
+                sleepInterval = headerIntervalMs;
+              }
+            }
+          }
+          await sleep3(sleepInterval);
+          break;
+        case "failed":
+        case "cancelled":
+        case "completed":
+          return batch;
+      }
+    }
+  }
+  /**
+   * Uploads the given files concurrently and then creates a vector store file batch.
+   *
+   * The concurrency limit is configurable using the `maxConcurrency` parameter.
+   */
+  async uploadAndPoll(vectorStoreId, { files, fileIds = [] }, options) {
+    if (files == null || files.length == 0) {
+      throw new Error(`No \`files\` provided to process. If you've already uploaded files you should use \`.createAndPoll()\` instead`);
+    }
+    const configuredConcurrency = options?.maxConcurrency ?? 5;
+    const concurrencyLimit = Math.min(configuredConcurrency, files.length);
+    const client = this._client;
+    const fileIterator = files.values();
+    const allFileIds = [...fileIds];
+    async function processFiles(iterator) {
+      for (let item of iterator) {
+        const fileObj = await client.files.create({ file: item, purpose: "assistants" }, options);
+        allFileIds.push(fileObj.id);
+      }
+    }
+    const workers = Array(concurrencyLimit).fill(fileIterator).map(processFiles);
+    await allSettledWithThrow2(workers);
+    return await this.createAndPoll(vectorStoreId, {
+      file_ids: allFileIds
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/vector-stores/files.mjs
+var Files6 = class extends APIResource2 {
+  /**
+   * Create a vector store file by attaching a
+   * [File](https://platform.openai.com/docs/api-reference/files) to a
+   * [vector store](https://platform.openai.com/docs/api-reference/vector-stores/object).
+   */
+  create(vectorStoreID, body, options) {
+    return this._client.post(path2`/vector_stores/${vectorStoreID}/files`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Retrieves a vector store file.
+   */
+  retrieve(fileID, params, options) {
+    const { vector_store_id } = params;
+    return this._client.get(path2`/vector_stores/${vector_store_id}/files/${fileID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Update attributes on a vector store file.
+   */
+  update(fileID, params, options) {
+    const { vector_store_id, ...body } = params;
+    return this._client.post(path2`/vector_stores/${vector_store_id}/files/${fileID}`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Returns a list of vector store files.
+   */
+  list(vectorStoreID, query = {}, options) {
+    return this._client.getAPIList(path2`/vector_stores/${vectorStoreID}/files`, CursorPage2, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete a vector store file. This will remove the file from the vector store but
+   * the file itself will not be deleted. To delete the file, use the
+   * [delete file](https://platform.openai.com/docs/api-reference/files/delete)
+   * endpoint.
+   */
+  delete(fileID, params, options) {
+    const { vector_store_id } = params;
+    return this._client.delete(path2`/vector_stores/${vector_store_id}/files/${fileID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Attach a file to the given vector store and wait for it to be processed.
+   */
+  async createAndPoll(vectorStoreId, body, options) {
+    const file2 = await this.create(vectorStoreId, body, options);
+    return await this.poll(vectorStoreId, file2.id, options);
+  }
+  /**
+   * Wait for the vector store file to finish processing.
+   *
+   * Note: this will return even if the file failed to process, you need to check
+   * file.last_error and file.status to handle these cases
+   */
+  async poll(vectorStoreID, fileID, options) {
+    const headers = buildHeaders2([
+      options?.headers,
+      {
+        "X-Stainless-Poll-Helper": "true",
+        "X-Stainless-Custom-Poll-Interval": options?.pollIntervalMs?.toString() ?? void 0
+      }
+    ]);
+    while (true) {
+      const fileResponse = await this.retrieve(fileID, {
+        vector_store_id: vectorStoreID
+      }, { ...options, headers }).withResponse();
+      const file2 = fileResponse.data;
+      switch (file2.status) {
+        case "in_progress":
+          let sleepInterval = 5e3;
+          if (options?.pollIntervalMs) {
+            sleepInterval = options.pollIntervalMs;
+          } else {
+            const headerInterval = fileResponse.response.headers.get("openai-poll-after-ms");
+            if (headerInterval) {
+              const headerIntervalMs = parseInt(headerInterval);
+              if (!isNaN(headerIntervalMs)) {
+                sleepInterval = headerIntervalMs;
+              }
+            }
+          }
+          await sleep3(sleepInterval);
+          break;
+        case "failed":
+        case "completed":
+          return file2;
+      }
+    }
+  }
+  /**
+   * Upload a file to the `files` API and then attach it to the given vector store.
+   *
+   * Note the file will be asynchronously processed (you can use the alternative
+   * polling helper method to wait for processing to complete).
+   */
+  async upload(vectorStoreId, file2, options) {
+    const fileInfo = await this._client.files.create({ file: file2, purpose: "assistants" }, options);
+    return this.create(vectorStoreId, { file_id: fileInfo.id }, options);
+  }
+  /**
+   * Add a file to a vector store and poll until processing is complete.
+   */
+  async uploadAndPoll(vectorStoreId, file2, options) {
+    const fileInfo = await this.upload(vectorStoreId, file2, options);
+    return await this.poll(vectorStoreId, fileInfo.id, options);
+  }
+  /**
+   * Retrieve the parsed contents of a vector store file.
+   */
+  content(fileID, params, options) {
+    const { vector_store_id } = params;
+    return this._client.getAPIList(path2`/vector_stores/${vector_store_id}/files/${fileID}/content`, Page2, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+
+// ../../node_modules/openai/resources/vector-stores/vector-stores.mjs
+var VectorStores2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    this.files = new Files6(this._client);
+    this.fileBatches = new FileBatches2(this._client);
+  }
+  /**
+   * Create a vector store.
+   */
+  create(body, options) {
+    return this._client.post("/vector_stores", {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Retrieves a vector store.
+   */
+  retrieve(vectorStoreID, options) {
+    return this._client.get(path2`/vector_stores/${vectorStoreID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Modifies a vector store.
+   */
+  update(vectorStoreID, body, options) {
+    return this._client.post(path2`/vector_stores/${vectorStoreID}`, {
+      body,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Returns a list of vector stores.
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/vector_stores", CursorPage2, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Delete a vector store.
+   */
+  delete(vectorStoreID, options) {
+    return this._client.delete(path2`/vector_stores/${vectorStoreID}`, {
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Search a vector store for relevant chunks based on a query and file attributes
+   * filter.
+   */
+  search(vectorStoreID, body, options) {
+    return this._client.getAPIList(path2`/vector_stores/${vectorStoreID}/search`, Page2, {
+      body,
+      method: "post",
+      ...options,
+      headers: buildHeaders2([{ "OpenAI-Beta": "assistants=v2" }, options?.headers]),
+      __security: { bearerAuth: true }
+    });
+  }
+};
+VectorStores2.Files = Files6;
+VectorStores2.FileBatches = FileBatches2;
+
+// ../../node_modules/openai/resources/videos.mjs
+var Videos2 = class extends APIResource2 {
+  /**
+   * Create a new video generation job from a prompt and optional reference assets.
+   */
+  create(body, options) {
+    return this._client.post("/videos", multipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+  /**
+   * Fetch the latest metadata for a generated video.
+   */
+  retrieve(videoID, options) {
+    return this._client.get(path2`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * List recently generated videos for the current project.
+   */
+  list(query = {}, options) {
+    return this._client.getAPIList("/videos", ConversationCursorPage2, {
+      query,
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Permanently delete a completed or failed video and its stored assets.
+   */
+  delete(videoID, options) {
+    return this._client.delete(path2`/videos/${videoID}`, { ...options, __security: { bearerAuth: true } });
+  }
+  /**
+   * Create a character from an uploaded video.
+   */
+  createCharacter(body, options) {
+    return this._client.post("/videos/characters", multipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+  /**
+   * Download the generated video bytes or a derived preview asset.
+   *
+   * Streams the rendered video content for the specified video job.
+   */
+  downloadContent(videoID, query = {}, options) {
+    return this._client.get(path2`/videos/${videoID}/content`, {
+      query,
+      ...options,
+      headers: buildHeaders2([{ Accept: "application/binary" }, options?.headers]),
+      __security: { bearerAuth: true },
+      __binaryResponse: true
+    });
+  }
+  /**
+   * Create a new video generation job by editing a source video or existing
+   * generated video.
+   */
+  edit(body, options) {
+    return this._client.post("/videos/edits", multipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+  /**
+   * Create an extension of a completed video.
+   */
+  extend(body, options) {
+    return this._client.post("/videos/extensions", multipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+  /**
+   * Fetch a character.
+   */
+  getCharacter(characterID, options) {
+    return this._client.get(path2`/videos/characters/${characterID}`, {
+      ...options,
+      __security: { bearerAuth: true }
+    });
+  }
+  /**
+   * Create a remix of a completed video using a refreshed prompt.
+   */
+  remix(videoID, body, options) {
+    return this._client.post(path2`/videos/${videoID}/remix`, maybeMultipartFormRequestOptions2({ body, ...options, __security: { bearerAuth: true } }, this._client));
+  }
+};
+
+// ../../node_modules/openai/resources/webhooks/webhooks.mjs
+var _Webhooks_instances2;
+var _Webhooks_validateSecret3;
+var _Webhooks_getRequiredHeader3;
+var Webhooks2 = class extends APIResource2 {
+  constructor() {
+    super(...arguments);
+    _Webhooks_instances2.add(this);
+  }
+  /**
+   * Validates that the given payload was sent by OpenAI and parses the payload.
+   */
+  async unwrap(payload, headers, secret = this._client.webhookSecret, tolerance = 300) {
+    await this.verifySignature(payload, headers, secret, tolerance);
+    return JSON.parse(payload);
+  }
+  /**
+   * Validates whether or not the webhook payload was sent by OpenAI.
+   *
+   * An error will be raised if the webhook payload was not sent by OpenAI.
+   *
+   * @param payload - The webhook payload
+   * @param headers - The webhook headers
+   * @param secret - The webhook secret (optional, will use client secret if not provided)
+   * @param tolerance - Maximum age of the webhook in seconds (default: 300 = 5 minutes)
+   */
+  async verifySignature(payload, headers, secret = this._client.webhookSecret, tolerance = 300) {
+    if (typeof crypto === "undefined" || typeof crypto.subtle.importKey !== "function" || typeof crypto.subtle.verify !== "function") {
+      throw new Error("Webhook signature verification is only supported when the `crypto` global is defined");
+    }
+    __classPrivateFieldGet2(this, _Webhooks_instances2, "m", _Webhooks_validateSecret3).call(this, secret);
+    const headersObj = buildHeaders2([headers]).values;
+    const signatureHeader = __classPrivateFieldGet2(this, _Webhooks_instances2, "m", _Webhooks_getRequiredHeader3).call(this, headersObj, "webhook-signature");
+    const timestamp2 = __classPrivateFieldGet2(this, _Webhooks_instances2, "m", _Webhooks_getRequiredHeader3).call(this, headersObj, "webhook-timestamp");
+    const webhookId = __classPrivateFieldGet2(this, _Webhooks_instances2, "m", _Webhooks_getRequiredHeader3).call(this, headersObj, "webhook-id");
+    const timestampSeconds = parseInt(timestamp2, 10);
+    if (isNaN(timestampSeconds)) {
+      throw new InvalidWebhookSignatureError2("Invalid webhook timestamp format");
+    }
+    const nowSeconds = Math.floor(Date.now() / 1e3);
+    if (nowSeconds - timestampSeconds > tolerance) {
+      throw new InvalidWebhookSignatureError2("Webhook timestamp is too old");
+    }
+    if (timestampSeconds > nowSeconds + tolerance) {
+      throw new InvalidWebhookSignatureError2("Webhook timestamp is too new");
+    }
+    const signatures = signatureHeader.split(" ").map((part) => part.startsWith("v1,") ? part.substring(3) : part);
+    const decodedSecret = secret.startsWith("whsec_") ? Buffer.from(secret.replace("whsec_", ""), "base64") : Buffer.from(secret, "utf-8");
+    const signedPayload = webhookId ? `${webhookId}.${timestamp2}.${payload}` : `${timestamp2}.${payload}`;
+    const key = await crypto.subtle.importKey("raw", decodedSecret, { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    for (const signature of signatures) {
+      try {
+        const signatureBytes = Buffer.from(signature, "base64");
+        const isValid2 = await crypto.subtle.verify("HMAC", key, signatureBytes, new TextEncoder().encode(signedPayload));
+        if (isValid2) {
+          return;
+        }
+      } catch {
+        continue;
+      }
+    }
+    throw new InvalidWebhookSignatureError2("The given webhook signature does not match the expected signature");
+  }
+};
+_Webhooks_instances2 = /* @__PURE__ */ new WeakSet(), _Webhooks_validateSecret3 = function _Webhooks_validateSecret4(secret) {
+  if (typeof secret !== "string" || secret.length === 0) {
+    throw new Error(`The webhook secret must either be set using the env var, OPENAI_WEBHOOK_SECRET, on the client class, OpenAI({ webhookSecret: '123' }), or passed to this function`);
+  }
+}, _Webhooks_getRequiredHeader3 = function _Webhooks_getRequiredHeader4(headers, name) {
+  if (!headers) {
+    throw new Error(`Headers are required`);
+  }
+  const value = headers.get(name);
+  if (value === null || value === void 0) {
+    throw new Error(`Missing required header: ${name}`);
+  }
+  return value;
+};
+
+// ../../node_modules/openai/client.mjs
+var _OpenAI_instances2;
+var _a4;
+var _OpenAI_encoder2;
+var _OpenAI_baseURLOverridden3;
+var WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER2 = "workload-identity-auth";
+var OpenAI3 = class {
+  /**
+   * API Client for interfacing with the OpenAI API.
+   *
+   * @param {string | null | undefined} [opts.apiKey=process.env['OPENAI_API_KEY'] ?? null]
+   * @param {string | null | undefined} [opts.adminAPIKey=process.env['OPENAI_ADMIN_KEY'] ?? null]
+   * @param {string | null | undefined} [opts.organization=process.env['OPENAI_ORG_ID'] ?? null]
+   * @param {string | null | undefined} [opts.project=process.env['OPENAI_PROJECT_ID'] ?? null]
+   * @param {string | null | undefined} [opts.webhookSecret=process.env['OPENAI_WEBHOOK_SECRET'] ?? null]
+   * @param {string} [opts.baseURL=process.env['OPENAI_BASE_URL'] ?? https://api.openai.com/v1] - Override the default base URL for the API.
+   * @param {number} [opts.timeout=10 minutes] - The maximum amount of time (in milliseconds) the client will wait for a response before timing out.
+   * @param {MergedRequestInit} [opts.fetchOptions] - Additional `RequestInit` options to be passed to `fetch` calls.
+   * @param {Fetch} [opts.fetch] - Specify a custom `fetch` function implementation.
+   * @param {number} [opts.maxRetries=2] - The maximum number of times the client will retry a request.
+   * @param {HeadersLike} opts.defaultHeaders - Default headers to include with every request to the API.
+   * @param {Record<string, string | undefined>} opts.defaultQuery - Default query parameters to include with every request to the API.
+   * @param {boolean} [opts.dangerouslyAllowBrowser=false] - By default, client-side use of this library is not allowed, as it risks exposing your secret API credentials to attackers.
+   */
+  constructor({ baseURL = readEnv2("OPENAI_BASE_URL"), apiKey = readEnv2("OPENAI_API_KEY") ?? null, adminAPIKey = readEnv2("OPENAI_ADMIN_KEY") ?? null, organization = readEnv2("OPENAI_ORG_ID") ?? null, project = readEnv2("OPENAI_PROJECT_ID") ?? null, webhookSecret = readEnv2("OPENAI_WEBHOOK_SECRET") ?? null, workloadIdentity, ...opts } = {}) {
+    _OpenAI_instances2.add(this);
+    _OpenAI_encoder2.set(this, void 0);
+    this.completions = new Completions4(this);
+    this.chat = new Chat2(this);
+    this.embeddings = new Embeddings2(this);
+    this.files = new Files5(this);
+    this.images = new Images2(this);
+    this.audio = new Audio2(this);
+    this.moderations = new Moderations2(this);
+    this.models = new Models2(this);
+    this.fineTuning = new FineTuning2(this);
+    this.graders = new Graders4(this);
+    this.vectorStores = new VectorStores2(this);
+    this.webhooks = new Webhooks2(this);
+    this.beta = new Beta2(this);
+    this.batches = new Batches2(this);
+    this.uploads = new Uploads2(this);
+    this.admin = new Admin2(this);
+    this.responses = new Responses2(this);
+    this.realtime = new Realtime4(this);
+    this.conversations = new Conversations2(this);
+    this.evals = new Evals2(this);
+    this.containers = new Containers2(this);
+    this.skills = new Skills2(this);
+    this.videos = new Videos2(this);
+    const options = {
+      apiKey,
+      adminAPIKey,
+      organization,
+      project,
+      webhookSecret,
+      workloadIdentity,
+      ...opts,
+      baseURL: baseURL || `https://api.openai.com/v1`
+    };
+    if (apiKey && workloadIdentity) {
+      throw new OpenAIError2("The `apiKey` and `workloadIdentity` options are mutually exclusive");
+    }
+    if (!apiKey && !adminAPIKey && !workloadIdentity) {
+      throw new OpenAIError2("Missing credentials. Please pass an `apiKey`, `workloadIdentity`, `adminAPIKey`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.");
+    }
+    if (!options.dangerouslyAllowBrowser && isRunningInBrowser2()) {
+      throw new OpenAIError2("It looks like you're running in a browser-like environment.\n\nThis is disabled by default, as it risks exposing your secret API credentials to attackers.\nIf you understand the risks and have appropriate mitigations in place,\nyou can set the `dangerouslyAllowBrowser` option to `true`, e.g.,\n\nnew OpenAI({ apiKey, dangerouslyAllowBrowser: true });\n\nhttps://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety\n");
+    }
+    this.baseURL = options.baseURL;
+    this.timeout = options.timeout ?? _a4.DEFAULT_TIMEOUT;
+    this.logger = options.logger ?? console;
+    const defaultLogLevel = "warn";
+    this.logLevel = defaultLogLevel;
+    this.logLevel = parseLogLevel2(options.logLevel, "ClientOptions.logLevel", this) ?? parseLogLevel2(readEnv2("OPENAI_LOG"), "process.env['OPENAI_LOG']", this) ?? defaultLogLevel;
+    this.fetchOptions = options.fetchOptions;
+    this.maxRetries = options.maxRetries ?? 2;
+    this.fetch = options.fetch ?? getDefaultFetch2();
+    __classPrivateFieldSet2(this, _OpenAI_encoder2, FallbackEncoder2, "f");
+    const customHeadersEnv = readEnv2("OPENAI_CUSTOM_HEADERS");
+    if (customHeadersEnv) {
+      const parsed = {};
+      for (const line2 of customHeadersEnv.split("\n")) {
+        const colon = line2.indexOf(":");
+        if (colon >= 0) {
+          parsed[line2.substring(0, colon).trim()] = line2.substring(colon + 1).trim();
+        }
+      }
+      options.defaultHeaders = buildHeaders2([parsed, options.defaultHeaders]);
+    }
+    this._options = options;
+    if (workloadIdentity) {
+      this._workloadIdentityAuth = new WorkloadIdentityAuth2(workloadIdentity, this.fetch);
+    }
+    this.apiKey = typeof apiKey === "string" ? apiKey : null;
+    this.adminAPIKey = adminAPIKey;
+    this.organization = organization;
+    this.project = project;
+    this.webhookSecret = webhookSecret;
+  }
+  /**
+   * Create a new client instance re-using the same options given to the current client with optional overriding.
+   */
+  withOptions(options) {
+    const client = new this.constructor({
+      ...this._options,
+      baseURL: this.baseURL,
+      maxRetries: this.maxRetries,
+      timeout: this.timeout,
+      logger: this.logger,
+      logLevel: this.logLevel,
+      fetch: this.fetch,
+      fetchOptions: this.fetchOptions,
+      apiKey: this._options.apiKey,
+      adminAPIKey: this.adminAPIKey,
+      workloadIdentity: this._options.workloadIdentity,
+      organization: this.organization,
+      project: this.project,
+      webhookSecret: this.webhookSecret,
+      ...options
+    });
+    return client;
+  }
+  defaultQuery() {
+    return this._options.defaultQuery;
+  }
+  validateHeaders({ values, nulls }, schemes = {
+    bearerAuth: true,
+    adminAPIKeyAuth: true
+  }) {
+    if (values.get("authorization") || values.get("api-key")) {
+      return;
+    }
+    if (nulls.has("authorization") || nulls.has("api-key")) {
+      return;
+    }
+    if (this._workloadIdentityAuth && schemes.bearerAuth) {
+      return;
+    }
+    throw new Error('Could not resolve authentication method. Expected either apiKey or adminAPIKey to be set. Or for one of the "Authorization" or "api-key" headers to be explicitly omitted');
+  }
+  async authHeaders(opts, schemes = {
+    bearerAuth: true,
+    adminAPIKeyAuth: true
+  }) {
+    return buildHeaders2([
+      schemes.bearerAuth ? await this.bearerAuth(opts) : null,
+      schemes.adminAPIKeyAuth ? await this.adminAPIKeyAuth(opts) : null
+    ]);
+  }
+  async bearerAuth(opts) {
+    if (this._workloadIdentityAuth) {
+      return buildHeaders2([{ Authorization: `Bearer ${await this._workloadIdentityAuth.getToken()}` }]);
+    }
+    if (this.apiKey == null) {
+      return void 0;
+    }
+    return buildHeaders2([{ Authorization: `Bearer ${this.apiKey}` }]);
+  }
+  async adminAPIKeyAuth(opts) {
+    if (this.adminAPIKey == null) {
+      return void 0;
+    }
+    return buildHeaders2([{ Authorization: `Bearer ${this.adminAPIKey}` }]);
+  }
+  stringifyQuery(query) {
+    return stringifyQuery2(query);
+  }
+  getUserAgent() {
+    return `${this.constructor.name}/JS ${VERSION2}`;
+  }
+  defaultIdempotencyKey() {
+    return `stainless-node-retry-${uuid43()}`;
+  }
+  makeStatusError(status, error40, message, headers) {
+    return APIError2.generate(status, error40, message, headers);
+  }
+  async _callApiKey() {
+    const apiKey = this._options.apiKey;
+    if (typeof apiKey !== "function")
+      return false;
+    let token;
+    try {
+      token = await apiKey();
+    } catch (err) {
+      if (err instanceof OpenAIError2)
+        throw err;
+      throw new OpenAIError2(
+        `Failed to get token from 'apiKey' function: ${err.message}`,
+        // @ts-ignore
+        { cause: err }
+      );
+    }
+    if (typeof token !== "string" || !token) {
+      throw new OpenAIError2(`Expected 'apiKey' function argument to return a string but it returned ${token}`);
+    }
+    this.apiKey = token;
+    return true;
+  }
+  buildURL(path3, query, defaultBaseURL) {
+    const baseURL = !__classPrivateFieldGet2(this, _OpenAI_instances2, "m", _OpenAI_baseURLOverridden3).call(this) && defaultBaseURL || this.baseURL;
+    const url2 = isAbsoluteURL2(path3) ? new URL(path3) : new URL(baseURL + (baseURL.endsWith("/") && path3.startsWith("/") ? path3.slice(1) : path3));
+    const defaultQuery = this.defaultQuery();
+    const pathQuery = Object.fromEntries(url2.searchParams);
+    if (!isEmptyObj2(defaultQuery) || !isEmptyObj2(pathQuery)) {
+      query = { ...pathQuery, ...defaultQuery, ...query };
+    }
+    if (typeof query === "object" && query && !Array.isArray(query)) {
+      url2.search = this.stringifyQuery(query);
+    }
+    return url2.toString();
+  }
+  /**
+   * Used as a callback for mutating the given `FinalRequestOptions` object.
+   */
+  async prepareOptions(options) {
+    const security = options.__security ?? { bearerAuth: true };
+    if (security.bearerAuth) {
+      await this._callApiKey();
+    }
+  }
+  /**
+   * Used as a callback for mutating the given `RequestInit` object.
+   *
+   * This is useful for cases where you want to add certain headers based off of
+   * the request properties, e.g. `method` or `url`.
+   */
+  async prepareRequest(request2, { url: url2, options }) {
+  }
+  get(path3, opts) {
+    return this.methodRequest("get", path3, opts);
+  }
+  post(path3, opts) {
+    return this.methodRequest("post", path3, opts);
+  }
+  patch(path3, opts) {
+    return this.methodRequest("patch", path3, opts);
+  }
+  put(path3, opts) {
+    return this.methodRequest("put", path3, opts);
+  }
+  delete(path3, opts) {
+    return this.methodRequest("delete", path3, opts);
+  }
+  methodRequest(method, path3, opts) {
+    return this.request(Promise.resolve(opts).then((opts2) => {
+      return { method, path: path3, ...opts2 };
+    }));
+  }
+  request(options, remainingRetries = null) {
+    return new APIPromise2(this, this.makeRequest(options, remainingRetries, void 0));
+  }
+  async makeRequest(optionsInput, retriesRemaining, retryOfRequestLogID) {
+    const options = await optionsInput;
+    const maxRetries = options.maxRetries ?? this.maxRetries;
+    if (retriesRemaining == null) {
+      retriesRemaining = maxRetries;
+    }
+    await this.prepareOptions(options);
+    const { req, url: url2, timeout } = await this.buildRequest(options, {
+      retryCount: maxRetries - retriesRemaining
+    });
+    await this.prepareRequest(req, { url: url2, options });
+    const requestLogID = "log_" + (Math.random() * (1 << 24) | 0).toString(16).padStart(6, "0");
+    const retryLogStr = retryOfRequestLogID === void 0 ? "" : `, retryOf: ${retryOfRequestLogID}`;
+    const startTime = Date.now();
+    loggerFor2(this).debug(`[${requestLogID}] sending request`, formatRequestDetails2({
+      retryOfRequestLogID,
+      method: options.method,
+      url: url2,
+      options,
+      headers: req.headers
+    }));
+    if (options.signal?.aborted) {
+      throw new APIUserAbortError2();
+    }
+    const security = options.__security ?? { bearerAuth: true };
+    const controller = new AbortController();
+    const response = await this.fetchWithAuth(url2, req, timeout, controller, security).catch(castToError2);
+    const headersTime = Date.now();
+    if (response instanceof globalThis.Error) {
+      const retryMessage = `retrying, ${retriesRemaining} attempts remaining`;
+      if (options.signal?.aborted) {
+        throw new APIUserAbortError2();
+      }
+      const isTimeout = isAbortError2(response) || /timed? ?out/i.test(String(response) + ("cause" in response ? String(response.cause) : ""));
+      if (retriesRemaining) {
+        loggerFor2(this).info(`[${requestLogID}] connection ${isTimeout ? "timed out" : "failed"} - ${retryMessage}`);
+        loggerFor2(this).debug(`[${requestLogID}] connection ${isTimeout ? "timed out" : "failed"} (${retryMessage})`, formatRequestDetails2({
+          retryOfRequestLogID,
+          url: url2,
+          durationMs: headersTime - startTime,
+          message: response.message
+        }));
+        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+      }
+      loggerFor2(this).info(`[${requestLogID}] connection ${isTimeout ? "timed out" : "failed"} - error; no more retries left`);
+      loggerFor2(this).debug(`[${requestLogID}] connection ${isTimeout ? "timed out" : "failed"} (error; no more retries left)`, formatRequestDetails2({
+        retryOfRequestLogID,
+        url: url2,
+        durationMs: headersTime - startTime,
+        message: response.message
+      }));
+      if (response instanceof OAuthError2 || response instanceof SubjectTokenProviderError2) {
+        throw response;
+      }
+      if (isTimeout) {
+        throw new APIConnectionTimeoutError2();
+      }
+      throw new APIConnectionError2({
+        message: getConnectionErrorMessage2(response),
+        cause: response
+      });
+    }
+    const specialHeaders = [...response.headers.entries()].filter(([name]) => name === "x-request-id").map(([name, value]) => ", " + name + ": " + JSON.stringify(value)).join("");
+    const responseInfo = `[${requestLogID}${retryLogStr}${specialHeaders}] ${req.method} ${url2} ${response.ok ? "succeeded" : "failed"} with status ${response.status} in ${headersTime - startTime}ms`;
+    if (!response.ok) {
+      if (response.status === 401 && this._workloadIdentityAuth && security.bearerAuth && !options.__metadata?.["hasStreamingBody"] && !options.__metadata?.["workloadIdentityTokenRefreshed"]) {
+        await CancelReadableStream2(response.body);
+        this._workloadIdentityAuth.invalidateToken();
+        return this.makeRequest({
+          ...options,
+          __metadata: {
+            ...options.__metadata,
+            workloadIdentityTokenRefreshed: true
+          }
+        }, retriesRemaining, retryOfRequestLogID ?? requestLogID);
+      }
+      const shouldRetry = await this.shouldRetry(response);
+      if (retriesRemaining && shouldRetry) {
+        const retryMessage2 = `retrying, ${retriesRemaining} attempts remaining`;
+        await CancelReadableStream2(response.body);
+        loggerFor2(this).info(`${responseInfo} - ${retryMessage2}`);
+        loggerFor2(this).debug(`[${requestLogID}] response error (${retryMessage2})`, formatRequestDetails2({
+          retryOfRequestLogID,
+          url: response.url,
+          status: response.status,
+          headers: response.headers,
+          durationMs: headersTime - startTime
+        }));
+        return this.retryRequest(options, retriesRemaining, retryOfRequestLogID ?? requestLogID, response.headers);
+      }
+      const retryMessage = shouldRetry ? `error; no more retries left` : `error; not retryable`;
+      loggerFor2(this).info(`${responseInfo} - ${retryMessage}`);
+      const errText = await response.text().catch((err2) => castToError2(err2).message);
+      const errJSON = safeJSON2(errText);
+      const errMessage = errJSON ? void 0 : errText;
+      loggerFor2(this).debug(`[${requestLogID}] response error (${retryMessage})`, formatRequestDetails2({
+        retryOfRequestLogID,
+        url: response.url,
+        status: response.status,
+        headers: response.headers,
+        message: errMessage,
+        durationMs: Date.now() - startTime
+      }));
+      const err = this.makeStatusError(response.status, errJSON, errMessage, response.headers);
+      throw err;
+    }
+    loggerFor2(this).info(responseInfo);
+    loggerFor2(this).debug(`[${requestLogID}] response start`, formatRequestDetails2({
+      retryOfRequestLogID,
+      url: response.url,
+      status: response.status,
+      headers: response.headers,
+      durationMs: headersTime - startTime
+    }));
+    return { response, options, controller, requestLogID, retryOfRequestLogID, startTime };
+  }
+  getAPIList(path3, Page3, opts) {
+    return this.requestAPIList(Page3, opts && "then" in opts ? opts.then((opts2) => ({ method: "get", path: path3, ...opts2 })) : { method: "get", path: path3, ...opts });
+  }
+  requestAPIList(Page3, options) {
+    const request2 = this.makeRequest(options, null, void 0);
+    return new PagePromise2(this, request2, Page3);
+  }
+  async fetchWithAuth(url2, init, timeout, controller, schemes = {
+    bearerAuth: true,
+    adminAPIKeyAuth: true
+  }) {
+    if (this._workloadIdentityAuth && schemes.bearerAuth) {
+      const headers = init.headers;
+      const authHeader = headers.get("Authorization");
+      if (!authHeader || authHeader === `Bearer ${WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER2}`) {
+        const token = await this._workloadIdentityAuth.getToken();
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+    }
+    const response = await this.fetchWithTimeout(url2, init, timeout, controller);
+    return response;
+  }
+  async fetchWithTimeout(url2, init, ms, controller) {
+    const { signal, method, ...options } = init || {};
+    const abort = this._makeAbort(controller);
+    if (signal)
+      signal.addEventListener("abort", abort, { once: true });
+    const timeout = setTimeout(abort, ms);
+    const isReadableBody = globalThis.ReadableStream && options.body instanceof globalThis.ReadableStream || typeof options.body === "object" && options.body !== null && Symbol.asyncIterator in options.body;
+    const fetchOptions = {
+      signal: controller.signal,
+      ...isReadableBody ? { duplex: "half" } : {},
+      method: "GET",
+      ...options
+    };
+    if (method) {
+      fetchOptions.method = method.toUpperCase();
+    }
+    try {
+      return await this.fetch.call(void 0, url2, fetchOptions);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  async shouldRetry(response) {
+    const shouldRetryHeader = response.headers.get("x-should-retry");
+    if (shouldRetryHeader === "true")
+      return true;
+    if (shouldRetryHeader === "false")
+      return false;
+    if (response.status === 408)
+      return true;
+    if (response.status === 409)
+      return true;
+    if (response.status === 429)
+      return true;
+    if (response.status >= 500)
+      return true;
+    return false;
+  }
+  async retryRequest(options, retriesRemaining, requestLogID, responseHeaders) {
+    let timeoutMillis;
+    const retryAfterMillisHeader = responseHeaders?.get("retry-after-ms");
+    if (retryAfterMillisHeader) {
+      const timeoutMs = parseFloat(retryAfterMillisHeader);
+      if (!Number.isNaN(timeoutMs)) {
+        timeoutMillis = timeoutMs;
+      }
+    }
+    const retryAfterHeader = responseHeaders?.get("retry-after");
+    if (retryAfterHeader && !timeoutMillis) {
+      const timeoutSeconds = parseFloat(retryAfterHeader);
+      if (!Number.isNaN(timeoutSeconds)) {
+        timeoutMillis = timeoutSeconds * 1e3;
+      } else {
+        timeoutMillis = Date.parse(retryAfterHeader) - Date.now();
+      }
+    }
+    if (timeoutMillis === void 0) {
+      const maxRetries = options.maxRetries ?? this.maxRetries;
+      timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
+    }
+    await sleep3(timeoutMillis);
+    return this.makeRequest(options, retriesRemaining - 1, requestLogID);
+  }
+  calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries) {
+    const initialRetryDelay = 0.5;
+    const maxRetryDelay = 8;
+    const numRetries = maxRetries - retriesRemaining;
+    const sleepSeconds = Math.min(initialRetryDelay * Math.pow(2, numRetries), maxRetryDelay);
+    const jitter = 1 - Math.random() * 0.25;
+    return sleepSeconds * jitter * 1e3;
+  }
+  async buildRequest(inputOptions, { retryCount = 0 } = {}) {
+    const options = { ...inputOptions };
+    const { method, path: path3, query, defaultBaseURL } = options;
+    const url2 = this.buildURL(path3, query, defaultBaseURL);
+    if ("timeout" in options)
+      validatePositiveInteger2("timeout", options.timeout);
+    options.timeout = options.timeout ?? this.timeout;
+    const { bodyHeaders, body, isStreamingBody } = this.buildBody({ options });
+    if (isStreamingBody) {
+      inputOptions.__metadata = {
+        ...inputOptions.__metadata,
+        hasStreamingBody: true
+      };
+    }
+    const reqHeaders = await this.buildHeaders({ options: inputOptions, method, bodyHeaders, retryCount });
+    const req = {
+      method,
+      headers: reqHeaders,
+      ...options.signal && { signal: options.signal },
+      ...globalThis.ReadableStream && body instanceof globalThis.ReadableStream && { duplex: "half" },
+      ...body && { body },
+      ...this.fetchOptions ?? {},
+      ...options.fetchOptions ?? {}
+    };
+    return { req, url: url2, timeout: options.timeout };
+  }
+  async buildHeaders({ options, method, bodyHeaders, retryCount }) {
+    let idempotencyHeaders = {};
+    if (this.idempotencyHeader && method !== "get") {
+      if (!options.idempotencyKey)
+        options.idempotencyKey = this.defaultIdempotencyKey();
+      idempotencyHeaders[this.idempotencyHeader] = options.idempotencyKey;
+    }
+    const headers = buildHeaders2([
+      idempotencyHeaders,
+      {
+        Accept: "application/json",
+        "User-Agent": this.getUserAgent(),
+        "X-Stainless-Retry-Count": String(retryCount),
+        ...options.timeout ? { "X-Stainless-Timeout": String(Math.trunc(options.timeout / 1e3)) } : {},
+        ...getPlatformHeaders2(),
+        "OpenAI-Organization": this.organization,
+        "OpenAI-Project": this.project
+      },
+      await this.authHeaders(options, options.__security ?? { bearerAuth: true }),
+      this._options.defaultHeaders,
+      bodyHeaders,
+      options.headers
+    ]);
+    this.validateHeaders(headers, options.__security ?? { bearerAuth: true });
+    return headers.values;
+  }
+  _makeAbort(controller) {
+    return () => controller.abort();
+  }
+  buildBody({ options: { body, headers: rawHeaders } }) {
+    if (!body) {
+      return { bodyHeaders: void 0, body: void 0, isStreamingBody: false };
+    }
+    const headers = buildHeaders2([rawHeaders]);
+    const isReadableStream = typeof globalThis.ReadableStream !== "undefined" && body instanceof globalThis.ReadableStream;
+    const isRetryableBody = !isReadableStream && (typeof body === "string" || body instanceof ArrayBuffer || ArrayBuffer.isView(body) || typeof globalThis.Blob !== "undefined" && body instanceof globalThis.Blob || body instanceof URLSearchParams || body instanceof FormData);
+    if (
+      // Pass raw type verbatim
+      ArrayBuffer.isView(body) || body instanceof ArrayBuffer || body instanceof DataView || typeof body === "string" && // Preserve legacy string encoding behavior for now
+      headers.values.has("content-type") || // `Blob` is superset of `File`
+      globalThis.Blob && body instanceof globalThis.Blob || // `FormData` -> `multipart/form-data`
+      body instanceof FormData || // `URLSearchParams` -> `application/x-www-form-urlencoded`
+      body instanceof URLSearchParams || // Send chunked stream (each chunk has own `length`)
+      isReadableStream
+    ) {
+      return { bodyHeaders: void 0, body, isStreamingBody: !isRetryableBody };
+    } else if (typeof body === "object" && (Symbol.asyncIterator in body || Symbol.iterator in body && "next" in body && typeof body.next === "function")) {
+      return {
+        bodyHeaders: void 0,
+        body: ReadableStreamFrom2(body),
+        isStreamingBody: true
+      };
+    } else if (typeof body === "object" && headers.values.get("content-type") === "application/x-www-form-urlencoded") {
+      return {
+        bodyHeaders: { "content-type": "application/x-www-form-urlencoded" },
+        body: this.stringifyQuery(body),
+        isStreamingBody: false
+      };
+    } else {
+      return { ...__classPrivateFieldGet2(this, _OpenAI_encoder2, "f").call(this, { body, headers }), isStreamingBody: false };
+    }
+  }
+};
+_a4 = OpenAI3, _OpenAI_encoder2 = /* @__PURE__ */ new WeakMap(), _OpenAI_instances2 = /* @__PURE__ */ new WeakSet(), _OpenAI_baseURLOverridden3 = function _OpenAI_baseURLOverridden4() {
+  return this.baseURL !== "https://api.openai.com/v1";
+};
+OpenAI3.OpenAI = _a4;
+OpenAI3.DEFAULT_TIMEOUT = 6e5;
+OpenAI3.OpenAIError = OpenAIError2;
+OpenAI3.APIError = APIError2;
+OpenAI3.APIConnectionError = APIConnectionError2;
+OpenAI3.APIConnectionTimeoutError = APIConnectionTimeoutError2;
+OpenAI3.APIUserAbortError = APIUserAbortError2;
+OpenAI3.NotFoundError = NotFoundError2;
+OpenAI3.ConflictError = ConflictError2;
+OpenAI3.RateLimitError = RateLimitError2;
+OpenAI3.BadRequestError = BadRequestError2;
+OpenAI3.AuthenticationError = AuthenticationError2;
+OpenAI3.InternalServerError = InternalServerError2;
+OpenAI3.PermissionDeniedError = PermissionDeniedError2;
+OpenAI3.UnprocessableEntityError = UnprocessableEntityError2;
+OpenAI3.InvalidWebhookSignatureError = InvalidWebhookSignatureError2;
+OpenAI3.toFile = toFile2;
+OpenAI3.Completions = Completions4;
+OpenAI3.Chat = Chat2;
+OpenAI3.Embeddings = Embeddings2;
+OpenAI3.Files = Files5;
+OpenAI3.Images = Images2;
+OpenAI3.Audio = Audio2;
+OpenAI3.Moderations = Moderations2;
+OpenAI3.Models = Models2;
+OpenAI3.FineTuning = FineTuning2;
+OpenAI3.Graders = Graders4;
+OpenAI3.VectorStores = VectorStores2;
+OpenAI3.Webhooks = Webhooks2;
+OpenAI3.Beta = Beta2;
+OpenAI3.Batches = Batches2;
+OpenAI3.Uploads = Uploads2;
+OpenAI3.Admin = Admin2;
+OpenAI3.Responses = Responses2;
+OpenAI3.Realtime = Realtime4;
+OpenAI3.Conversations = Conversations2;
+OpenAI3.Evals = Evals2;
+OpenAI3.Containers = Containers2;
+OpenAI3.Skills = Skills2;
+OpenAI3.Videos = Videos2;
+function getConnectionErrorMessage2(error40) {
+  if (isUndiciDispatcherVersionMismatchError2(error40)) {
+    return `Connection error. This may be caused by passing an undici dispatcher, such as ProxyAgent, that is incompatible with the fetch implementation. If you are using undici's ProxyAgent, pass the fetch implementation from the same undici package: import { fetch, ProxyAgent } from 'undici'; new OpenAI({ fetch, fetchOptions: { dispatcher: new ProxyAgent(...) } });`;
+  }
+  return void 0;
+}
+function isUndiciDispatcherVersionMismatchError2(error40) {
+  let current = error40;
+  for (let i = 0; i < 8 && current && typeof current === "object"; i++) {
+    const err = current;
+    if (err.code === "UND_ERR_INVALID_ARG" && typeof err.message === "string" && err.message.includes("invalid onRequestStart method")) {
+      return true;
+    }
+    current = err.cause;
+  }
+  return false;
+}
+
+// src/routes/meta-glasses.ts
+var sessions = /* @__PURE__ */ new Map();
+var SESSION_TTL_MS = 24 * 60 * 60 * 1e3;
+var MAX_EVENTS = 100;
+setInterval(() => {
+  const cutoff = Date.now() - SESSION_TTL_MS;
+  for (const [id, session] of sessions) {
+    if (session.createdAt < cutoff) sessions.delete(id);
+  }
+}, 15 * 60 * 1e3).unref();
+function makeCode() {
+  return crypto2.randomBytes(3).toString("hex").toUpperCase();
+}
+function makeSessionId() {
+  return crypto2.randomUUID();
+}
+function pushEvent(session, event) {
+  session.events.push(event);
+  if (session.events.length > MAX_EVENTS) session.events.shift();
+}
+function verifySignature(rawBody, header) {
+  const secret = process.env.META_APP_SECRET;
+  if (!secret || !header) return false;
+  const expected = `sha256=${crypto2.createHmac("sha256", secret).update(rawBody).digest("hex")}`;
+  try {
+    return crypto2.timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+var PEST_KEYWORDS = {
+  rodent: "rodent",
+  rat: "rodent",
+  mouse: "rodent",
+  mice: "rodent",
+  roach: "cockroach",
+  cockroach: "cockroach",
+  ant: "ant",
+  termite: "termite",
+  "bed bug": "bed_bug",
+  spider: "spider",
+  flea: "flea",
+  tick: "tick",
+  mosquito: "mosquito",
+  wasp: "wasp",
+  bee: "bee",
+  fly: "fly",
+  flies: "fly",
+  wildlife: "wildlife",
+  bird: "bird",
+  squirrel: "squirrel",
+  raccoon: "raccoon",
+  mold: "mold",
+  moisture: "moisture_damage",
+  water: "moisture_damage"
+};
+var SEVERITY_KEYWORDS = {
+  critical: "critical",
+  severe: "critical",
+  "heavy infestation": "critical",
+  heavy: "high",
+  active: "high",
+  moderate: "medium",
+  light: "low",
+  minor: "low",
+  trace: "low",
+  evidence: "medium"
+};
+var ZONE_KEYWORDS = {
+  kitchen: "kitchen",
+  bathroom: "bathroom",
+  basement: "basement",
+  attic: "attic",
+  garage: "garage",
+  exterior: "exterior",
+  interior: "interior",
+  crawl: "crawl_space",
+  utility: "utility",
+  perimeter: "perimeter"
+};
+function parseVoiceCommand(text2) {
+  const lower = text2.toLowerCase();
+  let category = "observation";
+  let species;
+  let confidence = 0.6;
+  for (const [keyword, cat] of Object.entries(PEST_KEYWORDS)) {
+    if (lower.includes(keyword)) {
+      category = cat.includes("damage") ? "damage" : "pest";
+      species = cat;
+      confidence = 0.75;
+      break;
+    }
+  }
+  let severity = "medium";
+  for (const [keyword, sev] of Object.entries(SEVERITY_KEYWORDS)) {
+    if (lower.includes(keyword)) {
+      severity = sev;
+      break;
+    }
+  }
+  let zone;
+  for (const [keyword, z] of Object.entries(ZONE_KEYWORDS)) {
+    if (lower.includes(keyword)) {
+      zone = z;
+      break;
+    }
+  }
+  const stationMatch = lower.match(/station\s+(\d+)/) ?? lower.match(/station\s+(one|two|three|four|five|six|seven|eight|nine|ten)/);
+  const station = stationMatch ? stationMatch[1] : void 0;
+  if (category === "observation" && !zone && !station) return null;
+  const parts = [];
+  if (species) parts.push(species.replace(/_/g, " "));
+  if (zone) parts.push(`at ${zone.replace(/_/g, " ")}`);
+  if (station) parts.push(`station ${station}`);
+  const description = parts.length > 0 ? `${text2.charAt(0).toUpperCase() + text2.slice(1)}. Detected: ${parts.join(", ")}.` : text2.charAt(0).toUpperCase() + text2.slice(1);
+  return { category, species, description, severity, zone, station, confidence };
+}
 var router28 = (0, import_express29.Router)();
-router28.use(health_default);
-router28.use("/auth", auth_default);
-router28.use(storage_default);
-router28.use("/leads", leads_default);
-router28.use("/share", share_default);
-router28.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router28.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router28.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router28.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router28.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router28.use(
+router28.post(
+  "/session",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  async (req, res) => {
+    const { inspectionId } = req.body ?? {};
+    if (!inspectionId || typeof inspectionId !== "number") {
+      return res.status(400).json({ error: "inspectionId is required" });
+    }
+    const companyId = req.user.companyId;
+    const [inspection] = await db.select({ id: inspectionsTable.id }).from(inspectionsTable).where(eq(inspectionsTable.id, inspectionId)).limit(1);
+    if (!inspection) {
+      return res.status(404).json({ error: "Inspection not found" });
+    }
+    const sessionId = makeSessionId();
+    const code = makeCode();
+    sessions.set(sessionId, {
+      sessionId,
+      code,
+      inspectionId,
+      companyId,
+      userId: req.user.id,
+      createdAt: Date.now(),
+      events: []
+    });
+    console.log(`[meta-glasses] session created: ${sessionId} inspection=${inspectionId} company=${companyId}`);
+    return res.json({ sessionId, code });
+  }
+);
+router28.get("/webhook", (req, res) => {
+  const mode = req.query["hub.mode"];
+  const challenge = req.query["hub.challenge"];
+  const token = req.query["hub.verify_token"];
+  const secret = process.env.META_APP_SECRET;
+  if (mode === "subscribe" && secret && token === secret) {
+    res.status(200).send(String(challenge ?? ""));
+  } else {
+    res.status(403).json({ error: "Forbidden" });
+  }
+});
+router28.post(
+  "/webhook",
+  (req, _res, next) => {
+    if (Buffer.isBuffer(req.body)) return next();
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      req.rawBody = Buffer.concat(chunks);
+      try {
+        req.body = JSON.parse(req.rawBody.toString("utf8"));
+      } catch {
+        req.body = {};
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    const rawBody = req.rawBody ?? Buffer.alloc(0);
+    const signature = req.headers["x-hub-signature-256"];
+    if (!verifySignature(rawBody, signature)) {
+      console.warn("[meta-glasses] webhook: invalid HMAC signature");
+      return res.status(401).json({ error: "Invalid signature" });
+    }
+    const sessionId = String(req.query.session ?? "");
+    const session = sessions.get(sessionId);
+    if (!session) {
+      return res.json({
+        text: "No active ReadyLoq inspection session found. Please start an inspection in the ReadyLoq app first."
+      });
+    }
+    const { text: rawText, image: base64Image, audio: base64Audio } = req.body ?? {};
+    let transcribedText = typeof rawText === "string" ? rawText.trim() : "";
+    let aiSummary = null;
+    if (base64Audio && !transcribedText) {
+      try {
+        const audioBuffer = Buffer.from(base64Audio, "base64");
+        const audioFile = await toFile2(audioBuffer, "glasses_audio.mp3", { type: "audio/mpeg" });
+        const transcription = await openai.audio.transcriptions.create({
+          model: "whisper-1",
+          file: audioFile,
+          language: "en"
+        });
+        transcribedText = transcription.text.trim();
+      } catch (err) {
+        void logErrorEvent("ai", { companyId: session.companyId, userId: session.userId, message: "Meta webhook: audio transcription failed", context: { err: String(err) } });
+      }
+    }
+    let findingFromImage;
+    if (base64Image) {
+      try {
+        const prediction = await analyzePhotoFromBase64(base64Image);
+        if (prediction?.category) {
+          const conf = prediction.confidence ?? 0.5;
+          const severity = conf >= 0.8 ? "high" : conf >= 0.6 ? "medium" : "low";
+          findingFromImage = {
+            category: prediction.category ?? "observation",
+            description: prediction.possibleConduciveCondition ?? prediction.possiblePest ?? prediction.possibleEntryPoint ?? prediction.rationale ?? "AI analysis complete",
+            confidence: conf,
+            severity,
+            zone: prediction.zone ?? void 0,
+            species: prediction.possiblePest ?? void 0
+          };
+          aiSummary = `AI detected: ${findingFromImage.description} (${Math.round(conf * 100)}% confidence)`;
+        }
+      } catch (err) {
+        void logErrorEvent("ai", { companyId: session.companyId, userId: session.userId, message: "Meta webhook: image analysis failed", context: { err: String(err) } });
+      }
+    }
+    let findingFromVoice;
+    if (transcribedText) {
+      const parsed = parseVoiceCommand(transcribedText);
+      if (parsed) {
+        findingFromVoice = {
+          category: parsed.category,
+          description: parsed.description,
+          confidence: parsed.confidence,
+          severity: parsed.severity,
+          zone: parsed.zone,
+          species: parsed.species
+        };
+      }
+    }
+    const finding = findingFromImage ?? findingFromVoice;
+    if (finding || transcribedText) {
+      const event = {
+        id: crypto2.randomUUID(),
+        type: finding ? "finding" : "transcription",
+        timestamp: Date.now(),
+        text: aiSummary ?? transcribedText ?? "Observation logged",
+        finding
+      };
+      pushEvent(session, event);
+    }
+    let spokenResponse;
+    if (aiSummary) {
+      spokenResponse = `${aiSummary}. Logged to inspection ${session.inspectionId}.`;
+    } else if (transcribedText) {
+      spokenResponse = `Logged: ${transcribedText}`;
+    } else {
+      spokenResponse = "Observation recorded.";
+    }
+    return res.json({ text: spokenResponse });
+  }
+);
+router28.get(
+  "/events/:sessionId",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  (req, res) => {
+    const sessionId = req.params.sessionId;
+    const session = sessions.get(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Session not found or expired" });
+    }
+    if (session.companyId !== req.user.companyId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const since = Number(String(req.query.since ?? "0"));
+    const events = since > 0 ? session.events.filter((e) => e.timestamp > since) : session.events;
+    return res.json({
+      sessionId,
+      inspectionId: session.inspectionId,
+      code: session.code,
+      events,
+      serverTime: Date.now()
+    });
+  }
+);
+var meta_glasses_default = router28;
+
+// src/routes/index.ts
+var router29 = (0, import_express30.Router)();
+router29.use(health_default);
+router29.use("/auth", auth_default);
+router29.use(storage_default);
+router29.use("/leads", leads_default);
+router29.use("/share", share_default);
+router29.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router29.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router29.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router29.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router29.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router29.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -94214,17 +104293,17 @@ router28.use(
   requireRole("manager"),
   intelligence_default
 );
-router28.use(
+router29.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router28.use("/branding", branding_default);
-router28.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router28.use("/beta", requireAuth, requireCompany, beta_default);
-router28.use(
+router29.use("/branding", branding_default);
+router29.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router29.use("/beta", requireAuth, requireCompany, beta_default);
+router29.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -94232,7 +104311,7 @@ router28.use(
   requireRole("sales"),
   opportunities_default
 );
-router28.use(
+router29.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -94240,7 +104319,7 @@ router28.use(
   requireRole("manager"),
   scorecards_default
 );
-router28.use(
+router29.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -94248,8 +104327,8 @@ router28.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router28.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router28.use(
+router29.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router29.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -94257,23 +104336,23 @@ router28.use(
   requireRole("sales"),
   proposals_default
 );
-router28.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router28.use(
+router29.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router29.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-router28.use("/products", requireAuth, requireBetaAccess, products_default);
-router28.use(
+router29.use("/products", requireAuth, requireBetaAccess, products_default);
+router29.use(
   "/inspections/:inspectionId/treatment-logs",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   treatment_logs_default
 );
-router28.use(
+router29.use(
   "/crm",
   requireAuth,
   requireCompany,
@@ -94281,8 +104360,8 @@ router28.use(
   requireRole("manager"),
   crm_default
 );
-router28.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
-router28.use(
+router29.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
+router29.use(
   "/review-queue",
   requireAuth,
   requireCompany,
@@ -94290,7 +104369,8 @@ router28.use(
   requireRole("manager"),
   review_queue_default
 );
-var routes_default = router28;
+router29.use("/meta-glasses", meta_glasses_default);
+var routes_default = router29;
 
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
@@ -94311,7 +104391,7 @@ var logger2 = (0, import_pino.default)({
 });
 
 // src/app.ts
-var app = (0, import_express30.default)();
+var app = (0, import_express31.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -94362,8 +104442,8 @@ app.use(
     }
   })
 );
-app.use(import_express30.default.json());
-app.use(import_express30.default.urlencoded({ extended: true }));
+app.use(import_express31.default.json());
+app.use(import_express31.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(

@@ -235,3 +235,36 @@ export async function generateAiPrediction(
 ): Promise<AiPrediction> {
   return (await analyzePhoto(objectPath)) ?? fallbackPrediction();
 }
+
+/**
+ * Variant of {@link analyzePhoto} that accepts a raw base64-encoded JPEG
+ * directly (e.g. from a Meta Live AI webhook frame) instead of an object-
+ * storage path.  No file I/O — the data URL is constructed in memory.
+ */
+export async function analyzePhotoFromBase64(
+  base64Jpeg: string,
+): Promise<AiPrediction | null> {
+  try {
+    const dataUrl = `data:image/jpeg;base64,${base64Jpeg}`;
+    const completion = await openai.chat.completions.create({
+      model: MODEL,
+      max_completion_tokens: 8192,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: userPrompt() },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+    });
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) return null;
+    return parsePrediction(raw);
+  } catch {
+    return null;
+  }
+}
