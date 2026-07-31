@@ -4,8 +4,8 @@ import type { Inspection } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { DailyRigSetupModal } from "@/components/DailyRigSetupModal";
-import { useDailyRig } from "@/hooks/useDailyRig";
+import { DailyRouteSetupModal } from "@/components/DailyRouteSetupModal";
+import { useDailyRoute } from "@/hooks/useDailyRoute";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 
 import { InspectionDetail } from "@/components/InspectionDetail";
@@ -43,13 +43,13 @@ export default function InspectionsScreen() {
 
   const {
     isSetupToday,
-    rigCount,
-    rigProductIds,
-    saveRig,
+    assignmentCount,
+    assignments,
+    saveRoute,
     showSetupModal,
     openSetupModal,
     closeSetupModal,
-  } = useDailyRig();
+  } = useDailyRoute();
 
   const { data, isLoading, isRefetching, refetch } = useQuery(
     getListInspectionsQueryOptions(),
@@ -203,7 +203,7 @@ export default function InspectionsScreen() {
         >
           <Ionicons name="flask-outline" size={16} color={colors.primary} />
           <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 13, flex: 1 }}>
-            {rigCount} product{rigCount !== 1 ? "s" : ""} on your rig today
+            {assignmentCount} assignment{assignmentCount !== 1 ? "s" : ""} on today's route
           </Text>
           <Text style={{ color: colors.primary, fontFamily: "Inter_400Regular", fontSize: 12 }}>
             Change
@@ -297,14 +297,14 @@ export default function InspectionsScreen() {
     </View>
   );
 
-  // ── Daily rig setup modal (accessible from the inspections tab) ───────────
+  // ── Daily route setup modal (accessible from the inspections tab) ─────────
   const rigSetupModal = (
-    <DailyRigSetupModal
+    <DailyRouteSetupModal
       visible={showSetupModal}
-      initialProductIds={rigProductIds}
+      initialAssignments={assignments}
       onClose={closeSetupModal}
-      onSave={(ids) => {
-        void saveRig(ids);
+      onSave={(newAssignments) => {
+        void saveRoute(newAssignments);
         closeSetupModal();
       }}
     />

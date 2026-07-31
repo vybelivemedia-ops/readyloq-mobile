@@ -18,6 +18,16 @@ import {
 } from "drizzle-orm/pg-core";
 import { companiesTable } from "./companies";
 
+/**
+ * Route assignment — a product-to-pest pairing for a technician's day.
+ * Stored as JSONB in the `assignments` column.
+ */
+export interface DbRouteAssignment {
+  productId: number;
+  targetPest: string;
+  notes?: string;
+}
+
 export const technicianDailyRigsTable = pgTable(
   "technician_daily_rigs",
   {
@@ -29,8 +39,16 @@ export const technicianDailyRigsTable = pgTable(
     technicianId: text("technician_id").notNull(),
     /** ISO date string "YYYY-MM-DD" — the day this rig configuration applies to. */
     rigDate: date("rig_date").notNull(),
-    /** Ordered list of product IDs selected for this day. */
-    productIds: jsonb("product_ids").$type<number[]>().notNull().default([]),
+    /**
+     * @deprecated Use `assignments` instead.
+     * Kept for zero-downtime migration; API reads `assignments` with fallback.
+     */
+    productIds: jsonb("product_ids").$type<number[]>().default([]),
+    /**
+     * Ordered list of product-to-pest route assignments for this day.
+     * Replaces the simpler `productIds` inventory model.
+     */
+    assignments: jsonb("assignments").$type<DbRouteAssignment[]>().notNull().default([]),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

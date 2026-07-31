@@ -16,7 +16,7 @@ import { AuthedImage } from "@/components/AuthedImage";
 import { FindingCard } from "@/components/FindingCard";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
 import { TreatmentLogWizard } from "@/components/TreatmentLogWizard";
-import { useDailyRig } from "@/hooks/useDailyRig";
+import { useDailyRoute } from "@/hooks/useDailyRoute";
 import { listTreatmentLogs, type TreatmentLog } from "@/lib/api-client/products";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -56,7 +56,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
 
   // ── Treatment logs ─────────────────────────────────────────────────────────
   const [showTreatmentWizard, setShowTreatmentWizard] = useState(false);
-  const { rigProductIds } = useDailyRig();
+  const { assignmentsWithProducts } = useDailyRoute();
   const treatmentLogsQ = useQuery({
     queryKey: ["treatment-logs", id],
     queryFn: () => listTreatmentLogs(id),
@@ -457,7 +457,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
             ? ((inspection as unknown as Record<string, unknown>).pestTypes as string[])
             : []
         }
-        dailyRigProductIds={rigProductIds}
+        routeAssignments={assignmentsWithProducts}
         onLogged={handleTreatmentLogged}
       />
 

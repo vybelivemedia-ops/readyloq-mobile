@@ -4,6 +4,15 @@
  * the tech updates their selection.  Date is stored as a simple ISO date string
  * ("YYYY-MM-DD") so midnight resets work cleanly regardless of timezone.
  */
+/**
+ * Route assignment — a product-to-pest pairing for a technician's day.
+ * Stored as JSONB in the `assignments` column.
+ */
+export interface DbRouteAssignment {
+    productId: number;
+    targetPest: string;
+    notes?: string;
+}
 export declare const technicianDailyRigsTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "technician_daily_rigs";
     schema: undefined;
@@ -83,7 +92,7 @@ export declare const technicianDailyRigsTable: import("drizzle-orm/pg-core").PgT
             columnType: "PgJsonb";
             data: number[];
             driverParam: unknown;
-            notNull: true;
+            notNull: false;
             hasDefault: true;
             isPrimaryKey: false;
             isAutoincrement: false;
@@ -94,6 +103,25 @@ export declare const technicianDailyRigsTable: import("drizzle-orm/pg-core").PgT
             generated: undefined;
         }, {}, {
             $type: number[];
+        }>;
+        assignments: import("drizzle-orm/pg-core").PgColumn<{
+            name: "assignments";
+            tableName: "technician_daily_rigs";
+            dataType: "json";
+            columnType: "PgJsonb";
+            data: DbRouteAssignment[];
+            driverParam: unknown;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: DbRouteAssignment[];
         }>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";

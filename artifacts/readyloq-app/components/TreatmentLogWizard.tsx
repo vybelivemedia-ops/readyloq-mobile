@@ -40,7 +40,7 @@ import {
   type ChecklistItem,
   type Product,
 } from "@/lib/api-client/products";
-import { getRecentMixes, type RecentMix } from "@/lib/api-client/daily-rig";
+import { getRecentMixes, type RecentMix, type RouteAssignmentWithProduct } from "@/lib/api-client/daily-route";
 import { useColors } from "@/hooks/useColors";
 import { PEST_TYPES } from "@/constants/inspection";
 
@@ -92,12 +92,12 @@ interface Props {
   /** Called on successful submission so the parent can refetch treatment logs. */
   onLogged: () => void;
   /**
-   * IDs of products currently on the technician's daily rig.
-   * When provided (non-empty), Step 0 gains a "Today's Rig" tab that shows a
-   * grid of rig products for one-tap selection, plus a "Recent Mixes" section
-   * that can pre-fill the rest of the wizard fields.
+   * Technician's daily route chemical assignments (product→pest pairings).
+   * When provided (non-empty), Step 0 gains a "Today's Route" tab that shows
+   * assignment cards for one-tap selection — tapping a card pre-fills both
+   * product AND pest and advances directly to Site (Step 1).
    */
-  dailyRigProductIds?: number[];
+  routeAssignments?: RouteAssignmentWithProduct[];
 }
 
 // ─── Step-level progress ──────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ export function TreatmentLogWizard({
   inspectionId,
   pestTypes,
   onLogged,
-  dailyRigProductIds = [],
+  routeAssignments = [],
 }: Props) {
   const colors = useColors();
 
@@ -133,9 +133,9 @@ export function TreatmentLogWizard({
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  // Step 0 quick-pick tabs — only visible when dailyRigProductIds is non-empty
-  const hasRig = dailyRigProductIds.length > 0;
-  const [step0Tab, setStep0Tab] = useState<"rig" | "all">(hasRig ? "rig" : "all");
+  // Step 0 quick-pick tabs — only visible when routeAssignments is non-empty
+  const hasRoute = routeAssignments.length > 0;
+  const [step0Tab, setStep0Tab] = useState<"route" | "all">(hasRoute ? "route" : "all");
   const [recentMixes, setRecentMixes] = useState<RecentMix[]>([]);
   const [loadingRecentMixes, setLoadingRecentMixes] = useState(false);
 
@@ -184,10 +184,10 @@ export function TreatmentLogWizard({
     setSubmitting(false);
     setSubmitError(null);
     // Quick-pick state
-    setStep0Tab(dailyRigProductIds.length > 0 ? "rig" : "all");
+    setStep0Tab(routeAssignments.length > 0 ? "route" : "all");
     setRecentMixes([]);
     setLoadingRecentMixes(false);
-  }, [dailyRigProductIds.length]);
+  }, [routeAssignments.length]);
 
   useEffect(() => {
     if (visible) resetAll();
@@ -204,15 +204,15 @@ export function TreatmentLogWizard({
       .finally(() => setLoadingProducts(false));
   }, [visible]);
 
-  // ── Recent mixes fetch (Today's Rig tab) ──────────────────────────────────
+  // ── Recent mixes fetch (Today's Route tab) ────────────────────────────────
   useEffect(() => {
-    if (!visible || !hasRig) return;
+    if (!visible || !hasRoute) return;
     setLoadingRecentMixes(true);
     getRecentMixes()
       .then(setRecentMixes)
       .catch(() => setRecentMixes([]))
       .finally(() => setLoadingRecentMixes(false));
-  }, [visible, hasRig]);
+  }, [visible, hasRoute]);
 
   // ── Checklist builder ──────────────────────────────────────────────────────
   // Rebuilds the checklist whenever a product is selected (Step 4 prep).
@@ -569,50 +569,11 @@ export function TreatmentLogWizard({
         .map((p) => p.id),
     );
 
-    // Products on today's rig (filtered from already-loaded catalogue).
-    const rigProducts = hasRig
-      ? products.filter((p) => dailyRigProductIds.includes(p.id))
-      : [];
-
     return (
       <ScrollView contentContainerStyle={{ gap: 20, paddingBottom: 20 }}>
-        {/* Pest chips */}
-        <View style={{ gap: 10 }}>
-          <StepLabel text="Select target pest" />
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {pestList.map((pest) => (
-              <Pressable
-                key={pest}
-                onPress={() => {
-                  setSelectedPest(pest);
-                  setSelectedProduct(null);
-                }}
-                style={[
-                  s.chip,
-                  selectedPest === pest && {
-                    backgroundColor: colors.primary,
-                    borderColor: colors.primary,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    s.chipText,
-                    {
-                      color:
-                        selectedPest === pest ? colors.primaryForeground : colors.foreground,
-                    },
-                  ]}
-                >
-                  {pest}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
 
-        {/* Quick-pick tab bar — only when a rig is loaded */}
-        {hasRig ? (
+        {/* Quick-pick tab bar — only when a route is loaded */}
+        {hasRoute ? (
           <View
             style={{
               flexDirection: "row",
@@ -622,7 +583,7 @@ export function TreatmentLogWizard({
               gap: 3,
             }}
           >
-            {(["rig", "all"] as const).map((tab) => {
+            {(["route", "all"] as const).map((tab) => {
               const active = step0Tab === tab;
               return (
                 <Pressable
@@ -643,8 +604,8 @@ export function TreatmentLogWizard({
                       color: active ? colors.foreground : colors.mutedForeground,
                     }}
                   >
-                    {tab === "rig"
-                      ? `Today's Rig (${rigProducts.length})`
+                    {tab === "route"
+                      ? `Today's Route (${routeAssignments.length})`
                       : "All Products"}
                   </Text>
                 </Pressable>
@@ -653,43 +614,89 @@ export function TreatmentLogWizard({
           </View>
         ) : null}
 
-        {/* ── Today's Rig tab ─────────────────────────────────────────────── */}
-        {step0Tab === "rig" && hasRig ? (
+        {/* ── Today's Route tab ───────────────────────────────────────────── */}
+        {step0Tab === "route" && hasRoute ? (
           <View style={{ gap: 14 }}>
-            {/* Rig product cards */}
-            <View style={{ gap: 10 }}>
-              <StepLabel text="Select product" />
-              {loadingProducts ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : rigProducts.length === 0 ? (
-                <View
-                  style={{
-                    padding: 16,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: colors.mutedForeground,
-                      fontFamily: "Inter_400Regular",
-                      fontSize: 13,
-                      textAlign: "center",
-                    }}
-                  >
-                    Your rig products haven't loaded yet. Switch to All Products to browse the full catalogue.
-                  </Text>
-                </View>
-              ) : (
-                rigProducts.map((p) => renderProductCard(p, approvedIds))
-              )}
-            </View>
+            <StepLabel text="Tap an assignment to pre-fill product & pest" />
 
-            {/* Recent Mixes */}
-            {hasRig && selectedPest ? (
+            {/* Route assignment cards — each pre-fills product + pest + jumps to Step 1 */}
+            {routeAssignments.map((assignment, idx) => {
+              const productName = assignment.product?.name ?? `Product #${assignment.productId}`;
+              const productObj = assignment.product
+                ?? products.find((p) => p.id === assignment.productId)
+                ?? null;
+              const isSelected =
+                selectedProduct?.id === assignment.productId &&
+                selectedPest === assignment.targetPest;
+
+              return (
+                <Pressable
+                  key={idx}
+                  onPress={() => {
+                    if (productObj) setSelectedProduct(productObj);
+                    setSelectedPest(assignment.targetPest);
+                    // Jump straight to Site step — both product and pest are known.
+                    setStep(1);
+                  }}
+                  style={[
+                    s.productCard,
+                    { borderColor: colors.border, backgroundColor: colors.card },
+                    isSelected && {
+                      borderColor: colors.primary,
+                      backgroundColor: "rgba(23,196,211,0.08)",
+                    },
+                  ]}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      {/* Product → Pest pair */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={[s.productName, { color: colors.foreground }]}>
+                          {productName}
+                        </Text>
+                        <Ionicons name="arrow-forward" size={12} color={colors.mutedForeground} />
+                        <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                          {assignment.targetPest}
+                        </Text>
+                      </View>
+                      {/* Active ingredient */}
+                      {assignment.product?.activeIngredients ? (
+                        <Text style={[s.productMeta, { color: colors.mutedForeground }]}>
+                          {assignment.product.activeIngredients}
+                        </Text>
+                      ) : null}
+                      {/* Notes */}
+                      {assignment.notes ? (
+                        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                          {assignment.notes}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {/* Signal word + RUP badges */}
+                    <View style={{ gap: 4, alignItems: "flex-end" }}>
+                      {assignment.product?.signalWord && assignment.product.signalWord !== "NONE" ? (
+                        <View
+                          style={[
+                            s.signalBadge,
+                            { backgroundColor: SIGNAL_COLORS[assignment.product.signalWord] ?? "#6b7280" },
+                          ]}
+                        >
+                          <Text style={s.signalText}>{assignment.product.signalWord}</Text>
+                        </View>
+                      ) : null}
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={colors.primary}
+                      />
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
+
+            {/* Recent Mixes — helpful context even in route tab */}
+            {recentMixes.length > 0 ? (
               <View style={{ gap: 10 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
@@ -700,21 +707,11 @@ export function TreatmentLogWizard({
                       fontSize: 13,
                     }}
                   >
-                    Recent Mixes — tap to pre-fill
+                    Recent mixes — tap to pre-fill rates
                   </Text>
                 </View>
                 {loadingRecentMixes ? (
                   <ActivityIndicator color={colors.primary} size="small" />
-                ) : recentMixes.length === 0 ? (
-                  <Text
-                    style={{
-                      color: colors.mutedForeground,
-                      fontFamily: "Inter_400Regular",
-                      fontSize: 12,
-                    }}
-                  >
-                    No recent mixes in the past 30 days.
-                  </Text>
                 ) : (
                   recentMixes.map((mix) => renderRecentMixCard(mix))
                 )}
@@ -723,9 +720,44 @@ export function TreatmentLogWizard({
           </View>
         ) : null}
 
-        {/* ── All Products tab (original flat list) ───────────────────────── */}
-        {step0Tab === "all" || !hasRig ? (
+        {/* ── All Products tab ─────────────────────────────────────────────── */}
+        {step0Tab === "all" || !hasRoute ? (
           <>
+            {/* Pest chips — shown only in All Products mode */}
+            <View style={{ gap: 10 }}>
+              <StepLabel text="Select target pest" />
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {pestList.map((pest) => (
+                  <Pressable
+                    key={pest}
+                    onPress={() => {
+                      setSelectedPest(pest);
+                      setSelectedProduct(null);
+                    }}
+                    style={[
+                      s.chip,
+                      selectedPest === pest && {
+                        backgroundColor: colors.primary,
+                        borderColor: colors.primary,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.chipText,
+                        {
+                          color:
+                            selectedPest === pest ? colors.primaryForeground : colors.foreground,
+                        },
+                      ]}
+                    >
+                      {pest}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
             {selectedPest ? (
               <View style={{ gap: 10 }}>
                 <StepLabel text="Select product" />
@@ -736,6 +768,25 @@ export function TreatmentLogWizard({
                 ) : (
                   products.map((product) => renderProductCard(product, approvedIds))
                 )}
+              </View>
+            ) : null}
+
+            {/* Recent Mixes — also available in All Products tab */}
+            {hasRoute && selectedPest && recentMixes.length > 0 ? (
+              <View style={{ gap: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
+                  <Text
+                    style={{
+                      color: colors.mutedForeground,
+                      fontFamily: "Inter_600SemiBold",
+                      fontSize: 13,
+                    }}
+                  >
+                    Recent mixes — tap to pre-fill rates
+                  </Text>
+                </View>
+                {recentMixes.map((mix) => renderRecentMixCard(mix))}
               </View>
             ) : null}
           </>

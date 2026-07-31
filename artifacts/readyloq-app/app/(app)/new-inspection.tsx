@@ -34,7 +34,8 @@ import { useVoiceField } from "@/hooks/useVoiceField";
 import { type LocalBaitStation } from "@/lib/local/inspection-store";
 import { WifiCameraModal } from "@/components/WifiCameraModal";
 import { TreatmentLogWizard } from "@/components/TreatmentLogWizard";
-import { useDailyRig } from "@/hooks/useDailyRig";
+import { useDailyRoute } from "@/hooks/useDailyRoute";
+import { verifyEquipmentUsage } from "@/lib/audio/intelligence/EquipmentVerifier";
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
@@ -247,7 +248,7 @@ export default function NewInspectionScreen() {
 
   // ── Chemical treatment log wizard ─────────────────────────────────────────
   const [showTreatmentWizard, setShowTreatmentWizard] = useState(false);
-  const { rigProductIds } = useDailyRig();
+  const { assignmentsWithProducts } = useDailyRoute();
 
   // ── Offline status (T003) ─────────────────────────────────────────────────
   const { isConnected } = useNetworkStatus();
@@ -435,6 +436,19 @@ export default function NewInspectionScreen() {
               break;
             }
 
+            // 3a. Equipment detection — cross-reference against daily route.
+            if (event.equipment) {
+              const activePest = pestTypes[pestTypes.length - 1] ?? null;
+              const result = verifyEquipmentUsage(event.equipment, activePest, assignmentsWithProducts);
+              setFaieStatus(result.message);
+              if (result.needsAttention) {
+                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              }
+              Speech.speak(result.message, { rate: 1.05 });
+              setTimeout(() => setFaieStatus("Listening…"), 4000);
+              break;
+            }
+
             // 3. Bait station auto-log: "placed Contrac Blox in kitchen" or any
             //    transcript matching a baitStationTrigger phrase.
             if (
@@ -482,6 +496,17 @@ export default function NewInspectionScreen() {
             // Auto-commit low-confidence events immediately — no tap required.
             // A "~" marker in the status line signals the uncertainty level
             // passively without blocking the technician's capture flow.
+            if (event.equipment) {
+              const activePest = pestTypes[pestTypes.length - 1] ?? null;
+              const result = verifyEquipmentUsage(event.equipment, activePest, assignmentsWithProducts);
+              setFaieStatus(`${result.message} ~`);
+              if (result.needsAttention) {
+                void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              }
+              Speech.speak(result.message, { rate: 1.05 });
+              setTimeout(() => setFaieStatus("Listening…"), 4000);
+              break;
+            }
             if (event.capturePhoto) {
               void takePhoto();
               setFaieStatus("Capturing photo…");
@@ -1898,7 +1923,7 @@ export default function NewInspectionScreen() {
             onClose={() => setShowTreatmentWizard(false)}
             inspectionId={wsInspectionId}
             pestTypes={pestTypes}
-            dailyRigProductIds={rigProductIds}
+            routeAssignments={assignmentsWithProducts}
             onLogged={() => {
               setShowTreatmentWizard(false);
             }}

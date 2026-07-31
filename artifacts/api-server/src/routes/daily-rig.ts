@@ -1,10 +1,13 @@
 /**
- * Daily rig routes — ReadyLoq
+ * Daily route routes — ReadyLoq
  *
- * POST /technician/daily-rig   — upsert today's rig (product IDs loaded on truck)
- * GET  /technician/daily-rig   — fetch today's rig with full product + label-rules data
- * GET  /technician/recent-mixes — last-30-day treatment logs, deduplicated by
- *                                 (productId, siteClassification), newest first, max 5
+ * POST /technician/daily-rig           — upsert today's route chemical assignments
+ * GET  /technician/daily-rig           — fetch today's assignments with full product data
+ * GET  /technician/daily-rig/recent-mixes — last-30-day treatment logs, deduped by
+ *                                          (productId, siteClassification), newest first, max 5
+ *
+ * "Route assignments" are product→pest pairings the technician sets each morning.
+ * e.g. [{ productId: 1, targetPest: "German Cockroaches" }, { productId: 3, targetPest: "Ants" }]
  */
 
 import { Router } from "express";
@@ -21,6 +24,14 @@ import { z } from "zod/v4";
 
 const router = Router();
 
+// ─── Shared types ─────────────────────────────────────────────────────────────
+
+interface RouteAssignment {
+  productId: number;
+  targetPest: string;
+  notes?: string;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Returns today's date as "YYYY-MM-DD" in UTC (server clock). */
@@ -28,29 +39,39 @@ function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Join products + label_rules for a list of product IDs. */
-async function loadProducts(productIds: number[]) {
-  if (productIds.length === 0) return [];
+/**
+ * Load products + label rules for a list of assignments, returning each
+ * assignment enriched with its full product data.
+ */
+async function enrichAssignments(assignments: RouteAssignment[]) {
+  if (assignments.length === 0) return [];
+  const productIds = [...new Set(assignments.map((a) => a.productId))];
   const rows = await db
     .select({ product: productsTable, labelRules: productLabelRulesTable })
     .from(productsTable)
     .leftJoin(productLabelRulesTable, eq(productLabelRulesTable.productId, productsTable.id))
     .where(inArray(productsTable.id, productIds));
-  // Re-order to preserve the technician's chosen ordering.
-  const map = new Map(rows.map((r) => [r.product.id, r]));
-  return productIds
-    .map((id) => {
-      const r = map.get(id);
-      if (!r) return null;
-      return { ...r.product, labelRules: r.labelRules ?? null };
-    })
-    .filter(Boolean);
+
+  const productMap = new Map(rows.map((r) => [r.product.id, r]));
+  return assignments.map((a) => {
+    const row = productMap.get(a.productId);
+    return {
+      ...a,
+      product: row ? { ...row.product, labelRules: row.labelRules ?? null } : null,
+    };
+  });
 }
 
 // ─── POST /technician/daily-rig ───────────────────────────────────────────────
 
-const upsertRigSchema = z.object({
-  productIds: z.array(z.number().int().positive()),
+const routeAssignmentSchema = z.object({
+  productId: z.number().int().positive(),
+  targetPest: z.string().min(1),
+  notes: z.string().optional(),
+});
+
+const upsertRouteSchema = z.object({
+  assignments: z.array(routeAssignmentSchema),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
@@ -60,39 +81,40 @@ router.post("/", async (req, res) => {
     const technicianId = req.user?.clerkUserId;
     if (!technicianId) return res.status(401).json({ error: "Unauthorized" });
 
-    const parse = upsertRigSchema.safeParse(req.body);
+    const parse = upsertRouteSchema.safeParse(req.body);
     if (!parse.success) {
       return res.status(400).json({ error: "Invalid body", detail: parse.error.issues });
     }
 
     const rigDate = parse.data.date ?? todayUtc();
-    const productIds = parse.data.productIds;
+    const assignments = parse.data.assignments as RouteAssignment[];
 
-    // Upsert: replace today's row when one already exists.
     const [row] = await db
       .insert(technicianDailyRigsTable)
-      .values({ companyId, technicianId, rigDate, productIds })
+      .values({ companyId, technicianId, rigDate, assignments })
       .onConflictDoUpdate({
         target: [
           technicianDailyRigsTable.companyId,
           technicianDailyRigsTable.technicianId,
           technicianDailyRigsTable.rigDate,
         ],
-        set: { productIds, updatedAt: new Date() },
+        set: { assignments, updatedAt: new Date() },
       })
       .returning();
 
-    if (!row) return res.status(500).json({ error: "Failed to save rig" });
+    if (!row) return res.status(500).json({ error: "Failed to save route" });
 
-    const products = await loadProducts(productIds);
+    const enriched = await enrichAssignments(assignments);
     return res.status(201).json({
-      ...row,
+      id: row.id,
+      technicianId: row.technicianId,
+      rigDate: row.rigDate,
+      assignments: enriched,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
-      products,
     });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to save rig" });
+  } catch {
+    return res.status(500).json({ error: "Failed to save route" });
   }
 });
 
@@ -123,22 +145,30 @@ router.get("/", async (req, res) => {
       .limit(1);
 
     if (!row) {
-      return res.status(404).json({ error: "No rig set up for this date" });
+      return res.status(404).json({ error: "No route set up for this date" });
     }
 
-    const products = await loadProducts(row.productIds ?? []);
+    // `assignments` is the new column; fall back to legacy `productIds` if empty.
+    const rawAssignments: RouteAssignment[] =
+      Array.isArray(row.assignments) && row.assignments.length > 0
+        ? (row.assignments as RouteAssignment[])
+        : (row.productIds ?? []).map((id: number) => ({ productId: id, targetPest: "" }));
+
+    const enriched = await enrichAssignments(rawAssignments);
     return res.json({
-      ...row,
+      id: row.id,
+      technicianId: row.technicianId,
+      rigDate: row.rigDate,
+      assignments: enriched,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
-      products,
     });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to fetch rig" });
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch route" });
   }
 });
 
-// ─── GET /technician/recent-mixes ─────────────────────────────────────────────
+// ─── GET /technician/daily-rig/recent-mixes ──────────────────────────────────
 
 router.get("/recent-mixes", async (req, res) => {
   try {
@@ -148,13 +178,8 @@ router.get("/recent-mixes", async (req, res) => {
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    // Fetch all treatment logs for this technician in the last 30 days,
-    // joined with their product names for the quick-pick display.
     const rows = await db
-      .select({
-        log: treatmentLogsTable,
-        product: productsTable,
-      })
+      .select({ log: treatmentLogsTable, product: productsTable })
       .from(treatmentLogsTable)
       .leftJoin(productsTable, eq(productsTable.id, treatmentLogsTable.productId))
       .where(
@@ -166,8 +191,7 @@ router.get("/recent-mixes", async (req, res) => {
       )
       .orderBy(desc(treatmentLogsTable.appliedAt));
 
-    // Deduplicate by (productId, siteClassification), keeping the most recent
-    // for each combination.  Return up to 5 results.
+    // Deduplicate by (productId, siteClassification), keep most recent, max 5.
     const seen = new Set<string>();
     const deduped: typeof rows = [];
     for (const row of rows) {
@@ -193,7 +217,7 @@ router.get("/recent-mixes", async (req, res) => {
         appliedAt: log.appliedAt.toISOString(),
       })),
     );
-  } catch (err) {
+  } catch {
     return res.status(500).json({ error: "Failed to fetch recent mixes" });
   }
 });

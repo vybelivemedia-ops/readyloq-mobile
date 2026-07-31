@@ -1,6 +1,17 @@
 import { INSPECTION_DICTIONARY } from "./VocabularyRegistry";
 import type { StructuredInspectionEvent, VisionContext } from "../types/intent.types";
 
+// Build a fast lowercase lookup for equipment names + aliases.
+const EQUIPMENT_CANONICAL: Map<string, string> = new Map(
+  INSPECTION_DICTIONARY.equipment.map((e) => [e.toLowerCase(), e]),
+);
+// Add alias → canonical mappings from the shared alias dict that map to equipment.
+for (const [alias, canonical] of Object.entries(INSPECTION_DICTIONARY.aliases)) {
+  if (INSPECTION_DICTIONARY.equipment.includes(canonical)) {
+    EQUIPMENT_CANONICAL.set(alias.toLowerCase(), canonical);
+  }
+}
+
 /**
  * Low-level keyword scanner over a normalized transcript.
  * Used by SpeechIntentEngine after alias resolution.
@@ -38,6 +49,7 @@ export class InspectionCommandParser {
 
     const severity = this.detectSeverity(lower);
     const capturePhoto = this.detectCaptureCommand(lower);
+    const equipment = this.detectEquipment(lower);
 
     return {
       action,
@@ -48,6 +60,7 @@ export class InspectionCommandParser {
       confidence: baseConfidence,
       severity,
       capturePhoto,
+      equipment,
       targetField: fieldMatch?.field,
       fieldValue: fieldMatch?.value,
     };
@@ -94,6 +107,40 @@ export class InspectionCommandParser {
     }
 
     return null;
+  }
+
+  /**
+   * Detects application equipment mentions in the transcript.
+   *
+   * Matches when:
+   *  a) One of the equipment phrases ("using my", "with the", ...) precedes a
+   *     known equipment term or alias, OR
+   *  b) The transcript consists almost entirely of an equipment name/alias
+   *     (standalone utterance like "B&G sprayer" or "bait gun").
+   *
+   * Returns the canonical equipment name (from INSPECTION_DICTIONARY.equipment)
+   * or undefined when no equipment is detected.
+   */
+  private detectEquipment(text: string): string | undefined {
+    // Check each canonical equipment entry and its aliases.
+    for (const [lowercaseKey, canonical] of EQUIPMENT_CANONICAL) {
+      if (!text.includes(lowercaseKey)) continue;
+
+      // Condition (b): standalone — text is just the equipment name (±10 chars of filler).
+      if (text.trim().replace(/[.,!?]/g, "").length <= lowercaseKey.length + 10) {
+        return canonical;
+      }
+
+      // Condition (a): an equipment phrase precedes the equipment name in the text.
+      const triggered = INSPECTION_DICTIONARY.equipmentPhrases.some((phrase) => {
+        const phraseIdx = text.indexOf(phrase.toLowerCase());
+        if (phraseIdx === -1) return false;
+        return text.indexOf(lowercaseKey) >= phraseIdx;
+      });
+      if (triggered) return canonical;
+    }
+
+    return undefined;
   }
 
   private findMatch(text: string, terms: string[]): string | undefined {

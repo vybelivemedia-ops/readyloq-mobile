@@ -35,6 +35,13 @@ export interface StructuredInspectionEvent {
    * Only present when targetField is set.
    */
   fieldValue?: string;
+  /**
+   * Application equipment detected in the transcript (e.g. "B&G sprayer",
+   * "bait gun", "bulb duster"). When set, the FAIE handler cross-references
+   * the technician's daily route assignments to verify correct product usage
+   * against label standards for the active target pest.
+   */
+  equipment?: string;
 }
 
 export interface VisionContext {

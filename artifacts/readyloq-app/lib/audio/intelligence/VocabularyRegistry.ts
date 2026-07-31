@@ -142,6 +142,26 @@ export const INSPECTION_DICTIONARY = {
     "igr":                  "Gentrol IGR",
     "tafgor":               "Tafgor",
 
+    // ── Equipment informal / abbreviated names ────────────────────────────
+    "b&g":                  "B&G sprayer",
+    "b and g":              "B&G sprayer",
+    "big g":                "B&G sprayer",
+    "bng":                  "B&G sprayer",
+    "bug sprayer":          "B&G sprayer",
+    "hand sprayer":         "B&G sprayer",
+    "bazooka":              "bait gun",
+    "bait applicator":      "bait gun",
+    "bait pistol":          "bait gun",
+    "gel gun":              "gel applicator",
+    "gel syringe":          "gel applicator",
+    "duster":               "bulb duster",
+    "puffer":               "bulb duster",
+    "fogger":               "Actisol fogger",
+    "mist blower":          "Actisol fogger",
+    "crack tip":            "crack and crevice tip",
+    "crevice tip":          "crack and crevice tip",
+    "c&c tip":              "crack and crevice tip",
+
     // ── Action synonyms ───────────────────────────────────────────────────
     "spray":                "applied",
     "sprayed":              "applied",
@@ -194,6 +214,44 @@ export const INSPECTION_DICTIONARY = {
     high: ["high", "high severity", "significant", "major", "heavy", "severe", "bad", "bad activity", "heavy activity", "a lot", "mucho", "bastante"],
     critical: ["critical", "extreme", "urgent", "emergency", "very high", "critical level", "infestation", "infested", "overrun", "everywhere", "all over", "demasiado"],
   } as Record<string, string[]>,
+
+  /**
+   * Canonical application equipment names.  These are matched against
+   * technician voice and used to cross-reference daily route assignments.
+   */
+  equipment: [
+    "B&G sprayer",
+    "bait gun",
+    "bulb duster",
+    "gel applicator",
+    "pump sprayer",
+    "Actisol fogger",
+    "fogger",
+    "crack and crevice tip",
+    "bait station",
+    "glue board",
+  ],
+
+  /**
+   * Trigger phrases that precede equipment mentions.
+   * e.g. "using my B&G" → equipment detected.
+   * Also matched standalone if the utterance contains only an equipment name.
+   */
+  equipmentPhrases: [
+    "using my",
+    "using the",
+    "with my",
+    "with the",
+    "grabbed the",
+    "grabbing the",
+    "picked up the",
+    "picking up the",
+    "loading the",
+    "filling the",
+    "switching to",
+    "switched to",
+    "got my",
+  ],
 
   captureCommands: [
     "take a photo",
