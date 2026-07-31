@@ -1,9 +1,22 @@
+/**
+ * Dashboard (index) — role-differentiated home screen.
+ *
+ * Role   Primary CTA              Tools shown
+ * ──────────────────────────────────────────────────────────────────
+ * Tech   Start AI Inspection      Bulk upload · Daily route status
+ * Sales  Start Property Scan      View pipeline · Recent scans
+ * Mgr    Review Yesterday's Work  Team health · Approval queue
+ * Owner  Daily Briefing           KPI strip · Comms quick-dial
+ *
+ * The lower section is always `<RoleBriefingView>` which renders the
+ * server-shaped data (stats + lists) specific to each role.
+ */
+
 import { useAuth, useUser } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
   getGetAnalyticsDashboardQueryOptions,
   getGetBriefingQueryOptions,
-  getListInspectionsQueryOptions,
 } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
@@ -16,7 +29,310 @@ import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
-import { formatRelative } from "@/constants/inspection";
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+/** Large hero CTA button. */
+function HeroCTA({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        backgroundColor: colors.primary,
+        borderRadius: colors.radius,
+        padding: 20,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 16,
+        opacity: pressed ? 0.9 : 1,
+      })}
+    >
+      <View
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 14,
+          backgroundColor: "rgba(255,255,255,0.18)",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Ionicons name={icon} size={28} color={colors.primaryForeground} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_700Bold", fontSize: 18 }}>
+          {title}
+        </Text>
+        <Text style={{ color: "rgba(255,255,255,0.85)", fontFamily: "Inter_400Regular", fontSize: 13 }}>
+          {subtitle}
+        </Text>
+      </View>
+      <Ionicons name="arrow-forward" size={22} color={colors.primaryForeground} />
+    </Pressable>
+  );
+}
+
+/** Small tool tile beneath the hero CTA. */
+function ToolTile({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flex: 1,
+        backgroundColor: colors.card,
+        borderRadius: colors.radius,
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: 14,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        opacity: pressed ? 0.75 : 1,
+      })}
+    >
+      <View
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 10,
+          backgroundColor: colors.accent,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Ionicons name={icon} size={20} color={colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+          {title}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}
+        >
+          {subtitle}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+    </Pressable>
+  );
+}
+
+/** Quick KPI stat card used in the Owner executive strip. */
+function KpiCard({
+  icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  value: string | number;
+  label: string;
+  tone: string;
+}) {
+  const colors = useColors();
+  return (
+    <View
+      style={{
+        flex: 1,
+        padding: 14,
+        borderRadius: 12,
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      <Ionicons name={icon} size={20} color={tone} />
+      <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 20 }}>
+        {value}
+      </Text>
+      <Text
+        style={{
+          color: colors.mutedForeground,
+          fontFamily: "Inter_400Regular",
+          fontSize: 11,
+          textAlign: "center",
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Role-specific quick-action sections ─────────────────────────────────────
+
+/** Technician tools: bulk upload + dataset ingestion. */
+function TechnicianTools({ router }: { router: ReturnType<typeof useRouter> }) {
+  return (
+    <View style={{ flexDirection: "row", gap: 10 }}>
+      <ToolTile
+        icon="cloud-upload-outline"
+        title="Upload Training Photos"
+        subtitle="Add historical data to dataset"
+        onPress={() => router.push("/dataset/bulk-upload" as Href)}
+      />
+    </View>
+  );
+}
+
+/** Sales tools: view pipeline + proposals. */
+function SalesTools({ router }: { router: ReturnType<typeof useRouter> }) {
+  return (
+    <View style={{ flexDirection: "row", gap: 10 }}>
+      <ToolTile
+        icon="briefcase-outline"
+        title="View Pipeline"
+        subtitle="Open opportunities & proposals"
+        onPress={() => router.push("/(tabs)/leads" as Href)}
+      />
+      <ToolTile
+        icon="document-text-outline"
+        title="Reports"
+        subtitle="Customer-ready summaries"
+        onPress={() => router.push("/(tabs)/reports" as Href)}
+      />
+    </View>
+  );
+}
+
+/** Manager tools: jump straight to review queue and team view. */
+function ManagerTools({
+  pendingCount,
+  router,
+}: {
+  pendingCount: number;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const colors = useColors();
+  return (
+    <View style={{ gap: 10 }}>
+      {/* Review queue shortcut — highlighted when there are pending items */}
+      <Pressable
+        onPress={() => router.push("/(tabs)/review" as Href)}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          padding: 16,
+          borderRadius: 12,
+          backgroundColor: pendingCount > 0 ? colors.warning + "18" : colors.card,
+          borderWidth: 1,
+          borderColor: pendingCount > 0 ? colors.warning + "55" : colors.border,
+          gap: 12,
+          opacity: pressed ? 0.8 : 1,
+        })}
+      >
+        <Ionicons
+          name="checkmark-done-outline"
+          size={22}
+          color={pendingCount > 0 ? (colors.warning ?? "#d97706") : colors.primary}
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+            {pendingCount > 0
+              ? `${pendingCount} inspection${pendingCount === 1 ? "" : "s"} need review`
+              : "Review queue"}
+          </Text>
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+            Approve or flag for callback · target &lt;20 min
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+      </Pressable>
+
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <ToolTile
+          icon="people-circle-outline"
+          title="Team"
+          subtitle="Quality scores · badges"
+          onPress={() => router.push("/(tabs)/team" as Href)}
+        />
+        <ToolTile
+          icon="document-text-outline"
+          title="All Reports"
+          subtitle="Tech + sales output"
+          onPress={() => router.push("/(tabs)/reports" as Href)}
+        />
+      </View>
+    </View>
+  );
+}
+
+/** Owner comms quick-dial strip. */
+function OwnerCommsStrip() {
+  const colors = useColors();
+  const contacts = [
+    { label: "Manager",      icon: "shield-outline"   as const },
+    { label: "Sales Lead",   icon: "trending-up-outline" as const },
+    { label: "Tech Sup.",    icon: "construct-outline" as const },
+  ];
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+        Quick contacts
+      </Text>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        {contacts.map((c) => (
+          <View
+            key={c.label}
+            style={{
+              flex: 1,
+              padding: 12,
+              borderRadius: 12,
+              backgroundColor: colors.card,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: colors.primary + "18",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name={c.icon} size={20} color={colors.primary} />
+            </View>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+              {c.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -26,34 +342,64 @@ export default function DashboardScreen() {
   const { user } = useCurrentUser();
   const { isCompact } = useWindowSizeClass();
 
-  // Role-shaped briefing: the server decides the caller's role and returns
-  // exactly the section that role needs. The old role-agnostic dashboard
-  // queries stay as a fallback while the briefing loads (or if it errors) so
-  // the home tab never regresses to a blank screen.
+  const role = user?.role ?? "technician";
+  const isTech    = role === "technician";
+  const isSales   = role === "sales";
+  const isManager = role === "manager";
+  const isOwner   = role === "owner";
+
   const briefing = useQuery(getGetBriefingQueryOptions());
-  const dash = useQuery(getGetAnalyticsDashboardQueryOptions());
-  const recent = useQuery(getListInspectionsQueryOptions());
+  const dash     = useQuery(getGetAnalyticsDashboardQueryOptions());
 
-  const refreshing = briefing.isRefetching || dash.isRefetching || recent.isRefetching;
-  const onRefresh = () => {
-    briefing.refetch();
-    dash.refetch();
-    recent.refetch();
-  };
+  const refreshing = briefing.isRefetching || dash.isRefetching;
+  const onRefresh  = () => { briefing.refetch(); dash.refetch(); };
 
-  const stats = [
-    { label: "Total", value: dash.data?.totalInspections ?? 0, icon: "albums-outline", tone: colors.primary },
-    { label: "Completed", value: dash.data?.completedInspections ?? 0, icon: "checkmark-done-outline", tone: colors.success },
-    { label: "Open", value: dash.data?.openInspections ?? 0, icon: "time-outline", tone: colors.warning },
-    {
-      label: "Avg findings",
-      value: dash.data ? Math.round((dash.data.avgFindingsPerInspection ?? 0) * 10) / 10 : 0,
-      icon: "search-outline",
-      tone: colors.info,
-    },
-  ] as const;
+  const firstName = clerkUser?.firstName || role.charAt(0).toUpperCase() + role.slice(1);
 
-  const firstName = clerkUser?.firstName || "Technician";
+  // Manager pending approvals count (from briefing).
+  const pendingApprovals = briefing.data?.manager?.pendingApprovals ?? 0;
+
+  // Owner KPI strip values.
+  const ownerKpis = briefing.data?.owner
+    ? [
+        {
+          icon: "checkmark-done-outline" as const,
+          value: briefing.data.owner.kpis.completions30d,
+          label: "Completions\n(30 days)",
+          tone: colors.success ?? "#16a34a",
+        },
+        {
+          icon: "ribbon-outline" as const,
+          value: briefing.data.owner.kpis.avgQualityScore30d != null
+            ? Math.round(briefing.data.owner.kpis.avgQualityScore30d)
+            : "—",
+          label: "Avg quality\n(30 days)",
+          tone: colors.primary,
+        },
+        {
+          icon: "trending-up-outline" as const,
+          value: briefing.data.owner.kpis.openOpportunities,
+          label: "Open\nopportunities",
+          tone: colors.info ?? "#3b82f6",
+        },
+        {
+          icon: "stats-chart-outline" as const,
+          value: briefing.data.owner.kpis.approvedSummaries30d,
+          label: "Approved\nsummaries",
+          tone: colors.primary,
+        },
+      ]
+    : [];
+
+  // Role-specific greeting suffix.
+  const greetingRole =
+    isSales   ? "Sales"
+    : isManager ? "Manager"
+    : isOwner   ? "Owner"
+    : "";
+
+  // Header label for company.
+  const companyName = user?.company?.name;
 
   return (
     <Screen>
@@ -70,32 +416,27 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
+        {/* ── Header ──────────────────────────────────────────────────────── */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14 }}>
-              Welcome back,
+              Welcome back{greetingRole ? `, ${greetingRole}` : ""},
             </Text>
             <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 24 }}>
               {firstName}
             </Text>
-            {user?.company?.name ? (
+            {companyName ? (
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
-                {user.company.name}
+                {companyName}
               </Text>
             ) : null}
           </View>
           <Pressable
             onPress={() => router.push("/about" as Href)}
             style={{
-              width: 42,
-              height: 42,
-              borderRadius: 21,
-              backgroundColor: colors.card,
-              borderWidth: 1,
-              borderColor: colors.border,
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 8,
+              width: 42, height: 42, borderRadius: 21,
+              backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+              alignItems: "center", justifyContent: "center", marginRight: 8,
             }}
           >
             <Ionicons name="information-circle-outline" size={20} color={colors.mutedForeground} />
@@ -103,171 +444,96 @@ export default function DashboardScreen() {
           <Pressable
             onPress={() => signOut()}
             style={{
-              width: 42,
-              height: 42,
-              borderRadius: 21,
-              backgroundColor: colors.card,
-              borderWidth: 1,
-              borderColor: colors.border,
-              alignItems: "center",
-              justifyContent: "center",
+              width: 42, height: 42, borderRadius: 21,
+              backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+              alignItems: "center", justifyContent: "center",
             }}
           >
             <Ionicons name="log-out-outline" size={20} color={colors.mutedForeground} />
           </Pressable>
         </View>
 
-        {/* Primary CTA */}
-        <Pressable
-          onPress={() => router.push("/new-inspection" as Href)}
-          style={({ pressed }) => ({
-            backgroundColor: colors.primary,
-            borderRadius: colors.radius,
-            padding: 20,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 16,
-            opacity: pressed ? 0.9 : 1,
-          })}
-        >
-          <View
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: 14,
-              backgroundColor: "rgba(255,255,255,0.18)",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons name="camera" size={28} color={colors.primaryForeground} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_700Bold", fontSize: 18 }}>
-              Start AI Inspection
-            </Text>
-            <Text style={{ color: "rgba(255,255,255,0.85)", fontFamily: "Inter_400Regular", fontSize: 13 }}>
-              Capture evidence and get instant analysis
-            </Text>
-          </View>
-          <Ionicons name="arrow-forward" size={22} color={colors.primaryForeground} />
-        </Pressable>
-
-        {/* Quick tools row — role-gated utilities below the primary CTA */}
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <Pressable
-            onPress={() => router.push("/dataset/bulk-upload" as Href)}
-            style={({ pressed }) => ({
-              flex: 1,
-              backgroundColor: colors.card,
-              borderRadius: colors.radius,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 10,
-              opacity: pressed ? 0.75 : 1,
-            })}
-          >
-            <View
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 10,
-                backgroundColor: colors.accent,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="cloud-upload-outline" size={20} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
-                Upload Training Photos
-              </Text>
-              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-                Add historical data to dataset
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
-          </Pressable>
-        </View>
-
-        {briefing.data ? (
-          /* Role-adaptive briefing: technician, sales, manager, or owner view */
-          <RoleBriefingView briefing={briefing.data} />
+        {/* ── Role-specific hero CTA ──────────────────────────────────────── */}
+        {isTech ? (
+          <HeroCTA
+            icon="camera"
+            title="Start AI Inspection"
+            subtitle="Capture evidence and get instant analysis"
+            onPress={() => router.push("/new-inspection" as Href)}
+          />
+        ) : isSales ? (
+          <HeroCTA
+            icon="scan"
+            title="Start Property Scan"
+            subtitle="AI identifies vulnerabilities and recommends services"
+            onPress={() => router.push("/new-inspection" as Href)}
+          />
+        ) : isManager ? (
+          <HeroCTA
+            icon="checkmark-done-circle-outline"
+            title="Review Yesterday's Work"
+            subtitle={
+              pendingApprovals > 0
+                ? `${pendingApprovals} inspection${pendingApprovals === 1 ? "" : "s"} waiting · target <20 min`
+                : "All caught up — no pending reviews"
+            }
+            onPress={() => router.push("/(tabs)/review" as Href)}
+          />
         ) : (
-          <>
-            {/* Fallback (briefing loading or unavailable): legacy stats grid */}
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-              {stats.map((s) => (
-                <Card key={s.label} style={{ width: isCompact ? "47.5%" : "23%", gap: 8 }}>
-                  <Ionicons name={s.icon as keyof typeof Ionicons.glyphMap} size={22} color={s.tone} />
-                  <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 26 }}>
-                    {s.value}
-                  </Text>
-                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }}>
-                    {s.label}
-                  </Text>
-                </Card>
-              ))}
-            </View>
+          /* Owner */
+          <HeroCTA
+            icon="stats-chart-outline"
+            title="Daily Executive Briefing"
+            subtitle="Company-wide performance summary · ~30 min"
+            onPress={() => router.push("/(tabs)/reports" as Href)}
+          />
+        )}
 
-            {/* Recent activity */}
-            <View style={{ gap: 12 }}>
-              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 17 }}>
-                Recent activity
-              </Text>
-              {dash.data?.recentActivity?.length ? (
-                <Card padded={false}>
-                  {dash.data.recentActivity.slice(0, 6).map((a, i) => (
-                    <View
-                      key={a.id}
-                      style={{
-                        flexDirection: "row",
-                        gap: 12,
-                        padding: 14,
-                        borderTopWidth: i === 0 ? 0 : 1,
-                        borderTopColor: colors.border,
-                        alignItems: "center",
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 18,
-                          backgroundColor: colors.accent,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Ionicons name="pulse-outline" size={18} color={colors.primary} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          numberOfLines={1}
-                          style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}
-                        >
-                          {a.description}
-                        </Text>
-                        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-                          {a.technicianName} · {formatRelative(a.createdAt)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </Card>
-              ) : (
-                <Card>
-                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", textAlign: "center" }}>
-                    No activity yet. Start your first inspection above.
-                  </Text>
-                </Card>
-              )}
-            </View>
-          </>
+        {/* ── Owner KPI strip ─────────────────────────────────────────────── */}
+        {isOwner && ownerKpis.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+            {ownerKpis.map((kpi) => (
+              <KpiCard
+                key={kpi.label}
+                icon={kpi.icon}
+                value={kpi.value}
+                label={kpi.label}
+                tone={kpi.tone}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {/* ── Owner comms strip ───────────────────────────────────────────── */}
+        {isOwner ? <OwnerCommsStrip /> : null}
+
+        {/* ── Role-specific quick tools ───────────────────────────────────── */}
+        {isTech    ? <TechnicianTools router={router} /> : null}
+        {isSales   ? <SalesTools router={router} /> : null}
+        {isManager ? <ManagerTools pendingCount={pendingApprovals} router={router} /> : null}
+
+        {/* ── Role-adaptive briefing (server-shaped stats + lists) ─────────── */}
+        {briefing.data ? (
+          <RoleBriefingView briefing={briefing.data} />
+        ) : briefing.isLoading ? null : (
+          /* Briefing unavailable fallback — generic dashboard metrics */
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+            {[
+              { label: "Total", value: dash.data?.totalInspections ?? 0, icon: "albums-outline" as const, tone: colors.primary },
+              { label: "Completed", value: dash.data?.completedInspections ?? 0, icon: "checkmark-done-outline" as const, tone: colors.success ?? "#16a34a" },
+              { label: "Open", value: dash.data?.openInspections ?? 0, icon: "time-outline" as const, tone: colors.warning ?? "#d97706" },
+            ].map((s) => (
+              <Card key={s.label} style={{ width: isCompact ? "47.5%" : "30%", gap: 8 }}>
+                <Ionicons name={s.icon} size={22} color={s.tone} />
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 26 }}>
+                  {s.value}
+                </Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }}>
+                  {s.label}
+                </Text>
+              </Card>
+            ))}
+          </View>
         )}
       </ScrollView>
     </Screen>

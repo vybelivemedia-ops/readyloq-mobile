@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router25;
+    module.exports = Router29;
     module.exports.Route = Route;
-    function Router25(options) {
-      if (!(this instanceof Router25)) {
-        return new Router25(options);
+    function Router29(options) {
+      if (!(this instanceof Router29)) {
+        return new Router29(options);
       }
       const opts = options || {};
-      function router25(req, res, next) {
-        router25.handle(req, res, next);
+      function router29(req, res, next) {
+        router29.handle(req, res, next);
       }
-      Object.setPrototypeOf(router25, this);
-      router25.caseSensitive = opts.caseSensitive;
-      router25.mergeParams = opts.mergeParams;
-      router25.params = {};
-      router25.strict = opts.strict;
-      router25.stack = [];
-      return router25;
+      Object.setPrototypeOf(router29, this);
+      router29.caseSensitive = opts.caseSensitive;
+      router29.mergeParams = opts.mergeParams;
+      router29.params = {};
+      router29.strict = opts.strict;
+      router29.stack = [];
+      return router29;
     }
-    Router25.prototype = function() {
+    Router29.prototype = function() {
     };
-    Router25.prototype.param = function param(name, fn) {
+    Router29.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router25.prototype.handle = function handle(req, res, callback) {
+    Router29.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router25.prototype.use = function use(handler) {
+    Router29.prototype.use = function use(handler) {
       let offset = 0;
       let path2 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router25.prototype.route = function route(path2) {
+    Router29.prototype.route = function route(path2) {
       const route2 = new Route(path2);
       const layer = new Layer(path2, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router25.prototype[method] = function(path2) {
+      Router29.prototype[method] = function(path2) {
         const route = this.route(path2);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router25 = require_router();
+    var Router29 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router25 = null;
+      var router29 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router25 === null) {
-            router25 = new Router25({
+          if (router29 === null) {
+            router29 = new Router29({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router25;
+          return router29;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router25 = this.router;
+      var router29 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router25.use(path2, fn2);
+          return router29.use(path2, fn2);
         }
         debug7(".use app under %s", path2);
         fn2.mountpath = path2;
         fn2.parent = this;
-        router25.use(path2, function mounted_app(req, res, next) {
+        router29.use(path2, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter2 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router25 = require_router();
+    var Router29 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router25.Route;
-    exports.Router = Router25;
+    exports.Route = Router29.Route;
+    exports.Router = Router29;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express26 = __toESM(require_express2(), 1);
+var import_express30 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router25 = config2.router;
-  if (isPlainObject(router25)) {
-    newTarget = getTargetFromProxyTable(req, router25);
-  } else if (typeof router25 === "function") {
-    newTarget = await router25(req, res, config2);
+  const router29 = config2.router;
+  if (isPlainObject(router29)) {
+    newTarget = getTargetFromProxyTable(req, router29);
+  } else if (typeof router29 === "function") {
+    newTarget = await router29(req, res, config2);
   }
   return newTarget;
 }
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express25 = __toESM(require_express2(), 1);
+var import_express29 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -57291,13 +57291,16 @@ __export(schema_exports, {
   insertDatasetImageSchema: () => insertDatasetImageSchema,
   insertInspectionMediaSchema: () => insertInspectionMediaSchema,
   insertInspectionSchema: () => insertInspectionSchema,
+  insertLabelRulesSchema: () => insertLabelRulesSchema,
   insertLeadSchema: () => insertLeadSchema,
   insertMessageSchema: () => insertMessageSchema,
+  insertProductSchema: () => insertProductSchema,
   insertPropertyNoteSchema: () => insertPropertyNoteSchema,
   insertPropertyProfileSchema: () => insertPropertyProfileSchema,
   insertQuizSchema: () => insertQuizSchema,
   insertReportSchema: () => insertReportSchema,
   insertTrainingScoreSchema: () => insertTrainingScoreSchema,
+  insertTreatmentLogSchema: () => insertTreatmentLogSchema,
   inspectionMediaTable: () => inspectionMediaTable,
   inspectionScorecardsTable: () => inspectionScorecardsTable,
   inspectionsTable: () => inspectionsTable,
@@ -57313,12 +57316,20 @@ __export(schema_exports, {
   opportunityEventsTable: () => opportunityEventsTable,
   opportunityNotesTable: () => opportunityNotesTable,
   opportunitySettingsTable: () => opportunitySettingsTable,
+  productLabelRulesTable: () => productLabelRulesTable,
+  productWithRulesSchema: () => productWithRulesSchema,
+  productsTable: () => productsTable,
   propertyNotesTable: () => propertyNotesTable,
   propertyProfilesTable: () => propertyProfilesTable,
   quizzesTable: () => quizzesTable,
   reportsTable: () => reportsTable,
   salesProposalsTable: () => salesProposalsTable,
+  selectLabelRulesSchema: () => selectLabelRulesSchema,
+  selectProductSchema: () => selectProductSchema,
+  selectTreatmentLogSchema: () => selectTreatmentLogSchema,
+  technicianDailyRigsTable: () => technicianDailyRigsTable,
   trainingScoresTable: () => trainingScoresTable,
+  treatmentLogsTable: () => treatmentLogsTable,
   treatmentOutcomeEnum: () => treatmentOutcomeEnum,
   usersTable: () => usersTable
 });
@@ -68489,6 +68500,7 @@ function isColumnType(column, columnTypes) {
 function isWithEnum(column) {
   return "enumValues" in column && Array.isArray(column.enumValues) && column.enumValues.length > 0;
 }
+var isPgEnum2 = isWithEnum;
 var literalSchema = external_exports.union([external_exports.string(), external_exports.number(), external_exports.boolean(), external_exports.null()]);
 var jsonSchema = external_exports.union([
   literalSchema,
@@ -68699,10 +68711,26 @@ function handleColumns(columns, refinements, conditions, factory) {
   }
   return external_exports.object(columnSchemas);
 }
+function handleEnum(enum_, factory) {
+  const zod = factory?.zodInstance ?? external_exports;
+  return zod.enum(enum_.enumValues);
+}
+var selectConditions = {
+  never: () => false,
+  optional: () => false,
+  nullable: (column) => !column.notNull
+};
 var insertConditions = {
   never: (column) => column?.generated?.type === "always" || column?.generatedIdentity?.type === "always",
   optional: (column) => !column.notNull || column.notNull && column.hasDefault,
   nullable: (column) => !column.notNull
+};
+var createSelectSchema = (entity, refine2) => {
+  if (isPgEnum2(entity)) {
+    return handleEnum(entity);
+  }
+  const columns = getColumns(entity);
+  return handleColumns(columns, refine2 ?? {}, selectConditions);
 };
 var createInsertSchema = (entity, refine2) => {
   const columns = getColumns(entity);
@@ -69587,6 +69615,478 @@ var insertBaitStationSchema = createInsertSchema(baitStationsTable).omit({
   createdAt: true,
   companyId: true
 });
+
+// ../../lib/db/src/schema/products.ts
+var productsTable = pgTable(
+  "products",
+  {
+    id: serial("id").primaryKey(),
+    /** Display name, e.g. "Contrac Blox". */
+    name: text("name").notNull(),
+    /** EPA product registration number, e.g. "12455-76". */
+    epaRegistrationNumber: text("epa_registration_number"),
+    /** "restricted-use" | "general-use" */
+    productType: text("product_type").notNull(),
+    /** Human-readable active ingredient list, e.g. "Bromadiolone 0.005%". */
+    activeIngredients: text("active_ingredients").notNull(),
+    /** "DANGER" | "WARNING" | "CAUTION" | "NONE" */
+    signalWord: text("signal_word"),
+    manufacturerName: text("manufacturer_name"),
+    /** Soft-delete: inactive products are hidden from quick-pick but kept for
+     *  historical treatment log references. */
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow()
+  },
+  (t) => [index("products_type_idx").on(t.productType)]
+);
+var productLabelRulesTable = pgTable("product_label_rules", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => productsTable.id, { onDelete: "cascade" }),
+  // ── Guardrail 1: approved pests ──────────────────────────────────────────
+  /** Array of pest type strings matching the mobile app's PEST_TYPES constants
+   *  (e.g. ["Rodents", "Ants"]). */
+  approvedPestTypes: jsonb("approved_pest_types").$type().notNull().default([]),
+  // ── Guardrail 2: approved sites ──────────────────────────────────────────
+  /** Array of site classification slugs (e.g. ["residential_interior",
+   *  "commercial_exterior"]). Checked against the technician's selected site
+   *  before allowing the application to proceed. */
+  approvedSiteClassifications: jsonb("approved_site_classifications").$type().notNull().default([]),
+  // ── Guardrail 3: equipment ────────────────────────────────────────────────
+  /** Human-readable equipment type slugs required by the label
+   *  (e.g. ["compressed_air_sprayer", "crack_crevice_tip"]). */
+  requiredEquipmentTypes: jsonb("required_equipment_types").$type().notNull().default([]),
+  /** Nozzle specification text from the label (e.g. "Fan-tip, 8002 flat fan"). */
+  nozzleSpec: text("nozzle_spec"),
+  /** Operating pressure range from the label (e.g. "30–60 psi"). */
+  pressurePsi: text("pressure_psi"),
+  /** Required droplet size classification (e.g. "Fine to medium"). */
+  dropletSize: text("droplet_size"),
+  // ── Guardrail 4: application rates ───────────────────────────────────────
+  /** Maximum label rate in fluid ounces of product per 1,000 sq ft. Used to
+   *  validate the rate calculator and block over-limit submissions (422). */
+  maxRateOzPer1000Sqft: real("max_rate_oz_per_1000sqft"),
+  /** Maximum label concentration in fluid ounces of product per gallon of
+   *  finished spray solution. */
+  maxRateOzPerGallon: real("max_rate_oz_per_gallon"),
+  // ── Guardrail 5: mixing directions ───────────────────────────────────────
+  /** Ordered array of plain-text mixing/dilution steps from the label. */
+  mixingSteps: jsonb("mixing_steps").$type().notNull().default([]),
+  // ── Guardrail 6: environmental warnings ──────────────────────────────────
+  /** Maximum ambient temperature (°F) for safe application per the label. */
+  maxTempF: integer("max_temp_f"),
+  /** Plant damage / phytotoxicity warning text from the label; null if none. */
+  phytotoxicityNotes: text("phytotoxicity_notes"),
+  /** Restricted-entry interval in hours (how long after application before
+   *  re-entry without PPE). */
+  reEntryIntervalHours: real("re_entry_interval_hours"),
+  createdAt: timestamp("created_at").notNull().defaultNow()
+});
+var insertProductSchema = createInsertSchema(productsTable).omit({
+  id: true,
+  createdAt: true
+});
+var selectProductSchema = createSelectSchema(productsTable);
+var insertLabelRulesSchema = createInsertSchema(
+  productLabelRulesTable
+).omit({ id: true, createdAt: true });
+var selectLabelRulesSchema = createSelectSchema(productLabelRulesTable);
+var productWithRulesSchema = selectProductSchema.extend({
+  labelRules: selectLabelRulesSchema.nullable()
+});
+
+// ../../lib/db/src/schema/treatment-logs.ts
+var treatmentLogsTable = pgTable(
+  "treatment_logs",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id),
+    inspectionId: integer("inspection_id").notNull().references(() => inspectionsTable.id, { onDelete: "cascade" }),
+    productId: integer("product_id").notNull().references(() => productsTable.id),
+    /** Clerk user ID of the applying technician (for FIFRA record-keeping). */
+    technicianId: text("technician_id"),
+    // ── Application details ────────────────────────────────────────────────
+    /** Target pest type, e.g. "Rodents" (must match PEST_TYPES). */
+    targetPest: text("target_pest").notNull(),
+    /** Site classification slug, e.g. "residential_interior". */
+    siteClassification: text("site_classification").notNull(),
+    // ── Area / measurement ─────────────────────────────────────────────────
+    /** Treated area in square feet; null for linear-footage applications. */
+    areaSqft: real("area_sqft"),
+    /** Treated linear footage; null for area applications. */
+    linearFt: real("linear_ft"),
+    // ── Mix / rate ─────────────────────────────────────────────────────────
+    /** Actual dilution used in oz of product per gallon of water. */
+    dilutionOzPerGallon: real("dilution_oz_per_gallon"),
+    /** Total product volume applied in fluid ounces. Used for rate validation:
+     *  appliedRate = (totalProductOz / areaSqft) × 1000 must not exceed
+     *  label_rules.maxRateOzPer1000Sqft. */
+    totalProductOz: real("total_product_oz"),
+    // ── Equipment ──────────────────────────────────────────────────────────
+    /** Equipment type used (technician-confirmed, e.g. "compressed_air_sprayer"). */
+    equipmentUsed: text("equipment_used"),
+    // ── Checklist ─────────────────────────────────────────────────────────
+    /** Completed pre-mix checklist items (PPE + mixing steps). */
+    checklistItems: jsonb("checklist_items").$type().default([]),
+    // ── Environmental ─────────────────────────────────────────────────────
+    /** Ambient temperature at time of application (°F), technician-entered. */
+    tempAtApplicationF: integer("temp_at_application_f"),
+    /** True when the technician explicitly acknowledged an environmental
+     *  warning (over-temp or phytotoxicity risk). */
+    environmentalWarningAcknowledged: boolean("environmental_warning_acknowledged").notNull().default(false),
+    notes: text("notes"),
+    /** When the product was applied (defaults to submission time). */
+    appliedAt: timestamp("applied_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow()
+  },
+  (t) => [
+    index("treatment_logs_inspection_idx").on(t.inspectionId),
+    index("treatment_logs_company_idx").on(t.companyId),
+    index("treatment_logs_technician_idx").on(t.technicianId),
+    index("treatment_logs_product_idx").on(t.productId)
+  ]
+);
+var insertTreatmentLogSchema = createInsertSchema(
+  treatmentLogsTable
+).omit({ id: true, createdAt: true, companyId: true });
+var selectTreatmentLogSchema = createSelectSchema(treatmentLogsTable);
+
+// ../../lib/db/src/schema/daily-rigs.ts
+var technicianDailyRigsTable = pgTable(
+  "technician_daily_rigs",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id),
+    /** Clerk userId — the technician who owns this rig configuration. */
+    technicianId: text("technician_id").notNull(),
+    /** ISO date string "YYYY-MM-DD" — the day this rig configuration applies to. */
+    rigDate: date("rig_date").notNull(),
+    /**
+     * @deprecated Use `assignments` instead.
+     * Kept for zero-downtime migration; API reads `assignments` with fallback.
+     */
+    productIds: jsonb("product_ids").$type().default([]),
+    /**
+     * Ordered list of product-to-pest route assignments for this day.
+     * Replaces the simpler `productIds` inventory model.
+     */
+    assignments: jsonb("assignments").$type().notNull().default([]),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow()
+  },
+  (t) => [
+    uniqueIndex("daily_rigs_tech_date_uq").on(t.companyId, t.technicianId, t.rigDate),
+    index("daily_rigs_company_date_idx").on(t.companyId, t.rigDate),
+    index("daily_rigs_technician_idx").on(t.technicianId)
+  ]
+);
+
+// ../../lib/db/src/seed/products.ts
+var SEED_PRODUCTS = [
+  {
+    name: "Contrac Blox",
+    epaRegistrationNumber: "12455-76",
+    productType: "restricted-use",
+    activeIngredients: "Bromadiolone 0.005%",
+    signalWord: "CAUTION",
+    manufacturerName: "Bell Laboratories",
+    labelRules: {
+      approvedPestTypes: ["Rodents"],
+      approvedSiteClassifications: [
+        "residential_interior",
+        "residential_exterior",
+        "commercial_interior",
+        "commercial_exterior",
+        "structural_void"
+      ],
+      requiredEquipmentTypes: ["tamper_resistant_bait_station"],
+      nozzleSpec: null,
+      pressurePsi: null,
+      dropletSize: null,
+      maxRateOzPer1000Sqft: null,
+      // bait-placement product — rate is per station, not area
+      maxRateOzPerGallon: null,
+      mixingSteps: [
+        "Place one 2 oz block per tamper-resistant bait station.",
+        "Position stations along rodent runways, burrow openings, and harborage areas.",
+        "Space stations every 15\u201330 ft for mice, every 30\u201350 ft for rats.",
+        "Wear nitrile gloves when handling bait blocks.",
+        "Do not place bait where children, pets, or non-target animals may contact it.",
+        "Inspect stations every 15 days and replenish bait until activity ceases."
+      ],
+      maxTempF: 110,
+      phytotoxicityNotes: null,
+      reEntryIntervalHours: 0
+    }
+  },
+  {
+    name: "Termidor SC",
+    epaRegistrationNumber: "279-9143",
+    productType: "restricted-use",
+    activeIngredients: "Fipronil 9.1%",
+    signalWord: "WARNING",
+    manufacturerName: "BASF Corporation",
+    labelRules: {
+      approvedPestTypes: ["Termites", "Ants"],
+      approvedSiteClassifications: [
+        "residential_exterior",
+        "commercial_exterior",
+        "structural_void",
+        "perimeter"
+      ],
+      requiredEquipmentTypes: ["power_sprayer", "soil_injection_rod"],
+      nozzleSpec: "Soil injection rod (12-inch spacing) or flat-fan tip for perimeter spray",
+      pressurePsi: "150 psi (injection) / 25\u201340 psi (surface spray)",
+      dropletSize: "Coarse (surface) / N/A (soil injection)",
+      maxRateOzPer1000Sqft: 4,
+      maxRateOzPerGallon: 0.8,
+      mixingSteps: [
+        "Fill tank half-full with water.",
+        "Measure Termidor SC at 0.8 fl oz per gallon for a 0.06% finished solution.",
+        "Add product to tank with agitation running.",
+        "Fill remainder with water and agitate for 2 minutes.",
+        "Apply 4 gallons of finished solution per 10 linear feet of foundation (per side).",
+        "Rod-inject at 12-inch horizontal intervals to a depth of 6 inches.",
+        "Wear chemical-resistant gloves, eye protection, and long sleeves during mixing and application."
+      ],
+      maxTempF: 95,
+      phytotoxicityNotes: "Avoid contact with ornamental plants, turf, and water bodies. Product is for soil applications only; overspray onto foliage can cause phytotoxic symptoms.",
+      reEntryIntervalHours: 12
+    }
+  },
+  {
+    name: "Demand CS",
+    epaRegistrationNumber: "100-1066",
+    productType: "restricted-use",
+    activeIngredients: "Lambda-cyhalothrin 9.7%",
+    signalWord: "WARNING",
+    manufacturerName: "Syngenta",
+    labelRules: {
+      approvedPestTypes: [
+        "Cockroaches",
+        "Ants",
+        "Spiders",
+        "Bed Bugs",
+        "Flies"
+      ],
+      approvedSiteClassifications: [
+        "residential_interior",
+        "residential_exterior",
+        "commercial_interior",
+        "commercial_exterior",
+        "perimeter"
+      ],
+      requiredEquipmentTypes: ["compressed_air_sprayer"],
+      nozzleSpec: "8002 flat-fan or low-pressure fan nozzle",
+      pressurePsi: "40\u201360 psi",
+      dropletSize: "Fine to medium",
+      maxRateOzPer1000Sqft: 0.8,
+      maxRateOzPerGallon: 0.8,
+      mixingSteps: [
+        "Fill sprayer tank halfway with water.",
+        "Measure Demand CS at 0.2\u20130.8 fl oz per gallon depending on pest pressure.",
+        "Add product to tank; mix by swirling or agitation.",
+        "Fill remainder of tank with water.",
+        "Agitate before and during application to maintain uniform suspension.",
+        "Apply 1 gallon of finished solution per 1,000 sq ft as a coarse, low-pressure spray."
+      ],
+      maxTempF: 95,
+      phytotoxicityNotes: "May cause spotting or marginal leaf burn on sensitive ornamental plants. Avoid direct application to flowers, new growth, and foliage of houseplants.",
+      reEntryIntervalHours: 12
+    }
+  },
+  {
+    name: "Phantom SC",
+    epaRegistrationNumber: "241-392",
+    productType: "restricted-use",
+    activeIngredients: "Chlorfenapyr 21.45%",
+    signalWord: "CAUTION",
+    manufacturerName: "BASF Corporation",
+    labelRules: {
+      approvedPestTypes: ["Cockroaches", "Bed Bugs", "Ants"],
+      approvedSiteClassifications: [
+        "residential_interior",
+        "commercial_interior",
+        "food_handling_area",
+        "structural_void"
+      ],
+      requiredEquipmentTypes: [
+        "compressed_air_sprayer",
+        "crack_crevice_tip"
+      ],
+      nozzleSpec: "Pin-stream or crack-and-crevice injection tip; do not use fan nozzle for indoor spot treatments",
+      pressurePsi: "20\u201340 psi",
+      dropletSize: "Coarse (crack-and-crevice stream)",
+      maxRateOzPer1000Sqft: 0.25,
+      maxRateOzPerGallon: 0.5,
+      mixingSteps: [
+        "Measure 0.5 fl oz of Phantom SC per gallon of water.",
+        "Fill sprayer with half the required water.",
+        "Add product and swirl gently.",
+        "Fill to final volume with water.",
+        "Apply ONLY as a spot treatment or crack-and-crevice treatment.",
+        "Do not apply as a broadcast spray to food-contact surfaces. Cover or remove food and utensils before application in food-handling areas."
+      ],
+      maxTempF: 100,
+      phytotoxicityNotes: null,
+      reEntryIntervalHours: 4
+    }
+  },
+  {
+    name: "Talstar P Granules",
+    epaRegistrationNumber: "279-9538",
+    productType: "general-use",
+    activeIngredients: "Bifenthrin 0.2%",
+    signalWord: "CAUTION",
+    manufacturerName: "FMC Corporation",
+    labelRules: {
+      approvedPestTypes: ["Ants", "Cockroaches", "Spiders", "Flies"],
+      approvedSiteClassifications: [
+        "residential_exterior",
+        "commercial_exterior",
+        "turf_lawn",
+        "perimeter"
+      ],
+      requiredEquipmentTypes: ["granular_spreader"],
+      nozzleSpec: null,
+      pressurePsi: null,
+      dropletSize: null,
+      maxRateOzPer1000Sqft: 32,
+      // 2 lb per 1,000 sq ft = 32 oz
+      maxRateOzPerGallon: null,
+      mixingSteps: [
+        "Calibrate granular spreader per manufacturer specifications before use.",
+        "Set spreader to deliver 1\u20132 lb of product per 1,000 sq ft.",
+        "Apply granules uniformly to the target area.",
+        "Irrigate with 0.25 inch of water immediately after application to activate product.",
+        "Do not apply when rain is expected within 24 hours.",
+        "Keep children and pets off treated area until irrigation water has dried."
+      ],
+      maxTempF: 90,
+      phytotoxicityNotes: "May temporarily yellow cool-season grasses at the high label rate. Irrigate immediately after application to minimize phytotoxic risk.",
+      reEntryIntervalHours: 12
+    }
+  },
+  {
+    name: "Gentrol IGR Concentrate",
+    epaRegistrationNumber: "2724-351",
+    productType: "general-use",
+    activeIngredients: "Hydroprene 9.0%",
+    signalWord: "CAUTION",
+    manufacturerName: "Wellmark International",
+    labelRules: {
+      approvedPestTypes: ["Stored Product Pests", "Cockroaches"],
+      approvedSiteClassifications: [
+        "food_handling_area",
+        "commercial_interior",
+        "residential_interior"
+      ],
+      requiredEquipmentTypes: ["compressed_air_sprayer"],
+      nozzleSpec: "Flat-fan or flood nozzle for surface application",
+      pressurePsi: "20\u201340 psi",
+      dropletSize: "Medium",
+      maxRateOzPer1000Sqft: 1,
+      maxRateOzPerGallon: 1,
+      mixingSteps: [
+        "Measure 1 fl oz of Gentrol per gallon of water for general surface application.",
+        "Fill sprayer halfway with water; add product.",
+        "Fill to final volume and agitate gently.",
+        "Apply 1 gallon of finished solution per 1,000 sq ft as a light surface spray.",
+        "In food-handling areas, apply to cracks, crevices, and under equipment only. Do not apply to food-contact surfaces.",
+        "Allow treated surfaces to dry completely before allowing re-entry."
+      ],
+      maxTempF: 100,
+      phytotoxicityNotes: null,
+      reEntryIntervalHours: 2
+    }
+  },
+  {
+    name: "Zenprox EC",
+    epaRegistrationNumber: "53883-216",
+    productType: "restricted-use",
+    activeIngredients: "Etofenprox 23.2%",
+    signalWord: "WARNING",
+    manufacturerName: "Wellmark International",
+    labelRules: {
+      approvedPestTypes: ["Flies", "Spiders"],
+      approvedSiteClassifications: [
+        "residential_exterior",
+        "commercial_exterior",
+        "turf_lawn"
+      ],
+      requiredEquipmentTypes: ["ulv_sprayer", "thermal_fogger"],
+      nozzleSpec: "Rotary atomizer (ULV) or thermal fogger nozzle; calibrate to deliver VMD 15\u201325 microns",
+      pressurePsi: "N/A (ULV/fogger \u2014 volume-metered delivery)",
+      dropletSize: "Ultra-fine (VMD 15\u201325 \xB5m)",
+      maxRateOzPer1000Sqft: 1,
+      maxRateOzPerGallon: 1,
+      mixingSteps: [
+        "Determine total treatment area and calculate product quantity needed.",
+        "Add Zenprox EC to equipment tank at label rate (0.5\u20131.0 fl oz per 1,000 sq ft).",
+        "Calibrate ULV or fogger equipment to deliver labeled droplet size (VMD 15\u201325 \xB5m).",
+        "Apply during calm conditions (wind speed < 5 mph) to prevent drift.",
+        "Do not apply immediately before or during rain.",
+        "Wear chemical-resistant gloves, eye protection, long sleeves, and a NIOSH-approved respirator."
+      ],
+      maxTempF: 85,
+      phytotoxicityNotes: "Do not apply directly to ornamental plants, water features, or aquatic areas. Maintain a minimum 25-foot buffer from ponds, streams, and wetlands.",
+      reEntryIntervalHours: 4
+    }
+  },
+  {
+    name: "Temprid FX",
+    epaRegistrationNumber: "3125-516",
+    productType: "general-use",
+    activeIngredients: "Imidacloprid 21.0%, Beta-cyfluthrin 10.5%",
+    signalWord: "WARNING",
+    manufacturerName: "Bayer Environmental Science",
+    labelRules: {
+      approvedPestTypes: ["Cockroaches", "Bed Bugs", "Ants", "Spiders"],
+      approvedSiteClassifications: [
+        "residential_interior",
+        "residential_exterior",
+        "commercial_interior",
+        "commercial_exterior"
+      ],
+      requiredEquipmentTypes: ["compressed_air_sprayer"],
+      nozzleSpec: "Fan or coarse-droplet nozzle for crack-and-crevice or broadcast",
+      pressurePsi: "30\u201350 psi",
+      dropletSize: "Medium to coarse",
+      maxRateOzPer1000Sqft: 0.27,
+      maxRateOzPerGallon: 0.27,
+      mixingSteps: [
+        "Fill sprayer half-full with clean water.",
+        "Measure 0.27 fl oz (8 mL) of Temprid FX per liter of finished spray.",
+        "Add product to tank with agitation.",
+        "Fill to desired final volume and mix thoroughly.",
+        "Apply as crack-and-crevice, spot, or broadcast treatment at 1 gallon per 1,000 sq ft.",
+        "Wear chemical-resistant gloves and eye protection during mixing and application."
+      ],
+      maxTempF: 95,
+      phytotoxicityNotes: "Avoid application to ornamental plants in bloom; product contains a neonicotinoid \u2014 potential bee toxicity risk in flowering areas.",
+      reEntryIntervalHours: 12
+    }
+  }
+];
+async function ensureProductsSeed() {
+  for (const seed of SEED_PRODUCTS) {
+    const [existing] = await db.select({ id: productsTable.id }).from(productsTable).where(eq(productsTable.epaRegistrationNumber, seed.epaRegistrationNumber)).limit(1);
+    if (existing) continue;
+    const [product] = await db.insert(productsTable).values({
+      name: seed.name,
+      epaRegistrationNumber: seed.epaRegistrationNumber,
+      productType: seed.productType,
+      activeIngredients: seed.activeIngredients,
+      signalWord: seed.signalWord,
+      manufacturerName: seed.manufacturerName,
+      isActive: true
+    }).returning();
+    if (!product) continue;
+    await db.insert(productLabelRulesTable).values({
+      productId: product.id,
+      ...seed.labelRules
+    });
+  }
+}
 
 // ../../lib/db/src/index.ts
 var { Pool: Pool3 } = esm_default;
@@ -92967,8 +93467,248 @@ router22.delete("/:stationId", async (req, res) => {
 });
 var bait_stations_default = router22;
 
-// src/routes/crm.ts
+// src/routes/products.ts
 var import_express24 = __toESM(require_express2(), 1);
+var router23 = (0, import_express24.Router)();
+function serializeProduct(p, lr) {
+  return {
+    ...p,
+    createdAt: p.createdAt.toISOString(),
+    labelRules: lr ? { ...lr, createdAt: lr.createdAt.toISOString() } : null
+  };
+}
+router23.get("/", async (req, res) => {
+  try {
+    const pest = typeof req.query.pest === "string" && req.query.pest ? req.query.pest : null;
+    const site = typeof req.query.site === "string" && req.query.site ? req.query.site : null;
+    const rows = await db.select({ product: productsTable, labelRules: productLabelRulesTable }).from(productsTable).leftJoin(
+      productLabelRulesTable,
+      eq(productLabelRulesTable.productId, productsTable.id)
+    ).where(eq(productsTable.isActive, true));
+    let filtered = rows;
+    if (pest) {
+      filtered = filtered.filter(
+        (r) => r.labelRules?.approvedPestTypes?.includes(pest)
+      );
+    }
+    if (site) {
+      filtered = filtered.filter(
+        (r) => r.labelRules?.approvedSiteClassifications?.includes(site)
+      );
+    }
+    return res.json(
+      filtered.map((r) => serializeProduct(r.product, r.labelRules))
+    );
+  } catch {
+    return res.status(500).json({ error: "Failed to list products" });
+  }
+});
+router23.get("/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Invalid product ID" });
+    }
+    const [row] = await db.select({ product: productsTable, labelRules: productLabelRulesTable }).from(productsTable).leftJoin(
+      productLabelRulesTable,
+      eq(productLabelRulesTable.productId, productsTable.id)
+    ).where(and(eq(productsTable.id, id), eq(productsTable.isActive, true)));
+    if (!row) return res.status(404).json({ error: "Product not found" });
+    return res.json(serializeProduct(row.product, row.labelRules));
+  } catch {
+    return res.status(500).json({ error: "Failed to get product" });
+  }
+});
+router23.get("/:id/label-rules", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Invalid product ID" });
+    }
+    const [row] = await db.select().from(productLabelRulesTable).where(eq(productLabelRulesTable.productId, id));
+    if (!row) return res.status(404).json({ error: "Label rules not found" });
+    return res.json({ ...row, createdAt: row.createdAt.toISOString() });
+  } catch {
+    return res.status(500).json({ error: "Failed to get label rules" });
+  }
+});
+var products_default = router23;
+
+// src/routes/treatment-logs.ts
+var import_express25 = __toESM(require_express2(), 1);
+var router24 = (0, import_express25.Router)({ mergeParams: true });
+var checklistItemSchema = external_exports.object({
+  label: external_exports.string().min(1),
+  checked: external_exports.boolean()
+});
+var createTreatmentLogSchema = external_exports.object({
+  productId: external_exports.number().int().positive(),
+  targetPest: external_exports.string().min(1),
+  siteClassification: external_exports.string().min(1),
+  areaSqft: external_exports.number().positive().optional(),
+  linearFt: external_exports.number().positive().optional(),
+  dilutionOzPerGallon: external_exports.number().positive().optional(),
+  totalProductOz: external_exports.number().positive().optional(),
+  equipmentUsed: external_exports.string().optional(),
+  checklistItems: external_exports.array(checklistItemSchema).optional(),
+  tempAtApplicationF: external_exports.number().int().optional(),
+  environmentalWarningAcknowledged: external_exports.boolean().default(false),
+  notes: external_exports.string().optional(),
+  appliedAt: external_exports.string().datetime().optional()
+});
+function serializeLog(row) {
+  return {
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+    appliedAt: row.appliedAt.toISOString()
+  };
+}
+router24.post("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    if (Number.isNaN(inspectionId)) {
+      return res.status(400).json({ error: "Invalid inspection ID" });
+    }
+    const [inspection] = await db.select({ id: inspectionsTable.id }).from(inspectionsTable).where(
+      and(
+        eq(inspectionsTable.id, inspectionId),
+        eq(inspectionsTable.companyId, companyId)
+      )
+    ).limit(1);
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+    const parse4 = createTreatmentLogSchema.safeParse(req.body);
+    if (!parse4.success) {
+      return res.status(400).json({ error: "Invalid body", detail: parse4.error.issues });
+    }
+    const data = parse4.data;
+    const [labelRulesRow] = await db.select({ labelRules: productLabelRulesTable, product: productsTable }).from(productLabelRulesTable).innerJoin(productsTable, eq(productsTable.id, productLabelRulesTable.productId)).where(eq(productLabelRulesTable.productId, data.productId)).limit(1);
+    if (!labelRulesRow) {
+      return res.status(404).json({ error: "Product or label rules not found" });
+    }
+    const { labelRules, product } = labelRulesRow;
+    const maxRate = labelRules.maxRateOzPer1000Sqft;
+    if (maxRate !== null) {
+      const hasArea = data.areaSqft !== void 0 || data.linearFt !== void 0;
+      const hasVolume = data.totalProductOz !== void 0;
+      if (!hasArea || !hasVolume) {
+        return res.status(422).json({
+          error: "rate_inputs_required",
+          message: `${product.name} has a label-defined maximum application rate. At least one area measurement (sq ft or linear ft) and total product volume (fl oz) are required.`
+        });
+      }
+    }
+    const approvedPests = labelRules.approvedPestTypes ?? [];
+    if (approvedPests.length > 0 && !approvedPests.includes(data.targetPest)) {
+      return res.status(422).json({
+        error: "pest_not_approved",
+        message: `${product.name} is not labelled for "${data.targetPest}". Approved pests: ${approvedPests.join(", ")}.`
+      });
+    }
+    const approvedSites = labelRules.approvedSiteClassifications ?? [];
+    if (approvedSites.length > 0 && !approvedSites.includes(data.siteClassification)) {
+      return res.status(422).json({
+        error: "site_not_approved",
+        message: `${product.name} is not labelled for site "${data.siteClassification}". Approved sites: ${approvedSites.join(", ")}.`
+      });
+    }
+    const expectedChecklistCount = (labelRules.ppeRequired?.length ?? 0) + (labelRules.requiresSuit ? 1 : 0) + (labelRules.requiresRespirator ? 1 : 0) + (labelRules.mixingSteps?.length ?? 0);
+    if (expectedChecklistCount > 0) {
+      const submitted = data.checklistItems ?? [];
+      if (submitted.length < expectedChecklistCount) {
+        return res.status(422).json({
+          error: "checklist_incomplete",
+          message: `Pre-mix safety checklist is incomplete. ${submitted.length} of ${expectedChecklistCount} required items submitted.`
+        });
+      }
+      const allChecked = submitted.every((item) => item.checked);
+      if (!allChecked) {
+        return res.status(422).json({
+          error: "checklist_items_unchecked",
+          message: "All pre-mix safety checklist items must be checked before recording an application."
+        });
+      }
+    }
+    const tempExceeded = labelRules.maxTempF !== null && data.tempAtApplicationF !== void 0 && data.tempAtApplicationF > labelRules.maxTempF;
+    const hasPhytoRisk = labelRules.phytotoxicityNotes !== null;
+    if ((tempExceeded || hasPhytoRisk) && !data.environmentalWarningAcknowledged) {
+      return res.status(422).json({
+        error: "environmental_warning_not_acknowledged",
+        message: "Environmental conditions exceed label guidance. Technician must acknowledge the warning before this application can be recorded."
+      });
+    }
+    if (maxRate !== null && data.totalProductOz !== void 0 && data.areaSqft !== void 0 && data.areaSqft > 0) {
+      const appliedRate = data.totalProductOz / data.areaSqft * 1e3;
+      if (appliedRate > maxRate) {
+        return res.status(422).json({
+          error: "rate_exceeds_label_maximum",
+          message: `Application rate of ${appliedRate.toFixed(2)} oz/1,000 sq ft exceeds the label maximum of ${maxRate} oz/1,000 sq ft for ${product.name}.`,
+          appliedRate: parseFloat(appliedRate.toFixed(4)),
+          maxRate,
+          productName: product.name
+        });
+      }
+    }
+    const [row] = await db.insert(treatmentLogsTable).values({
+      companyId,
+      inspectionId,
+      productId: data.productId,
+      technicianId: req.user?.clerkUserId ?? null,
+      targetPest: data.targetPest,
+      siteClassification: data.siteClassification,
+      areaSqft: data.areaSqft ?? null,
+      linearFt: data.linearFt ?? null,
+      dilutionOzPerGallon: data.dilutionOzPerGallon ?? null,
+      totalProductOz: data.totalProductOz ?? null,
+      equipmentUsed: data.equipmentUsed ?? null,
+      checklistItems: data.checklistItems ?? [],
+      tempAtApplicationF: data.tempAtApplicationF ?? null,
+      environmentalWarningAcknowledged: data.environmentalWarningAcknowledged,
+      notes: data.notes ?? null,
+      appliedAt: data.appliedAt ? new Date(data.appliedAt) : /* @__PURE__ */ new Date()
+    }).returning();
+    if (!row) return res.status(500).json({ error: "Failed to create treatment log" });
+    return res.status(201).json(serializeLog(row));
+  } catch {
+    return res.status(500).json({ error: "Failed to create treatment log" });
+  }
+});
+router24.get("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    if (Number.isNaN(inspectionId)) {
+      return res.status(400).json({ error: "Invalid inspection ID" });
+    }
+    const rows = await db.select({
+      log: treatmentLogsTable,
+      product: productsTable
+    }).from(treatmentLogsTable).leftJoin(productsTable, eq(productsTable.id, treatmentLogsTable.productId)).where(
+      and(
+        eq(treatmentLogsTable.inspectionId, inspectionId),
+        eq(treatmentLogsTable.companyId, companyId)
+      )
+    );
+    return res.json(
+      rows.map((r) => ({
+        ...serializeLog(r.log),
+        product: r.product ? {
+          id: r.product.id,
+          name: r.product.name,
+          productType: r.product.productType,
+          activeIngredients: r.product.activeIngredients,
+          epaRegistrationNumber: r.product.epaRegistrationNumber
+        } : null
+      }))
+    );
+  } catch {
+    return res.status(500).json({ error: "Failed to list treatment logs" });
+  }
+});
+var treatment_logs_default = router24;
+
+// src/routes/crm.ts
+var import_express26 = __toESM(require_express2(), 1);
 
 // src/services/integration/adapters/fieldRoutesAdapter.ts
 var FieldRoutesAdapter = class {
@@ -93158,8 +93898,8 @@ function getEnvCRMAdapter() {
 }
 
 // src/routes/crm.ts
-var router23 = (0, import_express24.Router)();
-router23.get("/clients", async (req, res) => {
+var router25 = (0, import_express26.Router)();
+router25.get("/clients", async (req, res) => {
   const adapter = getEnvCRMAdapter();
   if (!adapter) {
     return res.status(503).json({
@@ -93174,7 +93914,7 @@ router23.get("/clients", async (req, res) => {
     return res.status(502).json({ error: `CRM request failed: ${message}` });
   }
 });
-router23.post("/inspections/:inspectionId/push", async (req, res) => {
+router25.post("/inspections/:inspectionId/push", async (req, res) => {
   const adapter = getEnvCRMAdapter();
   if (!adapter) {
     return res.status(503).json({
@@ -93214,7 +93954,7 @@ router23.post("/inspections/:inspectionId/push", async (req, res) => {
     return res.status(502).json({ error: `CRM push failed: ${message}` });
   }
 });
-router23.get("/status", (_req, res) => {
+router25.get("/status", (_req, res) => {
   const hasFieldRoutes = !!process.env.FIELDROUTES_API_KEY && !!process.env.FIELDROUTES_API_TOKEN;
   const hasPestPac = !!process.env.PESTPAC_API_KEY;
   if (hasFieldRoutes) {
@@ -93234,21 +93974,239 @@ function extractFindings(raw) {
     notes: String(f.notes ?? f.description ?? "")
   }));
 }
-var crm_default = router23;
+var crm_default = router25;
+
+// src/routes/daily-rig.ts
+var import_express27 = __toESM(require_express2(), 1);
+var router26 = (0, import_express27.Router)();
+function todayUtc() {
+  return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+}
+async function enrichAssignments(assignments) {
+  if (assignments.length === 0) return [];
+  const productIds = [...new Set(assignments.map((a) => a.productId))];
+  const rows = await db.select({ product: productsTable, labelRules: productLabelRulesTable }).from(productsTable).leftJoin(productLabelRulesTable, eq(productLabelRulesTable.productId, productsTable.id)).where(inArray(productsTable.id, productIds));
+  const productMap = new Map(rows.map((r) => [r.product.id, r]));
+  return assignments.map((a) => {
+    const row = productMap.get(a.productId);
+    return {
+      ...a,
+      product: row ? { ...row.product, labelRules: row.labelRules ?? null } : null
+    };
+  });
+}
+var routeAssignmentSchema = external_exports.object({
+  productId: external_exports.number().int().positive(),
+  targetPest: external_exports.string().min(1),
+  notes: external_exports.string().optional()
+});
+var upsertRouteSchema = external_exports.object({
+  assignments: external_exports.array(routeAssignmentSchema),
+  date: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+});
+router26.post("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const technicianId = req.user?.clerkUserId;
+    if (!technicianId) return res.status(401).json({ error: "Unauthorized" });
+    const parse4 = upsertRouteSchema.safeParse(req.body);
+    if (!parse4.success) {
+      return res.status(400).json({ error: "Invalid body", detail: parse4.error.issues });
+    }
+    const rigDate = parse4.data.date ?? todayUtc();
+    const assignments = parse4.data.assignments;
+    const [row] = await db.insert(technicianDailyRigsTable).values({ companyId, technicianId, rigDate, assignments }).onConflictDoUpdate({
+      target: [
+        technicianDailyRigsTable.companyId,
+        technicianDailyRigsTable.technicianId,
+        technicianDailyRigsTable.rigDate
+      ],
+      set: { assignments, updatedAt: /* @__PURE__ */ new Date() }
+    }).returning();
+    if (!row) return res.status(500).json({ error: "Failed to save route" });
+    const enriched = await enrichAssignments(assignments);
+    return res.status(201).json({
+      id: row.id,
+      technicianId: row.technicianId,
+      rigDate: row.rigDate,
+      assignments: enriched,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString()
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to save route" });
+  }
+});
+router26.get("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const technicianId = req.user?.clerkUserId;
+    if (!technicianId) return res.status(401).json({ error: "Unauthorized" });
+    const date6 = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayUtc();
+    const [row] = await db.select().from(technicianDailyRigsTable).where(
+      and(
+        eq(technicianDailyRigsTable.companyId, companyId),
+        eq(technicianDailyRigsTable.technicianId, technicianId),
+        eq(technicianDailyRigsTable.rigDate, date6)
+      )
+    ).limit(1);
+    if (!row) {
+      return res.status(404).json({ error: "No route set up for this date" });
+    }
+    const rawAssignments = Array.isArray(row.assignments) && row.assignments.length > 0 ? row.assignments : (row.productIds ?? []).map((id) => ({ productId: id, targetPest: "" }));
+    const enriched = await enrichAssignments(rawAssignments);
+    return res.json({
+      id: row.id,
+      technicianId: row.technicianId,
+      rigDate: row.rigDate,
+      assignments: enriched,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString()
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch route" });
+  }
+});
+router26.get("/recent-mixes", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const technicianId = req.user?.clerkUserId;
+    if (!technicianId) return res.status(401).json({ error: "Unauthorized" });
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3);
+    const rows = await db.select({ log: treatmentLogsTable, product: productsTable }).from(treatmentLogsTable).leftJoin(productsTable, eq(productsTable.id, treatmentLogsTable.productId)).where(
+      and(
+        eq(treatmentLogsTable.companyId, companyId),
+        eq(treatmentLogsTable.technicianId, technicianId),
+        gte(treatmentLogsTable.appliedAt, thirtyDaysAgo)
+      )
+    ).orderBy(desc(treatmentLogsTable.appliedAt));
+    const seen = /* @__PURE__ */ new Set();
+    const deduped = [];
+    for (const row of rows) {
+      const key = `${row.log.productId}:${row.log.siteClassification}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(row);
+      if (deduped.length >= 5) break;
+    }
+    return res.json(
+      deduped.map(({ log, product }) => ({
+        logId: log.id,
+        productId: log.productId,
+        productName: product?.name ?? `Product #${log.productId}`,
+        productActiveIngredients: product?.activeIngredients ?? "",
+        targetPest: log.targetPest,
+        siteClassification: log.siteClassification,
+        areaSqft: log.areaSqft,
+        linearFt: log.linearFt,
+        totalProductOz: log.totalProductOz,
+        equipmentUsed: log.equipmentUsed,
+        appliedAt: log.appliedAt.toISOString()
+      }))
+    );
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch recent mixes" });
+  }
+});
+var daily_rig_default = router26;
+
+// src/routes/review-queue.ts
+var import_express28 = __toESM(require_express2(), 1);
+var router27 = (0, import_express28.Router)();
+var SEVERITY_RISK = {
+  critical: "critical",
+  high: "high",
+  medium: "medium",
+  low: "low"
+};
+var RISK_ORDER = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3
+};
+router27.get("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const now = /* @__PURE__ */ new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfYesterday = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1e3);
+    const useToday = req.query.date === "today";
+    const rangeStart = useToday ? startOfToday : startOfYesterday;
+    const rangeEnd = useToday ? now : startOfToday;
+    const inspections = await db.select({
+      id: inspectionsTable.id,
+      siteAddress: inspectionsTable.siteAddress,
+      technicianName: inspectionsTable.technicianName,
+      completedAt: inspectionsTable.completedAt,
+      pestTypes: inspectionsTable.pestTypes,
+      severity: inspectionsTable.severity,
+      findingsCount: inspectionsTable.findingsCount,
+      mediaCount: inspectionsTable.mediaCount
+    }).from(inspectionsTable).where(
+      and(
+        eq(inspectionsTable.companyId, companyId),
+        eq(inspectionsTable.status, "completed"),
+        gte(inspectionsTable.completedAt, rangeStart),
+        lt(inspectionsTable.completedAt, rangeEnd)
+      )
+    ).orderBy(desc(inspectionsTable.completedAt)).limit(50);
+    const items = inspections.map((insp) => {
+      const rawRisk = insp.severity ? SEVERITY_RISK[insp.severity] ?? "low" : "low";
+      return {
+        id: insp.id,
+        inspectionId: insp.id,
+        siteAddress: insp.siteAddress ?? "Unknown address",
+        technicianName: insp.technicianName ?? "Unknown",
+        completedAt: insp.completedAt?.toISOString() ?? (/* @__PURE__ */ new Date()).toISOString(),
+        findingsCount: insp.findingsCount ?? 0,
+        qualityScore: null,
+        // populated below if scorecard exists
+        riskLevel: rawRisk,
+        pestTypes: Array.isArray(insp.pestTypes) ? insp.pestTypes : [],
+        photoCount: insp.mediaCount ?? 0
+      };
+    }).sort(
+      (a, b) => (RISK_ORDER[a.riskLevel] ?? 3) - (RISK_ORDER[b.riskLevel] ?? 3) || new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
+    );
+    return res.json({
+      items,
+      date: rangeStart.toISOString().slice(0, 10),
+      totalCount: items.length
+    });
+  } catch (err) {
+    console.error("review-queue GET:", err);
+    return res.status(500).json({ error: "Failed to fetch review queue" });
+  }
+});
+var actionSchema = external_exports.object({
+  action: external_exports.enum(["approved", "flagged", "skipped"]),
+  note: external_exports.string().optional()
+});
+router27.post("/:id", async (req, res) => {
+  try {
+    const parse4 = actionSchema.safeParse(req.body);
+    if (!parse4.success) return res.status(400).json({ error: "Invalid action" });
+    return res.json({ ok: true, action: parse4.data.action });
+  } catch {
+    return res.status(500).json({ error: "Failed to submit review action" });
+  }
+});
+var review_queue_default = router27;
 
 // src/routes/index.ts
-var router24 = (0, import_express25.Router)();
-router24.use(health_default);
-router24.use("/auth", auth_default);
-router24.use(storage_default);
-router24.use("/leads", leads_default);
-router24.use("/share", share_default);
-router24.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router24.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router24.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router24.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router24.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router24.use(
+var router28 = (0, import_express29.Router)();
+router28.use(health_default);
+router28.use("/auth", auth_default);
+router28.use(storage_default);
+router28.use("/leads", leads_default);
+router28.use("/share", share_default);
+router28.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router28.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router28.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router28.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router28.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router28.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -93256,17 +94214,17 @@ router24.use(
   requireRole("manager"),
   intelligence_default
 );
-router24.use(
+router28.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router24.use("/branding", branding_default);
-router24.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router24.use("/beta", requireAuth, requireCompany, beta_default);
-router24.use(
+router28.use("/branding", branding_default);
+router28.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router28.use("/beta", requireAuth, requireCompany, beta_default);
+router28.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -93274,7 +94232,7 @@ router24.use(
   requireRole("sales"),
   opportunities_default
 );
-router24.use(
+router28.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -93282,7 +94240,7 @@ router24.use(
   requireRole("manager"),
   scorecards_default
 );
-router24.use(
+router28.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -93290,8 +94248,8 @@ router24.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router24.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router24.use(
+router28.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router28.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -93299,15 +94257,23 @@ router24.use(
   requireRole("sales"),
   proposals_default
 );
-router24.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router24.use(
+router28.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router28.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-router24.use(
+router28.use("/products", requireAuth, requireBetaAccess, products_default);
+router28.use(
+  "/inspections/:inspectionId/treatment-logs",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  treatment_logs_default
+);
+router28.use(
   "/crm",
   requireAuth,
   requireCompany,
@@ -93315,7 +94281,16 @@ router24.use(
   requireRole("manager"),
   crm_default
 );
-var routes_default = router24;
+router28.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
+router28.use(
+  "/review-queue",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  review_queue_default
+);
+var routes_default = router28;
 
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
@@ -93336,7 +94311,7 @@ var logger2 = (0, import_pino.default)({
 });
 
 // src/app.ts
-var app = (0, import_express26.default)();
+var app = (0, import_express30.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -93387,8 +94362,8 @@ app.use(
     }
   })
 );
-app.use(import_express26.default.json());
-app.use(import_express26.default.urlencoded({ extended: true }));
+app.use(import_express30.default.json());
+app.use(import_express30.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
@@ -93476,6 +94451,9 @@ app_default.listen(port, (err) => {
     process.exit(1);
   }
   logger2.info({ port }, "Server listening");
+  void ensureProductsSeed().catch((seedErr) => {
+    logger2.warn({ err: seedErr }, "Product seed failed \u2014 catalogue may be incomplete");
+  });
   void ensureClerkNativeRedirectUrls();
 });
 /*! Bundled license information:

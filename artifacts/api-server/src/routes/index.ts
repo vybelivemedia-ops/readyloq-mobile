@@ -31,6 +31,7 @@ import productsRouter from "./products";
 import treatmentLogsRouter from "./treatment-logs";
 import crmRouter from "./crm";
 import dailyRigRouter from "./daily-rig";
+import reviewQueueRouter from "./review-queue";
 
 const router: IRouter = Router();
 
@@ -151,5 +152,15 @@ router.use(
 // Sub-routes:  POST/GET /technician/daily-rig
 //              GET      /technician/daily-rig/recent-mixes
 router.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, dailyRigRouter);
+
+// Manager rapid-review queue — yesterday's completed inspections for 20-min callback validation.
+router.use(
+  "/review-queue",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  reviewQueueRouter,
+);
 
 export default router;

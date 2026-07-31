@@ -28,3 +28,4 @@
 - [Camera capture latency](camera-capture-latency.md) — skipProcessing:true eliminates 3–8s JPEG compression; release setCapturing before ingest; optimistic thumbnail via targeted setPhotos functional updater (never full rebuild mid-ingest)
 - [BLE smart glasses driver](ble-smart-glasses.md) — react-native-ble-plx wiring; ReadyLoq GATT UUIDs; frame chunk protocol; tar@6.2.1 firewall workaround; monitorCharacteristicForService returns Subscription not Promise
 - [BLE runtime permissions](ble-runtime-permissions.md) — Android 12+: BLUETOOTH_SCAN+CONNECT; Android 6-11: ACCESS_FINE_LOCATION via expo-location; iOS: noop (system dialog); AppState recheck on foreground; lib/ble/permissions.ts
+- [Role-Based UI](role-based-ui.md) — tab bar per role via href:null; new screens: scan/review/team/leads; /api/review-queue; customFetch pattern; BadgeTone/OwnerBriefing.kpis type notes
