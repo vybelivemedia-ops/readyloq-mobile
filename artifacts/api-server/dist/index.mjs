@@ -88407,7 +88407,14 @@ function taxonomyText() {
   }).join("\n");
 }
 var SYSTEM_PROMPT4 = "You are a senior pest-control field-intelligence analyst. You examine a single field photo taken by a technician and produce a precise, structured assessment for a training dataset. Be conservative: when the image is ambiguous, lower your confidence rather than guessing. Respond with a single JSON object only.";
-function userPrompt2() {
+function userPrompt2(technicianNote) {
+  const noteClause = technicianNote ? [
+    "",
+    `Technician note for this photo: "${technicianNote.trim()}"`,
+    "Use this note as additional context when classifying \u2014 the technician was on-site and",
+    "may have spotted something not immediately obvious in the image. Do NOT simply repeat",
+    "the note verbatim; ground your response in what is visually present."
+  ] : [];
   return [
     "Classify this pest-control field photo. Choose the single best category and",
     "subcategory from this taxonomy (use the exact slug strings shown):",
@@ -88436,7 +88443,8 @@ function userPrompt2() {
     "",
     "Only report what is actually visible in THIS image. Every field must be",
     "grounded in visible evidence \u2014 when the image shows no such evidence,",
-    "return null for that field rather than guessing."
+    "return null for that field rather than guessing.",
+    ...noteClause
   ].join("\n");
 }
 function clampConfidence2(value) {
@@ -88496,7 +88504,7 @@ function parsePrediction(raw) {
     pestCandidates
   };
 }
-async function analyzePhoto(objectPath) {
+async function analyzePhoto(objectPath, technicianNote) {
   try {
     const dataUrl = await objectToDataUrl(objectPath);
     const completion = await openai.chat.completions.create({
@@ -88508,7 +88516,7 @@ async function analyzePhoto(objectPath) {
         {
           role: "user",
           content: [
-            { type: "text", text: userPrompt2() },
+            { type: "text", text: userPrompt2(technicianNote) },
             { type: "image_url", image_url: { url: dataUrl } }
           ]
         }
@@ -89240,6 +89248,9 @@ router4.post("/analyze", async (req, res) => {
       )
     );
     const savedPaths = new Set(savedMedia.map((m) => toStoragePath(m.url)));
+    const captionByPath = new Map(
+      savedMedia.filter((m) => m.caption).map((m) => [toStoragePath(m.url), m.caption])
+    );
     const savedVideoPaths = new Set(
       savedMedia.filter((m) => m.mediaType === "video").map((m) => toStoragePath(m.url))
     );
@@ -89290,7 +89301,8 @@ router4.post("/analyze", async (req, res) => {
         if (prior) aiFindings.push({ ...prior, id: nextId++ });
         continue;
       }
-      const prediction = await analyzePhoto(storagePath);
+      const technicianNote = captionByPath.get(storagePath) ?? null;
+      const prediction = await analyzePhoto(storagePath, technicianNote);
       if (prediction === null) {
         analysisErrors++;
         continue;

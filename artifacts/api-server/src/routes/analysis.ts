@@ -306,6 +306,13 @@ router.post("/analyze", async (req, res) => {
         ),
       );
     const savedPaths = new Set(savedMedia.map((m) => toStoragePath(m.url)));
+    // Technician captions (notes written during or after capture) keyed by
+    // storage path — passed to the vision model as additional context.
+    const captionByPath = new Map<string, string>(
+      savedMedia
+        .filter((m) => m.caption)
+        .map((m) => [toStoragePath(m.url), m.caption as string]),
+    );
     // Video evidence must correspond to a persisted row that was actually saved
     // as a video — never accept a photo (or voice) URL submitted under videos[].
     const savedVideoPaths = new Set(
@@ -392,7 +399,8 @@ router.post("/analyze", async (req, res) => {
         continue;
       }
 
-      const prediction = await analyzePhoto(storagePath);
+      const technicianNote = captionByPath.get(storagePath) ?? null;
+      const prediction = await analyzePhoto(storagePath, technicianNote);
       if (prediction === null) {
         // Analysis failed for this photo — do NOT persist a placeholder finding
         // and do NOT mark it analyzed, so the next run retries it.

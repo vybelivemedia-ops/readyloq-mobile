@@ -262,6 +262,9 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
           captureSource: photo.captureSource,
           qualityScore: photo.qualityScore,
           captureMetadata: photo.captureMetadata,
+          // Technician-authored note (set during or after capture). Stored as
+          // caption on the server so AI analysis and reports can reference it.
+          caption: photo.description ?? undefined,
         });
         await merge((r) => {
           const p = r.photos.find((x) => x.localUri === localUri);

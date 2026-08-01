@@ -65,7 +65,16 @@ const SYSTEM_PROMPT =
   "for a training dataset. Be conservative: when the image is ambiguous, lower your " +
   "confidence rather than guessing. Respond with a single JSON object only.";
 
-function userPrompt(): string {
+function userPrompt(technicianNote?: string | null): string {
+  const noteClause = technicianNote
+    ? [
+        "",
+        `Technician note for this photo: "${technicianNote.trim()}"`,
+        "Use this note as additional context when classifying — the technician was on-site and",
+        "may have spotted something not immediately obvious in the image. Do NOT simply repeat",
+        "the note verbatim; ground your response in what is visually present.",
+      ]
+    : [];
   return [
     "Classify this pest-control field photo. Choose the single best category and",
     "subcategory from this taxonomy (use the exact slug strings shown):",
@@ -95,6 +104,7 @@ function userPrompt(): string {
     "Only report what is actually visible in THIS image. Every field must be",
     "grounded in visible evidence — when the image shows no such evidence,",
     "return null for that field rather than guessing.",
+    ...noteClause,
   ].join("\n");
 }
 
@@ -198,6 +208,7 @@ function parsePrediction(raw: string): AiPrediction | null {
  */
 export async function analyzePhoto(
   objectPath: string,
+  technicianNote?: string | null,
 ): Promise<AiPrediction | null> {
   try {
     const dataUrl = await objectToDataUrl(objectPath);
@@ -210,7 +221,7 @@ export async function analyzePhoto(
         {
           role: "user",
           content: [
-            { type: "text", text: userPrompt() },
+            { type: "text", text: userPrompt(technicianNote) },
             { type: "image_url", image_url: { url: dataUrl } },
           ],
         },
