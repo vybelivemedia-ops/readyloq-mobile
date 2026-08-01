@@ -14,7 +14,10 @@ import { getCompanyId } from "../lib/tenant";
 import { analyzePhoto } from "../lib/intelligence-ai";
 import { runOpportunitySynthesis } from "../lib/opportunity-ai";
 import { runScorecardComputation } from "../lib/scorecard";
-import { objectPathCompanyScope } from "../lib/objectStorage";
+import { objectPathCompanyScope, ObjectStorageService } from "../lib/objectStorage";
+import { zoomGlassesFrame } from "../lib/glasses-zoom";
+
+const objectStorageService = new ObjectStorageService();
 import { logErrorEvent } from "../lib/error-events";
 import { computeCoverage, zonesFromFinding } from "../lib/zone-coverage";
 import { computeEvidenceSummary } from "../lib/evidence-summary";
@@ -24,6 +27,45 @@ import { normalizeAddressKey } from "../lib/property-intelligence";
 import { derivePropertyType } from "../lib/report-narrative-ai";
 
 const router = Router();
+
+/**
+ * #116 — Background subject crop for phone-camera evidence photos.
+ * For each newly-analyzed photo with a real finding, downloads the stored
+ * JPEG, runs the Gemini zoom helper to crop to the detected subject, and
+ * re-uploads the cropped buffer to a new storage path. Updates the
+ * inspectionMedia row URL and zoomSubject so the evidence grid shows the
+ * tight crop on the next load. Fire-and-forget from the analyze route —
+ * the API response is never delayed or blocked by this function.
+ */
+async function cropPhonePhotos(
+  companyId: number,
+  candidates: Array<{ storagePath: string; confidence: number; species: string | null }>,
+): Promise<void> {
+  for (const { storagePath, confidence, species } of candidates) {
+    try {
+      const file = await objectStorageService.getObjectEntityFile(storagePath);
+      const res  = await objectStorageService.downloadObject(file, 0);
+      if (!res.ok) continue;
+      const buf  = Buffer.from(await res.arrayBuffer());
+      const zoom = await zoomGlassesFrame(buf, confidence, species ?? undefined);
+      if (!zoom.cropped) continue;
+      const newPath = await objectStorageService.uploadObjectBuffer(
+        companyId,
+        zoom.buffer,
+        "image/jpeg",
+      );
+      await db
+        .update(inspectionMediaTable)
+        .set({ url: newPath, zoomSubject: zoom.subject ?? null })
+        .where(
+          and(
+            eq(inspectionMediaTable.companyId, companyId),
+            eq(inspectionMediaTable.url, storagePath),
+          ),
+        );
+    } catch { /* background — failures are silently swallowed */ }
+  }
+}
 
 /**
  * Public storage URLs are served from `/api/storage/...` but the canonical
@@ -381,6 +423,8 @@ router.post("/analyze", async (req, res) => {
     const photoZones: Record<string, string> = {};
     let nextId = 1;
     let analysisErrors = 0;
+    // #116 — collect newly-analyzed phone-camera photos with real findings for background crop.
+    const cropCandidates: Array<{ storagePath: string; confidence: number; species: string | null }> = [];
     for (const image of images.slice(0, MAX_ANALYZE_IMAGES)) {
       if (!image?.imageUrl) continue;
       const storagePath = toStoragePath(image.imageUrl);
@@ -487,6 +531,14 @@ router.post("/analyze", async (req, res) => {
         confidenceLabel,
         reviewStatus: "pending",
       });
+      // #116 — queue phone-camera photos with genuine findings for background crop.
+      if (prediction.confidence >= 0.6) {
+        cropCandidates.push({
+          storagePath,
+          confidence: prediction.confidence,
+          species: prediction.possiblePest ?? null,
+        });
+      }
     }
 
     // Late-flagged duplicate safety: the mobile pixel-dedupe pass runs
@@ -586,6 +638,11 @@ router.post("/analyze", async (req, res) => {
         riskLevel,
       })
       .returning();
+
+    // #116 — background subject crop for newly-analyzed phone-camera photos.
+    if (cropCandidates.length > 0) {
+      void cropPhonePhotos(companyId, cropCandidates);
+    }
 
     // Opportunity Intelligence + Scorecard are DEFERRED for draft (in-progress)
     // analyses — the mobile live-capture flow passes `draft: true` and these run

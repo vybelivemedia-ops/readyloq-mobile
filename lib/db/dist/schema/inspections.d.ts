@@ -454,6 +454,23 @@ export declare const inspectionMediaTable: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        zoomSubject: import("drizzle-orm/pg-core").PgColumn<{
+            name: "zoom_subject";
+            tableName: "inspection_media";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         captureMetadata: import("drizzle-orm/pg-core").PgColumn<{
             name: "capture_metadata";
             tableName: "inspection_media";
@@ -517,6 +534,7 @@ export declare const insertInspectionMediaSchema: z.ZodObject<{
     durationSec: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     captureSource: z.ZodOptional<z.ZodString>;
     qualityScore: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
+    zoomSubject: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     captureMetadata: z.ZodOptional<z.ZodNullable<z.ZodType<Record<string, unknown>, Record<string, unknown>, z.core.$ZodTypeInternals<Record<string, unknown>, Record<string, unknown>>>>>;
 }, {
     out: {};

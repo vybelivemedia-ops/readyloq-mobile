@@ -19,6 +19,7 @@ import {
   Animated,
   AppState,
   BackHandler,
+  Modal,
   Pressable,
   ScrollView,
   Text,
@@ -32,6 +33,7 @@ import { BaitStationPanel } from "@/components/BaitStationPanel";
 import { VoiceMicButton } from "@/components/VoiceMicButton";
 import { useVoiceField } from "@/hooks/useVoiceField";
 import { type LocalBaitStation } from "@/lib/local/inspection-store";
+import { AuthedImage } from "@/components/AuthedImage";
 import { WifiCameraModal } from "@/components/WifiCameraModal";
 import { TreatmentLogWizard } from "@/components/TreatmentLogWizard";
 import { useDailyRoute } from "@/hooks/useDailyRoute";
@@ -639,6 +641,8 @@ export default function NewInspectionScreen() {
   // Persisted across the full inspection session. Each entry is a GlassesEvent
   // with a server-persisted frame (mediaId set) and/or a structured AI finding.
   const [glassesFindings, setGlassesFindings] = useState<GlassesEvent[]>([]);
+  // #110 — full-screen viewer for glasses-captured frames
+  const [glassesViewerPath, setGlassesViewerPath] = useState<string | null>(null);
 
   // ── Meta glasses session (Ray-Ban Live AI hands-free integration) ──────────
   // Registers a session with the API when an inspection is persisted so the
@@ -651,7 +655,10 @@ export default function NewInspectionScreen() {
       (event: GlassesEvent) => {
         // Persist frame findings in state so the detections panel stays up.
         if (event.finding || event.mediaId) {
-          setGlassesFindings((prev) => [...prev, event]);
+          // #111 — deduplicate by event ID (guards against poll-cursor race)
+          setGlassesFindings((prev) =>
+            prev.some((e) => e.id === event.id) ? prev : [...prev, event]
+          );
         }
         // Brief FAIE toast for immediate haptic feedback.
         setFaieStatus(`🕶 ${event.text}`);
@@ -1452,8 +1459,26 @@ export default function NewInspectionScreen() {
         <Ionicons name="glasses-outline" size={15} color="#fff" />
         <Text style={{ color: "#fff", fontFamily: "Inter_500Medium", fontSize: 12, flex: 1, flexShrink: 1 }}>
           {glassesSession.status ?? "Glasses active"}
-          {glassesSession.code ? `  ·  Code: ${glassesSession.code}` : ""}
         </Text>
+        {/* #109 — Amber badge when code just changed after a reconnect */}
+        {glassesSession.code ? (
+          <View
+            style={{
+              backgroundColor: glassesSession.codeJustChanged
+                ? "rgba(234,179,8,0.9)"
+                : "rgba(255,255,255,0.18)",
+              borderRadius: 5,
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              borderWidth: glassesSession.codeJustChanged ? 1 : 0,
+              borderColor: "rgba(254,240,138,0.8)",
+            }}
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.8 }}>
+              {glassesSession.code}
+            </Text>
+          </View>
+        ) : null}
         {glassesCaptures.length > 0 && (
           <View style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
             <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11 }}>
@@ -1464,8 +1489,9 @@ export default function NewInspectionScreen() {
       </View>
     ) : null;
 
-    // Compact list of the most recent glasses detections — shown below the strip
-    // so the tech can glance at what the AI has logged without leaving capture.
+    // Compact list of the most recent glasses detections — shown below the strip.
+    // #110 — entries with a stored frame are tappable to open full-screen.
+    // #115 — entries show the zoomed subject label when available.
     const glassesFindingsPanel = glassesCaptures.length > 0 ? (
       <View style={{ gap: 5, maxWidth: 440, alignSelf: "stretch" }}>
         {glassesCaptures.slice(-3).map((ev) => {
@@ -1475,32 +1501,82 @@ export default function NewInspectionScreen() {
             : sev === "medium" ? "#f59e0b"
             : "#22c55e";
           return (
-            <View
+            <Pressable
               key={ev.id}
+              onPress={ev.storagePath ? () => setGlassesViewerPath(ev.storagePath!) : undefined}
               style={{
                 flexDirection: "row", alignItems: "center", gap: 8,
                 backgroundColor: "rgba(124,58,237,0.18)",
-                borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
+                borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
                 borderWidth: 1, borderColor: "rgba(124,58,237,0.35)",
               }}
             >
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: sevColor }} />
-              <Text
-                style={{ color: "#e9d5ff", fontFamily: "Inter_500Medium", fontSize: 11, flex: 1 }}
-                numberOfLines={1}
-              >
-                {ev.finding
-                  ? `${ev.finding.category} · ${Math.round(ev.finding.confidence * 100)}%`
-                  : ev.text}
-              </Text>
+              {ev.storagePath ? (
+                <AuthedImage
+                  path={ev.storagePath}
+                  style={{ width: 36, height: 36, borderRadius: 6 }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: sevColor }} />
+              )}
+              <View style={{ flex: 1, gap: 1 }}>
+                <Text
+                  style={{ color: "#e9d5ff", fontFamily: "Inter_500Medium", fontSize: 11 }}
+                  numberOfLines={1}
+                >
+                  {ev.finding
+                    ? `${ev.finding.category} · ${Math.round(ev.finding.confidence * 100)}%`
+                    : ev.text}
+                </Text>
+                {ev.zoomSubject ? (
+                  <Text
+                    style={{ color: "rgba(196,181,253,0.65)", fontFamily: "Inter_400Regular", fontSize: 9 }}
+                    numberOfLines={1}
+                  >
+                    zoomed: {ev.zoomSubject}
+                  </Text>
+                ) : null}
+              </View>
               {ev.mediaId ? (
                 <Ionicons name="cloud-done-outline" size={11} color="rgba(233,213,255,0.7)" />
               ) : null}
-            </View>
+            </Pressable>
           );
         })}
       </View>
     ) : null;
+
+    // #110 — Full-screen viewer for glasses-captured frames.
+    const glassesViewerModal = (
+      <Modal
+        visible={glassesViewerPath != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGlassesViewerPath(null)}
+        statusBarTranslucent
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setGlassesViewerPath(null)}
+        >
+          {glassesViewerPath ? (
+            <View style={{ width: "100%", height: 320 }}>
+              <AuthedImage
+                path={glassesViewerPath}
+                style={{ flex: 1 }}
+                contentFit="contain"
+              />
+            </View>
+          ) : null}
+          <Text
+            style={{ position: "absolute", bottom: 48, alignSelf: "center", color: "rgba(255,255,255,0.5)", fontSize: 12 }}
+          >
+            Tap anywhere to close
+          </Text>
+        </Pressable>
+      </Modal>
+    );
 
     const qualityBanner = qualityNotice ? (
       <View
@@ -1673,6 +1749,7 @@ export default function NewInspectionScreen() {
                 )}
                 {qualityBanner}
                 {faieBanner}
+                {glassesViewerModal}
                 {glassesStrip}
                 {glassesFindingsPanel}
                 {zoomChips}

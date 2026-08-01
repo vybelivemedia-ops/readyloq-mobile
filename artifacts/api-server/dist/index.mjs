@@ -68832,6 +68832,9 @@ var inspectionMediaTable = pgTable("inspection_media", {
   captureSource: text("capture_source").notNull().default("phone_camera"),
   // 0–100 capture-time quality score from the on-device gate (null = ungated).
   qualityScore: integer("quality_score"),
+  // One-word label from the Gemini digital-zoom pass, e.g. "cockroach", "crack".
+  // Set when a frame was cropped to this subject before or after storage.
+  zoomSubject: text("zoom_subject"),
   // Device/EXIF context (dimensions, file size, provider id, device model…).
   captureMetadata: jsonb("capture_metadata").$type(),
   createdAt: timestamp("created_at").notNull().defaultNow()
@@ -88576,6 +88579,164 @@ async function analyzePhotoFromBase64(base64Jpeg) {
   }
 }
 
+// src/lib/glasses-zoom.ts
+import sharp from "sharp";
+
+// ../../lib/integrations-gemini-ai/src/client.ts
+import { GoogleGenAI } from "@google/genai";
+var _client2 = null;
+function getGeminiClient() {
+  if (_client2) return _client2;
+  if (!process.env.AI_INTEGRATIONS_GEMINI_BASE_URL) {
+    throw new Error(
+      "AI_INTEGRATIONS_GEMINI_BASE_URL must be set. Did you forget to provision the Gemini AI integration?"
+    );
+  }
+  if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY) {
+    throw new Error(
+      "AI_INTEGRATIONS_GEMINI_API_KEY must be set. Did you forget to provision the Gemini AI integration?"
+    );
+  }
+  _client2 = new GoogleGenAI({
+    apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+    httpOptions: {
+      apiVersion: "",
+      baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
+    }
+  });
+  return _client2;
+}
+var ai = new Proxy({}, {
+  get(_target, prop) {
+    return getGeminiClient()[prop];
+  }
+});
+
+// ../../lib/integrations-gemini-ai/src/image/client.ts
+import { Modality } from "@google/genai";
+var ai2 = new Proxy({}, {
+  get(_target, prop) {
+    return getGeminiClient()[prop];
+  }
+});
+async function generateImage(prompt) {
+  const response = await ai2.models.generateContent({
+    model: "gemini-2.5-flash-image",
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: {
+      responseModalities: [Modality.TEXT, Modality.IMAGE]
+    }
+  });
+  const candidate = response.candidates?.[0];
+  const imagePart = candidate?.content?.parts?.find(
+    (part) => part.inlineData
+  );
+  if (!imagePart?.inlineData?.data) {
+    throw new Error("No image data in response");
+  }
+  return {
+    b64_json: imagePart.inlineData.data,
+    mimeType: imagePart.inlineData.mimeType || "image/png"
+  };
+}
+
+// src/lib/glasses-zoom.ts
+var MIN_OUTPUT_PX = 800;
+var PADDING_FRACTION = 0.15;
+var CONFIDENCE_THRESHOLD = 0.6;
+async function zoomGlassesFrame(imageBuffer, confidence, subjectHint, existingBox) {
+  try {
+    let box = existingBox ?? null;
+    let subject = subjectHint ?? null;
+    const needsClarification = !box || (confidence ?? 0) < CONFIDENCE_THRESHOLD;
+    if (needsClarification) {
+      const clarified = await askGeminiForBoundingBox(imageBuffer);
+      if (clarified) {
+        box = clarified.box;
+        subject = clarified.subject;
+      }
+    }
+    if (!box) {
+      return { buffer: imageBuffer, subject, cropped: false };
+    }
+    const cropped = await cropAndUpscale(imageBuffer, box);
+    return { buffer: cropped, subject, cropped: true };
+  } catch {
+    return { buffer: imageBuffer, subject: subjectHint ?? null, cropped: false };
+  }
+}
+var GEMINI_PROMPT = `You are a pest inspection AI. Identify the single most inspection-relevant object in this image \u2014 a pest (insect, rodent, wildlife), bait/snap trap, structural damage, or conducive condition (moisture, mold, crack, gap).
+
+Return ONLY a JSON object with these exact fields:
+{
+  "subject": "<one-word label, e.g. cockroach, mousetrap, crack, moisture>",
+  "x": <left edge as fraction of image width, 0.0\u20131.0>,
+  "y": <top edge as fraction of image height, 0.0\u20131.0>,
+  "width": <width as fraction of image width, 0.0\u20131.0>,
+  "height": <height as fraction of image height, 0.0\u20131.0>
+}
+
+If no inspection-relevant object is clearly visible, return:
+{"subject":"none","x":0,"y":0,"width":1,"height":1}`;
+async function askGeminiForBoundingBox(imageBuffer) {
+  try {
+    const base643 = imageBuffer.toString("base64");
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: "image/jpeg", data: base643 } },
+            { text: GEMINI_PROMPT }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 256
+      }
+    });
+    const raw = (response.text ?? "").trim();
+    const clean = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+    const parsed = JSON.parse(clean);
+    const { subject, x, y, width, height } = parsed;
+    if (typeof subject !== "string" || subject === "none" || typeof x !== "number" || typeof y !== "number" || typeof width !== "number" || typeof height !== "number") {
+      return null;
+    }
+    if (x < 0 || x > 1 || y < 0 || y > 1 || width <= 0.02 || width > 1 || height <= 0.02 || height > 1) {
+      return null;
+    }
+    return {
+      box: { x, y, width, height },
+      subject: subject.toLowerCase().replace(/\s+/g, "_")
+    };
+  } catch {
+    return null;
+  }
+}
+async function cropAndUpscale(imageBuffer, box) {
+  const meta = await sharp(imageBuffer).metadata();
+  const imgW = meta.width ?? 0;
+  const imgH = meta.height ?? 0;
+  if (imgW === 0 || imgH === 0) return imageBuffer;
+  const padX = Math.round(box.width * PADDING_FRACTION * imgW);
+  const padY = Math.round(box.height * PADDING_FRACTION * imgH);
+  const left = Math.max(0, Math.round(box.x * imgW) - padX);
+  const top = Math.max(0, Math.round(box.y * imgH) - padY);
+  const right = Math.min(imgW, Math.round((box.x + box.width) * imgW) + padX);
+  const bottom = Math.min(imgH, Math.round((box.y + box.height) * imgH) + padY);
+  const cropW = right - left;
+  const cropH = bottom - top;
+  if (cropW <= 0 || cropH <= 0 || cropW > imgW * 0.95 || cropH > imgH * 0.95) {
+    return imageBuffer;
+  }
+  const scale = Math.max(1, MIN_OUTPUT_PX / Math.min(cropW, cropH));
+  const outW = Math.round(cropW * scale);
+  const outH = Math.round(cropH * scale);
+  return sharp(imageBuffer).extract({ left, top, width: cropW, height: cropH }).resize(outW, outH, { kernel: sharp.kernel.lanczos3 }).jpeg({ quality: 90 }).toBuffer();
+}
+
 // src/lib/evidence-summary.ts
 function tallyLabels(values) {
   const map2 = /* @__PURE__ */ new Map();
@@ -89098,7 +89259,32 @@ function deriveRecurringIssues(entries) {
 }
 
 // src/routes/analysis.ts
+var objectStorageService = new ObjectStorageService();
 var router4 = (0, import_express5.Router)();
+async function cropPhonePhotos(companyId, candidates) {
+  for (const { storagePath, confidence, species } of candidates) {
+    try {
+      const file2 = await objectStorageService.getObjectEntityFile(storagePath);
+      const res = await objectStorageService.downloadObject(file2, 0);
+      if (!res.ok) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      const zoom = await zoomGlassesFrame(buf, confidence, species ?? void 0);
+      if (!zoom.cropped) continue;
+      const newPath = await objectStorageService.uploadObjectBuffer(
+        companyId,
+        zoom.buffer,
+        "image/jpeg"
+      );
+      await db.update(inspectionMediaTable).set({ url: newPath, zoomSubject: zoom.subject ?? null }).where(
+        and(
+          eq(inspectionMediaTable.companyId, companyId),
+          eq(inspectionMediaTable.url, storagePath)
+        )
+      );
+    } catch {
+    }
+  }
+}
 function toStoragePath(url2) {
   return url2.replace(/^\/api\/storage/, "");
 }
@@ -89306,6 +89492,7 @@ router4.post("/analyze", async (req, res) => {
     const photoZones = {};
     let nextId = 1;
     let analysisErrors = 0;
+    const cropCandidates = [];
     for (const image of images.slice(0, MAX_ANALYZE_IMAGES)) {
       if (!image?.imageUrl) continue;
       const storagePath = toStoragePath(image.imageUrl);
@@ -89356,6 +89543,13 @@ router4.post("/analyze", async (req, res) => {
         confidenceLabel,
         reviewStatus: "pending"
       });
+      if (prediction.confidence >= 0.6) {
+        cropCandidates.push({
+          storagePath,
+          confidence: prediction.confidence,
+          species: prediction.possiblePest ?? null
+        });
+      }
     }
     const handledPaths = new Set(analyzedImagePaths);
     for (const rawPath of previousRun?.analyzedImagePaths ?? []) {
@@ -89412,6 +89606,9 @@ router4.post("/analyze", async (req, res) => {
       overallConfidence,
       riskLevel
     }).returning();
+    if (cropCandidates.length > 0) {
+      void cropPhonePhotos(companyId, cropCandidates);
+    }
     if (!draft) {
       void runOpportunitySynthesis({
         companyId,
@@ -91704,7 +91901,7 @@ var RequestUploadUrlResponse = external_exports.object({
   metadata: external_exports.object({ name: external_exports.string(), size: external_exports.number().optional(), contentType: external_exports.string().optional() }).optional()
 });
 var router12 = (0, import_express13.Router)();
-var objectStorageService = new ObjectStorageService();
+var objectStorageService2 = new ObjectStorageService();
 router12.post(
   "/storage/uploads/request-url",
   requireAuth,
@@ -91719,8 +91916,8 @@ router12.post(
     try {
       const { name, size, contentType } = parsed.data;
       const companyId = getCompanyId(req);
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL(companyId);
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      const uploadURL = await objectStorageService2.getObjectEntityUploadURL(companyId);
+      const objectPath = objectStorageService2.normalizeObjectEntityPath(uploadURL);
       res.json(
         RequestUploadUrlResponse.parse({
           uploadURL,
@@ -91744,12 +91941,12 @@ router12.get("/storage/public-objects/*filePath", async (req, res) => {
   try {
     const raw = req.params.filePath;
     const filePath = Array.isArray(raw) ? raw.join("/") : raw;
-    const file2 = await objectStorageService.searchPublicObject(filePath);
+    const file2 = await objectStorageService2.searchPublicObject(filePath);
     if (!file2) {
       res.status(404).json({ error: "File not found" });
       return;
     }
-    const response = await objectStorageService.downloadObject(file2);
+    const response = await objectStorageService2.downloadObject(file2);
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
     if (response.body) {
@@ -91785,8 +91982,8 @@ router12.get(
         res.status(404).json({ error: "Object not found" });
         return;
       }
-      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-      const response = await objectStorageService.downloadObject(objectFile);
+      const objectFile = await objectStorageService2.getObjectEntityFile(objectPath);
+      const response = await objectStorageService2.downloadObject(objectFile);
       res.status(response.status);
       response.headers.forEach((value, key) => res.setHeader(key, value));
       if (response.body) {
@@ -93212,66 +93409,6 @@ var share_default = router20;
 
 // src/routes/gemini.ts
 var import_express22 = __toESM(require_express2(), 1);
-
-// ../../lib/integrations-gemini-ai/src/client.ts
-import { GoogleGenAI } from "@google/genai";
-var _client2 = null;
-function getGeminiClient() {
-  if (_client2) return _client2;
-  if (!process.env.AI_INTEGRATIONS_GEMINI_BASE_URL) {
-    throw new Error(
-      "AI_INTEGRATIONS_GEMINI_BASE_URL must be set. Did you forget to provision the Gemini AI integration?"
-    );
-  }
-  if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY) {
-    throw new Error(
-      "AI_INTEGRATIONS_GEMINI_API_KEY must be set. Did you forget to provision the Gemini AI integration?"
-    );
-  }
-  _client2 = new GoogleGenAI({
-    apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-    httpOptions: {
-      apiVersion: "",
-      baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
-    }
-  });
-  return _client2;
-}
-var ai = new Proxy({}, {
-  get(_target, prop) {
-    return getGeminiClient()[prop];
-  }
-});
-
-// ../../lib/integrations-gemini-ai/src/image/client.ts
-import { Modality } from "@google/genai";
-var ai2 = new Proxy({}, {
-  get(_target, prop) {
-    return getGeminiClient()[prop];
-  }
-});
-async function generateImage(prompt) {
-  const response = await ai2.models.generateContent({
-    model: "gemini-2.5-flash-image",
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: {
-      responseModalities: [Modality.TEXT, Modality.IMAGE]
-    }
-  });
-  const candidate = response.candidates?.[0];
-  const imagePart = candidate?.content?.parts?.find(
-    (part) => part.inlineData
-  );
-  if (!imagePart?.inlineData?.data) {
-    throw new Error("No image data in response");
-  }
-  return {
-    b64_json: imagePart.inlineData.data,
-    mimeType: imagePart.inlineData.mimeType || "image/png"
-  };
-}
-
-// src/routes/gemini.ts
 var router21 = (0, import_express22.Router)();
 router21.get("/conversations", async (req, res) => {
   try {
@@ -104022,106 +104159,8 @@ function isUndiciDispatcherVersionMismatchError2(error40) {
   return false;
 }
 
-// src/lib/glasses-zoom.ts
-import sharp from "sharp";
-var MIN_OUTPUT_PX = 800;
-var PADDING_FRACTION = 0.15;
-var CONFIDENCE_THRESHOLD = 0.6;
-async function zoomGlassesFrame(imageBuffer, confidence, subjectHint, existingBox) {
-  try {
-    let box = existingBox ?? null;
-    let subject = subjectHint ?? null;
-    const needsClarification = !box || (confidence ?? 0) < CONFIDENCE_THRESHOLD;
-    if (needsClarification) {
-      const clarified = await askGeminiForBoundingBox(imageBuffer);
-      if (clarified) {
-        box = clarified.box;
-        subject = clarified.subject;
-      }
-    }
-    if (!box) {
-      return { buffer: imageBuffer, subject, cropped: false };
-    }
-    const cropped = await cropAndUpscale(imageBuffer, box);
-    return { buffer: cropped, subject, cropped: true };
-  } catch {
-    return { buffer: imageBuffer, subject: subjectHint ?? null, cropped: false };
-  }
-}
-var GEMINI_PROMPT = `You are a pest inspection AI. Identify the single most inspection-relevant object in this image \u2014 a pest (insect, rodent, wildlife), bait/snap trap, structural damage, or conducive condition (moisture, mold, crack, gap).
-
-Return ONLY a JSON object with these exact fields:
-{
-  "subject": "<one-word label, e.g. cockroach, mousetrap, crack, moisture>",
-  "x": <left edge as fraction of image width, 0.0\u20131.0>,
-  "y": <top edge as fraction of image height, 0.0\u20131.0>,
-  "width": <width as fraction of image width, 0.0\u20131.0>,
-  "height": <height as fraction of image height, 0.0\u20131.0>
-}
-
-If no inspection-relevant object is clearly visible, return:
-{"subject":"none","x":0,"y":0,"width":1,"height":1}`;
-async function askGeminiForBoundingBox(imageBuffer) {
-  try {
-    const base643 = imageBuffer.toString("base64");
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType: "image/jpeg", data: base643 } },
-            { text: GEMINI_PROMPT }
-          ]
-        }
-      ],
-      config: {
-        responseMimeType: "application/json",
-        maxOutputTokens: 256
-      }
-    });
-    const raw = (response.text ?? "").trim();
-    const clean = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-    const parsed = JSON.parse(clean);
-    const { subject, x, y, width, height } = parsed;
-    if (typeof subject !== "string" || subject === "none" || typeof x !== "number" || typeof y !== "number" || typeof width !== "number" || typeof height !== "number") {
-      return null;
-    }
-    if (x < 0 || x > 1 || y < 0 || y > 1 || width <= 0.02 || width > 1 || height <= 0.02 || height > 1) {
-      return null;
-    }
-    return {
-      box: { x, y, width, height },
-      subject: subject.toLowerCase().replace(/\s+/g, "_")
-    };
-  } catch {
-    return null;
-  }
-}
-async function cropAndUpscale(imageBuffer, box) {
-  const meta = await sharp(imageBuffer).metadata();
-  const imgW = meta.width ?? 0;
-  const imgH = meta.height ?? 0;
-  if (imgW === 0 || imgH === 0) return imageBuffer;
-  const padX = Math.round(box.width * PADDING_FRACTION * imgW);
-  const padY = Math.round(box.height * PADDING_FRACTION * imgH);
-  const left = Math.max(0, Math.round(box.x * imgW) - padX);
-  const top = Math.max(0, Math.round(box.y * imgH) - padY);
-  const right = Math.min(imgW, Math.round((box.x + box.width) * imgW) + padX);
-  const bottom = Math.min(imgH, Math.round((box.y + box.height) * imgH) + padY);
-  const cropW = right - left;
-  const cropH = bottom - top;
-  if (cropW <= 0 || cropH <= 0 || cropW > imgW * 0.95 || cropH > imgH * 0.95) {
-    return imageBuffer;
-  }
-  const scale = Math.max(1, MIN_OUTPUT_PX / Math.min(cropW, cropH));
-  const outW = Math.round(cropW * scale);
-  const outH = Math.round(cropH * scale);
-  return sharp(imageBuffer).extract({ left, top, width: cropW, height: cropH }).resize(outW, outH, { kernel: sharp.kernel.lanczos3 }).jpeg({ quality: 90 }).toBuffer();
-}
-
 // src/routes/meta-glasses.ts
-var objectStorageService2 = new ObjectStorageService();
+var objectStorageService3 = new ObjectStorageService();
 var sessions = /* @__PURE__ */ new Map();
 var SESSION_TTL_MS = 24 * 60 * 60 * 1e3;
 var MAX_EVENTS = 100;
@@ -104359,7 +104398,7 @@ router28.post(
         );
         const frameBuffer = zoomResult.buffer;
         if (zoomResult.subject) persistedZoomSubject = zoomResult.subject;
-        const storagePath = await objectStorageService2.uploadObjectBuffer(
+        const storagePath = await objectStorageService3.uploadObjectBuffer(
           session.companyId,
           frameBuffer,
           "image/jpeg"
@@ -104372,7 +104411,8 @@ router28.post(
           url: storagePath,
           captureSource: "smart_glasses",
           caption,
-          filename: `glasses_${Date.now()}.jpg`
+          filename: `glasses_${Date.now()}.jpg`,
+          zoomSubject: persistedZoomSubject ?? null
         }).returning();
         persistedStoragePath = storagePath;
         persistedMediaId = mediaRow?.id;

@@ -74,6 +74,11 @@ interface MetaGlassesSessionState {
    * 2 minutes — prompts the technician to check the glasses connection.
    */
   isInactive: boolean;
+  /**
+   * True for 8 s after the session reconnects and a new pairing code is
+   * issued — lets the UI highlight the code so the tech notices it changed.
+   */
+  codeJustChanged: boolean;
 }
 
 const POLL_INTERVAL_MS = 3_000;        // poll every 3 s
@@ -92,6 +97,8 @@ export function useMetaGlassesSession({
   const [isActive, setIsActive]   = useState(false);
   const [isInactive, setIsInactive] = useState(false);
   const [status, setStatus]       = useState<string | null>(null);
+  // #109 — true for 8 s after a reconnect issues a new pairing code.
+  const [codeJustChanged, setCodeJustChanged] = useState(false);
 
   // Last-polled cursor — never triggers re-renders.
   const lastSeenRef      = useRef<number>(0);
@@ -105,6 +112,8 @@ export function useMetaGlassesSession({
   // Always-current copy of inspectionId for use inside async poll closure.
   const inspectionIdRef  = useRef(inspectionId);
   inspectionIdRef.current = inspectionId;
+  // #111 — set of delivered event IDs; prevents re-delivery if cursor races.
+  const seenEventIdsRef  = useRef(new Set<string>());
 
   // ── Session registration ───────────────────────────────────────────────────
   useEffect(() => {
@@ -169,6 +178,8 @@ export function useMetaGlassesSession({
               if (reg.ok) {
                 const d = (await reg.json()) as { sessionId: string; code: string };
                 setCode(d.code);
+                setCodeJustChanged(true);
+                setTimeout(() => setCodeJustChanged(false), 8_000);
                 setStatus("Glasses reconnected · update code");
                 lastSeenRef.current      = Date.now();
                 lastEventTimeRef.current = Date.now();
@@ -191,19 +202,28 @@ export function useMetaGlassesSession({
         const data = (await res.json()) as { events: GlassesEvent[]; serverTime: number };
 
         if (data.events.length > 0) {
-          const newest = Math.max(...data.events.map((e) => e.timestamp));
-          lastSeenRef.current      = newest;
-          lastEventTimeRef.current = Date.now();
+          // #111 — skip events already delivered (guards against poll-cursor race).
+          const newEvents = data.events.filter((e) => {
+            if (seenEventIdsRef.current.has(e.id)) return false;
+            seenEventIdsRef.current.add(e.id);
+            return true;
+          });
 
-          setIsInactive(false);
-          setEventCount((prev) => prev + data.events.length);
-          setStatus(`Glasses active · ${data.events.length} new event${data.events.length === 1 ? "" : "s"}`);
+          if (newEvents.length > 0) {
+            const newest = Math.max(...newEvents.map((e) => e.timestamp));
+            lastSeenRef.current      = newest;
+            lastEventTimeRef.current = Date.now();
 
-          for (const event of data.events) {
-            onFindingRef.current(event);
+            setIsInactive(false);
+            setEventCount((prev) => prev + newEvents.length);
+            setStatus(`Glasses active · ${newEvents.length} new event${newEvents.length === 1 ? "" : "s"}`);
+
+            for (const event of newEvents) {
+              onFindingRef.current(event);
+            }
+
+            setTimeout(() => setStatus("Glasses active"), 4_000);
           }
-
-          setTimeout(() => setStatus("Glasses active"), 4_000);
         }
 
         // ── #106 — Inactivity check ───────────────────────────────────────
@@ -237,8 +257,9 @@ export function useMetaGlassesSession({
       lastSeenRef.current      = 0;
       lastEventTimeRef.current = 0;
       registeredForRef.current = null;
+      seenEventIdsRef.current.clear();
     }
   }, [inspectionId]);
 
-  return { sessionId, code, eventCount, status, isActive, isInactive };
+  return { sessionId, code, eventCount, status, isActive, isInactive, codeJustChanged };
 }

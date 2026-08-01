@@ -433,6 +433,7 @@ router.post(
             captureSource: "smart_glasses",
             caption,
             filename: `glasses_${Date.now()}.jpg`,
+            zoomSubject: persistedZoomSubject ?? null,
           })
           .returning();
         persistedStoragePath = storagePath;

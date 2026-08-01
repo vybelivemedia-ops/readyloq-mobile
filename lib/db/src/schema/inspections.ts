@@ -58,6 +58,9 @@ export const inspectionMediaTable = pgTable("inspection_media", {
   captureSource: text("capture_source").notNull().default("phone_camera"),
   // 0–100 capture-time quality score from the on-device gate (null = ungated).
   qualityScore: integer("quality_score"),
+  // One-word label from the Gemini digital-zoom pass, e.g. "cockroach", "crack".
+  // Set when a frame was cropped to this subject before or after storage.
+  zoomSubject: text("zoom_subject"),
   // Device/EXIF context (dimensions, file size, provider id, device model…).
   captureMetadata: jsonb("capture_metadata").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),

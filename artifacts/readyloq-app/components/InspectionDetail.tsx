@@ -80,6 +80,8 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const [correctingFinding, setCorrectingFinding] = useState<Finding | null>(null);
   const [customSpecies, setCustomSpecies] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
+  // #110 — full-screen evidence viewer
+  const [viewerPath, setViewerPath] = useState<string | null>(null);
 
   const inspection = inspectionQ.data;
   const analysis = analysisQ.data?.[0];
@@ -275,8 +277,11 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
               {photos.map((m) => {
                 const sourceInfo = describeCaptureSource(m.captureSource);
                 const lowQ = isLowQuality(m.qualityScore);
+                // #115 — zoomSubject set by the Gemini zoom pass on glasses/batch crops
+                const zoomSubject = (m as unknown as Record<string, unknown>).zoomSubject as string | undefined;
                 return (
-                  <View key={m.id}>
+                  // #110 — tap any thumbnail to open full-screen viewer
+                  <Pressable key={m.id} onPress={() => setViewerPath(m.url)}>
                     <AuthedImage
                       path={m.url}
                       style={{
@@ -333,12 +338,63 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                         <Ionicons name="chatbubble-ellipses" size={11} color="#fff" />
                       </View>
                     ) : null}
-                  </View>
+                    {zoomSubject ? (
+                      <View
+                        style={{
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          backgroundColor: "rgba(124,58,237,0.78)",
+                          paddingVertical: 2,
+                          paddingHorizontal: 4,
+                          borderBottomLeftRadius: 10,
+                          borderBottomRightRadius: 10,
+                        }}
+                      >
+                        <Text
+                          style={{ color: "#fff", fontSize: 9, fontFamily: "Inter_500Medium", textAlign: "center" }}
+                          numberOfLines={1}
+                        >
+                          {zoomSubject}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
                 );
               })}
             </View>
           </View>
         ) : null}
+
+        {/* #110 — Full-screen evidence viewer */}
+        <Modal
+          visible={viewerPath != null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setViewerPath(null)}
+          statusBarTranslucent
+        >
+          <Pressable
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" }}
+            onPress={() => setViewerPath(null)}
+          >
+            {viewerPath ? (
+              <View style={{ width: "100%", height: 320 }}>
+                <AuthedImage
+                  path={viewerPath}
+                  style={{ flex: 1 }}
+                  contentFit="contain"
+                />
+              </View>
+            ) : null}
+            <Text
+              style={{ position: "absolute", bottom: 48, alignSelf: "center", color: "rgba(255,255,255,0.5)", fontSize: 12 }}
+            >
+              Tap to close
+            </Text>
+          </Pressable>
+        </Modal>
 
         {error ? (
           <Text style={{ color: colors.destructive, fontSize: 14, textAlign: "center" }}>{error}</Text>
