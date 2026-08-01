@@ -43,6 +43,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 const objectStorageService = new ObjectStorageService();
 import { requireAuth, requireCompany, requireBetaAccess } from "../middleware/require-auth";
 import { analyzePhotoFromBase64 } from "../lib/intelligence-ai";
+import { zoomGlassesFrame } from "../lib/glasses-zoom";
 import { logErrorEvent } from "../lib/error-events";
 // Note: req.query values are string | string[] | ParsedQs | ParsedQs[].
 // Always coerce via String() before use in Map keys or comparisons.
@@ -66,6 +67,12 @@ export interface GlassesEvent {
   storagePath?: string;
   /** DB row ID of the inspection media record created for this frame. */
   mediaId?: number;
+  /**
+   * One-word subject label from the Gemini digital-zoom clarification pass,
+   * e.g. "cockroach", "mousetrap", "crack". Present when the stored frame
+   * was cropped to this subject.
+   */
+  zoomSubject?: string;
 }
 
 interface ActiveSession {
@@ -363,6 +370,7 @@ router.post(
     let findingFromImage: GlassesEvent["finding"] | undefined;
     let persistedStoragePath: string | undefined;
     let persistedMediaId: number | undefined;
+    let persistedZoomSubject: string | undefined;
     if (base64Image) {
       try {
         const prediction = await analyzePhotoFromBase64(base64Image);
@@ -393,10 +401,23 @@ router.post(
       // Even if AI analysis found nothing, we persist the frame so the
       // technician has a full visual record and the report can reference it.
       try {
-        const imageBuffer = Buffer.from(base64Image, "base64");
+        const rawBuffer = Buffer.from(base64Image, "base64");
+
+        // ── Digital zoom: crop to the detected subject before storage (#114) ──
+        // zoomGlassesFrame asks Gemini for a bounding box and crops + upscales
+        // the JPEG so the stored frame is evidence-quality, not a wide-angle snap.
+        // Falls back to the original buffer silently on any failure.
+        const zoomResult = await zoomGlassesFrame(
+          rawBuffer,
+          findingFromImage?.confidence,
+          findingFromImage?.species ?? undefined,
+        );
+        const frameBuffer = zoomResult.buffer;
+        if (zoomResult.subject) persistedZoomSubject = zoomResult.subject;
+
         const storagePath = await objectStorageService.uploadObjectBuffer(
           session.companyId,
-          imageBuffer,
+          frameBuffer,
           "image/jpeg",
         );
         const caption = findingFromImage
@@ -450,6 +471,7 @@ router.post(
         finding,
         storagePath: persistedStoragePath,
         mediaId: persistedMediaId,
+        zoomSubject: persistedZoomSubject,
       };
       pushEvent(session, event);
     }

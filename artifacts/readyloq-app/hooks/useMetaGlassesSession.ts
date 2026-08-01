@@ -41,6 +41,12 @@ export interface GlassesEvent {
   storagePath?: string;
   /** inspectionMediaTable row ID for the persisted frame (set by server). */
   mediaId?: number;
+  /**
+   * One-word subject label from the Gemini digital-zoom clarification pass,
+   * e.g. "cockroach", "mousetrap", "crack". Present when the stored frame
+   * was cropped to this subject before storage.
+   */
+  zoomSubject?: string;
 }
 
 interface UseMetaGlassesSessionOptions {

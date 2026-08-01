@@ -88313,6 +88313,24 @@ var ObjectStorageService = class {
       requestedPermission: requestedPermission ?? "read" /* READ */
     });
   }
+  /**
+   * Upload a raw buffer directly to object storage from the server side.
+   * Returns the normalized `/objects/companies/<id>/uploads/<uuid>` path that
+   * can be stored in the DB and later served via signed-URL or object endpoints.
+   *
+   * Use this when a server-side process (e.g. a webhook) receives binary data
+   * and needs to persist it without a round-trip presigned URL.
+   */
+  async uploadObjectBuffer(companyId, buffer, contentType) {
+    const objectId = randomUUID();
+    const entityDir = this.getPrivateObjectDir();
+    const entityId = `companies/${companyId}/uploads/${objectId}`;
+    const fullGcsPath = `${entityDir}/${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(fullGcsPath);
+    const file2 = objectStorageClient.bucket(bucketName).file(objectName);
+    await file2.save(buffer, { contentType, resumable: false });
+    return `/objects/${entityId}`;
+  }
 };
 function parseObjectPath(path4) {
   if (!path4.startsWith("/")) {
@@ -104004,7 +104022,106 @@ function isUndiciDispatcherVersionMismatchError2(error40) {
   return false;
 }
 
+// src/lib/glasses-zoom.ts
+import sharp from "sharp";
+var MIN_OUTPUT_PX = 800;
+var PADDING_FRACTION = 0.15;
+var CONFIDENCE_THRESHOLD = 0.6;
+async function zoomGlassesFrame(imageBuffer, confidence, subjectHint, existingBox) {
+  try {
+    let box = existingBox ?? null;
+    let subject = subjectHint ?? null;
+    const needsClarification = !box || (confidence ?? 0) < CONFIDENCE_THRESHOLD;
+    if (needsClarification) {
+      const clarified = await askGeminiForBoundingBox(imageBuffer);
+      if (clarified) {
+        box = clarified.box;
+        subject = clarified.subject;
+      }
+    }
+    if (!box) {
+      return { buffer: imageBuffer, subject, cropped: false };
+    }
+    const cropped = await cropAndUpscale(imageBuffer, box);
+    return { buffer: cropped, subject, cropped: true };
+  } catch {
+    return { buffer: imageBuffer, subject: subjectHint ?? null, cropped: false };
+  }
+}
+var GEMINI_PROMPT = `You are a pest inspection AI. Identify the single most inspection-relevant object in this image \u2014 a pest (insect, rodent, wildlife), bait/snap trap, structural damage, or conducive condition (moisture, mold, crack, gap).
+
+Return ONLY a JSON object with these exact fields:
+{
+  "subject": "<one-word label, e.g. cockroach, mousetrap, crack, moisture>",
+  "x": <left edge as fraction of image width, 0.0\u20131.0>,
+  "y": <top edge as fraction of image height, 0.0\u20131.0>,
+  "width": <width as fraction of image width, 0.0\u20131.0>,
+  "height": <height as fraction of image height, 0.0\u20131.0>
+}
+
+If no inspection-relevant object is clearly visible, return:
+{"subject":"none","x":0,"y":0,"width":1,"height":1}`;
+async function askGeminiForBoundingBox(imageBuffer) {
+  try {
+    const base643 = imageBuffer.toString("base64");
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: "image/jpeg", data: base643 } },
+            { text: GEMINI_PROMPT }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 256
+      }
+    });
+    const raw = (response.text ?? "").trim();
+    const clean = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+    const parsed = JSON.parse(clean);
+    const { subject, x, y, width, height } = parsed;
+    if (typeof subject !== "string" || subject === "none" || typeof x !== "number" || typeof y !== "number" || typeof width !== "number" || typeof height !== "number") {
+      return null;
+    }
+    if (x < 0 || x > 1 || y < 0 || y > 1 || width <= 0.02 || width > 1 || height <= 0.02 || height > 1) {
+      return null;
+    }
+    return {
+      box: { x, y, width, height },
+      subject: subject.toLowerCase().replace(/\s+/g, "_")
+    };
+  } catch {
+    return null;
+  }
+}
+async function cropAndUpscale(imageBuffer, box) {
+  const meta = await sharp(imageBuffer).metadata();
+  const imgW = meta.width ?? 0;
+  const imgH = meta.height ?? 0;
+  if (imgW === 0 || imgH === 0) return imageBuffer;
+  const padX = Math.round(box.width * PADDING_FRACTION * imgW);
+  const padY = Math.round(box.height * PADDING_FRACTION * imgH);
+  const left = Math.max(0, Math.round(box.x * imgW) - padX);
+  const top = Math.max(0, Math.round(box.y * imgH) - padY);
+  const right = Math.min(imgW, Math.round((box.x + box.width) * imgW) + padX);
+  const bottom = Math.min(imgH, Math.round((box.y + box.height) * imgH) + padY);
+  const cropW = right - left;
+  const cropH = bottom - top;
+  if (cropW <= 0 || cropH <= 0 || cropW > imgW * 0.95 || cropH > imgH * 0.95) {
+    return imageBuffer;
+  }
+  const scale = Math.max(1, MIN_OUTPUT_PX / Math.min(cropW, cropH));
+  const outW = Math.round(cropW * scale);
+  const outH = Math.round(cropH * scale);
+  return sharp(imageBuffer).extract({ left, top, width: cropW, height: cropH }).resize(outW, outH, { kernel: sharp.kernel.lanczos3 }).jpeg({ quality: 90 }).toBuffer();
+}
+
 // src/routes/meta-glasses.ts
+var objectStorageService2 = new ObjectStorageService();
 var sessions = /* @__PURE__ */ new Map();
 var SESSION_TTL_MS = 24 * 60 * 60 * 1e3;
 var MAX_EVENTS = 100;
@@ -104211,6 +104328,9 @@ router28.post(
       }
     }
     let findingFromImage;
+    let persistedStoragePath;
+    let persistedMediaId;
+    let persistedZoomSubject;
     if (base64Image) {
       try {
         const prediction = await analyzePhotoFromBase64(base64Image);
@@ -104230,6 +104350,35 @@ router28.post(
       } catch (err) {
         void logErrorEvent("ai", { companyId: session.companyId, userId: session.userId, message: "Meta webhook: image analysis failed", context: { err: String(err) } });
       }
+      try {
+        const rawBuffer = Buffer.from(base64Image, "base64");
+        const zoomResult = await zoomGlassesFrame(
+          rawBuffer,
+          findingFromImage?.confidence,
+          findingFromImage?.species ?? void 0
+        );
+        const frameBuffer = zoomResult.buffer;
+        if (zoomResult.subject) persistedZoomSubject = zoomResult.subject;
+        const storagePath = await objectStorageService2.uploadObjectBuffer(
+          session.companyId,
+          frameBuffer,
+          "image/jpeg"
+        );
+        const caption = findingFromImage ? `Glasses capture: ${findingFromImage.description}` : "Glasses frame capture";
+        const [mediaRow] = await db.insert(inspectionMediaTable).values({
+          companyId: session.companyId,
+          inspectionId: session.inspectionId,
+          mediaType: "photo",
+          url: storagePath,
+          captureSource: "smart_glasses",
+          caption,
+          filename: `glasses_${Date.now()}.jpg`
+        }).returning();
+        persistedStoragePath = storagePath;
+        persistedMediaId = mediaRow?.id;
+      } catch (err) {
+        void logErrorEvent("ai", { companyId: session.companyId, userId: session.userId, message: "Meta webhook: frame persistence failed", context: { err: String(err) } });
+      }
     }
     let findingFromVoice;
     if (transcribedText) {
@@ -104246,13 +104395,16 @@ router28.post(
       }
     }
     const finding = findingFromImage ?? findingFromVoice;
-    if (finding || transcribedText) {
+    if (finding || transcribedText || persistedMediaId) {
       const event = {
         id: crypto2.randomUUID(),
         type: finding ? "finding" : "transcription",
         timestamp: Date.now(),
-        text: aiSummary ?? transcribedText ?? "Observation logged",
-        finding
+        text: aiSummary ?? transcribedText ?? "Glasses frame captured",
+        finding,
+        storagePath: persistedStoragePath,
+        mediaId: persistedMediaId,
+        zoomSubject: persistedZoomSubject
       };
       pushEvent(session, event);
     }
