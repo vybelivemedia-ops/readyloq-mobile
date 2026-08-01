@@ -43,6 +43,8 @@ import {
 import {
   createWifiCameraProvider,
   configureWifiCamera,
+  getWifiCameraConfig,
+  restoreWifiCameraConfig,
   type WifiCameraProvider,
 } from "../vision/wifi-camera-provider";
 import {
@@ -143,6 +145,15 @@ export class DevicePlugin {
   ) {}
 
   async initialize(_context?: unknown): Promise<void> {
+    // ── Restore persisted Wi-Fi camera config (#107) ───────────────────────
+    // Must run before providers are registered so the camera is available
+    // from the first render of the Connections tab or inspection workspace.
+    await restoreWifiCameraConfig();
+    const savedWifiConfig = getWifiCameraConfig();
+    if (savedWifiConfig) {
+      this.registerWifiCamera(savedWifiConfig);
+    }
+
     // ── Camera providers ───────────────────────────────────────────────────
     const native = createNativeCameraProvider(this.cameraRef);
     const mediaImport = createMediaImportProvider();

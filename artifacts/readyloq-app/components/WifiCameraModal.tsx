@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -28,11 +28,27 @@ const PRESETS = [
 ];
 
 export function WifiCameraModal({ visible, onClose, onConnected }: Props) {
-  const existing = getWifiCameraConfig();
-  const [url, setUrl] = useState(existing?.baseUrl ?? "http://");
-  const [label, setLabel] = useState(existing?.label ?? "Wi-Fi camera");
+  const [url, setUrl] = useState(() => getWifiCameraConfig()?.baseUrl ?? "http://");
+  const [label, setLabel] = useState(() => getWifiCameraConfig()?.label ?? "Wi-Fi camera");
   const [probing, setProbing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Re-seed inputs whenever the modal opens so the persisted URL always
+  // pre-fills (useState initialiser only runs on first mount).
+  useEffect(() => {
+    if (visible) {
+      const cfg = getWifiCameraConfig();
+      setUrl(cfg?.baseUrl ?? "http://");
+      setLabel(cfg?.label ?? "Wi-Fi camera");
+      setError(null);
+    }
+  }, [visible]);
+
+  // #108 — Forget: clears AsyncStorage + in-memory config then closes.
+  function handleForget() {
+    clearWifiCameraConfig();
+    onClose();
+  }
 
   async function handleConnect() {
     if (!url.trim()) return;
@@ -119,6 +135,13 @@ export function WifiCameraModal({ visible, onClose, onConnected }: Props) {
           <Text style={styles.hint}>
             Make sure your phone is connected to the same Wi-Fi network as the camera.
           </Text>
+
+          {getWifiCameraConfig() ? (
+            <Pressable onPress={handleForget} style={styles.forgetBtn}>
+              <Ionicons name="trash-outline" size={14} color="#ef4444" />
+              <Text style={styles.forgetText}>Forget this camera</Text>
+            </Pressable>
+          ) : null}
         </View>
       </Pressable>
     </Modal>
@@ -141,4 +164,6 @@ const styles = StyleSheet.create({
   connectBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#17c4d3", borderRadius: 12, paddingVertical: 14, marginTop: 4 },
   connectText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 16 },
   hint: { color: "#6b7280", fontFamily: "Inter_400Regular", fontSize: 12, textAlign: "center", lineHeight: 16 },
+  forgetBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10, backgroundColor: "rgba(239,68,68,0.08)", borderWidth: 1, borderColor: "rgba(239,68,68,0.2)" },
+  forgetText: { color: "#ef4444", fontFamily: "Inter_500Medium", fontSize: 13 },
 });

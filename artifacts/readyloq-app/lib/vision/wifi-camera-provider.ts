@@ -17,6 +17,7 @@
  */
 
 import * as Crypto from "expo-crypto";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import type { HealthCheckResult } from "@platform/provider-registry";
 import type {
@@ -37,6 +38,8 @@ interface WifiCameraConfig {
   label?: string;
 }
 
+const WIFI_CAM_STORAGE_KEY = "@readyloq:wifi-camera-config";
+
 let _config: WifiCameraConfig | null = null;
 
 export function configureWifiCamera(config: WifiCameraConfig): void {
@@ -45,6 +48,8 @@ export function configureWifiCamera(config: WifiCameraConfig): void {
     baseUrl: config.baseUrl.replace(/\/$/, ""),
     capturePath: config.capturePath ?? detectCapturePath(config.baseUrl),
   };
+  // Fire-and-forget — never blocks the caller.
+  void AsyncStorage.setItem(WIFI_CAM_STORAGE_KEY, JSON.stringify(_config));
 }
 
 export function getWifiCameraConfig(): WifiCameraConfig | null {
@@ -53,6 +58,31 @@ export function getWifiCameraConfig(): WifiCameraConfig | null {
 
 export function clearWifiCameraConfig(): void {
   _config = null;
+  void AsyncStorage.removeItem(WIFI_CAM_STORAGE_KEY);
+}
+
+/**
+ * Restore a previously configured Wi-Fi camera URL from AsyncStorage.
+ * Call once at app startup (DevicePlugin.initialize()) so the provider is
+ * ready before the user opens the Connections tab or starts an inspection.
+ */
+export async function restoreWifiCameraConfig(): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(WIFI_CAM_STORAGE_KEY);
+    if (raw) {
+      const stored = JSON.parse(raw) as WifiCameraConfig;
+      // Apply the same normalisation as configureWifiCamera but skip the
+      // AsyncStorage write (config is already persisted).
+      _config = {
+        ...stored,
+        baseUrl: stored.baseUrl.replace(/\/$/, ""),
+        capturePath: stored.capturePath ?? detectCapturePath(stored.baseUrl),
+      };
+    }
+  } catch {
+    // Corrupt or missing entry — start unconfigured.
+    _config = null;
+  }
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
