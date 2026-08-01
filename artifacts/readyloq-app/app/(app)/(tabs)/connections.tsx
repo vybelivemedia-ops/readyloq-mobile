@@ -7,8 +7,8 @@
  */
 
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, type Href } from "expo-router";
-import React, { useEffect, useState, useCallback } from "react";
+import { useRouter, useFocusEffect, type Href } from "expo-router";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -240,6 +240,23 @@ export default function ConnectionsScreen() {
       }
     },
     [plugin],
+  );
+
+  // ── #101 — Resync sensor connection state on tab focus ──────────────────────
+  // connectedSensorIds is normally updated only via UI actions; when the user
+  // navigates away and back, or a background reconnect fires, we re-read the
+  // live provider state so cards reflect reality without a full re-mount.
+  useFocusEffect(
+    useCallback(() => {
+      const live = new Set<string>();
+      for (const entry of SENSOR_CATALOGUE) {
+        const p = plugin.getBleSensorProvider(entry.id);
+        if (p && (p as unknown as { isConnected: boolean }).isConnected) {
+          live.add(entry.id);
+        }
+      }
+      setConnectedSensorIds(live);
+    }, [plugin]),
   );
 
   // ── #89 — Acoustic bait station slot assignment ──────────────────────────────
@@ -658,8 +675,34 @@ export default function ConnectionsScreen() {
                   </Pressable>
                 ) : (
                   <Pressable
-                    onPress={() => setActiveSensorId(entry.id)}
-                    disabled={btOff || blePermStatus !== "granted"}
+                    onPress={async () => {
+                      // #100 — check/request permissions before opening scanner
+                      if (btOff) {
+                        Alert.alert(
+                          "Bluetooth is off",
+                          "Enable Bluetooth in device settings to scan for sensors.",
+                          [{ text: "OK" }],
+                        );
+                        return;
+                      }
+                      if (blePermStatus !== "granted") {
+                        const result = await requestBlePermissions();
+                        setBlePermStatus(result);
+                        if (result === "blocked") {
+                          Alert.alert(
+                            "Permission required",
+                            "Bluetooth permission was permanently denied. Open Settings to allow it.",
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              { text: "Open Settings", onPress: () => void Linking.openSettings() },
+                            ],
+                          );
+                          return;
+                        }
+                        if (result !== "granted") return;
+                      }
+                      setActiveSensorId(entry.id);
+                    }}
                     style={({ pressed }) => ({
                       paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
                       backgroundColor: colors.primary, opacity: pressed ? 0.7 : 1,

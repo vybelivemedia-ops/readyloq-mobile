@@ -319,6 +319,20 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                         <Ionicons name="warning" size={11} color="#fff" />
                       </View>
                     ) : null}
+                    {m.caption ? (
+                      <View
+                        style={{
+                          position: "absolute",
+                          bottom: 4,
+                          right: 4,
+                          backgroundColor: "rgba(0,0,0,0.65)",
+                          borderRadius: 999,
+                          padding: 3,
+                        }}
+                      >
+                        <Ionicons name="chatbubble-ellipses" size={11} color="#fff" />
+                      </View>
+                    ) : null}
                   </View>
                 );
               })}
