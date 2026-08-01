@@ -635,6 +635,11 @@ export default function NewInspectionScreen() {
   const [wsInspectionId, setWsInspectionId] = useState<number | null>(null);
   const [wsAnalyzing, setWsAnalyzing] = useState(false);
 
+  // ── #74 — Glasses-capture findings buffer ──────────────────────────────────
+  // Persisted across the full inspection session. Each entry is a GlassesEvent
+  // with a server-persisted frame (mediaId set) and/or a structured AI finding.
+  const [glassesFindings, setGlassesFindings] = useState<GlassesEvent[]>([]);
+
   // ── Meta glasses session (Ray-Ban Live AI hands-free integration) ──────────
   // Registers a session with the API when an inspection is persisted so the
   // tech's glasses can forward voice + camera events in real-time. The 6-char
@@ -644,10 +649,15 @@ export default function NewInspectionScreen() {
     active: wsInspectionId != null,
     onFinding: useCallback(
       (event: GlassesEvent) => {
+        // Persist frame findings in state so the detections panel stays up.
+        if (event.finding || event.mediaId) {
+          setGlassesFindings((prev) => [...prev, event]);
+        }
+        // Brief FAIE toast for immediate haptic feedback.
         setFaieStatus(`🕶 ${event.text}`);
-        setTimeout(() => setFaieStatus(null), 5_000);
+        setTimeout(() => setFaieStatus(null), 4_000);
       },
-      // setFaieStatus is stable (React setState); intentionally empty dep array.
+      // setFaieStatus and setGlassesFindings are stable React setState refs.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [],
     ),
@@ -1419,6 +1429,7 @@ export default function NewInspectionScreen() {
     ) : null;
 
     // Meta glasses activity strip — shown when a Live AI session is active.
+    const glassesCaptures = glassesFindings.filter((e) => e.finding || e.mediaId);
     const glassesStrip = glassesSession.isActive ? (
       <View
         style={{
@@ -1439,6 +1450,51 @@ export default function NewInspectionScreen() {
           {glassesSession.status ?? "Glasses active"}
           {glassesSession.code ? `  ·  Code: ${glassesSession.code}` : ""}
         </Text>
+        {glassesCaptures.length > 0 && (
+          <View style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
+            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11 }}>
+              {glassesCaptures.length} capture{glassesCaptures.length === 1 ? "" : "s"}
+            </Text>
+          </View>
+        )}
+      </View>
+    ) : null;
+
+    // Compact list of the most recent glasses detections — shown below the strip
+    // so the tech can glance at what the AI has logged without leaving capture.
+    const glassesFindingsPanel = glassesCaptures.length > 0 ? (
+      <View style={{ gap: 5, maxWidth: 440, alignSelf: "stretch" }}>
+        {glassesCaptures.slice(-3).map((ev) => {
+          const sev = ev.finding?.severity ?? "low";
+          const sevColor =
+            sev === "critical" || sev === "high" ? "#ef4444"
+            : sev === "medium" ? "#f59e0b"
+            : "#22c55e";
+          return (
+            <View
+              key={ev.id}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 8,
+                backgroundColor: "rgba(124,58,237,0.18)",
+                borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
+                borderWidth: 1, borderColor: "rgba(124,58,237,0.35)",
+              }}
+            >
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: sevColor }} />
+              <Text
+                style={{ color: "#e9d5ff", fontFamily: "Inter_500Medium", fontSize: 11, flex: 1 }}
+                numberOfLines={1}
+              >
+                {ev.finding
+                  ? `${ev.finding.category} · ${Math.round(ev.finding.confidence * 100)}%`
+                  : ev.text}
+              </Text>
+              {ev.mediaId ? (
+                <Ionicons name="cloud-done-outline" size={11} color="rgba(233,213,255,0.7)" />
+              ) : null}
+            </View>
+          );
+        })}
       </View>
     ) : null;
 
@@ -1614,6 +1670,7 @@ export default function NewInspectionScreen() {
                 {qualityBanner}
                 {faieBanner}
                 {glassesStrip}
+                {glassesFindingsPanel}
                 {zoomChips}
                 <NativeCameraHealthBadge />
                 <DeviceHealthStrip />
@@ -1863,6 +1920,7 @@ export default function NewInspectionScreen() {
               {qualityBanner}
               {faieBanner}
               {glassesStrip}
+              {glassesFindingsPanel}
               {zoomChips}
             </View>
             {thumbs}
@@ -1889,6 +1947,9 @@ export default function NewInspectionScreen() {
             ) : null}
             {glassesStrip ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{glassesStrip}</View>
+            ) : null}
+            {glassesFindingsPanel ? (
+              <View style={{ paddingHorizontal: 16 }}>{glassesFindingsPanel}</View>
             ) : null}
             {!isConnected && (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(239,68,68,0.15)", marginHorizontal: 16, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>

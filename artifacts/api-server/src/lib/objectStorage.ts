@@ -207,6 +207,31 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
+
+  /**
+   * Upload a raw buffer directly to object storage from the server side.
+   * Returns the normalized `/objects/companies/<id>/uploads/<uuid>` path that
+   * can be stored in the DB and later served via signed-URL or object endpoints.
+   *
+   * Use this when a server-side process (e.g. a webhook) receives binary data
+   * and needs to persist it without a round-trip presigned URL.
+   */
+  async uploadObjectBuffer(
+    companyId: number,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<string> {
+    const objectId = randomUUID();
+    // Derive GCS bucket + object from the private dir + company namespace.
+    const entityDir = this.getPrivateObjectDir();
+    const entityId = `companies/${companyId}/uploads/${objectId}`;
+    const fullGcsPath = `${entityDir}/${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(fullGcsPath);
+    const file = objectStorageClient.bucket(bucketName).file(objectName);
+    await file.save(buffer, { contentType, resumable: false });
+    // Return the canonical /objects/… path (mirrors normalizeObjectEntityPath output).
+    return `/objects/${entityId}`;
+  }
 }
 
 function parseObjectPath(path: string): {

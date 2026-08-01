@@ -23,5 +23,11 @@ description: How the Ray-Ban Meta glasses integrate into the ReadyLoq inspection
 - `logErrorEvent` takes `(category: ErrorCategory, input: LogErrorEventInput)` — 2 args
 - Express multi-middleware routes: cast `req.params.sessionId as string` to avoid `string | string[]` TS errors
 
+## Frame persistence (Task #74)
+- `ObjectStorageService.uploadObjectBuffer(companyId, buffer, contentType)` added to `lib/objectStorage.ts` — uploads server-side buffer directly via GCS SDK, returns `/objects/companies/<id>/uploads/<uuid>` path
+- Webhook handler now: upload JPEG → insert `inspectionMediaTable` row (`captureSource: "meta-glasses"`) → add `storagePath`/`mediaId` to `GlassesEvent`
+- Mobile: `glassesFindings: GlassesEvent[]` state in `new-inspection.tsx`; `onFinding` pushes finding/frame events to this list; `glassesFindingsPanel` shows last 3 detections inline; `glassesStrip` shows capture count badge
+- `GlassesEvent` type in both hook and server now includes `storagePath?: string; mediaId?: number`
+
 ## Why
-Real-time voice + image capture without phone-in-hand. Glasses push events via Meta's cloud; phone receives findings and displays a compact strip with the pairing code and live status.
+Real-time voice + image capture without phone-in-hand. Glasses push events via Meta's cloud; phone receives findings, persists frames to object storage, and displays a compact strip with the pairing code, live status, and detection count.

@@ -36,8 +36,11 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import crypto from "node:crypto";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { toFile } from "openai";
-import { db, inspectionsTable } from "@workspace/db";
+import { db, inspectionsTable, inspectionMediaTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const objectStorageService = new ObjectStorageService();
 import { requireAuth, requireCompany, requireBetaAccess } from "../middleware/require-auth";
 import { analyzePhotoFromBase64 } from "../lib/intelligence-ai";
 import { logErrorEvent } from "../lib/error-events";
@@ -59,6 +62,10 @@ export interface GlassesEvent {
     zone?: string;
     species?: string;
   };
+  /** Set when the glasses frame was persisted to object storage. */
+  storagePath?: string;
+  /** DB row ID of the inspection media record created for this frame. */
+  mediaId?: number;
 }
 
 interface ActiveSession {
@@ -354,6 +361,8 @@ router.post(
 
     // ── Analyze image if present ─────────────────────────────────────────────
     let findingFromImage: GlassesEvent["finding"] | undefined;
+    let persistedStoragePath: string | undefined;
+    let persistedMediaId: number | undefined;
     if (base64Image) {
       try {
         const prediction = await analyzePhotoFromBase64(base64Image);
@@ -379,6 +388,37 @@ router.post(
       } catch (err) {
         void logErrorEvent("ai", { companyId: session.companyId, userId: session.userId, message: "Meta webhook: image analysis failed", context: { err: String(err) } });
       }
+
+      // ── Persist the glasses frame to object storage + inspection media ──────
+      // Even if AI analysis found nothing, we persist the frame so the
+      // technician has a full visual record and the report can reference it.
+      try {
+        const imageBuffer = Buffer.from(base64Image, "base64");
+        const storagePath = await objectStorageService.uploadObjectBuffer(
+          session.companyId,
+          imageBuffer,
+          "image/jpeg",
+        );
+        const caption = findingFromImage
+          ? `Glasses capture: ${findingFromImage.description}`
+          : "Glasses frame capture";
+        const [mediaRow] = await db
+          .insert(inspectionMediaTable)
+          .values({
+            companyId: session.companyId,
+            inspectionId: session.inspectionId,
+            mediaType: "photo",
+            url: storagePath,
+            captureSource: "meta-glasses",
+            caption,
+            filename: `glasses_${Date.now()}.jpg`,
+          })
+          .returning();
+        persistedStoragePath = storagePath;
+        persistedMediaId = mediaRow?.id;
+      } catch (err) {
+        void logErrorEvent("ai", { companyId: session.companyId, userId: session.userId, message: "Meta webhook: frame persistence failed", context: { err: String(err) } });
+      }
     }
 
     // ── Parse voice command ──────────────────────────────────────────────────
@@ -401,13 +441,15 @@ router.post(
     const finding = findingFromImage ?? findingFromVoice;
 
     // ── Buffer event ─────────────────────────────────────────────────────────
-    if (finding || transcribedText) {
+    if (finding || transcribedText || persistedMediaId) {
       const event: GlassesEvent = {
         id: crypto.randomUUID(),
         type: finding ? "finding" : "transcription",
         timestamp: Date.now(),
-        text: aiSummary ?? transcribedText ?? "Observation logged",
+        text: aiSummary ?? transcribedText ?? "Glasses frame captured",
         finding,
+        storagePath: persistedStoragePath,
+        mediaId: persistedMediaId,
       };
       pushEvent(session, event);
     }

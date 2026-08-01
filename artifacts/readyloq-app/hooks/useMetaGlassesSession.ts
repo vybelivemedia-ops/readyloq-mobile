@@ -37,6 +37,10 @@ export interface GlassesEvent {
   timestamp: number;
   text: string;
   finding?: GlassesFinding;
+  /** Object-storage path of the persisted glasses frame (set by server). */
+  storagePath?: string;
+  /** inspectionMediaTable row ID for the persisted frame (set by server). */
+  mediaId?: number;
 }
 
 interface UseMetaGlassesSessionOptions {
