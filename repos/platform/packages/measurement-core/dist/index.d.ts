@@ -32,8 +32,8 @@
  */
 import type { DeviceProvider } from "@platform/device-core";
 export type { DeviceProvider, DeviceCapabilities, DeviceCategory, DeviceTransport, DeviceIdentity, DeviceStatus, DevicePermissions, DeviceEvent, DeviceEventKind, DeviceEventListener, } from "@platform/device-core";
-export type MeasurementKind = "width" | "height" | "depth" | "diameter" | "radius" | "length" | "perimeter" | "area" | "volume" | "angle" | "distance" | "thickness";
-export type MeasurementUnit = "mm" | "cm" | "m" | "in" | "ft" | "yd" | "mm2" | "cm2" | "m2" | "in2" | "ft2" | "mm3" | "cm3" | "m3" | "in3" | "ft3" | "deg";
+export type MeasurementKind = "width" | "height" | "depth" | "diameter" | "radius" | "length" | "perimeter" | "area" | "volume" | "angle" | "distance" | "thickness" | "temperature" | "humidity" | "co2" | "pressure" | "acoustic";
+export type MeasurementUnit = "mm" | "cm" | "m" | "in" | "ft" | "yd" | "mm2" | "cm2" | "m2" | "in2" | "ft2" | "mm3" | "cm3" | "m3" | "in3" | "ft3" | "deg" | "c" | "f" | "pct" | "ppm" | "ppb" | "pa" | "level";
 export type MeasurementMethod = "single_image_reference" | "stereo_depth" | "monocular_depth" | "ar_anchored" | "hardware_sensor" | "manual";
 export type CalibrationStatus = "uncalibrated" | "focal_length_auto" | "reference_object" | "ar_anchored" | "hardware_calibrated" | "manual";
 /**
@@ -435,6 +435,8 @@ export interface MeasurementReading {
     /** Signal quality / confidence from the device (0–1), if reported. */
     signalQuality?: number;
     capturedAt: string;
+    /** Provider-specific secondary readings and annotations (e.g. humidity alongside temperature). */
+    metadata?: Record<string, unknown>;
 }
 /**
  * Domain event kinds emitted by the measurement subsystem.

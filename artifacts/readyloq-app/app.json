@@ -22,9 +22,11 @@
         "NSPhotoLibraryUsageDescription": "ReadyLoq saves and attaches inspection photos to your reports.",
         "NSLocationWhenInUseUsageDescription": "ReadyLoq records the inspection site location to tag your reports.",
         "NSMicrophoneUsageDescription": "Allow ReadyLoq to use the microphone for hands-free inspection notes.",
-        "NSBluetoothAlwaysUsageDescription": "ReadyLoq connects to Meta Ray-Ban smart glasses over Bluetooth to receive hands-free inspection photos.",
-        "NSBluetoothPeripheralUsageDescription": "ReadyLoq uses Bluetooth to pair with Meta Ray-Ban smart glasses for evidence capture."
-      }
+        "NSBluetoothAlwaysUsageDescription": "ReadyLoq connects to BLE sensors and Meta Ray-Ban smart glasses for hands-free inspection capture and environmental measurement.",
+        "NSBluetoothPeripheralUsageDescription": "ReadyLoq uses Bluetooth to pair with smart glasses and measurement sensors.",
+        "UIBackgroundModes": ["bluetooth-central"]
+      },
+      "backgroundModes": ["bluetooth-central"]
     },
     "android": {
       "package": "com.hgwashingllc.readyloqmobile",
@@ -86,7 +88,7 @@
         }
       ],
       "expo-mail-composer",
-      "react-native-ble-plx",
+      ["react-native-ble-plx", { "isBackgroundEnabled": true }],
       "./plugins/withFoldableConfigChanges.js"
     ],
     "experiments": {

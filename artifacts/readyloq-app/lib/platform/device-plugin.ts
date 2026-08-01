@@ -6,23 +6,20 @@
  * (satisfied structurally — no import needed to avoid a circular dep edge).
  *
  * On initialize() it:
- *   1. Creates the built-in camera providers (NativeCamera, MediaImport) and
- *      mock measurement device providers (moisture meter, laser distance meter).
- *   2. Adapts camera CaptureCapabilities → DeviceCapabilities so they satisfy
- *      the DeviceProvider interface required by DeviceRegistry.
- *   3. Registers each provider with the internal DeviceRegistry.
+ *   1. Creates built-in camera providers (NativeCamera, MediaImport).
+ *   2. Creates the 5 real BLE sensor providers (moisture, laser, temperature,
+ *      CO₂, acoustic) — they start in disconnected state and connect on demand
+ *      via the Connections tab or DeviceScannerModal.
+ *   3. Adapts camera CaptureCapabilities → DeviceCapabilities.
+ *   4. Registers each provider with the internal DeviceRegistry.
  *
- * Consumers that need device access call `devicePlugin.registry` to query
- * registered devices, subscribe to health events, or get the primary device
- * for a category.
+ * BLE sensor providers expose setPairedDevice(id, name) in addition to the
+ * standard MeasurementDeviceProvider interface. Retrieve the full-typed
+ * provider via getBleSensorProvider(id) to call those methods from the
+ * Connections tab.
  *
- * WifiCamera is registered lazily via `registerWifiCamera()` after the user
- * has configured a baseUrl, because the registry entry is built from the
- * current _config snapshot at creation time.
- *
- * Measurement devices are registered at startup as mock providers. In
- * production, real BLE providers will be registered the same way — the
- * registry and UI layer are already wired and require no further changes.
+ * WifiCamera is registered lazily via registerWifiCamera() after the user
+ * has configured a baseUrl.
  */
 
 import type { RefObject } from "react";
@@ -49,8 +46,16 @@ import {
   type WifiCameraProvider,
 } from "../vision/wifi-camera-provider";
 import {
-  createMockMoistureMeterProvider,
-  createMockLaserDistanceMeterProvider,
+  createBleMoistureMeterProvider,
+  type BleMoistureMeterProvider,
+  createBleLaserDistanceProvider,
+  type BleLaserDistanceProvider,
+  createBleTemperatureProvider,
+  type BleTemperatureProvider,
+  createBleCO2Provider,
+  type BleCO2Provider,
+  createBleAcousticSensorProvider,
+  type BleAcousticSensorProvider,
 } from "../measurement";
 
 // ─── Transport mapping ────────────────────────────────────────────────────────
@@ -66,14 +71,6 @@ const TRANSPORT_MAP: Record<CaptureTransport, DeviceCapabilities["transports"][n
 
 // ─── Adapter: CaptureDeviceProvider → DeviceProvider ─────────────────────────
 
-/**
- * Wraps a fully-lifecycle-capable camera provider so it satisfies the
- * DeviceProvider interface expected by the DeviceRegistry.
- *
- * The key difference: DeviceProvider.capabilities is DeviceCapabilities while
- * camera providers carry CaptureCapabilities. We derive DeviceCapabilities
- * from the CaptureCapabilities and fix the categories to ["camera"].
- */
 function toCameraDeviceProvider(
   provider: NativeCameraProvider | MediaImportProvider | WifiCameraProvider,
 ): DeviceProvider {
@@ -108,14 +105,18 @@ function toCameraDeviceProvider(
   };
 }
 
+// ─── BLE sensor union type ────────────────────────────────────────────────────
+
+/** Union of all BLE sensor providers that expose setPairedDevice / clearPairedDevice. */
+export type BleSensorProvider =
+  | BleMoistureMeterProvider
+  | BleLaserDistanceProvider
+  | BleTemperatureProvider
+  | BleCO2Provider
+  | BleAcousticSensorProvider;
+
 // ─── DevicePlugin ─────────────────────────────────────────────────────────────
 
-/**
- * Satisfies the PlatformPlugin shape from @platform/platform-intelligence.
- * id, name, capabilities, initialize(), teardown() — all required members
- * are present; TypeScript structural typing makes this usable as PlatformPlugin
- * without importing the interface (which would create a new dep edge).
- */
 export class DevicePlugin {
   readonly id = "device";
   readonly name = "Device Registry";
@@ -126,17 +127,16 @@ export class DevicePlugin {
     "device.sensor",
     "sensor.moisture",
     "sensor.distance",
+    "sensor.temperature",
+    "sensor.co2",
+    "sensor.acoustic",
   ];
 
-  /** The central registry — query this for health, events, and provider lookup. */
   readonly registry: DeviceRegistry = createDeviceRegistry();
 
-  /**
-   * Live references to measurement providers, retained so callers can
-   * call provider.read() after retrieving them via getMeasurementDevice().
-   * The registry stores DeviceProvider; this map gives back the richer type.
-   */
   private readonly _measurementProviders = new Map<string, MeasurementDeviceProvider>();
+  /** Full-typed BLE sensor providers for setPairedDevice / clearPairedDevice access. */
+  private readonly _bleSensorProviders = new Map<string, BleSensorProvider>();
 
   constructor(
     private readonly cameraRef: RefObject<CameraView | null>,
@@ -153,51 +153,52 @@ export class DevicePlugin {
     this.registry.register(toCameraDeviceProvider(native));
     this.registry.register(toCameraDeviceProvider(mediaImport));
 
-    // ── Measurement providers ──────────────────────────────────────────────
-    const moistureMeter = createMockMoistureMeterProvider();
-    const laserMeter = createMockLaserDistanceMeterProvider();
+    // ── BLE sensor providers ───────────────────────────────────────────────
+    // All start disconnected; the user pairs them via the Connections tab.
+    const sensors: BleSensorProvider[] = [
+      createBleMoistureMeterProvider(),
+      createBleLaserDistanceProvider(),
+      createBleTemperatureProvider(),
+      createBleCO2Provider(),
+      createBleAcousticSensorProvider(),
+    ];
 
-    await moistureMeter.initialize();
-    await laserMeter.initialize();
-
-    this.registry.register(moistureMeter as unknown as DeviceProvider);
-    this.registry.register(laserMeter as unknown as DeviceProvider);
-
-    this._measurementProviders.set(moistureMeter.id, moistureMeter);
-    this._measurementProviders.set(laserMeter.id, laserMeter);
+    for (const sensor of sensors) {
+      await sensor.initialize();
+      this.registry.register(sensor as unknown as DeviceProvider);
+      this._measurementProviders.set(sensor.id, sensor);
+      this._bleSensorProviders.set(sensor.id, sensor);
+    }
   }
 
   async teardown(): Promise<void> {
     const providers = this.registry.list();
     await Promise.all(providers.map((p) => p.teardown?.()));
     this._measurementProviders.clear();
+    this._bleSensorProviders.clear();
   }
 
-  /**
-   * Retrieve a registered MeasurementDeviceProvider by its id so callers
-   * can invoke provider.read() and provider.subscribe().
-   *
-   * Returns undefined if the id is not a known measurement device.
-   */
   getMeasurementDevice(id: string): MeasurementDeviceProvider | undefined {
     return this._measurementProviders.get(id);
   }
 
-  /**
-   * All registered MeasurementDeviceProvider instances, in registration order.
-   * Safe to call before initialize() — returns an empty array.
-   */
   getMeasurementDevices(): MeasurementDeviceProvider[] {
     return Array.from(this._measurementProviders.values());
   }
 
   /**
-   * Configure and register the Wi-Fi camera provider.
-   *
-   * Call this after the user has supplied a baseUrl. The provider is
-   * re-created from the current config snapshot and (re-)registered under the
-   * same id "wifi-camera", replacing any previous entry.
+   * Returns the full-typed BLE sensor provider by id so the Connections tab
+   * can call setPairedDevice / clearPairedDevice before connect().
    */
+  getBleSensorProvider(id: string): BleSensorProvider | undefined {
+    return this._bleSensorProviders.get(id);
+  }
+
+  /** All BLE sensor providers in registration order. */
+  getBleSensorProviders(): BleSensorProvider[] {
+    return Array.from(this._bleSensorProviders.values());
+  }
+
   registerWifiCamera(config: { baseUrl: string; label?: string; capturePath?: string }): void {
     configureWifiCamera(config);
     const wifiCamera = createWifiCameraProvider();

@@ -13,6 +13,7 @@
  * provider files following the same factory pattern.
  */
 
+// ── Mock providers (development / demo / testing) ─────────────────────────────
 export {
   createMockMoistureMeterProvider,
   type MockMoistureMeterProvider,
@@ -22,3 +23,29 @@ export {
   createMockLaserDistanceMeterProvider,
   type MockLaserDistanceMeterProvider,
 } from "./mock-laser-distance-meter";
+
+// ── Real BLE providers ────────────────────────────────────────────────────────
+export {
+  createBleMoistureMeterProvider,
+  type BleMoistureMeterProvider,
+} from "./ble-moisture-meter-provider";
+
+export {
+  createBleLaserDistanceProvider,
+  type BleLaserDistanceProvider,
+} from "./ble-laser-distance-provider";
+
+export {
+  createBleTemperatureProvider,
+  type BleTemperatureProvider,
+} from "./ble-temperature-provider";
+
+export {
+  createBleCO2Provider,
+  type BleCO2Provider,
+} from "./ble-co2-provider";
+
+export {
+  createBleAcousticSensorProvider,
+  type BleAcousticSensorProvider,
+} from "./ble-acoustic-sensor-provider";

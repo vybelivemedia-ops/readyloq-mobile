@@ -63,7 +63,13 @@ export type MeasurementKind =
   | "volume"
   | "angle"
   | "distance"
-  | "thickness";
+  | "thickness"
+  // Environmental / sensor kinds
+  | "temperature"
+  | "humidity"
+  | "co2"
+  | "pressure"
+  | "acoustic";
 
 export type MeasurementUnit =
   | "mm"
@@ -82,7 +88,15 @@ export type MeasurementUnit =
   | "m3"
   | "in3"
   | "ft3"
-  | "deg";
+  | "deg"
+  // Environmental / sensor units
+  | "c"
+  | "f"
+  | "pct"
+  | "ppm"
+  | "ppb"
+  | "pa"
+  | "level";
 
 export type MeasurementMethod =
   | "single_image_reference"
@@ -644,6 +658,8 @@ export interface MeasurementReading {
   /** Signal quality / confidence from the device (0–1), if reported. */
   signalQuality?: number;
   capturedAt: string; // ISO-8601
+  /** Provider-specific secondary readings and annotations (e.g. humidity alongside temperature). */
+  metadata?: Record<string, unknown>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

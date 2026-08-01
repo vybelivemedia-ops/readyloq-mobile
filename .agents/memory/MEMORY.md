@@ -31,3 +31,5 @@
 - [Role-Based UI](role-based-ui.md) — tab bar per role via href:null; new screens: scan/review/team/leads; /api/review-queue; customFetch pattern; BadgeTone/OwnerBriefing.kpis type notes
 - [Meta glasses Live AI wiring](meta-glasses-wiring.md) — webhook transport (not BLE); in-memory session store; toFile from "openai" not integrations; AiPrediction field names; logErrorEvent 2-arg signature
 - [Stripe billing integration](stripe-billing.md) — connector field is `secret` (not `secret_key`); StripeSync param is `stripeSecretKey`; must externalize from esbuild; syncBackfill needs `{object:'all'}`
+- [BLE sensor persistence & background](ble-sensor-persistence-background.md) — storageKey 4th arg to BleSensorAdapter; restorePersistedDevice() in initialize(); AppState reconnect on foreground; app.json UIBackgroundModes + isBackgroundEnabled; MeasurementKind/Unit extended for temperature/co2/acoustic/humidity/pressure
+- [BLE sensor React Fragment pattern](ble-sensor-react-fragment.md) — map() that returns two sibling cards (sensor card + station-slot card) must wrap in React.Fragment with key; single-root JSX return; station-slot is acoustic-only conditional

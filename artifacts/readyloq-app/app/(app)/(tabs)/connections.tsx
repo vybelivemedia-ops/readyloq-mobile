@@ -17,12 +17,15 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { State as BleHwState } from "react-native-ble-plx";
 
 import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
+import { DeviceScannerModal } from "@/components/DeviceScannerModal";
 import { useColors } from "@/hooks/useColors";
 import {
   APP_VERSION,
@@ -37,6 +40,8 @@ import {
   type SmartGlassesBleState,
   type DiscoveredGlasses,
 } from "@/lib/ble";
+import { useDeviceRegistry } from "@/lib/platform/DeviceRegistryContext";
+import type { DiscoveredSensor } from "@/lib/ble/ble-sensor-adapter";
 
 // ─── Static device catalogue (Coming Soon entries) ───────────────────────────
 
@@ -72,6 +77,66 @@ const COMING_SOON_DEVICES: ComingSoonDevice[] = [
       "Body-cam or sport wearable. Frames push in as they're recorded and are automatically ingested as evidence.",
     icon: "watch-outline",
     transport: "BLE",
+  },
+];
+
+// ─── BLE Sensor catalogue ─────────────────────────────────────────────────────
+
+interface SensorEntry {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  serviceUUIDs: string[];
+  namePatterns: string[];
+  scanHint: string;
+}
+
+const SENSOR_CATALOGUE: SensorEntry[] = [
+  {
+    id: "protimeter-ble",
+    name: "Moisture Meter",
+    description: "Protimeter Surveymaster or compatible. Detects damp in walls, flooring, and structural elements.",
+    icon: "water-outline",
+    serviceUUIDs: ["59462F12-9543-9999-12C8-58B459A2712D", "0000181A-0000-1000-8000-00805F9B34FB"],
+    namePatterns: ["Protimeter", "PTM", "Surveymaster", "ReadyLoq Moisture"],
+    scanHint: "Power on your moisture meter and hold it within 1 m of the phone.",
+  },
+  {
+    id: "laser-distance-ble",
+    name: "Laser Distance Meter",
+    description: "Bosch GLM or compatible. Measures cavity and room dimensions via Bluetooth.",
+    icon: "scan-outline",
+    serviceUUIDs: ["6E400001-B5A3-F393-E0A9-E50E24DCCA9E"],
+    namePatterns: ["GLM", "Bosch", "Laser", "ReadyLoq Laser"],
+    scanHint: "Enable Bluetooth on the laser meter and keep it within range.",
+  },
+  {
+    id: "temperature-ble",
+    name: "Temp / Humidity Sensor",
+    description: "ESS-compatible probe (Govee, Inkbird, Aranet). Flags conditions that favor mold and pest activity.",
+    icon: "thermometer-outline",
+    serviceUUIDs: ["0000181A-0000-1000-8000-00805F9B34FB"],
+    namePatterns: ["Govee", "Inkbird", "SensorTag", "Aranet", "ReadyLoq Temp", "RL-Temp"],
+    scanHint: "The sensor should be awake and advertising. Check its LED if unsure.",
+  },
+  {
+    id: "co2-ble",
+    name: "CO₂ / Air Quality",
+    description: "ReadyLoq CO₂ sensor. Elevated readings can indicate mold, poor ventilation, or pest harborage.",
+    icon: "cloud-outline",
+    serviceUUIDs: ["0000E001-0000-1000-8000-00805F9B34FB"],
+    namePatterns: ["ReadyLoq CO2", "RL-CO2", "Aranet4", "SCD"],
+    scanHint: "Ensure the CO₂ sensor is powered and not in sleep mode.",
+  },
+  {
+    id: "acoustic-sensor-ble",
+    name: "Acoustic Activity Sensor",
+    description: "ReadyLoq acoustic probe. Detects termite feeding and pest movement in structural elements.",
+    icon: "ear-outline",
+    serviceUUIDs: ["0000F001-0000-1000-8000-00805F9B34FB"],
+    namePatterns: ["ReadyLoq Acoustic", "RL-Acoustic", "RL-Vibration"],
+    scanHint: "Place the acoustic sensor against the structure, then scan.",
   },
 ];
 
@@ -129,6 +194,73 @@ export default function ConnectionsScreen() {
   const isDisconnecting = ble.connectionState === "disconnecting";
   const btOff = ble.hwState !== BleHwState.PoweredOn;
   const busy = isConnecting || isDisconnecting;
+
+  // ── BLE sensor state ────────────────────────────────────────────────────────
+  const { plugin } = useDeviceRegistry();
+  /** Which sensor's scanner modal is currently open (null = none). */
+  const [activeSensorId, setActiveSensorId] = useState<string | null>(null);
+  /** IDs of sensors currently in the process of connecting. */
+  const [connectingSensorId, setConnectingSensorId] = useState<string | null>(null);
+  /** Track connected sensor IDs so cards re-render after connect/disconnect. */
+  const [connectedSensorIds, setConnectedSensorIds] = useState<Set<string>>(new Set());
+
+  const handleSensorConnect = useCallback(
+    async (sensorId: string, device: DiscoveredSensor) => {
+      setConnectingSensorId(sensorId);
+      try {
+        const provider = plugin.getBleSensorProvider(sensorId);
+        if (!provider) throw new Error("Sensor provider not found");
+        provider.setPairedDevice(device.id, device.name);
+        await provider.connect();
+        setConnectedSensorIds((prev) => new Set([...prev, sensorId]));
+        setActiveSensorId(null);
+      } catch (err) {
+        throw err; // let DeviceScannerModal surface the error
+      } finally {
+        setConnectingSensorId(null);
+      }
+    },
+    [plugin],
+  );
+
+  const handleSensorDisconnect = useCallback(
+    async (sensorId: string) => {
+      const provider = plugin.getBleSensorProvider(sensorId);
+      if (!provider) return;
+      try {
+        await provider.disconnect();
+        setConnectedSensorIds((prev) => {
+          const next = new Set(prev);
+          next.delete(sensorId);
+          return next;
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Disconnect failed.";
+        Alert.alert("Disconnect failed", msg, [{ text: "OK" }]);
+      }
+    },
+    [plugin],
+  );
+
+  // ── #89 — Acoustic bait station slot assignment ──────────────────────────────
+  const [acousticSlot, setAcousticSlot] = useState("");
+  const [acousticSlotDraft, setAcousticSlotDraft] = useState("");
+
+  useEffect(() => {
+    void AsyncStorage.getItem("@readyloq:sensor:acoustic-sensor-ble:slot").then((v) => {
+      if (v) { setAcousticSlot(v); setAcousticSlotDraft(v); }
+    });
+  }, []);
+
+  const saveAcousticSlot = useCallback((value: string) => {
+    const trimmed = value.trim();
+    setAcousticSlot(trimmed);
+    const acousticProvider = plugin.getBleSensorProvider("acoustic-sensor-ble");
+    if (acousticProvider && "setStationSlot" in acousticProvider) {
+      (acousticProvider as { setStationSlot: (s: string | null) => void })
+        .setStationSlot(trimmed || null);
+    }
+  }, [plugin]);
 
   const handleScan = useCallback(async () => {
     // ── Step 1: ensure runtime permissions are granted ──────────────────────
@@ -468,6 +600,141 @@ export default function ConnectionsScreen() {
             />
           )}
         </Section>
+
+        {/* ── BLE Sensors ─────────────────────────────────────────────────── */}
+        <Section title="Sensors" icon="hardware-chip-outline">
+          {SENSOR_CATALOGUE.map((entry) => {
+            const isConn = connectedSensorIds.has(entry.id);
+            const isConnectingThis = connectingSensorId === entry.id;
+            const provider = plugin.getBleSensorProvider(entry.id);
+            const pairedName = provider?.pairedDeviceName;
+            return (
+              <React.Fragment key={entry.id}>
+              <Card
+                style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 }}
+              >
+                {/* Icon */}
+                <View
+                  style={{
+                    width: 40, height: 40, borderRadius: 20,
+                    backgroundColor: isConn ? "rgba(34,197,94,0.12)" : colors.accent,
+                    alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  <Ionicons
+                    name={entry.icon as "water-outline"}
+                    size={20}
+                    color={isConn ? "#22c55e" : colors.mutedForeground}
+                  />
+                </View>
+
+                {/* Info */}
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                    {entry.name}
+                  </Text>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 16 }}>
+                    {isConn
+                      ? `Connected${pairedName ? ` · ${pairedName}` : ""}`
+                      : entry.description}
+                  </Text>
+                </View>
+
+                {/* Action */}
+                {isConnectingThis ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : isConn ? (
+                  <Pressable
+                    onPress={() => void handleSensorDisconnect(entry.id)}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+                      backgroundColor: "rgba(239,68,68,0.1)",
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Text style={{ color: "#ef4444", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                      Disconnect
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => setActiveSensorId(entry.id)}
+                    disabled={btOff || blePermStatus !== "granted"}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+                      backgroundColor: colors.primary, opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                      Connect
+                    </Text>
+                  </Pressable>
+                )}
+              </Card>
+
+              {/* ── #89 Station slot assignment (acoustic sensor only) ── */}
+              {entry.id === "acoustic-sensor-ble" && isConn && (
+                <Card style={{ gap: 6, paddingVertical: 10 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                      Assign to bait station slot
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <TextInput
+                      value={acousticSlotDraft}
+                      onChangeText={setAcousticSlotDraft}
+                      onBlur={() => saveAcousticSlot(acousticSlotDraft)}
+                      onSubmitEditing={() => saveAcousticSlot(acousticSlotDraft)}
+                      placeholder="e.g. Station 3A"
+                      placeholderTextColor={colors.mutedForeground}
+                      returnKeyType="done"
+                      style={{
+                        flex: 1,
+                        color: colors.foreground,
+                        fontFamily: "Inter_400Regular",
+                        fontSize: 14,
+                        backgroundColor: colors.accent,
+                        borderRadius: 8,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderWidth: 1,
+                        borderColor: acousticSlot ? colors.primary : colors.border,
+                      }}
+                    />
+                    {acousticSlot ? (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                        <Text style={{ color: "#22c55e", fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                          Assigned
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 15 }}>
+                    Activity detected by this sensor will auto-record to the assigned station slot.
+                  </Text>
+                </Card>
+              )}
+              </React.Fragment>
+            );
+          })}
+        </Section>
+
+        {/* DeviceScannerModal — opens for the active sensor */}
+        {SENSOR_CATALOGUE.map((entry) => (
+          <DeviceScannerModal
+            key={entry.id}
+            visible={activeSensorId === entry.id}
+            title={`Connect ${entry.name}`}
+            description={entry.scanHint}
+            serviceUUIDs={entry.serviceUUIDs}
+            namePatterns={entry.namePatterns}
+            onConnect={(device) => handleSensorConnect(entry.id, device)}
+            onClose={() => setActiveSensorId(null)}
+          />
+        ))}
 
         {/* ── Coming soon ── */}
         <Section title="Coming soon" icon="time-outline">
