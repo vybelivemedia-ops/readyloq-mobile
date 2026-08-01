@@ -34,11 +34,11 @@ export function GoogleAuthButton({
   const onPress = useCallback(async () => {
     try {
       setLoading(true);
-      // Linking.createURL is the reliable way to build a deep-link redirect
-      // for native (standalone/preview) builds — it uses the scheme registered
-      // in app.json directly and avoids the malformed-URI edge cases that
-      // AuthSession.makeRedirectUri can produce in expo-auth-session v7.
-      const redirectUrl = Linking.createURL("/sso-callback");
+      // Linking.createURL WITHOUT a leading slash produces the two-slash form
+      // readyloq-app://sso-callback (scheme + host).  A leading slash would
+      // produce readyloq-app:///sso-callback (empty host + path) which doesn't
+      // match the Clerk redirect allowlist and causes a callback mismatch.
+      const redirectUrl = Linking.createURL("sso-callback");
       const { createdSessionId, setActive, signUp } = await startSSOFlow({
         strategy: "oauth_google",
         redirectUrl,

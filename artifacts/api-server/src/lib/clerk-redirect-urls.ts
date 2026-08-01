@@ -8,7 +8,10 @@ import { logger } from "./logger";
  * mobile app. There is no dashboard access for Replit-managed Clerk, so the
  * server registers them itself at startup using its own secret key.
  */
-const NATIVE_REDIRECT_URLS = ["readyloq-app://sso-callback"];
+const NATIVE_REDIRECT_URLS = [
+  "readyloq-app://sso-callback",   // standard two-slash form (Linking.createURL without leading slash)
+  "readyloq-app:///sso-callback",  // three-slash form (empty host) — some Expo/platform combos produce this
+];
 
 const CLERK_API_BASE = "https://api.clerk.com/v1";
 

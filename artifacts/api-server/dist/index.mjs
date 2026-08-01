@@ -122819,7 +122819,12 @@ app.use("/api", apiLimiter, routes_default);
 var app_default = app;
 
 // src/lib/clerk-redirect-urls.ts
-var NATIVE_REDIRECT_URLS = ["readyloq-app://sso-callback"];
+var NATIVE_REDIRECT_URLS = [
+  "readyloq-app://sso-callback",
+  // standard two-slash form (Linking.createURL without leading slash)
+  "readyloq-app:///sso-callback"
+  // three-slash form (empty host) — some Expo/platform combos produce this
+];
 var CLERK_API_BASE = "https://api.clerk.com/v1";
 async function ensureClerkNativeRedirectUrls() {
   const secretKey = process.env.CLERK_SECRET_KEY;
