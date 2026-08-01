@@ -24,13 +24,17 @@
         "NSMicrophoneUsageDescription": "Allow ReadyLoq to use the microphone for hands-free inspection notes.",
         "NSBluetoothAlwaysUsageDescription": "ReadyLoq connects to BLE sensors and Meta Ray-Ban smart glasses for hands-free inspection capture and environmental measurement.",
         "NSBluetoothPeripheralUsageDescription": "ReadyLoq uses Bluetooth to pair with smart glasses and measurement sensors.",
-        "UIBackgroundModes": ["bluetooth-central"]
+        "UIBackgroundModes": [
+          "bluetooth-central"
+        ]
       },
-      "backgroundModes": ["bluetooth-central"]
+      "backgroundModes": [
+        "bluetooth-central"
+      ]
     },
     "android": {
       "package": "com.hgwashingllc.readyloqmobile",
-      "versionCode": 48,
+      "versionCode": 49,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -88,7 +92,12 @@
         }
       ],
       "expo-mail-composer",
-      ["react-native-ble-plx", { "isBackgroundEnabled": true }],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true
+        }
+      ],
       "./plugins/withFoldableConfigChanges.js"
     ],
     "experiments": {
