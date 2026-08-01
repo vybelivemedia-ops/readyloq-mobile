@@ -1430,13 +1430,17 @@ export default function NewInspectionScreen() {
 
     // Meta glasses activity strip — shown when a Live AI session is active.
     const glassesCaptures = glassesFindings.filter((e) => e.finding || e.mediaId);
+    // #106 — amber strip when glasses have gone silent for 2+ minutes
+    const glassesStripBg = glassesSession.isInactive
+      ? "rgba(202,138,4,0.92)"
+      : "rgba(124,58,237,0.88)";
     const glassesStrip = glassesSession.isActive ? (
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           gap: 8,
-          backgroundColor: "rgba(124,58,237,0.88)",
+          backgroundColor: glassesStripBg,
           paddingHorizontal: 12,
           paddingVertical: 7,
           borderRadius: 10,

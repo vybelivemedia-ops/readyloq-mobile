@@ -409,7 +409,7 @@ router.post(
             inspectionId: session.inspectionId,
             mediaType: "photo",
             url: storagePath,
-            captureSource: "meta-glasses",
+            captureSource: "smart_glasses",
             caption,
             filename: `glasses_${Date.now()}.jpg`,
           })
