@@ -1,4 +1,5 @@
 import { useAuth } from "@clerk/expo";
+import { useSignOut } from "@/hooks/useSignOut";
 import React, { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
@@ -13,7 +14,8 @@ type Mode = "create" | "join";
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const colors = useColors();
-  const { getToken, signOut } = useAuth();
+  const { getToken } = useAuth();
+  const signOut = useSignOut();
 
   const [mode, setMode] = useState<Mode>("create");
   const [companyName, setCompanyName] = useState("");

@@ -28,6 +28,7 @@ import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useSignOut } from "@/hooks/useSignOut";
 import { useLicenseStatus } from "@/hooks/useLicenseStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 
@@ -374,7 +375,7 @@ export default function DashboardScreen() {
   const colors = useColors();
   const router = useRouter();
   const { user: clerkUser } = useUser();
-  const { signOut } = useAuth();
+  const signOut = useSignOut();
   const { user } = useCurrentUser();
   const { isCompact } = useWindowSizeClass();
 
@@ -514,7 +515,7 @@ export default function DashboardScreen() {
             <Ionicons name="information-circle-outline" size={20} color={colors.mutedForeground} />
           </Pressable>
           <Pressable
-            onPress={() => signOut()}
+            onPress={() => { void signOut(); }}
             style={{
               width: 42, height: 42, borderRadius: 21,
               backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,

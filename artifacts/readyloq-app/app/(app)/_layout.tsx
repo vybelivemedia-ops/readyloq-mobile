@@ -15,6 +15,7 @@ import {
   deleteLocalInspection,
   listLocalInspections,
 } from "@/lib/local/inspection-store";
+import { useSignOut } from "@/hooks/useSignOut";
 import { configureSyncEngine } from "@/lib/sync/engine";
 import { speechService } from "@/lib/vision";
 
@@ -53,7 +54,7 @@ export default function AppLayout() {
 function Gate() {
   const colors = useColors();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const signOut = useSignOut();
   const { user, isLoading, error, refetch } = useCurrentUser();
   const promptedResume = useRef(false);
 
@@ -121,7 +122,7 @@ function Gate() {
         title="Couldn't load your account"
         message="Check your connection and try again."
         onRetry={refetch}
-        onSignOut={() => signOut()}
+        onSignOut={() => { void signOut(); }}
       />
     );
   }

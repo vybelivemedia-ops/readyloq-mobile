@@ -76,8 +76,8 @@ export interface CurrentUser {
   company?: CurrentCompany | null;
 }
 
-export function fetchCurrentUser(token: string | null) {
-  return request<CurrentUser>("/api/auth/me", token);
+export function fetchCurrentUser(token: string | null, init?: RequestInit) {
+  return request<CurrentUser>("/api/auth/me", token, init);
 }
 
 export function createCompany(token: string | null, name: string) {

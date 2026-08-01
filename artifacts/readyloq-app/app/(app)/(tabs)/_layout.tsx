@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
+import { Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 /**
  * Role-conditional tab bar.
@@ -19,6 +21,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 export default function TabsLayout() {
   const colors = useColors();
   const { user } = useCurrentUser();
+  const { isConnected } = useNetworkStatus();
   const role = user?.role ?? "technician";
 
   const isTech    = role === "technician";
@@ -30,7 +33,31 @@ export default function TabsLayout() {
   const show = (visible: boolean) => (visible ? undefined : null);
 
   return (
-    <Tabs
+    <View style={{ flex: 1 }}>
+      {/* Offline indicator — non-blocking, appears above the tab bar so
+          technicians know their queued work will sync once signal returns. */}
+      {!isConnected && (
+        <View
+          style={{
+            backgroundColor: "#4F7FFF",
+            paddingVertical: 5,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text
+            style={{
+              color: "#ffffff",
+              fontSize: 12,
+              fontFamily: "Inter_500Medium",
+              letterSpacing: 0.1,
+            }}
+          >
+            Offline — data will sync when connected
+          </Text>
+        </View>
+      )}
+      <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
@@ -130,5 +157,6 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </View>
   );
 }

@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/expo";
+import { useSignOut } from "@/hooks/useSignOut";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Text, View } from "react-native";
@@ -10,7 +10,7 @@ import { useColors } from "@/hooks/useColors";
 
 export function BetaPaused() {
   const colors = useColors();
-  const { signOut } = useAuth();
+  const signOut = useSignOut();
 
   return (
     <Screen edges={["top", "bottom"]} padded>
