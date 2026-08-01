@@ -1,5 +1,5 @@
 import { useSSO } from "@clerk/expo";
-import * as Linking from "expo-linking";
+import * as AuthSession from "expo-auth-session";
 import { type Href, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useCallback, useEffect, useState } from "react";
@@ -34,11 +34,15 @@ export function GoogleAuthButton({
   const onPress = useCallback(async () => {
     try {
       setLoading(true);
-      // Linking.createURL WITHOUT a leading slash produces the two-slash form
-      // readyloq-app://sso-callback (scheme + host).  A leading slash would
-      // produce readyloq-app:///sso-callback (empty host + path) which doesn't
-      // match the Clerk redirect allowlist and causes a callback mismatch.
-      const redirectUrl = Linking.createURL("sso-callback");
+      // makeRedirectUri({ scheme, path }) is the correct form for standalone
+      // Expo APKs. It coordinates with Android's intent system so the OS
+      // routes the OAuth callback back to this app instead of to the email
+      // client. Linking.createURL produces a subtly different URI format that
+      // Android misroutes on some devices.
+      const redirectUrl = AuthSession.makeRedirectUri({
+        scheme: "readyloq-app",
+        path: "sso-callback",
+      });
       const { createdSessionId, setActive, signUp } = await startSSOFlow({
         strategy: "oauth_google",
         redirectUrl,
