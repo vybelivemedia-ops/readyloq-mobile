@@ -38,6 +38,7 @@ import { useDailyRoute } from "@/hooks/useDailyRoute";
 import { verifyEquipmentUsage } from "@/lib/audio/intelligence/EquipmentVerifier";
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
+import { NativeCameraHealthBadge } from "@/components/NativeCameraHealthBadge";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
 import { useMetaGlassesSession, type GlassesEvent } from "@/hooks/useMetaGlassesSession";
 import { Button } from "@/components/ui/Button";
@@ -1614,6 +1615,7 @@ export default function NewInspectionScreen() {
                 {faieBanner}
                 {glassesStrip}
                 {zoomChips}
+                <NativeCameraHealthBadge />
                 <DeviceHealthStrip />
                 {guidance.text ? (
                   <View
@@ -1922,6 +1924,7 @@ export default function NewInspectionScreen() {
               </View>
             ) : null}
             <View style={{ alignItems: "center", paddingHorizontal: 16 }}>
+              <NativeCameraHealthBadge />
               <DeviceHealthStrip />
             </View>
             <View
