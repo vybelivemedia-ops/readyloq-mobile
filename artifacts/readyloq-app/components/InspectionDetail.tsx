@@ -275,7 +275,9 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
             <SectionTitle title={`Evidence (${photos.length})`} colors={colors} />
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               {photos.map((m) => {
-                const sourceInfo = describeCaptureSource(m.captureSource);
+                // #105 — meta-glasses frames get a distinct purple border + label chip
+                const isGlassesFrame = m.captureSource === "meta-glasses";
+                const sourceInfo = describeCaptureSource(isGlassesFrame ? "smart_glasses" : m.captureSource);
                 const lowQ = isLowQuality(m.qualityScore);
                 // #115 — zoomSubject set by the Gemini zoom pass on glasses/batch crops
                 const zoomSubject = (m as unknown as Record<string, unknown>).zoomSubject as string | undefined;
@@ -288,11 +290,31 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                         width: 104,
                         height: 104,
                         borderRadius: 10,
-                        borderWidth: lowQ ? 2 : 0,
-                        borderColor: lowQ ? colors.warning : "transparent",
+                        borderWidth: isGlassesFrame || lowQ ? 2 : 0,
+                        borderColor: isGlassesFrame
+                          ? "rgba(124,58,237,0.75)"
+                          : lowQ ? colors.warning : "transparent",
                       }}
                     />
-                    {!sourceInfo.isDefault ? (
+                    {/* #105 — GLASSES chip replaces the generic source icon for meta-glasses frames */}
+                    {isGlassesFrame ? (
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          left: 4,
+                          backgroundColor: "rgba(124,58,237,0.88)",
+                          borderRadius: 999,
+                          paddingHorizontal: 5,
+                          paddingVertical: 2,
+                        }}
+                      >
+                        <Text style={{ color: "#fff", fontSize: 8, fontFamily: "Inter_700Bold" }}>
+                          GLASSES
+                        </Text>
+                      </View>
+                    ) : null}
+                    {!sourceInfo.isDefault && !isGlassesFrame ? (
                       <View
                         style={{
                           position: "absolute",

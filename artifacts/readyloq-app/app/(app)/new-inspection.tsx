@@ -669,6 +669,15 @@ export default function NewInspectionScreen() {
       [],
     ),
   });
+
+  // #106 — Haptic alert the moment glasses first go silent (isInactive flips true).
+  // The amber strip already changes colour; the vibration grabs attention without
+  // requiring the technician to glance at the screen.
+  useEffect(() => {
+    if (glassesSession.isInactive) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    }
+  }, [glassesSession.isInactive]);
   const [wsError, setWsError] = useState<string | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const analyzedCount = useRef(0);
