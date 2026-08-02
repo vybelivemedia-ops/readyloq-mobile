@@ -10,6 +10,25 @@ import { confidencePct, formatStatus, severityTone } from "@/constants/inspectio
 
 type ReviewAction = "accept" | "correct" | "dismiss";
 
+/**
+ * Attribution source for a finding.
+ *
+ * - "ai"       → Discovered by FAIE (AI vision, no tech review yet)
+ * - "tech"     → Found by Tech (manually flagged, no AI involvement)
+ * - "verified" → Verified by Tech & AI (tech accepted or corrected an AI finding)
+ *
+ * Commission recognition rule: "tech" and "verified" both assign primary
+ * recognition credit to the technician.
+ */
+export type FindingAttribution = "ai" | "tech" | "verified";
+
+/** Derive attribution from reviewStatus. All current findings originate from AI;
+ *  tech involvement is represented by accept/correct. */
+export function findingAttribution(reviewStatus?: string | null): FindingAttribution {
+  if (reviewStatus === "accepted" || reviewStatus === "corrected") return "verified";
+  return "ai";
+}
+
 interface FindingCardProps {
   finding: Finding;
   /**
@@ -21,10 +40,24 @@ interface FindingCardProps {
   onReview?: (action: ReviewAction) => void;
   /** Persisted action for this finding (shows a status badge). */
   savedAction?: ReviewAction | null;
+  /**
+   * Name of the technician who ran the inspection. Shown on the attribution
+   * chip when the finding has been accepted or corrected (tech gets primary
+   * recognition credit per commission rules).
+   */
+  technicianName?: string;
 }
 
-export function FindingCard({ finding, onReview, savedAction }: FindingCardProps) {
+export function FindingCard({ finding, onReview, savedAction, technicianName }: FindingCardProps) {
   const colors = useColors();
+
+  const attribution = findingAttribution(finding.reviewStatus);
+
+  // Commission recognition: tech gets primary credit for accepted/corrected findings.
+  const techCredit =
+    (attribution === "verified" || attribution === "tech") && technicianName
+      ? technicianName
+      : null;
 
   const persistedStatus: ReviewAction | null =
     savedAction ??
@@ -77,6 +110,100 @@ export function FindingCard({ finding, onReview, savedAction }: FindingCardProps
       <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 }}>
         {finding.description}
       </Text>
+
+      {/* Attribution chip — source tag + commission credit */}
+      {attribution !== "ai" || !techCredit ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          {attribution === "ai" ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                backgroundColor: "rgba(124,58,237,0.10)",
+                borderRadius: 999,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderWidth: 1,
+                borderColor: "rgba(124,58,237,0.25)",
+              }}
+            >
+              <Ionicons name="sparkles" size={11} color="#7c3aed" />
+              <Text style={{ color: "#7c3aed", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+                Discovered by FAIE
+              </Text>
+            </View>
+          ) : attribution === "tech" ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                backgroundColor: (colors.success ?? "#16a34a") + "18",
+                borderRadius: 999,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderWidth: 1,
+                borderColor: (colors.success ?? "#16a34a") + "40",
+              }}
+            >
+              <Ionicons name="person" size={11} color={colors.success ?? "#16a34a"} />
+              <Text style={{ color: colors.success ?? "#16a34a", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+                Found by Tech
+              </Text>
+            </View>
+          ) : (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                backgroundColor: (colors.info ?? "#0ea5e9") + "15",
+                borderRadius: 999,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderWidth: 1,
+                borderColor: (colors.info ?? "#0ea5e9") + "35",
+              }}
+            >
+              <Ionicons name="shield-checkmark" size={11} color={colors.info ?? "#0ea5e9"} />
+              <Text style={{ color: colors.info ?? "#0ea5e9", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+                Verified by Tech & AI
+              </Text>
+            </View>
+          )}
+          {/* Commission credit — tech name shown when tech is involved; amounts always hidden on field view */}
+          {techCredit ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+              <Ionicons name="ribbon-outline" size={11} color={colors.mutedForeground} />
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                {techCredit}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        // AI-only finding with no tech name — show minimal FAIE chip
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            alignSelf: "flex-start",
+            backgroundColor: "rgba(124,58,237,0.10)",
+            borderRadius: 999,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderWidth: 1,
+            borderColor: "rgba(124,58,237,0.25)",
+          }}
+        >
+          <Ionicons name="sparkles" size={11} color="#7c3aed" />
+          <Text style={{ color: "#7c3aed", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+            Discovered by FAIE
+          </Text>
+        </View>
+      )}
 
       <View style={{ flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>

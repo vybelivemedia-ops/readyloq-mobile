@@ -92351,6 +92351,7 @@ function serializeOpportunity(row) {
 function serializeEvent(row) {
   return { ...row, createdAt: row.createdAt.toISOString() };
 }
+var OPEN_STATUSES2 = ["new", "reviewed", "quoted"];
 router15.get("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
@@ -92363,8 +92364,27 @@ router15.get("/", async (req, res) => {
     if (category && OPPORTUNITY_CATEGORIES.includes(category)) {
       conditions.push(eq(opportunitiesTable.category, category));
     }
-    const rows = await db.select().from(opportunitiesTable).where(and(...conditions)).orderBy(desc(opportunitiesTable.updatedAt));
-    return res.json(rows.map(serializeOpportunity));
+    const rows = await db.select({
+      opportunity: opportunitiesTable,
+      technicianName: inspectionsTable.technicianName
+    }).from(opportunitiesTable).leftJoin(inspectionsTable, eq(opportunitiesTable.inspectionId, inspectionsTable.id)).where(and(...conditions)).orderBy(desc(opportunitiesTable.updatedAt));
+    const now = Date.now();
+    const opportunities = rows.map(({ opportunity, technicianName }) => ({
+      ...serializeOpportunity(opportunity),
+      technicianName: technicianName ?? null,
+      ageDays: Math.floor((now - opportunity.updatedAt.getTime()) / 864e5)
+    }));
+    const openCount = opportunities.filter(
+      (o) => OPEN_STATUSES2.includes(o.status)
+    ).length;
+    const staleCount = opportunities.filter(
+      (o) => OPEN_STATUSES2.includes(o.status) && o.ageDays >= 14
+    ).length;
+    const pipelineValue = rows.reduce(
+      (acc, { opportunity }) => OPEN_STATUSES2.includes(opportunity.status) && opportunity.estimatedAnnualValue ? acc + opportunity.estimatedAnnualValue : acc,
+      0
+    );
+    return res.json({ opportunities, pipelineValue, openCount, staleCount });
   } catch {
     return res.status(500).json({ error: "Failed to list opportunities" });
   }

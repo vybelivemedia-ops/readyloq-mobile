@@ -6,6 +6,7 @@ import {
   opportunityNotesTable,
   opportunitySettingsTable,
   usersTable,
+  inspectionsTable,
   OPPORTUNITY_CATEGORIES,
   OPPORTUNITY_STATUSES,
   type OpportunityCategory,
@@ -40,7 +41,12 @@ function serializeEvent(row: typeof opportunityEventsTable.$inferSelect) {
   return { ...row, createdAt: row.createdAt.toISOString() };
 }
 
+/** Statuses that count as open pipeline (not yet won/lost/dismissed). */
+const OPEN_STATUSES: OpportunityStatus[] = ["new", "reviewed", "quoted"];
+
 // GET /opportunities — pipeline list with optional status/category filters.
+// Returns { opportunities, pipelineValue, openCount, staleCount } with
+// technicianName joined from the linked inspection for attribution display.
 router.get("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
@@ -56,11 +62,40 @@ router.get("/", async (req, res) => {
     }
 
     const rows = await db
-      .select()
+      .select({
+        opportunity: opportunitiesTable,
+        technicianName: inspectionsTable.technicianName,
+      })
       .from(opportunitiesTable)
+      .leftJoin(inspectionsTable, eq(opportunitiesTable.inspectionId, inspectionsTable.id))
       .where(and(...conditions))
       .orderBy(desc(opportunitiesTable.updatedAt));
-    return res.json(rows.map(serializeOpportunity));
+
+    const now = Date.now();
+    const opportunities = rows.map(({ opportunity, technicianName }) => ({
+      ...serializeOpportunity(opportunity),
+      technicianName: technicianName ?? null,
+      ageDays: Math.floor((now - opportunity.updatedAt.getTime()) / 86_400_000),
+    }));
+
+    // Pipeline stats — compute from full result set (no second query needed).
+    const openCount = opportunities.filter((o) =>
+      OPEN_STATUSES.includes(o.status as OpportunityStatus),
+    ).length;
+    // "stale" is a client display concept — DB doesn't have a stale status.
+    // Count opportunities that haven't moved in 14+ days as stale.
+    const staleCount = opportunities.filter(
+      (o) => OPEN_STATUSES.includes(o.status as OpportunityStatus) && o.ageDays >= 14,
+    ).length;
+    const pipelineValue = rows.reduce(
+      (acc, { opportunity }) =>
+        OPEN_STATUSES.includes(opportunity.status) && opportunity.estimatedAnnualValue
+          ? acc + opportunity.estimatedAnnualValue
+          : acc,
+      0,
+    );
+
+    return res.json({ opportunities, pipelineValue, openCount, staleCount });
   } catch {
     return res.status(500).json({ error: "Failed to list opportunities" });
   }

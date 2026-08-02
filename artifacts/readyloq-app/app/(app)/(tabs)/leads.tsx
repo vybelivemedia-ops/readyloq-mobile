@@ -40,6 +40,8 @@ interface Lead {
   riskLevel: "critical" | "high" | "medium" | "low";
   updatedAt: string;
   ageDays: number;
+  /** Technician who ran the linked inspection — shown for recognition credit. */
+  technicianName: string | null;
 }
 
 interface LeadsResponse {
@@ -184,6 +186,59 @@ export default function LeadsScreen() {
           </View>
         ) : null}
       </View>
+
+      {/* Attribution — tech gets primary recognition credit; financial amounts are
+          intentionally omitted from field-facing views per commission policy. */}
+      {item.technicianName ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            paddingTop: 6,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              backgroundColor: "rgba(22,163,74,0.10)",
+              borderRadius: 999,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderWidth: 1,
+              borderColor: "rgba(22,163,74,0.25)",
+            }}
+          >
+            <Ionicons name="ribbon" size={11} color="#16a34a" />
+            <Text style={{ color: "#16a34a", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+              Found by Tech
+            </Text>
+          </View>
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 11 }}>
+            {item.technicianName}
+          </Text>
+        </View>
+      ) : (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            paddingTop: 6,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          <Ionicons name="sparkles" size={11} color="#7c3aed" />
+          <Text style={{ color: "#7c3aed", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+            Discovered by FAIE
+          </Text>
+        </View>
+      )}
     </Card>
   );
 

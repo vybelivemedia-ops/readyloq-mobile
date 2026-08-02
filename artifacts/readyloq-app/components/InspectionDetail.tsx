@@ -455,6 +455,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                   finding={f}
                   onReview={(action) => handleFindingAction(f, action)}
                   savedAction={reviewResults[f.id] ?? null}
+                  technicianName={inspection.technicianName}
                 />
               ))}
 
