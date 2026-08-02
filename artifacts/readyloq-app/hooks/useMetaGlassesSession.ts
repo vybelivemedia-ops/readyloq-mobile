@@ -179,7 +179,7 @@ export function useMetaGlassesSession({
                 const d = (await reg.json()) as { sessionId: string; code: string };
                 setCode(d.code);
                 setCodeJustChanged(true);
-                setTimeout(() => setCodeJustChanged(false), 8_000);
+                setTimeout(() => setCodeJustChanged(false), 10_000);
                 setStatus("Glasses reconnected · update code");
                 lastSeenRef.current      = Date.now();
                 lastEventTimeRef.current = Date.now();
@@ -215,6 +215,8 @@ export function useMetaGlassesSession({
             lastEventTimeRef.current = Date.now();
 
             setIsInactive(false);
+            // #109 — first event after reconnect collapses the expanded code banner.
+            setCodeJustChanged(false);
             setEventCount((prev) => prev + newEvents.length);
             setStatus(`Glasses active · ${newEvents.length} new event${newEvents.length === 1 ? "" : "s"}`);
 

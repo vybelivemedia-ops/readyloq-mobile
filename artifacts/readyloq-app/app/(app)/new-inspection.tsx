@@ -1453,9 +1453,6 @@ export default function NewInspectionScreen() {
     const glassesStrip = glassesSession.isActive ? (
       <View
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 8,
           backgroundColor: glassesStripBg,
           paddingHorizontal: 12,
           paddingVertical: 7,
@@ -1463,38 +1460,60 @@ export default function NewInspectionScreen() {
           maxWidth: 440,
           borderWidth: 1,
           borderColor: "rgba(255,255,255,0.2)",
+          gap: 6,
         }}
       >
-        <Ionicons name="glasses-outline" size={15} color="#fff" />
-        <Text style={{ color: "#fff", fontFamily: "Inter_500Medium", fontSize: 12, flex: 1, flexShrink: 1 }}>
-          {glassesSession.status ?? "Glasses active"}
-        </Text>
-        {/* #109 — Amber badge when code just changed after a reconnect */}
-        {glassesSession.code ? (
+        {/* Normal status row */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Ionicons name="glasses-outline" size={15} color="#fff" />
+          <Text style={{ color: "#fff", fontFamily: "Inter_500Medium", fontSize: 12, flex: 1, flexShrink: 1 }}>
+            {glassesSession.status ?? "Glasses active"}
+          </Text>
+          {/* Compact code pill — always visible so tech can reference it */}
+          {glassesSession.code && !glassesSession.codeJustChanged ? (
+            <View
+              style={{
+                backgroundColor: "rgba(255,255,255,0.18)",
+                borderRadius: 5,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+              }}
+            >
+              <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.8 }}>
+                {glassesSession.code}
+              </Text>
+            </View>
+          ) : null}
+          {glassesCaptures.length > 0 && (
+            <View style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
+              <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11 }}>
+                {glassesCaptures.length} capture{glassesCaptures.length === 1 ? "" : "s"}
+              </Text>
+            </View>
+          )}
+        </View>
+        {/* #109 — Expanded reconnect banner: visible for 10 s after a new code is issued */}
+        {glassesSession.codeJustChanged && glassesSession.code ? (
           <View
             style={{
-              backgroundColor: glassesSession.codeJustChanged
-                ? "rgba(234,179,8,0.9)"
-                : "rgba(255,255,255,0.18)",
-              borderRadius: 5,
-              paddingHorizontal: 6,
-              paddingVertical: 2,
-              borderWidth: glassesSession.codeJustChanged ? 1 : 0,
-              borderColor: "rgba(254,240,138,0.8)",
+              backgroundColor: "rgba(0,0,0,0.25)",
+              borderRadius: 7,
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              alignItems: "center",
+              gap: 4,
+              borderWidth: 1,
+              borderColor: "rgba(254,240,138,0.55)",
             }}
           >
-            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.8 }}>
+            <Text style={{ color: "rgba(254,240,138,1)", fontFamily: "Inter_500Medium", fontSize: 10, textAlign: "center" }}>
+              New code issued — update the Meta app
+            </Text>
+            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 22, letterSpacing: 4 }}>
               {glassesSession.code}
             </Text>
           </View>
         ) : null}
-        {glassesCaptures.length > 0 && (
-          <View style={{ backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
-            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11 }}>
-              {glassesCaptures.length} capture{glassesCaptures.length === 1 ? "" : "s"}
-            </Text>
-          </View>
-        )}
       </View>
     ) : null;
 
