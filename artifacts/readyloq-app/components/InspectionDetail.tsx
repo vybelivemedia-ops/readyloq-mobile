@@ -398,17 +398,15 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
           statusBarTranslucent
         >
           <Pressable
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" }}
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.95)" }}
             onPress={() => setViewerPath(null)}
           >
             {viewerPath ? (
-              <View style={{ width: "100%", height: 320 }}>
-                <AuthedImage
-                  path={viewerPath}
-                  style={{ flex: 1 }}
-                  contentFit="contain"
-                />
-              </View>
+              <AuthedImage
+                path={viewerPath}
+                style={{ flex: 1 }}
+                contentFit="contain"
+              />
             ) : null}
             <Text
               style={{ position: "absolute", bottom: 48, alignSelf: "center", color: "rgba(255,255,255,0.5)", fontSize: 12 }}
