@@ -2,8 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { getListReportsQueryOptions } from "@/lib/api-client";
 import type { Report } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { type Href, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { type Href, useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 
 import { ReportDetail } from "@/components/ReportDetail";
@@ -15,6 +15,7 @@ import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { formatDate, formatStatus, severityTone, statusTone } from "@/constants/inspection";
+import { filterIntent } from "@/lib/filterIntent";
 
 // ─── Filter helpers ────────────────────────────────────────────────────────────
 
@@ -45,11 +46,11 @@ const FILTER_LABELS: Record<ReportFilter, string> = {
   stale:             "Stale pipeline",
 };
 
-const now = Date.now();
 const MS_7D  = 7  * 24 * 60 * 60 * 1000;
 const MS_30D = 30 * 24 * 60 * 60 * 1000;
 
 function applyFilter(reports: Report[], filter: ReportFilter): Report[] {
+  const now = Date.now();
   switch (filter) {
     case "7d":
       return reports.filter((r) => now - new Date(r.createdAt).getTime() <= MS_7D);
@@ -58,7 +59,6 @@ function applyFilter(reports: Report[], filter: ReportFilter): Report[] {
     case "high_risk":
       return reports.filter((r) => r.severity === "high" || r.severity === "critical");
     case "low_quality":
-      // Approximate: reports with critical/high severity often reflect quality issues
       return reports.filter((r) => r.severity === "critical" || r.severity === "high");
     case "pending_approvals":
       return reports.filter((r) => r.status === "pending" || r.status === "draft");
@@ -66,7 +66,7 @@ function applyFilter(reports: Report[], filter: ReportFilter): Report[] {
       return reports.filter((r) => r.status === "approved" || r.status === "complete");
     case "proposal_sent":
       return reports.filter((r) => r.status === "sent" || r.status === "proposal_sent");
-    // Informational filters — show all reports with a banner explaining context
+    // Informational — show all with a context banner
     case "quality":
     case "opportunities":
     case "stale":
@@ -83,26 +83,30 @@ const INFORMATIONAL_MESSAGES: Partial<Record<ReportFilter, string>> = {
   stale:         "Showing all reports — stale pipeline items appear in the Leads tab.",
 };
 
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function ReportsScreen() {
   const colors = useColors();
   const router = useRouter();
   const { sizeClass, isExpanded } = useWindowSizeClass();
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const params = useLocalSearchParams<{ filter?: string }>();
+  const [activeFilter, setActiveFilter] = useState<ReportFilter>("all");
 
-  // Initialise (and re-sync) filter from incoming deep-link param.
-  const [activeFilter, setActiveFilter] = useState<ReportFilter>(
-    (params.filter as ReportFilter | undefined) ?? "all",
+  /**
+   * useFocusEffect fires every time this tab comes into view — whether it was
+   * already mounted or freshly created. We consume the pending intent here so
+   * every dashboard deep-link lands on its mapped filter, including when the
+   * user has previously visited the Reports tab.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      const f = filterIntent.consume("reports");
+      if (f) setActiveFilter(f as ReportFilter);
+    }, []),
   );
-
-  // Re-apply when navigated to with a new param (e.g. from dashboard KPI card).
-  useEffect(() => {
-    if (params.filter) setActiveFilter(params.filter as ReportFilter);
-  }, [params.filter]);
 
   const { data, isLoading, isRefetching, refetch } = useQuery(getListReportsQueryOptions());
 
-  // Expanded uses a narrow list pane beside the detail → keep 1 column there.
   const numColumns = sizeClass === "medium" ? 2 : 1;
 
   const openItem = (item: Report) => {
@@ -164,7 +168,7 @@ export default function ReportsScreen() {
         </Text>
       </View>
 
-      {/* Active filter banner — dismissable */}
+      {/* Active filter banner — shows what filter is live and lets the user dismiss it */}
       {isFiltered ? (
         <View
           style={{
@@ -190,14 +194,7 @@ export default function ReportsScreen() {
             size={15}
             color={isInformational ? (colors.warning ?? "#d97706") : colors.primary}
           />
-          <Text
-            style={{
-              flex: 1,
-              color: colors.foreground,
-              fontFamily: "Inter_500Medium",
-              fontSize: 13,
-            }}
-          >
+          <Text style={{ flex: 1, color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 13 }}>
             {isInformational && INFORMATIONAL_MESSAGES[activeFilter]
               ? INFORMATIONAL_MESSAGES[activeFilter]
               : `Filtering: ${FILTER_LABELS[activeFilter] ?? activeFilter}`}

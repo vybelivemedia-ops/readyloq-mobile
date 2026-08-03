@@ -8,8 +8,8 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { type Href, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { type Href, useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -25,6 +25,7 @@ import { FullScreenLoader } from "@/components/ui/Loader";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import { customFetch } from "@/lib/api-client/custom-fetch";
+import { filterIntent } from "@/lib/filterIntent";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,12 +112,15 @@ export default function LeadsScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<LeadStatus | "all">("all");
 
-  const params = useLocalSearchParams<{ filter?: string }>();
-
-  // Re-apply filter when navigated to from a dashboard deep-link.
-  useEffect(() => {
-    if (params.filter) setFilter(params.filter as LeadStatus | "all");
-  }, [params.filter]);
+  // Consume any pending deep-link filter intent set by dashboard cards.
+  // useFocusEffect fires on every tab focus — even when the screen is already
+  // mounted — so this reliably picks up intents regardless of mount state.
+  useFocusEffect(
+    useCallback(() => {
+      const f = filterIntent.consume("leads");
+      if (f) setFilter(f as LeadStatus | "all");
+    }, []),
+  );
 
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ["leads"],

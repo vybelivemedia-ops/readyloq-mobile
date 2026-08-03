@@ -31,6 +31,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSignOut } from "@/hooks/useSignOut";
 import { useLicenseStatus } from "@/hooks/useLicenseStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
+import { filterIntent } from "@/lib/filterIntent";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -434,21 +435,21 @@ export default function DashboardScreen() {
             value: briefing.data.owner.kpis.completions7d,
             label: "Done this\nweek",
             tone: colors.success ?? "#16a34a",
-            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "7d" } } as unknown as Href),
+            onPress: () => { filterIntent.set("reports", "7d"); router.push("/(tabs)/reports" as Href); },
           },
           {
             icon: "trending-up-outline" as const,
             value: briefing.data.owner.kpis.openOpportunities,
             label: "Open\nopps",
             tone: colors.info ?? "#3b82f6",
-            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "opportunities" } } as unknown as Href),
+            onPress: () => { filterIntent.set("reports", "opportunities"); router.push("/(tabs)/reports" as Href); },
           },
           {
             icon: "cash-outline" as const,
             value: formatPipelineValue(briefing.data.owner.kpis.pipelineValue),
             label: "Pipeline\nvalue",
             tone: colors.primary,
-            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "opportunities" } } as unknown as Href),
+            onPress: () => { filterIntent.set("reports", "opportunities"); router.push("/(tabs)/reports" as Href); },
           },
           {
             icon: "ribbon-outline" as const,
@@ -457,7 +458,7 @@ export default function DashboardScreen() {
               : "—",
             label: "Avg quality\n(30d)",
             tone: colors.primary,
-            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "quality" } } as unknown as Href),
+            onPress: () => { filterIntent.set("reports", "quality"); router.push("/(tabs)/reports" as Href); },
           },
         ]
       : /* Multi-operator: executive summary metrics */
@@ -467,7 +468,7 @@ export default function DashboardScreen() {
             value: briefing.data.owner.kpis.completions30d,
             label: "Completions\n(30 days)",
             tone: colors.success ?? "#16a34a",
-            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "30d" } } as unknown as Href),
+            onPress: () => { filterIntent.set("reports", "30d"); router.push("/(tabs)/reports" as Href); },
           },
           {
             icon: "ribbon-outline" as const,
@@ -476,21 +477,21 @@ export default function DashboardScreen() {
               : "—",
             label: "Avg quality\n(30 days)",
             tone: colors.primary,
-            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "quality" } } as unknown as Href),
+            onPress: () => { filterIntent.set("reports", "quality"); router.push("/(tabs)/reports" as Href); },
           },
           {
             icon: "trending-up-outline" as const,
             value: briefing.data.owner.kpis.openOpportunities,
             label: "Open\nopportunities",
             tone: colors.info ?? "#3b82f6",
-            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "opportunities" } } as unknown as Href),
+            onPress: () => { filterIntent.set("reports", "opportunities"); router.push("/(tabs)/reports" as Href); },
           },
           {
             icon: "stats-chart-outline" as const,
             value: briefing.data.owner.kpis.approvedSummaries30d,
             label: "Approved\nsummaries",
             tone: colors.primary,
-            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "approved" } } as unknown as Href),
+            onPress: () => { filterIntent.set("reports", "approved"); router.push("/(tabs)/reports" as Href); },
           },
         ]
     : [];

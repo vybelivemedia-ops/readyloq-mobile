@@ -14,6 +14,7 @@ import { Text, View } from "react-native";
 import { Card } from "@/components/ui/Card";
 import { useColors } from "@/hooks/useColors";
 import { formatRelative } from "@/constants/inspection";
+import { filterIntent } from "@/lib/filterIntent";
 
 import { EmptyCard, formatMoney, ListRow, SectionTitle, StatGrid } from "./BriefingShared";
 
@@ -76,14 +77,22 @@ function TechnicianSection({ data }: { data: NonNullable<RoleBriefing["technicia
 function SalesSection({ data }: { data: NonNullable<RoleBriefing["sales"]> }) {
   const colors = useColors();
   const router = useRouter();
+  const toLeads = (filter?: string) => () => {
+    if (filter) filterIntent.set("leads", filter);
+    router.push("/(tabs)/leads" as Href);
+  };
+  const toReports = (filter: string) => () => {
+    filterIntent.set("reports", filter);
+    router.push("/(tabs)/reports" as Href);
+  };
   return (
     <>
       <StatGrid
         stats={[
-          { label: "Open opportunities", value: data.openCount,               icon: "briefcase-outline",    tone: colors.primary, onPress: () => router.push("/(tabs)/leads" as Href) },
-          { label: "Pipeline value",     value: formatMoney(data.pipelineValue), icon: "trending-up-outline", tone: colors.success, onPress: () => router.push("/(tabs)/leads" as Href) },
-          { label: "Going stale",        value: data.staleCount,              icon: "hourglass-outline",    tone: colors.warning, onPress: () => router.push({ pathname: "/(tabs)/leads", params: { filter: "stale" } } as unknown as Href) },
-          { label: "Proposals sent",     value: data.proposals.sent,          icon: "paper-plane-outline",  tone: colors.info,    onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "proposal_sent" } } as unknown as Href) },
+          { label: "Open opportunities", value: data.openCount,                  icon: "briefcase-outline",    tone: colors.primary, onPress: toLeads() },
+          { label: "Pipeline value",     value: formatMoney(data.pipelineValue), icon: "trending-up-outline",  tone: colors.success, onPress: toLeads() },
+          { label: "Going stale",        value: data.staleCount,                 icon: "hourglass-outline",    tone: colors.warning, onPress: toLeads("stale") },
+          { label: "Proposals sent",     value: data.proposals.sent,             icon: "paper-plane-outline",  tone: colors.info,    onPress: toReports("proposal_sent") },
         ]}
       />
       <View style={{ gap: 12 }}>
@@ -136,10 +145,10 @@ function ManagerSection({ data }: { data: NonNullable<RoleBriefing["manager"]> }
     <>
       <StatGrid
         stats={[
-          { label: "Pending approvals", value: data.pendingApprovals, icon: "shield-checkmark-outline", tone: data.pendingApprovals > 0 ? colors.warning : colors.success, onPress: () => router.push("/(tabs)/review" as Href) },
-          { label: "Avg quality (30d)", value: data.team.avgQualityScore30d ?? "—", icon: "ribbon-outline", tone: colors.primary, onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "quality" } } as unknown as Href) },
-          { label: "High risk (30d)", value: data.team.highRisk30d, icon: "warning-outline", tone: colors.destructive, onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "high_risk" } } as unknown as Href) },
-          { label: "Missed opps (30d)", value: data.team.missedOpportunities30d, icon: "eye-off-outline", tone: colors.info, onPress: () => router.push("/(tabs)/reports" as Href) },
+          { label: "Pending approvals", value: data.pendingApprovals,              icon: "shield-checkmark-outline", tone: data.pendingApprovals > 0 ? colors.warning : colors.success, onPress: () => router.push("/(tabs)/review" as Href) },
+          { label: "Avg quality (30d)", value: data.team.avgQualityScore30d ?? "—", icon: "ribbon-outline",           tone: colors.primary,     onPress: () => { filterIntent.set("reports", "quality");   router.push("/(tabs)/reports" as Href); } },
+          { label: "High risk (30d)",   value: data.team.highRisk30d,              icon: "warning-outline",           tone: colors.destructive, onPress: () => { filterIntent.set("reports", "high_risk"); router.push("/(tabs)/reports" as Href); } },
+          { label: "Missed opps (30d)", value: data.team.missedOpportunities30d,   icon: "eye-off-outline",           tone: colors.info,        onPress: () => router.push("/(tabs)/reports" as Href) },
         ]}
       />
       <View style={{ gap: 12 }}>
@@ -243,8 +252,10 @@ function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
   const colors = useColors();
   const router = useRouter();
 
-  const toReports = (filter: string) =>
-    () => router.push({ pathname: "/(tabs)/reports", params: { filter } } as unknown as Href);
+  const toReports = (filter: string) => () => {
+    filterIntent.set("reports", filter);
+    router.push("/(tabs)/reports" as Href);
+  };
 
   const severityTone = (severity: string) =>
     severity === "critical"
@@ -271,9 +282,6 @@ function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
           <Card padded={false}>
             {data.alerts.map((alert, i) => {
               const filterKey = ALERT_FILTER[alert.type];
-              const dest = filterKey
-                ? { pathname: "/(tabs)/reports" as const, params: { filter: filterKey } }
-                : ("/(tabs)/reports" as Href);
               return (
                 <ListRow
                   key={`${alert.type}-${i}`}
@@ -282,7 +290,10 @@ function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
                   tone={severityTone(alert.severity)}
                   title={alert.message}
                   subtitle={alert.severity === "critical" ? "Tap to review · Critical" : alert.severity === "warning" ? "Tap to review · Warning" : "Tap to review"}
-                  onPress={() => router.push(dest as Href)}
+                  onPress={() => {
+                    if (filterKey) filterIntent.set("reports", filterKey);
+                    router.push("/(tabs)/reports" as Href);
+                  }}
                 />
               );
             })}
