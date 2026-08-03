@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import React from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -18,16 +19,26 @@ import { useNetworkStatus } from "@/hooks/useNetworkStatus";
  * All Tabs.Screen entries must always be declared (Expo Router constraint).
  * Tabs not visible to a role are hidden via `href: null`.
  */
+// Standard RN bottom tab bar height (pts). Safe-area bottom inset is added on
+// top of this so the FAB clears the home-indicator on notched devices.
+const TAB_BAR_HEIGHT = 49;
+
 export default function TabsLayout() {
   const colors = useColors();
+  const router = useRouter();
   const { user } = useCurrentUser();
   const { isConnected } = useNetworkStatus();
+  const insets = useSafeAreaInsets();
   const role = user?.role ?? "technician";
 
   const isTech    = role === "technician";
   const isSales   = role === "sales";
   const isManager = role === "manager";
   const isOwner   = role === "owner";
+
+  // Only technicians and sales reps need the quick-capture FAB.
+  const showFAB = isTech || isSales;
+  const fabBottom = TAB_BAR_HEIGHT + insets.bottom + 14;
 
   // href helper — null removes the tab button from the bar entirely.
   const show = (visible: boolean) => (visible ? undefined : null);
@@ -156,6 +167,49 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+
+      {/* ── Persistent capture FAB ──────────────────────────────────────────
+          Floats above the tab bar so technicians and sales reps can start
+          a capture flow from any tab without navigating back to the dashboard.
+          Hidden for managers and owners who do not perform field capture.     */}
+      {showFAB && (
+        <Pressable
+          onPress={() =>
+            isSales
+              ? router.push("/(tabs)/scan" as never)
+              : router.push("/new-inspection" as never)
+          }
+          style={({ pressed }) => ({
+            position: "absolute",
+            bottom: fabBottom,
+            alignSelf: "center",
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            backgroundColor: colors.primary,
+            alignItems: "center",
+            justifyContent: "center",
+            // Elevation / shadow
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.22,
+            shadowRadius: 6,
+            elevation: 8,
+            opacity: pressed ? 0.85 : 1,
+            // Thin white ring so the button reads clearly over any tab bar colour
+            borderWidth: 3,
+            borderColor: colors.background,
+          })}
+          accessibilityLabel={isSales ? "Start property scan" : "Start new inspection"}
+          accessibilityRole="button"
+        >
+          <Ionicons
+            name={isSales ? "scan-outline" : "camera-outline"}
+            size={26}
+            color="#ffffff"
+          />
+        </Pressable>
+      )}
     </View>
   );
 }
