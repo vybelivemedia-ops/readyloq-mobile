@@ -151,6 +151,7 @@ function Gate() {
       <Stack.Screen name="inspection/[id]" />
       <Stack.Screen name="report/[id]" />
       <Stack.Screen name="about" />
+      <Stack.Screen name="settings" />
       <Stack.Screen name="billing" options={{ presentation: "modal" }} />
     </Stack>
   );

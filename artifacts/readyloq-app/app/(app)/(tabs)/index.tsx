@@ -31,6 +31,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSignOut } from "@/hooks/useSignOut";
 import { useLicenseStatus } from "@/hooks/useLicenseStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
+import { useViewPreference, resolveViewMode } from "@/hooks/useViewPreference";
 import { filterIntent } from "@/lib/filterIntent";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -408,6 +409,8 @@ export default function DashboardScreen() {
   const isManager = role === "manager";
   const isOwner   = role === "owner";
 
+  const { viewMode } = useViewPreference();
+
   const briefing = useQuery(getGetBriefingQueryOptions());
   const dash     = useQuery(getGetAnalyticsDashboardQueryOptions());
   // License status — loaded for owners to surface subscription prompts/warnings.
@@ -422,7 +425,13 @@ export default function DashboardScreen() {
   const pendingApprovals = briefing.data?.manager?.pendingApprovals ?? 0;
 
   // Owner mode flags.
-  const isSoloOperator = briefing.data?.owner?.isSoloOperator ?? false;
+  // The local view-preference hook overrides the server value when the owner
+  // has explicitly chosen a layout.  Falls back to the server's isSoloOperator
+  // flag (or true = solo when no briefing data yet).
+  const serverIsSolo = briefing.data?.owner?.isSoloOperator ?? false;
+  const isSoloOperator = isOwner
+    ? resolveViewMode(viewMode, serverIsSolo) === "solo"
+    : serverIsSolo;
 
   // Owner KPI strip — different sets for solo vs multi-operator.
   // Every card is a deep-link shortcut to the relevant filtered Reports view.
@@ -537,14 +546,14 @@ export default function DashboardScreen() {
             ) : null}
           </View>
           <Pressable
-            onPress={() => router.push("/about" as Href)}
+            onPress={() => router.push("/settings" as Href)}
             style={{
               width: 42, height: 42, borderRadius: 21,
               backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
               alignItems: "center", justifyContent: "center", marginRight: 8,
             }}
           >
-            <Ionicons name="information-circle-outline" size={20} color={colors.mutedForeground} />
+            <Ionicons name="settings-outline" size={20} color={colors.mutedForeground} />
           </Pressable>
           <Pressable
             onPress={() => { void signOut(); }}
