@@ -308,6 +308,8 @@ export function hasPendingWork(record: LocalInspection): boolean {
   if (record.serverId == null) return true;
   if (record.photos.some((p) => !p.storagePath || p.mediaRowId == null)) return true;
   if (record.photos.length > record.analyzedCount) return true;
+  // #95 — pending finding corrections queued while offline
+  if ((record.pendingCorrections ?? []).length > 0) return true;
   if (record.completed && !record.serverCompleted) return true;
   return false;
 }

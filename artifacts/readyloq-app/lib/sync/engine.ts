@@ -11,6 +11,7 @@ import {
   createBaitStation,
   updateBaitStation,
 } from "@/lib/api-client/bait-stations";
+import { correctFinding } from "@/lib/api-client/corrections";
 import {
   getLocalInspection,
   hasPendingWork,
@@ -332,6 +333,31 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
         }
       } catch {
         // Non-fatal: bait station errors must never block the main sync path.
+      }
+    }
+
+    // 5.6. #95 — Flush pending finding corrections queued while offline.
+    // Each correction is applied one at a time and removed from the queue on
+    // success. Errors are caught per-item so a single bad entry (e.g. a stale
+    // analysisId) never blocks the rest of the sync pass.
+    const corrections = [...(rec.pendingCorrections ?? [])];
+    for (const correction of corrections) {
+      try {
+        await correctFinding(correction.analysisId, {
+          findingId:         correction.findingId,
+          action:            correction.action,
+          technicianSpecies: correction.technicianSpecies,
+        });
+        await merge((r) => {
+          r.pendingCorrections = (r.pendingCorrections ?? []).filter(
+            (c) =>
+              !(c.analysisId === correction.analysisId &&
+                c.findingId  === correction.findingId),
+          );
+        });
+      } catch {
+        // Non-fatal: keep correction in queue; sync engine will retry with
+        // exponential backoff on the next pass.
       }
     }
 

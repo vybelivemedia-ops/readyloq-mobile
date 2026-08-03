@@ -30,6 +30,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
+import { useLicenseStatus } from "@/hooks/useLicenseStatus";
 import { customFetch } from "@/lib/api-client/custom-fetch";
 import { formatRelative } from "@/constants/inspection";
 
@@ -96,9 +97,10 @@ function estimatedMinutes(remaining: number): number {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ReviewScreen() {
-  const colors = useColors();
-  const router = useRouter();
-  const qc = useQueryClient();
+  const colors  = useColors();
+  const router  = useRouter();
+  const qc      = useQueryClient();
+  const license = useLicenseStatus();
 
   const { data, isLoading } = useQuery({
     queryKey: REVIEW_QUERY_KEY,
@@ -159,6 +161,43 @@ export default function ReviewScreen() {
     },
     [currentItem, currentIdx, items, actioned, animateOut, mutation],
   );
+
+  // ── #81 — Subscription gate ──────────────────────────────────────────────────
+  if (!license.isLoading && license.data != null && !license.data.isActive) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}>
+          <Ionicons name="lock-closed-outline" size={48} color={colors.mutedForeground} />
+          <Text style={{
+            color: colors.foreground, fontFamily: "Inter_700Bold",
+            fontSize: 20, marginTop: 16, textAlign: "center",
+          }}>
+            Subscription required
+          </Text>
+          <Text style={{
+            color: colors.mutedForeground, fontFamily: "Inter_400Regular",
+            fontSize: 14, marginTop: 8, textAlign: "center", lineHeight: 20,
+          }}>
+            Daily review is a Growth plan feature.
+            {license.data.status === "past_due"
+              ? " Your payment is overdue — update billing to restore access."
+              : " Renew or upgrade your subscription to continue."}
+          </Text>
+          <Pressable
+            onPress={() => router.push("/(app)/billing" as unknown as Parameters<typeof router.push>[0])}
+            style={({ pressed }) => ({
+              marginTop: 24, backgroundColor: colors.primary, borderRadius: 10,
+              paddingHorizontal: 24, paddingVertical: 12, opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+              {license.data.status === "past_due" ? "Update billing" : "View plans"}
+            </Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (isLoading) {
