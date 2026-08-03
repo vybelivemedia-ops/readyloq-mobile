@@ -89,12 +89,11 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* ── Technician only ─────────────────────────────────────────────── */}
+      {/* ── All roles — device pairing needed in field across all roles ─── */}
       <Tabs.Screen
         name="connections"
         options={{
           title: "Connections",
-          href: show(isTech),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bluetooth-outline" color={color} size={size} />
           ),
