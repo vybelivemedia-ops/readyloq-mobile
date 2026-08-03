@@ -210,21 +210,75 @@ function KpiCard({
   return <View style={cardStyle}>{inner}</View>;
 }
 
-// ─── Role-specific quick-action sections ─────────────────────────────────────
+// ─── Shared upload training card (all roles) ─────────────────────────────────
 
-/** Technician tools: bulk upload + dataset ingestion. */
-function TechnicianTools({ router }: { router: ReturnType<typeof useRouter> }) {
+/**
+ * Persistent nudge card shown to every role below the hero CTA.
+ * Spare-time uploads of pest / condition photos improve AI accuracy —
+ * keeping it top-of-mind increases contribution frequency.
+ */
+function UploadTrainingPhotosCard({
+  router,
+}: {
+  router: ReturnType<typeof useRouter>;
+}) {
+  const colors = useColors();
   return (
-    <View style={{ flexDirection: "row", gap: 10 }}>
-      <ToolTile
-        icon="cloud-upload-outline"
-        title="Upload Training Photos"
-        subtitle="Add historical data to dataset"
-        onPress={() => router.push("/dataset/bulk-upload" as Href)}
-      />
-    </View>
+    <Pressable
+      onPress={() => router.push("/dataset/bulk-upload" as Href)}
+      accessibilityLabel="Upload training photos"
+      accessibilityRole="button"
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 14,
+        padding: 14,
+        backgroundColor: colors.card,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: colors.border,
+        opacity: pressed ? 0.75 : 1,
+      })}
+    >
+      <View
+        style={{
+          width: 46,
+          height: 46,
+          borderRadius: 23,
+          backgroundColor: colors.primary + "1A",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Ionicons name="images-outline" size={22} color={colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            color: colors.foreground,
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 15,
+          }}
+        >
+          Upload Training Photos
+        </Text>
+        <Text
+          style={{
+            color: colors.mutedForeground,
+            fontFamily: "Inter_400Regular",
+            fontSize: 13,
+            marginTop: 2,
+          }}
+        >
+          Snap pest or condition photos in spare time · improves AI accuracy
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+    </Pressable>
   );
 }
+
+// ─── Role-specific quick-action sections ─────────────────────────────────────
 
 /** Sales tools: view pipeline + proposals. */
 function SalesTools({ router }: { router: ReturnType<typeof useRouter> }) {
@@ -611,6 +665,9 @@ export default function DashboardScreen() {
           />
         )}
 
+        {/* ── Upload Training Photos — visible to all roles ───────────────── */}
+        <UploadTrainingPhotosCard router={router} />
+
         {/* ── Owner KPI strip ─────────────────────────────────────────────── */}
         {isOwner && ownerKpis.length > 0 ? (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
@@ -715,7 +772,6 @@ export default function DashboardScreen() {
         {isOwner && !isSoloOperator ? <OwnerCommsStrip /> : null}
 
         {/* ── Role-specific quick tools ───────────────────────────────────── */}
-        {isTech    ? <TechnicianTools router={router} /> : null}
         {isSales   ? <SalesTools router={router} /> : null}
         {isManager ? <ManagerTools pendingCount={pendingApprovals} router={router} /> : null}
         {isOwner && isSoloOperator ? <SoloOwnerTools router={router} /> : null}

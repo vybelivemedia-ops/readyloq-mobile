@@ -153,6 +153,7 @@ function Gate() {
       <Stack.Screen name="about" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="billing" options={{ presentation: "modal" }} />
+      <Stack.Screen name="dataset" />
     </Stack>
   );
 }
