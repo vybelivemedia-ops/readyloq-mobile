@@ -66,6 +66,15 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    proxy: {
+      // Forward /app/ to the Expo web dev server so the "Log in" button works
+      // in development. In production, set VITE_APP_URL to the deployed app URL.
+      "/app": {
+        target: "http://localhost:8082",
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
   preview: {
     port,

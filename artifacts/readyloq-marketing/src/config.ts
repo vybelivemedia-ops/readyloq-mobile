@@ -18,7 +18,8 @@ const API_ORIGIN = stripTrailingSlash(import.meta.env.VITE_API_URL ?? "");
 
 // URL of the ReadyLoq application (sign in / launch the app). Falls back to "/"
 // so links resolve to the app mounted at the proxy root during development.
-export const APP_URL = APP_ORIGIN || "/";
+// In dev (no VITE_APP_URL set) the Expo web build is proxied at /app/
+export const APP_URL = APP_ORIGIN || "/app/";
 
 // Build a full API endpoint URL. Always targets the "/api" base path so callers
 // pass resource paths like "/leads" without worrying about the base.
