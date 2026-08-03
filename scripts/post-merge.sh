@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --prefer-offline
 # Multi-tenancy backfill MUST run before push. It creates the companies table,
 # the reserved platform/legacy companies, and fills company_id on every existing
 # row so the (non-interactive) push can enforce NOT NULL + FKs + unique indexes
