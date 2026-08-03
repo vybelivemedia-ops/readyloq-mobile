@@ -8,8 +8,8 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { type Href, useRouter } from "expo-router";
-import React, { useState } from "react";
+import { type Href, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -110,6 +110,13 @@ export default function LeadsScreen() {
   const colors = useColors();
   const router = useRouter();
   const [filter, setFilter] = useState<LeadStatus | "all">("all");
+
+  const params = useLocalSearchParams<{ filter?: string }>();
+
+  // Re-apply filter when navigated to from a dashboard deep-link.
+  useEffect(() => {
+    if (params.filter) setFilter(params.filter as LeadStatus | "all");
+  }, [params.filter]);
 
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ["leads"],
@@ -262,22 +269,28 @@ export default function LeadsScreen() {
           }}
         >
           {[
-            { label: "Open", value: String(data.openCount), icon: "briefcase-outline" as const, color: colors.primary },
-            { label: "Stale", value: String(data.staleCount), icon: "snow-outline" as const, color: colors.warning ?? "#d97706" },
-            { label: "Pipeline", value: formatMoney(data.pipelineValue), icon: "trending-up-outline" as const, color: colors.success ?? "#16a34a" },
+            { label: "Open",     value: String(data.openCount),       icon: "briefcase-outline" as const,    color: colors.primary,              filterKey: "new" as const },
+            { label: "Stale",    value: String(data.staleCount),      icon: "snow-outline" as const,         color: colors.warning ?? "#d97706", filterKey: "stale" as const },
+            { label: "Pipeline", value: formatMoney(data.pipelineValue), icon: "trending-up-outline" as const, color: colors.success ?? "#16a34a", filterKey: "all" as const },
           ].map((stat) => (
-            <View
+            <Pressable
               key={stat.label}
-              style={{
+              onPress={() => setFilter(stat.filterKey)}
+              style={({ pressed }) => ({
                 flex: 1,
                 padding: 12,
                 borderRadius: 12,
-                backgroundColor: colors.card,
+                backgroundColor: filter === stat.filterKey && stat.filterKey !== "all"
+                  ? stat.color + "18"
+                  : colors.card,
                 borderWidth: 1,
-                borderColor: colors.border,
+                borderColor: filter === stat.filterKey && stat.filterKey !== "all"
+                  ? stat.color
+                  : colors.border,
                 alignItems: "center",
                 gap: 4,
-              }}
+                opacity: pressed ? 0.75 : 1,
+              })}
             >
               <Ionicons name={stat.icon} size={18} color={stat.color} />
               <Text style={{ color: stat.color, fontFamily: "Inter_700Bold", fontSize: 18 }}>
@@ -286,7 +299,7 @@ export default function LeadsScreen() {
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
                 {stat.label}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       ) : null}

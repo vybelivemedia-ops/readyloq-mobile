@@ -80,10 +80,10 @@ function SalesSection({ data }: { data: NonNullable<RoleBriefing["sales"]> }) {
     <>
       <StatGrid
         stats={[
-          { label: "Open opportunities", value: data.openCount, icon: "briefcase-outline", tone: colors.primary },
-          { label: "Pipeline value", value: formatMoney(data.pipelineValue), icon: "trending-up-outline", tone: colors.success },
-          { label: "Going stale", value: data.staleCount, icon: "hourglass-outline", tone: colors.warning },
-          { label: "Proposals sent", value: data.proposals.sent, icon: "paper-plane-outline", tone: colors.info },
+          { label: "Open opportunities", value: data.openCount,               icon: "briefcase-outline",    tone: colors.primary, onPress: () => router.push("/(tabs)/leads" as Href) },
+          { label: "Pipeline value",     value: formatMoney(data.pipelineValue), icon: "trending-up-outline", tone: colors.success, onPress: () => router.push("/(tabs)/leads" as Href) },
+          { label: "Going stale",        value: data.staleCount,              icon: "hourglass-outline",    tone: colors.warning, onPress: () => router.push({ pathname: "/(tabs)/leads", params: { filter: "stale" } } as unknown as Href) },
+          { label: "Proposals sent",     value: data.proposals.sent,          icon: "paper-plane-outline",  tone: colors.info,    onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "proposal_sent" } } as unknown as Href) },
         ]}
       />
       <View style={{ gap: 12 }}>
@@ -136,10 +136,10 @@ function ManagerSection({ data }: { data: NonNullable<RoleBriefing["manager"]> }
     <>
       <StatGrid
         stats={[
-          { label: "Pending approvals", value: data.pendingApprovals, icon: "shield-checkmark-outline", tone: data.pendingApprovals > 0 ? colors.warning : colors.success },
-          { label: "Avg quality (30d)", value: data.team.avgQualityScore30d ?? "—", icon: "ribbon-outline", tone: colors.primary },
-          { label: "High risk (30d)", value: data.team.highRisk30d, icon: "warning-outline", tone: colors.destructive },
-          { label: "Missed opps (30d)", value: data.team.missedOpportunities30d, icon: "eye-off-outline", tone: colors.info },
+          { label: "Pending approvals", value: data.pendingApprovals, icon: "shield-checkmark-outline", tone: data.pendingApprovals > 0 ? colors.warning : colors.success, onPress: () => router.push("/(tabs)/review" as Href) },
+          { label: "Avg quality (30d)", value: data.team.avgQualityScore30d ?? "—", icon: "ribbon-outline", tone: colors.primary, onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "quality" } } as unknown as Href) },
+          { label: "High risk (30d)", value: data.team.highRisk30d, icon: "warning-outline", tone: colors.destructive, onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "high_risk" } } as unknown as Href) },
+          { label: "Missed opps (30d)", value: data.team.missedOpportunities30d, icon: "eye-off-outline", tone: colors.info, onPress: () => router.push("/(tabs)/reports" as Href) },
         ]}
       />
       <View style={{ gap: 12 }}>
@@ -231,40 +231,61 @@ const ALERT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   share_links_expiring: "link-outline",
 };
 
+/** Map each alert type to a reports filter param so owners land on relevant data. */
+const ALERT_FILTER: Record<string, string> = {
+  approvals_aging: "pending_approvals",
+  high_risk:       "high_risk",
+  quality_low:     "low_quality",
+  stale_pipeline:  "opportunities",
+};
+
 function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
   const colors = useColors();
+  const router = useRouter();
+
+  const toReports = (filter: string) =>
+    () => router.push({ pathname: "/(tabs)/reports", params: { filter } } as unknown as Href);
+
   const severityTone = (severity: string) =>
     severity === "critical"
       ? colors.destructive
       : severity === "warning"
         ? colors.warning
         : colors.info;
+
   return (
     <>
       <StatGrid
         stats={[
-          { label: "Completed (7d)", value: data.kpis.completions7d, icon: "checkmark-done-outline", tone: colors.success },
-          { label: "Completed (30d)", value: data.kpis.completions30d, icon: "calendar-outline", tone: colors.primary },
-          { label: "Open opportunities", value: data.kpis.openOpportunities, icon: "briefcase-outline", tone: colors.info },
-          { label: "Pipeline value", value: formatMoney(data.kpis.pipelineValue), icon: "trending-up-outline", tone: colors.success },
-          { label: "Avg quality (30d)", value: data.kpis.avgQualityScore30d ?? "—", icon: "ribbon-outline", tone: colors.primary },
-          { label: "Approved summaries", value: data.kpis.approvedSummaries30d, icon: "shield-checkmark-outline", tone: colors.success },
+          { label: "Completed (7d)",     value: data.kpis.completions7d,          icon: "checkmark-done-outline",   tone: colors.success, onPress: toReports("7d") },
+          { label: "Completed (30d)",    value: data.kpis.completions30d,          icon: "calendar-outline",         tone: colors.primary, onPress: toReports("30d") },
+          { label: "Open opportunities", value: data.kpis.openOpportunities,       icon: "briefcase-outline",        tone: colors.info,    onPress: toReports("opportunities") },
+          { label: "Pipeline value",     value: formatMoney(data.kpis.pipelineValue), icon: "trending-up-outline",  tone: colors.success, onPress: toReports("opportunities") },
+          { label: "Avg quality (30d)",  value: data.kpis.avgQualityScore30d ?? "—", icon: "ribbon-outline",        tone: colors.primary, onPress: toReports("quality") },
+          { label: "Approved summaries", value: data.kpis.approvedSummaries30d,   icon: "shield-checkmark-outline", tone: colors.success, onPress: toReports("approved") },
         ]}
       />
       <View style={{ gap: 12 }}>
         <SectionTitle>Needs attention</SectionTitle>
         {data.alerts.length ? (
           <Card padded={false}>
-            {data.alerts.map((alert, i) => (
-              <ListRow
-                key={`${alert.type}-${i}`}
-                first={i === 0}
-                icon={ALERT_ICONS[alert.type] ?? "alert-circle-outline"}
-                tone={severityTone(alert.severity)}
-                title={alert.message}
-                subtitle={alert.severity === "critical" ? "Critical" : alert.severity === "warning" ? "Warning" : "Info"}
-              />
-            ))}
+            {data.alerts.map((alert, i) => {
+              const filterKey = ALERT_FILTER[alert.type];
+              const dest = filterKey
+                ? { pathname: "/(tabs)/reports" as const, params: { filter: filterKey } }
+                : ("/(tabs)/reports" as Href);
+              return (
+                <ListRow
+                  key={`${alert.type}-${i}`}
+                  first={i === 0}
+                  icon={ALERT_ICONS[alert.type] ?? "alert-circle-outline"}
+                  tone={severityTone(alert.severity)}
+                  title={alert.message}
+                  subtitle={alert.severity === "critical" ? "Tap to review · Critical" : alert.severity === "warning" ? "Tap to review · Warning" : "Tap to review"}
+                  onPress={() => router.push(dest as Href)}
+                />
+              );
+            })}
           </Card>
         ) : (
           <Card>

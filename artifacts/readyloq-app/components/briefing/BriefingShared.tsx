@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { Card } from "@/components/ui/Card";
 import { useColors } from "@/hooks/useColors";
@@ -11,6 +11,8 @@ export type BriefingStat = {
   value: string | number;
   icon: keyof typeof Ionicons.glyphMap;
   tone: string;
+  /** When provided the card becomes a tappable deep-link shortcut. */
+  onPress?: () => void;
 };
 
 /** The dashboard's 2-up (compact) / 4-up stat card grid. */
@@ -19,17 +21,44 @@ export function StatGrid({ stats }: { stats: BriefingStat[] }) {
   const { isCompact } = useWindowSizeClass();
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-      {stats.map((s) => (
-        <Card key={s.label} style={{ width: isCompact ? "47.5%" : "23%", gap: 8 }}>
-          <Ionicons name={s.icon} size={22} color={s.tone} />
-          <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 26 }}>
-            {s.value}
-          </Text>
-          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }}>
-            {s.label}
-          </Text>
-        </Card>
-      ))}
+      {stats.map((s) =>
+        s.onPress ? (
+          <Pressable
+            key={s.label}
+            onPress={s.onPress}
+            style={({ pressed }) => ({
+              width: isCompact ? "47.5%" : "23%",
+              opacity: pressed ? 0.75 : 1,
+            })}
+          >
+            <Card style={{ gap: 8, flex: 1 }}>
+              <Ionicons name={s.icon} size={22} color={s.tone} />
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 26 }}>
+                {s.value}
+              </Text>
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }}>
+                {s.label}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: -2 }}>
+                <Text style={{ color: colors.primary, fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                  View details
+                </Text>
+                <Ionicons name="chevron-forward" size={11} color={colors.primary} />
+              </View>
+            </Card>
+          </Pressable>
+        ) : (
+          <Card key={s.label} style={{ width: isCompact ? "47.5%" : "23%", gap: 8 }}>
+            <Ionicons name={s.icon} size={22} color={s.tone} />
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 26 }}>
+              {s.value}
+            </Text>
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }}>
+              {s.label}
+            </Text>
+          </Card>
+        ),
+      )}
     </View>
   );
 }
@@ -56,7 +85,7 @@ export function EmptyCard({ text }: { text: string }) {
   );
 }
 
-/** A tappable row inside a `<Card padded={false}>` list. */
+/** A row inside a `<Card padded={false}>` list. Pass `onPress` to make it tappable. */
 export function ListRow({
   icon,
   tone,
@@ -64,6 +93,7 @@ export function ListRow({
   subtitle,
   right,
   first,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   tone: string;
@@ -71,9 +101,10 @@ export function ListRow({
   subtitle: string;
   right?: React.ReactNode;
   first: boolean;
+  onPress?: () => void;
 }) {
   const colors = useColors();
-  return (
+  const inner = (
     <View
       style={{
         flexDirection: "row",
@@ -110,9 +141,18 @@ export function ListRow({
           {subtitle}
         </Text>
       </View>
-      {right}
+      {right ?? (onPress ? <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} /> : null)}
     </View>
   );
+
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+        {inner}
+      </Pressable>
+    );
+  }
+  return inner;
 }
 
 export function formatMoney(v: number): string {

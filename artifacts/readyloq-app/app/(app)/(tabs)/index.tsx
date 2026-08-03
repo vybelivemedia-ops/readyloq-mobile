@@ -148,26 +148,17 @@ function KpiCard({
   value,
   label,
   tone,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   value: string | number;
   label: string;
   tone: string;
+  onPress?: () => void;
 }) {
   const colors = useColors();
-  return (
-    <View
-      style={{
-        flex: 1,
-        padding: 14,
-        borderRadius: 12,
-        backgroundColor: colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        alignItems: "center",
-        gap: 6,
-      }}
-    >
+  const inner = (
+    <>
       <Ionicons name={icon} size={20} color={tone} />
       <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 20 }}>
         {value}
@@ -182,8 +173,39 @@ function KpiCard({
       >
         {label}
       </Text>
-    </View>
+      {onPress ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 2, marginTop: -2 }}>
+          <Text style={{ color: colors.primary, fontFamily: "Inter_500Medium", fontSize: 10 }}>
+            View
+          </Text>
+          <Ionicons name="chevron-forward" size={10} color={colors.primary} />
+        </View>
+      ) : null}
+    </>
   );
+
+  const cardStyle = {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center" as const,
+    gap: 6,
+  };
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => ({ ...cardStyle, opacity: pressed ? 0.75 : 1 })}
+      >
+        {inner}
+      </Pressable>
+    );
+  }
+  return <View style={cardStyle}>{inner}</View>;
 }
 
 // ─── Role-specific quick-action sections ─────────────────────────────────────
@@ -402,6 +424,7 @@ export default function DashboardScreen() {
   const isSoloOperator = briefing.data?.owner?.isSoloOperator ?? false;
 
   // Owner KPI strip — different sets for solo vs multi-operator.
+  // Every card is a deep-link shortcut to the relevant filtered Reports view.
   const ownerKpis = briefing.data?.owner
     ? isSoloOperator
       ? /* Solo: personal field-execution metrics */
@@ -411,18 +434,21 @@ export default function DashboardScreen() {
             value: briefing.data.owner.kpis.completions7d,
             label: "Done this\nweek",
             tone: colors.success ?? "#16a34a",
+            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "7d" } } as unknown as Href),
           },
           {
             icon: "trending-up-outline" as const,
             value: briefing.data.owner.kpis.openOpportunities,
             label: "Open\nopps",
             tone: colors.info ?? "#3b82f6",
+            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "opportunities" } } as unknown as Href),
           },
           {
             icon: "cash-outline" as const,
             value: formatPipelineValue(briefing.data.owner.kpis.pipelineValue),
             label: "Pipeline\nvalue",
             tone: colors.primary,
+            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "opportunities" } } as unknown as Href),
           },
           {
             icon: "ribbon-outline" as const,
@@ -431,6 +457,7 @@ export default function DashboardScreen() {
               : "—",
             label: "Avg quality\n(30d)",
             tone: colors.primary,
+            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "quality" } } as unknown as Href),
           },
         ]
       : /* Multi-operator: executive summary metrics */
@@ -440,6 +467,7 @@ export default function DashboardScreen() {
             value: briefing.data.owner.kpis.completions30d,
             label: "Completions\n(30 days)",
             tone: colors.success ?? "#16a34a",
+            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "30d" } } as unknown as Href),
           },
           {
             icon: "ribbon-outline" as const,
@@ -448,18 +476,21 @@ export default function DashboardScreen() {
               : "—",
             label: "Avg quality\n(30 days)",
             tone: colors.primary,
+            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "quality" } } as unknown as Href),
           },
           {
             icon: "trending-up-outline" as const,
             value: briefing.data.owner.kpis.openOpportunities,
             label: "Open\nopportunities",
             tone: colors.info ?? "#3b82f6",
+            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "opportunities" } } as unknown as Href),
           },
           {
             icon: "stats-chart-outline" as const,
             value: briefing.data.owner.kpis.approvedSummaries30d,
             label: "Approved\nsummaries",
             tone: colors.primary,
+            onPress: () => router.push({ pathname: "/(tabs)/reports", params: { filter: "approved" } } as unknown as Href),
           },
         ]
     : [];
@@ -580,6 +611,7 @@ export default function DashboardScreen() {
                 value={kpi.value}
                 label={kpi.label}
                 tone={kpi.tone}
+                onPress={kpi.onPress}
               />
             ))}
           </View>
