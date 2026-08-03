@@ -61,3 +61,8 @@ packages = ["eas-cli"]
 
 [[ports]]
 localPort = 8081
+
+[userenv]
+
+[userenv.production]
+VITE_APP_URL = "https://pest-insight-engine.replit.app"
