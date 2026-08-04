@@ -51,6 +51,7 @@ import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { PEST_TYPES, PROPERTY_TYPES } from "@/constants/inspection";
 import { ApiError } from "@/lib/api";
+import { ingestAllUploadedPhotos } from "@/lib/faie-ingest";
 import {
   deleteLocalInspection,
   getLocalInspection,
@@ -961,6 +962,14 @@ export default function NewInspectionScreen() {
       if (updated) recordRef.current = updated;
 
       added.push({ localUri: durableUri, item });
+
+      // Fire FAIE global training ingest in the background — non-blocking.
+      void ingestAllUploadedPhotos({
+        photoUri: durableUri,
+        companyId: clerkUser?.id ?? "",
+        technicianId: clerkUser?.id ?? "",
+        source: "technician_field_upload",
+      });
     }
 
     setQualityNotice(warnings.length > 0 ? warnings[0] : null);

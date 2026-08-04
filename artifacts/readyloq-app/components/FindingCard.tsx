@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { Finding } from "@/lib/api-client";
-import React from "react";
-import { Pressable, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Image, Modal, Pressable, Text, TouchableOpacity, View } from "react-native";
 
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -50,6 +50,7 @@ interface FindingCardProps {
 
 export function FindingCard({ finding, onReview, savedAction, technicianName }: FindingCardProps) {
   const colors = useColors();
+  const [zoomVisible, setZoomVisible] = useState(false);
 
   const attribution = findingAttribution(finding.reviewStatus);
 
@@ -82,6 +83,34 @@ export function FindingCard({ finding, onReview, savedAction, technicianName }: 
 
   return (
     <Card style={{ gap: 10 }}>
+      {/* Tappable evidence thumbnail — shown only when the finding has an image */}
+      {finding.imageUrl ? (
+        <TouchableOpacity onPress={() => setZoomVisible(true)} activeOpacity={0.8}>
+          <Image
+            source={{ uri: finding.imageUrl }}
+            style={{ width: "100%", height: 160, borderRadius: 8, backgroundColor: colors.muted }}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+      ) : null}
+
+      {/* Full-screen zoom modal */}
+      <Modal visible={zoomVisible} transparent animationType="fade" onRequestClose={() => setZoomVisible(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setZoomVisible(false)}
+        >
+          <Image
+            source={{ uri: finding.imageUrl ?? "" }}
+            style={{ width: "92%", height: "75%", borderRadius: 10 }}
+            resizeMode="contain"
+          />
+          <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginTop: 14 }}>
+            Tap anywhere to close
+          </Text>
+        </Pressable>
+      </Modal>
+
       <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
         <Text
           style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15, flex: 1 }}

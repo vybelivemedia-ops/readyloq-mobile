@@ -34,6 +34,7 @@ import {
   statusTone,
 } from "@/constants/inspection";
 import { API_BASE, ApiError, reopenInspection } from "@/lib/api";
+import { ingestAnonymizedFaieData, sendPhotoToFaieDataset } from "@/lib/faie-ingest";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
 
 type ReviewAction = "accept" | "correct" | "dismiss";
@@ -169,13 +170,14 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
       setCustomSpecies(finding.species?.replace(/^Possible:\s*/i, "") ?? "");
       return;
     }
-    void submitReview(finding.id, action);
+    void submitReview(finding.id, action, undefined, finding);
   };
 
   const submitReview = async (
     findingId: number,
     action: ReviewAction,
     species?: string,
+    finding?: Finding,
   ) => {
     const analysisId = analysis?.id;
     if (!analysisId) return;
@@ -197,6 +199,22 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
       }
       setReviewResults((prev) => ({ ...prev, [findingId]: action }));
       await queryClient.invalidateQueries();
+      // Fire FAIE ingest non-blocking — failures must never surface to the tech
+      if (action === "accept" && finding?.imageUrl) {
+        void sendPhotoToFaieDataset({
+          photoUri: finding.imageUrl,
+          findingId: String(findingId),
+          label: finding.category,
+          confidence: finding.confidence ?? 0,
+        });
+      } else if (action === "correct" && finding?.imageUrl) {
+        void ingestAnonymizedFaieData({
+          photoUri: finding.imageUrl,
+          pestOrDefectCategory: species ?? finding.category,
+          visualConfidence: finding.confidence ?? 0,
+          structuralContext: finding.location ?? "",
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save review");
     } finally {
@@ -211,7 +229,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
     const finding = correctingFinding;
     setCorrectingFinding(null);
     setCustomSpecies("");
-    void submitReview(finding.id, "correct", species);
+    void submitReview(finding.id, "correct", species, finding);
   };
 
   let body: React.ReactNode;
