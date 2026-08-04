@@ -55,12 +55,12 @@ outputType = "console"
 name = "EAS Preview Build"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash -c 'cd /home/runner/workspace/artifacts/readyloq-app && pnpm install 2>&1 | tail -3 && EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN=$EXPO_TOKEN npx eas build --platform android --profile preview --non-interactive --no-wait 2>&1; echo EAS_DONE'"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [agent]
 stack = "PNPM_WORKSPACE"
