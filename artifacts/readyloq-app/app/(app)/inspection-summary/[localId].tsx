@@ -41,7 +41,7 @@ import {
   type DeliveryMethod,
 } from "@/lib/delivery/registry";
 import type { LocalInspection, LocalSyncPhase } from "@/lib/local/inspection-store";
-import { updatePhotoDescription } from "@/lib/local/inspection-store";
+import { updateLocalInspection, updatePhotoDescription } from "@/lib/local/inspection-store";
 import { syncNow } from "@/lib/sync/engine";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
 
@@ -544,6 +544,12 @@ function DeliverySection({
     try {
       const ctx = await buildDeliveryContext();
       await method.deliver(ctx);
+      // Stamp lastDeliveredAt for every outbound channel; preview is not a delivery.
+      if (method.id !== "preview") {
+        void updateLocalInspection(record.localId, (r) => {
+          r.lastDeliveredAt = new Date().toISOString();
+        });
+      }
     } catch (err) {
       Alert.alert(
         method.id === "preview" ? "Preview failed" : "Delivery failed",

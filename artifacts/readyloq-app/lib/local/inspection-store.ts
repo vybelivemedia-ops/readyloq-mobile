@@ -123,6 +123,12 @@ export type LocalInspection = {
     action: "accept" | "correct" | "dismiss";
     technicianSpecies?: string;
   }>;
+  /**
+   * ISO timestamp of the last time this inspection's report was successfully
+   * delivered via any channel (print, share, email). Null until first delivery.
+   * Updated by the delivery section on every successful hand-off.
+   */
+  lastDeliveredAt: string | null;
 };
 
 const INDEX_KEY = "readyloq.local-inspections.index.v1";
@@ -181,6 +187,7 @@ export function newLocalInspection(
     lastSyncSuccess: null,
     allFindingsReviewed: false,
     pendingCorrections: [],
+    lastDeliveredAt: null,
   };
 }
 
@@ -335,6 +342,7 @@ function parseRecord(raw: string): LocalInspection | null {
     rec.allFindingsReviewed ??= false;
     rec.pendingCorrections ??= [];
     rec.baitStations ??= [];
+    rec.lastDeliveredAt ??= null;
     return rec;
   } catch {
     return null;

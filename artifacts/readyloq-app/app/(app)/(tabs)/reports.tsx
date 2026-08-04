@@ -162,6 +162,14 @@ function SavedReportCard({
     ? "warning"
     : "default";
 
+  const deliveredLabel = record.lastDeliveredAt
+    ? `Sent ${new Date(record.lastDeliveredAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })}`
+    : null;
+
   return (
     <Card style={{ gap: 8 }}>
       {/* Address + sync badge */}
@@ -200,6 +208,16 @@ function SavedReportCard({
           </View>
         ) : null}
       </View>
+
+      {/* Last delivered badge */}
+      {deliveredLabel ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="checkmark-circle" size={13} color={colors.success ?? "#22c55e"} />
+          <Text style={{ color: colors.success ?? "#22c55e", fontFamily: "Inter_500Medium", fontSize: 12 }}>
+            {deliveredLabel}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Deliver button */}
       <Pressable
