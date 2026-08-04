@@ -422,6 +422,7 @@ export default function InspectionSummaryScreen() {
           analysisComplete={finalized && analysis !== undefined}
           companyName={user?.company?.name ?? null}
           customerSummaryUrl={customerSummaryUrl}
+          photosReady={loaded}
         />
 
         <View style={{ gap: 10 }}>
@@ -480,6 +481,7 @@ function DeliverySection({
   analysisComplete,
   companyName,
   customerSummaryUrl,
+  photosReady,
 }: {
   record: LocalInspection;
   findings: Finding[];
@@ -488,6 +490,10 @@ function DeliverySection({
   analysisComplete: boolean;
   companyName: string | null;
   customerSummaryUrl: string | null;
+  /** True once the local record has fully loaded from AsyncStorage and photos
+   *  are readable from disk. Delivery is blocked until this is true — generating
+   *  a PDF before the record is ready produces a blank or incomplete file. */
+  photosReady: boolean;
 }) {
   const colors = useColors();
   const [methods, setMethods] = useState<DeliveryMethod[]>([]);
@@ -506,7 +512,7 @@ function DeliverySection({
   if (methods.length === 0) return null;
 
   const deliver = async (method: DeliveryMethod) => {
-    if (busyId) return;
+    if (busyId || !photosReady) return;
     setBusyId(method.id);
     try {
       const pdfUri = await generateReportPdf({
@@ -541,7 +547,11 @@ function DeliverySection({
   return (
     <Card style={{ gap: 10 }}>
       <SectionTitle icon="paper-plane-outline" title="Deliver report" />
-      {!analysisComplete ? (
+      {!photosReady ? (
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+          Loading report data…
+        </Text>
+      ) : !analysisComplete ? (
         <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
           The PDF includes all photos now; AI findings are added automatically once syncing
           and analysis finish.
@@ -550,10 +560,11 @@ function DeliverySection({
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {methods.map((m) => {
           const busy = busyId === m.id;
+          const disabled = busyId != null || !photosReady;
           return (
             <Pressable
               key={m.id}
-              disabled={busyId != null}
+              disabled={disabled}
               onPress={() => void deliver(m)}
               style={{
                 flexDirection: "row",
@@ -565,7 +576,7 @@ function DeliverySection({
                 backgroundColor: colors.card,
                 borderWidth: 1,
                 borderColor: colors.border,
-                opacity: busyId != null && !busy ? 0.5 : 1,
+                opacity: disabled && !busy ? 0.5 : 1,
               }}
             >
               {busy ? (
