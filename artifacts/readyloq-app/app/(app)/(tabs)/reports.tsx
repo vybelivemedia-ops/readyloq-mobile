@@ -3,7 +3,7 @@ import { getListReportsQueryOptions } from "@/lib/api-client";
 import type { Report } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 
 import { ReportDetail } from "@/components/ReportDetail";
@@ -13,9 +13,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { FullScreenLoader } from "@/components/ui/Loader";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
+import { useLocalInspections } from "@/hooks/useLocalInspections";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { formatDate, formatStatus, severityTone, statusTone } from "@/constants/inspection";
 import { filterIntent } from "@/lib/filterIntent";
+import type { LocalInspection } from "@/lib/local/inspection-store";
 
 // ─── Filter helpers ────────────────────────────────────────────────────────────
 
@@ -82,6 +84,144 @@ const INFORMATIONAL_MESSAGES: Partial<Record<ReportFilter, string>> = {
   opportunities: "Showing all reports — open opportunities are linked to their source inspection.",
   stale:         "Showing all reports — stale pipeline items appear in the Leads tab.",
 };
+
+// ─── Saved Reports section ────────────────────────────────────────────────────
+
+/**
+ * Lists completed local inspections so technicians and managers can generate
+ * and deliver a PDF report at any time — not just immediately after finishing.
+ * Tapping "Deliver report" opens the inspection-summary screen which has the
+ * full suite of delivery options (print, share, email).
+ */
+function SavedReportsSection() {
+  const colors = useColors();
+  const router = useRouter();
+  const { records } = useLocalInspections();
+
+  const completed = useMemo(
+    () =>
+      records
+        .filter((r) => r.completed && r.completedAt)
+        .sort(
+          (a, b) =>
+            new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime(),
+        ),
+    [records],
+  );
+
+  if (completed.length === 0) return null;
+
+  return (
+    <View style={{ paddingHorizontal: 16, paddingBottom: 8, gap: 10 }}>
+      {/* Section label */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}>
+        <Ionicons name="phone-portrait-outline" size={15} color={colors.mutedForeground} />
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+          Saved on this device
+        </Text>
+      </View>
+
+      {completed.map((rec) => (
+        <SavedReportCard
+          key={rec.localId}
+          record={rec}
+          onDeliver={() => router.push(`/inspection-summary/${rec.localId}` as Href)}
+        />
+      ))}
+
+      {/* Divider before server reports */}
+      <View style={{ height: 1, backgroundColor: colors.border, marginTop: 4 }} />
+      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+        All reports
+      </Text>
+    </View>
+  );
+}
+
+function SavedReportCard({
+  record,
+  onDeliver,
+}: {
+  record: LocalInspection;
+  onDeliver: () => void;
+}) {
+  const colors = useColors();
+
+  const date = record.completedAt
+    ? new Date(record.completedAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+
+  const syncedLabel = record.serverCompleted ? "Synced" : record.serverId ? "Syncing" : "On device";
+  const syncedTone: "success" | "warning" | "default" = record.serverCompleted
+    ? "success"
+    : record.serverId
+    ? "warning"
+    : "default";
+
+  return (
+    <Card style={{ gap: 8 }}>
+      {/* Address + sync badge */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <Text
+          numberOfLines={1}
+          style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15, flex: 1 }}
+        >
+          {record.siteAddress || "Untitled inspection"}
+        </Text>
+        <Badge label={syncedLabel} tone={syncedTone} />
+      </View>
+
+      {/* Meta row */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+        {record.clientName ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Ionicons name="person-outline" size={13} color={colors.mutedForeground} />
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+              {record.clientName}
+            </Text>
+          </View>
+        ) : null}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="camera-outline" size={13} color={colors.mutedForeground} />
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+            {record.photos.length} photo{record.photos.length !== 1 ? "s" : ""}
+          </Text>
+        </View>
+        {date ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Ionicons name="calendar-outline" size={13} color={colors.mutedForeground} />
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+              {date}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Deliver button */}
+      <Pressable
+        onPress={onDeliver}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          paddingVertical: 9,
+          borderRadius: 8,
+          backgroundColor: pressed ? colors.primary + "cc" : colors.primary,
+        })}
+      >
+        <Ionicons name="paper-plane-outline" size={15} color={colors.primaryForeground} />
+        <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+          Deliver report
+        </Text>
+      </Pressable>
+    </Card>
+  );
+}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -216,6 +356,7 @@ export default function ReportsScreen() {
           numColumns={numColumns}
           columnWrapperStyle={numColumns > 1 ? { gap: 12 } : undefined}
           contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 12, flexGrow: 1 }}
+          ListHeaderComponent={<SavedReportsSection />}
           refreshControl={
             <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
           }
