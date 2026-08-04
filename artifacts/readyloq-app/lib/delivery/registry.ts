@@ -105,3 +105,30 @@ registerDeliveryMethod({
     }
   },
 });
+
+/**
+ * Preview — generates the PDF and opens it in the system document viewer
+ * (iOS Quick Look sheet, Android PDF viewer) so the technician can confirm
+ * the content before choosing a delivery channel. Registered first in the
+ * list so it renders to the left of the outbound delivery buttons.
+ *
+ * Intentionally registered after the other methods so it can be inserted
+ * at position 0 in the list — callers that want to show preview first
+ * can sort/shift by id === "preview".
+ */
+registerDeliveryMethod({
+  id: "preview",
+  label: "Preview PDF",
+  icon: "eye-outline",
+  isAvailable: () => Sharing.isAvailableAsync(),
+  deliver: async ({ pdfUri }) => {
+    // Opening with the PDF mime-type causes iOS to display the file in the
+    // Quick Look sheet (a full in-app document viewer) before presenting the
+    // share sheet. On Android the OS routes to the installed PDF viewer app.
+    await Sharing.shareAsync(pdfUri, {
+      mimeType: "application/pdf",
+      dialogTitle: "Preview inspection report",
+      UTI: "com.adobe.pdf",
+    });
+  },
+});

@@ -502,7 +502,12 @@ function DeliverySection({
   useEffect(() => {
     let cancelled = false;
     void getAvailableDeliveryMethods().then((m) => {
-      if (!cancelled) setMethods(m);
+      if (!cancelled) {
+        // Always show preview first, then the outbound delivery channels.
+        const preview = m.filter((x) => x.id === "preview");
+        const rest = m.filter((x) => x.id !== "preview");
+        setMethods([...preview, ...rest]);
+      }
     });
     return () => {
       cancelled = true;
@@ -511,38 +516,46 @@ function DeliverySection({
 
   if (methods.length === 0) return null;
 
+  const buildDeliveryContext = async () => {
+    const pdfUri = await generateReportPdf({
+      record,
+      findings,
+      recommendations,
+      riskLevel,
+      analysisComplete,
+      companyName,
+    });
+    return {
+      pdfUri,
+      subject: `Inspection report — ${record.siteAddress || "your property"}`,
+      body:
+        `Hi${record.clientName ? ` ${record.clientName}` : ""},\n\n` +
+        `Please find your inspection report attached` +
+        `${companyName ? ` from ${companyName}` : ""}. ` +
+        `It covers the full photo evidence${analysisComplete ? " and our findings" : ""} from the visit.\n\n` +
+        `Thank you!`,
+      customerSummaryUrl,
+    };
+  };
+
   const deliver = async (method: DeliveryMethod) => {
     if (busyId || !photosReady) return;
     setBusyId(method.id);
     try {
-      const pdfUri = await generateReportPdf({
-        record,
-        findings,
-        recommendations,
-        riskLevel,
-        analysisComplete,
-        companyName,
-      });
-      await method.deliver({
-        pdfUri,
-        subject: `Inspection report — ${record.siteAddress || "your property"}`,
-        body:
-          `Hi${record.clientName ? ` ${record.clientName}` : ""},\n\n` +
-          `Please find your inspection report attached` +
-          `${companyName ? ` from ${companyName}` : ""}. ` +
-          `It covers the full photo evidence${analysisComplete ? " and our findings" : ""} from the visit.\n\n` +
-          `Thank you!`,
-        customerSummaryUrl,
-      });
+      const ctx = await buildDeliveryContext();
+      await method.deliver(ctx);
     } catch (err) {
       Alert.alert(
-        "Delivery failed",
+        method.id === "preview" ? "Preview failed" : "Delivery failed",
         err instanceof Error ? err.message : "Something went wrong. Please try again.",
       );
     } finally {
       setBusyId(null);
     }
   };
+
+  const previewMethod = methods.find((m) => m.id === "preview");
+  const deliveryMethods = methods.filter((m) => m.id !== "preview");
 
   return (
     <Card style={{ gap: 10 }}>
@@ -557,40 +570,77 @@ function DeliverySection({
           and analysis finish.
         </Text>
       ) : null}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-        {methods.map((m) => {
-          const busy = busyId === m.id;
-          const disabled = busyId != null || !photosReady;
-          return (
-            <Pressable
-              key={m.id}
-              disabled={disabled}
-              onPress={() => void deliver(m)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                borderRadius: 10,
-                backgroundColor: colors.card,
-                borderWidth: 1,
-                borderColor: colors.border,
-                opacity: disabled && !busy ? 0.5 : 1,
-              }}
-            >
-              {busy ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Ionicons name={m.icon} size={17} color={colors.primary} />
-              )}
-              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
-                {m.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+
+      {/* Preview button — full-width, primary style, shown above delivery buttons */}
+      {previewMethod ? (() => {
+        const busy = busyId === previewMethod.id;
+        const disabled = busyId != null || !photosReady;
+        return (
+          <Pressable
+            disabled={disabled}
+            onPress={() => void deliver(previewMethod)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              borderRadius: 10,
+              backgroundColor: disabled && !busy ? colors.muted : colors.primary,
+              opacity: disabled && !busy ? 0.6 : 1,
+            }}
+          >
+            {busy ? (
+              <ActivityIndicator size="small" color={colors.primaryForeground} />
+            ) : (
+              <Ionicons name={previewMethod.icon} size={18} color={colors.primaryForeground} />
+            )}
+            <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+              {busy ? "Generating preview…" : previewMethod.label}
+            </Text>
+          </Pressable>
+        );
+      })() : null}
+
+      {/* Outbound delivery buttons — print / share / email */}
+      {deliveryMethods.length > 0 ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {deliveryMethods.map((m) => {
+            const busy = busyId === m.id;
+            const disabled = busyId != null || !photosReady;
+            return (
+              <Pressable
+                key={m.id}
+                disabled={disabled}
+                onPress={() => void deliver(m)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: colors.card,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  opacity: disabled && !busy ? 0.5 : 1,
+                }}
+              >
+                {busy ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name={m.icon} size={17} color={colors.primary} />
+                )}
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+                  {m.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
       {customerSummaryUrl ? (
         <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
           Emails include the approved customer summary link.
