@@ -446,6 +446,9 @@ export function AiInsightsPanel({
             backgroundColor: colors.muted,
             borderRadius: 10,
             padding: 3,
+            overflow: "hidden",
+            borderWidth: 1,
+            borderColor: colors.border,
           }}
         >
           {tabButton("insights", "Insights")}
@@ -1238,6 +1241,7 @@ export function AiInsightsPanel({
                     </View>
                     {s.body != null ? (
                       <Text
+                        selectable
                         style={{
                           color: colors.mutedForeground,
                           fontFamily: "Inter_400Regular",
