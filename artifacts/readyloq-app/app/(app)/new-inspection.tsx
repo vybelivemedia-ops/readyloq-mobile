@@ -924,60 +924,77 @@ export default function NewInspectionScreen() {
     const warnings: string[] = [];
     const added: { localUri: string; item: EvidenceItem }[] = [];
 
-    for (const item of items) {
-      const cacheUri = item.uri;
+    try {
+      for (const item of items) {
+        const cacheUri = item.uri;
 
-      // ── Step 1: optimistic thumbnail (instant, no I/O) ────────────────────
-      setPhotos((prev) => [...prev, { uri: cacheUri }]);
+        // ── Step 1: optimistic thumbnail (instant, no I/O) ──────────────────
+        setPhotos((prev) => [...prev, { uri: cacheUri }]);
 
-      // ── Step 2: copy out of cache → durable directory ─────────────────────
-      const durableUri = await persistPhoto(rec.localId, cacheUri);
-      const quality = assessEvidence(item);
-      if (!quality.acceptable && quality.reasons.length > 0) warnings.push(quality.reasons[0]);
+        // ── Step 2: copy out of cache → durable directory ───────────────────
+        const durableUri = await persistPhoto(rec.localId, cacheUri);
+        const quality = assessEvidence(item);
+        if (!quality.acceptable && quality.reasons.length > 0) warnings.push(quality.reasons[0]);
 
-      // Swap the optimistic cache URI for the durable one.  Functional updater
-      // is safe even when another capture added its own cache entry in the gap.
-      setPhotos((prev) =>
-        prev.map((p) => (p.uri === cacheUri ? { uri: durableUri } : p)),
-      );
+        // Swap the optimistic cache URI for the durable one.  Functional updater
+        // is safe even when another capture added its own cache entry in the gap.
+        setPhotos((prev) =>
+          prev.map((p) => (p.uri === cacheUri ? { uri: durableUri } : p)),
+        );
 
-      // ── Step 3: persist record to AsyncStorage ────────────────────────────
-      const updated = await updateLocalInspection(rec.localId, (r) => {
-        r.photos.push({
-          localUri: durableUri,
-          capturedAt: item.capturedAt,
-          captureSource: item.source,
-          qualityScore: quality.score,
-          captureMetadata: {
-            ...item.metadata,
-            width: item.width,
-            height: item.height,
-            fileSize: item.fileSize,
-          },
+        // ── Step 3: persist record to AsyncStorage ──────────────────────────
+        const updated = await updateLocalInspection(rec.localId, (r) => {
+          r.photos.push({
+            localUri: durableUri,
+            capturedAt: item.capturedAt,
+            captureSource: item.source,
+            qualityScore: quality.score,
+            captureMetadata: {
+              ...item.metadata,
+              width: item.width,
+              height: item.height,
+              fileSize: item.fileSize,
+            },
+          });
         });
-      });
-      // Keep recordRef in sync; do NOT call setPhotos here — the targeted swap
-      // above already reflects the correct URI, and a full rebuild would drop
-      // optimistic entries from concurrent captures still in-flight.
-      if (updated) recordRef.current = updated;
+        // Keep recordRef in sync; do NOT call setPhotos here — the targeted swap
+        // above already reflects the correct URI, and a full rebuild would drop
+        // optimistic entries from concurrent captures still in-flight.
+        if (updated) recordRef.current = updated;
 
-      added.push({ localUri: durableUri, item });
+        added.push({ localUri: durableUri, item });
 
-      // Fire FAIE global training ingest in the background — non-blocking.
-      void ingestAllUploadedPhotos({
-        photoUri: durableUri,
-        companyId: clerkUser?.id ?? "",
-        technicianId: clerkUser?.id ?? "",
-        source: "technician_field_upload",
-      });
+        // Fire FAIE global training ingest in the background — non-blocking.
+        void ingestAllUploadedPhotos({
+          photoUri: durableUri,
+          companyId: clerkUser?.id ?? "",
+          technicianId: clerkUser?.id ?? "",
+          source: "technician_field_upload",
+        });
+      }
+
+      setQualityNotice(warnings.length > 0 ? warnings[0] : null);
+      // A fresh capture re-arms auto-run analysis after a prior failure.
+      setWsError(null);
+      // Deferred pass: decode pixels OFF the capture path to compute a perceptual
+      // hash (duplicate detection) and a Laplacian sharpness score.
+      void analyzeEvidencePixels(rec.localId, added);
+    } catch (err) {
+      // Local storage failure (disk full, file-system error) — the photo could
+      // not be durably saved.  Surface a clear message so the technician knows
+      // to free space; never let this become a silent black screen.
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Couldn't save photo to device storage. Check available storage space and try again.";
+      setError(msg);
+      console.error("[ingestEvidence]", err);
+      // Roll back any optimistic thumbnails whose durable copy failed.
+      if (added.length < items.length) {
+        const savedUris = new Set(added.map((a) => a.localUri));
+        setPhotos((prev) => prev.filter((p) => savedUris.has(p.uri) || added.some((a) => a.localUri === p.uri)));
+      }
     }
-
-    setQualityNotice(warnings.length > 0 ? warnings[0] : null);
-    // A fresh capture re-arms auto-run analysis after a prior failure.
-    setWsError(null);
-    // Deferred pass: decode pixels OFF the capture path to compute a perceptual
-    // hash (duplicate detection) and a Laplacian sharpness score.
-    void analyzeEvidencePixels(rec.localId, added);
   };
 
   // Sequential (one decode at a time, to bound memory) background pixel pass:
