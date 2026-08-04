@@ -11,6 +11,7 @@ import {
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
+import faieRouter from "./routes/faie";
 import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./lib/webhookHandlers";
 
@@ -119,6 +120,13 @@ app.post(
     }
   },
 );
+
+// ── FAIE training ingest — /v1/faie/... ──────────────────────────────────────
+// Mounted BEFORE the global express.json() so these routes get the generous
+// 20 MB JSON limit rather than the global 100 KB default. Intentionally
+// unauthenticated: mobile clients post fire-and-forget after field photo
+// uploads and finding reviews. Payloads include base64 JPEG images (~1–4 MB).
+app.use("/v1/faie", express.json({ limit: "20mb" }), faieRouter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

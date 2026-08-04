@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router31;
+    module.exports = Router32;
     module.exports.Route = Route;
-    function Router31(options) {
-      if (!(this instanceof Router31)) {
-        return new Router31(options);
+    function Router32(options) {
+      if (!(this instanceof Router32)) {
+        return new Router32(options);
       }
       const opts = options || {};
-      function router31(req, res, next) {
-        router31.handle(req, res, next);
+      function router32(req, res, next) {
+        router32.handle(req, res, next);
       }
-      Object.setPrototypeOf(router31, this);
-      router31.caseSensitive = opts.caseSensitive;
-      router31.mergeParams = opts.mergeParams;
-      router31.params = {};
-      router31.strict = opts.strict;
-      router31.stack = [];
-      return router31;
+      Object.setPrototypeOf(router32, this);
+      router32.caseSensitive = opts.caseSensitive;
+      router32.mergeParams = opts.mergeParams;
+      router32.params = {};
+      router32.strict = opts.strict;
+      router32.stack = [];
+      return router32;
     }
-    Router31.prototype = function() {
+    Router32.prototype = function() {
     };
-    Router31.prototype.param = function param(name, fn) {
+    Router32.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router31.prototype.handle = function handle(req, res, callback) {
+    Router32.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router31.prototype.use = function use(handler) {
+    Router32.prototype.use = function use(handler) {
       let offset = 0;
       let path4 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router31.prototype.route = function route(path4) {
+    Router32.prototype.route = function route(path4) {
       const route2 = new Route(path4);
       const layer = new Layer(path4, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router31.prototype[method] = function(path4) {
+      Router32.prototype[method] = function(path4) {
         const route = this.route(path4);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router31 = require_router();
+    var Router32 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router31 = null;
+      var router32 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router31 === null) {
-            router31 = new Router31({
+          if (router32 === null) {
+            router32 = new Router32({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router31;
+          return router32;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router31 = this.router;
+      var router32 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router31.use(path4, fn2);
+          return router32.use(path4, fn2);
         }
         debug7(".use app under %s", path4);
         fn2.mountpath = path4;
         fn2.parent = this;
-        router31.use(path4, function mounted_app(req, res, next) {
+        router32.use(path4, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter3 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router31 = require_router();
+    var Router32 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router31.Route;
-    exports.Router = Router31;
+    exports.Route = Router32.Route;
+    exports.Router = Router32;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express32 = __toESM(require_express2(), 1);
+var import_express33 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router31 = config2.router;
-  if (isPlainObject(router31)) {
-    newTarget = getTargetFromProxyTable(req, router31);
-  } else if (typeof router31 === "function") {
-    newTarget = await router31(req, res, config2);
+  const router32 = config2.router;
+  if (isPlainObject(router32)) {
+    newTarget = getTargetFromProxyTable(req, router32);
+  } else if (typeof router32 === "function") {
+    newTarget = await router32(req, res, config2);
   }
   return newTarget;
 }
@@ -57281,6 +57281,7 @@ __export(schema_exports, {
   customerSummariesTable: () => customerSummariesTable,
   datasetImagesTable: () => datasetImagesTable,
   errorEventsTable: () => errorEventsTable,
+  faieTrainingImagesTable: () => faieTrainingImagesTable,
   insertAnalysisResultSchema: () => insertAnalysisResultSchema,
   insertBaitStationSchema: () => insertBaitStationSchema,
   insertBetaFeedbackSchema: () => insertBetaFeedbackSchema,
@@ -69789,6 +69790,43 @@ var technicianDailyRigsTable = pgTable(
     uniqueIndex("daily_rigs_tech_date_uq").on(t.companyId, t.technicianId, t.rigDate),
     index("daily_rigs_company_date_idx").on(t.companyId, t.rigDate),
     index("daily_rigs_technician_idx").on(t.technicianId)
+  ]
+);
+
+// ../../lib/db/src/schema/faie-training.ts
+var faieTrainingImagesTable = pgTable(
+  "faie_training_images",
+  {
+    id: serial("id").primaryKey(),
+    /** "dataset" | "global" | "anonymized" */
+    recordType: text("record_type").notNull(),
+    /**
+     * Company that owns this record.
+     * NULL for anonymized records (privacy by construction).
+     */
+    companyId: integer("company_id"),
+    /** dataset: finding id from the mobile app */
+    findingId: text("finding_id"),
+    /** dataset: pest/defect label that was accepted */
+    label: text("label"),
+    /** dataset / anonymized: AI confidence at ingest time */
+    confidence: real("confidence"),
+    /** global: Clerk user id of the uploading technician */
+    technicianId: text("technician_id"),
+    /** global: upload source tag e.g. "mobile_upload" */
+    source: text("source"),
+    /** anonymized: pest or defect category */
+    category: text("category"),
+    /** anonymized: structural context string */
+    context: text("context"),
+    /** Canonical object-storage path e.g. /objects/companies/5/uploads/<uuid> */
+    imageUrl: text("image_url").notNull(),
+    ingestedAt: timestamp("ingested_at").notNull().defaultNow()
+  },
+  (t) => [
+    index("faie_training_company_idx").on(t.companyId),
+    index("faie_training_type_idx").on(t.recordType),
+    index("faie_training_category_idx").on(t.category)
   ]
 );
 
@@ -122648,6 +122686,9 @@ router30.use("/meta-glasses", meta_glasses_default);
 router30.use("/billing", billing_default);
 var routes_default = router30;
 
+// src/routes/faie.ts
+var import_express32 = __toESM(require_express2(), 1);
+
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
 var isProduction = process.env.NODE_ENV === "production";
@@ -122665,6 +122706,116 @@ var logger2 = (0, import_pino.default)({
     }
   }
 });
+
+// src/routes/faie.ts
+var router31 = (0, import_express32.Router)();
+var storage2 = new ObjectStorageService();
+var DatasetIngestBody = external_exports.object({
+  companyId: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
+  findingId: external_exports.string().optional(),
+  label: external_exports.string().optional(),
+  confidence: external_exports.number().min(0).max(1).optional(),
+  imageBytes: external_exports.string().min(1),
+  // base64-encoded image
+  timestamp: external_exports.string().optional()
+});
+var GlobalIngestBody = external_exports.object({
+  companyId: external_exports.union([external_exports.string(), external_exports.number()]),
+  technicianId: external_exports.string(),
+  source: external_exports.string().default("mobile_upload"),
+  imageBytes: external_exports.string().min(1),
+  timestamp: external_exports.string().optional()
+});
+var AnonymizedIngestBody = external_exports.object({
+  category: external_exports.string().optional(),
+  confidence: external_exports.number().min(0).max(1).optional(),
+  context: external_exports.string().optional(),
+  imageBytes: external_exports.string().min(1),
+  timestamp: external_exports.string().optional()
+});
+async function storeBase64Image(base643, companyId) {
+  const buffer = Buffer.from(base643, "base64");
+  return storage2.uploadObjectBuffer(companyId, buffer, "image/jpeg");
+}
+function toCompanyId(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+router31.post("/dataset/ingest", async (req, res) => {
+  const parsed = DatasetIngestBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
+    return;
+  }
+  const { companyId: rawCompanyId, findingId, label, confidence, imageBytes } = parsed.data;
+  const companyId = toCompanyId(rawCompanyId);
+  try {
+    const imageUrl = await storeBase64Image(imageBytes, companyId);
+    await db.insert(faieTrainingImagesTable).values({
+      recordType: "dataset",
+      companyId,
+      findingId: findingId ?? null,
+      label: label ?? null,
+      confidence: confidence ?? null,
+      imageUrl
+    });
+    logger2.info({ companyId, findingId, label }, "[FAIE] dataset record ingested");
+    res.json({ ok: true });
+  } catch (err) {
+    logger2.error({ err }, "[FAIE] dataset/ingest failed");
+    res.status(500).json({ error: "Ingest failed" });
+  }
+});
+router31.post("/training/ingest-global", async (req, res) => {
+  const parsed = GlobalIngestBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
+    return;
+  }
+  const { companyId: rawCompanyId, technicianId, source, imageBytes } = parsed.data;
+  const companyId = toCompanyId(rawCompanyId);
+  try {
+    const imageUrl = await storeBase64Image(imageBytes, companyId);
+    await db.insert(faieTrainingImagesTable).values({
+      recordType: "global",
+      companyId,
+      technicianId,
+      source,
+      imageUrl
+    });
+    logger2.info({ companyId, technicianId, source }, "[FAIE] global training record ingested");
+    res.json({ ok: true });
+  } catch (err) {
+    logger2.error({ err }, "[FAIE] training/ingest-global failed");
+    res.status(500).json({ error: "Ingest failed" });
+  }
+});
+var PLATFORM_COMPANY_ID = 0;
+router31.post("/training/ingest-anonymized", async (req, res) => {
+  const parsed = AnonymizedIngestBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
+    return;
+  }
+  const { category, confidence, context, imageBytes } = parsed.data;
+  try {
+    const imageUrl = await storeBase64Image(imageBytes, PLATFORM_COMPANY_ID);
+    await db.insert(faieTrainingImagesTable).values({
+      recordType: "anonymized",
+      companyId: null,
+      category: category ?? null,
+      confidence: confidence ?? null,
+      context: context ?? null,
+      imageUrl
+    });
+    logger2.info({ category }, "[FAIE] anonymized training record ingested");
+    res.json({ ok: true });
+  } catch (err) {
+    logger2.error({ err }, "[FAIE] training/ingest-anonymized failed");
+    res.status(500).json({ error: "Ingest failed" });
+  }
+});
+var faie_default = router31;
 
 // src/lib/webhookHandlers.ts
 var WebhookHandlers = class _WebhookHandlers {
@@ -122785,7 +122936,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // src/app.ts
-var app = (0, import_express32.default)();
+var app = (0, import_express33.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -122838,7 +122989,7 @@ app.use(
 );
 app.post(
   "/api/stripe/webhook",
-  import_express32.default.raw({ type: "application/json" }),
+  import_express33.default.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -122858,8 +123009,9 @@ app.post(
     }
   }
 );
-app.use(import_express32.default.json());
-app.use(import_express32.default.urlencoded({ extended: true }));
+app.use("/v1/faie", import_express33.default.json({ limit: "20mb" }), faie_default);
+app.use(import_express33.default.json());
+app.use(import_express33.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(

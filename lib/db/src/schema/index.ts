@@ -21,3 +21,4 @@ export * from "./bait-stations";
 export * from "./products";
 export * from "./treatment-logs";
 export * from "./daily-rigs";
+export * from "./faie-training";
