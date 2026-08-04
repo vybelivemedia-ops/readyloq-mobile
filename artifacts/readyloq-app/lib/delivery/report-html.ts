@@ -81,22 +81,53 @@ const REPORT_QUALITY_MIN = 50;
 export async function buildReportHtml(data: ReportData): Promise<string> {
   const { record, findings, recommendations, riskLevel, analysisComplete, companyName } = data;
 
-  // Exclude photos that were explicitly scored below the acceptance threshold.
-  // Photos with no score (ungated capture) are always included — a blurry
-  // photo of a real finding is better than no photo.
-  const goodPhotos = record.photos.filter(
-    (p) => typeof p.qualityScore !== "number" || p.qualityScore >= REPORT_QUALITY_MIN,
-  );
-  const skippedCount = record.photos.length - goodPhotos.length;
+  // ── Finding filter ───────────────────────────────────────────────────────
+  // Dismissed findings are excluded from the report entirely — they are not
+  // shown in the findings section, not counted, and not mentioned anywhere.
+  // Accepted, corrected, pending, and un-reviewed findings are all included.
+  const reportFindings = findings.filter((f) => f.reviewStatus !== "dismissed");
+
+  // ── Photo filter ──────────────────────────────────────────────────────────
+  // Two separate exclusion rules, both silent (no "X excluded" notice):
+  //   1. Quality gate: photos scored below the acceptance threshold are dropped.
+  //   2. Dismissed evidence: if every AI finding attached to a photo was
+  //      dismissed by the technician the photo carries no accepted evidence —
+  //      exclude it silently so it does not appear in the report at all.
+  // Photos with no findings (pure photo evidence) and photos with at least one
+  // accepted/pending finding are always kept.
+  const goodPhotos = record.photos.filter((p) => {
+    if (typeof p.qualityScore === "number" && p.qualityScore < REPORT_QUALITY_MIN) {
+      return false; // quality gate
+    }
+    if (p.storagePath) {
+      const photoFindingAll = findings.filter(
+        (f) => f.imageUrl && f.imageUrl === p.storagePath,
+      );
+      if (
+        photoFindingAll.length > 0 &&
+        photoFindingAll.every((f) => f.reviewStatus === "dismissed")
+      ) {
+        return false; // all findings dismissed — exclude photo silently
+      }
+    }
+    return true;
+  });
+
+  // skippedCount only covers quality-excluded photos; dismissed photos are
+  // excluded silently and never mentioned.
+  const skippedCount = record.photos.filter(
+    (p) => typeof p.qualityScore === "number" && p.qualityScore < REPORT_QUALITY_MIN,
+  ).length;
 
   const photoUris = await Promise.all(goodPhotos.map((p) => photoDataUri(p.localUri)));
 
   // Findings keyed to photos by storage path (the AI reports imageUrl =
-  // storage path of the analyzed photo).
+  // storage path of the analyzed photo). Uses reportFindings so dismissed
+  // findings never appear under any photo's caption.
   const findingsForPhoto = (index: number): Finding[] => {
     const sp = goodPhotos[index]?.storagePath;
     if (!sp) return [];
-    return findings.filter((f) => f.imageUrl && f.imageUrl === sp);
+    return reportFindings.filter((f) => f.imageUrl && f.imageUrl === sp);
   };
 
   const completedAt = record.completedAt ? new Date(record.completedAt) : new Date();
@@ -111,9 +142,9 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
   });
 
   const findingsSection = analysisComplete
-    ? findings.length === 0
+    ? reportFindings.length === 0
       ? `<p class="muted">No pest activity or conducive conditions were detected in the captured evidence.</p>`
-      : findings
+      : reportFindings
           .map((f) => {
             const sev = (f.severity || "").toLowerCase();
             const color = SEVERITY_COLORS[sev] ?? "#475569";
@@ -255,7 +286,7 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
   ${record.notes ? `<div class="section"><h2>Inspection notes</h2><p>${esc(record.notes)}</p></div>` : ""}
 
   <div class="section">
-    <h2>Findings (${analysisComplete ? findings.length : "pending"})</h2>
+    <h2>Findings (${analysisComplete ? reportFindings.length : "pending"})</h2>
     ${findingsSection}
   </div>
 
