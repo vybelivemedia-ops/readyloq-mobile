@@ -15,6 +15,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { logErrorEvent } from "./error-events";
+import { calculateEstimatedAnnualValue } from "./pricing";
 import type { OpportunityRiskLevel } from "@workspace/db";
 
 /**
@@ -456,6 +457,7 @@ export async function runOpportunitySynthesis(input: {
       }
 
       try {
+        const opportunityRisk = computeOpportunityRisk(citedFindings);
         const [created] = await db
           .insert(opportunitiesTable)
           .values({
@@ -469,8 +471,15 @@ export async function runOpportunitySynthesis(input: {
             evidenceFindingIds: candidate.evidenceFindingIds,
             evidenceImagePaths,
             estimatedValueTier: candidate.estimatedValueTier,
+            estimatedAnnualValue: calculateEstimatedAnnualValue({
+              // siteAddress often embeds facility type (e.g. "Montague Restaurant",
+              // "Wortman Apts", "Medical Plaza") — keyword matching covers most cases.
+              propertyType: inspection.siteAddress,
+              tier: candidate.estimatedValueTier,
+              riskLevel: opportunityRisk,
+            }),
             confidence: candidate.confidence,
-            riskLevel: computeOpportunityRisk(citedFindings),
+            riskLevel: opportunityRisk,
             priority: computeOpportunityPriority({
               cited: citedFindings,
               confidence: candidate.confidence,

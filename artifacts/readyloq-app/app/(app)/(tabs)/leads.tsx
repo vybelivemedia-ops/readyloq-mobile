@@ -38,6 +38,8 @@ interface Lead {
   propertyAddress: string;
   status: LeadStatus;
   estimatedValueTier: "high" | "medium" | "low";
+  /** Auto-populated by the pricing engine when the opportunity is created. */
+  estimatedAnnualValue?: number | null;
   riskLevel: "critical" | "high" | "medium" | "low";
   updatedAt: string;
   ageDays: number;
@@ -170,15 +172,27 @@ export default function LeadsScreen() {
               backgroundColor: VALUE_COLORS[item.estimatedValueTier],
             }}
           />
-          <Text
-            style={{
-              color: VALUE_COLORS[item.estimatedValueTier],
-              fontFamily: "Inter_500Medium",
-              fontSize: 12,
-            }}
-          >
-            {VALUE_LABELS[item.estimatedValueTier]}
-          </Text>
+          {item.estimatedAnnualValue ? (
+            <Text
+              style={{
+                color: VALUE_COLORS[item.estimatedValueTier],
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 12,
+              }}
+            >
+              {formatMoney(item.estimatedAnnualValue)}/yr
+            </Text>
+          ) : (
+            <Text
+              style={{
+                color: VALUE_COLORS[item.estimatedValueTier],
+                fontFamily: "Inter_500Medium",
+                fontSize: 12,
+              }}
+            >
+              {VALUE_LABELS[item.estimatedValueTier]}
+            </Text>
+          )}
         </View>
         {item.ageDays > 14 ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
