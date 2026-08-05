@@ -969,6 +969,12 @@ export interface Report {
   pdfUrl?: string | null;
   aiNarrative?: null | AiReportNarrative;
   createdAt: string;
+  /**
+   * Estimated annual contract value from the linked sales opportunity,
+   * populated by the pricing engine at inspection time. Absent when no
+   * opportunity has been created for this report.
+   */
+  pipelineValue?: number;
 }
 
 export interface GenerateNarrativeInput {

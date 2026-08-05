@@ -6,6 +6,7 @@ import {
   analysisResultsTable,
   inspectionMediaTable,
   customerSummariesTable,
+  opportunitiesTable,
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
@@ -18,26 +19,44 @@ import { buildServerReportHtml } from "../lib/report-html-server";
 
 const router = Router();
 
-function serializeReport(row: typeof reportsTable.$inferSelect) {
+function serializeReport(
+  row: typeof reportsTable.$inferSelect,
+  pipelineValue?: number | null,
+) {
   return {
     ...row,
     findings: row.findings ?? [],
     recommendations: row.recommendations ?? [],
     exclusionOpportunities: row.exclusionOpportunities ?? [],
     createdAt: row.createdAt.toISOString(),
+    ...(pipelineValue != null ? { pipelineValue } : {}),
   };
 }
 
 // GET /reports
+// Left-joins the linked opportunity so each report carries `pipelineValue`
+// (the auto-populated estimatedAnnualValue from the pricing engine).
+// The client uses this for the owner home screen KPI strip without a separate
+// /opportunities request.
 router.get("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const rows = await db
-      .select()
+      .select({
+        report: reportsTable,
+        pipelineValue: opportunitiesTable.estimatedAnnualValue,
+      })
       .from(reportsTable)
+      .leftJoin(
+        opportunitiesTable,
+        and(
+          eq(opportunitiesTable.inspectionId, reportsTable.inspectionId),
+          eq(opportunitiesTable.companyId, reportsTable.companyId),
+        ),
+      )
       .where(eq(reportsTable.companyId, companyId))
       .orderBy(desc(reportsTable.createdAt));
-    return res.json(rows.map(serializeReport));
+    return res.json(rows.map((r) => serializeReport(r.report, r.pipelineValue)));
   } catch (err) {
     return res.status(500).json({ error: "Failed to list reports" });
   }

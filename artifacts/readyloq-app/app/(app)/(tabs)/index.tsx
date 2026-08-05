@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   getGetAnalyticsDashboardQueryOptions,
   getGetBriefingQueryOptions,
+  getListReportsQueryOptions,
 } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
@@ -29,7 +30,6 @@ import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSignOut } from "@/hooks/useSignOut";
-import { customFetch } from "@/lib/api-client/custom-fetch";
 import { getDashboardMetrics } from "@/lib/dashboard";
 import { useLicenseStatus } from "@/hooks/useLicenseStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
@@ -470,21 +470,19 @@ export default function DashboardScreen() {
   const briefing = useQuery(getGetBriefingQueryOptions());
   const dash     = useQuery(getGetAnalyticsDashboardQueryOptions());
 
-  // Opportunities list — shares the ["leads"] cache with the Leads tab so no
-  // extra network request is made when that tab has already fetched the data.
-  // Used to compute pipeline KPIs client-side via getDashboardMetrics().
-  const { data: leadsData } = useQuery({
-    queryKey: ["leads"],
-    queryFn: () => customFetch<{ opportunities: Array<{ status: string; estimatedAnnualValue?: number | null }> }>("/api/opportunities"),
+  // Reports list — shares the same React Query cache as the Reports tab so no
+  // extra network request is made when that screen has already loaded.
+  // Each report now carries `pipelineValue` from the linked sales opportunity
+  // (joined server-side), which getDashboardMetrics sums client-side.
+  const { data: reportsData } = useQuery({
+    ...getListReportsQueryOptions(),
     enabled: isOwner,
   });
 
-  // Derive client-side metrics from the cached opportunity list.
-  // Exclude won/lost so openOpportunitiesCount reflects active pipeline only.
+  // Derive client-side pipeline metrics from the reports list.
+  // Only reports that have a priced opportunity contribute to the total.
   const pipelineMetrics = getDashboardMetrics(
-    (leadsData?.opportunities ?? [])
-      .filter((o) => o.status !== "won" && o.status !== "lost")
-      .map((o) => ({ pipelineValue: o.estimatedAnnualValue ?? undefined })),
+    (reportsData ?? []).map((r) => ({ pipelineValue: r.pipelineValue })),
   );
 
   // License status — loaded for owners to surface subscription prompts/warnings.
