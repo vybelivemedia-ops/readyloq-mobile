@@ -86965,6 +86965,62 @@ async function generateCustomerSummaryBody(input) {
   return summary;
 }
 
+// src/lib/pricing.ts
+var PRICING_MATRIX = {
+  restaurant: { annualMin: 3e3, annualMax: 7200, defaultSqFt: 2500, perSqFtAnnual: 0.6 },
+  office: { annualMin: 1440, annualMax: 3600, defaultSqFt: 5e3, perSqFtAnnual: 0.36 },
+  warehouse: { annualMin: 4800, annualMax: 14400, defaultSqFt: 2e4, perSqFtAnnual: 0.24 },
+  retail: { annualMin: 1800, annualMax: 4800, defaultSqFt: 3e3, perSqFtAnnual: 0.42 },
+  multifamily: { annualMin: 2400, annualMax: 7200, defaultSqFt: 8e3, perSqFtAnnual: 0.48 },
+  residential: { annualMin: 600, annualMax: 1800, defaultSqFt: 1800, perSqFtAnnual: 0.2 },
+  healthcare: { annualMin: 6e3, annualMax: 18e3, defaultSqFt: 1e4, perSqFtAnnual: 0.8 },
+  school: { annualMin: 3600, annualMax: 9600, defaultSqFt: 12e3, perSqFtAnnual: 0.4 },
+  hotel: { annualMin: 4800, annualMax: 14400, defaultSqFt: 15e3, perSqFtAnnual: 0.55 }
+};
+var DEFAULT_RULE = {
+  annualMin: 1440,
+  annualMax: 4800,
+  defaultSqFt: 3e3,
+  perSqFtAnnual: 0.36
+};
+var TIER_POSITION = { low: 0.25, medium: 0.6, high: 1 };
+var RISK_MULTIPLIER = {
+  low: 0.85,
+  medium: 1,
+  high: 1.3,
+  critical: 1.55
+};
+function resolveRule(propertyType) {
+  const key = propertyType.toLowerCase();
+  if (key in PRICING_MATRIX) return PRICING_MATRIX[key];
+  if (/food|cafe|bar|kitchen|diner|bakery|deli|pizz|bistro|eatery/.test(key)) return PRICING_MATRIX.restaurant;
+  if (/apartment|condo|housing|unit|tenant|complex|reside|multifam/.test(key)) return PRICING_MATRIX.multifamily;
+  if (/store|shop|boutique|grocery|supermarket|market|strip.mall/.test(key)) return PRICING_MATRIX.retail;
+  if (/medical|clinic|hospital|dental|pharmacy|health|urgent.care/.test(key)) return PRICING_MATRIX.healthcare;
+  if (/school|university|college|campus|daycare|educat|k-12/.test(key)) return PRICING_MATRIX.school;
+  if (/hotel|motel|inn|lodge|airbnb|hospitality|resort/.test(key)) return PRICING_MATRIX.hotel;
+  if (/home|house|residen|single.family|sfr/.test(key)) return PRICING_MATRIX.residential;
+  if (/office|corporate|business|professional|co.work/.test(key)) return PRICING_MATRIX.office;
+  if (/warehouse|storage|distribution|logistics|industrial|fulfillment/.test(key)) return PRICING_MATRIX.warehouse;
+  return DEFAULT_RULE;
+}
+function calculateEstimatedAnnualValue({
+  propertyType,
+  tier,
+  riskLevel,
+  squareFootage
+}) {
+  const rule = resolveRule(propertyType);
+  const sqFt = squareFootage ?? rule.defaultSqFt;
+  const position = TIER_POSITION[tier] ?? 0.6;
+  const riskMult = RISK_MULTIPLIER[riskLevel ?? "medium"] ?? 1;
+  const base = rule.annualMin + (rule.annualMax - rule.annualMin) * position;
+  const sqFtContrib = sqFt * rule.perSqFtAnnual;
+  const raw = (base + sqFtContrib) * riskMult;
+  const bounded = Math.min(Math.max(raw, rule.annualMin), rule.annualMax * 2);
+  return Math.round(bounded / 100) * 100;
+}
+
 // src/lib/opportunity-ai.ts
 var MODEL3 = "gpt-5.4";
 var OPEN_STATUSES = ["new", "reviewed", "quoted"];
@@ -87244,6 +87300,7 @@ async function runOpportunitySynthesis(input) {
         continue;
       }
       try {
+        const opportunityRisk = computeOpportunityRisk(citedFindings);
         const [created] = await db.insert(opportunitiesTable).values({
           companyId,
           inspectionId,
@@ -87255,8 +87312,15 @@ async function runOpportunitySynthesis(input) {
           evidenceFindingIds: candidate.evidenceFindingIds,
           evidenceImagePaths,
           estimatedValueTier: candidate.estimatedValueTier,
+          estimatedAnnualValue: calculateEstimatedAnnualValue({
+            // siteAddress often embeds facility type (e.g. "Montague Restaurant",
+            // "Wortman Apts", "Medical Plaza") — keyword matching covers most cases.
+            propertyType: inspection.siteAddress,
+            tier: candidate.estimatedValueTier,
+            riskLevel: opportunityRisk
+          }),
           confidence: candidate.confidence,
-          riskLevel: computeOpportunityRisk(citedFindings),
+          riskLevel: opportunityRisk,
           priority: computeOpportunityPriority({
             cited: citedFindings,
             confidence: candidate.confidence,
@@ -88495,6 +88559,15 @@ function userPrompt2(technicianNote) {
     '- "possibleHarborage": harborage (nesting/shelter site) observed, else null',
     '- "possibleMoistureIssue": moisture problem observed (leak, standing water, damp material, condensation), else null',
     '- "possibleStructuralIssue": structural deficiency observed (gap, crack, hole, damaged material, failed seal), else null',
+    '- "measurementEstimate": ONLY when possibleStructuralIssue is non-null \u2014 estimate the physical dimensions',
+    "  of the defect using visible reference objects (door frame \u2248 7 ft tall, standard brick course \u2248 2.25 in,",
+    "  12-in floor tile, US electrical outlet \u2248 4.5 in \xD7 2.75 in, hand-width \u2248 4 in) or structural norms.",
+    '  Return: {"linearFt":<number|null>,"gapWidthIn":<number|null>,"heightFt":<number|null>,"confidence":<0-1>,"source":"ai_vision_estimate"}',
+    "  linearFt: total run length of the defect (e.g. gap perimeter, roofline section); null if indeterminate.",
+    "  gapWidthIn: opening width in inches; null if no gap is clearly present.",
+    "  heightFt: height of the opening in feet; null if not applicable.",
+    "  Set confidence < 0.35 when no reference object or structural norm is visible in the frame.",
+    "  Return null (not the object) when possibleStructuralIssue is null.",
     '- "possibleEntryPoint": entry point observed, else null',
     '- "suggestedCorrectiveAction": one concise recommended corrective action, else null',
     '- "rationale": one short sentence explaining the classification',
@@ -88505,6 +88578,20 @@ function userPrompt2(technicianNote) {
     "return null for that field rather than guessing.",
     ...noteClause
   ].join("\n");
+}
+function asNumberOrNull(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return value;
+}
+function parseMeasurementEstimate(raw) {
+  if (raw === null || raw === void 0 || typeof raw !== "object") return null;
+  const r = raw;
+  const confidence = typeof r.confidence === "number" ? Math.min(1, Math.max(0, r.confidence)) : 0;
+  const linearFt = asNumberOrNull(r.linearFt);
+  const gapWidthIn = asNumberOrNull(r.gapWidthIn);
+  const heightFt = asNumberOrNull(r.heightFt);
+  if (linearFt === null && gapWidthIn === null && heightFt === null) return null;
+  return { linearFt, gapWidthIn, heightFt, confidence, source: "ai_vision_estimate" };
 }
 function clampConfidence2(value) {
   const n = typeof value === "number" ? value : Number(value);
@@ -88559,6 +88646,7 @@ function parsePrediction(raw) {
     possibleHarborage: asStringOrNull(parsed.possibleHarborage),
     possibleMoistureIssue: asStringOrNull(parsed.possibleMoistureIssue),
     possibleStructuralIssue: asStringOrNull(parsed.possibleStructuralIssue),
+    measurementEstimate: parseMeasurementEstimate(parsed.measurementEstimate),
     zone: normalizeZone(parsed.zone),
     pestCandidates
   };
@@ -89987,20 +90075,30 @@ function buildServerReportHtml(report, inspection) {
 
 // src/routes/reports.ts
 var router6 = (0, import_express7.Router)();
-function serializeReport(row) {
+function serializeReport(row, pipelineValue) {
   return {
     ...row,
     findings: row.findings ?? [],
     recommendations: row.recommendations ?? [],
     exclusionOpportunities: row.exclusionOpportunities ?? [],
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
+    ...pipelineValue != null ? { pipelineValue } : {}
   };
 }
 router6.get("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
-    const rows = await db.select().from(reportsTable).where(eq(reportsTable.companyId, companyId)).orderBy(desc(reportsTable.createdAt));
-    return res.json(rows.map(serializeReport));
+    const rows = await db.select({
+      report: reportsTable,
+      pipelineValue: opportunitiesTable.estimatedAnnualValue
+    }).from(reportsTable).leftJoin(
+      opportunitiesTable,
+      and(
+        eq(opportunitiesTable.inspectionId, reportsTable.inspectionId),
+        eq(opportunitiesTable.companyId, reportsTable.companyId)
+      )
+    ).where(eq(reportsTable.companyId, companyId)).orderBy(desc(reportsTable.createdAt));
+    return res.json(rows.map((r) => serializeReport(r.report, r.pipelineValue)));
   } catch (err) {
     return res.status(500).json({ error: "Failed to list reports" });
   }
