@@ -290,6 +290,13 @@ export interface Finding {
     harborage?: string | null;
     moisture?: string | null;
     structuralIssue?: string | null;
+    measurementEstimate?: {
+        linearFt?: number | null;
+        gapWidthIn?: number | null;
+        heightFt?: number | null;
+        confidence: number;
+        source: "ai_vision_estimate";
+    } | null;
     zone?: string | null;
     candidates?: Array<{
         species: string;

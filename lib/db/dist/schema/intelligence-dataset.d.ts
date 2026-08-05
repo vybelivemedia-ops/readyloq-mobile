@@ -50,6 +50,17 @@ export type AiPrediction = {
         species: string;
         confidence: number;
     }>;
+    measurementEstimate?: {
+        /** Estimated linear footage of the defect run (gap perimeter, roofline run, etc.). */
+        linearFt?: number | null;
+        /** Estimated gap or opening width in inches. */
+        gapWidthIn?: number | null;
+        /** Estimated defect height in feet. */
+        heightFt?: number | null;
+        /** AI confidence in these dimension estimates (0–1). */
+        confidence: number;
+        source: "ai_vision_estimate";
+    } | null;
 };
 export declare const intelligenceRecordsTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "intelligence_records";
@@ -1115,8 +1126,8 @@ export type IntelligenceVote = typeof intelligenceVotesTable.$inferSelect;
 export type IntelligenceTrainingExport = typeof intelligenceTrainingExportsTable.$inferSelect;
 export declare const intelligenceSeverityEnum: z.ZodEnum<{
     low: "low";
-    high: "high";
     moderate: "moderate";
+    high: "high";
     critical: "critical";
 }>;
 export declare const treatmentOutcomeEnum: z.ZodEnum<{
