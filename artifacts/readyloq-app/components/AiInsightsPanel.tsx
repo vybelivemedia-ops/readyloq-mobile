@@ -9,6 +9,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useColors } from "@/hooks/useColors";
 import { confidencePct, formatStatus, severityTone } from "@/constants/inspection";
+import {
+  classifyExclusionFinding,
+  formatDollar,
+  EXCLUSION_TIERS,
+  type ExclusionItem,
+} from "@/lib/pricing";
 
 interface AiInsightsPanelProps {
   siteAddress: string;
@@ -266,7 +272,7 @@ export function AiInsightsPanel({
   onReview,
 }: AiInsightsPanelProps) {
   const colors = useColors();
-  const [tab, setTab] = useState<"insights" | "report">("insights");
+  const [tab, setTab] = useState<"insights" | "report" | "exclusion">("insights");
   const findings = analysis?.findings ?? [];
   const grouped = groupFindings(findings);
   const narrative = report?.aiNarrative ?? null;
@@ -300,6 +306,16 @@ export function AiInsightsPanel({
   // Memoized: dedupeDetections + speciesWithConfidence run O(n) per call.
   // On large inspections (40+ photos) these were re-running on every render
   // cycle (scroll, timer, state change) — visible as UI thread frame drops.
+  // Exclusion work items — findings that flag a structural remediation opportunity.
+  const exclusionItems = useMemo<ExclusionItem[]>(
+    () =>
+      findings
+        .filter((f) => f.exclusionOpportunity === true || f.structuralIssue != null)
+        .filter((f) => f.reviewStatus !== "dismissed")
+        .map((f) => classifyExclusionFinding(f)),
+    [findings],
+  );
+
   const species = useMemo(() => speciesWithConfidence(findings), [findings]);
   const detectionRows: {
     key: string;
@@ -380,7 +396,7 @@ export function AiInsightsPanel({
       ]
     : [];
 
-  const tabButton = (key: "insights" | "report", label: string) => {
+  const tabButton = (key: "insights" | "report" | "exclusion", label: string, badge?: number) => {
     const active = tab === key;
     return (
       <Pressable
@@ -409,14 +425,23 @@ export function AiInsightsPanel({
         {key === "report" && reportBuilding ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : key === "report" && narrative ? (
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary }} />
+        ) : badge && badge > 0 ? (
           <View
             style={{
-              width: 7,
-              height: 7,
-              borderRadius: 4,
-              backgroundColor: colors.primary,
+              backgroundColor: "#d97706",
+              borderRadius: 9,
+              minWidth: 18,
+              height: 18,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: 5,
             }}
-          />
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 10 }}>
+              {badge}
+            </Text>
+          </View>
         ) : null}
       </Pressable>
     );
@@ -453,6 +478,7 @@ export function AiInsightsPanel({
         >
           {tabButton("insights", "Insights")}
           {tabButton("report", "Live report")}
+          {tabButton("exclusion", "Exclusion", exclusionItems.length)}
         </View>
 
         {tab === "insights" ? (
@@ -1167,7 +1193,7 @@ export function AiInsightsPanel({
               />
             </Card>
           </>
-        ) : (
+        ) : tab === "report" ? (
           <>
             {/* Live report */}
             {reportError ? (
@@ -1283,6 +1309,154 @@ export function AiInsightsPanel({
                 ))}
               </>
             ) : null}
+          </>
+        ) : (
+          <>
+            {/* Exclusion Work tab — structural remediation upsell with market-rate estimates */}
+
+            {/* Header */}
+            <Card style={{ gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="construct-outline" size={16} color={colors.primary} />
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14, flex: 1 }}>
+                  Exclusion & remediation
+                </Text>
+                {exclusionItems.length > 0 ? (
+                  <Badge label={`${exclusionItems.length} item${exclusionItems.length === 1 ? "" : "s"}`} tone="warning" />
+                ) : (
+                  <Badge label="Clear" tone="success" />
+                )}
+              </View>
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 }}>
+                Structural defects detected during this inspection. Each carries a market-rate estimate you can quote on the spot.
+              </Text>
+            </Card>
+
+            {exclusionItems.length === 0 ? (
+              <Card style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
+                <Ionicons name="shield-checkmark-outline" size={28} color={colors.mutedForeground} />
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", lineHeight: 19 }}>
+                  No structural exclusion issues flagged.{"\n"}Capture more photos to identify entry points and harborage areas.
+                </Text>
+              </Card>
+            ) : (
+              <>
+                {exclusionItems.map((item) => {
+                  const tierMeta = EXCLUSION_TIERS[item.tier];
+                  const tierColor =
+                    item.tier === "major" ? "#dc2626" :
+                    item.tier === "medium" ? "#d97706" :
+                    "#16a34a";
+                  return (
+                    <Card key={item.id} style={{ gap: 10 }}>
+                      {/* Defect row */}
+                      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                        <Ionicons
+                          name={item.tier === "major" ? "warning-outline" : item.tier === "medium" ? "alert-circle-outline" : "information-circle-outline"}
+                          size={16}
+                          color={tierColor}
+                          style={{ marginTop: 1 }}
+                        />
+                        <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13, flex: 1, lineHeight: 18 }}>
+                          {item.defectDescription}
+                        </Text>
+                      </View>
+
+                      {/* Location */}
+                      {item.location ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <Ionicons name="location-outline" size={12} color={colors.mutedForeground} />
+                          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                            {item.location}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      {/* Recommended fix */}
+                      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 }}>
+                        {item.recommendedFix}
+                      </Text>
+
+                      {/* Price row */}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          paddingTop: 8,
+                          borderTopWidth: 1,
+                          borderTopColor: colors.border,
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 5,
+                            backgroundColor: `${tierColor}18`,
+                            borderRadius: 6,
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                          }}
+                        >
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tierColor }} />
+                          <Text style={{ color: tierColor, fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+                            {tierMeta.label}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: "flex-end" }}>
+                          <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 14 }}>
+                            {formatDollar(item.estimate)}
+                          </Text>
+                          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                            range {formatDollar(item.rangeMin)} – {formatDollar(item.rangeMax)}
+                          </Text>
+                        </View>
+                      </View>
+                    </Card>
+                  );
+                })}
+
+                {/* Total estimate card */}
+                {exclusionItems.length > 1 ? (() => {
+                  const totalLo = exclusionItems.reduce((s, i) => s + i.rangeMin, 0);
+                  const totalHi = exclusionItems.reduce((s, i) => s + i.rangeMax, 0);
+                  const totalMid = exclusionItems.reduce((s, i) => s + i.estimate, 0);
+                  return (
+                    <Card
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        backgroundColor: colors.accent,
+                        borderColor: colors.primary,
+                      }}
+                    >
+                      <View style={{ gap: 2 }}>
+                        <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+                          Total exclusion estimate
+                        </Text>
+                        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                          {exclusionItems.length} items · {formatDollar(totalLo)} – {formatDollar(totalHi)} range
+                        </Text>
+                      </View>
+                      <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 20 }}>
+                        {formatDollar(totalMid)}
+                      </Text>
+                    </Card>
+                  );
+                })() : null}
+
+                {/* Pitch tip */}
+                <Card style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: colors.muted }}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.mutedForeground} style={{ marginTop: 1 }} />
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17, flex: 1 }}>
+                    <Text style={{ fontFamily: "Inter_600SemiBold" }}>On-site pitch tip: </Text>
+                    Show the client the photo evidence, name the defect, and state the price range before leaving. Exclusion jobs close most often when quoted the same day as the inspection.
+                  </Text>
+                </Card>
+              </>
+            )}
           </>
         )}
 

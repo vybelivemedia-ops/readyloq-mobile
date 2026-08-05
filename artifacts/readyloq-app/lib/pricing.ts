@@ -94,3 +94,76 @@ export function formatEstimateRange(annualValue: number): string {
     n >= 1000 ? `$${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}K` : `$${n}`;
   return `${fmt(lo)} – ${fmt(hi)}/yr`;
 }
+
+// ─── Exclusion & Remediation Pricing ─────────────────────────────────────────
+
+export type ExclusionTier = "minor" | "medium" | "major";
+
+export interface ExclusionItem {
+  id: string;
+  defectDescription: string;
+  location: string | null;
+  tier: ExclusionTier;
+  /** Representative midpoint estimate in whole dollars. */
+  estimate: number;
+  /** Low end of the market range. */
+  rangeMin: number;
+  /** High end of the market range. */
+  rangeMax: number;
+  recommendedFix: string;
+}
+
+/** Market rate ranges per exclusion tier (commercial pest control, US 2024). */
+export const EXCLUSION_TIERS: Record<ExclusionTier, { min: number; max: number; label: string }> = {
+  minor: { min: 150,  max: 450,  label: "Minor exclusion"    },
+  medium:{ min: 300,  max: 800,  label: "Medium exclusion"   },
+  major: { min: 1000, max: 3500, label: "Major remediation"  },
+};
+
+/** Keywords that indicate the work severity. Order matters — major checked first. */
+const MAJOR_KEYWORDS =
+  /roofline|soffit|crawlspace|foundation|trench|attic|fascia|structural|framing|subflooring|utility.shaft|sewer|drain.pit/i;
+const MEDIUM_KEYWORDS =
+  /door.sweep|vent.screen|pipe.chase|conduit|utility.penetrat|hvac|duct|chase|plenum|ceiling.void|wall.void/i;
+
+/**
+ * Classifies a structural finding into an exclusion tier based on the issue
+ * and description text, then returns a fully-populated ExclusionItem.
+ */
+export function classifyExclusionFinding(finding: {
+  id: number;
+  structuralIssue?: string | null;
+  description: string;
+  location?: string | null;
+  treatment?: string | null;
+}): ExclusionItem {
+  const text = `${finding.structuralIssue ?? ""} ${finding.description}`;
+
+  let tier: ExclusionTier = "minor";
+  if (MAJOR_KEYWORDS.test(text)) tier = "major";
+  else if (MEDIUM_KEYWORDS.test(text)) tier = "medium";
+
+  const { min, max } = EXCLUSION_TIERS[tier];
+  const estimate = Math.round(((min + max) / 2) / 50) * 50; // round to nearest $50
+
+  const defaultFix: Record<ExclusionTier, string> = {
+    minor:  "Seal with commercial-grade caulk or install weep-hole screens",
+    medium: "Install door sweep / vent screen and seal utility penetration",
+    major:  "Structural sealing with heavy-duty mesh, sealant, and hardware cloth",
+  };
+
+  return {
+    id: String(finding.id),
+    defectDescription: finding.structuralIssue ?? finding.description,
+    location: finding.location ?? null,
+    tier,
+    estimate,
+    rangeMin: min,
+    rangeMax: max,
+    recommendedFix: finding.treatment ?? defaultFix[tier],
+  };
+}
+
+export function formatDollar(n: number): string {
+  return n >= 1000 ? `$${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}K` : `$${n}`;
+}
