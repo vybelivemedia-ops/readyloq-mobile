@@ -185,6 +185,21 @@ export type AiPrediction = {
   // RLQ-002: top-3 pest species candidates with confidence scores, sorted
   // descending. Absent on older predictions; [] when no pest is visible.
   pestCandidates?: Array<{ species: string; confidence: number }>;
+  // AI-estimated physical dimensions of the structural defect detected in this
+  // photo. Populated only when possibleStructuralIssue is non-null. Based on
+  // visible reference objects and structural norms in the scene — accuracy varies;
+  // hardware laser readings override these in the app's Exclusion pricing engine.
+  measurementEstimate?: {
+    /** Estimated linear footage of the defect run (gap perimeter, roofline run, etc.). */
+    linearFt?: number | null;
+    /** Estimated gap or opening width in inches. */
+    gapWidthIn?: number | null;
+    /** Estimated defect height in feet. */
+    heightFt?: number | null;
+    /** AI confidence in these dimension estimates (0–1). */
+    confidence: number;
+    source: "ai_vision_estimate";
+  } | null;
 };
 
 // ── Tables ───────────────────────────────────────────────────────────────────

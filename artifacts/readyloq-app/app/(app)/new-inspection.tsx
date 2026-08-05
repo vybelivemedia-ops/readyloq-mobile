@@ -52,6 +52,7 @@ import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { PEST_TYPES, PROPERTY_TYPES } from "@/constants/inspection";
 import { ApiError } from "@/lib/api";
 import { ingestAllUploadedPhotos } from "@/lib/faie-ingest";
+import { consumeLastMeasurementReading } from "@/lib/measurement";
 import {
   deleteLocalInspection,
   getLocalInspection,
@@ -949,12 +950,26 @@ export default function NewInspectionScreen() {
             capturedAt: item.capturedAt,
             captureSource: item.source,
             qualityScore: quality.score,
-            captureMetadata: {
-              ...item.metadata,
-              width: item.width,
-              height: item.height,
-              fileSize: item.fileSize,
-            },
+            captureMetadata: (() => {
+              // Consume any fresh laser reading stamped before this capture.
+              // The reading is cleared from the bridge so it attaches to exactly
+              // one photo rather than being reused for subsequent captures.
+              const laser = consumeLastMeasurementReading();
+              return {
+                ...item.metadata,
+                width: item.width,
+                height: item.height,
+                fileSize: item.fileSize,
+                ...(laser ? {
+                  laserMeasurement: {
+                    kind: laser.kind,
+                    value: laser.value,
+                    unit: laser.unit,
+                    capturedAt: laser.capturedAt,
+                  },
+                } : {}),
+              };
+            })(),
           });
         });
         // Keep recordRef in sync; do NOT call setPhotos here — the targeted swap

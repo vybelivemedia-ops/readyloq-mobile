@@ -15,6 +15,7 @@ import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from "reac
 import { AuthedImage } from "@/components/AuthedImage";
 import { FindingCard } from "@/components/FindingCard";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
+import { setLastMeasurementReading } from "@/lib/measurement";
 import { TreatmentLogWizard } from "@/components/TreatmentLogWizard";
 import { useDailyRoute } from "@/hooks/useDailyRoute";
 import { listTreatmentLogs, type TreatmentLog } from "@/lib/api-client/products";
@@ -503,7 +504,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
         </View>
 
         {/* Measurement devices */}
-        <MeasurementDevicePanel />
+        <MeasurementDevicePanel onStamp={setLastMeasurementReading} />
 
         {/* Treatments Applied */}
         <TreatmentsAppliedSection

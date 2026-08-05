@@ -15,6 +15,11 @@ import {
   EXCLUSION_TIERS,
   type ExclusionItem,
 } from "@/lib/pricing";
+import {
+  useMeasurementBridge,
+  readingToLinearFt,
+  formatReadingCompact,
+} from "@/lib/measurement";
 
 interface AiInsightsPanelProps {
   siteAddress: string;
@@ -306,14 +311,25 @@ export function AiInsightsPanel({
   // Memoized: dedupeDetections + speciesWithConfidence run O(n) per call.
   // On large inspections (40+ photos) these were re-running on every render
   // cycle (scroll, timer, state change) — visible as UI thread frame drops.
+  // Laser reading from the Stamp button — drives per-linear-foot pricing in the
+  // Exclusion tab. Reactively updates whenever the technician stamps a new shot.
+  const laserReading = useMeasurementBridge();
+  const laserLinearFt = useMemo(
+    () => (laserReading ? readingToLinearFt(laserReading) : null),
+    [laserReading],
+  );
+
   // Exclusion work items — findings that flag a structural remediation opportunity.
   const exclusionItems = useMemo<ExclusionItem[]>(
     () =>
       findings
         .filter((f) => f.exclusionOpportunity === true || f.structuralIssue != null)
         .filter((f) => f.reviewStatus !== "dismissed")
-        .map((f) => classifyExclusionFinding(f)),
-    [findings],
+        .map((f) => classifyExclusionFinding(
+          { ...f, measurementEstimate: (f as any).measurementEstimate ?? null },
+          laserLinearFt,
+        )),
+    [findings, laserLinearFt],
   );
 
   const species = useMemo(() => speciesWithConfidence(findings), [findings]);
@@ -1332,6 +1348,30 @@ export function AiInsightsPanel({
               </Text>
             </Card>
 
+            {/* Active laser reading banner — appears when a fresh stamped reading is driving estimates */}
+            {laserReading ? (
+              <Card
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  borderColor: "#17c4d3",
+                  backgroundColor: "rgba(23,196,211,0.07)",
+                }}
+              >
+                <Ionicons name="scan-outline" size={16} color="#17c4d3" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#17c4d3", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                    Active laser reading
+                  </Text>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                    {formatReadingCompact(laserReading)} · applied to all estimates below
+                  </Text>
+                </View>
+                <Ionicons name="checkmark-circle" size={16} color="#17c4d3" />
+              </Card>
+            ) : null}
+
             {exclusionItems.length === 0 ? (
               <Card style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
                 <Ionicons name="shield-checkmark-outline" size={28} color={colors.mutedForeground} />
@@ -1408,9 +1448,16 @@ export function AiInsightsPanel({
                           <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 14 }}>
                             {formatDollar(item.estimate)}
                           </Text>
-                          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
-                            range {formatDollar(item.rangeMin)} – {formatDollar(item.rangeMax)}
-                          </Text>
+                          {item.measurement ? (
+                            <Text style={{ color: "#17c4d3", fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                              {item.priceSource === "laser" ? "⚡" : "✦"}{" "}
+                              {item.measurement.linearFt.toFixed(1)} ft × ${item.perLinearFtRate}/ft
+                            </Text>
+                          ) : (
+                            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                              range {formatDollar(item.rangeMin)} – {formatDollar(item.rangeMax)}
+                            </Text>
+                          )}
                         </View>
                       </View>
                     </Card>

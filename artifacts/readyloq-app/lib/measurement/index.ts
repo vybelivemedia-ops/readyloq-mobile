@@ -49,3 +49,16 @@ export {
   createBleAcousticSensorProvider,
   type BleAcousticSensorProvider,
 } from "./ble-acoustic-sensor-provider";
+
+// ── Measurement Bridge ────────────────────────────────────────────────────────
+export {
+  setLastMeasurementReading,
+  getLastMeasurementReading,
+  hasFreshMeasurementReading,
+  consumeLastMeasurementReading,
+  clearMeasurementReading,
+  measurementAge,
+  useMeasurementBridge,
+  readingToLinearFt,
+  formatReadingCompact,
+} from "./measurement-bridge";

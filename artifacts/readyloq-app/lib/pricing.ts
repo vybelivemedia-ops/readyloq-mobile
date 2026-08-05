@@ -99,18 +99,40 @@ export function formatEstimateRange(annualValue: number): string {
 
 export type ExclusionTier = "minor" | "medium" | "major";
 
+/** How the price estimate was derived. */
+export type PriceSource = "laser" | "ai_estimate" | "tier_default";
+
+/** Mirrors the server-side AiPrediction.measurementEstimate shape. */
+export interface MeasurementEstimate {
+  linearFt?: number | null;
+  gapWidthIn?: number | null;
+  heightFt?: number | null;
+  confidence: number;
+  source: "ai_vision_estimate";
+}
+
 export interface ExclusionItem {
   id: string;
   defectDescription: string;
   location: string | null;
   tier: ExclusionTier;
-  /** Representative midpoint estimate in whole dollars. */
+  /** Dollar estimate for this item. */
   estimate: number;
-  /** Low end of the market range. */
+  /** Low end of the market range (used as floor). */
   rangeMin: number;
-  /** High end of the market range. */
+  /** High end of the market range (used as ceiling). */
   rangeMax: number;
   recommendedFix: string;
+  /** How the estimate was computed. */
+  priceSource: PriceSource;
+  /** Measurement that drove the pricing, when available. */
+  measurement?: {
+    linearFt: number;
+    source: PriceSource;
+    confidence: number;
+  };
+  /** Per-linear-foot rate used (when measurement-based pricing applies). */
+  perLinearFtRate?: number;
 }
 
 /** Market rate ranges per exclusion tier (commercial pest control, US 2024). */
@@ -127,16 +149,35 @@ const MEDIUM_KEYWORDS =
   /door.sweep|vent.screen|pipe.chase|conduit|utility.penetrat|hvac|duct|chase|plenum|ceiling.void|wall.void/i;
 
 /**
- * Classifies a structural finding into an exclusion tier based on the issue
- * and description text, then returns a fully-populated ExclusionItem.
+ * Per-linear-foot labor + material rates by exclusion tier (US commercial, 2024).
+ * Applied when a measurement (laser or AI vision) provides linear footage.
  */
-export function classifyExclusionFinding(finding: {
-  id: number;
-  structuralIssue?: string | null;
-  description: string;
-  location?: string | null;
-  treatment?: string | null;
-}): ExclusionItem {
+export const PER_LINEAR_FT_RATE: Record<ExclusionTier, number> = {
+  minor:  22,  // caulk runs, gap sealing, weep-hole screens
+  medium: 48,  // pipe chases, vent screens, door sweep runs
+  major:  95,  // roofline sealing, soffit work, foundation trenching
+};
+
+/**
+ * Classifies a structural finding into an exclusion tier and returns a
+ * fully-populated ExclusionItem.
+ *
+ * Pricing priority (highest wins):
+ *   1. laserLinearFt — exact hardware measurement, most accurate
+ *   2. finding.measurementEstimate.linearFt — AI vision estimate
+ *   3. Tier midpoint fallback — no measurement available
+ */
+export function classifyExclusionFinding(
+  finding: {
+    id: number;
+    structuralIssue?: string | null;
+    description: string;
+    location?: string | null;
+    treatment?: string | null;
+    measurementEstimate?: MeasurementEstimate | null;
+  },
+  laserLinearFt?: number | null,
+): ExclusionItem {
   const text = `${finding.structuralIssue ?? ""} ${finding.description}`;
 
   let tier: ExclusionTier = "minor";
@@ -144,7 +185,7 @@ export function classifyExclusionFinding(finding: {
   else if (MEDIUM_KEYWORDS.test(text)) tier = "medium";
 
   const { min, max } = EXCLUSION_TIERS[tier];
-  const estimate = Math.round(((min + max) / 2) / 50) * 50; // round to nearest $50
+  const rate = PER_LINEAR_FT_RATE[tier];
 
   const defaultFix: Record<ExclusionTier, string> = {
     minor:  "Seal with commercial-grade caulk or install weep-hole screens",
@@ -152,15 +193,59 @@ export function classifyExclusionFinding(finding: {
     major:  "Structural sealing with heavy-duty mesh, sealant, and hardware cloth",
   };
 
+  // ── Measurement-based pricing ─────────────────────────────────────────────
+  if (laserLinearFt != null && laserLinearFt > 0) {
+    const raw = laserLinearFt * rate;
+    const estimate = Math.max(Math.round(raw / 50) * 50, min);
+    return {
+      id: String(finding.id),
+      defectDescription: finding.structuralIssue ?? finding.description,
+      location: finding.location ?? null,
+      tier,
+      estimate,
+      rangeMin: min,
+      rangeMax: max,
+      recommendedFix: finding.treatment ?? defaultFix[tier],
+      priceSource: "laser",
+      measurement: { linearFt: laserLinearFt, source: "laser", confidence: 1.0 },
+      perLinearFtRate: rate,
+    };
+  }
+
+  const aiLinearFt = finding.measurementEstimate?.linearFt;
+  if (aiLinearFt != null && aiLinearFt > 0 && (finding.measurementEstimate?.confidence ?? 0) >= 0.35) {
+    const raw = aiLinearFt * rate;
+    const estimate = Math.max(Math.round(raw / 50) * 50, min);
+    return {
+      id: String(finding.id),
+      defectDescription: finding.structuralIssue ?? finding.description,
+      location: finding.location ?? null,
+      tier,
+      estimate,
+      rangeMin: min,
+      rangeMax: max,
+      recommendedFix: finding.treatment ?? defaultFix[tier],
+      priceSource: "ai_estimate",
+      measurement: {
+        linearFt: aiLinearFt,
+        source: "ai_estimate",
+        confidence: finding.measurementEstimate?.confidence ?? 0,
+      },
+      perLinearFtRate: rate,
+    };
+  }
+
+  // ── Tier midpoint fallback ────────────────────────────────────────────────
   return {
     id: String(finding.id),
     defectDescription: finding.structuralIssue ?? finding.description,
     location: finding.location ?? null,
     tier,
-    estimate,
+    estimate: Math.round(((min + max) / 2) / 50) * 50,
     rangeMin: min,
     rangeMax: max,
     recommendedFix: finding.treatment ?? defaultFix[tier],
+    priceSource: "tier_default",
   };
 }
 

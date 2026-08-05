@@ -58,6 +58,16 @@ export interface Finding {
   harborage?: string | null;
   moisture?: string | null;
   structuralIssue?: string | null;
+  // AI-estimated physical dimensions of this structural defect. Populated by
+  // the vision model when it can infer dimensions from the photo. Laser sensor
+  // readings (from hardware) override these in the mobile pricing engine.
+  measurementEstimate?: {
+    linearFt?: number | null;
+    gapWidthIn?: number | null;
+    heightFt?: number | null;
+    confidence: number;
+    source: "ai_vision_estimate";
+  } | null;
   // Inspection zone this finding belongs to (slug from the zone-coverage
   // taxonomy), when the vision model could place it. Null / absent when the
   // scene was unclear — it simply doesn't count toward completeness.

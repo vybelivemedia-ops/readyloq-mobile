@@ -96,6 +96,15 @@ function userPrompt(technicianNote?: string | null): string {
     '- "possibleHarborage": harborage (nesting/shelter site) observed, else null',
     '- "possibleMoistureIssue": moisture problem observed (leak, standing water, damp material, condensation), else null',
     '- "possibleStructuralIssue": structural deficiency observed (gap, crack, hole, damaged material, failed seal), else null',
+    '- "measurementEstimate": ONLY when possibleStructuralIssue is non-null — estimate the physical dimensions',
+    '  of the defect using visible reference objects (door frame ≈ 7 ft tall, standard brick course ≈ 2.25 in,',
+    '  12-in floor tile, US electrical outlet ≈ 4.5 in × 2.75 in, hand-width ≈ 4 in) or structural norms.',
+    '  Return: {"linearFt":<number|null>,"gapWidthIn":<number|null>,"heightFt":<number|null>,"confidence":<0-1>,"source":"ai_vision_estimate"}',
+    '  linearFt: total run length of the defect (e.g. gap perimeter, roofline section); null if indeterminate.',
+    '  gapWidthIn: opening width in inches; null if no gap is clearly present.',
+    '  heightFt: height of the opening in feet; null if not applicable.',
+    '  Set confidence < 0.35 when no reference object or structural norm is visible in the frame.',
+    '  Return null (not the object) when possibleStructuralIssue is null.',
     '- "possibleEntryPoint": entry point observed, else null',
     '- "suggestedCorrectiveAction": one concise recommended corrective action, else null',
     '- "rationale": one short sentence explaining the classification',
@@ -106,6 +115,25 @@ function userPrompt(technicianNote?: string | null): string {
     "return null for that field rather than guessing.",
     ...noteClause,
   ].join("\n");
+}
+
+function asNumberOrNull(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return value;
+}
+
+function parseMeasurementEstimate(
+  raw: unknown,
+): AiPrediction["measurementEstimate"] {
+  if (raw === null || raw === undefined || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const confidence = typeof r.confidence === "number" ? Math.min(1, Math.max(0, r.confidence)) : 0;
+  const linearFt = asNumberOrNull(r.linearFt);
+  const gapWidthIn = asNumberOrNull(r.gapWidthIn);
+  const heightFt = asNumberOrNull(r.heightFt);
+  // Discard if the model returned the object but nothing is measured.
+  if (linearFt === null && gapWidthIn === null && heightFt === null) return null;
+  return { linearFt, gapWidthIn, heightFt, confidence, source: "ai_vision_estimate" };
 }
 
 function clampConfidence(value: unknown): number {
@@ -190,6 +218,7 @@ function parsePrediction(raw: string): AiPrediction | null {
     possibleHarborage: asStringOrNull(parsed.possibleHarborage),
     possibleMoistureIssue: asStringOrNull(parsed.possibleMoistureIssue),
     possibleStructuralIssue: asStringOrNull(parsed.possibleStructuralIssue),
+    measurementEstimate: parseMeasurementEstimate(parsed.measurementEstimate),
     zone: normalizeZone(parsed.zone),
     pestCandidates,
   };
