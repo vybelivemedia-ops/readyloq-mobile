@@ -29,6 +29,8 @@ import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSignOut } from "@/hooks/useSignOut";
+import { customFetch } from "@/lib/api-client/custom-fetch";
+import { getDashboardMetrics } from "@/lib/dashboard";
 import { useLicenseStatus } from "@/hooks/useLicenseStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { useViewPreference, resolveViewMode } from "@/hooks/useViewPreference";
@@ -467,6 +469,24 @@ export default function DashboardScreen() {
 
   const briefing = useQuery(getGetBriefingQueryOptions());
   const dash     = useQuery(getGetAnalyticsDashboardQueryOptions());
+
+  // Opportunities list — shares the ["leads"] cache with the Leads tab so no
+  // extra network request is made when that tab has already fetched the data.
+  // Used to compute pipeline KPIs client-side via getDashboardMetrics().
+  const { data: leadsData } = useQuery({
+    queryKey: ["leads"],
+    queryFn: () => customFetch<{ opportunities: Array<{ status: string; estimatedAnnualValue?: number | null }> }>("/api/opportunities"),
+    enabled: isOwner,
+  });
+
+  // Derive client-side metrics from the cached opportunity list.
+  // Exclude won/lost so openOpportunitiesCount reflects active pipeline only.
+  const pipelineMetrics = getDashboardMetrics(
+    (leadsData?.opportunities ?? [])
+      .filter((o) => o.status !== "won" && o.status !== "lost")
+      .map((o) => ({ pipelineValue: o.estimatedAnnualValue ?? undefined })),
+  );
+
   // License status — loaded for owners to surface subscription prompts/warnings.
   const { data: license } = useLicenseStatus(isOwner);
 
@@ -502,14 +522,14 @@ export default function DashboardScreen() {
           },
           {
             icon: "trending-up-outline" as const,
-            value: briefing.data.owner.kpis.openOpportunities,
+            value: pipelineMetrics.openOpportunitiesCount,
             label: "Open\nopps",
             tone: colors.info ?? "#3b82f6",
             onPress: () => { filterIntent.set("reports", "opportunities"); router.push("/(tabs)/reports" as Href); },
           },
           {
             icon: "cash-outline" as const,
-            value: formatPipelineValue(briefing.data.owner.kpis.pipelineValue),
+            value: pipelineMetrics.pipelineValueFormatted,
             label: "Pipeline\nvalue",
             tone: colors.primary,
             onPress: () => { filterIntent.set("reports", "opportunities"); router.push("/(tabs)/reports" as Href); },
@@ -544,7 +564,7 @@ export default function DashboardScreen() {
           },
           {
             icon: "trending-up-outline" as const,
-            value: briefing.data.owner.kpis.openOpportunities,
+            value: pipelineMetrics.openOpportunitiesCount,
             label: "Open\nopportunities",
             tone: colors.info ?? "#3b82f6",
             onPress: () => { filterIntent.set("reports", "opportunities"); router.push("/(tabs)/reports" as Href); },
