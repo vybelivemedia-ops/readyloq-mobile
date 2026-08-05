@@ -2,11 +2,17 @@
  * MeasurementDevicePanel — shows connected physical measurement instruments
  * and lets a technician take live readings directly from the inspection screen.
  *
- * ─── Task #90 — Live readings ────────────────────────────────────────────────
- * As soon as a sensor connects, the panel automatically starts a subscription
- * via provider.subscribe() and updates the displayed value every poll interval.
- * The "Stamp Reading" button records the current live value so it can be
- * associated with the active inspection.
+ * ─── Visibility ───────────────────────────────────────────────────────────────
+ * By default only active (connected or connecting) devices are rendered.
+ * When sensors are registered but none are active, a compact "tap to connect"
+ * row is shown instead of listing every sensor as "Disconnected".
+ * A toggle in the header reveals all available sensors when the technician
+ * wants to pair a new device mid-inspection.
+ *
+ * ─── Active count ─────────────────────────────────────────────────────────────
+ * `onActiveCountChange` fires whenever the number of connected/connecting
+ * devices changes, allowing the parent screen to adjust layout (e.g. expanding
+ * the camera pane when no sensor drawer is open).
  *
  * ─── Provider access ─────────────────────────────────────────────────────────
  * Reads sensor providers from the DeviceRegistry (category "sensor") via the
@@ -69,10 +75,10 @@ function readingLabel(reading: MeasurementReading): string {
 }
 
 function liveIndicatorColor(kind: MeasurementReading["kind"], value: number): string {
-  if (kind === "thickness"   && value >= 20) return "#ef4444"; // damp alarm
-  if (kind === "temperature" && value >= 30) return "#f59e0b"; // hot
+  if (kind === "thickness"   && value >= 20)   return "#ef4444"; // damp alarm
+  if (kind === "temperature" && value >= 30)   return "#f59e0b"; // hot
   if (kind === "co2"         && value >= 1000) return "#f59e0b"; // elevated
-  if (kind === "acoustic"    && value >= 700) return "#ef4444"; // high activity
+  if (kind === "acoustic"    && value >= 700)  return "#ef4444"; // high activity
   return "#22c55e";
 }
 
@@ -106,12 +112,14 @@ function usePulse(active: boolean) {
 // ─── Per-device row ───────────────────────────────────────────────────────────
 
 interface DeviceRowProps {
-  provider:            DeviceProvider;
-  measurementProvider: MeasurementDeviceProvider | undefined;
-  onStamp?:            (reading: MeasurementReading) => void;
+  provider:             DeviceProvider;
+  measurementProvider:  MeasurementDeviceProvider | undefined;
+  onStamp?:             (reading: MeasurementReading) => void;
+  /** Fires when this device's active state (connected OR connecting) changes. */
+  onConnectionChange?:  (id: string, isActive: boolean) => void;
 }
 
-function DeviceRow({ provider, measurementProvider, onStamp }: DeviceRowProps) {
+function DeviceRow({ provider, measurementProvider, onStamp, onConnectionChange }: DeviceRowProps) {
   const colors     = useColors();
   const tokens     = provider.capabilities.tokens;
 
@@ -123,6 +131,17 @@ function DeviceRow({ provider, measurementProvider, onStamp }: DeviceRowProps) {
 
   const unsubRef = useRef<(() => void) | null>(null);
   const pulseOpacity = usePulse(live);
+
+  // ── Report active state to panel ───────────────────────────────────────────
+
+  const isActive = connected || connecting;
+  const prevActiveRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (prevActiveRef.current !== isActive) {
+      prevActiveRef.current = isActive;
+      onConnectionChange?.(provider.id, isActive);
+    }
+  }, [isActive, provider.id, onConnectionChange]);
 
   // ── Subscription management ─────────────────────────────────────────────────
 
@@ -289,28 +308,97 @@ function DeviceRow({ provider, measurementProvider, onStamp }: DeviceRowProps) {
 interface MeasurementDevicePanelProps {
   /** Called when a technician stamps a live reading into the inspection. */
   onStamp?: (reading: MeasurementReading) => void;
+  /**
+   * Fired whenever the number of active (connected or connecting) devices
+   * changes. The parent screen uses this to expand the camera pane when
+   * no sensor drawer is open.
+   */
+  onActiveCountChange?: (count: number) => void;
 }
 
-export function MeasurementDevicePanel({ onStamp }: MeasurementDevicePanelProps = {}) {
+export function MeasurementDevicePanel({ onStamp, onActiveCountChange }: MeasurementDevicePanelProps = {}) {
   const { registry, plugin } = useDeviceRegistry();
+  const colors  = useColors();
   const sensors = registry.findByCategory("sensor");
 
+  // Track which device IDs are currently active (connected or connecting).
+  const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
+
+  // When true, all registered sensors are shown (including disconnected ones)
+  // so the technician can initiate a new connection mid-inspection.
+  const [showAll, setShowAll] = useState(false);
+
+  const handleConnectionChange = useCallback((id: string, isActive: boolean) => {
+    setActiveIds((prev) => {
+      const next = new Set(prev);
+      if (isActive) next.add(id); else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  // Notify parent of active count changes.
+  const activeCount = activeIds.size;
+  useEffect(() => {
+    onActiveCountChange?.(activeCount);
+  }, [activeCount, onActiveCountChange]);
+
+  // Nothing to show — no sensors registered at all.
   if (sensors.length === 0) return null;
+
+  // Collapse back to active-only view once the user has connected a device.
+  const inactiveCount = sensors.length - activeCount;
+  const visibleSensors = showAll ? sensors : sensors.filter((s) => activeIds.has(s.id));
 
   return (
     <View style={styles.panel}>
+      {/* Panel header — always visible */}
       <View style={styles.panelHeader}>
         <Ionicons name="hardware-chip-outline" size={16} color="#17c4d3" />
         <Text style={styles.panelTitle}>Measurement Devices</Text>
+
+        {/* "X available" toggle — shows when some sensors are inactive */}
+        {inactiveCount > 0 && (
+          <Pressable
+            onPress={() => setShowAll((v) => !v)}
+            style={styles.availableToggle}
+            hitSlop={8}
+          >
+            <Ionicons
+              name={showAll ? "chevron-up" : "add-circle-outline"}
+              size={15}
+              color={colors.mutedForeground}
+            />
+            <Text style={[styles.availableText, { color: colors.mutedForeground }]}>
+              {showAll ? "Hide inactive" : `${inactiveCount} available`}
+            </Text>
+          </Pressable>
+        )}
       </View>
-      {sensors.map((p) => (
+
+      {/* Active (and optionally all) device rows */}
+      {visibleSensors.map((p) => (
         <DeviceRow
           key={p.id}
           provider={p}
           measurementProvider={plugin.getMeasurementDevice(p.id)}
           onStamp={onStamp}
+          onConnectionChange={handleConnectionChange}
         />
       ))}
+
+      {/* Empty state — no active devices and "show all" is off */}
+      {visibleSensors.length === 0 && !showAll && (
+        <Pressable
+          onPress={() => setShowAll(true)}
+          style={[styles.emptyRow, { borderColor: colors.border }]}
+        >
+          <Ionicons name="bluetooth-outline" size={16} color={colors.mutedForeground} />
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+            No active sensors · tap to connect a device
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -318,13 +406,38 @@ export function MeasurementDevicePanel({ onStamp }: MeasurementDevicePanelProps 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  panel:        { gap: 10 },
-  panelHeader:  { flexDirection: "row", alignItems: "center", gap: 6 },
+  panel:       { gap: 10 },
+  panelHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   panelTitle: {
     color: "#17c4d3",
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     letterSpacing: 0.3,
+    flex: 1,
+  },
+  availableToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  availableText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+  },
+
+  emptyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: "dashed",
+  },
+  emptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    flex: 1,
   },
 
   row: {

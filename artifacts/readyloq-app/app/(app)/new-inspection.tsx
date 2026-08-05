@@ -130,6 +130,11 @@ export default function NewInspectionScreen() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // Active sensor count — drives split-screen flex weights.
+  // When sensors are connected the panel gets equal space with the camera;
+  // when none are docked the camera expands to fill more of the screen.
+  const [activeSensorCount, setActiveSensorCount] = useState(0);
+
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
 
@@ -1739,12 +1744,16 @@ export default function NewInspectionScreen() {
     );
 
     // ─── Expanded: AI Inspection Workspace (camera + live insights) ──────────
+    // Split-screen flex weights — camera expands when no sensor drawer is open.
+    const cameraFlex = activeSensorCount > 0 ? 1.2 : 1.5;
+    const panelFlex  = activeSensorCount > 0 ? 1   : 0.5;
+
     if (isWideScreen) {
       return (
         <Screen edges={["top", "bottom"]}>
           <View style={{ flex: 1, flexDirection: "row" }}>
             {/* Left: live camera pane — stays mounted while AI results update */}
-            <View style={{ flex: 1.2, backgroundColor: "#000" }}>
+            <View style={{ flex: cameraFlex, backgroundColor: "#000" }}>
               <View
                 style={{
                   flexDirection: "row",
@@ -1869,7 +1878,7 @@ export default function NewInspectionScreen() {
             </View>
 
             {/* Right: Co-Pilot HUD or AI Insights panel depending on mode */}
-            <View style={{ flex: 1, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: colors.border }}>
+            <View style={{ flex: panelFlex, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: colors.border }}>
               {mode === "copilot" ? (
                 <View style={{ flex: 1, flexDirection: "column" }}>
                   <CoPilotHUD
@@ -1906,7 +1915,7 @@ export default function NewInspectionScreen() {
                       padding: 12,
                     }}
                   >
-                    <MeasurementDevicePanel />
+                    <MeasurementDevicePanel onActiveCountChange={setActiveSensorCount} />
                   </View>
                 </View>
               ) : (
@@ -2278,7 +2287,7 @@ export default function NewInspectionScreen() {
                   padding: 12,
                 }}
               >
-                <MeasurementDevicePanel />
+                <MeasurementDevicePanel onActiveCountChange={setActiveSensorCount} />
               </View>
             </View>
           ) : (
