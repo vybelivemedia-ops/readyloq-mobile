@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { AnalysisResult, CoverageSnapshot, EvidenceSummary, Finding, GuidanceRecommendation, InspectionMemory, MemoryHighlight, Report } from "@/lib/api-client";
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "react-native";
 
 import { FindingCard } from "@/components/FindingCard";
 import { Badge } from "@/components/ui/Badge";
@@ -278,6 +278,8 @@ export function AiInsightsPanel({
 }: AiInsightsPanelProps) {
   const colors = useColors();
   const [tab, setTab] = useState<"insights" | "report" | "exclusion">("insights");
+  // Tracks which exclusion item's FAIE photo detail panel is open (by item id).
+  const [expandedAiChipId, setExpandedAiChipId] = useState<string | null>(null);
   const findings = analysis?.findings ?? [];
   const grouped = groupFindings(findings);
   const narrative = report?.aiNarrative ?? null;
@@ -326,7 +328,11 @@ export function AiInsightsPanel({
         .filter((f) => f.exclusionOpportunity === true || f.structuralIssue != null)
         .filter((f) => f.reviewStatus !== "dismissed")
         .map((f) => classifyExclusionFinding(
-          { ...f, measurementEstimate: (f as any).measurementEstimate ?? null },
+          {
+            ...f,
+            measurementEstimate: (f as any).measurementEstimate ?? null,
+            imageUrl: f.imageUrl ?? null,
+          },
           laserLinearFt,
         )),
     [findings, laserLinearFt],
@@ -1474,10 +1480,42 @@ export function AiInsightsPanel({
                             {formatDollar(item.estimate)}
                           </Text>
                           {item.measurement ? (
-                            <Text style={{ color: "#17c4d3", fontFamily: "Inter_500Medium", fontSize: 11 }}>
-                              {item.priceSource === "laser" ? "⚡" : "✦"}{" "}
-                              {item.measurement.linearFt.toFixed(1)} ft × ${item.perLinearFtRate}/ft
-                            </Text>
+                            item.priceSource === "ai_estimate" ? (
+                              /* ✦ chip — tappable to reveal FAIE photo detail */
+                              <Pressable
+                                onPress={() =>
+                                  setExpandedAiChipId(
+                                    expandedAiChipId === item.id ? null : item.id,
+                                  )
+                                }
+                                style={({ pressed }) => ({
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  gap: 3,
+                                  opacity: pressed ? 0.7 : 1,
+                                  backgroundColor:
+                                    expandedAiChipId === item.id
+                                      ? "rgba(79,127,255,0.12)"
+                                      : "transparent",
+                                  borderRadius: 4,
+                                  paddingHorizontal: 4,
+                                  paddingVertical: 2,
+                                })}
+                              >
+                                <Text style={{ color: "#4F7FFF", fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                                  ✦ {item.measurement.linearFt.toFixed(1)} ft × ${item.perLinearFtRate}/ft
+                                </Text>
+                                <Ionicons
+                                  name={expandedAiChipId === item.id ? "chevron-up" : "chevron-down"}
+                                  size={11}
+                                  color="#4F7FFF"
+                                />
+                              </Pressable>
+                            ) : (
+                              <Text style={{ color: "#17c4d3", fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                                ⚡ {item.measurement.linearFt.toFixed(1)} ft × ${item.perLinearFtRate}/ft
+                              </Text>
+                            )
                           ) : (
                             <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
                               range {formatDollar(item.rangeMin)} – {formatDollar(item.rangeMax)}
@@ -1485,6 +1523,114 @@ export function AiInsightsPanel({
                           )}
                         </View>
                       </View>
+
+                      {/* FAIE photo detail panel — expands when the ✦ chip is tapped */}
+                      {expandedAiChipId === item.id && item.priceSource === "ai_estimate" && item.measurement ? (() => {
+                        const confidencePct = Math.round(item.measurement.confidence * 100);
+                        const isLowConfidence = item.measurement.confidence < 0.5;
+                        return (
+                          <View
+                            style={{
+                              marginTop: 2,
+                              borderTopWidth: 1,
+                              borderTopColor: "rgba(79,127,255,0.2)",
+                              paddingTop: 10,
+                              gap: 10,
+                            }}
+                          >
+                            {/* Row: thumbnail + metadata */}
+                            <View style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }}>
+                              {/* Source photo thumbnail */}
+                              {item.photoUrl ? (
+                                <Image
+                                  source={{ uri: item.photoUrl }}
+                                  style={{
+                                    width: 72,
+                                    height: 72,
+                                    borderRadius: 8,
+                                    backgroundColor: colors.muted,
+                                  }}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View
+                                  style={{
+                                    width: 72,
+                                    height: 72,
+                                    borderRadius: 8,
+                                    backgroundColor: colors.muted,
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Ionicons name="image-outline" size={24} color={colors.mutedForeground} />
+                                </View>
+                              )}
+
+                              {/* Metadata */}
+                              <View style={{ flex: 1, gap: 6 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                                  <Ionicons name="eye-outline" size={13} color="#4F7FFF" />
+                                  <Text style={{ color: "#4F7FFF", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                                    FAIE scale analysis
+                                  </Text>
+                                </View>
+                                <View style={{ gap: 3 }}>
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                                      Scale reference:
+                                    </Text>
+                                    <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                                      AI Vision Estimate
+                                    </Text>
+                                  </View>
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                                      Confidence:
+                                    </Text>
+                                    <Text
+                                      style={{
+                                        color: isLowConfidence ? "#d97706" : "#16a34a",
+                                        fontFamily: "Inter_600SemiBold",
+                                        fontSize: 11,
+                                      }}
+                                    >
+                                      {confidencePct}%
+                                    </Text>
+                                  </View>
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                                      Estimate:
+                                    </Text>
+                                    <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 11 }}>
+                                      {item.measurement.linearFt.toFixed(1)} linear ft
+                                    </Text>
+                                  </View>
+                                </View>
+                              </View>
+                            </View>
+
+                            {/* Low-confidence advisory */}
+                            {isLowConfidence ? (
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "flex-start",
+                                  gap: 6,
+                                  backgroundColor: "rgba(217,119,6,0.08)",
+                                  borderRadius: 6,
+                                  padding: 8,
+                                }}
+                              >
+                                <Ionicons name="alert-circle-outline" size={13} color="#d97706" style={{ marginTop: 1 }} />
+                                <Text style={{ color: "#d97706", fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16, flex: 1 }}>
+                                  Low confidence — consider stamping a laser reading for accuracy.
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        );
+                      })() : null}
                     </Card>
                   );
                 })}

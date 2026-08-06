@@ -133,6 +133,11 @@ export interface ExclusionItem {
   };
   /** Per-linear-foot rate used (when measurement-based pricing applies). */
   perLinearFtRate?: number;
+  /**
+   * URL of the photo FAIE analyzed to produce the AI vision estimate.
+   * Only present when priceSource === "ai_estimate".
+   */
+  photoUrl?: string | null;
 }
 
 /** Market rate ranges per exclusion tier (commercial pest control, US 2024). */
@@ -175,6 +180,8 @@ export function classifyExclusionFinding(
     location?: string | null;
     treatment?: string | null;
     measurementEstimate?: MeasurementEstimate | null;
+    /** Storage URL of the photo FAIE analyzed (Finding.imageUrl). */
+    imageUrl?: string | null;
   },
   laserLinearFt?: number | null,
 ): ExclusionItem {
@@ -232,6 +239,7 @@ export function classifyExclusionFinding(
         confidence: finding.measurementEstimate?.confidence ?? 0,
       },
       perLinearFtRate: rate,
+      photoUrl: finding.imageUrl ?? null,
     };
   }
 
