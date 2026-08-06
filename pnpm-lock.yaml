@@ -728,6 +728,9 @@ importers:
 
   artifacts/readyloq-app:
     dependencies:
+      '@platform/agent-registry':
+        specifier: workspace:*
+        version: link:../../repos/platform/packages/agent-registry
       '@platform/camera-core':
         specifier: workspace:*
         version: link:../../repos/platform/packages/camera-core
@@ -1309,6 +1312,19 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.14
+
+  repos/platform/packages/agent-registry:
+    dependencies:
+      '@platform/core':
+        specifier: workspace:*
+        version: link:../core
+      '@platform/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
   repos/platform/packages/ai-core:
     dependencies:
