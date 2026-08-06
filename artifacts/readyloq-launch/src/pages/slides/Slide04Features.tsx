@@ -42,13 +42,19 @@ export default function Slide04Features() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2vw', padding: '1.8vh 2vw', backgroundColor: '#131726', border: '1px solid rgba(79,127,255,0.2)', borderRadius: '0.7vw', boxShadow: '0 0 0 1px rgba(79,127,255,0.1)' }}>
-            <div style={{ width: '3vw', height: '3vw', backgroundColor: 'rgba(79,127,255,0.2)', borderRadius: '0.5vw', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '2vw', padding: '1.8vh 2vw', backgroundColor: '#131726', border: '1px solid rgba(79,127,255,0.2)', borderRadius: '0.7vw', boxShadow: '0 0 0 1px rgba(79,127,255,0.1)' }}>
+            <div style={{ width: '3vw', height: '3vw', backgroundColor: 'rgba(79,127,255,0.2)', borderRadius: '0.5vw', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '0.3vh' }}>
               <div style={{ width: '1.4vw', height: '1.4vw', backgroundColor: '#4F7FFF', borderRadius: '50%' }} />
             </div>
             <div style={{ flex: 1 }}>
               <span style={{ fontSize: '1.3vw', fontWeight: 700, color: '#4F7FFF' }}>FAIE Vision AI</span>
-              <span style={{ fontSize: '1.2vw', fontWeight: 300, color: 'rgba(255,255,255,0.55)', marginLeft: '1vw' }}>— real-time inspection guidance via camera, zero manual input</span>
+              <span style={{ fontSize: '1.2vw', fontWeight: 300, color: 'rgba(255,255,255,0.55)', marginLeft: '1vw' }}>— real-time guidance, species detection, zero manual input</span>
+              <div style={{ marginTop: '0.6vh', display: 'flex', alignItems: 'center', gap: '0.6vw' }}>
+                <div style={{ width: '0.35vw', height: '0.35vw', borderRadius: '50%', backgroundColor: '#4F7FFF', opacity: 0.6 }} />
+                <span style={{ fontSize: '1vw', fontWeight: 400, color: 'rgba(255,255,255,0.38)' }}>
+                  AI Vision Estimation (Built-in) — snaps a defect photo, reads door frames &amp; tile grout as scale references, returns linear footage for your exclusion quote
+                </span>
+              </div>
             </div>
           </div>
 

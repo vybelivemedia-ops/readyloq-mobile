@@ -3,7 +3,7 @@ import { CtaSection } from "@/components/cta-section";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Shield, Brain, Users, LineChart, FileText, Smartphone } from "lucide-react";
+import { Shield, Brain, Users, LineChart, FileText, Smartphone, Ruler } from "lucide-react";
 import { asset } from "@/config";
 
 export default function Home() {
@@ -182,6 +182,11 @@ export default function Home() {
                 icon: <Users className="text-primary" size={32} />,
                 title: "Standardized Communication",
                 desc: "Ensure handoffs between technicians are seamless with structured notes and media."
+              },
+              {
+                icon: <Ruler className="text-primary" size={32} />,
+                title: "FAIE AI Vision Estimation",
+                desc: "Snap a photo of any structural defect and FAIE automatically measures linear footage using visible scale references — door frames, tiles, brick courses — with no external tools."
               }
             ].map((feature, i) => (
               <motion.div

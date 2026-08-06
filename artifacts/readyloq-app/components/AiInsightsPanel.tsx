@@ -1372,6 +1372,31 @@ export function AiInsightsPanel({
               </Card>
             ) : null}
 
+            {/* FAIE AI Vision Estimation banner — shown when at least one estimate
+                was calculated from scale references in the photo rather than a
+                laser device. Educates the tech on what the ✦ chip means. */}
+            {!laserReading && exclusionItems.some((i) => i.priceSource === "ai_estimate") ? (
+              <Card
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  borderColor: "rgba(79,127,255,0.35)",
+                  backgroundColor: "rgba(79,127,255,0.06)",
+                }}
+              >
+                <Ionicons name="eye-outline" size={16} color="#4F7FFF" style={{ marginTop: 1 }} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: "#4F7FFF", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                    FAIE AI Vision Estimation (Built-in)
+                  </Text>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16 }}>
+                    FAIE scanned scale references in your photos — door frames, tile grout, brick courses — to calculate linear footage for the estimates marked ✦. No external tools needed.
+                  </Text>
+                </View>
+              </Card>
+            ) : null}
+
             {exclusionItems.length === 0 ? (
               <Card style={{ gap: 8, alignItems: "center", paddingVertical: 24 }}>
                 <Ionicons name="shield-checkmark-outline" size={28} color={colors.mutedForeground} />

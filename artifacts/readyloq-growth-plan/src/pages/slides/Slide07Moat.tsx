@@ -45,6 +45,12 @@ export default function Slide07Moat() {
               <div style={{ width: '0.5vw', height: '0.5vw', borderRadius: '50%', backgroundColor: '#E84424', marginTop: '1vh', flexShrink: 0 }} />
               <p className="font-body" style={{ fontSize: '1.45vw', color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>Seasonal exclusion patterns by property type and region</p>
             </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.2vw' }}>
+              <div style={{ width: '0.5vw', height: '0.5vw', borderRadius: '50%', backgroundColor: '#E84424', marginTop: '1vh', flexShrink: 0 }} />
+              <p className="font-body" style={{ fontSize: '1.45vw', color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>
+                Built-in AI dimension estimation — scale references in field photos annotate real linear footage, training exclusion pricing accuracy no competitor can replicate
+              </p>
+            </div>
           </div>
 
           <div style={{ marginTop: 'auto', paddingTop: '3vh', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
