@@ -24,6 +24,7 @@ import { type Href, useRouter } from "expo-router";
 import React from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
+import { MissionControlDashboard } from "@/components/MissionControlDashboard";
 import { RoleBriefingView } from "@/components/briefing/RoleBriefingView";
 import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
@@ -586,6 +587,24 @@ export default function DashboardScreen() {
 
   // Header label for company.
   const companyName = user?.company?.name;
+
+  // ── Owner: Mission Control full-screen takeover ────────────────────────────
+  if (isOwner) {
+    return (
+      <MissionControlDashboard
+        firstName={firstName}
+        companyName={companyName}
+        isSoloOperator={isSoloOperator}
+        briefing={briefing.data}
+        briefingLoading={briefing.isLoading}
+        refreshing={briefing.isRefetching || dash.isRefetching}
+        pipelineMetrics={pipelineMetrics}
+        license={license}
+        onRefresh={onRefresh}
+        onSignOut={() => { void signOut(); }}
+      />
+    );
+  }
 
   return (
     <Screen>
