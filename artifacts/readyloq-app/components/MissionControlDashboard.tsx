@@ -37,6 +37,7 @@ import type {
   OwnerBriefingKpis,
   RoleBriefing,
 } from "@/lib/api-client";
+import type { AgentRegistryEntry } from "@platform/agent-registry";
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 
@@ -162,8 +163,68 @@ export interface MissionControlDashboardProps {
   refreshing:       boolean;
   pipelineMetrics:  { pipelineValueFormatted: string; openOpportunitiesCount: number };
   license:          LicenseStatus | null | undefined;
+  /** Live agent roster from @platform/agent-registry + VYBE_HQ sync. */
+  agents?:          AgentRegistryEntry[];
+  /** True when the last remote agent-status sync failed (agents still render from cache). */
+  agentsSyncFailed?: boolean;
   onRefresh:        () => void;
   onSignOut:        () => void;
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+// ─── Agent status helpers ─────────────────────────────────────────────────────
+
+function agentStatusColor(status: AgentRegistryEntry["status"]): string {
+  switch (status) {
+    case "active":  return MC.success;
+    case "busy":    return MC.info;
+    case "standby": return MC.warning;
+    case "offline": return MC.dimmer;
+  }
+}
+
+function agentStatusLabel(status: AgentRegistryEntry["status"]): string {
+  switch (status) {
+    case "active":  return "ACTIVE";
+    case "busy":    return "BUSY";
+    case "standby": return "STANDBY";
+    case "offline": return "OFFLINE";
+  }
+}
+
+// ─── Agent row ────────────────────────────────────────────────────────────────
+
+function AgentRow({ entry }: { entry: AgentRegistryEntry }) {
+  const { agent, status } = entry;
+  const color = agentStatusColor(status);
+  return (
+    <View style={styles.agentRow}>
+      {/* Avatar */}
+      <View style={[styles.agentAvatar, { backgroundColor: `${agent.accentColor}20`, borderColor: `${agent.accentColor}40` }]}>
+        <Text style={[styles.agentInitials, { color: agent.accentColor }]}>{agent.initials}</Text>
+      </View>
+
+      {/* Identity */}
+      <View style={{ flex: 1, gap: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={styles.agentName}>{agent.name}</Text>
+          {agent.isExecutionEngine ? (
+            <View style={[styles.agentEngineBadge, { backgroundColor: `${MC.accent}18`, borderColor: `${MC.accent}33` }]}>
+              <Text style={[styles.agentEngineBadgeText, { color: MC.accent }]}>ENGINE</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.agentRole}>{agent.role}</Text>
+      </View>
+
+      {/* Status dot + label */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+        <Text style={[styles.agentStatus, { color: color }]}>{agentStatusLabel(status)}</Text>
+      </View>
+    </View>
+  );
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -177,6 +238,8 @@ export function MissionControlDashboard({
   refreshing,
   pipelineMetrics,
   license,
+  agents,
+  agentsSyncFailed,
   onRefresh,
   onSignOut,
 }: MissionControlDashboardProps) {
@@ -433,6 +496,34 @@ export function MissionControlDashboard({
             <Text style={[styles.actionBtnText, { color: MC.accent }]}>Pipeline</Text>
           </Pressable>
         </View>
+
+        {/* ── VYBE Agents ─────────────────────────────────────────────────── */}
+        {agents && agents.length > 0 ? (
+          <>
+            <SectionLabel
+              right={
+                agentsSyncFailed ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="cloud-offline-outline" size={11} color={MC.dimmer} />
+                    <Text style={[styles.statusText, { color: MC.dimmer, fontSize: 10 }]}>CACHED</Text>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: MC.success }} />
+                    <Text style={[styles.statusText, { color: MC.success, fontSize: 10 }]}>LIVE</Text>
+                  </View>
+                )
+              }
+            >
+              AGENTS
+            </SectionLabel>
+            <View style={styles.agentList}>
+              {agents.map(entry => (
+                <AgentRow key={entry.agent.id} entry={entry} />
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {/* ── Daily briefing body ──────────────────────────────────────────── */}
         <SectionLabel>DAILY BRIEFING</SectionLabel>
@@ -693,4 +784,35 @@ const styles = StyleSheet.create({
 
   // Skeleton
   skeleton: { backgroundColor: MC.surface, borderRadius: 10, borderWidth: 1, borderColor: MC.border },
+
+  // Agents
+  agentList: { gap: 1, backgroundColor: MC.surface, borderRadius: 10, borderWidth: 1, borderColor: MC.border, overflow: "hidden" },
+  agentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: MC.border,
+  },
+  agentAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  agentInitials: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.5 },
+  agentName:     { color: MC.text, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  agentRole:     { color: MC.muted, fontFamily: "Inter_400Regular", fontSize: 11 },
+  agentStatus:   { fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 0.8 },
+  agentEngineBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
+    borderWidth: 1,
+  },
+  agentEngineBadgeText: { fontFamily: "Inter_700Bold", fontSize: 8, letterSpacing: 1 },
 });

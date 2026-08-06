@@ -1,0 +1,25 @@
+{
+  "name": "@platform/agent-registry",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared agent roster and runtime registry for the VYBE platform. Defines every named executive agent (Quinn, Ada Reeves, Mara Linde, …) plus Agent Zero as typed constants. Both ReadyLoq and VYBE_HQ import from here — no per-app agent re-definition.",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@platform/core": "workspace:*",
+    "@platform/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "types": "./dist/index.d.ts"
+}

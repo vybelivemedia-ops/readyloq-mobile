@@ -9,6 +9,7 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/shared-types" },
+    { "path": "./packages/agent-registry" },
     { "path": "./packages/ai-core" },
     { "path": "./packages/asset-core" },
     { "path": "./packages/camera-core" },

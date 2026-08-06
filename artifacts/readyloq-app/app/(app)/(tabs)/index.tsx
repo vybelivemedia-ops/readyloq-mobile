@@ -31,6 +31,7 @@ import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSignOut } from "@/hooks/useSignOut";
+import { useVybeAgents } from "@/hooks/useVybeAgents";
 import { getDashboardMetrics } from "@/lib/dashboard";
 import { useLicenseStatus } from "@/hooks/useLicenseStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
@@ -589,6 +590,8 @@ export default function DashboardScreen() {
   const companyName = user?.company?.name;
 
   // ── Owner: Mission Control full-screen takeover ────────────────────────────
+  const vybeAgents = useVybeAgents();
+
   if (isOwner) {
     return (
       <MissionControlDashboard
@@ -600,7 +603,9 @@ export default function DashboardScreen() {
         refreshing={briefing.isRefetching || dash.isRefetching}
         pipelineMetrics={pipelineMetrics}
         license={license}
-        onRefresh={onRefresh}
+        agents={vybeAgents.agents}
+        agentsSyncFailed={vybeAgents.syncFailed}
+        onRefresh={() => { onRefresh(); vybeAgents.refresh(); }}
         onSignOut={() => { void signOut(); }}
       />
     );

@@ -65,6 +65,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@platform/agent-registry": "workspace:*",
     "@platform/camera-core": "workspace:*",
     "react-native-ble-plx": "3.2.1",
     "@platform/device-core": "workspace:*",
