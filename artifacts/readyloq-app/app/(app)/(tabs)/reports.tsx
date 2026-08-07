@@ -3,8 +3,8 @@ import type { Report } from "@/lib/api-client";
 import { fetchReportsQueryOptions } from "@/lib/api-client/reports";
 import type { ReportQueryParams } from "@/lib/api-client/reports";
 import { useQuery } from "@tanstack/react-query";
-import { type Href, useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 
@@ -257,19 +257,27 @@ export default function ReportsScreen() {
   const [activeFilter, setActiveFilter] = useState<ReportFilter>("all");
   const [activeTimeframe, setActiveTimeframe] = useState<ReportTimeframe>("all");
 
-  /**
-   * useFocusEffect fires every time this tab comes into view — whether it was
-   * already mounted or freshly created. We consume the pending intent here so
-   * every dashboard deep-link lands on its mapped filter, including when the
-   * user has previously visited the Reports tab.
-   */
+  // ── Primary: URL params set by dashboard cards/alerts ──────────────────────
+  // useLocalSearchParams updates on every router.push(), even to an already-
+  // mounted tab — so this fires reliably regardless of focus state.
+  const { filter: filterParam, timeframe: timeframeParam } =
+    useLocalSearchParams<{ filter?: string; timeframe?: string }>();
+
+  useEffect(() => {
+    if (filterParam) {
+      setActiveFilter(filterParam as ReportFilter);
+      setActiveTimeframe((timeframeParam as ReportTimeframe) ?? "all");
+    }
+  }, [filterParam, timeframeParam]);
+
+  // ── Fallback: module-level intent store (backward compat) ───────────────────
   useFocusEffect(
     useCallback(() => {
       const f = filterIntent.consume("reports");
       const p = filterIntent.consumeParams("reports");
       if (f) setActiveFilter(f as ReportFilter);
       if (p?.timeframe) setActiveTimeframe(p.timeframe as ReportTimeframe);
-      else if (f) setActiveTimeframe("all"); // reset timeframe when a plain filter is set
+      else if (f) setActiveTimeframe("all");
     }, []),
   );
 

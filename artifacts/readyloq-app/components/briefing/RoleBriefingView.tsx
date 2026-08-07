@@ -82,8 +82,7 @@ function SalesSection({ data }: { data: NonNullable<RoleBriefing["sales"]> }) {
     router.push("/(tabs)/leads" as Href);
   };
   const toReports = (filter: string) => () => {
-    filterIntent.set("reports", filter);
-    router.push("/(tabs)/reports" as Href);
+    router.push({ pathname: "/(tabs)/reports", params: { filter } } as unknown as Href);
   };
   return (
     <>
@@ -146,8 +145,8 @@ function ManagerSection({ data }: { data: NonNullable<RoleBriefing["manager"]> }
       <StatGrid
         stats={[
           { label: "Pending approvals", value: data.pendingApprovals,              icon: "shield-checkmark-outline", tone: data.pendingApprovals > 0 ? colors.warning : colors.success, onPress: () => router.push("/(tabs)/review" as Href) },
-          { label: "Avg quality (30d)", value: data.team.avgQualityScore30d ?? "—", icon: "ribbon-outline",           tone: colors.primary,     onPress: () => { filterIntent.set("reports", "quality");   router.push("/(tabs)/reports" as Href); } },
-          { label: "High risk (30d)",   value: data.team.highRisk30d,              icon: "warning-outline",           tone: colors.destructive, onPress: () => { filterIntent.set("reports", "high_risk"); router.push("/(tabs)/reports" as Href); } },
+          { label: "Avg quality (30d)", value: data.team.avgQualityScore30d ?? "—", icon: "ribbon-outline",           tone: colors.primary,     onPress: () => { router.push({ pathname: "/(tabs)/reports", params: { filter: "quality"    } } as unknown as Href); } },
+          { label: "High risk (30d)",   value: data.team.highRisk30d,              icon: "warning-outline",           tone: colors.destructive, onPress: () => { router.push({ pathname: "/(tabs)/reports", params: { filter: "high_risk" } } as unknown as Href); } },
           { label: "Missed opps (30d)", value: data.team.missedOpportunities30d,   icon: "eye-off-outline",           tone: colors.info,        onPress: () => router.push("/(tabs)/reports" as Href) },
         ]}
       />
@@ -252,9 +251,10 @@ function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
   const colors = useColors();
   const router = useRouter();
 
-  const toReports = (filter: string) => () => {
-    filterIntent.set("reports", filter);
-    router.push("/(tabs)/reports" as Href);
+  const toReports = (filter: string, timeframe?: string) => () => {
+    const params: Record<string, string> = { filter };
+    if (timeframe) params.timeframe = timeframe;
+    router.push({ pathname: "/(tabs)/reports", params } as unknown as Href);
   };
 
   const severityTone = (severity: string) =>
@@ -292,14 +292,12 @@ function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
                   subtitle={alert.severity === "critical" ? "Tap to review · Critical" : alert.severity === "warning" ? "Tap to review · Warning" : "Tap to review"}
                   right={<Ionicons name="chevron-forward" size={16} color={severityTone(alert.severity)} />}
                   onPress={() => {
+                    const params: Record<string, string> = {};
                     if (intent) {
-                      if (intent.timeframe) {
-                        filterIntent.setWithParams("reports", intent.filter, { timeframe: intent.timeframe });
-                      } else {
-                        filterIntent.set("reports", intent.filter);
-                      }
+                      params.filter = intent.filter;
+                      if (intent.timeframe) params.timeframe = intent.timeframe;
                     }
-                    router.push("/(tabs)/reports" as Href);
+                    router.push({ pathname: "/(tabs)/reports", params } as unknown as Href);
                   }}
                 />
               );
