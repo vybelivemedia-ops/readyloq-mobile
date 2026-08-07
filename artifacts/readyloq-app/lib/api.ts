@@ -70,10 +70,29 @@ export interface CurrentCompany {
 export interface CurrentUser {
   id: number | string;
   clerkUserId: string;
+  /** Actual DB role — unchanged by impersonation. */
   role: string;
+  /** Active role after applying roleOverride (use this for UI gates). */
+  effectiveRole: string;
+  /** Non-null while the super admin is impersonating a role. */
+  roleOverride: string | null;
+  isSuperAdmin: boolean;
   companyId: number | null;
   betaAccess: boolean;
   company?: CurrentCompany | null;
+}
+
+export interface AdminUser {
+  id: number;
+  clerkUserId: string;
+  role: string;
+  roleOverride: string | null;
+  isSuperAdmin: boolean;
+  betaAccess: boolean;
+  companyId: number | null;
+  companyName: string | null;
+  createdAt: string;
+  lastSeenAt: string | null;
 }
 
 export function fetchCurrentUser(token: string | null, init?: RequestInit) {
@@ -92,6 +111,39 @@ export function acceptInvite(token: string | null, inviteToken: string) {
     method: "POST",
     body: JSON.stringify({ token: inviteToken }),
   });
+}
+
+// ─── Super-admin helpers ──────────────────────────────────────────────────────
+
+export function bootstrapSuperAdmin(token: string | null, bootstrapToken: string) {
+  return request<{ success: boolean; message: string; isSuperAdmin: boolean }>(
+    "/api/admin/bootstrap",
+    token,
+    { method: "POST", body: JSON.stringify({ token: bootstrapToken }) },
+  );
+}
+
+export function fetchAdminUsers(token: string | null) {
+  return request<AdminUser[]>("/api/admin/users", token);
+}
+
+export function patchAdminUser(
+  token: string | null,
+  userId: number,
+  updates: { role?: string; isSuperAdmin?: boolean; betaAccess?: boolean },
+) {
+  return request<AdminUser>(`/api/admin/users/${userId}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+}
+
+export function setRoleOverride(token: string | null, role: string | null) {
+  return request<{ success: boolean; roleOverride: string | null }>(
+    "/api/auth/me/role-override",
+    token,
+    { method: "POST", body: JSON.stringify({ role }) },
+  );
 }
 
 export interface UploadUrlResponse {

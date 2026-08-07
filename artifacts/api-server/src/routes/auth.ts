@@ -11,7 +11,7 @@ import {
   type UserRole,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
-import { requireAuth, requireRole, requireCompany } from "../middleware/require-auth";
+import { requireAuth, requireRole, requireCompany, requireSuperAdmin } from "../middleware/require-auth";
 
 const router: IRouter = Router();
 
@@ -70,10 +70,14 @@ router.get("/me", requireAuth, async (req, res) => {
         .where(eq(companiesTable.id, user.companyId));
       if (row) company = { id: row.id, name: row.name, slug: row.slug };
     }
+    const effectiveRole = (user.roleOverride ?? user.role) as string;
     return res.json({
       id: user.id,
       clerkUserId: user.clerkUserId,
       role: user.role,
+      effectiveRole,
+      roleOverride: user.roleOverride ?? null,
+      isSuperAdmin: user.isSuperAdmin,
       companyId: user.companyId,
       betaAccess: user.betaAccess,
       company,
@@ -81,6 +85,23 @@ router.get("/me", requireAuth, async (req, res) => {
   } catch {
     return res.status(500).json({ error: "Failed to load user" });
   }
+});
+
+// ── POST /me/role-override — super-admin role impersonation ───────────────────
+// Sets an ephemeral roleOverride on the calling user's account. Pass role: null
+// to clear the override and revert to the real DB role.
+router.post("/me/role-override", requireAuth, requireSuperAdmin, async (req, res) => {
+  const user = req.user!;
+  const { role } = req.body as { role: UserRole | null };
+  const VALID: UserRole[] = ["owner", "manager", "sales", "technician"];
+  if (role !== null && role !== undefined && !VALID.includes(role as UserRole)) {
+    return res.status(400).json({ error: `role must be one of: ${VALID.join(", ")} or null` });
+  }
+  await db
+    .update(usersTable)
+    .set({ roleOverride: role ?? null })
+    .where(eq(usersTable.id, user.id));
+  return res.json({ success: true, roleOverride: role ?? null });
 });
 
 // ── POST /company — create a company; caller becomes its owner ──────────────────

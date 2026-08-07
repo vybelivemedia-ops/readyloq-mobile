@@ -40,6 +40,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
+            <a href={`${APP_URL}/settings`} className="text-xs font-mono font-medium text-muted-foreground/40 hover:text-primary transition-colors" title="Platform Admin">
+              ⬡ Admin
+            </a>
             <a href={APP_URL} className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
               Log in
             </a>

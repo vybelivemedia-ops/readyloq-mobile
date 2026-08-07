@@ -62,16 +62,22 @@ const ROLE_RANK: Record<UserRole, number> = {
   owner: 3,
 };
 
+/** Returns the role the user is currently acting as (override wins over DB role). */
+function effectiveRole(user: User): UserRole {
+  return (user.roleOverride as UserRole | null | undefined) ?? user.role;
+}
+
 export const requireRole =
   (role: UserRole) => (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-    if (ROLE_RANK[req.user.role] < ROLE_RANK[role]) {
+    const acting = effectiveRole(req.user);
+    if (ROLE_RANK[acting] < ROLE_RANK[role]) {
       // Persist company-scoped auth failures for the Beta Center error monitor.
       if (req.user.companyId != null) {
         void logErrorEvent("auth", {
           companyId: req.user.companyId,
           userId: req.user.id,
-          message: `Forbidden: ${req.user.role} attempted a ${role}+ action`,
+          message: `Forbidden: ${acting} (effective) attempted a ${role}+ action`,
           context: { code: "forbidden", route: req.baseUrl },
         });
       }
@@ -79,6 +85,14 @@ export const requireRole =
     }
     return next();
   };
+
+/** Blocks anyone who is not a platform super admin. Bypasses roleOverride —
+ *  the isSuperAdmin flag is always read from the DB, never the effective role. */
+export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+  if (!req.user.isSuperAdmin) return res.status(403).json({ error: "Super admin access required" });
+  return next();
+};
 
 // Closed-beta access gate. Owners and managers ALWAYS pass (never lock out an
 // admin). A technician whose betaAccess was revoked from the Beta Center is
@@ -88,7 +102,7 @@ export const requireRole =
 // gated so a paused tester can still report problems.
 export const requireBetaAccess = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-  if (ROLE_RANK[req.user.role] >= ROLE_RANK.manager) return next();
+  if (ROLE_RANK[effectiveRole(req.user)] >= ROLE_RANK.manager) return next();
   if (req.user.betaAccess === false) {
     if (req.user.companyId != null) {
       void logErrorEvent("auth", {

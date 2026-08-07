@@ -34,6 +34,7 @@ import dailyRigRouter from "./daily-rig";
 import reviewQueueRouter from "./review-queue";
 import metaGlassesRouter from "./meta-glasses";
 import billingRouter from "./billing";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -172,5 +173,10 @@ router.use("/meta-glasses", metaGlassesRouter);
 // Billing — Stripe subscription management.
 // /plans is public; subscription/checkout/portal are Owner-only (enforced inside billingRouter).
 router.use("/billing", billingRouter);
+
+// Platform super-admin — cross-tenant account management and role impersonation.
+// /bootstrap is auth-only (protected by SUPER_ADMIN_BOOTSTRAP_TOKEN env var);
+// all other /admin routes additionally require requireSuperAdmin (enforced inside adminRouter).
+router.use("/admin", adminRouter);
 
 export default router;

@@ -21,6 +21,15 @@ export const usersTable = pgTable("users", {
   // Updated (throttled) by requireAuth so the Beta Center can show tester activity.
   lastSeenAt: timestamp("last_seen_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // ── Platform Admin ──────────────────────────────────────────────────────────
+  // Cross-tenant super admin flag. Grants access to /api/admin/* endpoints
+  // and the role-switcher utility. Granted via POST /api/admin/bootstrap.
+  isSuperAdmin: boolean("is_super_admin").notNull().default(false),
+  // Ephemeral role override for testing / impersonation. When set, requireRole
+  // uses this value instead of `role` so the super admin can verify technician,
+  // sales, manager, and owner experiences without a real account switch.
+  // Super-admin-only endpoints check `isSuperAdmin` directly, bypassing this.
+  roleOverride: text("role_override").$type<UserRole>(),
 });
 
 export type User = typeof usersTable.$inferSelect;
