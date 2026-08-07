@@ -4,6 +4,7 @@ import { ensureClerkNativeRedirectUrls } from "./lib/clerk-redirect-urls";
 import { ensureProductsSeed } from "@workspace/db";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./lib/stripeClient";
+import { backfillOpportunityValues } from "./lib/backfill-opportunity-values";
 
 const rawPort = process.env["PORT"];
 
@@ -56,6 +57,12 @@ app.listen(port, (err) => {
 
   // Initialize Stripe schema, webhook, and data backfill.
   void initStripe();
+
+  // Backfill estimatedAnnualValue for legacy opportunities that were created
+  // before the tier-fallback fix. Idempotent — only updates NULL rows.
+  void backfillOpportunityValues().catch((err) => {
+    logger.warn({ err }, "Opportunity value backfill failed — pipeline totals may be incomplete");
+  });
 
   // Idempotent product catalogue seed — inserts any missing seed products on
   // startup. Safe to run every boot; skips rows that already exist.

@@ -87212,8 +87212,8 @@ function parseCandidates(raw, validFindingIds) {
     const rationale = typeof o.rationale === "string" ? o.rationale.trim() : "";
     if (!title || !rationale) continue;
     if (/\$\s*\d|\d+\s*(?:dollars|usd)\b/i.test(`${title} ${rationale}`)) continue;
-    const tier = typeof o.estimatedValueTier === "string" ? o.estimatedValueTier : "";
-    if (!VALUE_TIERS.includes(tier)) continue;
+    const rawTier = typeof o.estimatedValueTier === "string" ? o.estimatedValueTier : "";
+    const tier = VALUE_TIERS.includes(rawTier) ? rawTier : "medium";
     const evidenceFindingIds = Array.isArray(o.evidenceFindingIds) ? o.evidenceFindingIds.filter((id) => typeof id === "number" && validFindingIds.has(id)) : [];
     if (evidenceFindingIds.length === 0) continue;
     out.push({
@@ -123310,6 +123310,67 @@ async function ensureClerkNativeRedirectUrls() {
 
 // src/index.ts
 import { runMigrations } from "stripe-replit-sync";
+
+// src/lib/backfill-opportunity-values.ts
+var OPEN_STATUSES3 = ["new", "reviewed", "quoted"];
+async function backfillOpportunityValues() {
+  const rows = await db.select({
+    id: opportunitiesTable.id,
+    propertyAddress: opportunitiesTable.propertyAddress,
+    estimatedValueTier: opportunitiesTable.estimatedValueTier,
+    riskLevel: opportunitiesTable.riskLevel,
+    status: opportunitiesTable.status,
+    // Profile may not exist; fall back to "residential" below.
+    propertyType: propertyProfilesTable.propertyType
+  }).from(opportunitiesTable).leftJoin(
+    propertyProfilesTable,
+    and(
+      eq(propertyProfilesTable.companyId, opportunitiesTable.companyId),
+      eq(propertyProfilesTable.siteAddress, opportunitiesTable.propertyAddress)
+    )
+  ).where(
+    and(
+      inArray(opportunitiesTable.status, OPEN_STATUSES3),
+      isNull(opportunitiesTable.estimatedAnnualValue)
+    )
+  );
+  if (rows.length === 0) {
+    logger2.info("backfillOpportunityValues: nothing to backfill");
+    return;
+  }
+  logger2.info({ count: rows.length }, "backfillOpportunityValues: starting");
+  let updated = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const propertyType = row.propertyType ?? "residential";
+    const tier = row.estimatedValueTier ?? "medium";
+    const riskLevel = row.riskLevel ?? null;
+    const value = calculateEstimatedAnnualValue({
+      propertyType,
+      tier,
+      riskLevel,
+      squareFootage: null
+      // not stored on the profile; pricing engine uses category default
+    });
+    const result = await db.update(opportunitiesTable).set({ estimatedAnnualValue: value, updatedAt: /* @__PURE__ */ new Date() }).where(
+      and(
+        eq(opportunitiesTable.id, row.id),
+        isNull(opportunitiesTable.estimatedAnnualValue)
+      )
+    ).returning({ id: opportunitiesTable.id });
+    if (result.length > 0) {
+      updated++;
+    } else {
+      skipped++;
+    }
+  }
+  logger2.info(
+    { updated, skipped, total: rows.length },
+    "backfillOpportunityValues: complete"
+  );
+}
+
+// src/index.ts
 var rawPort = process.env["PORT"];
 if (!rawPort) {
   throw new Error(
@@ -123350,6 +123411,9 @@ app_default.listen(port, (err) => {
   }
   logger2.info({ port }, "Server listening");
   void initStripe();
+  void backfillOpportunityValues().catch((err2) => {
+    logger2.warn({ err: err2 }, "Opportunity value backfill failed \u2014 pipeline totals may be incomplete");
+  });
   void ensureProductsSeed().catch((seedErr) => {
     logger2.warn({ err: seedErr }, "Product seed failed \u2014 catalogue may be incomplete");
   });
