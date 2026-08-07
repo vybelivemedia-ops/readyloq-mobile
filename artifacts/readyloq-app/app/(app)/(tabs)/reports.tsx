@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { getListReportsQueryOptions } from "@/lib/api-client";
 import type { Report } from "@/lib/api-client";
+import { fetchReportsQueryOptions } from "@/lib/api-client/reports";
+import type { ReportQueryParams } from "@/lib/api-client/reports";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
+
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 
 import { ReportDetail } from "@/components/ReportDetail";
@@ -26,6 +28,7 @@ type ReportFilter =
   | "7d"
   | "30d"
   | "high_risk"
+  | "critical_risk"
   | "quality"
   | "low_quality"
   | "pending_approvals"
@@ -34,11 +37,14 @@ type ReportFilter =
   | "proposal_sent"
   | "stale";
 
+type ReportTimeframe = "all" | "7d" | "30d";
+
 const FILTER_LABELS: Record<ReportFilter, string> = {
   all:               "All reports",
   "7d":              "Completed — last 7 days",
   "30d":             "Completed — last 30 days",
   high_risk:         "High & critical risk",
+  critical_risk:     "Critical risk",
   quality:           "Quality review",
   low_quality:       "Low quality (below 60)",
   pending_approvals: "Pending approval",
@@ -48,33 +54,33 @@ const FILTER_LABELS: Record<ReportFilter, string> = {
   stale:             "Stale pipeline",
 };
 
-const MS_7D  = 7  * 24 * 60 * 60 * 1000;
-const MS_30D = 30 * 24 * 60 * 60 * 1000;
+/**
+ * Translate UI filter state → server query params.
+ * The API applies these in the DB query so we never over-fetch.
+ * Informational filters ("quality", "opportunities", "stale") intentionally
+ * return {} so the server sends everything and we just show a context banner.
+ */
+function filterToParams(filter: ReportFilter, timeframe: ReportTimeframe): ReportQueryParams {
+  const params: ReportQueryParams = {};
 
-function applyFilter(reports: Report[], filter: ReportFilter): Report[] {
-  const now = Date.now();
+  // Timeframe overlay (applies on top of any filter)
+  if (timeframe === "7d")  params.sinceDays = 7;
+  if (timeframe === "30d") params.sinceDays = 30;
+
   switch (filter) {
-    case "7d":
-      return reports.filter((r) => now - new Date(r.createdAt).getTime() <= MS_7D);
-    case "30d":
-      return reports.filter((r) => now - new Date(r.createdAt).getTime() <= MS_30D);
-    case "high_risk":
-      return reports.filter((r) => r.severity === "high" || r.severity === "critical");
-    case "low_quality":
-      return reports.filter((r) => r.severity === "critical" || r.severity === "high");
-    case "pending_approvals":
-      return reports.filter((r) => r.status === "pending" || r.status === "draft");
-    case "approved":
-      return reports.filter((r) => r.status === "approved" || r.status === "complete");
-    case "proposal_sent":
-      return reports.filter((r) => r.status === "sent" || r.status === "proposal_sent");
-    // Informational — show all with a context banner
-    case "quality":
-    case "opportunities":
-    case "stale":
-    default:
-      return reports;
+    case "7d":             params.sinceDays = 7;                              break;
+    case "30d":            params.sinceDays = 30;                             break;
+    case "high_risk":      params.severity  = ["high", "critical"];           break;
+    case "critical_risk":  params.severity  = ["critical"];                   break;
+    case "low_quality":    params.severity  = ["critical", "high"];           break;
+    case "pending_approvals": params.status = ["pending", "draft"];           break;
+    case "approved":       params.status    = ["approved", "complete"];       break;
+    case "proposal_sent":  params.status    = ["sent", "proposal_sent"];      break;
+    // Informational — fetch all, show banner only
+    default: break;
   }
+
+  return params;
 }
 
 const INFORMATIONAL_FILTERS: ReportFilter[] = ["quality", "opportunities", "stale"];
@@ -249,6 +255,7 @@ export default function ReportsScreen() {
   const { sizeClass, isExpanded } = useWindowSizeClass();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReportFilter>("all");
+  const [activeTimeframe, setActiveTimeframe] = useState<ReportTimeframe>("all");
 
   /**
    * useFocusEffect fires every time this tab comes into view — whether it was
@@ -259,11 +266,22 @@ export default function ReportsScreen() {
   useFocusEffect(
     useCallback(() => {
       const f = filterIntent.consume("reports");
+      const p = filterIntent.consumeParams("reports");
       if (f) setActiveFilter(f as ReportFilter);
+      if (p?.timeframe) setActiveTimeframe(p.timeframe as ReportTimeframe);
+      else if (f) setActiveTimeframe("all"); // reset timeframe when a plain filter is set
     }, []),
   );
 
-  const { data, isLoading, isRefetching, refetch } = useQuery(getListReportsQueryOptions());
+  // Recompute server params whenever filter/timeframe changes.
+  // React Query re-fetches automatically when the query key changes.
+  const queryParams = useMemo(
+    () => filterToParams(activeFilter, activeTimeframe),
+    [activeFilter, activeTimeframe],
+  );
+  const { data, isLoading, isRefetching, refetch } = useQuery(
+    fetchReportsQueryOptions(queryParams),
+  );
 
   const numColumns = sizeClass === "medium" ? 2 : 1;
 
@@ -272,8 +290,9 @@ export default function ReportsScreen() {
     else router.push(`/report/${item.id}` as Href);
   };
 
-  const filtered = data ? applyFilter(data, activeFilter) : [];
-  const isFiltered = activeFilter !== "all";
+  // The server already applied filter + timeframe — no client-side post-processing.
+  const filtered = data ?? [];
+  const isFiltered = activeFilter !== "all" || activeTimeframe !== "all";
   const isInformational = INFORMATIONAL_FILTERS.includes(activeFilter);
 
   const renderItem = ({ item }: { item: Report }) => (

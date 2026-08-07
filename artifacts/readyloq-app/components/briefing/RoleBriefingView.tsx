@@ -240,12 +240,12 @@ const ALERT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   share_links_expiring: "link-outline",
 };
 
-/** Map each alert type to a reports filter param so owners land on relevant data. */
-const ALERT_FILTER: Record<string, string> = {
-  approvals_aging: "pending_approvals",
-  high_risk:       "high_risk",
-  quality_low:     "low_quality",
-  stale_pipeline:  "opportunities",
+/** Map each alert type to a reports filter + optional extra params. */
+const ALERT_FILTER: Record<string, { filter: string; timeframe?: string }> = {
+  approvals_aging: { filter: "pending_approvals" },
+  high_risk:       { filter: "critical_risk", timeframe: "30d" },
+  quality_low:     { filter: "low_quality" },
+  stale_pipeline:  { filter: "opportunities" },
 };
 
 function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
@@ -281,7 +281,7 @@ function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
         {data.alerts.length ? (
           <Card padded={false}>
             {data.alerts.map((alert, i) => {
-              const filterKey = ALERT_FILTER[alert.type];
+              const intent = ALERT_FILTER[alert.type];
               return (
                 <ListRow
                   key={`${alert.type}-${i}`}
@@ -290,8 +290,15 @@ function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
                   tone={severityTone(alert.severity)}
                   title={alert.message}
                   subtitle={alert.severity === "critical" ? "Tap to review · Critical" : alert.severity === "warning" ? "Tap to review · Warning" : "Tap to review"}
+                  right={<Ionicons name="chevron-forward" size={16} color={severityTone(alert.severity)} />}
                   onPress={() => {
-                    if (filterKey) filterIntent.set("reports", filterKey);
+                    if (intent) {
+                      if (intent.timeframe) {
+                        filterIntent.setWithParams("reports", intent.filter, { timeframe: intent.timeframe });
+                      } else {
+                        filterIntent.set("reports", intent.filter);
+                      }
+                    }
                     router.push("/(tabs)/reports" as Href);
                   }}
                 />

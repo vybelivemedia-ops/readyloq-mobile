@@ -11,11 +11,25 @@
  */
 
 const pending: Record<string, string | null> = {};
+const pendingParams: Record<string, Record<string, string> | null> = {};
 
 export const filterIntent = {
   /** Set a pending filter for the named screen ("reports" | "leads"). */
   set(screen: string, filter: string): void {
     pending[screen] = filter;
+  },
+
+  /**
+   * Set a pending filter AND extra params (e.g. timeframe) for the named
+   * screen. The extra params are consumed separately via `consumeParams`.
+   */
+  setWithParams(
+    screen: string,
+    filter: string,
+    extra: Record<string, string>,
+  ): void {
+    pending[screen] = filter;
+    pendingParams[screen] = extra;
   },
 
   /**
@@ -27,5 +41,15 @@ export const filterIntent = {
     const f = pending[screen] ?? null;
     pending[screen] = null;
     return f;
+  },
+
+  /**
+   * Read **and clear** the pending extra params (e.g. `{ timeframe: "30d" }`).
+   * Always call alongside `consume` so both sides stay in sync.
+   */
+  consumeParams(screen: string): Record<string, string> | null {
+    const p = pendingParams[screen] ?? null;
+    pendingParams[screen] = null;
+    return p;
   },
 };

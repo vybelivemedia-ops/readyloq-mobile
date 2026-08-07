@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router32;
+    module.exports = Router33;
     module.exports.Route = Route;
-    function Router32(options) {
-      if (!(this instanceof Router32)) {
-        return new Router32(options);
+    function Router33(options) {
+      if (!(this instanceof Router33)) {
+        return new Router33(options);
       }
       const opts = options || {};
-      function router32(req, res, next) {
-        router32.handle(req, res, next);
+      function router33(req, res, next) {
+        router33.handle(req, res, next);
       }
-      Object.setPrototypeOf(router32, this);
-      router32.caseSensitive = opts.caseSensitive;
-      router32.mergeParams = opts.mergeParams;
-      router32.params = {};
-      router32.strict = opts.strict;
-      router32.stack = [];
-      return router32;
+      Object.setPrototypeOf(router33, this);
+      router33.caseSensitive = opts.caseSensitive;
+      router33.mergeParams = opts.mergeParams;
+      router33.params = {};
+      router33.strict = opts.strict;
+      router33.stack = [];
+      return router33;
     }
-    Router32.prototype = function() {
+    Router33.prototype = function() {
     };
-    Router32.prototype.param = function param(name, fn) {
+    Router33.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router32.prototype.handle = function handle(req, res, callback) {
+    Router33.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router32.prototype.use = function use(handler) {
+    Router33.prototype.use = function use(handler) {
       let offset = 0;
       let path4 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router32.prototype.route = function route(path4) {
+    Router33.prototype.route = function route(path4) {
       const route2 = new Route(path4);
       const layer = new Layer(path4, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router32.prototype[method] = function(path4) {
+      Router33.prototype[method] = function(path4) {
         const route = this.route(path4);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router32 = require_router();
+    var Router33 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router32 = null;
+      var router33 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router32 === null) {
-            router32 = new Router32({
+          if (router33 === null) {
+            router33 = new Router33({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router32;
+          return router33;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router32 = this.router;
+      var router33 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router32.use(path4, fn2);
+          return router33.use(path4, fn2);
         }
         debug7(".use app under %s", path4);
         fn2.mountpath = path4;
         fn2.parent = this;
-        router32.use(path4, function mounted_app(req, res, next) {
+        router33.use(path4, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter3 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router32 = require_router();
+    var Router33 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router32.Route;
-    exports.Router = Router32;
+    exports.Route = Router33.Route;
+    exports.Router = Router33;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express33 = __toESM(require_express2(), 1);
+var import_express34 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router32 = config2.router;
-  if (isPlainObject(router32)) {
-    newTarget = getTargetFromProxyTable(req, router32);
-  } else if (typeof router32 === "function") {
-    newTarget = await router32(req, res, config2);
+  const router33 = config2.router;
+  if (isPlainObject(router33)) {
+    newTarget = getTargetFromProxyTable(req, router33);
+  } else if (typeof router33 === "function") {
+    newTarget = await router33(req, res, config2);
   }
   return newTarget;
 }
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express31 = __toESM(require_express2(), 1);
+var import_express32 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -69048,7 +69048,16 @@ var usersTable = pgTable("users", {
   betaAccess: boolean("beta_access").notNull().default(true),
   // Updated (throttled) by requireAuth so the Beta Center can show tester activity.
   lastSeenAt: timestamp("last_seen_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow()
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  // ── Platform Admin ──────────────────────────────────────────────────────────
+  // Cross-tenant super admin flag. Grants access to /api/admin/* endpoints
+  // and the role-switcher utility. Granted via POST /api/admin/bootstrap.
+  isSuperAdmin: boolean("is_super_admin").notNull().default(false),
+  // Ephemeral role override for testing / impersonation. When set, requireRole
+  // uses this value instead of `role` so the super admin can verify technician,
+  // sales, manager, and owner experiences without a real account switch.
+  // Super-admin-only endpoints check `isSuperAdmin` directly, bypassing this.
+  roleOverride: text("role_override").$type()
 });
 
 // ../../lib/db/src/schema/properties.ts
@@ -70224,14 +70233,18 @@ var ROLE_RANK = {
   manager: 2,
   owner: 3
 };
+function effectiveRole(user) {
+  return user.roleOverride ?? user.role;
+}
 var requireRole = (role) => (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-  if (ROLE_RANK[req.user.role] < ROLE_RANK[role]) {
+  const acting = effectiveRole(req.user);
+  if (ROLE_RANK[acting] < ROLE_RANK[role]) {
     if (req.user.companyId != null) {
       void logErrorEvent("auth", {
         companyId: req.user.companyId,
         userId: req.user.id,
-        message: `Forbidden: ${req.user.role} attempted a ${role}+ action`,
+        message: `Forbidden: ${acting} (effective) attempted a ${role}+ action`,
         context: { code: "forbidden", route: req.baseUrl }
       });
     }
@@ -70239,9 +70252,14 @@ var requireRole = (role) => (req, res, next) => {
   }
   return next();
 };
+var requireSuperAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+  if (!req.user.isSuperAdmin) return res.status(403).json({ error: "Super admin access required" });
+  return next();
+};
 var requireBetaAccess = (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-  if (ROLE_RANK[req.user.role] >= ROLE_RANK.manager) return next();
+  if (ROLE_RANK[effectiveRole(req.user)] >= ROLE_RANK.manager) return next();
   if (req.user.betaAccess === false) {
     if (req.user.companyId != null) {
       void logErrorEvent("auth", {
@@ -76808,10 +76826,14 @@ router2.get("/me", requireAuth, async (req, res) => {
       const [row] = await db.select().from(companiesTable).where(eq(companiesTable.id, user.companyId));
       if (row) company = { id: row.id, name: row.name, slug: row.slug };
     }
+    const effectiveRole2 = user.roleOverride ?? user.role;
     return res.json({
       id: user.id,
       clerkUserId: user.clerkUserId,
       role: user.role,
+      effectiveRole: effectiveRole2,
+      roleOverride: user.roleOverride ?? null,
+      isSuperAdmin: user.isSuperAdmin,
       companyId: user.companyId,
       betaAccess: user.betaAccess,
       company
@@ -76819,6 +76841,16 @@ router2.get("/me", requireAuth, async (req, res) => {
   } catch {
     return res.status(500).json({ error: "Failed to load user" });
   }
+});
+router2.post("/me/role-override", requireAuth, requireSuperAdmin, async (req, res) => {
+  const user = req.user;
+  const { role } = req.body;
+  const VALID = ["owner", "manager", "sales", "technician"];
+  if (role !== null && role !== void 0 && !VALID.includes(role)) {
+    return res.status(400).json({ error: `role must be one of: ${VALID.join(", ")} or null` });
+  }
+  await db.update(usersTable).set({ roleOverride: role ?? null }).where(eq(usersTable.id, user.id));
+  return res.json({ success: true, roleOverride: role ?? null });
 });
 router2.post("/company", requireAuth, async (req, res) => {
   const user = req.user;
@@ -90088,6 +90120,23 @@ function serializeReport(row, pipelineValue) {
 router6.get("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
+    const severityParam = typeof req.query.severity === "string" ? req.query.severity : null;
+    const statusParam = typeof req.query.status === "string" ? req.query.status : null;
+    const sinceDaysParam = typeof req.query.since_days === "string" ? req.query.since_days : null;
+    const severityValues = severityParam ? severityParam.split(",").filter(Boolean) : null;
+    const statusValues = statusParam ? statusParam.split(",").filter(Boolean) : null;
+    const sinceDays = sinceDaysParam ? parseInt(sinceDaysParam, 10) : null;
+    const conditions = [eq(reportsTable.companyId, companyId)];
+    if (severityValues?.length) {
+      conditions.push(inArray(reportsTable.severity, severityValues));
+    }
+    if (statusValues?.length) {
+      conditions.push(inArray(reportsTable.status, statusValues));
+    }
+    if (sinceDays != null && !isNaN(sinceDays) && sinceDays > 0) {
+      const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1e3);
+      conditions.push(gte(reportsTable.createdAt, since));
+    }
     const rows = await db.select({
       report: reportsTable,
       pipelineValue: opportunitiesTable.estimatedAnnualValue
@@ -90097,7 +90146,7 @@ router6.get("/", async (req, res) => {
         eq(opportunitiesTable.inspectionId, reportsTable.inspectionId),
         eq(opportunitiesTable.companyId, reportsTable.companyId)
       )
-    ).where(eq(reportsTable.companyId, companyId)).orderBy(desc(reportsTable.createdAt));
+    ).where(and(...conditions)).orderBy(desc(reportsTable.createdAt));
     return res.json(rows.map((r) => serializeReport(r.report, r.pipelineValue)));
   } catch (err) {
     return res.status(500).json({ error: "Failed to list reports" });
@@ -122684,19 +122733,92 @@ router29.post("/portal", ...ownerOnly, async (req, res) => {
 });
 var billing_default = router29;
 
-// src/routes/index.ts
+// src/routes/admin.ts
+var import_express31 = __toESM(require_express2(), 1);
 var router30 = (0, import_express31.Router)();
-router30.use(health_default);
-router30.use("/auth", auth_default);
-router30.use(storage_default);
-router30.use("/leads", leads_default);
-router30.use("/share", share_default);
-router30.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router30.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router30.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router30.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router30.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router30.use(
+var VALID_ROLES = ["owner", "manager", "sales", "technician"];
+router30.post("/bootstrap", requireAuth, async (req, res) => {
+  const envToken = process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN;
+  if (!envToken) {
+    return res.status(503).json({ error: "Bootstrap token not configured" });
+  }
+  const { token } = req.body;
+  if (!token || token !== envToken) {
+    return res.status(403).json({ error: "Invalid bootstrap token" });
+  }
+  const user = req.user;
+  const [updated] = await db.update(usersTable).set({ isSuperAdmin: true }).where(eq(usersTable.id, user.id)).returning();
+  return res.json({
+    success: true,
+    message: "Super admin access granted",
+    isSuperAdmin: updated.isSuperAdmin
+  });
+});
+router30.get("/users", requireAuth, requireSuperAdmin, async (_req, res) => {
+  const rows = await db.select({
+    id: usersTable.id,
+    clerkUserId: usersTable.clerkUserId,
+    role: usersTable.role,
+    roleOverride: usersTable.roleOverride,
+    isSuperAdmin: usersTable.isSuperAdmin,
+    betaAccess: usersTable.betaAccess,
+    companyId: usersTable.companyId,
+    companyName: companiesTable.name,
+    createdAt: usersTable.createdAt,
+    lastSeenAt: usersTable.lastSeenAt
+  }).from(usersTable).leftJoin(companiesTable, eq(usersTable.companyId, companiesTable.id)).orderBy(usersTable.createdAt);
+  return res.json(
+    rows.map((r) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+      lastSeenAt: r.lastSeenAt ? r.lastSeenAt.toISOString() : null
+    }))
+  );
+});
+router30.patch("/users/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+  const userId = parseInt(req.params["id"], 10);
+  if (isNaN(userId)) return res.status(400).json({ error: "Invalid user id" });
+  const { role, isSuperAdmin, betaAccess } = req.body;
+  const updates = {};
+  if (role !== void 0) {
+    if (!VALID_ROLES.includes(role)) {
+      return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(", ")}` });
+    }
+    updates.role = role;
+  }
+  if (typeof isSuperAdmin === "boolean") updates.isSuperAdmin = isSuperAdmin;
+  if (typeof betaAccess === "boolean") updates.betaAccess = betaAccess;
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "No valid fields to update" });
+  }
+  const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, userId)).returning();
+  if (!updated) return res.status(404).json({ error: "User not found" });
+  return res.json({
+    id: updated.id,
+    clerkUserId: updated.clerkUserId,
+    role: updated.role,
+    roleOverride: updated.roleOverride,
+    isSuperAdmin: updated.isSuperAdmin,
+    betaAccess: updated.betaAccess,
+    companyId: updated.companyId,
+    createdAt: updated.createdAt.toISOString()
+  });
+});
+var admin_default = router30;
+
+// src/routes/index.ts
+var router31 = (0, import_express32.Router)();
+router31.use(health_default);
+router31.use("/auth", auth_default);
+router31.use(storage_default);
+router31.use("/leads", leads_default);
+router31.use("/share", share_default);
+router31.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router31.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router31.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router31.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router31.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router31.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -122704,17 +122826,17 @@ router30.use(
   requireRole("manager"),
   intelligence_default
 );
-router30.use(
+router31.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router30.use("/branding", branding_default);
-router30.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router30.use("/beta", requireAuth, requireCompany, beta_default);
-router30.use(
+router31.use("/branding", branding_default);
+router31.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router31.use("/beta", requireAuth, requireCompany, beta_default);
+router31.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -122722,7 +122844,7 @@ router30.use(
   requireRole("sales"),
   opportunities_default
 );
-router30.use(
+router31.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -122730,7 +122852,7 @@ router30.use(
   requireRole("manager"),
   scorecards_default
 );
-router30.use(
+router31.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -122738,8 +122860,8 @@ router30.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router30.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router30.use(
+router31.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router31.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -122747,23 +122869,23 @@ router30.use(
   requireRole("sales"),
   proposals_default
 );
-router30.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router30.use(
+router31.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router31.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-router30.use("/products", requireAuth, requireBetaAccess, products_default);
-router30.use(
+router31.use("/products", requireAuth, requireBetaAccess, products_default);
+router31.use(
   "/inspections/:inspectionId/treatment-logs",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   treatment_logs_default
 );
-router30.use(
+router31.use(
   "/crm",
   requireAuth,
   requireCompany,
@@ -122771,8 +122893,8 @@ router30.use(
   requireRole("manager"),
   crm_default
 );
-router30.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
-router30.use(
+router31.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
+router31.use(
   "/review-queue",
   requireAuth,
   requireCompany,
@@ -122780,12 +122902,13 @@ router30.use(
   requireRole("manager"),
   review_queue_default
 );
-router30.use("/meta-glasses", meta_glasses_default);
-router30.use("/billing", billing_default);
-var routes_default = router30;
+router31.use("/meta-glasses", meta_glasses_default);
+router31.use("/billing", billing_default);
+router31.use("/admin", admin_default);
+var routes_default = router31;
 
 // src/routes/faie.ts
-var import_express32 = __toESM(require_express2(), 1);
+var import_express33 = __toESM(require_express2(), 1);
 
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
@@ -122806,7 +122929,7 @@ var logger2 = (0, import_pino.default)({
 });
 
 // src/routes/faie.ts
-var router31 = (0, import_express32.Router)();
+var router32 = (0, import_express33.Router)();
 var storage2 = new ObjectStorageService();
 var DatasetIngestBody = external_exports.object({
   companyId: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
@@ -122839,7 +122962,7 @@ function toCompanyId(raw) {
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 }
-router31.post("/dataset/ingest", async (req, res) => {
+router32.post("/dataset/ingest", async (req, res) => {
   const parsed = DatasetIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -122864,7 +122987,7 @@ router31.post("/dataset/ingest", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-router31.post("/training/ingest-global", async (req, res) => {
+router32.post("/training/ingest-global", async (req, res) => {
   const parsed = GlobalIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -122889,7 +123012,7 @@ router31.post("/training/ingest-global", async (req, res) => {
   }
 });
 var PLATFORM_COMPANY_ID = 0;
-router31.post("/training/ingest-anonymized", async (req, res) => {
+router32.post("/training/ingest-anonymized", async (req, res) => {
   const parsed = AnonymizedIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -122913,7 +123036,7 @@ router31.post("/training/ingest-anonymized", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-var faie_default = router31;
+var faie_default = router32;
 
 // src/lib/webhookHandlers.ts
 var WebhookHandlers = class _WebhookHandlers {
@@ -123034,7 +123157,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // src/app.ts
-var app = (0, import_express33.default)();
+var app = (0, import_express34.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -123087,7 +123210,7 @@ app.use(
 );
 app.post(
   "/api/stripe/webhook",
-  import_express33.default.raw({ type: "application/json" }),
+  import_express34.default.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -123107,9 +123230,9 @@ app.post(
     }
   }
 );
-app.use("/v1/faie", import_express33.default.json({ limit: "20mb" }), faie_default);
-app.use(import_express33.default.json());
-app.use(import_express33.default.urlencoded({ extended: true }));
+app.use("/v1/faie", import_express34.default.json({ limit: "20mb" }), faie_default);
+app.use(import_express34.default.json());
+app.use(import_express34.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(

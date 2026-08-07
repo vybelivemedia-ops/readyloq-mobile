@@ -8,7 +8,7 @@ import {
   customerSummariesTable,
   opportunitiesTable,
 } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray, gte } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import {
   generateReportNarrative,
@@ -34,13 +34,39 @@ function serializeReport(
 }
 
 // GET /reports
+// Supports optional server-side filtering via query params:
+//   ?severity=high,critical   — filter by one or more severity values
+//   ?status=pending,draft     — filter by one or more status values
+//   ?since_days=30            — restrict to reports created in the last N days
 // Left-joins the linked opportunity so each report carries `pipelineValue`
 // (the auto-populated estimatedAnnualValue from the pricing engine).
-// The client uses this for the owner home screen KPI strip without a separate
-// /opportunities request.
 router.get("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
+
+    // Parse optional filter params
+    const severityParam  = typeof req.query.severity   === "string" ? req.query.severity   : null;
+    const statusParam    = typeof req.query.status     === "string" ? req.query.status     : null;
+    const sinceDaysParam = typeof req.query.since_days === "string" ? req.query.since_days : null;
+
+    const severityValues = severityParam  ? severityParam.split(",").filter(Boolean)  : null;
+    const statusValues   = statusParam    ? statusParam.split(",").filter(Boolean)    : null;
+    const sinceDays      = sinceDaysParam ? parseInt(sinceDaysParam, 10)              : null;
+
+    // Build WHERE conditions
+    const conditions = [eq(reportsTable.companyId, companyId)];
+    if (severityValues?.length) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      conditions.push(inArray(reportsTable.severity as any, severityValues));
+    }
+    if (statusValues?.length) {
+      conditions.push(inArray(reportsTable.status, statusValues));
+    }
+    if (sinceDays != null && !isNaN(sinceDays) && sinceDays > 0) {
+      const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+      conditions.push(gte(reportsTable.createdAt, since));
+    }
+
     const rows = await db
       .select({
         report: reportsTable,
@@ -54,7 +80,7 @@ router.get("/", async (req, res) => {
           eq(opportunitiesTable.companyId, reportsTable.companyId),
         ),
       )
-      .where(eq(reportsTable.companyId, companyId))
+      .where(and(...conditions))
       .orderBy(desc(reportsTable.createdAt));
     return res.json(rows.map((r) => serializeReport(r.report, r.pipelineValue)));
   } catch (err) {
