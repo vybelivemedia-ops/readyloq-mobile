@@ -1,7 +1,7 @@
 import { Seo } from "@/components/seo";
 import { CtaSection } from "@/components/cta-section";
 import { motion } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Ruler } from "lucide-react";
 import { asset } from "@/config";
 
 export default function Features() {
@@ -9,7 +9,7 @@ export default function Features() {
     <>
       <Seo 
         title="Features | ReadyLoq" 
-        description="Explore the features of ReadyLoq's property intelligence platform: knowledge retention, reporting, and operational visibility."
+        description="Explore ReadyLoq's features: AI-powered FAIE vision estimation, property intelligence records, white-labeled reporting, and operational visibility for field service teams."
       />
       
       <section className="pt-24 pb-16 bg-slate-50 border-b border-slate-200">
@@ -135,6 +135,60 @@ export default function Features() {
                   ))}
                 </ul>
               </div>
+            </div>
+
+            {/* Feature 4 — FAIE AI Vision Estimation */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+              <div>
+                <h2 className="text-sm font-mono text-primary font-bold uppercase tracking-wider mb-3">AI Estimation</h2>
+                <h3 className="text-3xl font-bold mb-6 text-slate-900">FAIE AI Vision Estimation</h3>
+                <p className="text-lg text-slate-600 mb-6">
+                  Snap a photo of any structural defect and FAIE handles the measuring for you. The AI detects natural scale references already present in the scene — door frames, tile grids, brick courses — and derives accurate linear footage without any external tools.
+                </p>
+                <ul className="space-y-4">
+                  {[
+                    "Instant footage estimate from a single photo",
+                    "Automatic scale reference detection — no tape measure needed",
+                    "On-the-spot exclusion quote generated in the field",
+                    "Technician can review and correct before it hits the report"
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <CheckCircle2 className="text-primary mt-1" size={20} />
+                      <span className="text-slate-700">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+              >
+                <div className="bg-slate-900 rounded-2xl aspect-video flex flex-col items-center justify-center border border-slate-700 shadow-inner overflow-hidden p-8 gap-6">
+                  {/* Simulated camera viewfinder */}
+                  <div className="relative w-full flex-1 rounded-xl border-2 border-primary/60 bg-slate-800 flex items-center justify-center overflow-hidden">
+                    {/* Corner brackets */}
+                    <span className="absolute top-2 left-2 w-5 h-5 border-t-2 border-l-2 border-primary rounded-tl" />
+                    <span className="absolute top-2 right-2 w-5 h-5 border-t-2 border-r-2 border-primary rounded-tr" />
+                    <span className="absolute bottom-2 left-2 w-5 h-5 border-b-2 border-l-2 border-primary rounded-bl" />
+                    <span className="absolute bottom-2 right-2 w-5 h-5 border-b-2 border-r-2 border-primary rounded-br" />
+                    {/* Ruler icon */}
+                    <div className="flex flex-col items-center gap-2 opacity-70">
+                      <Ruler className="text-primary" size={40} />
+                      <span className="text-xs text-primary font-mono tracking-widest uppercase">Measuring…</span>
+                    </div>
+                    {/* Simulated measurement overlay */}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-primary/90 text-white text-xs font-mono px-3 py-1 rounded-full whitespace-nowrap">
+                      14.3 linear ft detected
+                    </div>
+                  </div>
+                  {/* Quote chip */}
+                  <div className="w-full bg-slate-800 rounded-xl px-5 py-3 flex items-center justify-between border border-slate-700">
+                    <span className="text-slate-400 text-sm">Exclusion estimate</span>
+                    <span className="text-white font-bold font-mono">$1,287</span>
+                  </div>
+                </div>
+              </motion.div>
             </div>
 
           </div>
