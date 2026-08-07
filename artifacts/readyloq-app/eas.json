@@ -18,10 +18,12 @@
     },
     "preview": {
       "autoIncrement": true,
+      "developmentClient": false,
       "distribution": "internal",
       "node": "22.14.0",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
       "env": {
         "EXPO_PUBLIC_DOMAIN": "readyloq.com",
@@ -32,9 +34,11 @@
     },
     "production": {
       "autoIncrement": true,
+      "developmentClient": false,
       "node": "22.14.0",
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
       },
       "env": {
         "EXPO_PUBLIC_DOMAIN": "readyloq.com",
