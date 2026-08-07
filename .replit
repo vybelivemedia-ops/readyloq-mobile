@@ -24,10 +24,6 @@ args = "Expo Dev Server"
 task = "workflow.run"
 args = "API Server"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "EAS Preview Build"
-
 [[workflows.workflow]]
 name = "Expo Dev Server"
 author = "agent"
