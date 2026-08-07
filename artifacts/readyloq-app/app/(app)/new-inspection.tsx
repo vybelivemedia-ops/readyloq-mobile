@@ -144,6 +144,10 @@ export default function NewInspectionScreen() {
     sessionActive: step === "capture",
   });
   const [capturing, setCapturing] = useState(false);
+  // Synchronous ref-based lock — prevents burst captures when the shutter is
+  // tapped rapidly during a lag spike (React state updates are async, so the
+  // `capturing` state guard alone can be passed multiple times before it lands).
+  const captureLockedRef = useRef(false);
   const [importing, setImporting] = useState(false);
   // Advisory warning from the on-device quality gate — auto-clears; never
   // blocks capture (poor evidence of a real problem beats no evidence).
@@ -207,6 +211,9 @@ export default function NewInspectionScreen() {
   // contention, cameraRef not yet ready).
   const lastFrameUriRef = useRef<string | null>(null);
   const frameBufferIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Controls the co-pilot always-on voice watchdog loop.
+  // Set to true when FAIE starts in copilot mode; cleared when the user stops.
+  const faieAutoRestartRef = useRef(false);
   // Animated value for the frame-capture flash overlay (0 = transparent, 1 = white).
   const frameCaptureAnim = useRef(new Animated.Value(0)).current;
   // True when the most-recently dispatched voice event carried an imageUri.
@@ -333,12 +340,14 @@ export default function NewInspectionScreen() {
     }, 1_500);
   };
 
-  /** Stops the rolling frame-buffer interval and clears stored state. */
+  /** Stops the rolling frame-buffer interval and releases buffered frame memory. */
   const stopFrameBuffer = () => {
     if (frameBufferIntervalRef.current != null) {
       clearInterval(frameBufferIntervalRef.current);
       frameBufferIntervalRef.current = null;
     }
+    // Discard the stored frame URI so the JPEG is eligible for GC immediately.
+    lastFrameUriRef.current = null;
   };
 
   /**
@@ -376,6 +385,8 @@ export default function NewInspectionScreen() {
   // ── FAIE handlers ──────────────────────────────────────────────────────────
   const handleFaiePress = async () => {
     if (isFaieListening) {
+      // Clear the watchdog flag first so the loop exits after stopSession resolves.
+      faieAutoRestartRef.current = false;
       setIsFaieListening(false);
       setFaieStatus(null);
       setFaiePendingConfirm(null);
@@ -396,6 +407,10 @@ export default function NewInspectionScreen() {
       else if (ev.evidence) parts.push(`(${ev.evidence})`);
       return parts.join(" ").trim();
     };
+    // Co-pilot mode: keep the mic alive between recognition cycles so the
+    // technician never has to re-tap.  Other modes (manual / voice) are
+    // unaffected — the loop exits immediately after one session ends.
+    faieAutoRestartRef.current = mode === "copilot";
     try {
       setIsFaieListening(true);
       setFaieStatus("Listening for commands…");
@@ -404,6 +419,7 @@ export default function NewInspectionScreen() {
       // Start rolling background snapshots so getFrameWithBuffer always has a
       // recent frame ready even if the on-demand capture is slow or fails.
       startFrameBuffer();
+      do {
       // Stamp the session start time so the session manager can timestamp events.
       sessionManagerRef.current.setVisionContext({ timestamp: Date.now() });
       await sessionManagerRef.current.startSession(({ event, action }) => {
@@ -585,7 +601,19 @@ export default function NewInspectionScreen() {
         // populated even when the camera pipeline is momentarily busy.
         getFrame: getFrameWithBuffer,
       });
+      // Session ended naturally — in co-pilot mode pause briefly then loop back.
+      if (faieAutoRestartRef.current) {
+        setFaieStatus("Restarting…");
+        await new Promise<void>((resolve) => setTimeout(resolve, 300));
+        setFaieStatus("Listening for commands…");
+      }
+      } while (faieAutoRestartRef.current);
+      // Watchdog loop exited (user stopped or non-copilot mode) — clean up.
+      stopFrameBuffer();
+      setIsFaieListening(false);
+      setFaieStatus(null);
     } catch (e) {
+      faieAutoRestartRef.current = false;
       stopFrameBuffer();
       setIsFaieListening(false);
       setFaieStatus(null);
@@ -1054,7 +1082,10 @@ export default function NewInspectionScreen() {
 
   const takePhoto = async () => {
     const rec = recordRef.current;
-    if (!cameraRef.current || capturing || importing || !rec) return;
+    // captureLockedRef is a synchronous guard — checked and set before any
+    // await so rapid taps during a lag spike cannot queue up multiple captures.
+    if (!cameraRef.current || captureLockedRef.current || capturing || importing || !rec) return;
+    captureLockedRef.current = true;
     // Fire haptic immediately on press (before the async pipeline starts) so
     // the technician feels confirmation the moment they tap, not seconds later.
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1069,6 +1100,10 @@ export default function NewInspectionScreen() {
     } catch {
       setCapturing(false);
       setError("Couldn't capture photo. Please try again.");
+    } finally {
+      // 600 ms cooldown — discards any queued taps that arrived during the
+      // capture pipeline without blocking the next intentional tap longer than needed.
+      setTimeout(() => { captureLockedRef.current = false; }, 600);
     }
   };
 
