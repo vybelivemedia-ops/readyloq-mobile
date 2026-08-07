@@ -13,7 +13,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import { AuthedImage } from "@/components/AuthedImage";
 import { FindingCard } from "@/components/FindingCard";
@@ -465,76 +465,54 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
           onRequestClose={() => setViewerPath(null)}
           statusBarTranslucent
         >
-          <Pressable
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.95)" }}
-            onPress={() => setViewerPath(null)}
-          >
-            {viewerPath ? (
-              <AuthedImage
-                path={viewerPath}
-                style={{ flex: 1 }}
-                contentFit="contain"
-              />
-            ) : null}
-          </Pressable>
-          {/* Action bar — sits above the image so taps don't close the modal */}
-          <View
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 16,
-              paddingBottom: 40,
-              paddingTop: 16,
-              backgroundColor: "rgba(0,0,0,0.55)",
-            }}
-          >
+          <View style={{ flex: 1, backgroundColor: "#000" }}>
+            {/* Image — tap anywhere on it to close */}
             <Pressable
-              onPress={handleSaveViewerImage}
-              disabled={viewerSaving}
-              style={{
-                flexDirection: "row", alignItems: "center", gap: 6,
-                paddingHorizontal: 16, paddingVertical: 10,
-                borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)",
-                opacity: viewerSaving ? 0.5 : 1,
-              }}
-            >
-              <Ionicons name="download-outline" size={18} color="#fff" />
-              <Text style={{ color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" }}>
-                {viewerSaving ? "Saving…" : "Save"}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={handleCopyViewerImage}
-              disabled={viewerCopying}
-              style={{
-                flexDirection: "row", alignItems: "center", gap: 6,
-                paddingHorizontal: 16, paddingVertical: 10,
-                borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)",
-                opacity: viewerCopying ? 0.5 : 1,
-              }}
-            >
-              <Ionicons name="copy-outline" size={18} color="#fff" />
-              <Text style={{ color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" }}>
-                {viewerCopying ? "Copying…" : "Copy"}
-              </Text>
-            </Pressable>
-            <Pressable
+              style={{ flex: 1 }}
               onPress={() => setViewerPath(null)}
-              style={{
-                flexDirection: "row", alignItems: "center", gap: 6,
-                paddingHorizontal: 16, paddingVertical: 10,
-                borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)",
-              }}
             >
-              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, fontFamily: "Inter_400Regular" }}>
-                Close
-              </Text>
+              {viewerPath ? (
+                <AuthedImage
+                  path={viewerPath}
+                  style={{ flex: 1 }}
+                  contentFit="contain"
+                />
+              ) : null}
             </Pressable>
+
+            {/* Save / Copy button row */}
+            <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, paddingVertical: 14, paddingBottom: 32, backgroundColor: "rgba(0,0,0,0.9)" }}>
+              <TouchableOpacity
+                onPress={handleSaveViewerImage}
+                disabled={viewerSaving}
+                activeOpacity={0.7}
+                style={{
+                  flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                  backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingVertical: 12,
+                  opacity: viewerSaving ? 0.5 : 1,
+                }}
+              >
+                <Ionicons name="download-outline" size={16} color="#fff" />
+                <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  {viewerSaving ? "Saving…" : "Save to Phone"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleCopyViewerImage}
+                disabled={viewerCopying}
+                activeOpacity={0.7}
+                style={{
+                  flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                  backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingVertical: 12,
+                  opacity: viewerCopying ? 0.5 : 1,
+                }}
+              >
+                <Ionicons name="copy-outline" size={16} color="#fff" />
+                <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  {viewerCopying ? "Copying…" : "Copy Image"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Modal>
 

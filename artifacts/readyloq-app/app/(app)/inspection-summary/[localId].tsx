@@ -24,6 +24,7 @@ import {
   ScrollView,
   Text,
   TextInput,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -862,49 +863,19 @@ function PhotoViewer({
               ) : null}
             </View>
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Pressable
-              onPress={handleSaveImage}
-              disabled={saving}
-              style={{
-                width: 40, height: 40, borderRadius: 20,
-                backgroundColor: "rgba(255,255,255,0.15)",
-                alignItems: "center", justifyContent: "center",
-                opacity: saving ? 0.5 : 1,
-              }}
-            >
-              {saving
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Ionicons name="download-outline" size={20} color="#fff" />}
-            </Pressable>
-            <Pressable
-              onPress={handleCopyImage}
-              disabled={copying}
-              style={{
-                width: 40, height: 40, borderRadius: 20,
-                backgroundColor: "rgba(255,255,255,0.15)",
-                alignItems: "center", justifyContent: "center",
-                opacity: copying ? 0.5 : 1,
-              }}
-            >
-              {copying
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Ionicons name="copy-outline" size={20} color="#fff" />}
-            </Pressable>
-            <Pressable
-              onPress={onClose}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: "rgba(255,255,255,0.15)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="close" size={22} color="#fff" />
-            </Pressable>
-          </View>
+          <Pressable
+            onPress={onClose}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: "rgba(255,255,255,0.15)",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="close" size={22} color="#fff" />
+          </Pressable>
         </View>
 
         <FlatList
@@ -928,6 +899,44 @@ function PhotoViewer({
             </View>
           )}
         />
+
+        {/* ── Save / Copy button row ───────────────────────────────────────── */}
+        <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "rgba(0,0,0,0.85)" }}>
+          <TouchableOpacity
+            onPress={handleSaveImage}
+            disabled={saving}
+            activeOpacity={0.7}
+            style={{
+              flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+              backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingVertical: 12,
+              opacity: saving ? 0.5 : 1,
+            }}
+          >
+            {saving
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="download-outline" size={16} color="#fff" />}
+            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+              {saving ? "Saving…" : "Save to Phone"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleCopyImage}
+            disabled={copying}
+            activeOpacity={0.7}
+            style={{
+              flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+              backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingVertical: 12,
+              opacity: copying ? 0.5 : 1,
+            }}
+          >
+            {copying
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Ionicons name="copy-outline" size={16} color="#fff" />}
+            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+              {copying ? "Copying…" : "Copy Image"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <ScrollView
