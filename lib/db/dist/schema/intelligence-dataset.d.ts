@@ -1126,8 +1126,8 @@ export type IntelligenceVote = typeof intelligenceVotesTable.$inferSelect;
 export type IntelligenceTrainingExport = typeof intelligenceTrainingExportsTable.$inferSelect;
 export declare const intelligenceSeverityEnum: z.ZodEnum<{
     low: "low";
-    moderate: "moderate";
     high: "high";
+    moderate: "moderate";
     critical: "critical";
 }>;
 export declare const treatmentOutcomeEnum: z.ZodEnum<{
