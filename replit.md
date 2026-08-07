@@ -112,6 +112,10 @@ Store a **classic Personal Access Token** in the `GH_TOKEN` secret with exactly 
 
 To generate one: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token (classic). Check only `repo` and `workflow`, then paste the value into the `GH_TOKEN` Replit secret. Rotate the token when it expires and keep the scopes the same.
 
+## User preferences
+
+- **EAS builds** — never trigger a build automatically after a fix. Wait for an explicit command, or flag the user when enough changes have accumulated to justify one.
+
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
