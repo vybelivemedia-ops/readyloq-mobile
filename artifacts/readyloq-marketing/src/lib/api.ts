@@ -1,5 +1,14 @@
 import { apiUrl } from "@/config";
 
+export interface CurrentUser {
+  id: number;
+  clerkId: string;
+  role: string;
+  effectiveRole: string;
+  isSuperAdmin: boolean;
+  companyId: number | null;
+}
+
 // A lead is a sales prospect captured from the marketing site. There are two
 // kinds: a "demo" request (someone wants a product demo) and a "contact"
 // message (general inquiry). Both persist to the platform `leads` table.

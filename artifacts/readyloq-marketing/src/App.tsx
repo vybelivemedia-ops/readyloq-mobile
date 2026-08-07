@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
+import { ClerkProvider } from "@clerk/clerk-react";
 
 // Pages
 import Home from "@/pages/home";
@@ -15,6 +16,7 @@ import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 
 const queryClient = new QueryClient();
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
 function Router() {
   return (
@@ -34,7 +36,7 @@ function Router() {
 }
 
 function App() {
-  return (
+  const inner = (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
@@ -44,6 +46,13 @@ function App() {
       </TooltipProvider>
     </QueryClientProvider>
   );
+
+  // Wrap with Clerk only when the publishable key is present so the marketing
+  // site still renders in environments that haven't configured it.
+  if (clerkPubKey) {
+    return <ClerkProvider publishableKey={clerkPubKey}>{inner}</ClerkProvider>;
+  }
+  return inner;
 }
 
 export default App;
