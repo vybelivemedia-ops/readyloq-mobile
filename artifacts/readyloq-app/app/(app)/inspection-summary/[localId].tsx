@@ -6,7 +6,9 @@ import {
   type Finding,
 } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
+import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
+import * as MediaLibrary from "expo-media-library";
 import { type Href, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -785,6 +787,40 @@ function PhotoViewer({
     setDescDraft(meta?.[index]?.description ?? "");
   }, [index, meta]);
 
+  const [saving,  setSaving]  = useState(false);
+  const [copying, setCopying] = useState(false);
+
+  const currentUri = photos[index];
+
+  const handleSaveImage = async () => {
+    setSaving(true);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Please grant permission to save photos to your gallery.");
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(currentUri);
+      Alert.alert("Saved", "Photo saved to your gallery.");
+    } catch {
+      Alert.alert("Error", "Failed to save photo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCopyImage = async () => {
+    setCopying(true);
+    try {
+      await Clipboard.setImageAsync(currentUri);
+      Alert.alert("Copied", "Photo copied to clipboard.");
+    } catch {
+      Alert.alert("Error", "Failed to copy photo.");
+    } finally {
+      setCopying(false);
+    }
+  };
+
   const findings = findingsByPhoto.get(index) ?? [];
   const current = meta?.[index];
   const sourceInfo = describeCaptureSource(current?.source);
@@ -826,19 +862,49 @@ function PhotoViewer({
               ) : null}
             </View>
           </View>
-          <Pressable
-            onPress={onClose}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: "rgba(255,255,255,0.15)",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons name="close" size={22} color="#fff" />
-          </Pressable>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Pressable
+              onPress={handleSaveImage}
+              disabled={saving}
+              style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: "rgba(255,255,255,0.15)",
+                alignItems: "center", justifyContent: "center",
+                opacity: saving ? 0.5 : 1,
+              }}
+            >
+              {saving
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="download-outline" size={20} color="#fff" />}
+            </Pressable>
+            <Pressable
+              onPress={handleCopyImage}
+              disabled={copying}
+              style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: "rgba(255,255,255,0.15)",
+                alignItems: "center", justifyContent: "center",
+                opacity: copying ? 0.5 : 1,
+              }}
+            >
+              {copying
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="copy-outline" size={20} color="#fff" />}
+            </Pressable>
+            <Pressable
+              onPress={onClose}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: "rgba(255,255,255,0.15)",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="close" size={22} color="#fff" />
+            </Pressable>
+          </View>
         </View>
 
         <FlatList

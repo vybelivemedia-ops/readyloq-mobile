@@ -1,5 +1,8 @@
 import { useAuth } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
 import {
   getGetInspectionQueryOptions,
   getListAnalysisResultsQueryOptions,
@@ -84,6 +87,52 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const [reviewSaving, setReviewSaving] = useState(false);
   // #110 — full-screen evidence viewer
   const [viewerPath, setViewerPath] = useState<string | null>(null);
+  const [viewerSaving,  setViewerSaving]  = useState(false);
+  const [viewerCopying, setViewerCopying] = useState(false);
+
+  const handleSaveViewerImage = async () => {
+    if (!viewerPath) return;
+    setViewerSaving(true);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Please grant permission to save photos to your gallery.");
+        return;
+      }
+      const token = await getToken();
+      const fullUri = viewerPath.startsWith("http") ? viewerPath : `${API_BASE}${viewerPath}`;
+      const localUri = `${FileSystem.documentDirectory}tmp_evidence_save.jpg`;
+      await FileSystem.downloadAsync(fullUri, localUri, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      await MediaLibrary.saveToLibraryAsync(localUri);
+      Alert.alert("Saved", "Photo saved to your gallery.");
+    } catch {
+      Alert.alert("Error", "Failed to save photo.");
+    } finally {
+      setViewerSaving(false);
+    }
+  };
+
+  const handleCopyViewerImage = async () => {
+    if (!viewerPath) return;
+    setViewerCopying(true);
+    try {
+      const token = await getToken();
+      const fullUri = viewerPath.startsWith("http") ? viewerPath : `${API_BASE}${viewerPath}`;
+      // Download to temp, then copy — needed for authed URLs
+      const localUri = `${FileSystem.documentDirectory}tmp_evidence_copy.jpg`;
+      await FileSystem.downloadAsync(fullUri, localUri, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      await Clipboard.setImageAsync(localUri);
+      Alert.alert("Copied", "Photo copied to clipboard.");
+    } catch {
+      Alert.alert("Error", "Failed to copy photo.");
+    } finally {
+      setViewerCopying(false);
+    }
+  };
 
   const inspection = inspectionQ.data;
   const analysis = analysisQ.data?.[0];
@@ -427,12 +476,66 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                 contentFit="contain"
               />
             ) : null}
-            <Text
-              style={{ position: "absolute", bottom: 48, alignSelf: "center", color: "rgba(255,255,255,0.5)", fontSize: 12 }}
-            >
-              Tap to close
-            </Text>
           </Pressable>
+          {/* Action bar — sits above the image so taps don't close the modal */}
+          <View
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 16,
+              paddingBottom: 40,
+              paddingTop: 16,
+              backgroundColor: "rgba(0,0,0,0.55)",
+            }}
+          >
+            <Pressable
+              onPress={handleSaveViewerImage}
+              disabled={viewerSaving}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 6,
+                paddingHorizontal: 16, paddingVertical: 10,
+                borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)",
+                opacity: viewerSaving ? 0.5 : 1,
+              }}
+            >
+              <Ionicons name="download-outline" size={18} color="#fff" />
+              <Text style={{ color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" }}>
+                {viewerSaving ? "Saving…" : "Save"}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleCopyViewerImage}
+              disabled={viewerCopying}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 6,
+                paddingHorizontal: 16, paddingVertical: 10,
+                borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)",
+                opacity: viewerCopying ? 0.5 : 1,
+              }}
+            >
+              <Ionicons name="copy-outline" size={18} color="#fff" />
+              <Text style={{ color: "#fff", fontSize: 13, fontFamily: "Inter_500Medium" }}>
+                {viewerCopying ? "Copying…" : "Copy"}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setViewerPath(null)}
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 6,
+                paddingHorizontal: 16, paddingVertical: 10,
+                borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)",
+              }}
+            >
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, fontFamily: "Inter_400Regular" }}>
+                Close
+              </Text>
+            </Pressable>
+          </View>
         </Modal>
 
         {error ? (
