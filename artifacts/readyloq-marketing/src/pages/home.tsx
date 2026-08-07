@@ -4,41 +4,36 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Shield, Brain, Users, LineChart, FileText, Smartphone, Ruler } from "lucide-react";
-import { asset, APP_URL, apiUrl } from "@/config";
+import { asset, apiUrl } from "@/config";
 import { useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
+import { useLocation } from "wouter";
 import type { CurrentUser } from "@/lib/api";
 
-// Redirect super-admins straight to the admin dashboard; redirect everyone
-// else who is unauthenticated to the app login page.
+// Redirect super-admins straight to the admin dashboard; redirect signed-in
+// non-admins and unauthenticated visitors to /login.
 function useAuthRedirect() {
-  const { isLoaded, isSignedIn, user: clerkUser } = useUser();
+  const { isLoaded, isSignedIn } = useUser();
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     if (!isLoaded) return;
 
     if (isSignedIn) {
-      // Fetch the platform user record to check isSuperAdmin.
       void (async () => {
         try {
-          // The Clerk session cookie is sent automatically for same-origin
-          // requests in a browser context.
           const res = await fetch(apiUrl("/me"), { credentials: "include" });
           if (!res.ok) return;
           const me = (await res.json()) as CurrentUser;
-          if (me.isSuperAdmin) {
-            // Super admin: go straight to the admin/role-switcher settings.
-            window.location.replace(`${APP_URL}settings`);
-          }
+          if (me.isSuperAdmin) navigate("/dashboard");
         } catch {
-          // Silently ignore — show the landing page as normal.
+          // Show the landing page as normal on error.
         }
       })();
     } else {
-      // Not signed in: redirect to the app login page.
-      window.location.replace(APP_URL);
+      navigate("/login");
     }
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, navigate]);
 }
 
 export default function Home() {

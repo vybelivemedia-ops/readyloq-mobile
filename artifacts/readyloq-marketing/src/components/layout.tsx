@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { APP_URL, asset } from "@/config";
+import { asset } from "@/config";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
@@ -40,12 +40,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
-            <a href={`${APP_URL}/settings`} className="text-xs font-mono font-medium text-muted-foreground/40 hover:text-primary transition-colors" title="Platform Admin">
+            <Link href="/dashboard" className="text-xs font-mono font-medium text-muted-foreground/40 hover:text-primary transition-colors" title="Platform Admin">
               ⬡ Admin
-            </a>
-            <a href={APP_URL} className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+            </Link>
+            <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
               Log in
-            </a>
+            </Link>
             <Link href="/demo">
               <Button>Request Demo</Button>
             </Link>
@@ -84,12 +84,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               ))}
               <div className="h-px bg-border my-2" />
-              <a
-                href={APP_URL}
+              <Link
+                href="/login"
                 className="text-lg font-medium px-4 py-2 text-foreground"
+                onClick={() => setIsMobileMenuOpen(false)}
               >
                 Log in
-              </a>
+              </Link>
               <Link href="/demo" onClick={() => setIsMobileMenuOpen(false)}>
                 <Button className="w-full mt-2" size="lg">Request Demo</Button>
               </Link>
@@ -119,7 +120,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <li><Link href="/features" className="hover:text-primary transition-colors">Features</Link></li>
                 <li><Link href="/solutions" className="hover:text-primary transition-colors">Solutions</Link></li>
                 <li><Link href="/demo" className="hover:text-primary transition-colors">Request Demo</Link></li>
-                <li><a href={APP_URL} className="hover:text-primary transition-colors">Log in</a></li>
+                <li><Link href="/login" className="hover:text-primary transition-colors">Log in</Link></li>
               </ul>
             </div>
 

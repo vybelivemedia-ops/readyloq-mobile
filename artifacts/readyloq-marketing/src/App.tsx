@@ -14,24 +14,35 @@ import Demo from "@/pages/demo";
 import Contact from "@/pages/contact";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
+import Login from "@/pages/login";
+import Dashboard from "@/pages/dashboard";
 
 const queryClient = new QueryClient();
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/features" component={Features} />
-        <Route path="/solutions" component={Solutions} />
-        <Route path="/demo" component={Demo} />
-        <Route path="/contact" component={Contact} />
-        <Route path="/privacy" component={Privacy} />
-        <Route path="/terms" component={Terms} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      {/* Auth + admin pages — full-screen, no marketing chrome */}
+      <Route path="/login" component={Login} />
+      <Route path="/dashboard" component={Dashboard} />
+
+      {/* Public marketing pages — wrapped in Layout */}
+      <Route>
+        <Layout>
+          <Switch>
+            <Route path="/" component={Home} />
+            <Route path="/features" component={Features} />
+            <Route path="/solutions" component={Solutions} />
+            <Route path="/demo" component={Demo} />
+            <Route path="/contact" component={Contact} />
+            <Route path="/privacy" component={Privacy} />
+            <Route path="/terms" component={Terms} />
+            <Route component={NotFound} />
+          </Switch>
+        </Layout>
+      </Route>
+    </Switch>
   );
 }
 
