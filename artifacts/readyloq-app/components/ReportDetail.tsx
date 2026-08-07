@@ -148,7 +148,7 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
             <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
               Treatment notes
             </Text>
-            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 }}>
+            <Text selectable style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 }}>
               {report.treatmentNotes}
             </Text>
           </Card>
@@ -201,7 +201,7 @@ function NarrativeBody({
               {s.title}
             </Text>
             {s.body ? (
-              <Text style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 21 }}>
+              <Text selectable style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 21 }}>
                 {s.body}
               </Text>
             ) : null}
@@ -262,7 +262,7 @@ function BulletRow({ text, colors }: { text: string; colors: ReturnType<typeof u
   return (
     <View style={{ flexDirection: "row", gap: 8 }}>
       <Text style={{ color: colors.primary, fontSize: 14, lineHeight: 21 }}>•</Text>
-      <Text style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 21, flex: 1 }}>
+      <Text selectable style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 21, flex: 1 }}>
         {text}
       </Text>
     </View>

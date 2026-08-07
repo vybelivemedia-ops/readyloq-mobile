@@ -1177,6 +1177,7 @@ export function AiInsightsPanel({
                       <View key={i} style={{ flexDirection: "row", gap: 8 }}>
                         <Text style={{ color: colors.primary, fontSize: 13, lineHeight: 19 }}>•</Text>
                         <Text
+                          selectable
                           style={{
                             color: colors.mutedForeground,
                             fontFamily: "Inter_400Regular",
