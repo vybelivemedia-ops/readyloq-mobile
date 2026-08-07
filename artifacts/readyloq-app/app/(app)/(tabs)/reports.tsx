@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
 
 import { ReportDetail } from "@/components/ReportDetail";
 import { Badge } from "@/components/ui/Badge";
@@ -268,6 +268,7 @@ export default function ReportsScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReportFilter>("all");
   const [activeTimeframe, setActiveTimeframe] = useState<ReportTimeframe>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // ── Primary: URL params set by dashboard cards/alerts ──────────────────────
   // useLocalSearchParams updates on every router.push(), even to an already-
@@ -310,9 +311,26 @@ export default function ReportsScreen() {
     else router.push(`/report/${item.id}` as Href);
   };
 
-  // The server already applied filter + timeframe — no client-side post-processing.
-  const filtered = data ?? [];
+  // Server already applied filter + timeframe. Apply client-side text search on top.
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    const base = data ?? [];
+    if (!trimmedQuery) return base;
+    return base.filter((r) => {
+      const haystack = [
+        r.title,
+        r.siteAddress,
+        (r as Report & { clientName?: string | null }).clientName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(trimmedQuery);
+    });
+  }, [data, trimmedQuery]);
+
   const isFiltered = activeFilter !== "all" || activeTimeframe !== "all";
+  const isSearching = trimmedQuery.length > 0;
   const isInformational = INFORMATIONAL_FILTERS.includes(activeFilter);
 
   const renderItem = ({ item }: { item: Report }) => (
@@ -363,6 +381,47 @@ export default function ReportsScreen() {
         <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 24 }}>
           Reports
         </Text>
+      </View>
+
+      {/* Search bar */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          marginHorizontal: 16,
+          marginBottom: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.card ?? colors.background,
+          gap: 8,
+        }}
+      >
+        <Ionicons name="search-outline" size={16} color={colors.mutedForeground} />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search by address or client…"
+          placeholderTextColor={colors.mutedForeground}
+          style={{
+            flex: 1,
+            fontFamily: "Inter_400Regular",
+            fontSize: 14,
+            color: colors.foreground,
+            padding: 0,
+          }}
+          returnKeyType="search"
+          autoCorrect={false}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
+        />
+        {searchQuery.length > 0 ? (
+          <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={colors.mutedForeground} />
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Scrollable filter chip row */}
@@ -452,7 +511,7 @@ export default function ReportsScreen() {
         <FullScreenLoader />
       ) : (
         <FlatList
-          key={`cols-${numColumns}-${activeFilter}`}
+          key={`cols-${numColumns}-${activeFilter}-${trimmedQuery}`}
           data={filtered}
           keyExtractor={(i) => String(i.id)}
           renderItem={renderItem}
@@ -466,9 +525,11 @@ export default function ReportsScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="document-text-outline"
-              title={isFiltered ? "No matching reports" : "No reports yet"}
+              title={isSearching ? "No results" : isFiltered ? "No matching reports" : "No reports yet"}
               subtitle={
-                isFiltered
+                isSearching
+                  ? `No reports match "${searchQuery}". Try a different address or client name.`
+                  : isFiltered
                   ? `No reports match "${FILTER_LABELS[activeFilter] ?? activeFilter}". Tap × above to clear.`
                   : "Complete an inspection and generate a report to see it here."
               }
