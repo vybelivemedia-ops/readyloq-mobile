@@ -263,8 +263,11 @@ function clampConfidence(value: unknown): number {
 /**
  * Parse + ground the model output. Anything that fails validation is dropped
  * silently — a rejected candidate simply doesn't exist.
+ *
+ * Exported for unit-testing the fallback tier / grounding logic without
+ * needing a live DB or OpenAI call.
  */
-function parseCandidates(raw: string, validFindingIds: Set<number>): CandidateOpportunity[] {
+export function parseCandidates(raw: string, validFindingIds: Set<number>): CandidateOpportunity[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);

@@ -1,0 +1,389 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { calculateEstimatedAnnualValue } from "./pricing";
+
+/**
+ * Unit + integration tests for opportunity-ai helpers.
+ *
+ * Focus: the "medium" tier fallback in parseCandidates ensures that a missing
+ * or unrecognised estimatedValueTier from the AI model never produces a
+ * null / zero estimatedAnnualValue in the DB — which would silently corrupt
+ * pipeline totals on the Leads/Reports screen.
+ */
+
+// ── OpenAI mock (must be hoisted so it is in place before the module loads) ──
+
+const { aiState } = vi.hoisted(() => ({
+  aiState: { response: null as string | null },
+}));
+
+vi.mock("@workspace/integrations-openai-ai-server", () => ({
+  openai: {
+    chat: {
+      completions: {
+        create: vi.fn(async () => ({
+          choices: [{ message: { content: aiState.response } }],
+        })),
+      },
+    },
+  },
+}));
+
+// ── Clerk mock (required by the DB layer imported transitively) ───────────────
+
+vi.mock("@clerk/express", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@clerk/express")>();
+  return {
+    ...actual,
+    getAuth: () => ({ userId: null }),
+    clerkMiddleware: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  };
+});
+
+// ── Imports (after mocks) ─────────────────────────────────────────────────────
+
+import { parseCandidates, runOpportunitySynthesis } from "./opportunity-ai";
+import {
+  db,
+  companiesTable,
+  usersTable,
+  inspectionsTable,
+  opportunitiesTable,
+  opportunityEventsTable,
+  opportunitySettingsTable,
+  type Finding,
+} from "@workspace/db";
+import { eq } from "drizzle-orm";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Minimal Finding that satisfies the type and passes the grounding gate. */
+function makeFinding(overrides: Partial<Finding> = {}): Finding {
+  return {
+    id: 1,
+    category: "structural",
+    description: "Foundation crack at north wall",
+    confidence: 0.9,
+    severity: "medium",
+    location: "North wall",
+    imageUrl: null,
+    treatment: "Seal crack",
+    exclusionOpportunity: null,
+    ...overrides,
+  };
+}
+
+/** Raw JSON string the "AI model" returns for a single structural candidate. */
+function aiResponse(tier: string | undefined): string {
+  const item: Record<string, unknown> = {
+    category: "structural",
+    title: "Foundation crack remediation",
+    rationale: "A verified structural finding documents a foundation crack at the north wall.",
+    evidenceFindingIds: [1],
+    confidence: 0.85,
+  };
+  if (tier !== undefined) {
+    item.estimatedValueTier = tier;
+  }
+  return JSON.stringify({ opportunities: [item] });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unit tests — parseCandidates (pure function, no DB)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("parseCandidates — estimatedValueTier fallback", () => {
+  const validIds = new Set([1]);
+
+  it("preserves a valid tier when the AI provides one", () => {
+    const candidates = parseCandidates(aiResponse("high"), validIds);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].estimatedValueTier).toBe("high");
+  });
+
+  it("falls back to 'medium' when estimatedValueTier is missing", () => {
+    // The AI omitted the field entirely.
+    const candidates = parseCandidates(aiResponse(undefined), validIds);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].estimatedValueTier).toBe("medium");
+  });
+
+  it("falls back to 'medium' when estimatedValueTier is an unrecognised string", () => {
+    const candidates = parseCandidates(aiResponse("extreme"), validIds);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].estimatedValueTier).toBe("medium");
+  });
+
+  it("falls back to 'medium' when estimatedValueTier is null", () => {
+    const raw = JSON.stringify({
+      opportunities: [
+        {
+          category: "structural",
+          title: "Foundation crack remediation",
+          rationale: "A verified structural finding documents a foundation crack.",
+          evidenceFindingIds: [1],
+          estimatedValueTier: null,
+          confidence: 0.8,
+        },
+      ],
+    });
+    const candidates = parseCandidates(raw, validIds);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].estimatedValueTier).toBe("medium");
+  });
+
+  it("falls back to 'medium' when estimatedValueTier is a number (type confusion)", () => {
+    const raw = JSON.stringify({
+      opportunities: [
+        {
+          category: "structural",
+          title: "Foundation crack remediation",
+          rationale: "A verified structural finding documents a foundation crack.",
+          evidenceFindingIds: [1],
+          estimatedValueTier: 2,
+          confidence: 0.8,
+        },
+      ],
+    });
+    const candidates = parseCandidates(raw, validIds);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].estimatedValueTier).toBe("medium");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Integration tests — runOpportunitySynthesis writes non-null, non-zero value
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CLERK_OWNER = "opp_ai_test_owner_clerk_id";
+
+let companyId: number;
+let inspectionId: number;
+
+const findings: Finding[] = [makeFinding({ id: 1 })];
+
+beforeAll(async () => {
+  // Idempotent company creation — other test files use different slugs.
+  const [existing] = await db
+    .select()
+    .from(companiesTable)
+    .where(eq(companiesTable.slug, "opp-ai-unit-test-co"));
+  companyId = existing
+    ? existing.id
+    : (await db.insert(companiesTable).values({ name: "Opp AI Unit Test Co", slug: "opp-ai-unit-test-co" }).returning())[0].id;
+
+  // Ensure a user exists for the inspection FK chain.
+  const [existingUser] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.clerkUserId, CLERK_OWNER));
+  if (!existingUser) {
+    await db.insert(usersTable).values({ clerkUserId: CLERK_OWNER, role: "owner", companyId });
+  }
+});
+
+beforeEach(async () => {
+  aiState.response = null;
+
+  // Scope all cleanup strictly to this fixture company to avoid cross-test
+  // coupling with other suites that share the same test DB.
+  await db
+    .delete(opportunitySettingsTable)
+    .where(eq(opportunitySettingsTable.companyId, companyId));
+  await db
+    .delete(opportunityEventsTable)
+    .where(eq(opportunityEventsTable.companyId, companyId));
+  await db
+    .delete(opportunitiesTable)
+    .where(eq(opportunitiesTable.companyId, companyId));
+  await db
+    .delete(inspectionsTable)
+    .where(eq(inspectionsTable.companyId, companyId));
+
+  // Fresh inspection for each test so FK constraints are satisfied.
+  const [insp] = await db
+    .insert(inspectionsTable)
+    .values({
+      companyId,
+      siteAddress: "500 Opp AI Test Avenue",
+      technicianName: "Tester",
+      clientName: "Client",
+      pestTypes: ["rodents"],
+    })
+    .returning();
+  inspectionId = insp.id;
+});
+
+describe("runOpportunitySynthesis — estimatedAnnualValue is populated", () => {
+  it("inserts a row with non-null, non-zero estimatedAnnualValue when tier is absent from the AI response", async () => {
+    // The AI model deliberately omits estimatedValueTier.
+    aiState.response = aiResponse(undefined);
+
+    await runOpportunitySynthesis({ companyId, inspectionId, findings });
+
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+
+    expect(rows).toHaveLength(1);
+    // Tier fallback: parseCandidates must have applied "medium".
+    expect(rows[0].estimatedValueTier).toBe("medium");
+    // Value must be a positive whole-dollar figure (the pricing engine rounds
+    // to the nearest $100, so the smallest realistic output is $600).
+    expect(rows[0].estimatedAnnualValue).not.toBeNull();
+    expect(rows[0].estimatedAnnualValue).toBeGreaterThan(0);
+  });
+
+  it("inserts a row with non-null, non-zero estimatedAnnualValue when tier is an unrecognised string", async () => {
+    aiState.response = aiResponse("unknown_tier");
+
+    await runOpportunitySynthesis({ companyId, inspectionId, findings });
+
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].estimatedValueTier).toBe("medium");
+    expect(rows[0].estimatedAnnualValue).not.toBeNull();
+    expect(rows[0].estimatedAnnualValue).toBeGreaterThan(0);
+  });
+
+  it("also produces non-null, non-zero value for explicit valid tiers (low / high)", async () => {
+    for (const tier of ["low", "high"] as const) {
+      // Reset between sub-cases.
+      await db.delete(opportunityEventsTable).where(eq(opportunityEventsTable.companyId, companyId));
+      await db.delete(opportunitiesTable).where(eq(opportunitiesTable.companyId, companyId));
+      const [freshInsp] = await db
+        .insert(inspectionsTable)
+        .values({
+          companyId,
+          siteAddress: "500 Opp AI Test Avenue",
+          technicianName: "Tester",
+          clientName: "Client",
+          pestTypes: ["rodents"],
+        })
+        .returning();
+
+      aiState.response = aiResponse(tier);
+      await runOpportunitySynthesis({ companyId, inspectionId: freshInsp.id, findings });
+
+      const rows = await db
+        .select()
+        .from(opportunitiesTable)
+        .where(eq(opportunitiesTable.companyId, companyId));
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].estimatedValueTier).toBe(tier);
+      expect(rows[0].estimatedAnnualValue).not.toBeNull();
+      expect(rows[0].estimatedAnnualValue).toBeGreaterThan(0);
+    }
+  });
+
+  it("estimatedAnnualValue matches the pricing engine output for the resolved tier", async () => {
+    // Verify the stored value is exactly what calculateEstimatedAnnualValue
+    // would produce — not a truncated/null variant — so pipeline SUM queries
+    // are accurate from day one.
+    aiState.response = aiResponse("high");
+
+    await runOpportunitySynthesis({ companyId, inspectionId, findings });
+
+    const [row] = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+
+    expect(row.estimatedAnnualValue).not.toBeNull();
+    // The pricing engine is deterministic; any positive whole-dollar value
+    // confirms the full pipeline ran (tier → risk → price). We also confirm
+    // it matches the engine's own output for the same inputs.
+    const expected = calculateEstimatedAnnualValue({
+      propertyType: "500 Opp AI Test Avenue",
+      tier: "high",
+      riskLevel: row.riskLevel ?? "medium",
+    });
+    expect(row.estimatedAnnualValue).toBe(expected);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Concurrent synthesis — pipeline totals stay accurate under race conditions
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("runOpportunitySynthesis — concurrent analysis runs", () => {
+  it("produces exactly one opportunity row when two synthesis runs fire simultaneously for the same property", async () => {
+    // Both runs see the same findings and will propose the same fingerprint.
+    // The second INSERT hits the unique partial index (23505) and the catch
+    // block falls back to strengthen the winner — total rows must stay at 1.
+    aiState.response = aiResponse("medium");
+
+    await Promise.all([
+      runOpportunitySynthesis({ companyId, inspectionId, findings }),
+      runOpportunitySynthesis({ companyId, inspectionId, findings }),
+    ]);
+
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+
+    // No duplicates: exactly one open opportunity for this fingerprint.
+    expect(rows).toHaveLength(1);
+
+    // The surviving row must carry a non-null, non-zero value so the pipeline
+    // total (SUM of estimatedAnnualValue) is accurate.
+    expect(rows[0].estimatedAnnualValue).not.toBeNull();
+    expect(rows[0].estimatedAnnualValue).toBeGreaterThan(0);
+    expect(rows[0].estimatedValueTier).toBe("medium");
+  });
+
+  it("pipeline total (sum of estimatedAnnualValue) equals the single opportunity's value after concurrent inserts", async () => {
+    aiState.response = aiResponse("high");
+
+    // Three concurrent runs for the same property/fingerprint.
+    await Promise.all([
+      runOpportunitySynthesis({ companyId, inspectionId, findings }),
+      runOpportunitySynthesis({ companyId, inspectionId, findings }),
+      runOpportunitySynthesis({ companyId, inspectionId, findings }),
+    ]);
+
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+
+    // Still exactly one row — no phantom duplicates inflating the pipeline.
+    expect(rows).toHaveLength(1);
+
+    const singleValue = rows[0].estimatedAnnualValue ?? 0;
+    expect(singleValue).toBeGreaterThan(0);
+
+    // The pipeline total equals the single opportunity's value — no inflation
+    // from duplicate rows that would corrupt the SUM on the Leads screen.
+    const pipelineTotal = rows.reduce((sum, r) => sum + (r.estimatedAnnualValue ?? 0), 0);
+    expect(pipelineTotal).toBe(singleValue);
+  });
+
+  it("concurrent runs with a missing tier still produce exactly one row with a non-zero value", async () => {
+    // Worst case: tier is absent (AI omitted it) AND two runs race.
+    aiState.response = aiResponse(undefined);
+
+    await Promise.all([
+      runOpportunitySynthesis({ companyId, inspectionId, findings }),
+      runOpportunitySynthesis({ companyId, inspectionId, findings }),
+    ]);
+
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].estimatedValueTier).toBe("medium"); // fallback applied
+    expect(rows[0].estimatedAnnualValue).not.toBeNull();
+    expect(rows[0].estimatedAnnualValue).toBeGreaterThan(0);
+  });
+});
