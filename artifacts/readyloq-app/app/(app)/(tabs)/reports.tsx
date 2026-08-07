@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { ReportDetail } from "@/components/ReportDetail";
 import { Badge } from "@/components/ui/Badge";
@@ -84,6 +84,18 @@ function filterToParams(filter: ReportFilter, timeframe: ReportTimeframe): Repor
 }
 
 const INFORMATIONAL_FILTERS: ReportFilter[] = ["quality", "opportunities", "stale"];
+
+// Chips shown in the scrollable filter row — informational-only filters are
+// intentionally excluded because they don't actually narrow the list.
+const FILTER_CHIPS: { filter: ReportFilter; label: string }[] = [
+  { filter: "all",               label: "All" },
+  { filter: "pending_approvals", label: "Pending approval" },
+  { filter: "critical_risk",     label: "Critical risk" },
+  { filter: "high_risk",         label: "High risk" },
+  { filter: "approved",          label: "Approved" },
+  { filter: "7d",                label: "Last 7 days" },
+  { filter: "30d",               label: "Last 30 days" },
+];
 
 const INFORMATIONAL_MESSAGES: Partial<Record<ReportFilter, string>> = {
   quality:       "Showing all reports — detailed quality scores appear in inspection scorecards.",
@@ -352,6 +364,52 @@ export default function ReportsScreen() {
           Reports
         </Text>
       </View>
+
+      {/* Scrollable filter chip row */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}
+        style={{ flexGrow: 0 }}
+      >
+        {FILTER_CHIPS.map(({ filter, label }) => {
+          const isActive = activeFilter === filter;
+          return (
+            <Pressable
+              key={filter}
+              onPress={() => {
+                setActiveFilter(filter);
+                // Time chips stand alone — clear any separate timeframe state
+                if (filter === "7d" || filter === "30d" || filter === "all") {
+                  setActiveTimeframe("all");
+                }
+              }}
+              style={({ pressed }) => ({
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: isActive ? colors.primary : colors.border,
+                backgroundColor: isActive
+                  ? colors.primary
+                  : pressed
+                  ? colors.muted
+                  : colors.card ?? colors.background,
+              })}
+            >
+              <Text
+                style={{
+                  fontFamily: isActive ? "Inter_600SemiBold" : "Inter_400Regular",
+                  fontSize: 13,
+                  color: isActive ? colors.primaryForeground : colors.foreground,
+                }}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       {/* Active filter banner — shows what filter is live and lets the user dismiss it */}
       {isFiltered ? (
