@@ -286,8 +286,14 @@ function parseCandidates(raw: string, validFindingIds: Set<number>): CandidateOp
     // figure in the text is invented pricing. Reject, don't strip — a
     // candidate built around a fabricated number isn't trustworthy.
     if (/\$\s*\d|\d+\s*(?:dollars|usd)\b/i.test(`${title} ${rationale}`)) continue;
-    const tier = typeof o.estimatedValueTier === "string" ? o.estimatedValueTier : "";
-    if (!VALUE_TIERS.includes(tier as OpportunityValueTier)) continue;
+    // Apply a "medium" fallback when the AI omits or returns an unrecognised
+    // tier — this ensures calculateEstimatedAnnualValue is always called on
+    // insert and estimatedAnnualValue is never left null (which would cause
+    // pipeline totals to show $0).
+    const rawTier = typeof o.estimatedValueTier === "string" ? o.estimatedValueTier : "";
+    const tier: OpportunityValueTier = VALUE_TIERS.includes(rawTier as OpportunityValueTier)
+      ? (rawTier as OpportunityValueTier)
+      : "medium";
     // Grounding gate: only IDs that resolve to real findings from this run
     // survive; a candidate left with no verified evidence is rejected.
     const evidenceFindingIds = Array.isArray(o.evidenceFindingIds)
