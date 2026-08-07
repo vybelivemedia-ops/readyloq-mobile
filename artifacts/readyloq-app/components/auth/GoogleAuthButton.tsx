@@ -21,9 +21,9 @@ export function GoogleAuthButton({
   // Preload the browser on Android to reduce auth load time
   useEffect(() => {
     if (Platform.OS !== "android") return;
-    void WebBrowser.warmUpAsync();
+    void WebBrowser.warmUpAsync().catch(() => {});
     return () => {
-      void WebBrowser.coolDownAsync();
+      void WebBrowser.coolDownAsync().catch(() => {});
     };
   }, []);
 

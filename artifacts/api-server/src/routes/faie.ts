@@ -66,10 +66,16 @@ async function storeBase64Image(
   return storage.uploadObjectBuffer(companyId, buffer, "image/jpeg");
 }
 
-/** Coerce a loose companyId value to a positive integer, or fall back to 0. */
-function toCompanyId(raw: string | number | undefined): number {
+/**
+ * Coerce a loose companyId value to a positive integer.
+ * Returns null when the value is missing or cannot be resolved to a positive
+ * integer so callers can reject the request explicitly rather than silently
+ * writing under company 0 (the platform namespace).
+ */
+function toCompanyId(raw: string | number | undefined): number | null {
+  if (raw === undefined || raw === null) return null;
   const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
 
 // ── POST /dataset/ingest ──────────────────────────────────────────────────────
@@ -83,20 +89,23 @@ router.post("/dataset/ingest", async (req, res) => {
 
   const { companyId: rawCompanyId, findingId, label, confidence, imageBytes } = parsed.data;
   const companyId = toCompanyId(rawCompanyId);
+  // Fall back to platform namespace (0) only for dataset records — they are
+  // used for positive-reinforcement training and not tenant-sensitive.
+  const effectiveCompanyId = companyId ?? 0;
 
   try {
-    const imageUrl = await storeBase64Image(imageBytes, companyId);
+    const imageUrl = await storeBase64Image(imageBytes, effectiveCompanyId);
 
     await db.insert(faieTrainingImagesTable).values({
       recordType: "dataset",
-      companyId,
+      companyId: effectiveCompanyId,
       findingId: findingId ?? null,
       label: label ?? null,
       confidence: confidence ?? null,
       imageUrl,
     });
 
-    logger.info({ companyId, findingId, label }, "[FAIE] dataset record ingested");
+    logger.info({ companyId: effectiveCompanyId, findingId, label }, "[FAIE] dataset record ingested");
     res.json({ ok: true });
   } catch (err) {
     logger.error({ err }, "[FAIE] dataset/ingest failed");
@@ -115,6 +124,12 @@ router.post("/training/ingest-global", async (req, res) => {
 
   const { companyId: rawCompanyId, technicianId, source, imageBytes } = parsed.data;
   const companyId = toCompanyId(rawCompanyId);
+  // companyId is required for global ingest — reject bad/missing values loudly
+  // instead of silently writing into the platform namespace (company 0).
+  if (companyId === null) {
+    res.status(400).json({ error: "Invalid companyId — must be a positive integer" });
+    return;
+  }
 
   try {
     const imageUrl = await storeBase64Image(imageBytes, companyId);

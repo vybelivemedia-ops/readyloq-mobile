@@ -1792,7 +1792,6 @@ export default function NewInspectionScreen() {
                 ref={cameraRef}
                 style={{ flex: 1, width: "100%" }}
                 facing="back"
-                ratio="4:3"
                 zoom={zoom}
                 flash={flash}
               />
