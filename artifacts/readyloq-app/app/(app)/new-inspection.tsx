@@ -1744,18 +1744,45 @@ export default function NewInspectionScreen() {
     );
 
     // ─── Expanded: AI Inspection Workspace (camera + live insights) ──────────
-    // Split-screen flex weights — camera expands when no sensor drawer is open.
-    const cameraFlex = activeSensorCount > 0 ? 1.2 : 1.5;
-    const panelFlex  = activeSensorCount > 0 ? 1   : 0.5;
+    // Strict 50/50 split — camera fills its pane edge-to-edge (cover mode).
 
     if (isWideScreen) {
       return (
         <Screen edges={["top", "bottom"]}>
-          <View style={{ flex: 1, flexDirection: "row" }}>
-            {/* Left: live camera pane — stays mounted while AI results update */}
-            <View style={{ flex: cameraFlex, backgroundColor: "#000" }}>
+          <View style={{ flex: 1, flexDirection: "row", backgroundColor: "#0D1117" }}>
+            {/* Left: camera pane — cover-fills the entire half, no letterboxing */}
+            <View style={{ flex: 1, backgroundColor: "#000" }}>
+              {/* CameraView fills the pane completely — acts as CSS object-fit:cover */}
+              <CameraView
+                ref={cameraRef}
+                style={{ flex: 1, width: "100%" }}
+                facing="back"
+                ratio="4:3"
+                zoom={zoom}
+                flash={flash}
+              />
+
+              {/* Frame-capture flash overlay */}
+              <Animated.View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "#fff",
+                  opacity: frameCaptureAnim,
+                }}
+              />
+
+              {/* Top overlay: back button + photo count */}
               <View
                 style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -1768,7 +1795,7 @@ export default function NewInspectionScreen() {
                     width: 40,
                     height: 40,
                     borderRadius: 20,
-                    backgroundColor: "rgba(255,255,255,0.12)",
+                    backgroundColor: "rgba(0,0,0,0.45)",
                     alignItems: "center",
                     justifyContent: "center",
                   }}
@@ -1777,7 +1804,7 @@ export default function NewInspectionScreen() {
                 </Pressable>
                 <View
                   style={{
-                    backgroundColor: "rgba(255,255,255,0.12)",
+                    backgroundColor: "rgba(0,0,0,0.45)",
                     paddingHorizontal: 12,
                     paddingVertical: 6,
                     borderRadius: 999,
@@ -1789,32 +1816,8 @@ export default function NewInspectionScreen() {
                 </View>
               </View>
 
-              {/* Aspect-fitted preview: letterboxed, never stretched or cropped */}
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 12 }}>
-                <CameraView
-                  ref={cameraRef}
-                  style={{ width: "100%", maxHeight: "100%", aspectRatio: isLandscape ? 4 / 3 : 3 / 4 }}
-                  facing="back"
-                  ratio="4:3"
-                  zoom={zoom}
-                  flash={flash}
-                />
-                {/* Frame-capture flash overlay for wide-screen layout */}
-                <Animated.View
-                  pointerEvents="none"
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: "#fff",
-                    opacity: frameCaptureAnim,
-                  }}
-                />
-              </View>
-
-              <View style={{ padding: 16, gap: 14, alignItems: "center" }}>
+              {/* Bottom overlay: controls float above the live camera feed */}
+              <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: 16, gap: 14, alignItems: "center" }}>
                 {!isConnected && (
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(239,68,68,0.15)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, alignSelf: "stretch" }}>
                     <Ionicons name="cloud-offline" size={16} color="#ef4444" />
@@ -1877,8 +1880,8 @@ export default function NewInspectionScreen() {
               />
             </View>
 
-            {/* Right: Co-Pilot HUD or AI Insights panel depending on mode */}
-            <View style={{ flex: panelFlex, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: colors.border }}>
+            {/* Right: AI Insights / Co-Pilot pane — strict 50% of screen */}
+            <View style={{ flex: 1, borderLeftWidth: 1, borderLeftColor: "#30363D", backgroundColor: "#161B22" }}>
               {mode === "copilot" ? (
                 <View style={{ flex: 1, flexDirection: "column" }}>
                   <CoPilotHUD
