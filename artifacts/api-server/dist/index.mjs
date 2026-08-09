@@ -122804,6 +122804,44 @@ router30.patch("/users/:id", requireAuth, requireSuperAdmin, async (req, res) =>
     createdAt: updated.createdAt.toISOString()
   });
 });
+router30.post("/resynthesize-opportunities", async (req, res) => {
+  const envToken = process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN;
+  const headerToken = req.headers["x-admin-token"];
+  const tokenOk = envToken && typeof headerToken === "string" && headerToken === envToken;
+  if (!tokenOk) return res.status(403).json({ error: "Forbidden" });
+  const rows = await db.select({
+    id: analysisResultsTable.id,
+    companyId: analysisResultsTable.companyId,
+    inspectionId: analysisResultsTable.inspectionId,
+    findings: analysisResultsTable.findings
+  }).from(analysisResultsTable);
+  const eligible = rows.filter((r) => Array.isArray(r.findings) && r.findings.length > 0);
+  let processed = 0;
+  let failed = 0;
+  const errors = [];
+  for (const row of eligible) {
+    try {
+      await runOpportunitySynthesis({
+        companyId: row.companyId,
+        inspectionId: row.inspectionId,
+        findings: row.findings
+      });
+      processed++;
+    } catch (err) {
+      failed++;
+      errors.push({
+        analysisId: row.id,
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
+  }
+  return res.json({
+    total: eligible.length,
+    processed,
+    failed,
+    errors
+  });
+});
 var admin_default = router30;
 
 // src/routes/transcribe.ts

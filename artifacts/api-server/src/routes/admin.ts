@@ -6,8 +6,9 @@
  */
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { usersTable, companiesTable, type UserRole } from "@workspace/db";
+import { usersTable, companiesTable, analysisResultsTable, type UserRole } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { runOpportunitySynthesis } from "../lib/opportunity-ai";
 import { requireAuth, requireSuperAdmin } from "../middleware/require-auth";
 
 const router: IRouter = Router();
@@ -117,6 +118,57 @@ router.patch("/users/:id", requireAuth, requireSuperAdmin, async (req, res) => {
     betaAccess: updated.betaAccess,
     companyId: updated.companyId,
     createdAt: updated.createdAt.toISOString(),
+  });
+});
+
+// ── POST /resynthesize-opportunities ─────────────────────────────────────────
+// Re-runs opportunity synthesis for every completed analysis result in the DB.
+// Safe to call multiple times — synthesis itself is idempotent (strengthens
+// existing open opportunities rather than duplicating them).
+// Accepts either full Clerk auth+superAdmin OR the SUPER_ADMIN_BOOTSTRAP_TOKEN
+// header for shell/script access.
+router.post("/resynthesize-opportunities", async (req, res) => {
+  const envToken = process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN;
+  const headerToken = req.headers["x-admin-token"];
+  const tokenOk = envToken && typeof headerToken === "string" && headerToken === envToken;
+  if (!tokenOk) return res.status(403).json({ error: "Forbidden" });
+  const rows = await db
+    .select({
+      id: analysisResultsTable.id,
+      companyId: analysisResultsTable.companyId,
+      inspectionId: analysisResultsTable.inspectionId,
+      findings: analysisResultsTable.findings,
+    })
+    .from(analysisResultsTable);
+
+  const eligible = rows.filter((r) => Array.isArray(r.findings) && r.findings.length > 0);
+
+  let processed = 0;
+  let failed = 0;
+  const errors: { analysisId: number; error: string }[] = [];
+
+  for (const row of eligible) {
+    try {
+      await runOpportunitySynthesis({
+        companyId: row.companyId,
+        inspectionId: row.inspectionId,
+        findings: row.findings as Parameters<typeof runOpportunitySynthesis>[0]["findings"],
+      });
+      processed++;
+    } catch (err) {
+      failed++;
+      errors.push({
+        analysisId: row.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return res.json({
+    total: eligible.length,
+    processed,
+    failed,
+    errors,
   });
 });
 
