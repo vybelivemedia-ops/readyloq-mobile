@@ -2,6 +2,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
 
+// Lazily resolved so the delivery registry module is not imported at module
+// initialisation time (avoids issues with module load order in the RN bundler).
+let _getDeliveryMethod: ((id: string) => { supportsAutoRetry?: boolean } | undefined) | null = null;
+function getDeliveryMethodLazy(id: string): { supportsAutoRetry?: boolean } | undefined {
+  if (!_getDeliveryMethod) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    _getDeliveryMethod = require("@/lib/delivery/registry").getDeliveryMethod as typeof _getDeliveryMethod;
+  }
+  return _getDeliveryMethod?.(id);
+}
+
 /**
  * Local-first inspection store — the single source of truth for in-progress
  * and pending-sync inspections on this device.
@@ -129,6 +140,29 @@ export type LocalInspection = {
    * Updated by the delivery section on every successful hand-off.
    */
   lastDeliveredAt: string | null;
+  /**
+   * Delivery attempts that failed (e.g. offline, weak signal, OS error) and
+   * are waiting for the technician to retry or, for server-push channels, for
+   * the sync engine to auto-retry on reconnection.
+   *
+   * Each entry records the delivery channel and enough context to rebuild the
+   * delivery (subject, body, customerSummaryUrl) — the PDF is regenerated
+   * fresh on retry since it is never persisted to disk.
+   */
+  pendingDeliveries: Array<{
+    /** Delivery method id (matches DeliveryMethod.id in the registry). */
+    methodId: string;
+    /** Human-readable label for the UI indicator. */
+    label: string;
+    /** ISO timestamp when the failed attempt was queued. */
+    queuedAt: string;
+    /** Delivery context minus pdfUri (regenerated on retry). */
+    context: {
+      subject: string;
+      body: string;
+      customerSummaryUrl: string | null;
+    };
+  }>;
 };
 
 const INDEX_KEY = "readyloq.local-inspections.index.v1";
@@ -188,6 +222,7 @@ export function newLocalInspection(
     allFindingsReviewed: false,
     pendingCorrections: [],
     lastDeliveredAt: null,
+    pendingDeliveries: [],
   };
 }
 
@@ -318,6 +353,18 @@ export function hasPendingWork(record: LocalInspection): boolean {
   // #95 — pending finding corrections queued while offline
   if ((record.pendingCorrections ?? []).length > 0) return true;
   if (record.completed && !record.serverCompleted) return true;
+  // Pending deliveries that support background auto-retry (server-push channels)
+  // keep the record in the sync scheduler so reconnection triggers the retry.
+  // Interactive-only channels (email, share, print) are NOT counted here —
+  // they require the technician to tap Retry and must not prevent the inspection
+  // from reaching "synced" status.
+  if (
+    (record.pendingDeliveries ?? []).some(
+      (d) => getDeliveryMethodLazy(d.methodId)?.supportsAutoRetry === true,
+    )
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -343,6 +390,7 @@ function parseRecord(raw: string): LocalInspection | null {
     rec.pendingCorrections ??= [];
     rec.baitStations ??= [];
     rec.lastDeliveredAt ??= null;
+    rec.pendingDeliveries ??= [];
     return rec;
   } catch {
     return null;

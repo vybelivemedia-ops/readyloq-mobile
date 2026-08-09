@@ -12,6 +12,7 @@ import {
   updateBaitStation,
 } from "@/lib/api-client/bait-stations";
 import { correctFinding } from "@/lib/api-client/corrections";
+import { getDeliveryMethod } from "@/lib/delivery/registry";
 import {
   getLocalInspection,
   hasPendingWork,
@@ -370,6 +371,41 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
         r.serverCompleted = true;
         r.reportId = result.reportId ?? r.reportId;
       });
+    }
+
+    // 7. Delivery retry — re-attempt any pending deliveries for channels that
+    // support background auto-retry (server-push: SMS gateway, CRM webhook,
+    // portal push, etc.). Interactive OS-sheet channels (email, share, print)
+    // have supportsAutoRetry === false/undefined and are skipped here; they
+    // remain in the queue as a visible indicator on the summary screen so the
+    // technician can tap "Retry" when they are ready.
+    const pendingDeliveries = rec.pendingDeliveries ?? [];
+    if (pendingDeliveries.length > 0) {
+      const stillPending: typeof pendingDeliveries = [];
+      for (const entry of pendingDeliveries) {
+        const method = getDeliveryMethod(entry.methodId);
+        if (!method?.supportsAutoRetry) {
+          // Interactive or unknown method — leave in queue for manual retry.
+          stillPending.push(entry);
+          continue;
+        }
+        try {
+          // Server-push methods don't open OS UI and don't need a local PDF.
+          await method.deliver({ pdfUri: "", ...entry.context });
+          // On success the entry is dropped (not pushed to stillPending).
+        } catch {
+          // Non-fatal: keep in queue; next sync pass will retry.
+          stillPending.push(entry);
+        }
+      }
+      if (stillPending.length !== pendingDeliveries.length) {
+        await merge((r) => {
+          r.pendingDeliveries = stillPending;
+          if (stillPending.length === 0) {
+            r.lastDeliveredAt = new Date().toISOString();
+          }
+        });
+      }
     }
 
     await merge((r) => {

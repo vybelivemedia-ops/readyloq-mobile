@@ -475,6 +475,10 @@ export default function InspectionSummaryScreen() {
  * appear here automatically when registered). The PDF is generated fresh from
  * LOCAL data on each delivery, so it works fully offline and always reflects
  * the latest synced findings.
+ *
+ * Failed delivery attempts are persisted in `record.pendingDeliveries` so
+ * technicians don't lose sends made on poor signal. A banner shows the queued
+ * count and lets the technician retry once connectivity returns.
  */
 function DeliverySection({
   record,
@@ -519,6 +523,18 @@ function DeliverySection({
 
   if (methods.length === 0) return null;
 
+  // Soft context (no pdfUri) — used both for delivery and for queueing failures.
+  const buildSoftContext = () => ({
+    subject: `Inspection report — ${record.siteAddress || "your property"}`,
+    body:
+      `Hi${record.clientName ? ` ${record.clientName}` : ""},\n\n` +
+      `Please find your inspection report attached` +
+      `${companyName ? ` from ${companyName}` : ""}. ` +
+      `It covers the full photo evidence${analysisComplete ? " and our findings" : ""} from the visit.\n\n` +
+      `Thank you!`,
+    customerSummaryUrl,
+  });
+
   const buildDeliveryContext = async () => {
     const pdfUri = await generateReportPdf({
       record,
@@ -528,20 +544,19 @@ function DeliverySection({
       analysisComplete,
       companyName,
     });
-    return {
-      pdfUri,
-      subject: `Inspection report — ${record.siteAddress || "your property"}`,
-      body:
-        `Hi${record.clientName ? ` ${record.clientName}` : ""},\n\n` +
-        `Please find your inspection report attached` +
-        `${companyName ? ` from ${companyName}` : ""}. ` +
-        `It covers the full photo evidence${analysisComplete ? " and our findings" : ""} from the visit.\n\n` +
-        `Thank you!`,
-      customerSummaryUrl,
-    };
+    return { pdfUri, ...buildSoftContext() };
   };
 
-  const deliver = async (method: DeliveryMethod) => {
+  /**
+   * Attempt delivery for `method`. On success, stamp `lastDeliveredAt` and
+   * remove any queued entry for this channel. On failure for an outbound
+   * (non-preview) channel, persist the intent to `pendingDeliveries` so it
+   * survives app restarts and surfaces a retry indicator on this screen.
+   *
+   * @param clearFromQueue When true, a successful delivery also removes this
+   *   method's entry from `pendingDeliveries` (used when retrying a queued send).
+   */
+  const deliver = async (method: DeliveryMethod, clearFromQueue = false) => {
     if (busyId || !photosReady) return;
     setBusyId(method.id);
     try {
@@ -551,13 +566,40 @@ function DeliverySection({
       if (method.id !== "preview") {
         void updateLocalInspection(record.localId, (r) => {
           r.lastDeliveredAt = new Date().toISOString();
+          if (clearFromQueue) {
+            r.pendingDeliveries = r.pendingDeliveries.filter(
+              (d) => d.methodId !== method.id,
+            );
+          }
         });
       }
     } catch (err) {
-      Alert.alert(
-        method.id === "preview" ? "Preview failed" : "Delivery failed",
-        err instanceof Error ? err.message : "Something went wrong. Please try again.",
-      );
+      if (method.id === "preview") {
+        // Preview failures are ephemeral — the PDF viewer opens/closes locally.
+        Alert.alert(
+          "Preview failed",
+          err instanceof Error ? err.message : "Something went wrong. Please try again.",
+        );
+      } else {
+        // Queue the intent so the technician can retry after connectivity returns.
+        void updateLocalInspection(record.localId, (r) => {
+          const alreadyQueued = r.pendingDeliveries.some(
+            (d) => d.methodId === method.id,
+          );
+          if (!alreadyQueued) {
+            r.pendingDeliveries.push({
+              methodId: method.id,
+              label: method.label,
+              queuedAt: new Date().toISOString(),
+              context: buildSoftContext(),
+            });
+          }
+        });
+        Alert.alert(
+          "Delivery queued",
+          `Couldn't send via ${method.label} right now. It's been saved — tap Retry on the banner when you're back online.`,
+        );
+      }
     } finally {
       setBusyId(null);
     }
@@ -565,6 +607,7 @@ function DeliverySection({
 
   const previewMethod = methods.find((m) => m.id === "preview");
   const deliveryMethods = methods.filter((m) => m.id !== "preview");
+  const pendingDeliveries = record.pendingDeliveries ?? [];
 
   return (
     <Card style={{ gap: 10 }}>
@@ -579,6 +622,80 @@ function DeliverySection({
           and analysis finish.
         </Text>
       ) : null}
+
+      {/* Queued-delivery indicator — shown when one or more sends failed and
+          were persisted for retry. Each pending entry gets a Retry button that
+          re-invokes the full deliver flow and clears the entry on success.
+          The header copy distinguishes auto-retry channels (server-push, future
+          SMS / CRM) from interactive channels (email, share, print) which
+          require the technician to tap Retry manually. */}
+      {pendingDeliveries.length > 0 ? (() => {
+        const hasAutoRetry = pendingDeliveries.some(
+          (d) => methods.find((m) => m.id === d.methodId)?.supportsAutoRetry,
+        );
+        const headerText = hasAutoRetry
+          ? "Delivery pending — will send when back online"
+          : "Delivery queued — tap Retry to resend";
+        return (
+        <View
+          style={{
+            backgroundColor: colors.warning + "22",
+            borderWidth: 1,
+            borderColor: colors.warning + "66",
+            borderRadius: 10,
+            padding: 12,
+            gap: 10,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="time-outline" size={17} color={colors.warning} />
+            <Text style={{ color: colors.warning, fontFamily: "Inter_600SemiBold", fontSize: 13, flex: 1 }}>
+              {headerText}
+            </Text>
+          </View>
+          {pendingDeliveries.map((entry) => {
+            const retryMethod = methods.find((m) => m.id === entry.methodId);
+            const retryBusy = busyId === entry.methodId;
+            return (
+              <View
+                key={entry.methodId}
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <Ionicons
+                  name={(retryMethod?.icon ?? "alert-circle-outline") as keyof typeof Ionicons.glyphMap}
+                  size={14}
+                  color={colors.mutedForeground}
+                />
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
+                  {entry.label}
+                </Text>
+                {retryMethod ? (
+                  <Pressable
+                    disabled={busyId != null || !photosReady}
+                    onPress={() => void deliver(retryMethod, true)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                      backgroundColor: colors.primary,
+                      opacity: busyId != null && !retryBusy ? 0.5 : 1,
+                    }}
+                  >
+                    {retryBusy ? (
+                      <ActivityIndicator size="small" color={colors.primaryForeground} />
+                    ) : (
+                      <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                        Retry
+                      </Text>
+                    )}
+                  </Pressable>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+        );
+      })() : null}
 
       {/* Preview button — full-width, primary style, shown above delivery buttons */}
       {previewMethod ? (() => {

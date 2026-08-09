@@ -34,6 +34,13 @@ export interface DeliveryMethod {
    * been dismissed; throws only on genuine failure (surfaced to the user).
    */
   deliver: (ctx: DeliveryContext) => Promise<void>;
+  /**
+   * When true the sync engine may call `deliver` automatically on reconnection
+   * (server-push channels: SMS gateway, CRM webhook, portal push, etc.).
+   * Interactive OS-sheet channels (email, share, print) MUST leave this unset
+   * or false — the OS cannot open a dialog in the background.
+   */
+  supportsAutoRetry?: boolean;
 }
 
 const methods: DeliveryMethod[] = [];
@@ -42,6 +49,11 @@ export function registerDeliveryMethod(method: DeliveryMethod): void {
   const existing = methods.findIndex((m) => m.id === method.id);
   if (existing >= 0) methods.splice(existing, 1, method);
   else methods.push(method);
+}
+
+/** Look up a registered method by id (returns undefined when not found). */
+export function getDeliveryMethod(id: string): DeliveryMethod | undefined {
+  return methods.find((m) => m.id === id);
 }
 
 /** Resolves the registered methods that are usable on this device, in order. */
