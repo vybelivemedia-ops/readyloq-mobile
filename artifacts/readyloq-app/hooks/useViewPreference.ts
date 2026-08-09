@@ -10,14 +10,29 @@
  * Default: 'auto' (respects the server-supplied `isSoloOperator` flag from the
  * briefing API).  Once the owner explicitly picks a mode it is stored locally
  * and takes precedence over the server value.
+ *
+ * All mounted instances of this hook share state via a module-level EventEmitter,
+ * so changing the mode in one tab (e.g. Settings) is immediately reflected in
+ * every other mounted consumer (e.g. Dashboard) without requiring a focus event
+ * or a full re-render of the tab.
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
+import { EventEmitter } from "events";
 
 export type ViewMode = "solo" | "enterprise";
 
 const STORAGE_KEY = "@readyloq/view_mode";
+
+// Module-level emitter — one instance for the lifetime of the JS bundle.
+// All hook instances subscribe to this so writes in any one instance
+// immediately propagate to all others.
+const emitter = new EventEmitter();
+const CHANGE_EVENT = "viewModeChanged";
+
+// Avoid Node's default 10-listener warning; realistically only a few tabs mount.
+emitter.setMaxListeners(20);
 
 export interface UseViewPreferenceResult {
   /** Persisted preference, or null while loading / never set. */
@@ -28,43 +43,53 @@ export interface UseViewPreferenceResult {
   setMode: (mode: ViewMode) => Promise<void>;
   /** Clear the override — dashboard falls back to the server value. */
   clearMode: () => Promise<void>;
-  /** Re-read from AsyncStorage (call from useFocusEffect to pick up changes made on other screens). */
-  reload: () => Promise<void>;
 }
 
 export function useViewPreference(): UseViewPreferenceResult {
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const readFromStorage = useCallback(async () => {
-    try {
-      const saved = await AsyncStorage.getItem(STORAGE_KEY);
-      if (saved === "solo" || saved === "enterprise") setViewMode(saved);
-      else setViewMode(null);
-    } catch {
-      /* non-fatal */
-    }
+  // Read initial value from AsyncStorage on mount.
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((saved) => {
+        if (!cancelled) {
+          if (saved === "solo" || saved === "enterprise") setViewMode(saved);
+          else setViewMode(null);
+        }
+      })
+      .catch(() => {/* non-fatal */})
+      .finally(() => {
+        if (!cancelled) setIsLoaded(true);
+      });
+    return () => { cancelled = true; };
   }, []);
 
+  // Subscribe to cross-instance updates from the module-level emitter.
   useEffect(() => {
-    readFromStorage().finally(() => setIsLoaded(true));
-  }, [readFromStorage]);
+    const handler = (mode: ViewMode | null) => {
+      setViewMode(mode);
+    };
+    emitter.on(CHANGE_EVENT, handler);
+    return () => {
+      emitter.off(CHANGE_EVENT, handler);
+    };
+  }, []);
 
   const setMode = useCallback(async (mode: ViewMode) => {
     setViewMode(mode);
+    emitter.emit(CHANGE_EVENT, mode);
     await AsyncStorage.setItem(STORAGE_KEY, mode).catch(() => {/* non-fatal */});
   }, []);
 
   const clearMode = useCallback(async () => {
     setViewMode(null);
+    emitter.emit(CHANGE_EVENT, null);
     await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {/* non-fatal */});
   }, []);
 
-  const reload = useCallback(async () => {
-    await readFromStorage();
-  }, [readFromStorage]);
-
-  return { viewMode, isLoaded, setMode, clearMode, reload };
+  return { viewMode, isLoaded, setMode, clearMode };
 }
 
 /**

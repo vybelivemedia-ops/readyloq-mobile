@@ -20,8 +20,8 @@ import {
   getListReportsQueryOptions,
 } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { type Href, useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import { type Href, useRouter } from "expo-router";
+import React from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { MissionControlDashboard } from "@/components/MissionControlDashboard";
@@ -467,15 +467,7 @@ export default function DashboardScreen() {
   const isManager = role === "manager";
   const isOwner   = role === "owner";
 
-  const { viewMode, reload: reloadViewMode } = useViewPreference();
-
-  // Re-read the view preference whenever this screen comes into focus,
-  // so changes made in Settings are reflected immediately on return.
-  useFocusEffect(
-    useCallback(() => {
-      void reloadViewMode();
-    }, [reloadViewMode]),
-  );
+  const { viewMode } = useViewPreference();
 
   const briefing = useQuery(getGetBriefingQueryOptions());
   const dash     = useQuery(getGetAnalyticsDashboardQueryOptions());
