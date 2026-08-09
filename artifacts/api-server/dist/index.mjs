@@ -57296,6 +57296,7 @@ __export(schema_exports, {
   insertLeadSchema: () => insertLeadSchema,
   insertMessageSchema: () => insertMessageSchema,
   insertProductSchema: () => insertProductSchema,
+  insertPropertyMemorySchema: () => insertPropertyMemorySchema,
   insertPropertyNoteSchema: () => insertPropertyNoteSchema,
   insertPropertyProfileSchema: () => insertPropertyProfileSchema,
   insertQuizSchema: () => insertQuizSchema,
@@ -57320,6 +57321,7 @@ __export(schema_exports, {
   productLabelRulesTable: () => productLabelRulesTable,
   productWithRulesSchema: () => productWithRulesSchema,
   productsTable: () => productsTable,
+  propertyMemoryTable: () => propertyMemoryTable,
   propertyNotesTable: () => propertyNotesTable,
   propertyProfilesTable: () => propertyProfilesTable,
   quizzesTable: () => quizzesTable,
@@ -69089,8 +69091,32 @@ var propertyNotesTable = pgTable("property_notes", {
   authorName: text("author_name"),
   createdAt: timestamp("created_at").notNull().defaultNow()
 });
+var propertyMemoryTable = pgTable(
+  "property_memory",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id),
+    addressKey: text("address_key").notNull(),
+    // The canonical display address stored alongside the key for easy rendering.
+    siteAddress: text("site_address").notNull(),
+    // FK to the most recent inspection that contributed to this memory row.
+    lastInspectionId: integer("last_inspection_id").references(() => inspectionsTable.id, { onDelete: "set null" }),
+    lastVisitedAt: timestamp("last_visited_at"),
+    // AI-distilled list of pest species identified across all prior visits.
+    historicalPests: jsonb("historical_pests").$type().default([]),
+    // AI-summarised recurring findings (description + category + frequency).
+    historicalFindings: jsonb("historical_findings").$type().default([]),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow()
+  },
+  (t) => ({
+    // Primary lookup: one memory row per (company, address).
+    companyAddressIdx: index("property_memory_company_address_idx").on(t.companyId, t.addressKey)
+  })
+);
 var insertPropertyProfileSchema = createInsertSchema(propertyProfilesTable).omit({ id: true, createdAt: true, updatedAt: true, companyId: true });
 var insertPropertyNoteSchema = createInsertSchema(propertyNotesTable).omit({ id: true, createdAt: true, companyId: true });
+var insertPropertyMemorySchema = createInsertSchema(propertyMemoryTable).omit({ id: true, createdAt: true, updatedAt: true, companyId: true });
 
 // ../../lib/db/src/schema/leads.ts
 var leadsTable = pgTable("leads", {
@@ -91944,6 +91970,72 @@ async function buildFeed(addressKey, companyId) {
     notes: notes.map((n) => ({ ...n, createdAt: iso2(n.createdAt) }))
   };
 }
+router11.get("/memory", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const siteAddress = typeof req.query.siteAddress === "string" ? req.query.siteAddress : "";
+    if (!siteAddress.trim()) {
+      return res.status(400).json({ error: "siteAddress query parameter is required" });
+    }
+    const key = normalizeAddressKey(siteAddress);
+    const [row] = await db.select().from(propertyMemoryTable).where(and(eq(propertyMemoryTable.companyId, companyId), eq(propertyMemoryTable.addressKey, key))).limit(1);
+    if (!row) return res.json({ found: false });
+    return res.json({ found: true, data: row });
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch property memory" });
+  }
+});
+var memoryInputSchema = external_exports.object({
+  siteAddress: external_exports.string().min(1),
+  lastInspectionId: external_exports.number().int().optional(),
+  lastVisitedAt: external_exports.string().datetime().optional(),
+  historicalPests: external_exports.array(external_exports.string()).optional(),
+  historicalFindings: external_exports.array(
+    external_exports.object({
+      category: external_exports.string(),
+      description: external_exports.string(),
+      frequency: external_exports.number().int().min(1),
+      severity: external_exports.enum(["low", "medium", "high"]).optional()
+    })
+  ).optional()
+});
+router11.put("/memory", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const parsed = memoryInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", issues: parsed.error.issues });
+    }
+    const { siteAddress, lastInspectionId, lastVisitedAt, historicalPests, historicalFindings } = parsed.data;
+    const key = normalizeAddressKey(siteAddress);
+    if (!key) return res.status(400).json({ error: "Could not normalize siteAddress" });
+    const [existing] = await db.select().from(propertyMemoryTable).where(and(eq(propertyMemoryTable.companyId, companyId), eq(propertyMemoryTable.addressKey, key))).limit(1);
+    const now = /* @__PURE__ */ new Date();
+    if (existing) {
+      const [updated] = await db.update(propertyMemoryTable).set({
+        siteAddress,
+        lastInspectionId: lastInspectionId ?? existing.lastInspectionId,
+        lastVisitedAt: lastVisitedAt ? new Date(lastVisitedAt) : existing.lastVisitedAt,
+        historicalPests: historicalPests ?? existing.historicalPests,
+        historicalFindings: historicalFindings ?? existing.historicalFindings,
+        updatedAt: now
+      }).where(and(eq(propertyMemoryTable.companyId, companyId), eq(propertyMemoryTable.addressKey, key))).returning();
+      return res.json({ found: true, data: updated });
+    }
+    const [created] = await db.insert(propertyMemoryTable).values({
+      companyId,
+      addressKey: key,
+      siteAddress,
+      lastInspectionId: lastInspectionId ?? null,
+      lastVisitedAt: lastVisitedAt ? new Date(lastVisitedAt) : null,
+      historicalPests: historicalPests ?? [],
+      historicalFindings: historicalFindings ?? []
+    }).returning();
+    return res.status(201).json({ found: true, data: created });
+  } catch {
+    return res.status(500).json({ error: "Failed to upsert property memory" });
+  }
+});
 router11.get("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);

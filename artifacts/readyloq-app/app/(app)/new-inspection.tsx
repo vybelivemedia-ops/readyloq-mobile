@@ -50,7 +50,7 @@ import { useColors } from "@/hooks/useColors";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { PEST_TYPES, PROPERTY_TYPES } from "@/constants/inspection";
-import { ApiError } from "@/lib/api";
+import { ApiError, fetchPropertyMemory, type PropertyMemoryData } from "@/lib/api";
 import { ingestAllUploadedPhotos } from "@/lib/faie-ingest";
 import { consumeLastMeasurementReading } from "@/lib/measurement";
 import {
@@ -273,6 +273,31 @@ export default function NewInspectionScreen() {
 
   // ── Offline status (T003) ─────────────────────────────────────────────────
   const { isConnected } = useNetworkStatus();
+
+  // ── Property memory — prior-visit context banner ──────────────────────────
+  const [propertyMemory, setPropertyMemory] = useState<PropertyMemoryData | null>(null);
+
+  useEffect(() => {
+    if (siteAddress.trim().length < 6) {
+      setPropertyMemory(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      getToken()
+        .then((token) => fetchPropertyMemory(token, siteAddress))
+        .then((res) => {
+          if (!cancelled) setPropertyMemory(res.found ? res.data : null);
+        })
+        .catch(() => {
+          // Non-blocking — failure just means no banner is shown.
+        });
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [siteAddress, getToken]);
 
   // Clean up any live recording if the screen is dismissed mid-dictation.
   useEffect(() => {
@@ -2656,6 +2681,47 @@ export default function NewInspectionScreen() {
             style={wsInspectionId != null ? { opacity: 0.5 } : undefined}
           />
         </View>
+
+        {/* ── Prior Visit Memory Banner ───────────────────────────────────── */}
+        {propertyMemory && (
+          <View
+            style={{
+              backgroundColor: "#0D1117",
+              borderWidth: 1,
+              borderColor: "#1C2235",
+              borderRadius: 10,
+              padding: 12,
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: 10,
+            }}
+          >
+            <Ionicons name="time-outline" size={18} color="#17c4d3" style={{ marginTop: 1 }} />
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={{ color: "#17c4d3", fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 0.4 }}>
+                PRIOR VISIT DETECTED
+              </Text>
+              {propertyMemory.lastVisitedAt ? (
+                <Text style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                  Last visit: {new Date(propertyMemory.lastVisitedAt).toLocaleDateString()}
+                </Text>
+              ) : null}
+              {propertyMemory.historicalPests.length > 0 ? (
+                <Text style={{ color: "rgba(255,255,255,0.75)", fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>
+                  Known pests: {propertyMemory.historicalPests.join(", ")}
+                </Text>
+              ) : null}
+              {propertyMemory.historicalFindings.length > 0 ? (
+                <Text style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 2 }}>
+                  {propertyMemory.historicalFindings.slice(0, 2).map((f) => f.description).join(" · ")}
+                  {propertyMemory.historicalFindings.length > 2
+                    ? ` · +${propertyMemory.historicalFindings.length - 2} more`
+                    : ""}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        )}
 
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>

@@ -326,11 +326,200 @@ export declare const propertyNotesTable: import("drizzle-orm/pg-core").PgTableWi
     };
     dialect: "pg";
 }>;
+export declare const propertyMemoryTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
+    name: "property_memory";
+    schema: undefined;
+    columns: {
+        id: import("drizzle-orm/pg-core").PgColumn<{
+            name: "id";
+            tableName: "property_memory";
+            dataType: "number";
+            columnType: "PgSerial";
+            data: number;
+            driverParam: number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: true;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        companyId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "company_id";
+            tableName: "property_memory";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        addressKey: import("drizzle-orm/pg-core").PgColumn<{
+            name: "address_key";
+            tableName: "property_memory";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        siteAddress: import("drizzle-orm/pg-core").PgColumn<{
+            name: "site_address";
+            tableName: "property_memory";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        lastInspectionId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "last_inspection_id";
+            tableName: "property_memory";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        lastVisitedAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "last_visited_at";
+            tableName: "property_memory";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        historicalPests: import("drizzle-orm/pg-core").PgColumn<{
+            name: "historical_pests";
+            tableName: "property_memory";
+            dataType: "json";
+            columnType: "PgJsonb";
+            data: string[];
+            driverParam: unknown;
+            notNull: false;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: string[];
+        }>;
+        historicalFindings: import("drizzle-orm/pg-core").PgColumn<{
+            name: "historical_findings";
+            tableName: "property_memory";
+            dataType: "json";
+            columnType: "PgJsonb";
+            data: HistoricalFinding[];
+            driverParam: unknown;
+            notNull: false;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: HistoricalFinding[];
+        }>;
+        createdAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "created_at";
+            tableName: "property_memory";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        updatedAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "updated_at";
+            tableName: "property_memory";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+    };
+    dialect: "pg";
+}>;
+export interface HistoricalFinding {
+    category: string;
+    description: string;
+    /** Number of visits where this finding appeared. */
+    frequency: number;
+    /** Most recently seen severity level. */
+    severity?: "low" | "medium" | "high";
+}
 export declare const insertPropertyProfileSchema: z.ZodObject<{
+    addressKey: z.ZodString;
     siteAddress: z.ZodString;
     clientName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     propertyType: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    addressKey: z.ZodString;
     technicianKnowledge: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     hotspots: z.ZodOptional<z.ZodNullable<z.ZodType<Hotspot[], Hotspot[], z.core.$ZodTypeInternals<Hotspot[], Hotspot[]>>>>;
 }, {
@@ -338,11 +527,22 @@ export declare const insertPropertyProfileSchema: z.ZodObject<{
     in: {};
 }>;
 export declare const insertPropertyNoteSchema: z.ZodObject<{
-    category: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     addressKey: z.ZodString;
     note: z.ZodString;
     zone: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    category: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     authorName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+}, {
+    out: {};
+    in: {};
+}>;
+export declare const insertPropertyMemorySchema: z.ZodObject<{
+    addressKey: z.ZodString;
+    siteAddress: z.ZodString;
+    lastInspectionId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
+    lastVisitedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
+    historicalPests: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;
+    historicalFindings: z.ZodOptional<z.ZodNullable<z.ZodType<HistoricalFinding[], HistoricalFinding[], z.core.$ZodTypeInternals<HistoricalFinding[], HistoricalFinding[]>>>>;
 }, {
     out: {};
     in: {};
@@ -351,4 +551,6 @@ export type PropertyProfile = typeof propertyProfilesTable.$inferSelect;
 export type InsertPropertyProfile = z.infer<typeof insertPropertyProfileSchema>;
 export type PropertyNote = typeof propertyNotesTable.$inferSelect;
 export type InsertPropertyNote = z.infer<typeof insertPropertyNoteSchema>;
+export type PropertyMemory = typeof propertyMemoryTable.$inferSelect;
+export type InsertPropertyMemory = z.infer<typeof insertPropertyMemorySchema>;
 //# sourceMappingURL=properties.d.ts.map

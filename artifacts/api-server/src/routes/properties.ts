@@ -6,8 +6,10 @@ import {
   analysisResultsTable,
   propertyProfilesTable,
   propertyNotesTable,
+  propertyMemoryTable,
   type Finding,
   type Hotspot,
+  type HistoricalFinding,
 } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -236,6 +238,103 @@ async function buildFeed(addressKey: string, companyId: number) {
     notes: notes.map((n) => ({ ...n, createdAt: iso(n.createdAt) as string })),
   };
 }
+
+// ─── Property Memory ──────────────────────────────────────────────────────────
+
+// GET /properties/memory?siteAddress=...
+// Returns the AI-synthesized memory row for this (company, address) pair.
+// Returns 200 { found: false } when no prior memory exists — not a 404 — so
+// the mobile client can handle both branches without special-casing errors.
+router.get("/memory", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const siteAddress = typeof req.query.siteAddress === "string" ? req.query.siteAddress : "";
+    if (!siteAddress.trim()) {
+      return res.status(400).json({ error: "siteAddress query parameter is required" });
+    }
+    const key = normalizeAddressKey(siteAddress);
+    const [row] = await db
+      .select()
+      .from(propertyMemoryTable)
+      .where(and(eq(propertyMemoryTable.companyId, companyId), eq(propertyMemoryTable.addressKey, key)))
+      .limit(1);
+    if (!row) return res.json({ found: false });
+    return res.json({ found: true, data: row });
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch property memory" });
+  }
+});
+
+// PUT /properties/memory
+// Upsert the AI-synthesized memory for a (company, address) pair.
+// Called by the inspection-completion pipeline after analysis is ready.
+const memoryInputSchema = z.object({
+  siteAddress: z.string().min(1),
+  lastInspectionId: z.number().int().optional(),
+  lastVisitedAt: z.string().datetime().optional(),
+  historicalPests: z.array(z.string()).optional(),
+  historicalFindings: z.array(
+    z.object({
+      category: z.string(),
+      description: z.string(),
+      frequency: z.number().int().min(1),
+      severity: z.enum(["low", "medium", "high"]).optional(),
+    }),
+  ).optional(),
+});
+
+router.put("/memory", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const parsed = memoryInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request body", issues: parsed.error.issues });
+    }
+    const { siteAddress, lastInspectionId, lastVisitedAt, historicalPests, historicalFindings } =
+      parsed.data;
+    const key = normalizeAddressKey(siteAddress);
+    if (!key) return res.status(400).json({ error: "Could not normalize siteAddress" });
+
+    const [existing] = await db
+      .select()
+      .from(propertyMemoryTable)
+      .where(and(eq(propertyMemoryTable.companyId, companyId), eq(propertyMemoryTable.addressKey, key)))
+      .limit(1);
+
+    const now = new Date();
+    if (existing) {
+      const [updated] = await db
+        .update(propertyMemoryTable)
+        .set({
+          siteAddress,
+          lastInspectionId: lastInspectionId ?? existing.lastInspectionId,
+          lastVisitedAt: lastVisitedAt ? new Date(lastVisitedAt) : existing.lastVisitedAt,
+          historicalPests: historicalPests ?? existing.historicalPests,
+          historicalFindings: (historicalFindings ?? existing.historicalFindings) as HistoricalFinding[],
+          updatedAt: now,
+        })
+        .where(and(eq(propertyMemoryTable.companyId, companyId), eq(propertyMemoryTable.addressKey, key)))
+        .returning();
+      return res.json({ found: true, data: updated });
+    }
+
+    const [created] = await db
+      .insert(propertyMemoryTable)
+      .values({
+        companyId,
+        addressKey: key,
+        siteAddress,
+        lastInspectionId: lastInspectionId ?? null,
+        lastVisitedAt: lastVisitedAt ? new Date(lastVisitedAt) : null,
+        historicalPests: historicalPests ?? [],
+        historicalFindings: (historicalFindings ?? []) as HistoricalFinding[],
+      })
+      .returning();
+    return res.status(201).json({ found: true, data: created });
+  } catch {
+    return res.status(500).json({ error: "Failed to upsert property memory" });
+  }
+});
 
 // GET /properties — list known properties with intelligence summary
 router.get("/", async (req, res) => {

@@ -176,6 +176,39 @@ export function reopenInspection(token: string | null, id: number) {
   });
 }
 
+// ─── Property memory ─────────────────────────────────────────────────────────
+
+export interface HistoricalFinding {
+  category: string;
+  description: string;
+  frequency: number;
+  severity?: "low" | "medium" | "high";
+}
+
+export interface PropertyMemoryData {
+  id: number;
+  companyId: number;
+  addressKey: string;
+  siteAddress: string;
+  lastInspectionId: number | null;
+  lastVisitedAt: string | null;
+  historicalPests: string[];
+  historicalFindings: HistoricalFinding[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PropertyMemoryResponse =
+  | { found: false }
+  | { found: true; data: PropertyMemoryData };
+
+export function fetchPropertyMemory(token: string | null, siteAddress: string) {
+  return request<PropertyMemoryResponse>(
+    `/api/properties/memory?siteAddress=${encodeURIComponent(siteAddress)}`,
+    token,
+  );
+}
+
 // ─── Bulk dataset ingestion ───────────────────────────────────────────────────
 
 export interface BulkIngestMetadata {
