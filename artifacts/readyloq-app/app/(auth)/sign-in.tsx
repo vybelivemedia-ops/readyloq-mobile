@@ -9,36 +9,55 @@ import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
 import { useColors } from "@/hooks/useColors";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { clerkErrorMessage } from "@/lib/clerkErrors";
+
+const OFFLINE_MESSAGE = "No internet connection — check your signal and try again.";
+
+function isNetworkError(err: unknown): boolean {
+  if (!err) return false;
+  const msg = (err as { message?: string }).message ?? String(err);
+  return /network|fetch|failed to fetch|no internet|offline|econnrefused|etimedout/i.test(msg);
+}
 
 export default function SignInScreen() {
   const colors = useColors();
   const { signIn, errors, fetchStatus } = useSignIn();
   const router = useRouter();
+  const network = useNetworkStatus();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
   const submitting = fetchStatus === "fetching";
+  const isOffline = !network.isConnected || network.isInternetReachable === false;
 
   const handleSubmit = async () => {
-    setFormError(null);
-    const { error } = await signIn.password({ emailAddress, password });
-    if (error) {
-      setFormError(clerkErrorMessage(error));
+    if (isOffline) {
+      setFormError(OFFLINE_MESSAGE);
       return;
     }
+    setFormError(null);
+    try {
+      const { error } = await signIn.password({ emailAddress, password });
+      if (error) {
+        setFormError(clerkErrorMessage(error));
+        return;
+      }
 
-    if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) return;
-          router.replace(decorateUrl("/") as Href);
-        },
-      });
-    } else {
-      setFormError("Additional verification is required. Please contact your administrator.");
+      if (signIn.status === "complete") {
+        await signIn.finalize({
+          navigate: ({ session, decorateUrl }) => {
+            if (session?.currentTask) return;
+            router.replace(decorateUrl("/") as Href);
+          },
+        });
+      } else {
+        setFormError("Additional verification is required. Please contact your administrator.");
+      }
+    } catch (err) {
+      setFormError(isNetworkError(err) ? OFFLINE_MESSAGE : "Something went wrong. Please try again.");
     }
   };
 
@@ -48,6 +67,27 @@ export default function SignInScreen() {
         contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center", gap: 24 }}
         keyboardShouldPersistTaps="handled"
       >
+        {isOffline && (
+          <View
+            style={{
+              backgroundColor: colors.destructive,
+              borderRadius: 8,
+              padding: 12,
+            }}
+          >
+            <Text
+              style={{
+                color: "#fff",
+                fontFamily: "Inter_400Regular",
+                fontSize: 14,
+                textAlign: "center",
+              }}
+            >
+              {OFFLINE_MESSAGE}
+            </Text>
+          </View>
+        )}
+
         <View style={{ alignItems: "center", gap: 12 }}>
           <Logo size={32} />
           <Text
@@ -93,7 +133,7 @@ export default function SignInScreen() {
             size="lg"
             onPress={handleSubmit}
             loading={submitting}
-            disabled={!emailAddress || !password}
+            disabled={isOffline || !emailAddress || !password}
           />
         </View>
 

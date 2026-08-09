@@ -9,13 +9,23 @@ import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
 import { useColors } from "@/hooks/useColors";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { clerkErrorMessage } from "@/lib/clerkErrors";
+
+const OFFLINE_MESSAGE = "No internet connection — check your signal and try again.";
+
+function isNetworkError(err: unknown): boolean {
+  if (!err) return false;
+  const msg = (err as { message?: string }).message ?? String(err);
+  return /network|fetch|failed to fetch|no internet|offline|econnrefused|etimedout/i.test(msg);
+}
 
 export default function SignUpScreen() {
   const colors = useColors();
   const { signUp, errors, fetchStatus } = useSignUp();
   const { isSignedIn } = useAuth();
   const router = useRouter();
+  const network = useNetworkStatus();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -23,31 +33,61 @@ export default function SignUpScreen() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const submitting = fetchStatus === "fetching";
+  const isOffline = !network.isConnected || network.isInternetReachable === false;
 
   const handleSubmit = async () => {
-    setFormError(null);
-    const { error } = await signUp.password({ emailAddress, password });
-    if (error) {
-      setFormError(clerkErrorMessage(error));
+    if (isOffline) {
+      setFormError(OFFLINE_MESSAGE);
       return;
     }
-    await signUp.verifications.sendEmailCode();
+    setFormError(null);
+    try {
+      const { error } = await signUp.password({ emailAddress, password });
+      if (error) {
+        setFormError(clerkErrorMessage(error));
+        return;
+      }
+      await signUp.verifications.sendEmailCode();
+    } catch (err) {
+      setFormError(isNetworkError(err) ? OFFLINE_MESSAGE : "Something went wrong. Please try again.");
+    }
   };
 
   const handleVerify = async () => {
+    if (isOffline) {
+      setFormError(OFFLINE_MESSAGE);
+      return;
+    }
     setFormError(null);
-    await signUp.verifications.verifyEmailCode({ code });
-    if (signUp.status === "complete") {
-      await signUp.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) return;
-          router.replace(decorateUrl("/") as Href);
-        },
-      });
-    } else {
-      setFormError(
-        errors?.fields?.code?.message || "That code didn't work. Please try again.",
-      );
+    try {
+      await signUp.verifications.verifyEmailCode({ code });
+      if (signUp.status === "complete") {
+        await signUp.finalize({
+          navigate: ({ session, decorateUrl }) => {
+            if (session?.currentTask) return;
+            router.replace(decorateUrl("/") as Href);
+          },
+        });
+      } else {
+        setFormError(
+          errors?.fields?.code?.message || "That code didn't work. Please try again.",
+        );
+      }
+    } catch (err) {
+      setFormError(isNetworkError(err) ? OFFLINE_MESSAGE : "Something went wrong. Please try again.");
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (isOffline) {
+      setFormError(OFFLINE_MESSAGE);
+      return;
+    }
+    setFormError(null);
+    try {
+      await signUp.verifications.sendEmailCode();
+    } catch (err) {
+      setFormError(isNetworkError(err) ? OFFLINE_MESSAGE : "Something went wrong. Please try again.");
     }
   };
 
@@ -67,6 +107,27 @@ export default function SignUpScreen() {
           contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center", gap: 24 }}
           keyboardShouldPersistTaps="handled"
         >
+          {isOffline && (
+            <View
+              style={{
+                backgroundColor: colors.destructive,
+                borderRadius: 8,
+                padding: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color: "#fff",
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 14,
+                  textAlign: "center",
+                }}
+              >
+                {OFFLINE_MESSAGE}
+              </Text>
+            </View>
+          )}
+
           <View style={{ alignItems: "center", gap: 12 }}>
             <Logo size={32} />
             <Text
@@ -107,12 +168,13 @@ export default function SignUpScreen() {
               size="lg"
               onPress={handleVerify}
               loading={submitting}
-              disabled={!code}
+              disabled={isOffline || !code}
             />
             <Button
               title="Resend code"
               variant="ghost"
-              onPress={() => signUp.verifications.sendEmailCode()}
+              onPress={handleResendCode}
+              disabled={isOffline}
             />
           </View>
         </ScrollView>
@@ -126,6 +188,27 @@ export default function SignUpScreen() {
         contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center", gap: 24 }}
         keyboardShouldPersistTaps="handled"
       >
+        {isOffline && (
+          <View
+            style={{
+              backgroundColor: colors.destructive,
+              borderRadius: 8,
+              padding: 12,
+            }}
+          >
+            <Text
+              style={{
+                color: "#fff",
+                fontFamily: "Inter_400Regular",
+                fontSize: 14,
+                textAlign: "center",
+              }}
+            >
+              {OFFLINE_MESSAGE}
+            </Text>
+          </View>
+        )}
+
         <View style={{ alignItems: "center", gap: 12 }}>
           <Logo size={32} />
           <Text
@@ -171,7 +254,7 @@ export default function SignUpScreen() {
             size="lg"
             onPress={handleSubmit}
             loading={submitting}
-            disabled={!emailAddress || !password}
+            disabled={isOffline || !emailAddress || !password}
           />
         </View>
 

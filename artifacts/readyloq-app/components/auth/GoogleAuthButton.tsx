@@ -6,7 +6,16 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
 
 import { Button } from "@/components/ui/Button";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { clerkErrorMessage } from "@/lib/clerkErrors";
+
+const OFFLINE_MESSAGE = "No internet connection — check your signal and try again.";
+
+function isNetworkError(err: unknown): boolean {
+  if (!err) return false;
+  const msg = (err as { message?: string }).message ?? String(err);
+  return /network|fetch|failed to fetch|no internet|offline|econnrefused|etimedout/i.test(msg);
+}
 
 // Handle any pending authentication sessions
 WebBrowser.maybeCompleteAuthSession();
@@ -18,6 +27,8 @@ export function GoogleAuthButton({
   label?: string;
   onError?: (message: string) => void;
 }) {
+  const network = useNetworkStatus();
+  const isOffline = !network.isConnected || network.isInternetReachable === false;
   // Preload the browser on Android to reduce auth load time
   useEffect(() => {
     if (Platform.OS !== "android") return;
@@ -32,6 +43,10 @@ export function GoogleAuthButton({
   const [loading, setLoading] = useState(false);
 
   const onPress = useCallback(async () => {
+    if (isOffline) {
+      onError?.(OFFLINE_MESSAGE);
+      return;
+    }
     try {
       setLoading(true);
       // makeRedirectUri({ scheme, path }) is the correct form for standalone
@@ -64,7 +79,7 @@ export function GoogleAuthButton({
         onError?.("Google sign-in didn't complete. Please try again.");
       }
     } catch (err) {
-      onError?.(clerkErrorMessage(err));
+      onError?.(isNetworkError(err) ? OFFLINE_MESSAGE : clerkErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -77,6 +92,7 @@ export function GoogleAuthButton({
       icon="logo-google"
       onPress={onPress}
       loading={loading}
+      disabled={isOffline}
     />
   );
 }
