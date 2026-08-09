@@ -27061,7 +27061,7 @@ var require_atomic_sleep = __commonJS({
   "../../node_modules/.pnpm/atomic-sleep@1.0.0/node_modules/atomic-sleep/index.js"(exports, module) {
     "use strict";
     if (typeof SharedArrayBuffer !== "undefined" && typeof Atomics !== "undefined") {
-      let sleep4 = function(ms) {
+      let sleep5 = function(ms) {
         const valid = ms > 0 && ms < Infinity;
         if (valid === false) {
           if (typeof ms !== "number" && typeof ms !== "bigint") {
@@ -27072,9 +27072,9 @@ var require_atomic_sleep = __commonJS({
         Atomics.wait(nil, 0, 0, Number(ms));
       };
       const nil = new Int32Array(new SharedArrayBuffer(4));
-      module.exports = sleep4;
+      module.exports = sleep5;
     } else {
-      let sleep4 = function(ms) {
+      let sleep5 = function(ms) {
         const valid = ms > 0 && ms < Infinity;
         if (valid === false) {
           if (typeof ms !== "number" && typeof ms !== "bigint") {
@@ -27086,7 +27086,7 @@ var require_atomic_sleep = __commonJS({
         while (target > Date.now()) {
         }
       };
-      module.exports = sleep4;
+      module.exports = sleep5;
     }
   }
 });
@@ -27099,7 +27099,7 @@ var require_sonic_boom = __commonJS({
     var EventEmitter3 = __require("events");
     var inherits = __require("util").inherits;
     var path4 = __require("path");
-    var sleep4 = require_atomic_sleep();
+    var sleep5 = require_atomic_sleep();
     var assert2 = __require("assert");
     var BUSY_WRITE_TIMEOUT = 100;
     var kEmptyBuffer = Buffer.allocUnsafe(0);
@@ -27245,7 +27245,7 @@ var require_sonic_boom = __commonJS({
           if ((err.code === "EAGAIN" || err.code === "EBUSY") && this.retryEAGAIN(err, this._writingBuf.length, this._len - this._writingBuf.length)) {
             if (this.sync) {
               try {
-                sleep4(BUSY_WRITE_TIMEOUT);
+                sleep5(BUSY_WRITE_TIMEOUT);
                 this.release(void 0, 0);
               } catch (err2) {
                 this.release(err2);
@@ -27558,7 +27558,7 @@ var require_sonic_boom = __commonJS({
           if (shouldRetry && !this.retryEAGAIN(err, buf.length, this._len - buf.length)) {
             throw err;
           }
-          sleep4(BUSY_WRITE_TIMEOUT);
+          sleep5(BUSY_WRITE_TIMEOUT);
         }
       }
       try {
@@ -27595,7 +27595,7 @@ var require_sonic_boom = __commonJS({
           if (shouldRetry && !this.retryEAGAIN(err, buf.length, this._len - buf.length)) {
             throw err;
           }
-          sleep4(BUSY_WRITE_TIMEOUT);
+          sleep5(BUSY_WRITE_TIMEOUT);
         }
       }
     }
@@ -28336,7 +28336,7 @@ var require_transport = __commonJS({
     var { createRequire } = __require("module");
     var getCallers = require_caller();
     var { join: join2, isAbsolute, sep } = __require("node:path");
-    var sleep4 = require_atomic_sleep();
+    var sleep5 = require_atomic_sleep();
     var onExit = require_on_exit_leak_free();
     var ThreadStream = require_thread_stream();
     function setupOnExit(stream) {
@@ -28370,7 +28370,7 @@ var require_transport = __commonJS({
           return;
         }
         stream.flushSync();
-        sleep4(100);
+        sleep5(100);
         stream.end();
       }
       return stream;
@@ -87253,170 +87253,212 @@ function parseCandidates(raw, validFindingIds) {
   }
   return out;
 }
-async function runOpportunitySynthesis(input) {
+function sleep3(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+async function callAiWithRetry(messages2) {
+  const RETRY_DELAY_MS = 1500;
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: MODEL3,
+        max_completion_tokens: 8192,
+        response_format: { type: "json_object" },
+        messages: messages2
+      });
+      return completion.choices[0]?.message?.content ?? null;
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 0) {
+        console.warn(
+          `[opportunity-synthesis] AI call failed on attempt 1, retrying in ${RETRY_DELAY_MS}ms:`,
+          err instanceof Error ? err.message : String(err)
+        );
+        await sleep3(RETRY_DELAY_MS);
+      }
+    }
+  }
+  throw lastErr;
+}
+async function runOpportunitySynthesisCore(input) {
   const { companyId, inspectionId, findings } = input;
-  try {
-    if (findings.length === 0) return;
-    const settings = await getSettings(companyId);
-    if (!settings.enabled) return;
-    const [inspection] = await db.select().from(inspectionsTable).where(
-      and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
-    ).limit(1);
-    if (!inspection) return;
-    const siteAddress = inspection.siteAddress;
-    const [openOpportunities, trend] = await Promise.all([
-      db.select().from(opportunitiesTable).where(
+  if (findings.length === 0) return;
+  const settings = await getSettings(companyId);
+  if (!settings.enabled) return;
+  const [inspection] = await db.select().from(inspectionsTable).where(
+    and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
+  ).limit(1);
+  if (!inspection) return;
+  const siteAddress = inspection.siteAddress;
+  const [openOpportunities, trend] = await Promise.all([
+    db.select().from(opportunitiesTable).where(
+      and(
+        eq(opportunitiesTable.companyId, companyId),
+        eq(opportunitiesTable.propertyAddress, siteAddress),
+        inArray(opportunitiesTable.status, [...OPEN_STATUSES])
+      )
+    ),
+    propertySpeciesTrend(companyId, siteAddress)
+  ]);
+  const raw = await callAiWithRetry([
+    { role: "system", content: SYSTEM_PROMPT3 },
+    { role: "user", content: userPrompt({ findings, openOpportunities, trend }) }
+  ]);
+  if (!raw) {
+    console.info(
+      `[opportunity-synthesis] AI returned empty content \u2014 no opportunities written`,
+      { companyId, inspectionId }
+    );
+    return;
+  }
+  const validIds = new Set(findings.map((f) => f.id));
+  let candidates = parseCandidates(raw, validIds);
+  candidates = candidates.filter((c) => c.confidence >= settings.minConfidence);
+  if (settings.enabledCategories) {
+    const allowed = new Set(settings.enabledCategories);
+    candidates = candidates.filter((c) => allowed.has(c.category));
+  }
+  if (candidates.length === 0) {
+    console.info(
+      `[opportunity-synthesis] AI returned ${parseCandidates(raw, validIds).length} candidate(s) before filtering, 0 after threshold/category filter \u2014 no opportunities written`,
+      { companyId, inspectionId, minConfidence: settings.minConfidence }
+    );
+    return;
+  }
+  const findingById = new Map(findings.map((f) => [f.id, f]));
+  const openByFingerprint = new Map(
+    openOpportunities.map((o) => [o.fingerprint, o])
+  );
+  for (const candidate of candidates) {
+    const fingerprint = opportunityFingerprint(candidate.category, candidate.title);
+    const evidenceImagePaths = Array.from(
+      new Set(
+        candidate.evidenceFindingIds.map((id) => findingById.get(id)?.imageUrl).filter((u) => typeof u === "string" && u.length > 0)
+      )
+    );
+    const citedFindings = candidate.evidenceFindingIds.map((id) => findingById.get(id)).filter((f) => f !== void 0);
+    const strengthen = async (existing2) => {
+      const mergedPaths = Array.from(
+        /* @__PURE__ */ new Set([...existing2.evidenceImagePaths, ...evidenceImagePaths])
+      );
+      const [strengthenCount] = await db.select({ count: sql`count(*)::int` }).from(opportunityEventsTable).where(
+        and(
+          eq(opportunityEventsTable.companyId, companyId),
+          eq(opportunityEventsTable.opportunityId, existing2.id),
+          eq(opportunityEventsTable.action, "strengthened")
+        )
+      );
+      const occurrences = 2 + (strengthenCount?.count ?? 0);
+      const newConfidence = Math.max(existing2.confidence, candidate.confidence);
+      const [updated] = await db.update(opportunitiesTable).set({
+        evidenceFindingIds: candidate.evidenceFindingIds,
+        evidenceImagePaths: mergedPaths,
+        confidence: newConfidence,
+        rationale: candidate.rationale,
+        // Recomputed from the NEW run's cited findings (old IDs are
+        // run-local and unresolvable). Tier is never updated on
+        // strengthen, so the tier weight stays at the original tier.
+        riskLevel: computeOpportunityRisk(citedFindings),
+        priority: computeOpportunityPriority({
+          cited: citedFindings,
+          confidence: newConfidence,
+          tier: existing2.estimatedValueTier,
+          occurrences
+        }),
+        inspectionId,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(
+        and(
+          eq(opportunitiesTable.id, existing2.id),
+          eq(opportunitiesTable.companyId, companyId)
+        )
+      ).returning();
+      if (updated) {
+        openByFingerprint.set(fingerprint, updated);
+        await db.insert(opportunityEventsTable).values({
+          companyId,
+          opportunityId: existing2.id,
+          userId: null,
+          action: "strengthened",
+          detail: { inspectionId, findingIds: candidate.evidenceFindingIds }
+        });
+      }
+    };
+    const existing = openByFingerprint.get(fingerprint);
+    if (existing) {
+      await strengthen(existing);
+      continue;
+    }
+    try {
+      const opportunityRisk = computeOpportunityRisk(citedFindings);
+      const [created] = await db.insert(opportunitiesTable).values({
+        companyId,
+        inspectionId,
+        propertyAddress: siteAddress,
+        category: candidate.category,
+        title: candidate.title,
+        rationale: candidate.rationale,
+        fingerprint,
+        evidenceFindingIds: candidate.evidenceFindingIds,
+        evidenceImagePaths,
+        estimatedValueTier: candidate.estimatedValueTier,
+        estimatedAnnualValue: calculateEstimatedAnnualValue({
+          // siteAddress often embeds facility type (e.g. "Montague Restaurant",
+          // "Wortman Apts", "Medical Plaza") — keyword matching covers most cases.
+          propertyType: inspection.siteAddress,
+          tier: candidate.estimatedValueTier,
+          riskLevel: opportunityRisk
+        }),
+        confidence: candidate.confidence,
+        riskLevel: opportunityRisk,
+        priority: computeOpportunityPriority({
+          cited: citedFindings,
+          confidence: candidate.confidence,
+          tier: candidate.estimatedValueTier,
+          occurrences: 1
+        }),
+        status: "new"
+      }).returning();
+      if (created) {
+        openByFingerprint.set(fingerprint, created);
+        await db.insert(opportunityEventsTable).values({
+          companyId,
+          opportunityId: created.id,
+          userId: null,
+          action: "created",
+          detail: { inspectionId, findingIds: candidate.evidenceFindingIds }
+        });
+      }
+    } catch (insertErr) {
+      const isUniqueViolation = typeof insertErr === "object" && insertErr !== null && insertErr.code === "23505";
+      const cause = insertErr?.cause;
+      if (!isUniqueViolation && cause?.code !== "23505") throw insertErr;
+      const [winner] = await db.select().from(opportunitiesTable).where(
         and(
           eq(opportunitiesTable.companyId, companyId),
           eq(opportunitiesTable.propertyAddress, siteAddress),
+          eq(opportunitiesTable.fingerprint, fingerprint),
           inArray(opportunitiesTable.status, [...OPEN_STATUSES])
         )
-      ),
-      propertySpeciesTrend(companyId, siteAddress)
-    ]);
-    const completion = await openai.chat.completions.create({
-      model: MODEL3,
-      max_completion_tokens: 8192,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT3 },
-        { role: "user", content: userPrompt({ findings, openOpportunities, trend }) }
-      ]
-    });
-    const raw = completion.choices[0]?.message?.content;
-    if (!raw) return;
-    const validIds = new Set(findings.map((f) => f.id));
-    let candidates = parseCandidates(raw, validIds);
-    candidates = candidates.filter((c) => c.confidence >= settings.minConfidence);
-    if (settings.enabledCategories) {
-      const allowed = new Set(settings.enabledCategories);
-      candidates = candidates.filter((c) => allowed.has(c.category));
+      ).limit(1);
+      if (winner) await strengthen(winner);
     }
-    if (candidates.length === 0) return;
-    const findingById = new Map(findings.map((f) => [f.id, f]));
-    const openByFingerprint = new Map(
-      openOpportunities.map((o) => [o.fingerprint, o])
-    );
-    for (const candidate of candidates) {
-      const fingerprint = opportunityFingerprint(candidate.category, candidate.title);
-      const evidenceImagePaths = Array.from(
-        new Set(
-          candidate.evidenceFindingIds.map((id) => findingById.get(id)?.imageUrl).filter((u) => typeof u === "string" && u.length > 0)
-        )
-      );
-      const citedFindings = candidate.evidenceFindingIds.map((id) => findingById.get(id)).filter((f) => f !== void 0);
-      const strengthen = async (existing2) => {
-        const mergedPaths = Array.from(
-          /* @__PURE__ */ new Set([...existing2.evidenceImagePaths, ...evidenceImagePaths])
-        );
-        const [strengthenCount] = await db.select({ count: sql`count(*)::int` }).from(opportunityEventsTable).where(
-          and(
-            eq(opportunityEventsTable.companyId, companyId),
-            eq(opportunityEventsTable.opportunityId, existing2.id),
-            eq(opportunityEventsTable.action, "strengthened")
-          )
-        );
-        const occurrences = 2 + (strengthenCount?.count ?? 0);
-        const newConfidence = Math.max(existing2.confidence, candidate.confidence);
-        const [updated] = await db.update(opportunitiesTable).set({
-          evidenceFindingIds: candidate.evidenceFindingIds,
-          evidenceImagePaths: mergedPaths,
-          confidence: newConfidence,
-          rationale: candidate.rationale,
-          // Recomputed from the NEW run's cited findings (old IDs are
-          // run-local and unresolvable). Tier is never updated on
-          // strengthen, so the tier weight stays at the original tier.
-          riskLevel: computeOpportunityRisk(citedFindings),
-          priority: computeOpportunityPriority({
-            cited: citedFindings,
-            confidence: newConfidence,
-            tier: existing2.estimatedValueTier,
-            occurrences
-          }),
-          inspectionId,
-          updatedAt: /* @__PURE__ */ new Date()
-        }).where(
-          and(
-            eq(opportunitiesTable.id, existing2.id),
-            eq(opportunitiesTable.companyId, companyId)
-          )
-        ).returning();
-        if (updated) {
-          openByFingerprint.set(fingerprint, updated);
-          await db.insert(opportunityEventsTable).values({
-            companyId,
-            opportunityId: existing2.id,
-            userId: null,
-            action: "strengthened",
-            detail: { inspectionId, findingIds: candidate.evidenceFindingIds }
-          });
-        }
-      };
-      const existing = openByFingerprint.get(fingerprint);
-      if (existing) {
-        await strengthen(existing);
-        continue;
-      }
-      try {
-        const opportunityRisk = computeOpportunityRisk(citedFindings);
-        const [created] = await db.insert(opportunitiesTable).values({
-          companyId,
-          inspectionId,
-          propertyAddress: siteAddress,
-          category: candidate.category,
-          title: candidate.title,
-          rationale: candidate.rationale,
-          fingerprint,
-          evidenceFindingIds: candidate.evidenceFindingIds,
-          evidenceImagePaths,
-          estimatedValueTier: candidate.estimatedValueTier,
-          estimatedAnnualValue: calculateEstimatedAnnualValue({
-            // siteAddress often embeds facility type (e.g. "Montague Restaurant",
-            // "Wortman Apts", "Medical Plaza") — keyword matching covers most cases.
-            propertyType: inspection.siteAddress,
-            tier: candidate.estimatedValueTier,
-            riskLevel: opportunityRisk
-          }),
-          confidence: candidate.confidence,
-          riskLevel: opportunityRisk,
-          priority: computeOpportunityPriority({
-            cited: citedFindings,
-            confidence: candidate.confidence,
-            tier: candidate.estimatedValueTier,
-            occurrences: 1
-          }),
-          status: "new"
-        }).returning();
-        if (created) {
-          openByFingerprint.set(fingerprint, created);
-          await db.insert(opportunityEventsTable).values({
-            companyId,
-            opportunityId: created.id,
-            userId: null,
-            action: "created",
-            detail: { inspectionId, findingIds: candidate.evidenceFindingIds }
-          });
-        }
-      } catch (insertErr) {
-        const isUniqueViolation = typeof insertErr === "object" && insertErr !== null && insertErr.code === "23505";
-        const cause = insertErr?.cause;
-        if (!isUniqueViolation && cause?.code !== "23505") throw insertErr;
-        const [winner] = await db.select().from(opportunitiesTable).where(
-          and(
-            eq(opportunitiesTable.companyId, companyId),
-            eq(opportunitiesTable.propertyAddress, siteAddress),
-            eq(opportunitiesTable.fingerprint, fingerprint),
-            inArray(opportunitiesTable.status, [...OPEN_STATUSES])
-          )
-        ).limit(1);
-        if (winner) await strengthen(winner);
-      }
-    }
+  }
+}
+async function runOpportunitySynthesis(input) {
+  const { companyId, inspectionId } = input;
+  try {
+    await runOpportunitySynthesisCore(input);
   } catch (err) {
+    const errMessage = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[opportunity-synthesis] ERROR \u2014 synthesis failed for inspectionId=${inspectionId} companyId=${companyId}: ${errMessage}`
+    );
     void logErrorEvent("ai", {
       companyId,
       message: "Opportunity synthesis failed",
-      context: { stage: "opportunity_synthesis", inspectionId }
+      context: { stage: "opportunity_synthesis", inspectionId, error: errMessage }
     });
   }
 }
@@ -92742,6 +92784,39 @@ router15.patch("/settings", requireRole("owner"), async (req, res) => {
     return res.status(500).json({ error: "Failed to update opportunity settings" });
   }
 });
+router15.post("/resynthesize", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const rows = await db.select({
+      id: analysisResultsTable.id,
+      inspectionId: analysisResultsTable.inspectionId,
+      findings: analysisResultsTable.findings
+    }).from(analysisResultsTable).where(eq(analysisResultsTable.companyId, companyId));
+    const eligible = rows.filter((r) => Array.isArray(r.findings) && r.findings.length > 0);
+    let processed = 0;
+    let failed = 0;
+    const errors = [];
+    for (const row of eligible) {
+      try {
+        await runOpportunitySynthesisCore({
+          companyId,
+          inspectionId: row.inspectionId,
+          findings: row.findings
+        });
+        processed++;
+      } catch (err) {
+        failed++;
+        errors.push({
+          analysisId: row.id,
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
+    }
+    return res.json({ total: eligible.length, processed, failed, errors });
+  } catch {
+    return res.status(500).json({ error: "Failed to resynthesize opportunities" });
+  }
+});
 router15.get("/:id", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
@@ -94939,7 +95014,7 @@ var safeJSON2 = (text2) => {
 };
 
 // ../../node_modules/openai/internal/utils/sleep.mjs
-var sleep3 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+var sleep4 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ../../node_modules/openai/version.mjs
 var VERSION2 = "6.44.0";
@@ -101454,7 +101529,7 @@ var Runs3 = class extends APIResource2 {
               }
             }
           }
-          await sleep3(sleepInterval);
+          await sleep4(sleepInterval);
           break;
         //We return the run in any terminal state.
         case "requires_action":
@@ -102061,7 +102136,7 @@ var Files5 = class extends APIResource2 {
     const start = Date.now();
     let file2 = await this.retrieve(id);
     while (!file2.status || !TERMINAL_STATES.has(file2.status)) {
-      await sleep3(pollInterval);
+      await sleep4(pollInterval);
       file2 = await this.retrieve(id);
       if (Date.now() - start > maxWait) {
         throw new APIConnectionTimeoutError2({
@@ -103431,7 +103506,7 @@ var FileBatches2 = class extends APIResource2 {
               }
             }
           }
-          await sleep3(sleepInterval);
+          await sleep4(sleepInterval);
           break;
         case "failed":
         case "cancelled":
@@ -103571,7 +103646,7 @@ var Files6 = class extends APIResource2 {
               }
             }
           }
-          await sleep3(sleepInterval);
+          await sleep4(sleepInterval);
           break;
         case "failed":
         case "completed":
@@ -104295,7 +104370,7 @@ var OpenAI3 = class {
       const maxRetries = options.maxRetries ?? this.maxRetries;
       timeoutMillis = this.calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries);
     }
-    await sleep3(timeoutMillis);
+    await sleep4(timeoutMillis);
     return this.makeRequest(options, retriesRemaining - 1, requestLogID);
   }
   calculateDefaultRetryTimeoutMillis(retriesRemaining, maxRetries) {
@@ -122913,7 +122988,7 @@ router30.post("/resynthesize-opportunities", async (req, res) => {
   const errors = [];
   for (const row of eligible) {
     try {
-      await runOpportunitySynthesis({
+      await runOpportunitySynthesisCore({
         companyId: row.companyId,
         inspectionId: row.inspectionId,
         findings: row.findings

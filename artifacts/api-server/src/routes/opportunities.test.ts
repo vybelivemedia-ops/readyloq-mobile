@@ -195,7 +195,7 @@ describe("tenant isolation", () => {
     asUser(SALES_A_ID);
     const res = await request(app).get("/api/opportunities");
     expect(res.status).toBe(200);
-    const ids = res.body.map((o: { id: number }) => o.id);
+    const ids = res.body.opportunities.map((o: { id: number }) => o.id);
     expect(ids).toContain(oppA.id);
     expect(ids).not.toContain(oppB.id);
   });

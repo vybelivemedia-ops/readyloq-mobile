@@ -13,16 +13,26 @@ import { calculateEstimatedAnnualValue } from "./pricing";
 // ── OpenAI mock (must be hoisted so it is in place before the module loads) ──
 
 const { aiState } = vi.hoisted(() => ({
-  aiState: { response: null as string | null },
+  aiState: {
+    response: null as string | null,
+    /** 0-based call indices that should throw instead of returning a response. */
+    errorCalls: [] as number[],
+    /** Tracks how many times `create` has been called; reset in beforeEach. */
+    callCount: 0,
+  },
 }));
 
 vi.mock("@workspace/integrations-openai-ai-server", () => ({
   openai: {
     chat: {
       completions: {
-        create: vi.fn(async () => ({
-          choices: [{ message: { content: aiState.response } }],
-        })),
+        create: vi.fn(async () => {
+          const idx = aiState.callCount++;
+          if (aiState.errorCalls.includes(idx)) {
+            throw new Error("AI timeout (simulated)");
+          }
+          return { choices: [{ message: { content: aiState.response } }] };
+        }),
       },
     },
   },
@@ -41,7 +51,7 @@ vi.mock("@clerk/express", async (importOriginal) => {
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { parseCandidates, runOpportunitySynthesis } from "./opportunity-ai";
+import { parseCandidates, runOpportunitySynthesis, runOpportunitySynthesisCore } from "./opportunity-ai";
 import {
   db,
   companiesTable,
@@ -185,6 +195,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   aiState.response = null;
+  aiState.callCount = 0;
+  aiState.errorCalls = [];
 
   // Scope all cleanup strictly to this fixture company to avoid cross-test
   // coupling with other suites that share the same test DB.
@@ -386,4 +398,71 @@ describe("runOpportunitySynthesis — concurrent analysis runs", () => {
     expect(rows[0].estimatedAnnualValue).not.toBeNull();
     expect(rows[0].estimatedAnnualValue).toBeGreaterThan(0);
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Retry and failure-count tests
+// Verifies that a transient AI error triggers exactly one retry, and that
+// exhausting both retries causes runOpportunitySynthesisCore to throw (so
+// catch-up endpoints can count real failures) while the fire-and-forget wrapper
+// swallows the error silently.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("runOpportunitySynthesisCore — retry and failure behavior", () => {
+  it("retries once on a transient AI failure and writes the opportunity on success", async () => {
+    // Call 0 throws (transient), call 1 succeeds.
+    aiState.errorCalls = [0];
+    aiState.response = aiResponse("medium");
+
+    await expect(
+      runOpportunitySynthesisCore({ companyId, inspectionId, findings }),
+    ).resolves.toBeUndefined();
+
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].estimatedAnnualValue).not.toBeNull();
+    expect(rows[0].estimatedAnnualValue).toBeGreaterThan(0);
+    // Two AI calls: the failed one plus the retry.
+    expect(aiState.callCount).toBe(2);
+  }, 10_000);
+
+  it("throws when both AI attempts fail so catch-up endpoints can count real failures", async () => {
+    // Both retries throw — synthesis cannot recover.
+    aiState.errorCalls = [0, 1];
+
+    await expect(
+      runOpportunitySynthesisCore({ companyId, inspectionId, findings }),
+    ).rejects.toThrow("AI timeout (simulated)");
+
+    // No opportunity row written when both attempts fail.
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+    expect(rows).toHaveLength(0);
+
+    // Both calls were attempted (initial + retry).
+    expect(aiState.callCount).toBe(2);
+  }, 10_000);
+
+  it("fire-and-forget wrapper resolves (never throws) even when both retries fail", async () => {
+    // Verify the fire-and-forget contract: a synthesis failure must never
+    // propagate to the inspection path that called void runOpportunitySynthesis().
+    aiState.errorCalls = [0, 1];
+
+    await expect(
+      runOpportunitySynthesis({ companyId, inspectionId, findings }),
+    ).resolves.toBeUndefined();
+
+    // Failure was swallowed — no row written, no unhandled rejection.
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+    expect(rows).toHaveLength(0);
+  }, 10_000);
 });

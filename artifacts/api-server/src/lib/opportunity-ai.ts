@@ -316,229 +316,305 @@ export function parseCandidates(raw: string, validFindingIds: Set<number>): Cand
   return out;
 }
 
+/** One-shot async sleep used by the synthesis retry path. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
- * Entry point. Call fire-and-forget (`void runOpportunitySynthesis(...)`)
- * after an analysis run persists — never awaited on the technician's path.
+ * Attempt the AI completion once. On network/rate-limit error, wait
+ * RETRY_DELAY_MS and try once more. Throws on the second failure so the
+ * caller can log it distinctly from "AI returned an empty list".
  */
-export async function runOpportunitySynthesis(input: {
+async function callAiWithRetry(
+  messages: Parameters<typeof openai.chat.completions.create>[0]["messages"],
+): Promise<string | null> {
+  const RETRY_DELAY_MS = 1_500;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: MODEL,
+        max_completion_tokens: 8192,
+        response_format: { type: "json_object" },
+        messages,
+      });
+      return completion.choices[0]?.message?.content ?? null;
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 0) {
+        console.warn(
+          `[opportunity-synthesis] AI call failed on attempt 1, retrying in ${RETRY_DELAY_MS}ms:`,
+          err instanceof Error ? err.message : String(err),
+        );
+        await sleep(RETRY_DELAY_MS);
+      }
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * Core synthesis logic. Throws on any failure (AI call, DB error, etc.) so
+ * callers that need to surface failures — such as batch catch-up endpoints —
+ * can count and report them accurately.
+ *
+ * The fire-and-forget wrapper `runOpportunitySynthesis` below catches and logs
+ * these throws so they never disturb the inspection path.
+ */
+export async function runOpportunitySynthesisCore(input: {
   companyId: number;
   inspectionId: number;
   findings: Finding[];
 }): Promise<void> {
   const { companyId, inspectionId, findings } = input;
-  try {
-    if (findings.length === 0) return;
 
-    const settings = await getSettings(companyId);
-    if (!settings.enabled) return;
+  if (findings.length === 0) return;
 
-    const [inspection] = await db
+  const settings = await getSettings(companyId);
+  if (!settings.enabled) return;
+
+  const [inspection] = await db
+    .select()
+    .from(inspectionsTable)
+    .where(
+      and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)),
+    )
+    .limit(1);
+  if (!inspection) return;
+  const siteAddress = inspection.siteAddress;
+
+  const [openOpportunities, trend] = await Promise.all([
+    db
       .select()
-      .from(inspectionsTable)
+      .from(opportunitiesTable)
       .where(
-        and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)),
-      )
-      .limit(1);
-    if (!inspection) return;
-    const siteAddress = inspection.siteAddress;
+        and(
+          eq(opportunitiesTable.companyId, companyId),
+          eq(opportunitiesTable.propertyAddress, siteAddress),
+          inArray(opportunitiesTable.status, [...OPEN_STATUSES]),
+        ),
+      ),
+    propertySpeciesTrend(companyId, siteAddress),
+  ]);
 
-    const [openOpportunities, trend] = await Promise.all([
-      db
+  // callAiWithRetry throws on both-attempt failure — the throw propagates to
+  // the caller so batch endpoints can count it as a real failure.
+  const raw = await callAiWithRetry([
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: userPrompt({ findings, openOpportunities, trend }) },
+  ]);
+  if (!raw) {
+    console.info(
+      `[opportunity-synthesis] AI returned empty content — no opportunities written`,
+      { companyId, inspectionId },
+    );
+    return;
+  }
+
+  const validIds = new Set(findings.map((f) => f.id));
+  let candidates = parseCandidates(raw, validIds);
+
+  // Company tuning: confidence threshold + category allow-list.
+  candidates = candidates.filter((c) => c.confidence >= settings.minConfidence);
+  if (settings.enabledCategories) {
+    const allowed = new Set(settings.enabledCategories);
+    candidates = candidates.filter((c) => allowed.has(c.category));
+  }
+  if (candidates.length === 0) {
+    console.info(
+      `[opportunity-synthesis] AI returned ${parseCandidates(raw, validIds).length} candidate(s) before filtering, 0 after threshold/category filter — no opportunities written`,
+      { companyId, inspectionId, minConfidence: settings.minConfidence },
+    );
+    return;
+  }
+
+  const findingById = new Map(findings.map((f) => [f.id, f]));
+  const openByFingerprint = new Map(
+    openOpportunities.map((o) => [o.fingerprint, o] as const),
+  );
+
+  for (const candidate of candidates) {
+    const fingerprint = opportunityFingerprint(candidate.category, candidate.title);
+    const evidenceImagePaths = Array.from(
+      new Set(
+        candidate.evidenceFindingIds
+          .map((id) => findingById.get(id)?.imageUrl)
+          .filter((u): u is string => typeof u === "string" && u.length > 0),
+      ),
+    );
+    const citedFindings = candidate.evidenceFindingIds
+      .map((id) => findingById.get(id))
+      .filter((f): f is Finding => f !== undefined);
+    const strengthen = async (existing: Opportunity) => {
+      // Strengthen: the row's evidence is REPLACED with this run's findings
+      // so evidenceFindingIds always resolves against the row's (updated)
+      // inspectionId — finding IDs are run-local, so merging IDs across
+      // runs would corrupt the trail. Prior evidence stays resolvable in
+      // the immutable event history ({inspectionId, findingIds} per event).
+      // Image paths ARE merged: they're globally unique storage paths.
+      const mergedPaths = Array.from(
+        new Set([...existing.evidenceImagePaths, ...evidenceImagePaths]),
+      );
+      // Recurrence for priority: 1 (original run) + prior strengthens + this
+      // one — deterministic count over the immutable event history.
+      const [strengthenCount] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(opportunityEventsTable)
+        .where(
+          and(
+            eq(opportunityEventsTable.companyId, companyId),
+            eq(opportunityEventsTable.opportunityId, existing.id),
+            eq(opportunityEventsTable.action, "strengthened"),
+          ),
+        );
+      const occurrences = 2 + (strengthenCount?.count ?? 0);
+      const newConfidence = Math.max(existing.confidence, candidate.confidence);
+      const [updated] = await db
+        .update(opportunitiesTable)
+        .set({
+          evidenceFindingIds: candidate.evidenceFindingIds,
+          evidenceImagePaths: mergedPaths,
+          confidence: newConfidence,
+          rationale: candidate.rationale,
+          // Recomputed from the NEW run's cited findings (old IDs are
+          // run-local and unresolvable). Tier is never updated on
+          // strengthen, so the tier weight stays at the original tier.
+          riskLevel: computeOpportunityRisk(citedFindings),
+          priority: computeOpportunityPriority({
+            cited: citedFindings,
+            confidence: newConfidence,
+            tier: existing.estimatedValueTier,
+            occurrences,
+          }),
+          inspectionId,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(opportunitiesTable.id, existing.id),
+            eq(opportunitiesTable.companyId, companyId),
+          ),
+        )
+        .returning();
+      if (updated) {
+        openByFingerprint.set(fingerprint, updated);
+        await db.insert(opportunityEventsTable).values({
+          companyId,
+          opportunityId: existing.id,
+          userId: null,
+          action: "strengthened",
+          detail: { inspectionId, findingIds: candidate.evidenceFindingIds },
+        });
+      }
+    };
+
+    const existing = openByFingerprint.get(fingerprint);
+    if (existing) {
+      await strengthen(existing);
+      continue;
+    }
+
+    try {
+      const opportunityRisk = computeOpportunityRisk(citedFindings);
+      const [created] = await db
+        .insert(opportunitiesTable)
+        .values({
+          companyId,
+          inspectionId,
+          propertyAddress: siteAddress,
+          category: candidate.category,
+          title: candidate.title,
+          rationale: candidate.rationale,
+          fingerprint,
+          evidenceFindingIds: candidate.evidenceFindingIds,
+          evidenceImagePaths,
+          estimatedValueTier: candidate.estimatedValueTier,
+          estimatedAnnualValue: calculateEstimatedAnnualValue({
+            // siteAddress often embeds facility type (e.g. "Montague Restaurant",
+            // "Wortman Apts", "Medical Plaza") — keyword matching covers most cases.
+            propertyType: inspection.siteAddress,
+            tier: candidate.estimatedValueTier,
+            riskLevel: opportunityRisk,
+          }),
+          confidence: candidate.confidence,
+          riskLevel: opportunityRisk,
+          priority: computeOpportunityPriority({
+            cited: citedFindings,
+            confidence: candidate.confidence,
+            tier: candidate.estimatedValueTier,
+            occurrences: 1,
+          }),
+          status: "new",
+        })
+        .returning();
+      if (created) {
+        openByFingerprint.set(fingerprint, created);
+        await db.insert(opportunityEventsTable).values({
+          companyId,
+          opportunityId: created.id,
+          userId: null,
+          action: "created",
+          detail: { inspectionId, findingIds: candidate.evidenceFindingIds },
+        });
+      }
+    } catch (insertErr) {
+      // Unique violation on opportunities_open_fingerprint_idx: a concurrent
+      // run inserted the same open opportunity between our read and this
+      // insert. Re-read the winner and strengthen it instead.
+      const isUniqueViolation =
+        typeof insertErr === "object" &&
+        insertErr !== null &&
+        (insertErr as { code?: string }).code === "23505";
+      const cause = (insertErr as { cause?: { code?: string } })?.cause;
+      if (!isUniqueViolation && cause?.code !== "23505") throw insertErr;
+      const [winner] = await db
         .select()
         .from(opportunitiesTable)
         .where(
           and(
             eq(opportunitiesTable.companyId, companyId),
             eq(opportunitiesTable.propertyAddress, siteAddress),
+            eq(opportunitiesTable.fingerprint, fingerprint),
             inArray(opportunitiesTable.status, [...OPEN_STATUSES]),
           ),
-        ),
-      propertySpeciesTrend(companyId, siteAddress),
-    ]);
-
-    const completion = await openai.chat.completions.create({
-      model: MODEL,
-      max_completion_tokens: 8192,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt({ findings, openOpportunities, trend }) },
-      ],
-    });
-    const raw = completion.choices[0]?.message?.content;
-    if (!raw) return;
-
-    const validIds = new Set(findings.map((f) => f.id));
-    let candidates = parseCandidates(raw, validIds);
-
-    // Company tuning: confidence threshold + category allow-list.
-    candidates = candidates.filter((c) => c.confidence >= settings.minConfidence);
-    if (settings.enabledCategories) {
-      const allowed = new Set(settings.enabledCategories);
-      candidates = candidates.filter((c) => allowed.has(c.category));
+        )
+        .limit(1);
+      if (winner) await strengthen(winner);
     }
-    if (candidates.length === 0) return;
+  }
+}
 
-    const findingById = new Map(findings.map((f) => [f.id, f]));
-    const openByFingerprint = new Map(
-      openOpportunities.map((o) => [o.fingerprint, o] as const),
-    );
-
-    for (const candidate of candidates) {
-      const fingerprint = opportunityFingerprint(candidate.category, candidate.title);
-      const evidenceImagePaths = Array.from(
-        new Set(
-          candidate.evidenceFindingIds
-            .map((id) => findingById.get(id)?.imageUrl)
-            .filter((u): u is string => typeof u === "string" && u.length > 0),
-        ),
-      );
-      const citedFindings = candidate.evidenceFindingIds
-        .map((id) => findingById.get(id))
-        .filter((f): f is Finding => f !== undefined);
-      const strengthen = async (existing: Opportunity) => {
-        // Strengthen: the row's evidence is REPLACED with this run's findings
-        // so evidenceFindingIds always resolves against the row's (updated)
-        // inspectionId — finding IDs are run-local, so merging IDs across
-        // runs would corrupt the trail. Prior evidence stays resolvable in
-        // the immutable event history ({inspectionId, findingIds} per event).
-        // Image paths ARE merged: they're globally unique storage paths.
-        const mergedPaths = Array.from(
-          new Set([...existing.evidenceImagePaths, ...evidenceImagePaths]),
-        );
-        // Recurrence for priority: 1 (original run) + prior strengthens + this
-        // one — deterministic count over the immutable event history.
-        const [strengthenCount] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(opportunityEventsTable)
-          .where(
-            and(
-              eq(opportunityEventsTable.companyId, companyId),
-              eq(opportunityEventsTable.opportunityId, existing.id),
-              eq(opportunityEventsTable.action, "strengthened"),
-            ),
-          );
-        const occurrences = 2 + (strengthenCount?.count ?? 0);
-        const newConfidence = Math.max(existing.confidence, candidate.confidence);
-        const [updated] = await db
-          .update(opportunitiesTable)
-          .set({
-            evidenceFindingIds: candidate.evidenceFindingIds,
-            evidenceImagePaths: mergedPaths,
-            confidence: newConfidence,
-            rationale: candidate.rationale,
-            // Recomputed from the NEW run's cited findings (old IDs are
-            // run-local and unresolvable). Tier is never updated on
-            // strengthen, so the tier weight stays at the original tier.
-            riskLevel: computeOpportunityRisk(citedFindings),
-            priority: computeOpportunityPriority({
-              cited: citedFindings,
-              confidence: newConfidence,
-              tier: existing.estimatedValueTier,
-              occurrences,
-            }),
-            inspectionId,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(opportunitiesTable.id, existing.id),
-              eq(opportunitiesTable.companyId, companyId),
-            ),
-          )
-          .returning();
-        if (updated) {
-          openByFingerprint.set(fingerprint, updated);
-          await db.insert(opportunityEventsTable).values({
-            companyId,
-            opportunityId: existing.id,
-            userId: null,
-            action: "strengthened",
-            detail: { inspectionId, findingIds: candidate.evidenceFindingIds },
-          });
-        }
-      };
-
-      const existing = openByFingerprint.get(fingerprint);
-      if (existing) {
-        await strengthen(existing);
-        continue;
-      }
-
-      try {
-        const opportunityRisk = computeOpportunityRisk(citedFindings);
-        const [created] = await db
-          .insert(opportunitiesTable)
-          .values({
-            companyId,
-            inspectionId,
-            propertyAddress: siteAddress,
-            category: candidate.category,
-            title: candidate.title,
-            rationale: candidate.rationale,
-            fingerprint,
-            evidenceFindingIds: candidate.evidenceFindingIds,
-            evidenceImagePaths,
-            estimatedValueTier: candidate.estimatedValueTier,
-            estimatedAnnualValue: calculateEstimatedAnnualValue({
-              // siteAddress often embeds facility type (e.g. "Montague Restaurant",
-              // "Wortman Apts", "Medical Plaza") — keyword matching covers most cases.
-              propertyType: inspection.siteAddress,
-              tier: candidate.estimatedValueTier,
-              riskLevel: opportunityRisk,
-            }),
-            confidence: candidate.confidence,
-            riskLevel: opportunityRisk,
-            priority: computeOpportunityPriority({
-              cited: citedFindings,
-              confidence: candidate.confidence,
-              tier: candidate.estimatedValueTier,
-              occurrences: 1,
-            }),
-            status: "new",
-          })
-          .returning();
-        if (created) {
-          openByFingerprint.set(fingerprint, created);
-          await db.insert(opportunityEventsTable).values({
-            companyId,
-            opportunityId: created.id,
-            userId: null,
-            action: "created",
-            detail: { inspectionId, findingIds: candidate.evidenceFindingIds },
-          });
-        }
-      } catch (insertErr) {
-        // Unique violation on opportunities_open_fingerprint_idx: a concurrent
-        // run inserted the same open opportunity between our read and this
-        // insert. Re-read the winner and strengthen it instead.
-        const isUniqueViolation =
-          typeof insertErr === "object" &&
-          insertErr !== null &&
-          (insertErr as { code?: string }).code === "23505";
-        const cause = (insertErr as { cause?: { code?: string } })?.cause;
-        if (!isUniqueViolation && cause?.code !== "23505") throw insertErr;
-        const [winner] = await db
-          .select()
-          .from(opportunitiesTable)
-          .where(
-            and(
-              eq(opportunitiesTable.companyId, companyId),
-              eq(opportunitiesTable.propertyAddress, siteAddress),
-              eq(opportunitiesTable.fingerprint, fingerprint),
-              inArray(opportunitiesTable.status, [...OPEN_STATUSES]),
-            ),
-          )
-          .limit(1);
-        if (winner) await strengthen(winner);
-      }
-    }
+/**
+ * Fire-and-forget wrapper. Call as `void runOpportunitySynthesis(...)` after
+ * an analysis run persists — never awaited on the technician's path. Catches
+ * all errors from `runOpportunitySynthesisCore` and logs them without
+ * propagating, so a synthesis failure never disturbs the inspection response.
+ *
+ * For batch/catch-up paths that need to surface real failures, call
+ * `runOpportunitySynthesisCore` directly instead.
+ */
+export async function runOpportunitySynthesis(input: {
+  companyId: number;
+  inspectionId: number;
+  findings: Finding[];
+}): Promise<void> {
+  const { companyId, inspectionId } = input;
+  try {
+    await runOpportunitySynthesisCore(input);
   } catch (err) {
     // Never let opportunity mining disturb the inspection flow.
+    // Log with enough detail to distinguish an AI call error from a DB/parse
+    // error, and surface the error message so ops can triage without a stack
+    // trace hunt.
+    const errMessage = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[opportunity-synthesis] ERROR — synthesis failed for inspectionId=${inspectionId} companyId=${companyId}: ${errMessage}`,
+    );
     void logErrorEvent("ai", {
       companyId,
       message: "Opportunity synthesis failed",
-      context: { stage: "opportunity_synthesis", inspectionId },
+      context: { stage: "opportunity_synthesis", inspectionId, error: errMessage },
     });
   }
 }

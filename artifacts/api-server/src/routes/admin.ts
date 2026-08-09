@@ -8,7 +8,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { usersTable, companiesTable, analysisResultsTable, type UserRole } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { runOpportunitySynthesis } from "../lib/opportunity-ai";
+import { runOpportunitySynthesisCore } from "../lib/opportunity-ai";
 import { requireAuth, requireSuperAdmin } from "../middleware/require-auth";
 
 const router: IRouter = Router();
@@ -149,10 +149,10 @@ router.post("/resynthesize-opportunities", async (req, res) => {
 
   for (const row of eligible) {
     try {
-      await runOpportunitySynthesis({
+      await runOpportunitySynthesisCore({
         companyId: row.companyId,
         inspectionId: row.inspectionId,
-        findings: row.findings as Parameters<typeof runOpportunitySynthesis>[0]["findings"],
+        findings: row.findings as Parameters<typeof runOpportunitySynthesisCore>[0]["findings"],
       });
       processed++;
     } catch (err) {

@@ -7,7 +7,7 @@
 
 import { db, analysisResultsTable, opportunitiesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { runOpportunitySynthesis } from "../lib/opportunity-ai";
+import { runOpportunitySynthesisCore } from "../lib/opportunity-ai";
 import type { Finding } from "@workspace/db";
 
 async function main() {
@@ -39,7 +39,7 @@ async function main() {
     );
 
     try {
-      await runOpportunitySynthesis({
+      await runOpportunitySynthesisCore({
         companyId: row.companyId,
         inspectionId: row.inspectionId,
         findings: row.findings as Finding[],

@@ -7,6 +7,7 @@ import {
   opportunitySettingsTable,
   usersTable,
   inspectionsTable,
+  analysisResultsTable,
   OPPORTUNITY_CATEGORIES,
   OPPORTUNITY_STATUSES,
   type OpportunityCategory,
@@ -15,6 +16,7 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { requireRole } from "../middleware/require-auth";
+import { runOpportunitySynthesisCore } from "../lib/opportunity-ai";
 
 /**
  * Opportunity Intelligence routes — the management-only view of the hidden
@@ -210,6 +212,53 @@ router.patch("/settings", requireRole("owner"), async (req, res) => {
     return res.json({ ...row, updatedAt: row.updatedAt.toISOString() });
   } catch {
     return res.status(500).json({ error: "Failed to update opportunity settings" });
+  }
+});
+
+// POST /opportunities/resynthesize — owner-only catch-up trigger.
+// Re-runs opportunity synthesis for every completed analysis result belonging
+// to the caller's company. Safe to call multiple times — synthesis is
+// idempotent (strengthens existing open opportunities rather than duplicating).
+// Scoped strictly to the caller's company; owners cannot touch other tenants.
+router.post("/resynthesize", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+
+    const rows = await db
+      .select({
+        id: analysisResultsTable.id,
+        inspectionId: analysisResultsTable.inspectionId,
+        findings: analysisResultsTable.findings,
+      })
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId));
+
+    const eligible = rows.filter((r) => Array.isArray(r.findings) && r.findings.length > 0);
+
+    let processed = 0;
+    let failed = 0;
+    const errors: { analysisId: number; error: string }[] = [];
+
+    for (const row of eligible) {
+      try {
+        await runOpportunitySynthesisCore({
+          companyId,
+          inspectionId: row.inspectionId,
+          findings: row.findings as Parameters<typeof runOpportunitySynthesisCore>[0]["findings"],
+        });
+        processed++;
+      } catch (err) {
+        failed++;
+        errors.push({
+          analysisId: row.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return res.json({ total: eligible.length, processed, failed, errors });
+  } catch {
+    return res.status(500).json({ error: "Failed to resynthesize opportunities" });
   }
 });
 
