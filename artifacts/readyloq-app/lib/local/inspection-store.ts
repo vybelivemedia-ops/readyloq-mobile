@@ -381,7 +381,25 @@ async function readIndex(): Promise<string[]> {
   }
 }
 
-function parseRecord(raw: string): LocalInspection | null {
+/**
+ * Append a delivery entry to the pending queue, deduplicating by `methodId`.
+ * Pure function — the only place the queue is grown, so the no-duplicates
+ * invariant is enforced in exactly one spot and is trivially unit-testable.
+ */
+export function enqueueDelivery(
+  pending: LocalInspection["pendingDeliveries"],
+  entry: LocalInspection["pendingDeliveries"][number],
+): LocalInspection["pendingDeliveries"] {
+  if (pending.some((d) => d.methodId === entry.methodId)) return pending;
+  return [...pending, entry];
+}
+
+/**
+ * Parse and migrate a raw JSON string from AsyncStorage into a LocalInspection.
+ * Exported for unit testing the schema-migration defaults.
+ * All new optional fields must be defaulted here so old records hydrate cleanly.
+ */
+export function parseRecord(raw: string): LocalInspection | null {
   try {
     const rec = JSON.parse(raw) as LocalInspection;
     if (rec?.schemaVersion !== 1 || typeof rec.localId !== "string") return null;

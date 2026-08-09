@@ -44,7 +44,7 @@ import {
   type DeliveryMethod,
 } from "@/lib/delivery/registry";
 import type { LocalInspection, LocalSyncPhase } from "@/lib/local/inspection-store";
-import { updateLocalInspection, updatePhotoDescription } from "@/lib/local/inspection-store";
+import { enqueueDelivery, updateLocalInspection, updatePhotoDescription } from "@/lib/local/inspection-store";
 import { syncNow } from "@/lib/sync/engine";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
 
@@ -582,18 +582,15 @@ function DeliverySection({
         );
       } else {
         // Queue the intent so the technician can retry after connectivity returns.
+        // enqueueDelivery deduplicates by methodId so tapping Send twice while
+        // offline never creates two entries for the same channel.
         void updateLocalInspection(record.localId, (r) => {
-          const alreadyQueued = r.pendingDeliveries.some(
-            (d) => d.methodId === method.id,
-          );
-          if (!alreadyQueued) {
-            r.pendingDeliveries.push({
-              methodId: method.id,
-              label: method.label,
-              queuedAt: new Date().toISOString(),
-              context: buildSoftContext(),
-            });
-          }
+          r.pendingDeliveries = enqueueDelivery(r.pendingDeliveries, {
+            methodId: method.id,
+            label: method.label,
+            queuedAt: new Date().toISOString(),
+            context: buildSoftContext(),
+          });
         });
         Alert.alert(
           "Delivery queued",
