@@ -743,6 +743,95 @@ export default function DashboardScreen() {
             </Pressable>
           </View>
 
+          {/* ── Live pipeline stats ───────────────────────────────────────── */}
+          {(() => {
+            const kpis = briefing.data?.owner?.kpis;
+            const isLoading = briefing.isLoading;
+
+            const stats: Array<{
+              icon: keyof typeof Ionicons.glyphMap;
+              value: string;
+              label: string;
+              onPress: () => void;
+            }> = [
+              {
+                icon: "cash-outline",
+                value: isLoading ? "—" : formatPipelineValue(kpis?.pipelineValue ?? 0),
+                label: "Pipeline",
+                onPress: () => { filterIntent.set("reports", "opportunities"); router.push("/(tabs)/reports" as Href); },
+              },
+              {
+                icon: "briefcase-outline",
+                value: isLoading ? "—" : String(kpis?.openOpportunities ?? 0),
+                label: "Open opps",
+                onPress: () => { filterIntent.set("reports", "opportunities"); router.push("/(tabs)/reports" as Href); },
+              },
+              {
+                icon: "checkmark-done-outline",
+                value: isLoading ? "—" : String(kpis?.completions7d ?? 0),
+                label: "Done this week",
+                onPress: () => { filterIntent.set("reports", "7d"); router.push("/(tabs)/reports" as Href); },
+              },
+            ];
+
+            return (
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {stats.map((s) => (
+                  <Pressable
+                    key={s.label}
+                    onPress={s.onPress}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      backgroundColor: MC_SURFACE,
+                      borderWidth: 1,
+                      borderColor: MC_BORDER,
+                      borderRadius: 10,
+                      paddingVertical: 12,
+                      paddingHorizontal: 8,
+                      alignItems: "center",
+                      gap: 4,
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Ionicons name={s.icon} size={15} color={MC_ACCENT} />
+                    {isLoading ? (
+                      <View
+                        style={{
+                          width: 36,
+                          height: 16,
+                          borderRadius: 4,
+                          backgroundColor: "rgba(255,255,255,0.08)",
+                        }}
+                      />
+                    ) : (
+                      <Text
+                        style={{
+                          color: MC_TEXT,
+                          fontFamily: "Inter_700Bold",
+                          fontSize: 16,
+                          letterSpacing: -0.3,
+                        }}
+                      >
+                        {s.value}
+                      </Text>
+                    )}
+                    <Text
+                      style={{
+                        color: MC_MUTED,
+                        fontFamily: "Inter_400Regular",
+                        fontSize: 10,
+                        letterSpacing: 0.2,
+                        textAlign: "center",
+                      }}
+                    >
+                      {s.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            );
+          })()}
+
           {/* ── AI Assistant — Quinn Harlow ──────────────────────────────── */}
           <View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
