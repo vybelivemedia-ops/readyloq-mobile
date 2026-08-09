@@ -35,6 +35,7 @@ import reviewQueueRouter from "./review-queue";
 import metaGlassesRouter from "./meta-glasses";
 import billingRouter from "./billing";
 import adminRouter from "./admin";
+import transcribeRouter from "./transcribe";
 
 const router: IRouter = Router();
 
@@ -178,5 +179,8 @@ router.use("/billing", billingRouter);
 // /bootstrap is auth-only (protected by SUPER_ADMIN_BOOTSTRAP_TOKEN env var);
 // all other /admin routes additionally require requireSuperAdmin (enforced inside adminRouter).
 router.use("/admin", adminRouter);
+
+// Cloud voice transcription — auth-gated; used by mobile as Whisper fallback.
+router.use(requireAuth, transcribeRouter);
 
 export default router;

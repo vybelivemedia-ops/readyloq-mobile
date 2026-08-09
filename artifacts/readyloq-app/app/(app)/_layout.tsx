@@ -1,8 +1,8 @@
-import { useAuth } from "@clerk/expo";
+import { useAuth, useUser } from "@clerk/expo";
 import { setAuthTokenGetter } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Redirect, Stack, useRouter } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 import { BetaPaused } from "@/components/BetaPaused";
@@ -18,6 +18,7 @@ import {
 import { useSignOut } from "@/hooks/useSignOut";
 import { configureSyncEngine } from "@/lib/sync/engine";
 import { speechService } from "@/lib/vision";
+import { createCompany } from "@/lib/api";
 
 export default function AppLayout() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -56,7 +57,55 @@ function Gate() {
   const router = useRouter();
   const signOut = useSignOut();
   const { user, isLoading, error, refetch } = useCurrentUser();
+  const { getToken } = useAuth();
+  const { user: clerkUser } = useUser();
   const promptedResume = useRef(false);
+
+  // ── Auto-create company on first login ──────────────────────────────────
+  // When a new user has no company yet, silently derive a company name from
+  // their Clerk profile and create it. Blocks rendering with a loading screen
+  // so the user never sees the manual Onboarding form unless the auto-create
+  // fails (in which case the form is shown as a graceful fallback).
+  const [autoCreating, setAutoCreating] = useState(false);
+  const [autoCreateFailed, setAutoCreateFailed] = useState(false);
+  const autoCreateAttempted = useRef(false);
+
+  useEffect(() => {
+    if (!user || user.companyId != null) return;
+    if (autoCreateAttempted.current || autoCreateFailed) return;
+    if (!clerkUser) return;
+
+    const nameParts = [clerkUser.firstName, clerkUser.lastName].filter(Boolean);
+    const derived =
+      nameParts.length > 0
+        ? `${nameParts.join(" ")} Pest Control`
+        : (() => {
+            const email = clerkUser.primaryEmailAddress?.emailAddress ?? "";
+            const prefix = email.split("@")[0] ?? "";
+            return prefix ? `${prefix} Pest Control` : "";
+          })();
+
+    if (!derived) {
+      // No usable name — fall through to the manual Onboarding form.
+      setAutoCreateFailed(true);
+      return;
+    }
+
+    autoCreateAttempted.current = true;
+    setAutoCreating(true);
+
+    void (async () => {
+      try {
+        const token = await getToken();
+        await createCompany(token, derived);
+        await refetch();
+      } catch {
+        setAutoCreateFailed(true);
+      } finally {
+        setAutoCreating(false);
+      }
+    })();
+  }, [user, clerkUser, autoCreateFailed, getToken, refetch]);
 
   // Resume prompt: if the app was killed mid-inspection, the draft survives
   // in local storage. Offer to pick up exactly where the technician left off.
@@ -132,6 +181,8 @@ function Gate() {
   }
 
   if (user.companyId == null) {
+    if (autoCreating) return <FullScreenLoader label="Setting up your workspace…" />;
+    // Auto-create failed or user has no derivable name — show the manual form.
     return <Onboarding onDone={refetch} />;
   }
 

@@ -1,6 +1,7 @@
 export type { SpeechProvider } from "./providers/SpeechProvider";
 export { LocalWhisperProvider } from "./providers/LocalWhisperProvider";
 export { OpenAIWhisperProvider } from "./providers/OpenAIWhisperProvider";
+export { FallbackSpeechProvider } from "./providers/FallbackSpeechProvider";
 export { AppleSpeechProvider } from "./providers/AppleSpeechProvider";
 
 export type { SpeechProviderOptions, SpeechTranscriptionResult, AudioFrame, SpeechProviderName } from "./types/audio.types";

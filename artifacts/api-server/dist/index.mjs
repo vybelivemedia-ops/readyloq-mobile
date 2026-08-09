@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router33;
+    module.exports = Router34;
     module.exports.Route = Route;
-    function Router33(options) {
-      if (!(this instanceof Router33)) {
-        return new Router33(options);
+    function Router34(options) {
+      if (!(this instanceof Router34)) {
+        return new Router34(options);
       }
       const opts = options || {};
-      function router33(req, res, next) {
-        router33.handle(req, res, next);
+      function router34(req, res, next) {
+        router34.handle(req, res, next);
       }
-      Object.setPrototypeOf(router33, this);
-      router33.caseSensitive = opts.caseSensitive;
-      router33.mergeParams = opts.mergeParams;
-      router33.params = {};
-      router33.strict = opts.strict;
-      router33.stack = [];
-      return router33;
+      Object.setPrototypeOf(router34, this);
+      router34.caseSensitive = opts.caseSensitive;
+      router34.mergeParams = opts.mergeParams;
+      router34.params = {};
+      router34.strict = opts.strict;
+      router34.stack = [];
+      return router34;
     }
-    Router33.prototype = function() {
+    Router34.prototype = function() {
     };
-    Router33.prototype.param = function param(name, fn) {
+    Router34.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router33.prototype.handle = function handle(req, res, callback) {
+    Router34.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router33.prototype.use = function use(handler) {
+    Router34.prototype.use = function use(handler) {
       let offset = 0;
       let path4 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router33.prototype.route = function route(path4) {
+    Router34.prototype.route = function route(path4) {
       const route2 = new Route(path4);
       const layer = new Layer(path4, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router33.prototype[method] = function(path4) {
+      Router34.prototype[method] = function(path4) {
         const route = this.route(path4);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router33 = require_router();
+    var Router34 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router33 = null;
+      var router34 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router33 === null) {
-            router33 = new Router33({
+          if (router34 === null) {
+            router34 = new Router34({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router33;
+          return router34;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router33 = this.router;
+      var router34 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router33.use(path4, fn2);
+          return router34.use(path4, fn2);
         }
         debug7(".use app under %s", path4);
         fn2.mountpath = path4;
         fn2.parent = this;
-        router33.use(path4, function mounted_app(req, res, next) {
+        router34.use(path4, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter3 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router33 = require_router();
+    var Router34 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router33.Route;
-    exports.Router = Router33;
+    exports.Route = Router34.Route;
+    exports.Router = Router34;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express34 = __toESM(require_express2(), 1);
+var import_express35 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router33 = config2.router;
-  if (isPlainObject(router33)) {
-    newTarget = getTargetFromProxyTable(req, router33);
-  } else if (typeof router33 === "function") {
-    newTarget = await router33(req, res, config2);
+  const router34 = config2.router;
+  if (isPlainObject(router34)) {
+    newTarget = getTargetFromProxyTable(req, router34);
+  } else if (typeof router34 === "function") {
+    newTarget = await router34(req, res, config2);
   }
   return newTarget;
 }
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express32 = __toESM(require_express2(), 1);
+var import_express33 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -122806,19 +122806,46 @@ router30.patch("/users/:id", requireAuth, requireSuperAdmin, async (req, res) =>
 });
 var admin_default = router30;
 
-// src/routes/index.ts
+// src/routes/transcribe.ts
+var import_express32 = __toESM(require_express2(), 1);
 var router31 = (0, import_express32.Router)();
-router31.use(health_default);
-router31.use("/auth", auth_default);
-router31.use(storage_default);
-router31.use("/leads", leads_default);
-router31.use("/share", share_default);
-router31.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router31.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router31.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router31.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router31.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router31.use(
+router31.post("/transcribe", requireAuth, async (req, res) => {
+  const { audio, mimeType } = req.body;
+  if (!audio || typeof audio !== "string") {
+    res.status(400).json({ error: "audio (base64) is required" });
+    return;
+  }
+  const mime = mimeType ?? "audio/wav";
+  const ext = mime.includes("mp4") || mime.includes("m4a") ? ".m4a" : ".wav";
+  try {
+    const buffer = Buffer.from(audio, "base64");
+    const file2 = await toFile2(buffer, `recording${ext}`, { type: mime });
+    const response = await openai.audio.transcriptions.create({
+      file: file2,
+      model: "whisper-1",
+      language: "en"
+    });
+    res.json({ text: response.text, language: "en" });
+  } catch (err) {
+    logErrorEvent("transcribe", err);
+    res.status(500).json({ error: "Transcription failed. Please try again." });
+  }
+});
+var transcribe_default = router31;
+
+// src/routes/index.ts
+var router32 = (0, import_express33.Router)();
+router32.use(health_default);
+router32.use("/auth", auth_default);
+router32.use(storage_default);
+router32.use("/leads", leads_default);
+router32.use("/share", share_default);
+router32.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router32.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router32.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router32.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router32.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router32.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -122826,17 +122853,17 @@ router31.use(
   requireRole("manager"),
   intelligence_default
 );
-router31.use(
+router32.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router31.use("/branding", branding_default);
-router31.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router31.use("/beta", requireAuth, requireCompany, beta_default);
-router31.use(
+router32.use("/branding", branding_default);
+router32.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router32.use("/beta", requireAuth, requireCompany, beta_default);
+router32.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -122844,7 +122871,7 @@ router31.use(
   requireRole("sales"),
   opportunities_default
 );
-router31.use(
+router32.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -122852,7 +122879,7 @@ router31.use(
   requireRole("manager"),
   scorecards_default
 );
-router31.use(
+router32.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -122860,8 +122887,8 @@ router31.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router31.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router31.use(
+router32.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router32.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -122869,23 +122896,23 @@ router31.use(
   requireRole("sales"),
   proposals_default
 );
-router31.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router31.use(
+router32.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router32.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-router31.use("/products", requireAuth, requireBetaAccess, products_default);
-router31.use(
+router32.use("/products", requireAuth, requireBetaAccess, products_default);
+router32.use(
   "/inspections/:inspectionId/treatment-logs",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   treatment_logs_default
 );
-router31.use(
+router32.use(
   "/crm",
   requireAuth,
   requireCompany,
@@ -122893,8 +122920,8 @@ router31.use(
   requireRole("manager"),
   crm_default
 );
-router31.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
-router31.use(
+router32.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
+router32.use(
   "/review-queue",
   requireAuth,
   requireCompany,
@@ -122902,13 +122929,14 @@ router31.use(
   requireRole("manager"),
   review_queue_default
 );
-router31.use("/meta-glasses", meta_glasses_default);
-router31.use("/billing", billing_default);
-router31.use("/admin", admin_default);
-var routes_default = router31;
+router32.use("/meta-glasses", meta_glasses_default);
+router32.use("/billing", billing_default);
+router32.use("/admin", admin_default);
+router32.use(requireAuth, transcribe_default);
+var routes_default = router32;
 
 // src/routes/faie.ts
-var import_express33 = __toESM(require_express2(), 1);
+var import_express34 = __toESM(require_express2(), 1);
 
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
@@ -122929,7 +122957,7 @@ var logger2 = (0, import_pino.default)({
 });
 
 // src/routes/faie.ts
-var router32 = (0, import_express33.Router)();
+var router33 = (0, import_express34.Router)();
 var storage2 = new ObjectStorageService();
 var DatasetIngestBody = external_exports.object({
   companyId: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
@@ -122959,10 +122987,11 @@ async function storeBase64Image(base643, companyId) {
   return storage2.uploadObjectBuffer(companyId, buffer, "image/jpeg");
 }
 function toCompanyId(raw) {
+  if (raw === void 0 || raw === null) return null;
   const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
-router32.post("/dataset/ingest", async (req, res) => {
+router33.post("/dataset/ingest", async (req, res) => {
   const parsed = DatasetIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -122970,24 +122999,25 @@ router32.post("/dataset/ingest", async (req, res) => {
   }
   const { companyId: rawCompanyId, findingId, label, confidence, imageBytes } = parsed.data;
   const companyId = toCompanyId(rawCompanyId);
+  const effectiveCompanyId = companyId ?? 0;
   try {
-    const imageUrl = await storeBase64Image(imageBytes, companyId);
+    const imageUrl = await storeBase64Image(imageBytes, effectiveCompanyId);
     await db.insert(faieTrainingImagesTable).values({
       recordType: "dataset",
-      companyId,
+      companyId: effectiveCompanyId,
       findingId: findingId ?? null,
       label: label ?? null,
       confidence: confidence ?? null,
       imageUrl
     });
-    logger2.info({ companyId, findingId, label }, "[FAIE] dataset record ingested");
+    logger2.info({ companyId: effectiveCompanyId, findingId, label }, "[FAIE] dataset record ingested");
     res.json({ ok: true });
   } catch (err) {
     logger2.error({ err }, "[FAIE] dataset/ingest failed");
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-router32.post("/training/ingest-global", async (req, res) => {
+router33.post("/training/ingest-global", async (req, res) => {
   const parsed = GlobalIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -122995,6 +123025,10 @@ router32.post("/training/ingest-global", async (req, res) => {
   }
   const { companyId: rawCompanyId, technicianId, source, imageBytes } = parsed.data;
   const companyId = toCompanyId(rawCompanyId);
+  if (companyId === null) {
+    res.status(400).json({ error: "Invalid companyId \u2014 must be a positive integer" });
+    return;
+  }
   try {
     const imageUrl = await storeBase64Image(imageBytes, companyId);
     await db.insert(faieTrainingImagesTable).values({
@@ -123012,7 +123046,7 @@ router32.post("/training/ingest-global", async (req, res) => {
   }
 });
 var PLATFORM_COMPANY_ID = 0;
-router32.post("/training/ingest-anonymized", async (req, res) => {
+router33.post("/training/ingest-anonymized", async (req, res) => {
   const parsed = AnonymizedIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123036,7 +123070,7 @@ router32.post("/training/ingest-anonymized", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-var faie_default = router32;
+var faie_default = router33;
 
 // src/lib/webhookHandlers.ts
 var WebhookHandlers = class _WebhookHandlers {
@@ -123157,7 +123191,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // src/app.ts
-var app = (0, import_express34.default)();
+var app = (0, import_express35.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -123210,7 +123244,7 @@ app.use(
 );
 app.post(
   "/api/stripe/webhook",
-  import_express34.default.raw({ type: "application/json" }),
+  import_express35.default.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -123230,9 +123264,9 @@ app.post(
     }
   }
 );
-app.use("/v1/faie", import_express34.default.json({ limit: "20mb" }), faie_default);
-app.use(import_express34.default.json());
-app.use(import_express34.default.urlencoded({ extended: true }));
+app.use("/v1/faie", import_express35.default.json({ limit: "20mb" }), faie_default);
+app.use(import_express35.default.json());
+app.use(import_express35.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(

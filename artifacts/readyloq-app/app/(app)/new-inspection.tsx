@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/expo";
+import { useAuth, useUser } from "@clerk/expo";
 import { Ionicons } from "@expo/vector-icons";
 import {
   deleteInspection,
@@ -74,7 +74,7 @@ import {
 } from "@/lib/vision";
 import {
   AudioSessionManager,
-  LocalWhisperProvider,
+  FallbackSpeechProvider,
   ConfidenceAction,
   type StructuredInspectionEvent,
 } from "@/lib/audio";
@@ -111,6 +111,7 @@ export default function NewInspectionScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user: clerkUser } = useUser();
+  const { getToken } = useAuth();
   const params = useLocalSearchParams<{ resume?: string }>();
 
   const generateReport = useGenerateReport();
@@ -125,6 +126,8 @@ export default function NewInspectionScreen() {
   const [pestTypes, setPestTypes] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
+  /** True when resuming a previously completed inspection — edits are locked. */
+  const [isCompleted, setIsCompleted] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState("");
@@ -395,7 +398,7 @@ export default function NewInspectionScreen() {
       return;
     }
     if (!sessionManagerRef.current) {
-      sessionManagerRef.current = new AudioSessionManager(new LocalWhisperProvider());
+      sessionManagerRef.current = new AudioSessionManager(new FallbackSpeechProvider());
     }
     const formatEvent = (ev: StructuredInspectionEvent): string => {
       const parts: string[] = [ev.action];
@@ -600,6 +603,9 @@ export default function NewInspectionScreen() {
         // falls back to the rolling 1.5 s background buffer so imageUri is
         // populated even when the camera pipeline is momentarily busy.
         getFrame: getFrameWithBuffer,
+        // Token getter for cloud-backed providers (FallbackSpeechProvider routes
+        // this to OpenAIWhisperProvider when the local model is unavailable).
+        getToken: () => getToken(),
       });
       // Session ended naturally — in co-pilot mode pause briefly then loop back.
       if (faieAutoRestartRef.current) {
@@ -755,6 +761,7 @@ export default function NewInspectionScreen() {
         analyzedCount.current = rec.analyzedCount;
         if (rec.serverId != null) setWsInspectionId(rec.serverId);
         if (rec.baitStations?.length) setBaitStations(rec.baitStations);
+        if (rec.completed) setIsCompleted(true);
         setStep(rec.photos.length > 0 ? "capture" : "setup");
       }
       setHydrated(true);
@@ -935,6 +942,7 @@ export default function NewInspectionScreen() {
   const canContinueSetup = siteAddress.trim().length > 0 && technicianName.trim().length > 0;
 
   const togglePest = (p: string) => {
+    if (isCompleted) return;
     setPestTypeError(false);
     setPestTypes((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
   };
@@ -2698,7 +2706,7 @@ export default function NewInspectionScreen() {
           </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {PEST_TYPES.map((p) => (
-              <Pill key={p} label={p} active={pestTypes.includes(p)} onPress={() => togglePest(p)} colors={colors} />
+              <Pill key={p} label={p} active={pestTypes.includes(p)} onPress={() => togglePest(p)} colors={colors} disabled={isCompleted} />
             ))}
           </View>
           {pestTypeError && (
@@ -2774,8 +2782,9 @@ export default function NewInspectionScreen() {
           <TextField
             placeholder="Conditions observed, access notes, etc."
             value={notes}
-            onChangeText={setNotes}
+            onChangeText={isCompleted ? undefined : setNotes}
             multiline
+            editable={!isCompleted}
           />
         </View>
       </ScrollView>
@@ -2848,15 +2857,17 @@ function Pill({
   active,
   onPress,
   colors,
+  disabled = false,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
       style={{
         paddingHorizontal: 14,
         paddingVertical: 9,
@@ -2864,6 +2875,7 @@ function Pill({
         backgroundColor: active ? colors.primary : colors.card,
         borderWidth: 1,
         borderColor: active ? colors.primary : colors.border,
+        opacity: disabled ? 0.45 : 1,
       }}
     >
       <Text
