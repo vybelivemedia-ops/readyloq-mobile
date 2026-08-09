@@ -687,6 +687,41 @@ function DeliverySection({
                     )}
                   </Pressable>
                 ) : null}
+                {/* Dismiss button — removes this entry after a confirmation prompt. */}
+                <Pressable
+                  disabled={busyId != null}
+                  onPress={() => {
+                    Alert.alert(
+                      `Remove queued ${entry.label}?`,
+                      "The report will not be sent. You can still deliver it manually using the buttons below.",
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                          text: "Remove",
+                          style: "destructive",
+                          onPress: () => {
+                            void updateLocalInspection(record.localId, (r) => {
+                              r.pendingDeliveries = r.pendingDeliveries.filter(
+                                (d) => d.methodId !== entry.methodId,
+                              );
+                            });
+                          },
+                        },
+                      ],
+                    );
+                  }}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: colors.muted,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: busyId != null ? 0.4 : 1,
+                  }}
+                >
+                  <Ionicons name="close" size={15} color={colors.mutedForeground} />
+                </Pressable>
               </View>
             );
           })}
