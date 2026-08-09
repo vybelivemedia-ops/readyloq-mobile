@@ -176,6 +176,42 @@ export function reopenInspection(token: string | null, id: number) {
   });
 }
 
+// ─── Field-service platform integrations ─────────────────────────────────────
+
+export type FieldIntegrationSystem = "pestpac" | "fieldroutes";
+
+export interface FieldIntegrationConfig {
+  id: number;
+  systemType: FieldIntegrationSystem;
+  accountId: string;
+  apiBaseUrl: string | null;
+  enabled: boolean;
+  updatedAt: string;
+}
+
+export type IntegrationConfigResponse =
+  | { configured: false }
+  | { configured: true; integration: FieldIntegrationConfig };
+
+export interface IntegrationSyncResult {
+  success: boolean;
+  externalSystem: FieldIntegrationSystem;
+  postedNotes: boolean;
+  attachmentsPosted: number;
+  error?: string;
+}
+
+export function fetchIntegrationConfig(token: string | null) {
+  return request<IntegrationConfigResponse>("/api/integrations/config", token);
+}
+
+export function triggerIntegrationSync(token: string | null, inspectionId: number) {
+  return request<IntegrationSyncResult>("/api/integrations/sync", token, {
+    method: "POST",
+    body: JSON.stringify({ inspectionId }),
+  });
+}
+
 // ─── Property memory ─────────────────────────────────────────────────────────
 
 export interface HistoricalFinding {

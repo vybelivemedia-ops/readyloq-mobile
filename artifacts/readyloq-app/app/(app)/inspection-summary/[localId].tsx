@@ -33,11 +33,18 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
+import { useAuth } from "@clerk/expo";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLocalInspection } from "@/hooks/useLocalInspections";
 import { formatStatus, severityTone } from "@/constants/inspection";
-import { API_BASE } from "@/lib/api";
+import {
+  API_BASE,
+  fetchIntegrationConfig,
+  triggerIntegrationSync,
+  type FieldIntegrationSystem,
+  type IntegrationConfigResponse,
+} from "@/lib/api";
 import { generateReportPdf } from "@/lib/delivery/pdf";
 import {
   getAvailableDeliveryMethods,
@@ -113,6 +120,46 @@ export default function InspectionSummaryScreen() {
 
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+
+  // ── Field-service platform integration ──────────────────────────────────────
+  const { getToken } = useAuth();
+  const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfigResponse | null>(null);
+  // Explicit cast so TS doesn't complain about `token` param below.
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    if (!finalized || !isManager) return;
+    getToken()
+      .then((token: string | null) => fetchIntegrationConfig(token))
+      .then(setIntegrationConfig)
+      .catch(() => { /* non-blocking — button just won't show */ });
+  }, [finalized, isManager, getToken]);
+
+  const systemLabel: Record<FieldIntegrationSystem, string> = {
+    pestpac: "PestPac",
+    fieldroutes: "FieldRoutes",
+  };
+
+  const handlePushToDispatch = async () => {
+    if (!serverId || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const token = await getToken();
+      await triggerIntegrationSync(token, serverId);
+      Alert.alert(
+        "Pushed to dispatch",
+        "Inspection report, photos, and conditions were successfully sent.",
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      Alert.alert(
+        "Sync failed",
+        `Could not push to dispatch software. ${msg}`,
+      );
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Imported photos that haven't gone through server AI yet.
   const hasUnanalyzed =
@@ -437,6 +484,26 @@ export default function InspectionSummaryScreen() {
               onPress={() => router.replace(`/inspection/${serverId}` as Href)}
             />
           ) : null}
+
+          {/* Push to dispatch — shown when the company has a PestPac / FieldRoutes integration configured. */}
+          {serverId != null &&
+            finalized &&
+            integrationConfig?.configured === true &&
+            integrationConfig.integration.enabled ? (
+            <Button
+              title={
+                isSyncing
+                  ? "Pushing to dispatch…"
+                  : `Push to ${systemLabel[integrationConfig.integration.systemType]}`
+              }
+              size="lg"
+              icon="cloud-upload-outline"
+              variant="outline"
+              disabled={isSyncing}
+              onPress={() => void handlePushToDispatch()}
+            />
+          ) : null}
+
           <Button
             title="Back to inspections"
             variant={serverId != null && finalized ? "ghost" : "primary"}

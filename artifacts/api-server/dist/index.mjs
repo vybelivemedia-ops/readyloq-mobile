@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router34;
+    module.exports = Router35;
     module.exports.Route = Route;
-    function Router34(options) {
-      if (!(this instanceof Router34)) {
-        return new Router34(options);
+    function Router35(options) {
+      if (!(this instanceof Router35)) {
+        return new Router35(options);
       }
       const opts = options || {};
-      function router34(req, res, next) {
-        router34.handle(req, res, next);
+      function router35(req, res, next) {
+        router35.handle(req, res, next);
       }
-      Object.setPrototypeOf(router34, this);
-      router34.caseSensitive = opts.caseSensitive;
-      router34.mergeParams = opts.mergeParams;
-      router34.params = {};
-      router34.strict = opts.strict;
-      router34.stack = [];
-      return router34;
+      Object.setPrototypeOf(router35, this);
+      router35.caseSensitive = opts.caseSensitive;
+      router35.mergeParams = opts.mergeParams;
+      router35.params = {};
+      router35.strict = opts.strict;
+      router35.stack = [];
+      return router35;
     }
-    Router34.prototype = function() {
+    Router35.prototype = function() {
     };
-    Router34.prototype.param = function param(name, fn) {
+    Router35.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router34.prototype.handle = function handle(req, res, callback) {
+    Router35.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router34.prototype.use = function use(handler) {
+    Router35.prototype.use = function use(handler) {
       let offset = 0;
       let path4 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router34.prototype.route = function route(path4) {
+    Router35.prototype.route = function route(path4) {
       const route2 = new Route(path4);
       const layer = new Layer(path4, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router34.prototype[method] = function(path4) {
+      Router35.prototype[method] = function(path4) {
         const route = this.route(path4);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router34 = require_router();
+    var Router35 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router34 = null;
+      var router35 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router34 === null) {
-            router34 = new Router34({
+          if (router35 === null) {
+            router35 = new Router35({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router34;
+          return router35;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router34 = this.router;
+      var router35 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router34.use(path4, fn2);
+          return router35.use(path4, fn2);
         }
         debug7(".use app under %s", path4);
         fn2.mountpath = path4;
         fn2.parent = this;
-        router34.use(path4, function mounted_app(req, res, next) {
+        router35.use(path4, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter3 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router34 = require_router();
+    var Router35 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router34.Route;
-    exports.Router = Router34;
+    exports.Route = Router35.Route;
+    exports.Router = Router35;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express35 = __toESM(require_express2(), 1);
+var import_express36 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router34 = config2.router;
-  if (isPlainObject(router34)) {
-    newTarget = getTargetFromProxyTable(req, router34);
-  } else if (typeof router34 === "function") {
-    newTarget = await router34(req, res, config2);
+  const router35 = config2.router;
+  if (isPlainObject(router35)) {
+    newTarget = getTargetFromProxyTable(req, router35);
+  } else if (typeof router35 === "function") {
+    newTarget = await router35(req, res, config2);
   }
   return newTarget;
 }
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express33 = __toESM(require_express2(), 1);
+var import_express34 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -57276,6 +57276,7 @@ __export(schema_exports, {
   brandingProfilesTable: () => brandingProfilesTable,
   callbacksTable: () => callbacksTable,
   companiesTable: () => companiesTable,
+  companyFieldIntegrationsTable: () => companyFieldIntegrationsTable,
   companyInvitesTable: () => companyInvitesTable,
   conversations: () => conversations,
   customerSummariesTable: () => customerSummariesTable,
@@ -57290,6 +57291,7 @@ __export(schema_exports, {
   insertCompanySchema: () => insertCompanySchema,
   insertConversationSchema: () => insertConversationSchema,
   insertDatasetImageSchema: () => insertDatasetImageSchema,
+  insertFieldIntegrationSchema: () => insertFieldIntegrationSchema,
   insertInspectionMediaSchema: () => insertInspectionMediaSchema,
   insertInspectionSchema: () => insertInspectionSchema,
   insertLabelRulesSchema: () => insertLabelRulesSchema,
@@ -69864,6 +69866,29 @@ var faieTrainingImagesTable = pgTable(
     index("faie_training_category_idx").on(t.category)
   ]
 );
+
+// ../../lib/db/src/schema/field-integrations.ts
+var companyFieldIntegrationsTable = pgTable(
+  "company_field_integrations",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().unique().references(() => companiesTable.id, { onDelete: "cascade" }),
+    systemType: text("system_type").$type().notNull(),
+    // The company / account identifier within the external system.
+    accountId: text("account_id").notNull(),
+    // API key or bearer token for the external system.
+    // Never serialised into any API response.
+    apiKey: text("api_key").notNull(),
+    // Optional base URL override — useful for on-prem / sandbox environments.
+    apiBaseUrl: text("api_base_url"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow()
+  }
+);
+var insertFieldIntegrationSchema = createInsertSchema(
+  companyFieldIntegrationsTable
+).omit({ id: true, createdAt: true, updatedAt: true, companyId: true });
 
 // ../../lib/db/src/seed/products.ts
 var SEED_PRODUCTS = [
@@ -123038,19 +123063,271 @@ router31.post("/transcribe", requireAuth, async (req, res) => {
 });
 var transcribe_default = router31;
 
-// src/routes/index.ts
+// src/routes/integrations.ts
+var import_express33 = __toESM(require_express2(), 1);
+
+// src/services/field-integration.ts
+var PESTPAC_DEFAULT_BASE = "https://api.pestpac.com/v1";
+async function syncToPestPac(payload) {
+  const base = payload.apiBaseUrl?.replace(/\/$/, "") ?? PESTPAC_DEFAULT_BASE;
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${payload.apiKey}`
+  };
+  const customerId = payload.accountId;
+  const noteRes = await fetch(`${base}/customers/${customerId}/notes`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      note: `[ReadyLoq AI Report] ${payload.reportSummary}`,
+      date: payload.inspectionDate
+    })
+  });
+  if (!noteRes.ok) {
+    const body = await noteRes.text();
+    throw new Error(`PestPac note POST failed (${noteRes.status}): ${body}`);
+  }
+  let attachmentsPosted = 0;
+  for (const photo of payload.photos) {
+    const attachRes = await fetch(`${base}/customers/${customerId}/attachments`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        fileUrl: photo.url,
+        description: `${photo.severity.toUpperCase()}: ${photo.caption ?? ""}`
+      })
+    });
+    if (attachRes.ok) attachmentsPosted++;
+    else {
+      const body = await attachRes.text();
+      console.warn(`PestPac attachment POST failed (${attachRes.status}): ${body}`);
+    }
+  }
+  return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted };
+}
+var FIELDROUTES_DEFAULT_BASE = "https://api.fieldroutes.com/api/v1";
+async function syncToFieldRoutes(payload) {
+  const base = payload.apiBaseUrl?.replace(/\/$/, "") ?? FIELDROUTES_DEFAULT_BASE;
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${payload.apiKey}`
+  };
+  const customerId = payload.accountId;
+  const histRes = await fetch(
+    `${base}/customer/${customerId}/service-history`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        summary: payload.reportSummary,
+        conditions: {
+          pestsFound: payload.treatmentConditions.pestsFound,
+          chemicalsUsed: payload.treatmentConditions.chemicalsUsed,
+          temperature: payload.treatmentConditions.temperature ?? null,
+          notes: payload.treatmentConditions.notes ?? null
+        },
+        mediaUrls: payload.photos.map((p) => p.url),
+        date: payload.inspectionDate
+      })
+    }
+  );
+  if (!histRes.ok) {
+    const body = await histRes.text();
+    throw new Error(`FieldRoutes service-history POST failed (${histRes.status}): ${body}`);
+  }
+  return {
+    success: true,
+    externalSystem: "fieldroutes",
+    postedNotes: true,
+    attachmentsPosted: payload.photos.length
+  };
+}
+async function syncInspectionToExternalSystem(payload) {
+  switch (payload.externalSystem) {
+    case "pestpac":
+      return syncToPestPac(payload);
+    case "fieldroutes":
+      return syncToFieldRoutes(payload);
+    default: {
+      const exhaustive = payload.externalSystem;
+      throw new Error(`Unknown external system: ${String(exhaustive)}`);
+    }
+  }
+}
+
+// src/routes/integrations.ts
 var router32 = (0, import_express33.Router)();
-router32.use(health_default);
-router32.use("/auth", auth_default);
-router32.use(storage_default);
-router32.use("/leads", leads_default);
-router32.use("/share", share_default);
-router32.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router32.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router32.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router32.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router32.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router32.use(
+var configInputSchema = external_exports.object({
+  systemType: external_exports.enum(["pestpac", "fieldroutes"]),
+  accountId: external_exports.string().min(1),
+  apiKey: external_exports.string().min(1),
+  apiBaseUrl: external_exports.string().url().optional(),
+  enabled: external_exports.boolean().optional()
+});
+router32.get("/config", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const [row] = await db.select({
+      id: companyFieldIntegrationsTable.id,
+      systemType: companyFieldIntegrationsTable.systemType,
+      accountId: companyFieldIntegrationsTable.accountId,
+      apiBaseUrl: companyFieldIntegrationsTable.apiBaseUrl,
+      enabled: companyFieldIntegrationsTable.enabled,
+      updatedAt: companyFieldIntegrationsTable.updatedAt
+    }).from(companyFieldIntegrationsTable).where(eq(companyFieldIntegrationsTable.companyId, companyId)).limit(1);
+    if (!row) return res.json({ configured: false });
+    return res.json({ configured: true, integration: row });
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch integration config" });
+  }
+});
+router32.put("/config", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const parsed = configInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid config", issues: parsed.error.issues });
+    }
+    const { systemType, accountId, apiKey, apiBaseUrl, enabled } = parsed.data;
+    const now = /* @__PURE__ */ new Date();
+    const [existing] = await db.select({ id: companyFieldIntegrationsTable.id }).from(companyFieldIntegrationsTable).where(eq(companyFieldIntegrationsTable.companyId, companyId)).limit(1);
+    if (existing) {
+      await db.update(companyFieldIntegrationsTable).set({
+        systemType,
+        accountId,
+        apiKey,
+        apiBaseUrl: apiBaseUrl ?? null,
+        enabled: enabled ?? true,
+        updatedAt: now
+      }).where(eq(companyFieldIntegrationsTable.companyId, companyId));
+    } else {
+      await db.insert(companyFieldIntegrationsTable).values({
+        companyId,
+        systemType,
+        accountId,
+        apiKey,
+        apiBaseUrl: apiBaseUrl ?? null,
+        enabled: enabled ?? true
+      });
+    }
+    return res.json({ configured: true, systemType, accountId });
+  } catch {
+    return res.status(500).json({ error: "Failed to save integration config" });
+  }
+});
+router32.delete("/config", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    await db.delete(companyFieldIntegrationsTable).where(eq(companyFieldIntegrationsTable.companyId, companyId));
+    return res.json({ configured: false });
+  } catch {
+    return res.status(500).json({ error: "Failed to remove integration config" });
+  }
+});
+var syncInputSchema = external_exports.object({
+  inspectionId: external_exports.number().int().positive()
+});
+router32.post("/sync", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const parsed = syncInputSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request", issues: parsed.error.issues });
+    }
+    const { inspectionId } = parsed.data;
+    const [config2] = await db.select().from(companyFieldIntegrationsTable).where(eq(companyFieldIntegrationsTable.companyId, companyId)).limit(1);
+    if (!config2 || !config2.enabled) {
+      return res.status(422).json({ error: "No active field-service integration configured" });
+    }
+    const [inspection] = await db.select().from(inspectionsTable).where(
+      and(
+        eq(inspectionsTable.id, inspectionId),
+        eq(inspectionsTable.companyId, companyId)
+      )
+    ).limit(1);
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+    if (inspection.status !== "complete" && inspection.status !== "completed") {
+      return res.status(422).json({ error: "Inspection is not yet finalized" });
+    }
+    const [analyses, media, logs] = await Promise.all([
+      db.select().from(analysisResultsTable).where(
+        and(
+          eq(analysisResultsTable.inspectionId, inspectionId),
+          eq(analysisResultsTable.companyId, companyId)
+        )
+      ),
+      db.select().from(inspectionMediaTable).where(
+        and(
+          eq(inspectionMediaTable.inspectionId, inspectionId),
+          eq(inspectionMediaTable.companyId, companyId)
+        )
+      ),
+      db.select({ productId: treatmentLogsTable.productId }).from(treatmentLogsTable).where(
+        and(
+          eq(treatmentLogsTable.inspectionId, inspectionId),
+          eq(treatmentLogsTable.companyId, companyId)
+        )
+      )
+    ]);
+    const productIds = [...new Set(logs.map((l) => l.productId).filter((id) => id != null))];
+    const products = productIds.length > 0 ? await db.select({ id: productsTable.id, name: productsTable.name }).from(productsTable).where(inArray(productsTable.id, productIds)) : [];
+    const analysis = analyses[0];
+    const findings = analysis?.findings ?? [];
+    const narrative = analysis?.narrative ?? "";
+    const reportSummary = narrative || (findings.length > 0 ? findings.slice(0, 5).map((f) => `${f.category}: ${f.description}`).join(". ") : "No significant findings detected.");
+    const photos = media.filter((m) => m.mediaType === "photo" && m.url).map((m) => ({
+      url: m.url,
+      caption: m.caption ?? null,
+      severity: findings.find((f) => f.imageUrl === m.url)?.severity ?? "low"
+    }));
+    const pestsFound = [
+      ...new Set(
+        findings.filter((f) => f.category === "Pest Activity" || f.possiblePest).map((f) => f.possiblePest ?? f.category).filter(Boolean)
+      )
+    ];
+    const productNameById = new Map(products.map((p) => [p.id, p.name]));
+    const chemicalsUsed = [
+      ...new Set(
+        logs.map((l) => l.productId != null ? productNameById.get(l.productId) : null).filter((n) => n != null)
+      )
+    ];
+    const result = await syncInspectionToExternalSystem({
+      externalSystem: config2.systemType,
+      accountId: config2.accountId,
+      apiKey: config2.apiKey,
+      apiBaseUrl: config2.apiBaseUrl,
+      inspectionDate: (inspection.completedAt ?? inspection.createdAt).toISOString().split("T")[0],
+      reportSummary,
+      photos,
+      treatmentConditions: {
+        pestsFound,
+        chemicalsUsed,
+        temperature: null,
+        notes: inspection.notes ?? null
+      }
+    });
+    return res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Sync failed";
+    console.error("[integrations/sync]", message);
+    return res.status(502).json({ error: message });
+  }
+});
+var integrations_default = router32;
+
+// src/routes/index.ts
+var router33 = (0, import_express34.Router)();
+router33.use(health_default);
+router33.use("/auth", auth_default);
+router33.use(storage_default);
+router33.use("/leads", leads_default);
+router33.use("/share", share_default);
+router33.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router33.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router33.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router33.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router33.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router33.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -123058,17 +123335,17 @@ router32.use(
   requireRole("manager"),
   intelligence_default
 );
-router32.use(
+router33.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router32.use("/branding", branding_default);
-router32.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router32.use("/beta", requireAuth, requireCompany, beta_default);
-router32.use(
+router33.use("/branding", branding_default);
+router33.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router33.use("/beta", requireAuth, requireCompany, beta_default);
+router33.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -123076,7 +123353,7 @@ router32.use(
   requireRole("sales"),
   opportunities_default
 );
-router32.use(
+router33.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -123084,7 +123361,7 @@ router32.use(
   requireRole("manager"),
   scorecards_default
 );
-router32.use(
+router33.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -123092,8 +123369,8 @@ router32.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router32.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router32.use(
+router33.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router33.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -123101,23 +123378,23 @@ router32.use(
   requireRole("sales"),
   proposals_default
 );
-router32.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router32.use(
+router33.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router33.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-router32.use("/products", requireAuth, requireBetaAccess, products_default);
-router32.use(
+router33.use("/products", requireAuth, requireBetaAccess, products_default);
+router33.use(
   "/inspections/:inspectionId/treatment-logs",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   treatment_logs_default
 );
-router32.use(
+router33.use(
   "/crm",
   requireAuth,
   requireCompany,
@@ -123125,8 +123402,16 @@ router32.use(
   requireRole("manager"),
   crm_default
 );
-router32.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
-router32.use(
+router33.use(
+  "/integrations",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  integrations_default
+);
+router33.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
+router33.use(
   "/review-queue",
   requireAuth,
   requireCompany,
@@ -123134,14 +123419,14 @@ router32.use(
   requireRole("manager"),
   review_queue_default
 );
-router32.use("/meta-glasses", meta_glasses_default);
-router32.use("/billing", billing_default);
-router32.use("/admin", admin_default);
-router32.use(requireAuth, transcribe_default);
-var routes_default = router32;
+router33.use("/meta-glasses", meta_glasses_default);
+router33.use("/billing", billing_default);
+router33.use("/admin", admin_default);
+router33.use(requireAuth, transcribe_default);
+var routes_default = router33;
 
 // src/routes/faie.ts
-var import_express34 = __toESM(require_express2(), 1);
+var import_express35 = __toESM(require_express2(), 1);
 
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
@@ -123162,7 +123447,7 @@ var logger2 = (0, import_pino.default)({
 });
 
 // src/routes/faie.ts
-var router33 = (0, import_express34.Router)();
+var router34 = (0, import_express35.Router)();
 var storage2 = new ObjectStorageService();
 var DatasetIngestBody = external_exports.object({
   companyId: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
@@ -123196,7 +123481,7 @@ function toCompanyId(raw) {
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
-router33.post("/dataset/ingest", async (req, res) => {
+router34.post("/dataset/ingest", async (req, res) => {
   const parsed = DatasetIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123222,7 +123507,7 @@ router33.post("/dataset/ingest", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-router33.post("/training/ingest-global", async (req, res) => {
+router34.post("/training/ingest-global", async (req, res) => {
   const parsed = GlobalIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123251,7 +123536,7 @@ router33.post("/training/ingest-global", async (req, res) => {
   }
 });
 var PLATFORM_COMPANY_ID = 0;
-router33.post("/training/ingest-anonymized", async (req, res) => {
+router34.post("/training/ingest-anonymized", async (req, res) => {
   const parsed = AnonymizedIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123275,7 +123560,7 @@ router33.post("/training/ingest-anonymized", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-var faie_default = router33;
+var faie_default = router34;
 
 // src/lib/webhookHandlers.ts
 var WebhookHandlers = class _WebhookHandlers {
@@ -123396,7 +123681,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // src/app.ts
-var app = (0, import_express35.default)();
+var app = (0, import_express36.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -123449,7 +123734,7 @@ app.use(
 );
 app.post(
   "/api/stripe/webhook",
-  import_express35.default.raw({ type: "application/json" }),
+  import_express36.default.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -123469,9 +123754,9 @@ app.post(
     }
   }
 );
-app.use("/v1/faie", import_express35.default.json({ limit: "20mb" }), faie_default);
-app.use(import_express35.default.json());
-app.use(import_express35.default.urlencoded({ extended: true }));
+app.use("/v1/faie", import_express36.default.json({ limit: "20mb" }), faie_default);
+app.use(import_express36.default.json());
+app.use(import_express36.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(

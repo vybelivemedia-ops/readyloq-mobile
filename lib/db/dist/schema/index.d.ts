@@ -22,4 +22,5 @@ export * from "./products";
 export * from "./treatment-logs";
 export * from "./daily-rigs";
 export * from "./faie-training";
+export * from "./field-integrations";
 //# sourceMappingURL=index.d.ts.map

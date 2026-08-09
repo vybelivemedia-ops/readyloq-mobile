@@ -36,6 +36,7 @@ import metaGlassesRouter from "./meta-glasses";
 import billingRouter from "./billing";
 import adminRouter from "./admin";
 import transcribeRouter from "./transcribe";
+import integrationsRouter from "./integrations";
 
 const router: IRouter = Router();
 
@@ -151,6 +152,16 @@ router.use(
   requireBetaAccess,
   requireRole("manager"),
   crmRouter,
+);
+// Field-service platform integrations (PestPac / FieldRoutes).
+// Config (PUT/DELETE) is owner-only; GET config and POST sync are manager+.
+router.use(
+  "/integrations",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  integrationsRouter,
 );
 // Daily rig + recent mixes — all authenticated beta users (technicians included).
 // Sub-routes:  POST/GET /technician/daily-rig
