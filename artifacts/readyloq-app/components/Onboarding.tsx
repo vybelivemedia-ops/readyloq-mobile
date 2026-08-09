@@ -12,7 +12,23 @@ import { acceptInvite, ApiError, createCompany } from "@/lib/api";
 
 type Mode = "create" | "join";
 
-export function Onboarding({ onDone }: { onDone: () => void }) {
+interface OnboardingProps {
+  onDone: () => void;
+  /**
+   * When true the submit button is disabled and an inline note is shown so the
+   * user knows they cannot proceed until connectivity returns.
+   */
+  isOffline?: boolean;
+  /**
+   * When true the form shows a prominent "You're offline" banner instead of the
+   * normal helper text. Used when the auto-create already failed due to a
+   * network error — the user does not need to do anything; the app will retry
+   * automatically once connectivity returns.
+   */
+  showOfflineBanner?: boolean;
+}
+
+export function Onboarding({ onDone, isOffline = false, showOfflineBanner = false }: OnboardingProps) {
   const colors = useColors();
   const { getToken } = useAuth();
   const signOut = useSignOut();
@@ -24,6 +40,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
+    if (isOffline) return; // guard — button should already be disabled
     setError(null);
     setSubmitting(true);
     try {
@@ -87,17 +104,45 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           >
             Set up your workspace
           </Text>
-          <Text
-            style={{
-              color: colors.mutedForeground,
-              fontFamily: "Inter_400Regular",
-              fontSize: 15,
-              textAlign: "center",
-              lineHeight: 21,
-            }}
-          >
-            Create a new company or join an existing one with an invite code from your manager.
-          </Text>
+          {showOfflineBanner ? (
+            // Auto-create already failed due to a network error. The app will
+            // retry automatically — no action needed from the user.
+            <View
+              style={{
+                backgroundColor: colors.muted,
+                borderRadius: colors.radius,
+                borderWidth: 1,
+                borderColor: colors.border,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                width: "100%",
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.foreground,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 14,
+                  textAlign: "center",
+                  lineHeight: 20,
+                }}
+              >
+                You're offline — your workspace will be set up automatically once you're connected.
+              </Text>
+            </View>
+          ) : (
+            <Text
+              style={{
+                color: colors.mutedForeground,
+                fontFamily: "Inter_400Regular",
+                fontSize: 15,
+                textAlign: "center",
+                lineHeight: 21,
+              }}
+            >
+              Create a new company or join an existing one with an invite code from your manager.
+            </Text>
+          )}
         </View>
 
         <View
@@ -143,7 +188,21 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           size="lg"
           onPress={submit}
           loading={submitting}
+          disabled={isOffline || submitting}
         />
+
+        {isOffline ? (
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontFamily: "Inter_400Regular",
+              fontSize: 13,
+              textAlign: "center",
+            }}
+          >
+            You're offline. Connect to the internet to continue.
+          </Text>
+        ) : null}
 
         <Button title="Sign out" variant="ghost" onPress={() => signOut()} />
       </ScrollView>
