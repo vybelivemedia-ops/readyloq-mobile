@@ -20,8 +20,8 @@ import {
   getListReportsQueryOptions,
 } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { type Href, useRouter } from "expo-router";
-import React from "react";
+import { type Href, useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { MissionControlDashboard } from "@/components/MissionControlDashboard";
@@ -467,7 +467,15 @@ export default function DashboardScreen() {
   const isManager = role === "manager";
   const isOwner   = role === "owner";
 
-  const { viewMode } = useViewPreference();
+  const { viewMode, reload: reloadViewMode } = useViewPreference();
+
+  // Re-read the view preference whenever this screen comes into focus,
+  // so changes made in Settings are reflected immediately on return.
+  useFocusEffect(
+    useCallback(() => {
+      void reloadViewMode();
+    }, [reloadViewMode]),
+  );
 
   const briefing = useQuery(getGetBriefingQueryOptions());
   const dash     = useQuery(getGetAnalyticsDashboardQueryOptions());
@@ -589,10 +597,16 @@ export default function DashboardScreen() {
   // Header label for company.
   const companyName = user?.company?.name;
 
-  // ── Owner: Mission Control full-screen takeover ────────────────────────────
+  // ── Owner: route to Mission Control or Streamlined view ──────────────────
   const vybeAgents = useVybeAgents();
+  const missionControlActive = isOwner
+    ? resolveViewMode(viewMode, briefing.data?.owner?.isSoloOperator ?? false) === "enterprise"
+    : false;
 
-  if (isOwner) {
+  // Quinn Harlow — Chief of Staff — is always first in the VYBE_AGENTS roster.
+  const quinnEntry = vybeAgents.agents.find((a) => a.agent.id === "quinn-harlow") ?? vybeAgents.agents[0];
+
+  if (isOwner && missionControlActive) {
     return (
       <MissionControlDashboard
         firstName={firstName}
@@ -608,6 +622,166 @@ export default function DashboardScreen() {
         onRefresh={() => { onRefresh(); vybeAgents.refresh(); }}
         onSignOut={() => { void signOut(); }}
       />
+    );
+  }
+
+  if (isOwner && !missionControlActive) {
+    // ── Streamlined / Solo owner view ──────────────────────────────────────
+    const MC_BG      = "#08090E";
+    const MC_SURFACE = "#10141F";
+    const MC_BORDER  = "#1C2235";
+    const MC_ACCENT  = "#17c4d3";
+    const MC_TEXT    = "#FFFFFF";
+    const MC_MUTED   = "rgba(255,255,255,0.45)";
+    const MC_SUCCESS = "#22c55e";
+
+    const quinnInitials = quinnEntry?.agent.initials ?? "QH";
+    const quinnStatus = quinnEntry?.status ?? "active";
+    const statusDotColor = quinnStatus === "active" ? MC_SUCCESS : quinnStatus === "standby" ? MC_ACCENT : MC_MUTED;
+
+    return (
+      <View style={{ flex: 1, backgroundColor: MC_BG }}>
+        <ScrollView
+          contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 40 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={briefing.isRefetching}
+              onRefresh={() => briefing.refetch()}
+              tintColor={MC_ACCENT}
+            />
+          }
+        >
+          {/* ── Header ──────────────────────────────────────────────────── */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: MC_TEXT, fontFamily: "Inter_700Bold", fontSize: 22, letterSpacing: -0.5 }}>
+                {firstName.toUpperCase()}
+              </Text>
+              {companyName ? (
+                <Text style={{ color: MC_MUTED, fontFamily: "Inter_400Regular", fontSize: 11, letterSpacing: 1.2, marginTop: 1 }}>
+                  {companyName.toUpperCase()}
+                </Text>
+              ) : null}
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ backgroundColor: "rgba(23,196,211,0.10)", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(23,196,211,0.25)" }}>
+                <Text style={{ color: MC_ACCENT, fontFamily: "Inter_700Bold", fontSize: 9, letterSpacing: 1.2 }}>
+                  STREAMLINED
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => router.push("/settings" as Href)}
+                style={({ pressed }) => ({
+                  width: 36, height: 36, borderRadius: 9,
+                  backgroundColor: MC_SURFACE, borderWidth: 1, borderColor: MC_BORDER,
+                  alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Ionicons name="settings-outline" size={17} color={MC_MUTED} />
+              </Pressable>
+              <Pressable
+                onPress={() => { void signOut(); }}
+                style={({ pressed }) => ({
+                  width: 36, height: 36, borderRadius: 9,
+                  backgroundColor: MC_SURFACE, borderWidth: 1, borderColor: MC_BORDER,
+                  alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Ionicons name="log-out-outline" size={17} color={MC_MUTED} />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* ── Start Inspection hero ────────────────────────────────────── */}
+          <Pressable
+            onPress={() => router.push("/new-inspection" as Href)}
+            style={({ pressed }) => ({
+              backgroundColor: MC_ACCENT,
+              borderRadius: 14,
+              paddingVertical: 18,
+              paddingHorizontal: 20,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              opacity: pressed ? 0.88 : 1,
+            })}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+              <Ionicons name="camera" size={26} color="#000" />
+              <Text style={{ color: "#000000", fontFamily: "Inter_700Bold", fontSize: 19 }}>
+                Start Inspection
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color="#000" />
+          </Pressable>
+
+          {/* ── Quick actions ─────────────────────────────────────────────── */}
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Pressable
+              onPress={() => router.push("/(tabs)/reports" as Href)}
+              style={({ pressed }) => ({
+                flex: 1, backgroundColor: MC_SURFACE, borderWidth: 1, borderColor: MC_BORDER,
+                borderRadius: 10, paddingVertical: 13,
+                flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Ionicons name="document-text-outline" size={18} color={MC_ACCENT} />
+              <Text style={{ color: MC_TEXT, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Reports</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push("/(tabs)/leads" as Href)}
+              style={({ pressed }) => ({
+                flex: 1, backgroundColor: MC_SURFACE, borderWidth: 1, borderColor: MC_BORDER,
+                borderRadius: 10, paddingVertical: 13,
+                flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Ionicons name="trending-up-outline" size={18} color={MC_ACCENT} />
+              <Text style={{ color: MC_TEXT, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Pipeline</Text>
+            </Pressable>
+          </View>
+
+          {/* ── AI Assistant — Quinn Harlow ──────────────────────────────── */}
+          <View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <View style={{ width: 3, height: 13, backgroundColor: MC_ACCENT, borderRadius: 2 }} />
+              <Text style={{ color: MC_ACCENT, fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 1.6 }}>
+                AI ASSISTANT
+              </Text>
+            </View>
+            <View style={{
+              backgroundColor: MC_SURFACE,
+              borderWidth: 1, borderColor: MC_BORDER,
+              borderRadius: 12, padding: 14,
+              flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <View style={{
+                  width: 42, height: 42, borderRadius: 11,
+                  backgroundColor: "rgba(23,196,211,0.12)",
+                  borderWidth: 1, borderColor: "rgba(23,196,211,0.25)",
+                  alignItems: "center", justifyContent: "center",
+                }}>
+                  <Text style={{ color: MC_ACCENT, fontFamily: "Inter_700Bold", fontSize: 12, letterSpacing: 0.5 }}>
+                    {quinnInitials}
+                  </Text>
+                </View>
+                <View>
+                  <Text style={{ color: MC_TEXT, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+                    {quinnEntry?.agent.name ?? "Quinn Harlow"}
+                  </Text>
+                  <Text style={{ color: MC_MUTED, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 1 }}>
+                    {quinnEntry?.agent.role ?? "Chief of Staff"} · Active Voice Copilot
+                  </Text>
+                </View>
+              </View>
+              <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: statusDotColor }} />
+            </View>
+          </View>
+        </ScrollView>
+      </View>
     );
   }
 

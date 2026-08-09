@@ -28,22 +28,27 @@ export interface UseViewPreferenceResult {
   setMode: (mode: ViewMode) => Promise<void>;
   /** Clear the override — dashboard falls back to the server value. */
   clearMode: () => Promise<void>;
+  /** Re-read from AsyncStorage (call from useFocusEffect to pick up changes made on other screens). */
+  reload: () => Promise<void>;
 }
 
 export function useViewPreference(): UseViewPreferenceResult {
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((saved) => {
-        if (saved === "solo" || saved === "enterprise") setViewMode(saved);
-      })
-      .catch(() => {
-        /* ignore — storage errors are non-fatal */
-      })
-      .finally(() => setIsLoaded(true));
+  const readFromStorage = useCallback(async () => {
+    try {
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      if (saved === "solo" || saved === "enterprise") setViewMode(saved);
+      else setViewMode(null);
+    } catch {
+      /* non-fatal */
+    }
   }, []);
+
+  useEffect(() => {
+    readFromStorage().finally(() => setIsLoaded(true));
+  }, [readFromStorage]);
 
   const setMode = useCallback(async (mode: ViewMode) => {
     setViewMode(mode);
@@ -55,7 +60,11 @@ export function useViewPreference(): UseViewPreferenceResult {
     await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {/* non-fatal */});
   }, []);
 
-  return { viewMode, isLoaded, setMode, clearMode };
+  const reload = useCallback(async () => {
+    await readFromStorage();
+  }, [readFromStorage]);
+
+  return { viewMode, isLoaded, setMode, clearMode, reload };
 }
 
 /**

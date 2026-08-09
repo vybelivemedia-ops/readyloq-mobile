@@ -468,45 +468,26 @@ export default function SettingsScreen() {
       <ScrollView
         contentContainerStyle={{ padding: 16, gap: 20, paddingBottom: 48 }}
       >
-        {/* ── View Mode (owners only) ──────────────────────────────────── */}
+        {/* ── Dashboard Preferences (owners only) ──────────────────────── */}
         {isOwner && isLoaded && (
           <View>
-            <SectionHeader label="Dashboard Layout" />
+            <SectionHeader label="Dashboard Preferences" />
             <Card style={{ overflow: "hidden", padding: 0 }}>
-              <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 }}>
-                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
-                  View Mode
-                </Text>
-                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 3 }}>
-                  {viewMode == null
-                    ? "Auto — following your account type"
-                    : "Manually set — overrides your account type"}
-                </Text>
-              </View>
-
-              <ViewModeToggle
-                mode={effectiveMode}
-                onChange={(m) => void setMode(m)}
+              <SettingRow
+                icon="pulse-outline"
+                label="Mission Control Mode"
+                sublabel="Show full metrics, KPIs, and agent roster"
+                isLast
+                right={
+                  <Switch
+                    value={effectiveMode === "enterprise"}
+                    onValueChange={(v) => void setMode(v ? "enterprise" : "solo")}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor="#ffffff"
+                  />
+                }
               />
-
-              {viewMode != null && (
-                <Pressable
-                  onPress={() => void clearMode()}
-                  style={({ pressed }) => ({
-                    alignItems: "center",
-                    paddingVertical: 10,
-                    borderTopWidth: 1,
-                    borderTopColor: colors.border,
-                    opacity: pressed ? 0.6 : 1,
-                  })}
-                >
-                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
-                    Reset to automatic
-                  </Text>
-                </Pressable>
-              )}
             </Card>
-
             <Text
               style={{
                 color: colors.mutedForeground,
@@ -517,9 +498,9 @@ export default function SettingsScreen() {
                 lineHeight: 17,
               }}
             >
-              {effectiveMode === "solo"
-                ? "Solo Operator hides multi-tech queues and team metrics so the dashboard stays focused on your own field work."
-                : "Enterprise shows approval queues, team performance metrics, and the training upload card."}
+              {effectiveMode === "enterprise"
+                ? "Mission Control is ON — showing full KPIs, alerts, and the complete agent roster."
+                : "Mission Control is OFF — dashboard shows only your core actions and AI assistant."}
             </Text>
           </View>
         )}
