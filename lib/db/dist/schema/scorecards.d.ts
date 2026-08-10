@@ -262,6 +262,23 @@ export declare const inspectionScorecardsTable: import("drizzle-orm/pg-core").Pg
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        criticalAlertSent: import("drizzle-orm/pg-core").PgColumn<{
+            name: "critical_alert_sent";
+            tableName: "inspection_scorecards";
+            dataType: "boolean";
+            columnType: "PgBoolean";
+            data: boolean;
+            driverParam: boolean;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
     };
     dialect: "pg";
 }>;

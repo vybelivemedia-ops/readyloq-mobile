@@ -160,6 +160,40 @@ export declare const usersTable: import("drizzle-orm/pg-core").PgTableWithColumn
         }, {}, {
             $type: UserRole;
         }>;
+        pushToken: import("drizzle-orm/pg-core").PgColumn<{
+            name: "push_token";
+            tableName: "users";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        pushNotificationsEnabled: import("drizzle-orm/pg-core").PgColumn<{
+            name: "push_notifications_enabled";
+            tableName: "users";
+            dataType: "boolean";
+            columnType: "PgBoolean";
+            data: boolean;
+            driverParam: boolean;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
     };
     dialect: "pg";
 }>;

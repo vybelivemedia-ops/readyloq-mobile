@@ -3,7 +3,24 @@ import { setAuthTokenGetter } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Redirect, Stack, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Alert, Platform, Text, View } from "react-native";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
+import { registerPushToken } from "@/lib/api";
+
+// ── Foreground notification handler ────────────────────────────────────────────
+// Without this, Expo does not present incoming notifications while the app is
+// foregrounded. Set it at module scope so it is registered before any push
+// arrives, regardless of which screen the user is on.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 import { BetaPaused } from "@/components/BetaPaused";
 import { Onboarding } from "@/components/Onboarding";
@@ -184,6 +201,49 @@ function Gate() {
       console.warn("[SpeechService] Background warm-up failed:", e);
     });
   }, [ready]);
+
+  // ── Push token registration (owners only) ───────────────────────────────────
+  // Request permission and register the Expo push token so the server can
+  // deliver critical-risk inspection alerts. Runs once after the workspace
+  // is fully ready and the user is an owner. Silently no-ops on failure —
+  // notifications are a best-effort feature and must never block the UI.
+  useEffect(() => {
+    if (!ready || user?.role !== "owner") return;
+    if (!Device.isDevice) return; // push not available on simulators
+
+    void (async () => {
+      try {
+        // Set up a notification channel for Android (required for Android 8+).
+        if (Platform.OS === "android") {
+          await Notifications.setNotificationChannelAsync("critical-alerts", {
+            name: "Critical Risk Alerts",
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: "#ef4444",
+          });
+        }
+
+        // expo-notifications v57 types omit `granted` from the top-level
+        // NotificationPermissionsStatus but it IS present at runtime (inherited
+        // from PermissionResponse in expo). Cast through unknown to satisfy TS.
+        type GrantedResult = { granted: boolean };
+        const existingPerm = (await Notifications.getPermissionsAsync()) as unknown as GrantedResult;
+        if (!existingPerm.granted) {
+          const requested = (await Notifications.requestPermissionsAsync()) as unknown as GrantedResult;
+          if (!requested.granted) return; // user denied — silently skip
+        }
+
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: "7927cf86-2cbd-4c14-9bd5-d43f2beabec8",
+        });
+        const token = await getToken();
+        await registerPushToken(token, tokenData.data);
+      } catch (e: unknown) {
+        console.warn("[PushToken] Registration failed:", e);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, user?.role]);
 
   useEffect(() => {
     if (!ready || promptedResume.current) return;

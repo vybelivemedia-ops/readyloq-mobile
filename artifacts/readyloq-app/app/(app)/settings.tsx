@@ -35,6 +35,7 @@ import {
   fetchIntegrationConfig,
   saveIntegrationConfig,
   deleteIntegrationConfig,
+  setPushNotificationsEnabled,
   type FieldIntegrationSystem,
   type IntegrationConfigResponse,
 } from "@/lib/api";
@@ -725,6 +726,28 @@ export default function SettingsScreen() {
   const serverIsSolo = briefing.data?.owner?.isSoloOperator ?? true;
   const effectiveMode = resolveViewMode(viewMode, serverIsSolo);
 
+  // ── Push notification toggle (owner only) ────────────────────────────────────
+  const [pushEnabled, setPushEnabled] = React.useState<boolean>(
+    user?.pushNotificationsEnabled ?? true,
+  );
+  const [pushToggling, setPushToggling] = React.useState(false);
+
+  const handlePushToggle = async (value: boolean) => {
+    if (pushToggling) return;
+    setPushEnabled(value);
+    setPushToggling(true);
+    try {
+      const token = await getToken();
+      await setPushNotificationsEnabled(token, value);
+    } catch {
+      // Revert optimistic update on failure
+      setPushEnabled(!value);
+      Alert.alert("Error", "Failed to update notification preference.");
+    } finally {
+      setPushToggling(false);
+    }
+  };
+
   return (
     <Screen>
       {/* Header */}
@@ -793,6 +816,44 @@ export default function SettingsScreen() {
               {effectiveMode === "enterprise"
                 ? "Mission Control is ON — showing full KPIs, alerts, and the complete agent roster."
                 : "Mission Control is OFF — dashboard shows only your core actions and AI assistant."}
+            </Text>
+          </View>
+        )}
+
+        {/* ── Notifications (owners only) ──────────────────────────────── */}
+        {isOwner && (
+          <View>
+            <SectionHeader label="Notifications" />
+            <Card style={{ overflow: "hidden", padding: 0 }}>
+              <SettingRow
+                icon="notifications-outline"
+                label="Critical Risk Alerts"
+                sublabel="Push notification when an inspection scores critical risk"
+                isLast
+                right={
+                  <Switch
+                    value={pushEnabled}
+                    onValueChange={(v) => void handlePushToggle(v)}
+                    disabled={pushToggling}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor="#ffffff"
+                  />
+                }
+              />
+            </Card>
+            <Text
+              style={{
+                color: colors.mutedForeground,
+                fontFamily: "Inter_400Regular",
+                fontSize: 12,
+                marginTop: 8,
+                paddingHorizontal: 4,
+                lineHeight: 17,
+              }}
+            >
+              {pushEnabled
+                ? "You'll be notified immediately when a completed inspection scores as critical risk."
+                : "Critical risk alerts are off. Enable to get instant push notifications."}
             </Text>
           </View>
         )}

@@ -196,10 +196,10 @@ export declare const companyPlaybooksTable: import("drizzle-orm/pg-core").PgTabl
 export declare const insertPlaybookSchema: import("zod/v4").ZodObject<{
     notes: import("zod/v4").ZodOptional<import("zod/v4").ZodNullable<import("zod/v4").ZodString>>;
     title: import("zod/v4").ZodString;
+    isActive: import("zod/v4").ZodOptional<import("zod/v4").ZodBoolean>;
     targetPests: import("zod/v4").ZodOptional<import("zod/v4").ZodType<string[], string[], import("zod/v4/core").$ZodTypeInternals<string[], string[]>>>;
     requiredSteps: import("zod/v4").ZodOptional<import("zod/v4").ZodType<PlaybookRequiredStep[], PlaybookRequiredStep[], import("zod/v4/core").$ZodTypeInternals<PlaybookRequiredStep[], PlaybookRequiredStep[]>>>;
     chemicalRestrictions: import("zod/v4").ZodOptional<import("zod/v4").ZodType<ChemicalRestriction[], ChemicalRestriction[], import("zod/v4/core").$ZodTypeInternals<ChemicalRestriction[], ChemicalRestriction[]>>>;
-    isActive: import("zod/v4").ZodOptional<import("zod/v4").ZodBoolean>;
 }, {
     out: {};
     in: {};

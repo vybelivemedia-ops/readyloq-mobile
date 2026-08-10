@@ -176,6 +176,9 @@ export async function runScorecardComputation(input: {
           findingsCount: input.findings.length,
           photosAnalyzed: input.photosAnalyzed,
           updatedAt: new Date(),
+          // criticalAlertSent is intentionally NOT included here: once a push
+          // has been claimed for this inspection we must not reset the flag on
+          // re-analysis, or the owner gets a second notification.
         },
       });
   } catch {

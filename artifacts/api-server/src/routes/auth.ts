@@ -81,6 +81,7 @@ router.get("/me", requireAuth, async (req, res) => {
       companyId: user.companyId,
       betaAccess: user.betaAccess,
       company,
+      pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
     });
   } catch {
     return res.status(500).json({ error: "Failed to load user" });
@@ -230,6 +231,59 @@ router.get(
     }
   },
 );
+
+// ── POST /me/push-token — register device push token ─────────────────────────
+// Stores the Expo push token for the authenticated user. Owners use this to
+// receive critical-risk inspection push notifications. Any role can register a
+// token, but only owner tokens are currently consumed.
+router.post("/me/push-token", requireAuth, async (req, res) => {
+  const user = req.user!;
+  const { token } = req.body as { token?: unknown };
+  if (typeof token !== "string" || !token.startsWith("ExponentPushToken[")) {
+    return res.status(400).json({ error: "Invalid push token format" });
+  }
+  try {
+    await db
+      .update(usersTable)
+      .set({ pushToken: token })
+      .where(eq(usersTable.id, user.id));
+    return res.json({ success: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to save push token" });
+  }
+});
+
+// ── DELETE /me/push-token — remove push token (opt out) ───────────────────────
+router.delete("/me/push-token", requireAuth, async (req, res) => {
+  const user = req.user!;
+  try {
+    await db
+      .update(usersTable)
+      .set({ pushToken: null })
+      .where(eq(usersTable.id, user.id));
+    return res.json({ success: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to remove push token" });
+  }
+});
+
+// ── PATCH /me/push-notifications — toggle notification preference ─────────────
+router.patch("/me/push-notifications", requireAuth, async (req, res) => {
+  const user = req.user!;
+  const { enabled } = req.body as { enabled?: unknown };
+  if (typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled must be a boolean" });
+  }
+  try {
+    await db
+      .update(usersTable)
+      .set({ pushNotificationsEnabled: enabled })
+      .where(eq(usersTable.id, user.id));
+    return res.json({ success: true, pushNotificationsEnabled: enabled });
+  } catch {
+    return res.status(500).json({ error: "Failed to update push notification preference" });
+  }
+});
 
 // ── POST /accept-invite — join a company via token ─────────────────────────────
 router.post("/accept-invite", requireAuth, async (req, res) => {

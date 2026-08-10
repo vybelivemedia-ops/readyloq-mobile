@@ -5,6 +5,7 @@ import {
   reportsTable,
   customerSummariesTable,
   inspectionMediaTable,
+  inspectionScorecardsTable,
   type Finding,
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
@@ -15,6 +16,7 @@ import { runScorecardComputation } from "./scorecard";
 import { computeCoverage, zonesFromFinding } from "./zone-coverage";
 import { logErrorEvent } from "./error-events";
 import { writePropertyMemory } from "./property-memory-writer";
+import { notifyCriticalInspection } from "./push-notifications";
 
 /**
  * Explicit "Complete Inspection" finalization pipeline.
@@ -332,6 +334,47 @@ export async function runInspectionFinalization(input: {
       message: "Complete-inspection: scorecard computation failed",
       inspectionId,
       context: { stage: "complete_scorecard" },
+    });
+  }
+
+  // 5. Critical-risk push notification — fire to all owner tokens for the company
+  // when the scorecard lands as critical. Exactly-once delivery is enforced with
+  // an atomic UPDATE … WHERE critical_alert_sent = FALSE. Concurrent or retried
+  // finalization paths will hit the false branch and skip, so the owner is never
+  // spammed. Best-effort: a failure here never blocks completion.
+  try {
+    // Atomically claim the right to send: flip critical_alert_sent to true only
+    // if it is still false (first caller wins). RETURNING gives us the riskLevel
+    // so we can skip the push without a second round-trip when uncritical.
+    const claimed = await db
+      .update(inspectionScorecardsTable)
+      .set({ criticalAlertSent: true })
+      .where(
+        and(
+          eq(inspectionScorecardsTable.inspectionId, inspectionId),
+          eq(inspectionScorecardsTable.companyId, companyId),
+          eq(inspectionScorecardsTable.riskLevel, "critical"),
+          eq(inspectionScorecardsTable.criticalAlertSent, false),
+        ),
+      )
+      .returning({ id: inspectionScorecardsTable.id });
+
+    if (claimed.length > 0) {
+      // We won the atomic claim — send exactly once.
+      await notifyCriticalInspection({
+        companyId,
+        inspectionId,
+        siteAddress: inspection.siteAddress ?? "",
+        technicianName: inspection.technicianName ?? null,
+      });
+    }
+  } catch {
+    void logErrorEvent("notification", {
+      companyId,
+      userId,
+      message: "Complete-inspection: critical-risk push notification failed",
+      inspectionId,
+      context: { stage: "complete_push_notification" },
     });
   }
 

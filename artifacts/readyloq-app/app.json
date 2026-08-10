@@ -60,7 +60,10 @@
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_ADVERTISE",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
       ]
     },
     "web": {
@@ -105,6 +108,16 @@
         "expo-av",
         {
           "microphonePermission": "Allow ReadyLoq to use the microphone for hands-free inspection notes."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#0d1117",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "#{unread_notifications} new alerts"
         }
       ],
       "expo-mail-composer",

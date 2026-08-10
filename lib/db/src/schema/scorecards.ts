@@ -4,6 +4,7 @@ import {
   integer,
   text,
   jsonb,
+  boolean,
   timestamp,
   index,
   uniqueIndex,
@@ -74,6 +75,12 @@ export const inspectionScorecardsTable = pgTable(
     photosAnalyzed: integer("photos_analyzed").notNull().default(0),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    // Delivery idempotency: set to true the first time a critical-risk push is
+    // successfully claimed for this inspection. The atomic claim (UPDATE WHERE
+    // critical_alert_sent = false) ensures exactly-once delivery across retries
+    // and concurrent finalization paths. NOT reset by re-analysis upserts so
+    // the owner isn't spammed on re-runs.
+    criticalAlertSent: boolean("critical_alert_sent").notNull().default(false),
   },
   (t) => ({
     companyIdx: index("inspection_scorecards_company_idx").on(t.companyId),

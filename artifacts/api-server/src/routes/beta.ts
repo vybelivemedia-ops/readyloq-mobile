@@ -254,7 +254,7 @@ router.get("/errors", requireRole("manager"), async (req, res) => {
       .where(eq(errorEventsTable.companyId, companyId))
       .orderBy(desc(errorEventsTable.id))
       .limit(200);
-    const summary = { upload: 0, ai: 0, report: 0, auth: 0, total: rows.length };
+    const summary = { upload: 0, ai: 0, report: 0, auth: 0, notification: 0, total: rows.length };
     for (const r of rows) summary[r.category] += 1;
     return res.json({ summary, events: rows.map(serializeErrorEvent) });
   } catch {

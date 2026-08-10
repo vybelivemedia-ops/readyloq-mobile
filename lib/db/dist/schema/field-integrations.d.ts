@@ -163,11 +163,11 @@ export declare const companyFieldIntegrationsTable: import("drizzle-orm/pg-core"
     dialect: "pg";
 }>;
 export declare const insertFieldIntegrationSchema: z.ZodObject<{
+    enabled: z.ZodOptional<z.ZodBoolean>;
     systemType: z.ZodString;
     accountId: z.ZodString;
     apiKey: z.ZodString;
     apiBaseUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    enabled: z.ZodOptional<z.ZodBoolean>;
 }, {
     out: {};
     in: {};

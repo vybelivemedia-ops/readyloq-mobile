@@ -80,6 +80,8 @@ export interface CurrentUser {
   companyId: number | null;
   betaAccess: boolean;
   company?: CurrentCompany | null;
+  /** Whether push notifications are enabled for this user. */
+  pushNotificationsEnabled: boolean;
 }
 
 export interface AdminUser {
@@ -437,6 +439,14 @@ export function fetchExecutiveInspections(
   }>(`/api/executive/inspections?riskLevel=${riskLevel}`, token);
 }
 
+/** Register (or refresh) the device Expo push token for this user. */
+export function registerPushToken(token: string | null, pushToken: string) {
+  return request<{ success: boolean }>("/api/auth/me/push-token", token, {
+    method: "POST",
+    body: JSON.stringify({ token: pushToken }),
+  });
+}
+
 // ─── Executive daily briefing ─────────────────────────────────────────────────
 
 export interface DailyBriefing {
@@ -484,4 +494,23 @@ export function bulkIngestDataset(
     method: "POST",
     body: JSON.stringify({ images, metadata }),
   });
+}
+
+/** Remove the stored push token (opt-out path). */
+export function removePushToken(token: string | null) {
+  return request<{ success: boolean }>("/api/auth/me/push-token", token, {
+    method: "DELETE",
+  });
+}
+
+/** Toggle push notification preference on the server. */
+export function setPushNotificationsEnabled(token: string | null, enabled: boolean) {
+  return request<{ success: boolean; pushNotificationsEnabled: boolean }>(
+    "/api/auth/me/push-notifications",
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    },
+  );
 }

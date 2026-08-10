@@ -36059,7 +36059,7 @@ var require_serializer = __commonJS({
     exports.serialize = void 0;
     var buffer_writer_1 = require_buffer_writer();
     var writer = new buffer_writer_1.Writer();
-    var startup = (opts) => {
+    var startup2 = (opts) => {
       writer.addInt16(3).addInt16(0);
       for (const key of Object.keys(opts)) {
         writer.addCString(key).addCString(opts[key]);
@@ -36245,7 +36245,7 @@ var require_serializer = __commonJS({
       /* code.copyDone */
     );
     var serialize6 = {
-      startup,
+      startup: startup2,
       password,
       requestSsl,
       sendSASLInitialResponseMessage,
@@ -69075,7 +69075,14 @@ var usersTable = pgTable("users", {
   // uses this value instead of `role` so the super admin can verify technician,
   // sales, manager, and owner experiences without a real account switch.
   // Super-admin-only endpoints check `isSuperAdmin` directly, bypassing this.
-  roleOverride: text("role_override").$type()
+  roleOverride: text("role_override").$type(),
+  // ── Push Notifications ──────────────────────────────────────────────────────
+  // Expo push token registered from the device. Stored per-user; cleared when
+  // the user opts out. Nullable: token not yet registered or user opted out.
+  pushToken: text("push_token"),
+  // Owner opt-out toggle. When false, no critical-risk push is sent even if
+  // a token is on file. Default true so pushes fire immediately on registration.
+  pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(true)
 });
 
 // ../../lib/db/src/schema/properties.ts
@@ -69568,7 +69575,13 @@ var inspectionScorecardsTable = pgTable(
     findingsCount: integer("findings_count").notNull().default(0),
     photosAnalyzed: integer("photos_analyzed").notNull().default(0),
     createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow()
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    // Delivery idempotency: set to true the first time a critical-risk push is
+    // successfully claimed for this inspection. The atomic claim (UPDATE WHERE
+    // critical_alert_sent = false) ensures exactly-once delivery across retries
+    // and concurrent finalization paths. NOT reset by re-analysis upserts so
+    // the owner isn't spammed on re-runs.
+    criticalAlertSent: boolean("critical_alert_sent").notNull().default(false)
   },
   (t) => ({
     companyIdx: index("inspection_scorecards_company_idx").on(t.companyId),
@@ -76938,7 +76951,8 @@ router2.get("/me", requireAuth, async (req, res) => {
       isSuperAdmin: user.isSuperAdmin,
       companyId: user.companyId,
       betaAccess: user.betaAccess,
-      company
+      company,
+      pushNotificationsEnabled: user.pushNotificationsEnabled ?? true
     });
   } catch {
     return res.status(500).json({ error: "Failed to load user" });
@@ -77053,6 +77067,41 @@ router2.get(
     }
   }
 );
+router2.post("/me/push-token", requireAuth, async (req, res) => {
+  const user = req.user;
+  const { token } = req.body;
+  if (typeof token !== "string" || !token.startsWith("ExponentPushToken[")) {
+    return res.status(400).json({ error: "Invalid push token format" });
+  }
+  try {
+    await db.update(usersTable).set({ pushToken: token }).where(eq(usersTable.id, user.id));
+    return res.json({ success: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to save push token" });
+  }
+});
+router2.delete("/me/push-token", requireAuth, async (req, res) => {
+  const user = req.user;
+  try {
+    await db.update(usersTable).set({ pushToken: null }).where(eq(usersTable.id, user.id));
+    return res.json({ success: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to remove push token" });
+  }
+});
+router2.patch("/me/push-notifications", requireAuth, async (req, res) => {
+  const user = req.user;
+  const { enabled } = req.body;
+  if (typeof enabled !== "boolean") {
+    return res.status(400).json({ error: "enabled must be a boolean" });
+  }
+  try {
+    await db.update(usersTable).set({ pushNotificationsEnabled: enabled }).where(eq(usersTable.id, user.id));
+    return res.json({ success: true, pushNotificationsEnabled: enabled });
+  } catch {
+    return res.status(500).json({ error: "Failed to update push notification preference" });
+  }
+});
 router2.post("/accept-invite", requireAuth, async (req, res) => {
   const user = req.user;
   if (user.companyId != null) {
@@ -87665,6 +87714,9 @@ async function runScorecardComputation(input) {
         findingsCount: input.findings.length,
         photosAnalyzed: input.photosAnalyzed,
         updatedAt: /* @__PURE__ */ new Date()
+        // criticalAlertSent is intentionally NOT included here: once a push
+        // has been claimed for this inspection we must not reset the flag on
+        // re-analysis, or the owner gets a second notification.
       }
     });
   } catch {
@@ -88054,6 +88106,90 @@ async function writePropertyMemory(input) {
   }
 }
 
+// src/lib/push-notifications.ts
+var EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+async function sendExpoPush(messages2, ctx) {
+  if (messages2.length === 0) return;
+  try {
+    const response = await fetch(EXPO_PUSH_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(messages2)
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(unreadable)");
+      void logErrorEvent("notification", {
+        companyId: ctx.companyId,
+        inspectionId: ctx.inspectionId,
+        message: `Expo push API returned ${response.status}: ${body}`,
+        context: { stage: "push_send", tokenCount: messages2.length }
+      });
+      return;
+    }
+    const json3 = await response.json();
+    const tickets = json3.data ?? [];
+    for (const ticket of tickets) {
+      if (ticket.status === "error") {
+        void logErrorEvent("notification", {
+          companyId: ctx.companyId,
+          inspectionId: ctx.inspectionId,
+          message: `Expo push ticket error: ${ticket.message ?? "unknown"}`,
+          context: { errorCode: ticket.details?.error }
+        });
+      }
+    }
+  } catch (err) {
+    void logErrorEvent("notification", {
+      companyId: ctx.companyId,
+      inspectionId: ctx.inspectionId,
+      message: `Expo push send failed: ${err instanceof Error ? err.message : String(err)}`,
+      context: { stage: "push_send", tokenCount: messages2.length }
+    });
+  }
+}
+async function notifyCriticalInspection(input) {
+  const { companyId, inspectionId, siteAddress, technicianName } = input;
+  const ctx = { companyId, inspectionId };
+  let owners = [];
+  try {
+    owners = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(
+      and(
+        eq(usersTable.companyId, companyId),
+        eq(usersTable.role, "owner"),
+        eq(usersTable.pushNotificationsEnabled, true)
+      )
+    );
+  } catch (err) {
+    void logErrorEvent("notification", {
+      companyId,
+      inspectionId,
+      message: `Failed to fetch owner push tokens: ${err instanceof Error ? err.message : String(err)}`,
+      context: { stage: "push_fetch_tokens" }
+    });
+    return;
+  }
+  const tokens = owners.map((o) => o.pushToken).filter((t) => typeof t === "string" && t.startsWith("ExponentPushToken["));
+  if (tokens.length === 0) return;
+  const tech = technicianName ? ` by ${technicianName}` : "";
+  const shortAddress = siteAddress.length > 60 ? siteAddress.slice(0, 57) + "\u2026" : siteAddress;
+  const messages2 = tokens.map((token) => ({
+    to: token,
+    title: "\u{1F6A8} Critical Risk Inspection Completed",
+    body: `${shortAddress}${tech} \u2014 tap to view`,
+    sound: "default",
+    channelId: "critical-alerts",
+    data: {
+      screen: "inspection",
+      inspectionId,
+      companyId
+    }
+  }));
+  await sendExpoPush(messages2, ctx);
+}
+
 // src/lib/inspection-complete.ts
 async function ensureReportForInspection(input) {
   const { companyId, inspectionId } = input;
@@ -88255,6 +88391,32 @@ async function runInspectionFinalization(input) {
       message: "Complete-inspection: scorecard computation failed",
       inspectionId,
       context: { stage: "complete_scorecard" }
+    });
+  }
+  try {
+    const claimed = await db.update(inspectionScorecardsTable).set({ criticalAlertSent: true }).where(
+      and(
+        eq(inspectionScorecardsTable.inspectionId, inspectionId),
+        eq(inspectionScorecardsTable.companyId, companyId),
+        eq(inspectionScorecardsTable.riskLevel, "critical"),
+        eq(inspectionScorecardsTable.criticalAlertSent, false)
+      )
+    ).returning({ id: inspectionScorecardsTable.id });
+    if (claimed.length > 0) {
+      await notifyCriticalInspection({
+        companyId,
+        inspectionId,
+        siteAddress: inspection.siteAddress ?? "",
+        technicianName: inspection.technicianName ?? null
+      });
+    }
+  } catch {
+    void logErrorEvent("notification", {
+      companyId,
+      userId,
+      message: "Complete-inspection: critical-risk push notification failed",
+      inspectionId,
+      context: { stage: "complete_push_notification" }
     });
   }
   try {
@@ -92798,7 +92960,7 @@ router14.get("/errors", requireRole("manager"), async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const rows = await db.select().from(errorEventsTable).where(eq(errorEventsTable.companyId, companyId)).orderBy(desc(errorEventsTable.id)).limit(200);
-    const summary = { upload: 0, ai: 0, report: 0, auth: 0, total: rows.length };
+    const summary = { upload: 0, ai: 0, report: 0, auth: 0, notification: 0, total: rows.length };
     for (const r of rows) summary[r.category] += 1;
     return res.json({ summary, events: rows.map(serializeErrorEvent) });
   } catch {
@@ -124694,6 +124856,33 @@ async function backfillPropertyMemory() {
   logger2.info({ written, skipped }, "backfillPropertyMemory: complete");
 }
 
+// src/lib/migrate-push-notifications.ts
+async function columnExists(table, column) {
+  const result = await db.execute(
+    sql`SELECT 1 FROM information_schema.columns
+        WHERE table_name = ${table} AND column_name = ${column}`
+  );
+  return result.rows.length > 0;
+}
+async function migratePushNotificationColumns() {
+  if (!await columnExists("users", "push_token")) {
+    await db.execute(sql`ALTER TABLE users ADD COLUMN push_token TEXT`);
+    logger2.info("migratePushNotifications: added users.push_token");
+  }
+  if (!await columnExists("users", "push_notifications_enabled")) {
+    await db.execute(
+      sql`ALTER TABLE users ADD COLUMN push_notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE`
+    );
+    logger2.info("migratePushNotifications: added users.push_notifications_enabled");
+  }
+  if (!await columnExists("inspection_scorecards", "critical_alert_sent")) {
+    await db.execute(
+      sql`ALTER TABLE inspection_scorecards ADD COLUMN critical_alert_sent BOOLEAN NOT NULL DEFAULT FALSE`
+    );
+    logger2.info("migratePushNotifications: added inspection_scorecards.critical_alert_sent");
+  }
+}
+
 // src/index.ts
 var rawPort = process.env["PORT"];
 if (!rawPort) {
@@ -124705,6 +124894,31 @@ var port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
+async function startup() {
+  await migratePushNotificationColumns();
+  app_default.listen(port, (err) => {
+    if (err) {
+      logger2.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+    logger2.info({ port }, "Server listening");
+    void initStripe();
+    void backfillOpportunityValues().catch((err2) => {
+      logger2.warn({ err: err2 }, "Opportunity value backfill failed \u2014 pipeline totals may be incomplete");
+    });
+    void backfillPropertyMemory().catch((err2) => {
+      logger2.warn({ err: err2 }, "Property memory backfill failed \u2014 Prior Visit banner may be empty for legacy inspections");
+    });
+    void ensureProductsSeed().catch((seedErr) => {
+      logger2.warn({ err: seedErr }, "Product seed failed \u2014 catalogue may be incomplete");
+    });
+    void ensureClerkNativeRedirectUrls();
+  });
+}
+void startup().catch((err) => {
+  logger2.error({ err }, "Fatal startup error \u2014 server did not start");
+  process.exit(1);
+});
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -124728,24 +124942,6 @@ async function initStripe() {
     logger2.warn({ err }, "Stripe initialization failed \u2014 billing features unavailable");
   }
 }
-app_default.listen(port, (err) => {
-  if (err) {
-    logger2.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-  logger2.info({ port }, "Server listening");
-  void initStripe();
-  void backfillOpportunityValues().catch((err2) => {
-    logger2.warn({ err: err2 }, "Opportunity value backfill failed \u2014 pipeline totals may be incomplete");
-  });
-  void backfillPropertyMemory().catch((err2) => {
-    logger2.warn({ err: err2 }, "Property memory backfill failed \u2014 Prior Visit banner may be empty for legacy inspections");
-  });
-  void ensureProductsSeed().catch((seedErr) => {
-    logger2.warn({ err: seedErr }, "Product seed failed \u2014 catalogue may be incomplete");
-  });
-  void ensureClerkNativeRedirectUrls();
-});
 /*! Bundled license information:
 
 depd/index.js:

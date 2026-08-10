@@ -30,6 +30,13 @@ export const usersTable = pgTable("users", {
   // sales, manager, and owner experiences without a real account switch.
   // Super-admin-only endpoints check `isSuperAdmin` directly, bypassing this.
   roleOverride: text("role_override").$type<UserRole>(),
+  // ── Push Notifications ──────────────────────────────────────────────────────
+  // Expo push token registered from the device. Stored per-user; cleared when
+  // the user opts out. Nullable: token not yet registered or user opted out.
+  pushToken: text("push_token"),
+  // Owner opt-out toggle. When false, no critical-risk push is sent even if
+  // a token is on file. Default true so pushes fire immediately on registration.
+  pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(true),
 });
 
 export type User = typeof usersTable.$inferSelect;
