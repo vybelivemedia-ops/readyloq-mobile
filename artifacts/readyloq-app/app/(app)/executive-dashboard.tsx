@@ -10,6 +10,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   Text,
@@ -19,10 +20,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@clerk/expo";
 import Svg, { Rect, Line, Text as SvgText } from "react-native-svg";
+import * as MailComposer from "expo-mail-composer";
 import {
   fetchExecutiveMetrics,
   fetchExecutiveQualityTrend,
   fetchDailyBriefing,
+  fetchExecutiveEmailPreview,
   type ExecutiveMetrics,
   type ExecutiveTechnician,
   type ExecutiveQualityWeek,
@@ -526,6 +529,7 @@ export default function ExecutiveDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -546,6 +550,36 @@ export default function ExecutiveDashboardScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  }, [getToken]);
+
+  const handleShare = useCallback(async () => {
+    setSharing(true);
+    try {
+      const token = await getToken();
+      const { html, subject } = await fetchExecutiveEmailPreview(token);
+
+      const available = await MailComposer.isAvailableAsync();
+      if (!available) {
+        Alert.alert(
+          "Email Not Available",
+          "No email account is configured on this device. Please set up a mail account in Settings and try again.",
+        );
+        return;
+      }
+
+      await MailComposer.composeAsync({
+        subject,
+        body: html,
+        isHtml: true,
+      });
+    } catch (e) {
+      Alert.alert(
+        "Export Failed",
+        e instanceof Error ? e.message : "Could not generate dashboard snapshot.",
+      );
+    } finally {
+      setSharing(false);
     }
   }, [getToken]);
 
@@ -618,6 +652,26 @@ export default function ExecutiveDashboardScreen() {
           }}
         >
           <Ionicons name="refresh" size={18} color={C.muted} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => void handleShare()}
+          disabled={sharing || loading}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: sharing ? C.primary + "22" : "#ffffff08",
+            borderWidth: sharing ? 1 : 0,
+            borderColor: C.primary + "55",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {sharing ? (
+            <ActivityIndicator size="small" color={C.primary} />
+          ) : (
+            <Ionicons name="mail-outline" size={18} color={loading ? C.muted : C.primary} />
+          )}
         </TouchableOpacity>
       </View>
 

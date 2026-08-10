@@ -466,6 +466,13 @@ export function fetchDailyBriefing(token: string | null) {
   );
 }
 
+export function fetchExecutiveEmailPreview(token: string | null) {
+  return request<{ success: true; html: string; subject: string }>(
+    "/api/executive/intelligence/email-preview",
+    token,
+  );
+}
+
 // ─── Bulk dataset ingestion ───────────────────────────────────────────────────
 
 export interface BulkIngestMetadata {
