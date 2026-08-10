@@ -25,6 +25,8 @@ import {
   Text,
   View,
 } from "react-native";
+import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import * as Speech from "expo-speech";
 import { AiInsightsPanel } from "@/components/AiInsightsPanel";
@@ -715,6 +717,37 @@ export default function NewInspectionScreen() {
   const [glassesFindings, setGlassesFindings] = useState<GlassesEvent[]>([]);
   // #110 — full-screen viewer for glasses-captured frames
   const [glassesViewerPath, setGlassesViewerPath] = useState<string | null>(null);
+
+  // #117 — pinch-to-zoom for the glasses viewer
+  const glassesViewerScale     = useSharedValue(1);
+  const glassesViewerBaseScale = useSharedValue(1);
+
+  useEffect(() => {
+    if (glassesViewerPath === null) {
+      glassesViewerScale.value     = 1;
+      glassesViewerBaseScale.value = 1;
+    }
+  }, [glassesViewerPath, glassesViewerScale, glassesViewerBaseScale]);
+
+  const glassesViewerPinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      glassesViewerScale.value = Math.max(1, Math.min(glassesViewerBaseScale.value * e.scale, 8));
+    })
+    .onEnd(() => {
+      glassesViewerBaseScale.value = glassesViewerScale.value;
+    });
+
+  const glassesViewerDoubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      glassesViewerScale.value     = withTiming(1, { duration: 250 });
+      glassesViewerBaseScale.value = 1;
+    });
+
+  const glassesViewerGesture   = Gesture.Simultaneous(glassesViewerPinch, glassesViewerDoubleTap);
+  const glassesViewerAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: glassesViewerScale.value }],
+  }));
 
   // ── Meta glasses session (Ray-Ban Live AI hands-free integration) ──────────
   // Registers a session with the API when an inspection is persisted so the
@@ -1721,23 +1754,39 @@ export default function NewInspectionScreen() {
         onRequestClose={() => setGlassesViewerPath(null)}
         statusBarTranslucent
       >
-        <Pressable
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.95)" }}
-          onPress={() => setGlassesViewerPath(null)}
-        >
-          {glassesViewerPath ? (
-            <AuthedImage
-              path={glassesViewerPath}
-              style={{ flex: 1 }}
-              contentFit="contain"
-            />
-          ) : null}
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.95)" }}>
+          {/* Close button */}
+          <Pressable
+            onPress={() => setGlassesViewerPath(null)}
+            hitSlop={12}
+            style={{
+              position: "absolute", top: 52, right: 16, zIndex: 10,
+              backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 999,
+              padding: 8,
+            }}
+          >
+            <Ionicons name="close" size={22} color="#fff" />
+          </Pressable>
+
+          {/* Pinch-to-zoom image (double-tap to reset) */}
+          <GestureDetector gesture={glassesViewerGesture}>
+            <Reanimated.View style={[{ flex: 1, overflow: "hidden" }, glassesViewerAnimStyle]}>
+              {glassesViewerPath ? (
+                <AuthedImage
+                  path={glassesViewerPath}
+                  style={{ flex: 1 }}
+                  contentFit="contain"
+                />
+              ) : null}
+            </Reanimated.View>
+          </GestureDetector>
+
           <Text
             style={{ position: "absolute", bottom: 48, alignSelf: "center", color: "rgba(255,255,255,0.5)", fontSize: 12 }}
           >
-            Tap anywhere to close
+            Pinch to zoom · Double-tap to reset
           </Text>
-        </Pressable>
+        </View>
       </Modal>
     );
 

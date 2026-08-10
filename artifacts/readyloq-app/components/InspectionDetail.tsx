@@ -12,8 +12,10 @@ import {
 } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import { AuthedImage } from "@/components/AuthedImage";
 import { FindingCard } from "@/components/FindingCard";
@@ -89,6 +91,38 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const [viewerPath, setViewerPath] = useState<string | null>(null);
   const [viewerSaving,  setViewerSaving]  = useState(false);
   const [viewerCopying, setViewerCopying] = useState(false);
+
+  // #117 — pinch-to-zoom for the full-screen viewer
+  const viewerScale     = useSharedValue(1);
+  const viewerBaseScale = useSharedValue(1);
+
+  // Reset zoom whenever the viewer closes
+  useEffect(() => {
+    if (viewerPath === null) {
+      viewerScale.value     = 1;
+      viewerBaseScale.value = 1;
+    }
+  }, [viewerPath, viewerScale, viewerBaseScale]);
+
+  const viewerPinch = Gesture.Pinch()
+    .onUpdate((e) => {
+      viewerScale.value = Math.max(1, Math.min(viewerBaseScale.value * e.scale, 8));
+    })
+    .onEnd(() => {
+      viewerBaseScale.value = viewerScale.value;
+    });
+
+  const viewerDoubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      viewerScale.value     = withTiming(1, { duration: 250 });
+      viewerBaseScale.value = 1;
+    });
+
+  const viewerGesture   = Gesture.Simultaneous(viewerPinch, viewerDoubleTap);
+  const viewerAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: viewerScale.value }],
+  }));
 
   const handleSaveViewerImage = async () => {
     if (!viewerPath) return;
@@ -466,19 +500,31 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
           statusBarTranslucent
         >
           <View style={{ flex: 1, backgroundColor: "#000" }}>
-            {/* Image — tap anywhere on it to close */}
+            {/* Close button */}
             <Pressable
-              style={{ flex: 1 }}
               onPress={() => setViewerPath(null)}
+              hitSlop={12}
+              style={{
+                position: "absolute", top: 52, right: 16, zIndex: 10,
+                backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 999,
+                padding: 8,
+              }}
             >
-              {viewerPath ? (
-                <AuthedImage
-                  path={viewerPath}
-                  style={{ flex: 1 }}
-                  contentFit="contain"
-                />
-              ) : null}
+              <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
+
+            {/* Pinch-to-zoom image (double-tap to reset) */}
+            <GestureDetector gesture={viewerGesture}>
+              <Reanimated.View style={[{ flex: 1, overflow: "hidden" }, viewerAnimStyle]}>
+                {viewerPath ? (
+                  <AuthedImage
+                    path={viewerPath}
+                    style={{ flex: 1 }}
+                    contentFit="contain"
+                  />
+                ) : null}
+              </Reanimated.View>
+            </GestureDetector>
 
             {/* Save / Copy button row */}
             <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, paddingVertical: 14, paddingBottom: 32, backgroundColor: "rgba(0,0,0,0.9)" }}>
