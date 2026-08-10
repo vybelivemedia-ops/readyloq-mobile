@@ -39,7 +39,7 @@ export const RELEASE_NOTES: { title: string; items: string[] }[] = [
     ],
   },
   {
-    title: "Major Features (0.9.0)",
+    title: "Platform Features",
     items: [
       "Fold 7 and large-screen optimization",
       "Responsive tablet and foldable layouts",
@@ -51,23 +51,17 @@ export const RELEASE_NOTES: { title: string; items: string[] }[] = [
       "Customer Property Summaries",
       "Sales Proposal Builder",
       "Management Intelligence Dashboard",
+      "Executive Intelligence Dashboard",
+      "Company Playbooks & Learning Engine",
+      "Property Memory",
       "Background AI processing",
       "Role-based intelligence views",
       "Evidence-grounded AI recommendations",
       "Anti-fabrication safeguards",
       "Secure customer share links",
       "Opportunity notes and audit history",
-    ],
-  },
-  {
-    title: "Known Upcoming Features",
-    items: [
-      "Company Learning Engine",
-      "Company Playbooks",
-      "Property Memory",
-      "Executive Intelligence Dashboard",
-      "PestPac Integration",
-      "FieldRoutes Integration",
+      "PestPac field integration",
+      "FieldRoutes field integration",
     ],
   },
 ];
