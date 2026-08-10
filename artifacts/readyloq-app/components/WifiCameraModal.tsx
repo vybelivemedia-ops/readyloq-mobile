@@ -22,7 +22,7 @@ interface Props {
   onConnected: () => void;
 }
 
-const PRESETS = [
+const PRESETS: { label: string; url: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { label: "GoPro", url: "http://10.5.5.9", icon: "camera" },
   { label: "Custom", url: "", icon: "wifi" },
 ];
@@ -83,7 +83,7 @@ export function WifiCameraModal({ visible, onClose, onConnected }: Props) {
           <View style={styles.presets}>
             {PRESETS.map((p) => (
               <Pressable key={p.label} onPress={() => applyPreset(p)} style={styles.presetChip}>
-                <Ionicons name={p.icon as any} size={14} color="#17c4d3" />
+                <Ionicons name={p.icon} size={14} color="#17c4d3" />
                 <Text style={styles.presetLabel}>{p.label}</Text>
               </Pressable>
             ))}

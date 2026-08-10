@@ -913,7 +913,7 @@ router.patch("/:id/findings/correct", async (req, res) => {
         .insert(intelligenceRecordsTable)
         .values({
           companyId,
-          imageUrl: f.imageUrl!,
+          imageUrl: f.imageUrl as string,
           // Full immutable snapshot of the AI's original prediction.
           aiPrediction: {
             category: f.category ?? null,

@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { stripeService } from "../lib/stripeService";
 import { stripeStorage } from "../lib/stripeStorage";
+import { logger } from "../lib/logger";
 import {
   requireAuth,
   requireCompany,
@@ -66,7 +67,7 @@ router.get("/plans", async (_req: Request, res: Response) => {
 
     return res.json({ data: Array.from(productsMap.values()) });
   } catch (err) {
-    console.error("[billing] /plans error:", err);
+    logger.error({ err }, "[billing] /plans error");
     return res.status(500).json({ error: "Failed to load plans" });
   }
 });
@@ -82,7 +83,7 @@ router.get("/license", ...memberAuth, async (req: Request, res: Response) => {
     );
     return res.json(licenseStatus);
   } catch (err) {
-    console.error("[billing] /license error:", err);
+    logger.error({ err }, "[billing] /license error");
     return res.status(500).json({ error: "Failed to fetch license status" });
   }
 });
@@ -103,7 +104,7 @@ router.get("/subscription", ...ownerOnly, async (req: Request, res: Response) =>
     );
     return res.json({ subscription, items });
   } catch (err) {
-    console.error("[billing] /subscription error:", err);
+    logger.error({ err }, "[billing] /subscription error");
     return res.status(500).json({ error: "Failed to fetch subscription" });
   }
 });
@@ -153,7 +154,7 @@ router.post("/checkout", ...ownerOnly, async (req: Request, res: Response) => {
 
     return res.json({ url: session.url, sessionId: session.id });
   } catch (err) {
-    console.error("[billing] /checkout error:", err);
+    logger.error({ err }, "[billing] /checkout error");
     return res
       .status(500)
       .json({ error: (err as Error).message || "Failed to create checkout session" });
@@ -188,7 +189,7 @@ router.patch("/seats", ...ownerOnly, async (req: Request, res: Response) => {
     await stripeService.updateSubscriptionSeats(company.id, seats);
     return res.json({ ok: true, additionalSeats: seats });
   } catch (err) {
-    console.error("[billing] /seats error:", err);
+    logger.error({ err }, "[billing] /seats error");
     return res.status(500).json({ error: "Failed to update seat count" });
   }
 });
@@ -210,7 +211,7 @@ router.post("/portal", ...ownerOnly, async (req: Request, res: Response) => {
     );
     return res.json({ url: session.url });
   } catch (err) {
-    console.error("[billing] /portal error:", err);
+    logger.error({ err }, "[billing] /portal error");
     return res.status(500).json({ error: "Failed to open billing portal" });
   }
 });

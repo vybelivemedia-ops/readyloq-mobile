@@ -30,6 +30,11 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, lt, lte, ne, sql } from "d
 
 const DAY_MS = 86_400_000;
 
+/** Briefing domain constants — centralises the magic numbers used across all sections. */
+const STALE_OPPORTUNITY_DAYS    = 14;  // opportunities untouched this long are flagged as stale
+const REPORTING_WINDOW_DAYS     = 30;  // standard rolling window for KPI aggregations
+const LOW_QUALITY_SCORE_THRESHOLD = 60; // inspections below this score trigger quality alerts
+
 // ─── Payload types (mirrored in lib/api-spec/openapi.yaml) ───────────────────
 
 export interface TechnicianBriefing {
@@ -179,7 +184,7 @@ async function buildTechnicianSection(companyId: number): Promise<TechnicianBrie
 }
 
 async function buildSalesSection(companyId: number): Promise<SalesBriefing> {
-  const staleBefore = new Date(Date.now() - 14 * DAY_MS);
+  const staleBefore = new Date(Date.now() - STALE_OPPORTUNITY_DAYS * DAY_MS);
   const [oppCounts, top, proposalCounts] = await Promise.all([
     db
       .select({
@@ -249,7 +254,7 @@ async function buildSalesSection(companyId: number): Promise<SalesBriefing> {
 }
 
 async function buildManagerSection(companyId: number): Promise<ManagerBriefing> {
-  const monthAgo = new Date(Date.now() - 30 * DAY_MS);
+  const monthAgo = new Date(Date.now() - REPORTING_WINDOW_DAYS * DAY_MS);
   const now = Date.now();
   const [queue, [pending], [teamAgg], perTech, recentCompletions] = await Promise.all([
     db
@@ -354,8 +359,8 @@ async function buildManagerSection(companyId: number): Promise<ManagerBriefing> 
 
 async function buildOwnerSection(companyId: number): Promise<OwnerBriefing> {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
-  const monthAgo = new Date(Date.now() - 30 * DAY_MS);
-  const staleBefore = new Date(Date.now() - 14 * DAY_MS);
+  const monthAgo = new Date(Date.now() - REPORTING_WINDOW_DAYS * DAY_MS);
+  const staleBefore = new Date(Date.now() - STALE_OPPORTUNITY_DAYS * DAY_MS);
   const approvalsAgingBefore = new Date(Date.now() - 3 * DAY_MS);
   const nowDate = new Date();
   const weekAhead = new Date(Date.now() + 7 * DAY_MS);
@@ -383,7 +388,7 @@ async function buildOwnerSection(companyId: number): Promise<OwnerBriefing> {
     db
       .select({
         avgQuality: sql<number | null>`round(avg(${inspectionScorecardsTable.qualityScore}))::int`,
-        lowQuality: sql<number>`count(*) filter (where ${inspectionScorecardsTable.qualityScore} < 60)::int`,
+        lowQuality: sql<number>`count(*) filter (where ${inspectionScorecardsTable.qualityScore} < ${LOW_QUALITY_SCORE_THRESHOLD})::int`,
         highRisk: sql<number>`count(*) filter (where ${inspectionScorecardsTable.riskLevel} in ('high', 'critical'))::int`,
       })
       .from(inspectionScorecardsTable)
@@ -453,7 +458,7 @@ async function buildOwnerSection(companyId: number): Promise<OwnerBriefing> {
     alerts.push({
       type: "quality_low",
       severity: "warning",
-      message: `${lowQuality} inspection${lowQuality === 1 ? "" : "s"} scored below 60 quality in the last 30 days`,
+      message: `${lowQuality} inspection${lowQuality === 1 ? "" : "s"} scored below ${LOW_QUALITY_SCORE_THRESHOLD} quality in the last ${REPORTING_WINDOW_DAYS} days`,
       count: lowQuality,
     });
   }

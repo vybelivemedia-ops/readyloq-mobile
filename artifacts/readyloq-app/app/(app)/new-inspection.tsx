@@ -1701,7 +1701,7 @@ export default function NewInspectionScreen() {
           return (
             <Pressable
               key={ev.id}
-              onPress={ev.storagePath ? () => setGlassesViewerPath(ev.storagePath!) : undefined}
+              onPress={ev.storagePath ? () => setGlassesViewerPath(ev.storagePath as string) : undefined}
               style={{
                 flexDirection: "row", alignItems: "center", gap: 8,
                 backgroundColor: "rgba(124,58,237,0.18)",

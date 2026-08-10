@@ -15,6 +15,7 @@ import { Router } from "express";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "@workspace/db";
+import { logger } from "../lib/logger";
 import {
   companyPlaybooksTable,
   analysisResultsTable,
@@ -70,7 +71,7 @@ router.get("/active", async (req, res) => {
 
     return res.json({ success: true, playbooks });
   } catch (err) {
-    console.error("[playbooks] GET /active error:", err);
+    logger.error({ err }, "[playbooks] GET /active error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -141,7 +142,7 @@ router.get("/compliance", async (req, res) => {
 
     return res.json({ success: true, ...result });
   } catch (err) {
-    console.error("[playbooks] GET /compliance error:", err);
+    logger.error({ err }, "[playbooks] GET /compliance error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -159,7 +160,7 @@ router.get("/", requireRole("manager"), async (req, res) => {
 
     return res.json({ success: true, playbooks });
   } catch (err) {
-    console.error("[playbooks] GET / error:", err);
+    logger.error({ err }, "[playbooks] GET / error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -182,7 +183,7 @@ router.post("/", requireRole("owner"), async (req, res) => {
 
     return res.status(201).json({ success: true, playbook: created });
   } catch (err) {
-    console.error("[playbooks] POST / error:", err);
+    logger.error({ err }, "[playbooks] POST / error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -217,7 +218,7 @@ router.put("/:id", requireRole("owner"), async (req, res) => {
     if (!updated) return res.status(404).json({ error: "Playbook not found" });
     return res.json({ success: true, playbook: updated });
   } catch (err) {
-    console.error("[playbooks] PUT /:id error:", err);
+    logger.error({ err }, "[playbooks] PUT /:id error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -245,7 +246,7 @@ router.delete("/:id", requireRole("owner"), async (req, res) => {
       return res.status(404).json({ error: "Playbook not found" });
     return res.json({ success: true });
   } catch (err) {
-    console.error("[playbooks] DELETE /:id error:", err);
+    logger.error({ err }, "[playbooks] DELETE /:id error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });

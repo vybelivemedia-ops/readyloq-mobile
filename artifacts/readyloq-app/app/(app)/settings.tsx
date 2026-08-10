@@ -492,7 +492,7 @@ function DispatchIntegrationSection() {
 const ROLE_OPTIONS = ["owner", "manager", "sales", "technician"] as const;
 type RoleOption = (typeof ROLE_OPTIONS)[number];
 
-const ROLE_META: Record<RoleOption, { color: string; icon: string; label: string }> = {
+const ROLE_META: Record<RoleOption, { color: string; icon: keyof typeof Ionicons.glyphMap; label: string }> = {
   owner:      { color: "#7c3aed", icon: "ribbon-outline",       label: "Owner"      },
   manager:    { color: "#0284c7", icon: "briefcase-outline",     label: "Manager"    },
   sales:      { color: "#059669", icon: "trending-up-outline",   label: "Sales"      },
@@ -528,7 +528,7 @@ function RoleSwitcher({
           width: 36, height: 36, borderRadius: 18,
           backgroundColor: meta.color + "22", alignItems: "center", justifyContent: "center",
         }}>
-          <Ionicons name={meta.icon as any} size={17} color={meta.color} />
+          <Ionicons name={meta.icon} size={17} color={meta.color} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>

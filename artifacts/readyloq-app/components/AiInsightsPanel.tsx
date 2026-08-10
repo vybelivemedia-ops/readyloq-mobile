@@ -1,5 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { AnalysisResult, CoverageSnapshot, EvidenceSummary, Finding, GuidanceRecommendation, InspectionMemory, MemoryHighlight, Report } from "@/lib/api-client";
+import type { MeasurementEstimate } from "@/lib/pricing";
+
+/** Local extension — measurementEstimate is written by the measurement bridge but not in the generated OpenAPI schema. */
+type FindingWithMeasurement = Finding & { measurementEstimate?: MeasurementEstimate | null };
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -330,7 +334,7 @@ export function AiInsightsPanel({
         .map((f) => classifyExclusionFinding(
           {
             ...f,
-            measurementEstimate: (f as any).measurementEstimate ?? null,
+            measurementEstimate: (f as FindingWithMeasurement).measurementEstimate ?? null,
             imageUrl: f.imageUrl ?? null,
           },
           laserLinearFt,

@@ -26,7 +26,7 @@ const STATUS_COLORS: Record<BaitStation["status"], string> = {
   removed: "#6b7280",
 };
 
-const STATUS_ICONS: Record<BaitStation["status"], string> = {
+const STATUS_ICONS: Record<BaitStation["status"], keyof typeof Ionicons.glyphMap> = {
   active: "checkmark-circle",
   missing: "alert-circle",
   damaged: "warning",
@@ -81,7 +81,7 @@ export function BaitStationPanel({ stations, onAdd, onUpdate, onRemove }: Props)
           {stations.map((s) => (
             <Pressable key={s.id} onPress={() => cycleStatus(s)} style={styles.stationCard}>
               <Ionicons
-                name={STATUS_ICONS[s.status] as any}
+                name={STATUS_ICONS[s.status]}
                 size={20}
                 color={STATUS_COLORS[s.status]}
               />

@@ -277,7 +277,7 @@ class SmartGlassesBleManager {
         // in case the glasses are advertising without the custom service UUID.
         const nameMatch =
           device.name &&
-          GLASSES_NAME_PATTERNS.some((p) => device.name!.includes(p));
+          GLASSES_NAME_PATTERNS.some((p) => device.name?.includes(p));
 
         if (!nameMatch && !SCAN_SERVICE_UUIDS.some((uuid) =>
           device.serviceUUIDs?.includes(uuid)

@@ -10,6 +10,7 @@ import { and, avg, count, eq, inArray, isNotNull, sql, sum } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { requireAuth, requireCompany, requireBetaAccess, requireRole } from "../middleware/require-auth";
 import { generateDailyExecutiveBriefing } from "../services/briefing";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -135,7 +136,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error("executive intelligence error:", error);
+      logger.error({ err: error }, "executive intelligence error");
       return res.status(500).json({ error: "Internal server error" });
     }
   },
@@ -272,7 +273,7 @@ router.get(
         })),
       });
     } catch (error) {
-      console.error("executive inspections error:", error);
+      logger.error({ err: error }, "executive inspections error");
       return res.status(500).json({ error: "Internal server error" });
     }
   },
@@ -345,7 +346,7 @@ router.get(
 
       return res.json({ success: true, weeks });
     } catch (error) {
-      console.error("executive quality-trend error:", error);
+      logger.error({ err: error }, "executive quality-trend error");
       return res.status(500).json({ error: "Internal server error" });
     }
   },
@@ -374,7 +375,7 @@ router.get(
       const result = await generateDailyExecutiveBriefing(companyId, yesterday);
       return res.json(result);
     } catch (error) {
-      console.error("executive briefing error:", error);
+      logger.error({ err: error }, "executive briefing error");
       return res.status(500).json({ error: "Internal server error" });
     }
   },
@@ -698,7 +699,7 @@ router.get(
 
       return res.json({ success: true, html, subject });
     } catch (error) {
-      console.error("executive email-preview error:", error);
+      logger.error({ err: error }, "executive email-preview error");
       return res.status(500).json({ error: "Internal server error" });
     }
   },

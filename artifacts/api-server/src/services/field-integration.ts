@@ -10,6 +10,7 @@
  */
 
 import type { FieldIntegrationSystem } from "@workspace/db";
+import { logger } from "../lib/logger";
 
 // ─── Retry helper ─────────────────────────────────────────────────────────────
 
@@ -139,14 +140,16 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
       } else {
         // All retry attempts returned a non-OK response — log and continue.
         const body = await attachRes.text();
-        console.warn(
-          `PestPac attachment POST failed after retries (${attachRes.status}): ${body}`,
+        logger.warn(
+          { status: attachRes.status, body },
+          "PestPac attachment POST failed after retries",
         );
       }
     } catch (err) {
       // Network-level error (fetch threw) after all retries — non-fatal, skip this photo.
-      console.warn(
-        `PestPac attachment POST threw after retries for ${photo.url}: ${String(err)}`,
+      logger.warn(
+        { url: photo.url, err: String(err) },
+        "PestPac attachment POST threw after retries",
       );
     }
   }

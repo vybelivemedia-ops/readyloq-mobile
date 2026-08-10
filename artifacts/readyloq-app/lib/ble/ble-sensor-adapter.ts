@@ -217,7 +217,9 @@ export class BleSensorAdapter {
   /** Read one characteristic value. Returns raw base64. */
   async readCharacteristic(serviceUUID: string, charUUID: string): Promise<string> {
     this.assertConnected();
-    const char = await this._device!.readCharacteristicForService(serviceUUID, charUUID);
+    const device = this._device;
+    if (!device) throw new Error("Not connected"); // assertConnected() guarantees this; guard narrows type
+    const char = await device.readCharacteristicForService(serviceUUID, charUUID);
     if (!char.value) throw new Error("Empty characteristic value");
     return char.value;
   }
@@ -233,12 +235,14 @@ export class BleSensorAdapter {
     withResponse = true,
   ): Promise<void> {
     this.assertConnected();
+    const device = this._device;
+    if (!device) throw new Error("Not connected"); // assertConnected() guarantees this; guard narrows type
     if (withResponse) {
-      await this._device!.writeCharacteristicWithResponseForService(
+      await device.writeCharacteristicWithResponseForService(
         serviceUUID, charUUID, base64Value,
       );
     } else {
-      await this._device!.writeCharacteristicWithoutResponseForService(
+      await device.writeCharacteristicWithoutResponseForService(
         serviceUUID, charUUID, base64Value,
       );
     }
@@ -255,7 +259,9 @@ export class BleSensorAdapter {
     onError?:    (err: Error) => void,
   ): () => void {
     this.assertConnected();
-    const sub = this._device!.monitorCharacteristicForService(
+    const device = this._device;
+    if (!device) throw new Error("Not connected"); // assertConnected() guarantees this; guard narrows type
+    const sub = device.monitorCharacteristicForService(
       serviceUUID,
       charUUID,
       (err, char) => {
