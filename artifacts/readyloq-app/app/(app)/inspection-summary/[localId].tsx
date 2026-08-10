@@ -42,8 +42,10 @@ import {
   API_BASE,
   fetchIntegrationConfig,
   triggerIntegrationSync,
+  fetchPlaybookCompliance,
   type FieldIntegrationSystem,
   type IntegrationConfigResponse,
+  type ComplianceViolation,
 } from "@/lib/api";
 import { generateReportPdf } from "@/lib/delivery/pdf";
 import {
@@ -134,6 +136,17 @@ export default function InspectionSummaryScreen() {
       .then(setIntegrationConfig)
       .catch(() => { /* non-blocking — button just won't show */ });
   }, [finalized, isManager, getToken]);
+
+  // ── Company Playbook compliance (Learning Engine) ───────────────────────────
+  const [complianceViolations, setComplianceViolations] = useState<ComplianceViolation[]>([]);
+
+  useEffect(() => {
+    if (!finalized || serverId == null) return;
+    getToken()
+      .then((token: string | null) => fetchPlaybookCompliance(token, serverId))
+      .then((r) => setComplianceViolations(r.violations))
+      .catch(() => { /* non-blocking — banner simply won't show */ });
+  }, [finalized, serverId, getToken]);
 
   const systemLabel: Record<FieldIntegrationSystem, string> = {
     pestpac: "PestPac",
@@ -474,6 +487,48 @@ export default function InspectionSummaryScreen() {
           customerSummaryUrl={customerSummaryUrl}
           photosReady={loaded}
         />
+
+        {/* ── Company Playbook Compliance Warning ────────────────────────── */}
+        {complianceViolations.length > 0 && (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: 10,
+              backgroundColor: "#F8511408",
+              borderWidth: 1,
+              borderColor: "#F85114",
+              borderRadius: 10,
+              padding: 14,
+            }}
+          >
+            <Ionicons name="alert-circle" size={20} color="#F85114" style={{ marginTop: 1 }} />
+            <View style={{ flex: 1, gap: 6 }}>
+              <Text
+                style={{
+                  color: "#F85114",
+                  fontFamily: "Inter_700Bold",
+                  fontSize: 13,
+                }}
+              >
+                Company Playbook Warning
+              </Text>
+              {complianceViolations.map((v, i) => (
+                <Text
+                  key={i}
+                  style={{
+                    color: "#c0392b",
+                    fontFamily: "Inter_400Regular",
+                    fontSize: 12,
+                    lineHeight: 17,
+                  }}
+                >
+                  {"• "}{v.message}
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
 
         <View style={{ gap: 10 }}>
           {serverId != null && finalized ? (

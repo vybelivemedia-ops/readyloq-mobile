@@ -37,6 +37,7 @@ import billingRouter from "./billing";
 import adminRouter from "./admin";
 import transcribeRouter from "./transcribe";
 import integrationsRouter from "./integrations";
+import playbooksRouter from "./playbooks";
 
 const router: IRouter = Router();
 
@@ -162,6 +163,16 @@ router.use(
   requireBetaAccess,
   requireRole("manager"),
   integrationsRouter,
+);
+// Company Playbooks + Learning Engine.
+// GET /active and GET /compliance are open to all authenticated beta users.
+// GET / (full list) is manager+; POST/PUT/DELETE are owner-only (enforced inside router).
+router.use(
+  "/playbooks",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  playbooksRouter,
 );
 // Daily rig + recent mixes — all authenticated beta users (technicians included).
 // Sub-routes:  POST/GET /technician/daily-rig

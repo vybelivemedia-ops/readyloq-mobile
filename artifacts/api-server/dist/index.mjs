@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router35;
+    module.exports = Router36;
     module.exports.Route = Route;
-    function Router35(options) {
-      if (!(this instanceof Router35)) {
-        return new Router35(options);
+    function Router36(options) {
+      if (!(this instanceof Router36)) {
+        return new Router36(options);
       }
       const opts = options || {};
-      function router35(req, res, next) {
-        router35.handle(req, res, next);
+      function router36(req, res, next) {
+        router36.handle(req, res, next);
       }
-      Object.setPrototypeOf(router35, this);
-      router35.caseSensitive = opts.caseSensitive;
-      router35.mergeParams = opts.mergeParams;
-      router35.params = {};
-      router35.strict = opts.strict;
-      router35.stack = [];
-      return router35;
+      Object.setPrototypeOf(router36, this);
+      router36.caseSensitive = opts.caseSensitive;
+      router36.mergeParams = opts.mergeParams;
+      router36.params = {};
+      router36.strict = opts.strict;
+      router36.stack = [];
+      return router36;
     }
-    Router35.prototype = function() {
+    Router36.prototype = function() {
     };
-    Router35.prototype.param = function param(name, fn) {
+    Router36.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router35.prototype.handle = function handle(req, res, callback) {
+    Router36.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router35.prototype.use = function use(handler) {
+    Router36.prototype.use = function use(handler) {
       let offset = 0;
       let path4 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router35.prototype.route = function route(path4) {
+    Router36.prototype.route = function route(path4) {
       const route2 = new Route(path4);
       const layer = new Layer(path4, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router35.prototype[method] = function(path4) {
+      Router36.prototype[method] = function(path4) {
         const route = this.route(path4);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router35 = require_router();
+    var Router36 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router35 = null;
+      var router36 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router35 === null) {
-            router35 = new Router35({
+          if (router36 === null) {
+            router36 = new Router36({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router35;
+          return router36;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router35 = this.router;
+      var router36 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router35.use(path4, fn2);
+          return router36.use(path4, fn2);
         }
         debug7(".use app under %s", path4);
         fn2.mountpath = path4;
         fn2.parent = this;
-        router35.use(path4, function mounted_app(req, res, next) {
+        router36.use(path4, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter3 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router35 = require_router();
+    var Router36 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router35.Route;
-    exports.Router = Router35;
+    exports.Route = Router36.Route;
+    exports.Router = Router36;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express36 = __toESM(require_express2(), 1);
+var import_express37 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router35 = config2.router;
-  if (isPlainObject(router35)) {
-    newTarget = getTargetFromProxyTable(req, router35);
-  } else if (typeof router35 === "function") {
-    newTarget = await router35(req, res, config2);
+  const router36 = config2.router;
+  if (isPlainObject(router36)) {
+    newTarget = getTargetFromProxyTable(req, router36);
+  } else if (typeof router36 === "function") {
+    newTarget = await router36(req, res, config2);
   }
   return newTarget;
 }
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express34 = __toESM(require_express2(), 1);
+var import_express35 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -57278,6 +57278,7 @@ __export(schema_exports, {
   companiesTable: () => companiesTable,
   companyFieldIntegrationsTable: () => companyFieldIntegrationsTable,
   companyInvitesTable: () => companyInvitesTable,
+  companyPlaybooksTable: () => companyPlaybooksTable,
   conversations: () => conversations,
   customerSummariesTable: () => customerSummariesTable,
   datasetImagesTable: () => datasetImagesTable,
@@ -57297,6 +57298,7 @@ __export(schema_exports, {
   insertLabelRulesSchema: () => insertLabelRulesSchema,
   insertLeadSchema: () => insertLeadSchema,
   insertMessageSchema: () => insertMessageSchema,
+  insertPlaybookSchema: () => insertPlaybookSchema,
   insertProductSchema: () => insertProductSchema,
   insertPropertyMemorySchema: () => insertPropertyMemorySchema,
   insertPropertyNoteSchema: () => insertPropertyNoteSchema,
@@ -69889,6 +69891,28 @@ var companyFieldIntegrationsTable = pgTable(
 var insertFieldIntegrationSchema = createInsertSchema(
   companyFieldIntegrationsTable
 ).omit({ id: true, createdAt: true, updatedAt: true, companyId: true });
+
+// ../../lib/db/src/schema/playbooks.ts
+var companyPlaybooksTable = pgTable("company_playbooks", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  /** Display name shown to technicians, e.g. "Commercial Rodent Protocol". */
+  title: text("title").notNull(),
+  /** Pest categories / species this playbook governs. */
+  targetPests: jsonb("target_pests").$type().default([]).notNull(),
+  /** Mandatory steps — every one must be evidenced in the inspection. */
+  requiredSteps: jsonb("required_steps").$type().default([]).notNull(),
+  /** Chemicals disallowed or restricted under this playbook. */
+  chemicalRestrictions: jsonb("chemical_restrictions").$type().default([]).notNull(),
+  /** Free-form notes or compliance references for technicians. */
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+var insertPlaybookSchema = createInsertSchema(
+  companyPlaybooksTable
+).omit({ id: true, companyId: true, createdAt: true, updatedAt: true });
 
 // ../../lib/db/src/seed/products.ts
 var SEED_PRODUCTS = [
@@ -87760,6 +87784,249 @@ function computeCoverage(input) {
   };
 }
 
+// src/lib/property-intelligence.ts
+var STREET_SUFFIXES = {
+  street: "st",
+  st: "st",
+  avenue: "ave",
+  ave: "ave",
+  boulevard: "blvd",
+  blvd: "blvd",
+  road: "rd",
+  rd: "rd",
+  drive: "dr",
+  dr: "dr",
+  lane: "ln",
+  ln: "ln",
+  court: "ct",
+  ct: "ct",
+  place: "pl",
+  pl: "pl",
+  parkway: "pkwy",
+  pkwy: "pkwy",
+  highway: "hwy",
+  hwy: "hwy"
+};
+var UNIT_TOKENS = /* @__PURE__ */ new Set(["suite", "ste", "unit", "apt", "apartment", "fl", "floor", "bldg", "building"]);
+function normalizeAddressKey(siteAddress) {
+  if (!siteAddress) return "";
+  const cleaned = siteAddress.toLowerCase().replace(/[.,#]/g, " ").replace(/\s+/g, " ").trim();
+  const tokens = cleaned.split(" ");
+  const out = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (!t) continue;
+    if (UNIT_TOKENS.has(t)) {
+      i++;
+      continue;
+    }
+    out.push(STREET_SUFFIXES[t] ?? t);
+  }
+  return out.join("-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+function propertyTypeFor(clientName, siteAddress) {
+  const s2 = `${clientName ?? ""} ${siteAddress}`.toLowerCase();
+  if (s2.includes("warehouse") || s2.includes("industrial")) return "Warehouse";
+  if (s2.includes("restaurant") || s2.includes("bakery") || s2.includes("cafe") || s2.includes("kitchen")) return "Restaurant";
+  if (s2.includes("apartment") || s2.includes("hoa") || s2.includes("residence hall") || s2.includes("campus")) return "Multifamily";
+  if (s2.includes("office") || s2.includes("commerce") || s2.includes("square")) return "Commercial";
+  if (s2.includes("residence") || s2.includes("home") || s2.includes("house")) return "Single Family";
+  return "Commercial";
+}
+function severityRank(sev) {
+  if (sev === "critical") return 4;
+  if (sev === "high") return 3;
+  if (sev === "medium") return 2;
+  if (sev === "low") return 1;
+  return 0;
+}
+function deriveRecurringIssues(entries) {
+  const map2 = /* @__PURE__ */ new Map();
+  for (const entry of entries) {
+    const ts = entry.date ? new Date(entry.date).getTime() : null;
+    for (const f of entry.findings ?? []) {
+      const cat = f.category || "Observation";
+      const cur = map2.get(cat) ?? { count: 0, severity: f.severity ?? "low", lastSeen: ts, sample: f.description ?? null };
+      cur.count += 1;
+      if (severityRank(f.severity) > severityRank(cur.severity)) cur.severity = f.severity ?? cur.severity;
+      if (ts !== null && (cur.lastSeen === null || ts > cur.lastSeen)) cur.lastSeen = ts;
+      if (!cur.sample && f.description) cur.sample = f.description;
+      map2.set(cat, cur);
+    }
+  }
+  return Array.from(map2.entries()).map(([category, v]) => ({
+    category,
+    count: v.count,
+    severity: v.severity,
+    lastSeen: v.lastSeen !== null ? new Date(v.lastSeen).toISOString() : null,
+    sampleDescription: v.sample
+  })).sort((a, b) => b.count - a.count || severityRank(b.severity) - severityRank(a.severity));
+}
+
+// src/lib/logger.ts
+var import_pino = __toESM(require_pino(), 1);
+var isProduction = process.env.NODE_ENV === "production";
+var logger2 = (0, import_pino.default)({
+  level: process.env.LOG_LEVEL ?? "info",
+  redact: [
+    "req.headers.authorization",
+    "req.headers.cookie",
+    "res.headers['set-cookie']"
+  ],
+  ...isProduction ? {} : {
+    transport: {
+      target: "pino-pretty",
+      options: { colorize: true }
+    }
+  }
+});
+
+// src/lib/property-memory-writer.ts
+function findingPestName(f) {
+  const raw = f.reviewStatus === "corrected" ? f.technicianSpecies ?? f.species : f.species;
+  if (!raw?.trim()) return null;
+  return raw.replace(/^Possible:\s*/i, "").trim() || null;
+}
+async function writePropertyMemory(input) {
+  const { companyId, inspectionId, siteAddress } = input;
+  const addressKey = normalizeAddressKey(siteAddress);
+  if (!addressKey) {
+    logger2.debug(
+      { companyId, inspectionId },
+      "writePropertyMemory: empty address key \u2014 skipping"
+    );
+    return;
+  }
+  const allInspections = await db.select().from(inspectionsTable).where(
+    and(
+      eq(inspectionsTable.companyId, companyId),
+      eq(inspectionsTable.status, "completed")
+    )
+  );
+  const matchedInspections = allInspections.filter(
+    (i) => normalizeAddressKey(i.siteAddress ?? "") === addressKey
+  );
+  if (matchedInspections.length === 0) {
+    logger2.debug(
+      { companyId, inspectionId, addressKey },
+      "writePropertyMemory: no completed inspections at address \u2014 skipping"
+    );
+    return;
+  }
+  const inspectionIds = matchedInspections.map((i) => i.id);
+  const analyses = await db.select().from(analysisResultsTable).where(
+    and(
+      eq(analysisResultsTable.companyId, companyId),
+      eq(analysisResultsTable.status, "complete"),
+      inArray(analysisResultsTable.inspectionId, inspectionIds)
+    )
+  ).orderBy(desc(analysisResultsTable.createdAt));
+  const latestByInspection = /* @__PURE__ */ new Map();
+  for (const row of analyses) {
+    if (row.inspectionId == null || latestByInspection.has(row.inspectionId)) continue;
+    latestByInspection.set(row.inspectionId, row);
+  }
+  const pestsSeen = /* @__PURE__ */ new Set();
+  const historicalPests = [];
+  const findingFreq = /* @__PURE__ */ new Map();
+  for (const insp of matchedInspections) {
+    const analysis = latestByInspection.get(insp.id);
+    const findings = analysis?.findings ?? [];
+    for (const f of findings) {
+      const name = findingPestName(f);
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (!pestsSeen.has(key)) {
+        pestsSeen.add(key);
+        historicalPests.push(name);
+      }
+    }
+    const seenThisInsp = /* @__PURE__ */ new Set();
+    for (const f of findings) {
+      const cat = f.category ?? "observation";
+      const desc2 = f.description ?? cat;
+      const key = `${cat}::${desc2}`;
+      if (seenThisInsp.has(key)) continue;
+      seenThisInsp.add(key);
+      const entry = findingFreq.get(key);
+      if (entry) {
+        entry.count++;
+        entry.hf.severity = f.severity ?? entry.hf.severity;
+      } else {
+        findingFreq.set(key, {
+          hf: {
+            category: cat,
+            description: desc2,
+            frequency: 1,
+            severity: f.severity ?? void 0
+          },
+          count: 1
+        });
+      }
+    }
+  }
+  const historicalFindings = Array.from(findingFreq.values()).map(
+    ({ hf, count }) => ({ ...hf, frequency: count })
+  );
+  const lastVisitedAt = matchedInspections.reduce((best, i) => {
+    const ts = i.completedAt ? new Date(i.completedAt) : null;
+    if (!ts) return best;
+    return best === null || ts > best ? ts : best;
+  }, null);
+  const [existing] = await db.select().from(propertyMemoryTable).where(
+    and(
+      eq(propertyMemoryTable.companyId, companyId),
+      eq(propertyMemoryTable.addressKey, addressKey)
+    )
+  ).limit(1);
+  const now = /* @__PURE__ */ new Date();
+  if (existing) {
+    await db.update(propertyMemoryTable).set({
+      siteAddress,
+      lastInspectionId: inspectionId,
+      lastVisitedAt,
+      historicalPests,
+      historicalFindings,
+      updatedAt: now
+    }).where(
+      and(
+        eq(propertyMemoryTable.companyId, companyId),
+        eq(propertyMemoryTable.addressKey, addressKey)
+      )
+    );
+    logger2.info(
+      {
+        companyId,
+        inspectionId,
+        addressKey,
+        pests: historicalPests.length,
+        findings: historicalFindings.length
+      },
+      "writePropertyMemory: updated"
+    );
+  } else {
+    await db.insert(propertyMemoryTable).values({
+      companyId,
+      addressKey,
+      siteAddress,
+      lastInspectionId: inspectionId,
+      lastVisitedAt,
+      historicalPests,
+      historicalFindings
+    });
+    logger2.info(
+      {
+        companyId,
+        inspectionId,
+        addressKey,
+        pests: historicalPests.length,
+        findings: historicalFindings.length
+      },
+      "writePropertyMemory: created"
+    );
+  }
+}
+
 // src/lib/inspection-complete.ts
 async function ensureReportForInspection(input) {
   const { companyId, inspectionId } = input;
@@ -87961,6 +88228,21 @@ async function runInspectionFinalization(input) {
       message: "Complete-inspection: scorecard computation failed",
       inspectionId,
       context: { stage: "complete_scorecard" }
+    });
+  }
+  try {
+    await writePropertyMemory({
+      companyId,
+      inspectionId,
+      siteAddress: inspection.siteAddress ?? ""
+    });
+  } catch {
+    void logErrorEvent("ai", {
+      companyId,
+      userId,
+      message: "Complete-inspection: property memory write failed",
+      inspectionId,
+      context: { stage: "complete_property_memory" }
     });
   }
 }
@@ -89232,7 +89514,7 @@ function iso(date6) {
   const t = millis(date6);
   return t ? new Date(t).toISOString() : null;
 }
-function severityRank(sev) {
+function severityRank2(sev) {
   if (sev === "critical") return 4;
   if (sev === "high") return 3;
   if (sev === "medium") return 2;
@@ -89315,7 +89597,7 @@ function computeInspectionMemory(priorVisits, current) {
         const cur = pestMap.get(key);
         if (cur) {
           cur.visits += 1;
-          if (severityRank(f.severity) > severityRank(cur.severity)) {
+          if (severityRank2(f.severity) > severityRank2(cur.severity)) {
             cur.severity = f.severity ?? cur.severity;
           }
           if (vts > millis(cur.lastSeen)) cur.lastSeen = vIso;
@@ -89416,7 +89698,7 @@ function computeInspectionMemory(priorVisits, current) {
   highlights.sort(
     (a, b) => typeRank[a.type] - typeRank[b.type] || (a.zone ?? "").localeCompare(b.zone ?? "")
   );
-  const pestActivity = Array.from(pestMap.values()).sort((a, b) => b.visits - a.visits || severityRank(b.severity) - severityRank(a.severity)).slice(0, MAX_PESTS);
+  const pestActivity = Array.from(pestMap.values()).sort((a, b) => b.visits - a.visits || severityRank2(b.severity) - severityRank2(a.severity)).slice(0, MAX_PESTS);
   return {
     hasPriorVisits: true,
     priorVisitCount: visits.length,
@@ -89428,85 +89710,6 @@ function computeInspectionMemory(priorVisits, current) {
     treatments: dedupeNewest(treatList, MAX_LIST),
     highlights
   };
-}
-
-// src/lib/property-intelligence.ts
-var STREET_SUFFIXES = {
-  street: "st",
-  st: "st",
-  avenue: "ave",
-  ave: "ave",
-  boulevard: "blvd",
-  blvd: "blvd",
-  road: "rd",
-  rd: "rd",
-  drive: "dr",
-  dr: "dr",
-  lane: "ln",
-  ln: "ln",
-  court: "ct",
-  ct: "ct",
-  place: "pl",
-  pl: "pl",
-  parkway: "pkwy",
-  pkwy: "pkwy",
-  highway: "hwy",
-  hwy: "hwy"
-};
-var UNIT_TOKENS = /* @__PURE__ */ new Set(["suite", "ste", "unit", "apt", "apartment", "fl", "floor", "bldg", "building"]);
-function normalizeAddressKey(siteAddress) {
-  if (!siteAddress) return "";
-  const cleaned = siteAddress.toLowerCase().replace(/[.,#]/g, " ").replace(/\s+/g, " ").trim();
-  const tokens = cleaned.split(" ");
-  const out = [];
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i];
-    if (!t) continue;
-    if (UNIT_TOKENS.has(t)) {
-      i++;
-      continue;
-    }
-    out.push(STREET_SUFFIXES[t] ?? t);
-  }
-  return out.join("-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
-}
-function propertyTypeFor(clientName, siteAddress) {
-  const s2 = `${clientName ?? ""} ${siteAddress}`.toLowerCase();
-  if (s2.includes("warehouse") || s2.includes("industrial")) return "Warehouse";
-  if (s2.includes("restaurant") || s2.includes("bakery") || s2.includes("cafe") || s2.includes("kitchen")) return "Restaurant";
-  if (s2.includes("apartment") || s2.includes("hoa") || s2.includes("residence hall") || s2.includes("campus")) return "Multifamily";
-  if (s2.includes("office") || s2.includes("commerce") || s2.includes("square")) return "Commercial";
-  if (s2.includes("residence") || s2.includes("home") || s2.includes("house")) return "Single Family";
-  return "Commercial";
-}
-function severityRank2(sev) {
-  if (sev === "critical") return 4;
-  if (sev === "high") return 3;
-  if (sev === "medium") return 2;
-  if (sev === "low") return 1;
-  return 0;
-}
-function deriveRecurringIssues(entries) {
-  const map2 = /* @__PURE__ */ new Map();
-  for (const entry of entries) {
-    const ts = entry.date ? new Date(entry.date).getTime() : null;
-    for (const f of entry.findings ?? []) {
-      const cat = f.category || "Observation";
-      const cur = map2.get(cat) ?? { count: 0, severity: f.severity ?? "low", lastSeen: ts, sample: f.description ?? null };
-      cur.count += 1;
-      if (severityRank2(f.severity) > severityRank2(cur.severity)) cur.severity = f.severity ?? cur.severity;
-      if (ts !== null && (cur.lastSeen === null || ts > cur.lastSeen)) cur.lastSeen = ts;
-      if (!cur.sample && f.description) cur.sample = f.description;
-      map2.set(cat, cur);
-    }
-  }
-  return Array.from(map2.entries()).map(([category, v]) => ({
-    category,
-    count: v.count,
-    severity: v.severity,
-    lastSeen: v.lastSeen !== null ? new Date(v.lastSeen).toISOString() : null,
-    sampleDescription: v.sample
-  })).sort((a, b) => b.count - a.count || severityRank2(b.severity) - severityRank2(a.severity));
 }
 
 // src/routes/analysis.ts
@@ -123181,7 +123384,7 @@ router32.get("/config", async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch integration config" });
   }
 });
-router32.put("/config", async (req, res) => {
+router32.put("/config", requireRole("owner"), async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const parsed = configInputSchema.safeParse(req.body);
@@ -123215,7 +123418,7 @@ router32.put("/config", async (req, res) => {
     return res.status(500).json({ error: "Failed to save integration config" });
   }
 });
-router32.delete("/config", async (req, res) => {
+router32.delete("/config", requireRole("owner"), async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     await db.delete(companyFieldIntegrationsTable).where(eq(companyFieldIntegrationsTable.companyId, companyId));
@@ -123315,19 +123518,200 @@ router32.post("/sync", async (req, res) => {
 });
 var integrations_default = router32;
 
-// src/routes/index.ts
+// src/routes/playbooks.ts
+var import_express34 = __toESM(require_express2(), 1);
+
+// src/lib/playbook-compliance.ts
+function evaluatePlaybookCompliance(findings, productNames, playbooks) {
+  const violations = [];
+  for (const playbook of playbooks) {
+    const inScope = findings.some(
+      (f) => playbook.targetPests.some(
+        (target) => f.category?.toLowerCase().includes(target.toLowerCase()) || f.species && f.species.toLowerCase().includes(target.toLowerCase())
+      )
+    );
+    if (!inScope) continue;
+    for (const step of playbook.requiredSteps) {
+      const covered = findings.some(
+        (f) => f.treatment && f.treatment.toLowerCase().includes(step.label.toLowerCase())
+      );
+      if (!covered) {
+        violations.push({
+          playbookId: playbook.id,
+          playbookTitle: playbook.title,
+          type: "missing_step",
+          missingStep: step.label,
+          severity: "WARNING",
+          message: `"${step.label}" was not logged for this treatment \u2014 required by "${playbook.title}".`
+        });
+      }
+    }
+    for (const restriction of playbook.chemicalRestrictions) {
+      const used = productNames.some(
+        (p) => p.toLowerCase().includes(restriction.name.toLowerCase())
+      );
+      if (used) {
+        violations.push({
+          playbookId: playbook.id,
+          playbookTitle: playbook.title,
+          type: "restricted_chemical",
+          restrictedChemical: restriction.name,
+          severity: "ERROR",
+          message: `Restricted chemical "${restriction.name}" was used \u2014 prohibited by "${playbook.title}".${restriction.reason ? ` Reason: ${restriction.reason}` : ""}`
+        });
+      }
+    }
+  }
+  return { compliant: violations.length === 0, violations };
+}
+
+// src/routes/playbooks.ts
+var requiredStepSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  label: external_exports.string().min(1)
+});
+var chemicalRestrictionSchema = external_exports.object({
+  name: external_exports.string().min(1),
+  reason: external_exports.string().optional()
+});
+var playbookInputSchema = external_exports.object({
+  title: external_exports.string().min(1).max(200),
+  targetPests: external_exports.array(external_exports.string()).default([]),
+  requiredSteps: external_exports.array(requiredStepSchema).default([]),
+  chemicalRestrictions: external_exports.array(chemicalRestrictionSchema).default([]),
+  notes: external_exports.string().max(2e3).nullish(),
+  isActive: external_exports.boolean().default(true)
+});
 var router33 = (0, import_express34.Router)();
-router33.use(health_default);
-router33.use("/auth", auth_default);
-router33.use(storage_default);
-router33.use("/leads", leads_default);
-router33.use("/share", share_default);
-router33.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router33.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router33.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router33.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router33.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router33.use(
+router33.get("/active", async (req, res) => {
+  const companyId = req.user.companyId;
+  try {
+    const playbooks = await db.select().from(companyPlaybooksTable).where(
+      and(
+        eq(companyPlaybooksTable.companyId, companyId),
+        eq(companyPlaybooksTable.isActive, true)
+      )
+    ).orderBy(companyPlaybooksTable.title);
+    return res.json({ success: true, playbooks });
+  } catch (err) {
+    console.error("[playbooks] GET /active error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+router33.get("/compliance", async (req, res) => {
+  const companyId = req.user.companyId;
+  const inspectionId = Number(req.query.inspectionId);
+  if (!inspectionId || isNaN(inspectionId)) {
+    return res.status(400).json({ error: "inspectionId query param is required" });
+  }
+  try {
+    const [inspection] = await db.select({ id: inspectionsTable.id }).from(inspectionsTable).where(
+      and(
+        eq(inspectionsTable.id, inspectionId),
+        eq(inspectionsTable.companyId, companyId)
+      )
+    ).limit(1);
+    if (!inspection) {
+      return res.status(404).json({ error: "Inspection not found" });
+    }
+    const [analysis] = await db.select({ findings: analysisResultsTable.findings }).from(analysisResultsTable).where(eq(analysisResultsTable.inspectionId, inspectionId)).orderBy(analysisResultsTable.id).limit(1);
+    const findings = analysis?.findings ?? [];
+    const logs = await db.select({ productName: productsTable.name }).from(treatmentLogsTable).leftJoin(productsTable, eq(treatmentLogsTable.productId, productsTable.id)).where(eq(treatmentLogsTable.inspectionId, inspectionId));
+    const productNames = logs.map((l) => l.productName).filter((n) => n != null);
+    const playbooks = await db.select().from(companyPlaybooksTable).where(
+      and(
+        eq(companyPlaybooksTable.companyId, companyId),
+        eq(companyPlaybooksTable.isActive, true)
+      )
+    );
+    const result = evaluatePlaybookCompliance(findings, productNames, playbooks);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error("[playbooks] GET /compliance error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+router33.get("/", requireRole("manager"), async (req, res) => {
+  const companyId = req.user.companyId;
+  try {
+    const playbooks = await db.select().from(companyPlaybooksTable).where(eq(companyPlaybooksTable.companyId, companyId)).orderBy(companyPlaybooksTable.title);
+    return res.json({ success: true, playbooks });
+  } catch (err) {
+    console.error("[playbooks] GET / error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+router33.post("/", requireRole("owner"), async (req, res) => {
+  const parsed = playbookInputSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid playbook data", issues: parsed.error.issues });
+  }
+  const companyId = req.user.companyId;
+  try {
+    const [created] = await db.insert(companyPlaybooksTable).values({ ...parsed.data, companyId, notes: parsed.data.notes ?? null }).returning();
+    return res.status(201).json({ success: true, playbook: created });
+  } catch (err) {
+    console.error("[playbooks] POST / error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+router33.put("/:id", requireRole("owner"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const companyId = req.user.companyId;
+  const updateSchema = playbookInputSchema.partial();
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid playbook data", issues: parsed.error.issues });
+  }
+  try {
+    const [updated] = await db.update(companyPlaybooksTable).set({ ...parsed.data, updatedAt: /* @__PURE__ */ new Date() }).where(
+      and(
+        eq(companyPlaybooksTable.id, id),
+        eq(companyPlaybooksTable.companyId, companyId)
+      )
+    ).returning();
+    if (!updated) return res.status(404).json({ error: "Playbook not found" });
+    return res.json({ success: true, playbook: updated });
+  } catch (err) {
+    console.error("[playbooks] PUT /:id error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+router33.delete("/:id", requireRole("owner"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+  const companyId = req.user.companyId;
+  try {
+    const [deactivated] = await db.update(companyPlaybooksTable).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(
+      and(
+        eq(companyPlaybooksTable.id, id),
+        eq(companyPlaybooksTable.companyId, companyId)
+      )
+    ).returning();
+    if (!deactivated)
+      return res.status(404).json({ error: "Playbook not found" });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("[playbooks] DELETE /:id error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+var playbooks_default = router33;
+
+// src/routes/index.ts
+var router34 = (0, import_express35.Router)();
+router34.use(health_default);
+router34.use("/auth", auth_default);
+router34.use(storage_default);
+router34.use("/leads", leads_default);
+router34.use("/share", share_default);
+router34.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router34.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router34.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router34.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router34.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router34.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -123335,17 +123719,17 @@ router33.use(
   requireRole("manager"),
   intelligence_default
 );
-router33.use(
+router34.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router33.use("/branding", branding_default);
-router33.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router33.use("/beta", requireAuth, requireCompany, beta_default);
-router33.use(
+router34.use("/branding", branding_default);
+router34.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router34.use("/beta", requireAuth, requireCompany, beta_default);
+router34.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -123353,7 +123737,7 @@ router33.use(
   requireRole("sales"),
   opportunities_default
 );
-router33.use(
+router34.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -123361,7 +123745,7 @@ router33.use(
   requireRole("manager"),
   scorecards_default
 );
-router33.use(
+router34.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -123369,8 +123753,8 @@ router33.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router33.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router33.use(
+router34.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router34.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -123378,23 +123762,23 @@ router33.use(
   requireRole("sales"),
   proposals_default
 );
-router33.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router33.use(
+router34.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router34.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-router33.use("/products", requireAuth, requireBetaAccess, products_default);
-router33.use(
+router34.use("/products", requireAuth, requireBetaAccess, products_default);
+router34.use(
   "/inspections/:inspectionId/treatment-logs",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   treatment_logs_default
 );
-router33.use(
+router34.use(
   "/crm",
   requireAuth,
   requireCompany,
@@ -123402,7 +123786,7 @@ router33.use(
   requireRole("manager"),
   crm_default
 );
-router33.use(
+router34.use(
   "/integrations",
   requireAuth,
   requireCompany,
@@ -123410,8 +123794,15 @@ router33.use(
   requireRole("manager"),
   integrations_default
 );
-router33.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
-router33.use(
+router34.use(
+  "/playbooks",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  playbooks_default
+);
+router34.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
+router34.use(
   "/review-queue",
   requireAuth,
   requireCompany,
@@ -123419,35 +123810,15 @@ router33.use(
   requireRole("manager"),
   review_queue_default
 );
-router33.use("/meta-glasses", meta_glasses_default);
-router33.use("/billing", billing_default);
-router33.use("/admin", admin_default);
-router33.use(requireAuth, transcribe_default);
-var routes_default = router33;
+router34.use("/meta-glasses", meta_glasses_default);
+router34.use("/billing", billing_default);
+router34.use("/admin", admin_default);
+router34.use(requireAuth, transcribe_default);
+var routes_default = router34;
 
 // src/routes/faie.ts
-var import_express35 = __toESM(require_express2(), 1);
-
-// src/lib/logger.ts
-var import_pino = __toESM(require_pino(), 1);
-var isProduction = process.env.NODE_ENV === "production";
-var logger2 = (0, import_pino.default)({
-  level: process.env.LOG_LEVEL ?? "info",
-  redact: [
-    "req.headers.authorization",
-    "req.headers.cookie",
-    "res.headers['set-cookie']"
-  ],
-  ...isProduction ? {} : {
-    transport: {
-      target: "pino-pretty",
-      options: { colorize: true }
-    }
-  }
-});
-
-// src/routes/faie.ts
-var router34 = (0, import_express35.Router)();
+var import_express36 = __toESM(require_express2(), 1);
+var router35 = (0, import_express36.Router)();
 var storage2 = new ObjectStorageService();
 var DatasetIngestBody = external_exports.object({
   companyId: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
@@ -123481,7 +123852,7 @@ function toCompanyId(raw) {
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
-router34.post("/dataset/ingest", async (req, res) => {
+router35.post("/dataset/ingest", async (req, res) => {
   const parsed = DatasetIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123507,7 +123878,7 @@ router34.post("/dataset/ingest", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-router34.post("/training/ingest-global", async (req, res) => {
+router35.post("/training/ingest-global", async (req, res) => {
   const parsed = GlobalIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123536,7 +123907,7 @@ router34.post("/training/ingest-global", async (req, res) => {
   }
 });
 var PLATFORM_COMPANY_ID = 0;
-router34.post("/training/ingest-anonymized", async (req, res) => {
+router35.post("/training/ingest-anonymized", async (req, res) => {
   const parsed = AnonymizedIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123560,7 +123931,7 @@ router34.post("/training/ingest-anonymized", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-var faie_default = router34;
+var faie_default = router35;
 
 // src/lib/webhookHandlers.ts
 var WebhookHandlers = class _WebhookHandlers {
@@ -123681,7 +124052,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // src/app.ts
-var app = (0, import_express36.default)();
+var app = (0, import_express37.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -123734,7 +124105,7 @@ app.use(
 );
 app.post(
   "/api/stripe/webhook",
-  import_express36.default.raw({ type: "application/json" }),
+  import_express37.default.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -123754,9 +124125,9 @@ app.post(
     }
   }
 );
-app.use("/v1/faie", import_express36.default.json({ limit: "20mb" }), faie_default);
-app.use(import_express36.default.json());
-app.use(import_express36.default.urlencoded({ extended: true }));
+app.use("/v1/faie", import_express37.default.json({ limit: "20mb" }), faie_default);
+app.use(import_express37.default.json());
+app.use(import_express37.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
@@ -123894,6 +124265,63 @@ async function backfillOpportunityValues() {
   );
 }
 
+// src/lib/backfill-property-memory.ts
+async function backfillPropertyMemory() {
+  const inspections = await db.select().from(inspectionsTable).where(eq(inspectionsTable.status, "completed"));
+  const addressed = inspections.filter(
+    (i) => !!normalizeAddressKey(i.siteAddress ?? "")
+  );
+  if (addressed.length === 0) {
+    logger2.info("backfillPropertyMemory: no completed inspections \u2014 skipping");
+    return;
+  }
+  const existingMemory = await db.select().from(propertyMemoryTable);
+  const coveredKeys = new Set(
+    existingMemory.map((m) => `${m.companyId}::${m.addressKey}`)
+  );
+  const pairsToWrite = /* @__PURE__ */ new Map();
+  for (const insp of addressed) {
+    const key = normalizeAddressKey(insp.siteAddress ?? "");
+    const groupKey = `${insp.companyId}::${key}`;
+    if (coveredKeys.has(groupKey)) continue;
+    const existing = pairsToWrite.get(groupKey);
+    const ts = insp.completedAt ? new Date(insp.completedAt).getTime() : 0;
+    const existingTs = existing?.inspectionId ? 0 : -1;
+    if (!existing || ts > existingTs) {
+      pairsToWrite.set(groupKey, {
+        companyId: insp.companyId,
+        inspectionId: insp.id,
+        siteAddress: insp.siteAddress ?? ""
+      });
+    }
+  }
+  if (pairsToWrite.size === 0) {
+    logger2.info(
+      "backfillPropertyMemory: all addresses already have memory rows"
+    );
+    return;
+  }
+  logger2.info(
+    { pairs: pairsToWrite.size },
+    "backfillPropertyMemory: starting"
+  );
+  let written = 0;
+  let skipped = 0;
+  for (const pair of pairsToWrite.values()) {
+    try {
+      await writePropertyMemory(pair);
+      written++;
+    } catch (err) {
+      logger2.warn(
+        { err, ...pair },
+        "backfillPropertyMemory: failed to write memory row \u2014 skipping"
+      );
+      skipped++;
+    }
+  }
+  logger2.info({ written, skipped }, "backfillPropertyMemory: complete");
+}
+
 // src/index.ts
 var rawPort = process.env["PORT"];
 if (!rawPort) {
@@ -123937,6 +124365,9 @@ app_default.listen(port, (err) => {
   void initStripe();
   void backfillOpportunityValues().catch((err2) => {
     logger2.warn({ err: err2 }, "Opportunity value backfill failed \u2014 pipeline totals may be incomplete");
+  });
+  void backfillPropertyMemory().catch((err2) => {
+    logger2.warn({ err: err2 }, "Property memory backfill failed \u2014 Prior Visit banner may be empty for legacy inspections");
   });
   void ensureProductsSeed().catch((seedErr) => {
     logger2.warn({ err: seedErr }, "Product seed failed \u2014 catalogue may be incomplete");

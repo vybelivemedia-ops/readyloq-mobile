@@ -270,6 +270,105 @@ export function fetchPropertyMemory(token: string | null, siteAddress: string) {
   );
 }
 
+// ─── Company Playbooks & Learning Engine ─────────────────────────────────────
+
+export interface PlaybookRequiredStep {
+  id: string;
+  label: string;
+}
+
+export interface ChemicalRestriction {
+  name: string;
+  reason?: string;
+}
+
+export interface CompanyPlaybook {
+  id: number;
+  companyId: number;
+  title: string;
+  targetPests: string[];
+  requiredSteps: PlaybookRequiredStep[];
+  chemicalRestrictions: ChemicalRestriction[];
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComplianceViolation {
+  playbookId: number;
+  playbookTitle: string;
+  type: "missing_step" | "restricted_chemical";
+  missingStep?: string;
+  restrictedChemical?: string;
+  severity: "WARNING" | "ERROR";
+  message: string;
+}
+
+export interface ComplianceResult {
+  compliant: boolean;
+  violations: ComplianceViolation[];
+}
+
+export type NewPlaybookInput = {
+  title: string;
+  targetPests: string[];
+  requiredSteps: PlaybookRequiredStep[];
+  chemicalRestrictions: ChemicalRestriction[];
+  notes?: string;
+  isActive?: boolean;
+};
+
+export function fetchActivePlaybooks(token: string | null) {
+  return request<{ success: true; playbooks: CompanyPlaybook[] }>(
+    "/api/playbooks/active",
+    token,
+  );
+}
+
+export function fetchAllPlaybooks(token: string | null) {
+  return request<{ success: true; playbooks: CompanyPlaybook[] }>(
+    "/api/playbooks",
+    token,
+  );
+}
+
+export function fetchPlaybookCompliance(
+  token: string | null,
+  inspectionId: number,
+) {
+  return request<{ success: true } & ComplianceResult>(
+    `/api/playbooks/compliance?inspectionId=${inspectionId}`,
+    token,
+  );
+}
+
+export function createPlaybook(token: string | null, input: NewPlaybookInput) {
+  return request<{ success: true; playbook: CompanyPlaybook }>(
+    "/api/playbooks",
+    token,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function updatePlaybook(
+  token: string | null,
+  id: number,
+  input: Partial<NewPlaybookInput>,
+) {
+  return request<{ success: true; playbook: CompanyPlaybook }>(
+    `/api/playbooks/${id}`,
+    token,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
+}
+
+export function deletePlaybook(token: string | null, id: number) {
+  return request<{ success: true }>(`/api/playbooks/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
 // ─── Bulk dataset ingestion ───────────────────────────────────────────────────
 
 export interface BulkIngestMetadata {

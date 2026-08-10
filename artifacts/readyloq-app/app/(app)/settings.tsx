@@ -797,6 +797,22 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* ── Company Playbooks (owners only) ──────────────────────────── */}
+        {isOwner && (
+          <View>
+            <SectionHeader label="Company Playbooks" />
+            <Card style={{ overflow: "hidden", padding: 0 }}>
+              <SettingRow
+                icon="book-outline"
+                label="Manage Playbooks"
+                sublabel="SOPs, required steps, and chemical restrictions"
+                onPress={() => router.push("/playbooks" as any)}
+                isLast
+              />
+            </Card>
+          </View>
+        )}
+
         {/* ── Dispatch Integration (owners only) ───────────────────────── */}
         {isOwner && <DispatchIntegrationSection />}
 
