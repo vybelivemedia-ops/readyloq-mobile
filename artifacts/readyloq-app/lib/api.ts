@@ -450,15 +450,25 @@ export function fetchExecutiveQualityTrend(token: string | null) {
   );
 }
 
+export interface ExecutiveInspectionFilters {
+  technicianName?: string;
+  since?: string; // ISO date string, e.g. "2026-07-01"
+}
+
 export function fetchExecutiveInspections(
   token: string | null,
   riskLevel: ExecutiveRiskLevel,
+  filters?: ExecutiveInspectionFilters,
 ) {
+  const params = new URLSearchParams({ riskLevel });
+  if (filters?.technicianName) params.set("technicianName", filters.technicianName);
+  if (filters?.since) params.set("since", filters.since);
   return request<{
     success: true;
     riskLevel: ExecutiveRiskLevel;
+    filters: { technicianName: string | null; since: string | null };
     inspections: ExecutiveRiskInspection[];
-  }>(`/api/executive/inspections?riskLevel=${riskLevel}`, token);
+  }>(`/api/executive/inspections?${params.toString()}`, token);
 }
 
 /** Register (or refresh) the device Expo push token for this user. */

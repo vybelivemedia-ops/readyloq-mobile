@@ -155,7 +155,33 @@ router.get(
       });
     }
 
+    // Optional filters — both scoped to companyId so no cross-tenant leakage.
+    const technicianName = typeof req.query.technicianName === "string" && req.query.technicianName.trim()
+      ? req.query.technicianName.trim()
+      : undefined;
+
+    // Validate `since` as an ISO date string (YYYY-MM-DD or full ISO 8601).
+    // Reject anything that cannot be parsed to a real date to avoid DB 500s.
+    let since: string | undefined;
+    if (typeof req.query.since === "string" && req.query.since.trim()) {
+      const raw = req.query.since.trim();
+      const parsed = new Date(raw);
+      if (isNaN(parsed.getTime())) {
+        return res.status(400).json({
+          error: "since query param must be a valid ISO date string (e.g. 2026-07-01)",
+        });
+      }
+      since = parsed.toISOString();
+    }
+
     try {
+      const conditions = [
+        eq(inspectionScorecardsTable.companyId, companyId),
+        eq(inspectionScorecardsTable.riskLevel, riskLevel as RiskLevel),
+        ...(technicianName ? [eq(inspectionScorecardsTable.technicianName, technicianName)] : []),
+        ...(since ? [sql`${inspectionScorecardsTable.updatedAt} >= ${since}::timestamptz`] : []),
+      ];
+
       const rows = await db
         .select({
           inspectionId:    inspectionScorecardsTable.inspectionId,
@@ -171,18 +197,17 @@ router.get(
           inspectionsTable,
           eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
         )
-        .where(
-          and(
-            eq(inspectionScorecardsTable.companyId, companyId),
-            eq(inspectionScorecardsTable.riskLevel, riskLevel as RiskLevel),
-          ),
-        )
+        .where(and(...conditions))
         .orderBy(sql`${inspectionScorecardsTable.riskScore} desc`)
-        .limit(100);
+        .limit(200);
 
       return res.json({
         success: true,
         riskLevel,
+        filters: {
+          technicianName: technicianName ?? null,
+          since: since ?? null,
+        },
         inspections: rows.map((r) => ({
           inspectionId:   r.inspectionId,
           siteAddress:    r.siteAddress,
