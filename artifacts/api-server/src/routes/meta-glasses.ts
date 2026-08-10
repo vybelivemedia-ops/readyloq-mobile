@@ -1,3 +1,5 @@
+import { logger } from "../lib/logger";
+
 /**
  * Meta Live AI glasses integration — ReadyLoq webhook + session + events
  *
@@ -331,7 +333,7 @@ router.post(
     const signature = req.headers["x-hub-signature-256"] as string | undefined;
 
     if (!verifySignature(rawBody, signature)) {
-      console.warn("[meta-glasses] webhook: invalid HMAC signature");
+      logger.warn("[meta-glasses] webhook: invalid HMAC signature");
       return res.status(401).json({ error: "Invalid signature" });
     }
 

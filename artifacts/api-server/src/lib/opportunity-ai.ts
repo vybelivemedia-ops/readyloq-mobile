@@ -1,4 +1,5 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { logger } from "./logger";
 import {
   db,
   inspectionsTable,
@@ -343,9 +344,9 @@ async function callAiWithRetry(
     } catch (err) {
       lastErr = err;
       if (attempt === 0) {
-        console.warn(
-          `[opportunity-synthesis] AI call failed on attempt 1, retrying in ${RETRY_DELAY_MS}ms:`,
-          err instanceof Error ? err.message : String(err),
+        logger.warn(
+          { err: err instanceof Error ? err.message : String(err), retryDelayMs: RETRY_DELAY_MS },
+          "[opportunity-synthesis] AI call failed on attempt 1, retrying",
         );
         await sleep(RETRY_DELAY_MS);
       }
@@ -608,8 +609,9 @@ export async function runOpportunitySynthesis(input: {
     // error, and surface the error message so ops can triage without a stack
     // trace hunt.
     const errMessage = err instanceof Error ? err.message : String(err);
-    console.error(
-      `[opportunity-synthesis] ERROR — synthesis failed for inspectionId=${inspectionId} companyId=${companyId}: ${errMessage}`,
+    logger.error(
+      { inspectionId, companyId, err: errMessage },
+      "[opportunity-synthesis] synthesis failed",
     );
     void logErrorEvent("ai", {
       companyId,

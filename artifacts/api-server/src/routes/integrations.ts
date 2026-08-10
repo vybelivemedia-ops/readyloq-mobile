@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db, pool } from "@workspace/db";
+import { logger } from "../lib/logger";
 import {
   companyFieldIntegrationsTable,
   inspectionSyncLogsTable,
@@ -345,7 +346,7 @@ router.post("/sync", async (req, res) => {
     return res.json(syncResult);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed";
-    console.error("[integrations/sync]", message);
+    logger.error({ message }, "[integrations/sync] error");
 
     // Best-effort failure log. Only written when validatedSyncCtx is set,
     // meaning the inspection was positively tenant-validated before the error

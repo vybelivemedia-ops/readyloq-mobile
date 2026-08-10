@@ -13,6 +13,7 @@ import { inspectionsTable } from "@workspace/db";
 import { and, eq, gte, lt, desc } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { z } from "zod/v4";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -94,7 +95,7 @@ router.get("/", async (req, res) => {
       totalCount: items.length,
     });
   } catch (err) {
-    console.error("review-queue GET:", err);
+    logger.error({ err }, "review-queue GET error");
     return res.status(500).json({ error: "Failed to fetch review queue" });
   }
 });

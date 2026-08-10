@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod/v4";
 import { db } from "@workspace/db";
+import { logger } from "../lib/logger";
 import {
   analysisResultsTable,
   intelligenceRecordsTable,
@@ -88,8 +89,9 @@ function validateFindings(
       invalidCount++;
       // Log the first failing field for diagnostics without flooding output.
       const first = result.error.issues[0];
-      console.error(
-        `[analysis] Invalid finding stripped (${context}): ${first?.message ?? "unknown"} at path "${first?.path?.join(".") ?? "-"}"`,
+      logger.error(
+        { context, message: first?.message, path: first?.path?.join(".") },
+        "[analysis] Invalid finding stripped",
       );
     }
   }

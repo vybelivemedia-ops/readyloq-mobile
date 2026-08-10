@@ -565,7 +565,7 @@ function RoleSwitcher({
                 borderWidth: active ? 0 : 1, borderColor: colors.border,
               })}
             >
-              <Ionicons name={m.icon as any} size={16} color={active ? "#fff" : colors.mutedForeground} />
+              <Ionicons name={m.icon} size={16} color={active ? "#fff" : colors.mutedForeground} />
               <Text style={{
                 color: active ? "#fff" : colors.mutedForeground,
                 fontFamily: "Inter_600SemiBold", fontSize: 10,

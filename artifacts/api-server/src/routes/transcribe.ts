@@ -13,6 +13,7 @@
  */
 
 import { Router } from "express";
+import { logger } from "../lib/logger";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { toFile } from "openai";
 import { requireAuth } from "../middleware/require-auth";
@@ -45,7 +46,7 @@ router.post("/transcribe", requireAuth, async (req, res) => {
 
     res.json({ text: response.text, language: "en" });
   } catch (err) {
-    console.error("[transcribe] Whisper API error:", err);
+    logger.error({ err }, "[transcribe] Whisper API error");
     res.status(500).json({ error: "Transcription failed. Please try again." });
   }
 });
