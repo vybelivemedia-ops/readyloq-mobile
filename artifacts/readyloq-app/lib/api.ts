@@ -452,8 +452,20 @@ export function fetchExecutiveQualityTrend(token: string | null) {
 
 export interface ExecutiveInspectionFilters {
   technicianName?: string;
+
   since?: string; // ISO date string, e.g. "2026-07-01"
-  offset?: number;
+
+  offset?: number; // pagination offset (default 0, page size 100)
+}
+
+export interface ExecutiveInspectionsResponse {
+  success: true;
+  riskLevel: ExecutiveRiskLevel;
+  filters: { technicianName: string | null; since: string | null };
+  pagination: { offset: number; limit: number; total: number; hasMore: boolean };
+  total: number;
+  hasMore: boolean;
+  inspections: ExecutiveRiskInspection[];
 }
 
 export function fetchExecutiveInspections(
@@ -464,16 +476,12 @@ export function fetchExecutiveInspections(
   const params = new URLSearchParams({ riskLevel });
   if (filters?.technicianName) params.set("technicianName", filters.technicianName);
   if (filters?.since) params.set("since", filters.since);
-  if (filters?.offset != null && filters.offset > 0) params.set("offset", String(filters.offset));
-  return request<{
-    success: true;
-    riskLevel: ExecutiveRiskLevel;
-    filters: { technicianName: string | null; since: string | null };
-    offset: number;
-    limit: number;
-    hasMore: boolean;
-    inspections: ExecutiveRiskInspection[];
-  }>(`/api/executive/inspections?${params.toString()}`, token);
+  if (filters?.offset != null && filters.offset > 0)
+    params.set("offset", String(filters.offset));
+  return request<ExecutiveInspectionsResponse>(
+    `/api/executive/inspections?${params.toString()}`,
+    token,
+  );
 }
 
 /** Register (or refresh) the device Expo push token for this user. */

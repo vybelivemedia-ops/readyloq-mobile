@@ -52,7 +52,6 @@ router.get(
           ),
         );
 
-      // Won opportunities (revenue closed)
       const [wonRow] = await db
         .select({ wonCount: count(opportunitiesTable.id) })
         .from(opportunitiesTable)
@@ -63,7 +62,7 @@ router.get(
           ),
         );
 
-      // ── 2. Scorecards: quality, risk, technician leaderboard ───────────────
+      // Scorecards
       const [scoreRow] = await db
         .select({
           totalScorecards: count(inspectionScorecardsTable.id),
@@ -76,7 +75,7 @@ router.get(
         .from(inspectionScorecardsTable)
         .where(eq(inspectionScorecardsTable.companyId, companyId));
 
-      // Top technicians by average quality score (min 2 inspections)
+      // Top technicians
       const techRows = await db
         .select({
           technicianName: inspectionScorecardsTable.technicianName,
@@ -90,7 +89,7 @@ router.get(
         .orderBy(sql`avg(${inspectionScorecardsTable.qualityScore}) desc`)
         .limit(5);
 
-      // ── 3. Inspection velocity: completed this month vs last month ──────────
+      // Velocity
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
@@ -188,8 +187,8 @@ router.get(
     }
 
     // Offset-based pagination — page size is fixed at 100 rows.
-    // We fetch PAGE_SIZE + 1 rows and use the extra row to determine hasMore
-    // without a separate COUNT(*) query.
+    // A parallel COUNT(*) query returns the total so the client can show
+    // "X of Y" and know when the list is complete.
     const PAGE_SIZE = 100;
     const rawOffset = parseInt(String(req.query.offset ?? "0"), 10);
     const offset = isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset;
@@ -202,28 +201,39 @@ router.get(
         ...(since ? [sql`${inspectionScorecardsTable.updatedAt} >= ${since}::timestamptz`] : []),
       ];
 
-      const rows = await db
-        .select({
-          inspectionId:    inspectionScorecardsTable.inspectionId,
-          siteAddress:     inspectionsTable.siteAddress,
-          technicianName:  inspectionScorecardsTable.technicianName,
-          qualityScore:    inspectionScorecardsTable.qualityScore,
-          riskLevel:       inspectionScorecardsTable.riskLevel,
-          riskScore:       inspectionScorecardsTable.riskScore,
-          scoredAt:        inspectionScorecardsTable.updatedAt,
-        })
-        .from(inspectionScorecardsTable)
-        .innerJoin(
-          inspectionsTable,
-          eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
-        )
-        .where(and(...conditions))
-        .orderBy(sql`${inspectionScorecardsTable.riskScore} desc`)
-        .limit(PAGE_SIZE + 1)
-        .offset(offset);
+      // Run the page query and count query in parallel to minimise latency.
+      const [rows, [countRow]] = await Promise.all([
+        db
+          .select({
+            inspectionId:    inspectionScorecardsTable.inspectionId,
+            siteAddress:     inspectionsTable.siteAddress,
+            technicianName:  inspectionScorecardsTable.technicianName,
+            qualityScore:    inspectionScorecardsTable.qualityScore,
+            riskLevel:       inspectionScorecardsTable.riskLevel,
+            riskScore:       inspectionScorecardsTable.riskScore,
+            scoredAt:        inspectionScorecardsTable.updatedAt,
+          })
+          .from(inspectionScorecardsTable)
+          .innerJoin(
+            inspectionsTable,
+            eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
+          )
+          .where(and(...conditions))
+          .orderBy(
+            sql`${inspectionScorecardsTable.riskScore} desc`,
+            sql`${inspectionScorecardsTable.id} asc`,
+          )
+          .limit(PAGE_SIZE)
+          .offset(offset),
 
-      const hasMore = rows.length > PAGE_SIZE;
-      const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+        db
+          .select({ total: count(inspectionScorecardsTable.id) })
+          .from(inspectionScorecardsTable)
+          .where(and(...conditions)),
+      ]);
+
+      const total = Number(countRow?.total ?? 0);
+      const hasMore = offset + rows.length < total;
 
       return res.json({
         success: true,
@@ -232,10 +242,16 @@ router.get(
           technicianName: technicianName ?? null,
           since: since ?? null,
         },
-        offset,
-        limit: PAGE_SIZE,
+        pagination: {
+          offset,
+          limit: PAGE_SIZE,
+          total,
+          hasMore,
+        },
+        // top-level aliases for convenience / backwards compatibility
+        total,
         hasMore,
-        inspections: page.map((r) => ({
+        inspections: rows.map((r) => ({
           inspectionId:   r.inspectionId,
           siteAddress:    r.siteAddress,
           technicianName: r.technicianName || "Unknown",

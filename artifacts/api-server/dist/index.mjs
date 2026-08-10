@@ -18531,8 +18531,8 @@ var require_escape_html = __commonJS({
   "../../node_modules/.pnpm/escape-html@1.0.3/node_modules/escape-html/index.js"(exports, module) {
     "use strict";
     var matchHtmlRegExp = /["'&<>]/;
-    module.exports = escapeHtml;
-    function escapeHtml(string4) {
+    module.exports = escapeHtml2;
+    function escapeHtml2(string4) {
       var str4 = "" + string4;
       var match2 = matchHtmlRegExp.exec(str4);
       if (!match2) {
@@ -18663,13 +18663,13 @@ var require_finalhandler = __commonJS({
     "use strict";
     var debug7 = require_src()("finalhandler");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var onFinished = require_on_finished();
     var parseUrl = require_parseurl();
     var statuses = require_statuses();
     var isFinished = onFinished.isFinished;
     function createHtmlDocument(message) {
-      var body = escapeHtml(message).replaceAll("\n", "<br>").replaceAll("  ", " &nbsp;");
+      var body = escapeHtml2(message).replaceAll("\n", "<br>").replaceAll("  ", " &nbsp;");
       return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>Error</title>\n</head>\n<body>\n<pre>' + body + "</pre>\n</body>\n</html>\n";
     }
     module.exports = finalhandler;
@@ -22553,7 +22553,7 @@ var require_send = __commonJS({
     var createError = require_http_errors();
     var debug7 = require_src()("send");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
     var fs2 = __require("fs");
@@ -22606,7 +22606,7 @@ var require_send = __commonJS({
       }
       var res = this.res;
       var msg = statuses.message[status] || String(status);
-      var doc = createHtmlDocument("Error", escapeHtml(msg));
+      var doc = createHtmlDocument("Error", escapeHtml2(msg));
       clearHeaders(res);
       if (err && err.headers) {
         setHeaders(res, err.headers);
@@ -22706,7 +22706,7 @@ var require_send = __commonJS({
         return;
       }
       var loc = encodeUrl(collapseLeadingSlashes(this.path + "/"));
-      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml(loc));
+      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
       res.statusCode = 301;
       res.setHeader("Content-Type", "text/html; charset=UTF-8");
       res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -23110,7 +23110,7 @@ var require_response = __commonJS({
     var createError = require_http_errors();
     var deprecate = require_depd()("express");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var http4 = __require("node:http");
     var onFinished = require_on_finished();
     var mime = require_mime_types();
@@ -23449,7 +23449,7 @@ var require_response = __commonJS({
           body = statuses.message[status] + ". Redirecting to " + address;
         },
         html: function() {
-          var u = escapeHtml(address);
+          var u = escapeHtml2(address);
           body = "<p>" + statuses.message[status] + ". Redirecting to " + u + "</p>";
         },
         default: function() {
@@ -23577,7 +23577,7 @@ var require_serve_static = __commonJS({
   "../../node_modules/.pnpm/serve-static@2.2.1/node_modules/serve-static/index.js"(exports, module) {
     "use strict";
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var parseUrl = require_parseurl();
     var resolve = __require("path").resolve;
     var send = require_send();
@@ -23663,7 +23663,7 @@ var require_serve_static = __commonJS({
         originalUrl.path = null;
         originalUrl.pathname = collapseLeadingSlashes(originalUrl.pathname + "/");
         var loc = encodeUrl(url2.format(originalUrl));
-        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml(loc));
+        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
         res.statusCode = 301;
         res.setHeader("Content-Type", "text/html; charset=UTF-8");
         res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -24627,23 +24627,23 @@ var require_helpers = __commonJS({
   "../../node_modules/.pnpm/ip-address@10.2.0/node_modules/ip-address/dist/v6/helpers.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.escapeHtml = escapeHtml;
+    exports.escapeHtml = escapeHtml2;
     exports.spanAllZeroes = spanAllZeroes;
     exports.spanAll = spanAll;
     exports.spanLeadingZeroes = spanLeadingZeroes;
     exports.simpleGroup = simpleGroup;
-    function escapeHtml(s2) {
+    function escapeHtml2(s2) {
       return s2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
     function spanAllZeroes(s2) {
-      return escapeHtml(s2).replace(/(0+)/g, '<span class="zero">$1</span>');
+      return escapeHtml2(s2).replace(/(0+)/g, '<span class="zero">$1</span>');
     }
     function spanAll(s2, offset = 0) {
       const letters = s2.split("");
-      return letters.map((n, i) => `<span class="digit value-${escapeHtml(n)} position-${i + offset}">${spanAllZeroes(n)}</span>`).join("");
+      return letters.map((n, i) => `<span class="digit value-${escapeHtml2(n)} position-${i + offset}">${spanAllZeroes(n)}</span>`).join("");
     }
     function spanLeadingZeroesSimple(group) {
-      return escapeHtml(group).replace(/^(0+)/, '<span class="zero">$1</span>');
+      return escapeHtml2(group).replace(/^(0+)/, '<span class="zero">$1</span>');
     }
     function spanLeadingZeroes(address) {
       const groups = address.split(":");
@@ -123492,14 +123492,17 @@ async function syncToPestPac(payload) {
     Authorization: `Bearer ${payload.apiKey}`
   };
   const customerId = payload.accountId;
-  const noteRes = await fetch(`${base}/customers/${customerId}/notes`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      note: `[ReadyLoq AI Report] ${payload.reportSummary}`,
-      date: payload.inspectionDate
-    })
-  });
+  const noteRes = await withRetry(
+    () => fetch(`${base}/customers/${customerId}/notes`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        note: `[ReadyLoq AI Report] ${payload.reportSummary}`,
+        date: payload.inspectionDate
+      })
+    }),
+    (res) => !res.ok
+  );
   if (!noteRes.ok) {
     const body = await noteRes.text();
     throw new Error(`PestPac note POST failed (${noteRes.status}): ${body}`);
@@ -124078,6 +124081,9 @@ async function generateDailyExecutiveBriefing(companyId, targetDate) {
 
 // src/routes/executive.ts
 var router34 = (0, import_express35.Router)();
+function escapeHtml(raw) {
+  return raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 router34.get(
   "/executive/intelligence",
   requireAuth,
@@ -124176,27 +124182,64 @@ router34.get(
         error: "riskLevel query param is required and must be one of: critical, high, medium, low"
       });
     }
+    const technicianName = typeof req.query.technicianName === "string" && req.query.technicianName.trim() ? req.query.technicianName.trim() : void 0;
+    let since;
+    if (typeof req.query.since === "string" && req.query.since.trim()) {
+      const raw = req.query.since.trim();
+      const parsed = new Date(raw);
+      if (isNaN(parsed.getTime())) {
+        return res.status(400).json({
+          error: "since query param must be a valid ISO date string (e.g. 2026-07-01)"
+        });
+      }
+      since = parsed.toISOString();
+    }
+    const PAGE_SIZE = 100;
+    const rawOffset = parseInt(String(req.query.offset ?? "0"), 10);
+    const offset = isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset;
     try {
-      const rows = await db.select({
-        inspectionId: inspectionScorecardsTable.inspectionId,
-        siteAddress: inspectionsTable.siteAddress,
-        technicianName: inspectionScorecardsTable.technicianName,
-        qualityScore: inspectionScorecardsTable.qualityScore,
-        riskLevel: inspectionScorecardsTable.riskLevel,
-        riskScore: inspectionScorecardsTable.riskScore,
-        scoredAt: inspectionScorecardsTable.updatedAt
-      }).from(inspectionScorecardsTable).innerJoin(
-        inspectionsTable,
-        eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId)
-      ).where(
-        and(
-          eq(inspectionScorecardsTable.companyId, companyId),
-          eq(inspectionScorecardsTable.riskLevel, riskLevel)
-        )
-      ).orderBy(sql`${inspectionScorecardsTable.riskScore} desc`).limit(100);
+      const conditions = [
+        eq(inspectionScorecardsTable.companyId, companyId),
+        eq(inspectionScorecardsTable.riskLevel, riskLevel),
+        ...technicianName ? [eq(inspectionScorecardsTable.technicianName, technicianName)] : [],
+        ...since ? [sql`${inspectionScorecardsTable.updatedAt} >= ${since}::timestamptz`] : []
+      ];
+      const [rows, [countRow]] = await Promise.all([
+        db.select({
+          inspectionId: inspectionScorecardsTable.inspectionId,
+          siteAddress: inspectionsTable.siteAddress,
+          technicianName: inspectionScorecardsTable.technicianName,
+          qualityScore: inspectionScorecardsTable.qualityScore,
+          riskLevel: inspectionScorecardsTable.riskLevel,
+          riskScore: inspectionScorecardsTable.riskScore,
+          scoredAt: inspectionScorecardsTable.updatedAt
+        }).from(inspectionScorecardsTable).innerJoin(
+          inspectionsTable,
+          eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId)
+        ).where(and(...conditions)).orderBy(
+          sql`${inspectionScorecardsTable.riskScore} desc`,
+          sql`${inspectionScorecardsTable.id} asc`
+        ).limit(PAGE_SIZE).offset(offset),
+        db.select({ total: count(inspectionScorecardsTable.id) }).from(inspectionScorecardsTable).where(and(...conditions))
+      ]);
+      const total = Number(countRow?.total ?? 0);
+      const hasMore = offset + rows.length < total;
       return res.json({
         success: true,
         riskLevel,
+        filters: {
+          technicianName: technicianName ?? null,
+          since: since ?? null
+        },
+        pagination: {
+          offset,
+          limit: PAGE_SIZE,
+          total,
+          hasMore
+        },
+        // top-level aliases for convenience / backwards compatibility
+        total,
+        hasMore,
         inspections: rows.map((r) => ({
           inspectionId: r.inspectionId,
           siteAddress: r.siteAddress,
@@ -124295,6 +124338,7 @@ router34.get(
       const OPEN_STATUSES4 = ["new", "reviewed", "quoted"];
       const [companyRow] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, companyId));
       const companyName = companyRow?.name ?? "Your Company";
+      const companyNameHtml = escapeHtml(companyName);
       const [pipelineRow] = await db.select({
         openCount: count(opportunitiesTable.id),
         pipelineValue: sum(opportunitiesTable.estimatedAnnualValue)
@@ -124351,6 +124395,7 @@ router34.get(
       const qualityColor = avgQualityScore >= 80 ? "#3FB950" : avgQualityScore >= 60 ? "#D29922" : "#F85149";
       const techRowsHtml = techRows.length > 0 ? techRows.map((t, i) => {
         const name = t.technicianName || "Unknown";
+        const nameHtml = escapeHtml(name);
         const quality = Math.round(Number(t.avgQuality ?? 0));
         const count2 = Number(t.inspectionCount);
         const qColor = quality >= 80 ? "#3FB950" : quality >= 60 ? "#D29922" : "#F85149";
@@ -124358,7 +124403,7 @@ router34.get(
         return `
             <tr style="border-bottom:1px solid #30363D;">
               <td style="padding:10px 14px;color:#8B949E;font-size:14px;">${medal}</td>
-              <td style="padding:10px 14px;color:#E6EDF3;font-size:14px;">${name}</td>
+              <td style="padding:10px 14px;color:#E6EDF3;font-size:14px;">${nameHtml}</td>
               <td style="padding:10px 14px;color:#8B949E;font-size:13px;">${count2} inspection${count2 !== 1 ? "s" : ""}</td>
               <td style="padding:10px 14px;text-align:right;">
                 <span style="color:${qColor};font-weight:700;font-size:14px;">${quality}</span>
@@ -124376,7 +124421,7 @@ router34.get(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Executive Dashboard \u2014 ${companyName}</title>
+  <title>Executive Dashboard \u2014 ${companyNameHtml}</title>
 </head>
 <body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#0D1117;padding:24px 0;">
@@ -124391,7 +124436,7 @@ router34.get(
                 <tr>
                   <td>
                     <div style="color:#17C4D3;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Executive Intelligence</div>
-                    <div style="color:#E6EDF3;font-size:22px;font-weight:800;margin-bottom:4px;">${companyName}</div>
+                    <div style="color:#E6EDF3;font-size:22px;font-weight:800;margin-bottom:4px;">${companyNameHtml}</div>
                     <div style="color:#8B949E;font-size:13px;">Performance snapshot \xB7 ${generatedAt}</div>
                   </td>
                   <td align="right" style="vertical-align:top;">
@@ -124490,6 +124535,38 @@ router34.get(
 </body>
 </html>`;
       const subject = `Executive Dashboard Snapshot \u2014 ${companyName} \xB7 ${generatedAt}`;
+      if (req.query.format === "text") {
+        const velocityLine = velocityDelta !== null ? `vs ${lastMonth} last month (${velocityDelta >= 0 ? "\u25B2" : "\u25BC"} ${Math.abs(velocityDelta)}%)` : `vs ${lastMonth} last month`;
+        const techLines = techRows.length > 0 ? techRows.map((t, i) => {
+          const medal = ["\u{1F947}", "\u{1F948}", "\u{1F949}"][i] ?? `${i + 1}.`;
+          const name2 = t.technicianName || "Unknown";
+          const q2 = Math.round(Number(t.avgQuality ?? 0));
+          const c2 = Number(t.inspectionCount);
+          return `  ${medal} ${name2} \u2014 score ${q2} (${c2} inspection${c2 !== 1 ? "s" : ""})`;
+        }).join("\n") : "  No technicians with 2+ scored inspections yet.";
+        const text2 = [
+          `EXECUTIVE DASHBOARD SNAPSHOT`,
+          `${companyName} \xB7 ${generatedAt}`,
+          ``,
+          `\u2500\u2500 PIPELINE \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+          `Open pipeline:    ${pipelineFormatted}`,
+          `Opportunities:    ${openOpportunities} open \xB7 ${wonOpportunities} won`,
+          ``,
+          `\u2500\u2500 QUALITY & RISK \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+          `Avg quality score: ${avgQualityScore} (${totalScorecards} scored inspections)`,
+          `Risk breakdown:    ${critical} critical \xB7 ${high} high \xB7 ${medium} medium \xB7 ${low} low`,
+          ``,
+          `\u2500\u2500 INSPECTION VELOCITY \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+          `This month:  ${thisMonth} completed`,
+          `${velocityLine}`,
+          ``,
+          `\u2500\u2500 TOP TECHNICIANS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+          techLines,
+          ``,
+          `Generated by ReadyLoq`
+        ].join("\n");
+        return res.json({ success: true, text: text2, subject });
+      }
       return res.json({ success: true, html, subject });
     } catch (error40) {
       console.error("executive email-preview error:", error40);

@@ -33,8 +33,6 @@ import {
   type ExecutiveRiskLevel,
 } from "@/lib/api";
 
-// ─── Palette (mirrors executive-dashboard.tsx) ────────────────────────────────
-
 const C = {
   bg: "#0D1117",
   surface: "#161B22",
@@ -315,6 +313,7 @@ export default function ExecutiveRiskInspectionsScreen() {
 
   // ── Data state ────────────────────────────────────────────────────────────
   const [items, setItems] = useState<ExecutiveRiskInspection[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -378,6 +377,7 @@ export default function ExecutiveRiskInspectionsScreen() {
           loadedCountRef.current = res.inspections.length;
         }
         setHasMore(res.hasMore);
+        setTotal(res.total ?? null);
 
         // Populate the technician picker from the initial unfiltered load only,
         // so the options list never shrinks when a filter is applied.
@@ -770,10 +770,22 @@ export default function ExecutiveRiskInspectionsScreen() {
                 <Text
                   style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}
                 >
-                  <Text style={{ color: accentColor, fontFamily: "Inter_700Bold" }}>
-                    {items.length}{hasMore ? "+" : ""}
-                  </Text>{" "}
-                  {levelLabel.toLowerCase()} risk inspection{items.length !== 1 ? "s" : ""}{" · "}
+                  {total !== null && total > items.length ? (
+                    <>
+                      <Text style={{ color: accentColor, fontFamily: "Inter_700Bold" }}>
+                        {items.length}
+                      </Text>
+                      <Text> of </Text>
+                      <Text style={{ color: accentColor, fontFamily: "Inter_700Bold" }}>
+                        {total}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={{ color: accentColor, fontFamily: "Inter_700Bold" }}>
+                      {total ?? items.length}
+                    </Text>
+                  )}{" "}
+                  {levelLabel.toLowerCase()} risk inspection{(total ?? items.length) !== 1 ? "s" : ""}{" · "}
                   {summaryText}
                 </Text>
               </View>
