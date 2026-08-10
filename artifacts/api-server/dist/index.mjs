@@ -57309,6 +57309,7 @@ __export(schema_exports, {
   insertTreatmentLogSchema: () => insertTreatmentLogSchema,
   inspectionMediaTable: () => inspectionMediaTable,
   inspectionScorecardsTable: () => inspectionScorecardsTable,
+  inspectionSyncLogsTable: () => inspectionSyncLogsTable,
   inspectionsTable: () => inspectionsTable,
   intelligenceRecordsTable: () => intelligenceRecordsTable,
   intelligenceReviewsTable: () => intelligenceReviewsTable,
@@ -69891,6 +69892,21 @@ var companyFieldIntegrationsTable = pgTable(
 var insertFieldIntegrationSchema = createInsertSchema(
   companyFieldIntegrationsTable
 ).omit({ id: true, createdAt: true, updatedAt: true, companyId: true });
+var inspectionSyncLogsTable = pgTable(
+  "inspection_sync_logs",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+    inspectionId: integer("inspection_id").notNull().references(() => inspectionsTable.id, { onDelete: "cascade" }),
+    systemType: text("system_type").$type().notNull(),
+    syncedAt: timestamp("synced_at").notNull().defaultNow(),
+    // Full SyncResult JSON stored so we can replay it without re-syncing.
+    resultJson: jsonb("result_json").notNull()
+  },
+  (t) => [
+    index("inspection_sync_logs_company_inspection_idx").on(t.companyId, t.inspectionId)
+  ]
+);
 
 // ../../lib/db/src/schema/playbooks.ts
 var companyPlaybooksTable = pgTable("company_playbooks", {
@@ -123359,6 +123375,7 @@ async function syncInspectionToExternalSystem(payload) {
 }
 
 // src/routes/integrations.ts
+var SYNC_COOLDOWN_SECONDS = 60;
 var router32 = (0, import_express33.Router)();
 var configInputSchema = external_exports.object({
   systemType: external_exports.enum(["pestpac", "fieldroutes"]),
@@ -123452,6 +123469,43 @@ router32.post("/sync", async (req, res) => {
     if (inspection.status !== "complete" && inspection.status !== "completed") {
       return res.status(422).json({ error: "Inspection is not yet finalized" });
     }
+    const result = await pool.connect().then(async (client) => {
+      try {
+        await client.query("BEGIN");
+        const { rows: lockRows } = await client.query(
+          "SELECT pg_try_advisory_xact_lock($1) AS locked",
+          [inspectionId]
+        );
+        if (!lockRows[0]?.locked) {
+          await client.query("ROLLBACK");
+          return { _conflict: true };
+        }
+        const cooldownCutoff = new Date(Date.now() - SYNC_COOLDOWN_SECONDS * 1e3);
+        const [recentLog] = await db.select().from(inspectionSyncLogsTable).where(
+          and(
+            eq(inspectionSyncLogsTable.inspectionId, inspectionId),
+            eq(inspectionSyncLogsTable.companyId, companyId)
+          )
+        ).orderBy(desc(inspectionSyncLogsTable.syncedAt)).limit(1);
+        if (recentLog && recentLog.syncedAt >= cooldownCutoff) {
+          await client.query("ROLLBACK");
+          return { _cached: true, result: recentLog.resultJson };
+        }
+        await client.query("COMMIT");
+        return { _cached: false };
+      } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+      } finally {
+        client.release();
+      }
+    });
+    if (result._conflict) {
+      return res.status(409).json({ error: "Sync already in progress for this inspection" });
+    }
+    if (result._cached) {
+      return res.json({ ...result.result, _idempotent: true });
+    }
     const [analyses, media, logs] = await Promise.all([
       db.select().from(analysisResultsTable).where(
         and(
@@ -123493,7 +123547,7 @@ router32.post("/sync", async (req, res) => {
         logs.map((l) => l.productId != null ? productNameById.get(l.productId) : null).filter((n) => n != null)
       )
     ];
-    const result = await syncInspectionToExternalSystem({
+    const syncResult = await syncInspectionToExternalSystem({
       externalSystem: config2.systemType,
       accountId: config2.accountId,
       apiKey: config2.apiKey,
@@ -123508,7 +123562,13 @@ router32.post("/sync", async (req, res) => {
         notes: inspection.notes ?? null
       }
     });
-    return res.json(result);
+    await db.insert(inspectionSyncLogsTable).values({
+      companyId,
+      inspectionId,
+      systemType: config2.systemType,
+      resultJson: syncResult
+    });
+    return res.json(syncResult);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed";
     console.error("[integrations/sync]", message);

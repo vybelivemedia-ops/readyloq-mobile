@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
+import { db, pool } from "@workspace/db";
 import {
   companyFieldIntegrationsTable,
+  inspectionSyncLogsTable,
   inspectionsTable,
   analysisResultsTable,
   inspectionMediaTable,
@@ -9,11 +10,14 @@ import {
   productsTable,
   type Finding,
 } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import { getCompanyId } from "../lib/tenant";
 import { requireRole } from "../middleware/require-auth";
 import { syncInspectionToExternalSystem } from "../services/field-integration";
+
+/** Duplicate taps within this window (seconds) return the cached result. */
+const SYNC_COOLDOWN_SECONDS = 60;
 
 const router = Router();
 
@@ -117,6 +121,12 @@ router.delete("/config", requireRole("owner"), async (req, res) => {
 // ─── POST /api/integrations/sync ─────────────────────────────────────────────
 // Packages a finalized inspection and pushes it to the external system.
 // The route reads the api_key from the DB — it is never accepted from the client.
+//
+// Idempotency guards:
+//   1. Cooldown check — if a successful sync exists within SYNC_COOLDOWN_SECONDS,
+//      return the stored result without contacting the external system.
+//   2. Advisory lock — pg_try_advisory_xact_lock(inspectionId) prevents two
+//      concurrent requests from both passing the cooldown check simultaneously.
 const syncInputSchema = z.object({
   inspectionId: z.number().int().positive(),
 });
@@ -154,6 +164,62 @@ router.post("/sync", async (req, res) => {
     if (!inspection) return res.status(404).json({ error: "Inspection not found" });
     if (inspection.status !== "complete" && inspection.status !== "completed") {
       return res.status(422).json({ error: "Inspection is not yet finalized" });
+    }
+
+    // ── Idempotency: run the rest inside a transaction so the advisory lock
+    //    and the sync-log insert are atomic. ────────────────────────────────
+    const result = await pool.connect().then(async (client) => {
+      try {
+        await client.query("BEGIN");
+
+        // Advisory lock scoped to this inspection (released when txn ends).
+        // If another request already holds it, we bail immediately — the
+        // concurrent request will also see the cooldown record and return early.
+        const { rows: lockRows } = await client.query<{ locked: boolean }>(
+          "SELECT pg_try_advisory_xact_lock($1) AS locked",
+          [inspectionId],
+        );
+        if (!lockRows[0]?.locked) {
+          await client.query("ROLLBACK");
+          return { _conflict: true } as const;
+        }
+
+        // ── Cooldown: return cached result if last sync was recent. ────────
+        const cooldownCutoff = new Date(Date.now() - SYNC_COOLDOWN_SECONDS * 1000);
+        const [recentLog] = await db
+          .select()
+          .from(inspectionSyncLogsTable)
+          .where(
+            and(
+              eq(inspectionSyncLogsTable.inspectionId, inspectionId),
+              eq(inspectionSyncLogsTable.companyId, companyId),
+            ),
+          )
+          .orderBy(desc(inspectionSyncLogsTable.syncedAt))
+          .limit(1);
+
+        if (recentLog && recentLog.syncedAt >= cooldownCutoff) {
+          await client.query("ROLLBACK");
+          return { _cached: true, result: recentLog.resultJson } as const;
+        }
+
+        // ── Not a duplicate: load data and call the external system. ───────
+        await client.query("COMMIT");
+        return { _cached: false } as const;
+      } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+      } finally {
+        client.release();
+      }
+    });
+
+    if (result._conflict) {
+      // Another concurrent request is already syncing — tell the client to retry.
+      return res.status(409).json({ error: "Sync already in progress for this inspection" });
+    }
+    if (result._cached) {
+      return res.json({ ...result.result, _idempotent: true });
     }
 
     // Load analysis + media in parallel.
@@ -230,7 +296,7 @@ router.post("/sync", async (req, res) => {
       ),
     ];
 
-    const result = await syncInspectionToExternalSystem({
+    const syncResult = await syncInspectionToExternalSystem({
       externalSystem: config.systemType,
       accountId: config.accountId,
       apiKey: config.apiKey,
@@ -247,7 +313,15 @@ router.post("/sync", async (req, res) => {
       },
     });
 
-    return res.json(result);
+    // Record successful sync so future duplicate taps return cached result.
+    await db.insert(inspectionSyncLogsTable).values({
+      companyId,
+      inspectionId,
+      systemType: config.systemType,
+      resultJson: syncResult,
+    });
+
+    return res.json(syncResult);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed";
     console.error("[integrations/sync]", message);

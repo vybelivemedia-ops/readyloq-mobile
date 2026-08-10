@@ -174,4 +174,116 @@ export declare const insertFieldIntegrationSchema: z.ZodObject<{
 }>;
 export type CompanyFieldIntegration = typeof companyFieldIntegrationsTable.$inferSelect;
 export type InsertFieldIntegration = z.infer<typeof insertFieldIntegrationSchema>;
+export declare const inspectionSyncLogsTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
+    name: "inspection_sync_logs";
+    schema: undefined;
+    columns: {
+        id: import("drizzle-orm/pg-core").PgColumn<{
+            name: "id";
+            tableName: "inspection_sync_logs";
+            dataType: "number";
+            columnType: "PgSerial";
+            data: number;
+            driverParam: number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: true;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        companyId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "company_id";
+            tableName: "inspection_sync_logs";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        inspectionId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "inspection_id";
+            tableName: "inspection_sync_logs";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        systemType: import("drizzle-orm/pg-core").PgColumn<{
+            name: "system_type";
+            tableName: "inspection_sync_logs";
+            dataType: "string";
+            columnType: "PgText";
+            data: FieldIntegrationSystem;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: FieldIntegrationSystem;
+        }>;
+        syncedAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "synced_at";
+            tableName: "inspection_sync_logs";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        resultJson: import("drizzle-orm/pg-core").PgColumn<{
+            name: "result_json";
+            tableName: "inspection_sync_logs";
+            dataType: "json";
+            columnType: "PgJsonb";
+            data: unknown;
+            driverParam: unknown;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+    };
+    dialect: "pg";
+}>;
+export type InspectionSyncLog = typeof inspectionSyncLogsTable.$inferSelect;
 //# sourceMappingURL=field-integrations.d.ts.map
