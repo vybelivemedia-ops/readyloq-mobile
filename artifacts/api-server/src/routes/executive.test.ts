@@ -503,3 +503,122 @@ describe("executive intelligence endpoint: inspection velocity is scoped per com
     expect(res.body.metrics.inspectionsThisMonth).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Email preview endpoint tests
+// ---------------------------------------------------------------------------
+
+describe("executive email-preview endpoint: authentication & role guards", () => {
+  it("returns 401 when unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when called by a technician (not an owner)", async () => {
+    asUser(EXEC_TECH_A);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("executive email-preview endpoint: response structure", () => {
+  it("returns success with html and subject fields for an owner", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(typeof res.body.html).toBe("string");
+    expect(res.body.html.length).toBeGreaterThan(0);
+    expect(typeof res.body.subject).toBe("string");
+    expect(res.body.subject.length).toBeGreaterThan(0);
+  });
+
+  it("embeds the requesting company's name in the HTML and subject", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+    // Company A's name was seeded as "Exec Test Co A".
+    expect(res.body.html).toContain("Exec Test Co A");
+    expect(res.body.subject).toContain("Exec Test Co A");
+  });
+});
+
+describe("executive email-preview endpoint: cross-company isolation", () => {
+  /**
+   * Fixture recap (seeded in beforeAll):
+   *   Company A — "Exec Test Co A", technician "Alice", pipeline $5000 open
+   *   Company B — "Exec Test Co B", technician "Bob", $8000 won deal, critical risk
+   *
+   * Each company's email snapshot must contain only its own data.
+   */
+
+  it("company A's email does not contain company B's technician name (Bob)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+    expect(res.body.html).not.toContain("Bob");
+  });
+
+  it("company A's email does not contain company B's company name", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+    expect(res.body.html).not.toContain("Exec Test Co B");
+    expect(res.body.subject).not.toContain("Exec Test Co B");
+  });
+
+  it("company B's email does not contain company A's technician name (Alice)", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+    expect(res.body.html).not.toContain("Alice");
+  });
+
+  it("company B's email does not contain company A's company name", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+    expect(res.body.html).not.toContain("Exec Test Co A");
+    expect(res.body.subject).not.toContain("Exec Test Co A");
+  });
+
+  it("company A's email pipeline value reflects only company A's open opportunity ($5000)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+    // A has $5K open pipeline — rendered as "$5K" by the formatter.
+    expect(res.body.html).toContain("$5K");
+    // Company B's $8000 won deal must not bleed into the pipeline value.
+    // If $8K appeared it would indicate cross-tenant leakage.
+    expect(res.body.html).not.toMatch(/\$8K|\$8,000|\$13K|\$13,000/);
+  });
+
+  it("company A's email shows zero critical risk sites (A has no critical scorecards)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+    const html: string = res.body.html;
+    // The critical-risk KPI block renders the count in a styled <div>.
+    // Company A has 0 critical scorecards; Company B has 1.
+    // We locate the "Critical Risk Sites" section and verify it shows 0, not 1.
+    const criticalBlockIdx = html.indexOf("Critical Risk Sites");
+    expect(criticalBlockIdx).toBeGreaterThan(-1);
+    // The count <div> immediately follows the label <div> — extract the nearby text.
+    const snippet = html.slice(criticalBlockIdx, criticalBlockIdx + 300);
+    // The number "0" (critical count for A) should appear; the number "1" should
+    // not be the critical count (it belongs to B's critical scorecard).
+    // We match the color pattern for the critical block to pin the value.
+    expect(snippet).toMatch(/font-size:28px[^>]*>0</);
+  });
+
+  it("company B's email embeds company B's own name and not company A's pipeline value", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+    // B's email is branded for B.
+    expect(res.body.html).toContain("Exec Test Co B");
+    // B has 0 open opportunities — $5K (A's open pipeline) must not appear.
+    expect(res.body.html).not.toContain("$5K");
+  });
+});
