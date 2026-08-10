@@ -12,6 +12,7 @@ import {
 import { eq, and, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import { getCompanyId } from "../lib/tenant";
+import { requireRole } from "../middleware/require-auth";
 import { syncInspectionToExternalSystem } from "../services/field-integration";
 
 const router = Router();
@@ -53,9 +54,9 @@ router.get("/config", async (req, res) => {
 });
 
 // ─── PUT /api/integrations/config ────────────────────────────────────────────
-// Upsert the integration config. Owner-only (enforced by requireRole in the
-// router mount). The api_key is stored server-side and never returned.
-router.put("/config", async (req, res) => {
+// Upsert the integration config. Owner-only. The api_key is stored server-side
+// and never returned.
+router.put("/config", requireRole("owner"), async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const parsed = configInputSchema.safeParse(req.body);
@@ -101,7 +102,7 @@ router.put("/config", async (req, res) => {
 });
 
 // ─── DELETE /api/integrations/config ─────────────────────────────────────────
-router.delete("/config", async (req, res) => {
+router.delete("/config", requireRole("owner"), async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     await db

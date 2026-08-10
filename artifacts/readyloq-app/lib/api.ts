@@ -212,6 +212,31 @@ export function triggerIntegrationSync(token: string | null, inspectionId: numbe
   });
 }
 
+export interface SaveIntegrationConfigArgs {
+  systemType: FieldIntegrationSystem;
+  accountId: string;
+  apiKey: string;
+  apiBaseUrl?: string;
+  enabled?: boolean;
+}
+
+export function saveIntegrationConfig(
+  token: string | null,
+  args: SaveIntegrationConfigArgs,
+) {
+  return request<{ configured: true; systemType: string; accountId: string }>(
+    "/api/integrations/config",
+    token,
+    { method: "PUT", body: JSON.stringify(args) },
+  );
+}
+
+export function deleteIntegrationConfig(token: string | null) {
+  return request<{ configured: false }>("/api/integrations/config", token, {
+    method: "DELETE",
+  });
+}
+
 // ─── Property memory ─────────────────────────────────────────────────────────
 
 export interface HistoricalFinding {
