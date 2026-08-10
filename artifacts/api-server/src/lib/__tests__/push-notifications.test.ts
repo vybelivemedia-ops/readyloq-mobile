@@ -407,6 +407,119 @@ describe("notifyCriticalInspection — opted-out and tokenless owners are exclud
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// notifyCriticalInspection — multi-tenant isolation
+//
+// Two companies (A = the fixture company, B = a second company) each have an
+// owner with a valid push token.  A critical inspection belonging to company A
+// must ONLY reach company A's owner.  Company B's owner must never receive it,
+// and the payload must carry the correct inspectionId / companyId.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("notifyCriticalInspection — cross-tenant isolation", () => {
+  const COMPANY_B_SLUG = "push-notif-test-co-b";
+  const OWNER_B2_CLERK = "pn_test_owner_b2";
+  const VALID_TOKEN_B2 = "ExponentPushToken[bbbbbbbbbbbbbbbbbbb2]";
+
+  let companyBId: number;
+  let inspectionAId: number;
+
+  beforeAll(async () => {
+    // Ensure company B exists (idempotent).
+    const [existing] = await db
+      .select()
+      .from(companiesTable)
+      .where(eq(companiesTable.slug, COMPANY_B_SLUG));
+    companyBId = existing
+      ? existing.id
+      : (
+          await db
+            .insert(companiesTable)
+            .values({ name: "Push Notif Test Co B", slug: COMPANY_B_SLUG })
+            .returning()
+        )[0].id;
+  });
+
+  beforeEach(async () => {
+    // Clean up both companies' users and company B's inspections.
+    await db.delete(usersTable).where(eq(usersTable.companyId, companyBId));
+    await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyBId));
+
+    // Owner for company A (the triggering company).
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+    });
+
+    // Owner for company B (the other tenant — must never be notified).
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_B2_CLERK,
+      role: "owner",
+      companyId: companyBId,
+      pushToken: VALID_TOKEN_B2,
+      pushNotificationsEnabled: true,
+    });
+
+    // Inspection owned by company A.
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: SITE_ADDRESS,
+        technicianName: "Alice",
+        clientName: "Test Client",
+        pestTypes: ["rodents"],
+      })
+      .returning();
+    inspectionAId = insp.id;
+  });
+
+  it("sends only to company A's owner token when a company-A inspection fires", async () => {
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId: inspectionAId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+
+    // Only one message — company A's owner.
+    expect(messages).toHaveLength(1);
+    expect(messages[0].to).toBe(VALID_TOKEN_A);
+
+    // Company B's token must be completely absent from the batch.
+    const allTokens = messages.map((m) => m.to);
+    expect(allTokens).not.toContain(VALID_TOKEN_B2);
+  });
+
+  it("embeds the correct inspectionId and companyId in the push payload", async () => {
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId: inspectionAId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    const data = messages[0].data as Record<string, unknown>;
+
+    expect(data.inspectionId).toBe(inspectionAId);
+    expect(data.companyId).toBe(companyId);
+    // Must NOT carry company B's id in the payload.
+    expect(data.companyId).not.toBe(companyBId);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /auth/me/push-token — token format validation
 // ─────────────────────────────────────────────────────────────────────────────
 
