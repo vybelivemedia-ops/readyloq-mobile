@@ -50,7 +50,13 @@ import { useColors } from "@/hooks/useColors";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import { PEST_TYPES, PROPERTY_TYPES } from "@/constants/inspection";
-import { ApiError, fetchPropertyMemory, type PropertyMemoryData } from "@/lib/api";
+import {
+  ApiError,
+  fetchPlaybookCompliance,
+  fetchPropertyMemory,
+  type ComplianceViolation,
+  type PropertyMemoryData,
+} from "@/lib/api";
 import { ingestAllUploadedPhotos } from "@/lib/faie-ingest";
 import { consumeLastMeasurementReading } from "@/lib/measurement";
 import {
@@ -949,6 +955,23 @@ export default function NewInspectionScreen() {
     enabled: wsInspectionId != null,
   });
   const wsAnalysis = wsInspectionId != null ? wsAnalysisQ.data?.[0] : undefined;
+
+  // Task #251 — Live compliance check. Fetched when the technician enters the
+  // review step so violations appear BEFORE the inspection is finalised.
+  const [reviewViolations, setReviewViolations] = useState<ComplianceViolation[]>([]);
+  const [reviewViolationsLoading, setReviewViolationsLoading] = useState(false);
+
+  useEffect(() => {
+    if (step !== "review" || wsInspectionId == null) return;
+    let cancelled = false;
+    setReviewViolationsLoading(true);
+    getToken()
+      .then((token) => fetchPlaybookCompliance(token, wsInspectionId))
+      .then((r) => { if (!cancelled) setReviewViolations(r.violations); })
+      .catch(() => { /* non-fatal — violations are advisory only */ })
+      .finally(() => { if (!cancelled) setReviewViolationsLoading(false); });
+    return () => { cancelled = true; };
+  }, [step, wsInspectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep FAIE vision context current with the latest AI analysis detections.
   useEffect(() => {
@@ -2589,6 +2612,96 @@ export default function NewInspectionScreen() {
               >
                 AI findings reviewed
               </Text>
+            </View>
+          ) : null}
+
+          {/* Task #251 — Compliance violations surfaced BEFORE the inspection is
+              finalised so the technician can still correct them. Shown as soon
+              as we have a server ID and playbook data comes back. */}
+          {reviewViolationsLoading && wsInspectionId != null ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                padding: 12,
+                borderRadius: 10,
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                Checking playbook compliance…
+              </Text>
+            </View>
+          ) : reviewViolations.length > 0 ? (
+            <View
+              style={{
+                gap: 10,
+                borderWidth: 1,
+                borderColor: "rgba(234,179,8,0.5)",
+                borderRadius: 10,
+                padding: 14,
+                backgroundColor: "rgba(234,179,8,0.08)",
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="warning-outline" size={20} color="#ca8a04" />
+                <Text
+                  style={{
+                    color: "#ca8a04",
+                    fontFamily: "Inter_700Bold",
+                    fontSize: 14,
+                    flex: 1,
+                  }}
+                >
+                  Playbook {reviewViolations.length === 1 ? "Violation" : "Violations"} Detected
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: "rgba(234,179,8,0.2)",
+                    borderRadius: 999,
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                  }}
+                >
+                  <Text style={{ color: "#ca8a04", fontFamily: "Inter_700Bold", fontSize: 12 }}>
+                    {reviewViolations.length}
+                  </Text>
+                </View>
+              </View>
+              {reviewViolations.map((v, i) => (
+                <View
+                  key={i}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    paddingTop: i > 0 ? 8 : 0,
+                    borderTopWidth: i > 0 ? 1 : 0,
+                    borderTopColor: "rgba(234,179,8,0.2)",
+                  }}
+                >
+                  <Ionicons
+                    name={v.severity === "ERROR" ? "close-circle-outline" : "alert-circle-outline"}
+                    size={16}
+                    color={v.severity === "ERROR" ? "#ef4444" : "#ca8a04"}
+                    style={{ marginTop: 1 }}
+                  />
+                  <Text
+                    style={{
+                      color: colors.foreground,
+                      fontFamily: "Inter_400Regular",
+                      fontSize: 13,
+                      flex: 1,
+                    }}
+                  >
+                    {v.message}
+                  </Text>
+                </View>
+              ))}
             </View>
           ) : null}
 

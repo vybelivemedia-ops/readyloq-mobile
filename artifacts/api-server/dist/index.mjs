@@ -875,8 +875,8 @@ var require_depd = __commonJS({
       return deprecate;
     }
     function eehaslisteners(emitter, type) {
-      var count = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
-      return count > 0;
+      var count2 = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
+      return count2 > 0;
     }
     function isignored(namespace) {
       if (process.noDeprecation) {
@@ -18445,14 +18445,14 @@ var require_urlencoded = __commonJS({
       };
     }
     function parameterCount(body, limit3) {
-      let count = 0;
+      let count2 = 0;
       let index2 = -1;
       do {
-        count++;
-        if (count > limit3) return void 0;
+        count2++;
+        if (count2 > limit3) return void 0;
         index2 = body.indexOf("&", index2 + 1);
       } while (index2 !== -1);
-      return count;
+      return count2;
     }
   }
 });
@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router36;
+    module.exports = Router37;
     module.exports.Route = Route;
-    function Router36(options) {
-      if (!(this instanceof Router36)) {
-        return new Router36(options);
+    function Router37(options) {
+      if (!(this instanceof Router37)) {
+        return new Router37(options);
       }
       const opts = options || {};
-      function router36(req, res, next) {
-        router36.handle(req, res, next);
+      function router37(req, res, next) {
+        router37.handle(req, res, next);
       }
-      Object.setPrototypeOf(router36, this);
-      router36.caseSensitive = opts.caseSensitive;
-      router36.mergeParams = opts.mergeParams;
-      router36.params = {};
-      router36.strict = opts.strict;
-      router36.stack = [];
-      return router36;
+      Object.setPrototypeOf(router37, this);
+      router37.caseSensitive = opts.caseSensitive;
+      router37.mergeParams = opts.mergeParams;
+      router37.params = {};
+      router37.strict = opts.strict;
+      router37.stack = [];
+      return router37;
     }
-    Router36.prototype = function() {
+    Router37.prototype = function() {
     };
-    Router36.prototype.param = function param(name, fn) {
+    Router37.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router36.prototype.handle = function handle(req, res, callback) {
+    Router37.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router36.prototype.use = function use(handler) {
+    Router37.prototype.use = function use(handler) {
       let offset = 0;
       let path4 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router36.prototype.route = function route(path4) {
+    Router37.prototype.route = function route(path4) {
       const route2 = new Route(path4);
       const layer = new Layer(path4, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router36.prototype[method] = function(path4) {
+      Router37.prototype[method] = function(path4) {
         const route = this.route(path4);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router36 = require_router();
+    var Router37 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router36 = null;
+      var router37 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router36 === null) {
-            router36 = new Router36({
+          if (router37 === null) {
+            router37 = new Router37({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router36;
+          return router37;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router36 = this.router;
+      var router37 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router36.use(path4, fn2);
+          return router37.use(path4, fn2);
         }
         debug7(".use app under %s", path4);
         fn2.mountpath = path4;
         fn2.parent = this;
-        router36.use(path4, function mounted_app(req, res, next) {
+        router37.use(path4, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -21665,13 +21665,13 @@ var require_mediaType = __commonJS({
       return spec.q > 0;
     }
     function quoteCount(string4) {
-      var count = 0;
+      var count2 = 0;
       var index2 = 0;
       while ((index2 = string4.indexOf('"', index2)) !== -1) {
-        count++;
+        count2++;
         index2++;
       }
-      return count;
+      return count2;
     }
     function splitKeyValuePair(str4) {
       var index2 = str4.indexOf("=");
@@ -22976,8 +22976,8 @@ var require_send = __commonJS({
       }
     }
     function hasListeners(emitter, type) {
-      var count = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
-      return count > 0;
+      var count2 = typeof emitter.listenerCount !== "function" ? emitter.listeners(type).length : emitter.listenerCount(type);
+      return count2 > 0;
     }
     function normalizeList(val, name) {
       var list = [].concat(val || []);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter3 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router36 = require_router();
+    var Router37 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router36.Route;
-    exports.Router = Router36;
+    exports.Route = Router37.Route;
+    exports.Router = Router37;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -30860,7 +30860,7 @@ var require_to_regex_range = __commonJS({
       let zipped = zip(start, stop);
       let digits = zipped.length;
       let pattern = "";
-      let count = 0;
+      let count2 = 0;
       for (let i = 0; i < digits; i++) {
         let [startDigit, stopDigit] = zipped[i];
         if (startDigit === stopDigit) {
@@ -30868,13 +30868,13 @@ var require_to_regex_range = __commonJS({
         } else if (startDigit !== "0" || stopDigit !== "9") {
           pattern += toCharacterClass(startDigit, stopDigit, options);
         } else {
-          count++;
+          count2++;
         }
       }
-      if (count) {
+      if (count2) {
         pattern += options.shorthand === true ? "\\d" : "[0-9]";
       }
-      return { pattern, count: [count], digits };
+      return { pattern, count: [count2], digits };
     }
     function splitToPatterns(min, max, tok, options) {
       let ranges = splitToRanges(min, max);
@@ -32621,13 +32621,13 @@ var require_parse3 = __commonJS({
         consume(token.value);
       };
       const negate = () => {
-        let count = 1;
+        let count2 = 1;
         while (peek() === "!" && (peek(2) !== "(" || peek(3) === "?")) {
           advance();
           state.start++;
-          count++;
+          count2++;
         }
-        if (count % 2 === 0) {
+        if (count2 % 2 === 0) {
           return false;
         }
         state.negated = true;
@@ -34395,11 +34395,11 @@ var require_binaryParsers = __commonJS({
         var array2 = [];
         var i2;
         if (dimension.length > 1) {
-          var count = dimension.shift();
-          for (i2 = 0; i2 < count; i2++) {
+          var count2 = dimension.shift();
+          for (i2 = 0; i2 < count2; i2++) {
             array2[i2] = parse4(dimension, elementType2);
           }
-          dimension.unshift(count);
+          dimension.unshift(count2);
         } else {
           for (i2 = 0; i2 < dimension[0]; i2++) {
             array2[i2] = parseElement(elementType2);
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express37 = __toESM(require_express2(), 1);
+var import_express38 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router36 = config2.router;
-  if (isPlainObject(router36)) {
-    newTarget = getTargetFromProxyTable(req, router36);
-  } else if (typeof router36 === "function") {
-    newTarget = await router36(req, res, config2);
+  const router37 = config2.router;
+  if (isPlainObject(router37)) {
+    newTarget = getTargetFromProxyTable(req, router37);
+  } else if (typeof router37 === "function") {
+    newTarget = await router37(req, res, config2);
   }
   return newTarget;
 }
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express35 = __toESM(require_express2(), 1);
+var import_express36 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -53720,6 +53720,17 @@ function mapRelationalRow(tablesConfig, tableConfig, row, buildQueryResultSelect
     }
   }
   return result;
+}
+
+// ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/drizzle-orm/sql/functions/aggregate.js
+function count(expression) {
+  return sql`count(${expression || sql.raw("*")})`.mapWith(Number);
+}
+function avg(expression) {
+  return sql`avg(${expression})`.mapWith(String);
+}
+function sum(expression) {
+  return sql`sum(${expression})`.mapWith(String);
 }
 
 // ../../node_modules/.pnpm/drizzle-orm@0.45.2_@types+pg@8.20.0_pg@8.20.0/node_modules/drizzle-orm/pg-core/view-base.js
@@ -61177,8 +61188,8 @@ function az_default() {
 }
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/locales/be.js
-function getBelarusianPlural(count, one, few, many) {
-  const absCount = Math.abs(count);
+function getBelarusianPlural(count2, one, few, many) {
+  const absCount = Math.abs(count2);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
@@ -64323,8 +64334,8 @@ function pt_default() {
 }
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v4/locales/ru.js
-function getRussianPlural(count, one, few, many) {
-  const absCount = Math.abs(count);
+function getRussianPlural(count2, one, few, many) {
+  const absCount = Math.abs(count2);
   const lastDigit = absCount % 10;
   const lastTwoDigits = absCount % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
@@ -87982,7 +87993,7 @@ async function writePropertyMemory(input) {
     }
   }
   const historicalFindings = Array.from(findingFreq.values()).map(
-    ({ hf, count }) => ({ ...hf, frequency: count })
+    ({ hf, count: count2 }) => ({ ...hf, frequency: count2 })
   );
   const lastVisitedAt = matchedInspections.reduce((best, i) => {
     const ts = i.completedAt ? new Date(i.completedAt) : null;
@@ -89300,7 +89311,7 @@ function tallyLabels(values) {
     if (existing) existing.count += 1;
     else map2.set(key, { label: trimmed, count: 1 });
   }
-  const items = [...map2.entries()].map(([key, { label, count }]) => ({ key, label, count })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  const items = [...map2.entries()].map(([key, { label, count: count2 }]) => ({ key, label, count: count2 })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
   return { total, items };
 }
 function computeEvidenceSummary(findings, videoEvidence) {
@@ -89854,14 +89865,14 @@ router4.get("/summary", async (req, res) => {
     for (const f of allFindings) {
       categoryMap[f.category] = (categoryMap[f.category] ?? 0) + 1;
     }
-    const topFindings = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([category, count]) => ({ category, count }));
+    const topFindings = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([category, count2]) => ({ category, count: count2 }));
     const total = allFindings.length;
-    const findingsByCategory = Object.entries(categoryMap).map(([category, count]) => ({
+    const findingsByCategory = Object.entries(categoryMap).map(([category, count2]) => ({
       category,
-      count,
-      percentage: total > 0 ? Math.round(count / total * 100) : 0
+      count: count2,
+      percentage: total > 0 ? Math.round(count2 / total * 100) : 0
     }));
-    const avgConfidence = completed.length > 0 ? completed.reduce((sum, r) => sum + (r.overallConfidence ?? 0), 0) / completed.length : 0;
+    const avgConfidence = completed.length > 0 ? completed.reduce((sum2, r) => sum2 + (r.overallConfidence ?? 0), 0) / completed.length : 0;
     return res.json({
       totalAnalyses: completed.length,
       avgConfidence: Math.round(avgConfidence * 10) / 10,
@@ -90684,7 +90695,7 @@ router7.get("/dashboard", async (req, res) => {
         pestMap[p] = (pestMap[p] ?? 0) + 1;
       }
     }
-    const topPestTypes = Object.entries(pestMap).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([pestType, count]) => ({ pestType, count }));
+    const topPestTypes = Object.entries(pestMap).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([pestType, count2]) => ({ pestType, count: count2 }));
     const recentActivity = inspections.slice(0, 10).map((insp) => ({
       id: insp.id,
       type: insp.status === "completed" ? "inspection_completed" : "inspection_created",
@@ -90697,19 +90708,19 @@ router7.get("/dashboard", async (req, res) => {
     for (const i of inspections) {
       statusMap[i.status] = (statusMap[i.status] ?? 0) + 1;
     }
-    const inspectionsByStatus = Object.entries(statusMap).map(([status, count]) => ({
+    const inspectionsByStatus = Object.entries(statusMap).map(([status, count2]) => ({
       status,
-      count
+      count: count2
     }));
     const now = /* @__PURE__ */ new Date();
     const monthlyInspections = Array.from({ length: 6 }, (_2, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       const label = d.toLocaleDateString("en-US", { month: "short" });
-      const count = inspections.filter((insp) => {
+      const count2 = inspections.filter((insp) => {
         const cd = new Date(insp.createdAt);
         return cd.getFullYear() === d.getFullYear() && cd.getMonth() === d.getMonth();
       }).length;
-      return { date: d.toISOString().slice(0, 7), value: count, label };
+      return { date: d.toISOString().slice(0, 7), value: count2, label };
     });
     return res.json({
       totalInspections: total,
@@ -90916,10 +90927,10 @@ function computeHighRiskProperties(inspections, analyses) {
   }
   return result.sort((a, b) => b.riskScore - a.riskScore);
 }
-function monthBuckets(count) {
+function monthBuckets(count2) {
   const now = /* @__PURE__ */ new Date();
-  return Array.from({ length: count }, (_2, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (count - 1 - i), 1);
+  return Array.from({ length: count2 }, (_2, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (count2 - 1 - i), 1);
     return {
       key: d.toISOString().slice(0, 7),
       label: d.toLocaleDateString("en-US", { month: "short" }),
@@ -91026,13 +91037,13 @@ router8.get("/callbacks", async (req, res) => {
       if (!c.callbackCause) continue;
       causeMap[c.callbackCause] = (causeMap[c.callbackCause] ?? 0) + 1;
     }
-    const topCauses = Object.entries(causeMap).map(([cause, count]) => ({ cause, label: CAUSE_LABEL[cause] ?? cause, count })).sort((a, b) => b.count - a.count);
+    const topCauses = Object.entries(causeMap).map(([cause, count2]) => ({ cause, label: CAUSE_LABEL[cause] ?? cause, count: count2 })).sort((a, b) => b.count - a.count);
     const findingMap = {};
     for (const c of all) {
       const bucket = findingBucket(c.finding, c.pestType);
       findingMap[bucket] = (findingMap[bucket] ?? 0) + 1;
     }
-    const recurringFindings = Object.entries(findingMap).map(([finding, count]) => ({ finding, count })).filter((f) => f.count >= 2).sort((a, b) => b.count - a.count);
+    const recurringFindings = Object.entries(findingMap).map(([finding, count2]) => ({ finding, count: count2 })).filter((f) => f.count >= 2).sort((a, b) => b.count - a.count);
     const propMap = {};
     for (const c of all) {
       propMap[c.propertyType] ??= { total: 0, callbacks: 0 };
@@ -91066,7 +91077,7 @@ router8.get("/callbacks", async (req, res) => {
       if (!c.conduciveCondition) continue;
       condMap[c.conduciveCondition] = (condMap[c.conduciveCondition] ?? 0) + 1;
     }
-    const conduciveConditions = Object.entries(condMap).map(([condition, count]) => ({ condition, count })).sort((a, b) => b.count - a.count);
+    const conduciveConditions = Object.entries(condMap).map(([condition, count2]) => ({ condition, count: count2 })).sort((a, b) => b.count - a.count);
     const chains = [...all].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((c) => ({
       id: c.id,
       finding: c.finding,
@@ -91117,7 +91128,7 @@ router8.get("/property-risk", async (req, res) => {
     }
     const indicatorMap = {};
     for (const p of propertyConditions) for (const c of p.conditions) indicatorMap[c] = (indicatorMap[c] ?? 0) + 1;
-    const riskIndicators = Object.entries(indicatorMap).map(([condition, count]) => ({ condition, count })).sort((a, b) => b.count - a.count);
+    const riskIndicators = Object.entries(indicatorMap).map(([condition, count2]) => ({ condition, count: count2 })).sort((a, b) => b.count - a.count);
     const recurringConditions = riskIndicators.filter((r) => r.count >= 2);
     const highRiskProperties = computeHighRiskProperties(inspections, analyses);
     const buckets = monthBuckets(6);
@@ -91463,10 +91474,10 @@ router9.get("/analytics", async (req, res) => {
       for (const r of list) {
         if (r.category) counts[r.category] = (counts[r.category] ?? 0) + 1;
       }
-      return Object.entries(counts).map(([slug, count]) => ({
+      return Object.entries(counts).map(([slug, count2]) => ({
         slug,
         label: TAXONOMY_LABEL[slug] ?? slug,
-        count
+        count: count2
       })).sort((a, b) => b.count - a.count).slice(0, 6);
     };
     const byVerificationLevel = [1, 2, 3, 4, 5].map((level) => ({
@@ -92969,7 +92980,7 @@ router15.get("/trends", async (req, res) => {
         (propertyCounts.get(row.propertyAddress) ?? 0) + 1
       );
     }
-    const topProperties = Array.from(propertyCounts.entries()).map(([propertyAddress, count]) => ({ propertyAddress, count })).sort((a, b) => b.count - a.count).slice(0, 10);
+    const topProperties = Array.from(propertyCounts.entries()).map(([propertyAddress, count2]) => ({ propertyAddress, count: count2 })).sort((a, b) => b.count - a.count).slice(0, 10);
     return res.json({ total: rows.length, byCategory, byStatus, byTier, topProperties });
   } catch {
     return res.status(500).json({ error: "Failed to compute opportunity trends" });
@@ -93261,10 +93272,10 @@ router16.get("/summary", async (req, res) => {
         createdAt: analysisResultsTable.createdAt
       }).from(analysisResultsTable).where(eq(analysisResultsTable.companyId, companyId)).orderBy(desc(analysisResultsTable.createdAt)).limit(200)
     ]);
-    const count = scorecards.length;
-    const avg = (nums) => nums.length === 0 ? 0 : Math.round(nums.reduce((s2, n) => s2 + n, 0) / nums.length);
-    const avgQuality = avg(scorecards.map((s2) => s2.qualityScore));
-    const avgRisk = avg(scorecards.map((s2) => s2.riskScore));
+    const count2 = scorecards.length;
+    const avg2 = (nums) => nums.length === 0 ? 0 : Math.round(nums.reduce((s2, n) => s2 + n, 0) / nums.length);
+    const avgQuality = avg2(scorecards.map((s2) => s2.qualityScore));
+    const avgRisk = avg2(scorecards.map((s2) => s2.riskScore));
     const riskDistribution = {};
     const byTechnician = /* @__PURE__ */ new Map();
     const missedByService = {};
@@ -93307,7 +93318,7 @@ router16.get("/summary", async (req, res) => {
     }
     const topN = (counts, n) => Object.entries(counts).map(([label, occurrences]) => ({ label, occurrences })).sort((a, b) => b.occurrences - a.occurrences).slice(0, n);
     return res.json({
-      totalScorecards: count,
+      totalScorecards: count2,
       avgQuality,
       avgRisk,
       riskDistribution,
@@ -123758,19 +123769,107 @@ router33.delete("/:id", requireRole("owner"), async (req, res) => {
 });
 var playbooks_default = router33;
 
-// src/routes/index.ts
+// src/routes/executive.ts
+var import_express35 = __toESM(require_express2(), 1);
 var router34 = (0, import_express35.Router)();
-router34.use(health_default);
-router34.use("/auth", auth_default);
-router34.use(storage_default);
-router34.use("/leads", leads_default);
-router34.use("/share", share_default);
-router34.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router34.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router34.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router34.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router34.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router34.use(
+router34.get(
+  "/executive/intelligence",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+    try {
+      const OPEN_STATUSES4 = ["new", "reviewed", "quoted"];
+      const [pipelineRow] = await db.select({
+        openCount: count(opportunitiesTable.id),
+        pipelineValue: sum(opportunitiesTable.estimatedAnnualValue)
+      }).from(opportunitiesTable).where(
+        and(
+          eq(opportunitiesTable.companyId, companyId),
+          inArray(opportunitiesTable.status, [...OPEN_STATUSES4])
+        )
+      );
+      const [wonRow] = await db.select({ wonCount: count(opportunitiesTable.id) }).from(opportunitiesTable).where(
+        and(
+          eq(opportunitiesTable.companyId, companyId),
+          eq(opportunitiesTable.status, "won")
+        )
+      );
+      const [scoreRow] = await db.select({
+        totalScorecards: count(inspectionScorecardsTable.id),
+        avgQuality: avg(inspectionScorecardsTable.qualityScore),
+        criticalCount: sql`sum(case when ${inspectionScorecardsTable.riskLevel} = 'critical' then 1 else 0 end)`,
+        highCount: sql`sum(case when ${inspectionScorecardsTable.riskLevel} = 'high'     then 1 else 0 end)`,
+        mediumCount: sql`sum(case when ${inspectionScorecardsTable.riskLevel} = 'medium'   then 1 else 0 end)`,
+        lowCount: sql`sum(case when ${inspectionScorecardsTable.riskLevel} = 'low'      then 1 else 0 end)`
+      }).from(inspectionScorecardsTable).where(eq(inspectionScorecardsTable.companyId, companyId));
+      const techRows = await db.select({
+        technicianName: inspectionScorecardsTable.technicianName,
+        avgQuality: avg(inspectionScorecardsTable.qualityScore),
+        inspectionCount: count(inspectionScorecardsTable.id)
+      }).from(inspectionScorecardsTable).where(eq(inspectionScorecardsTable.companyId, companyId)).groupBy(inspectionScorecardsTable.technicianName).having(sql`count(*) >= 2`).orderBy(sql`avg(${inspectionScorecardsTable.qualityScore}) desc`).limit(5);
+      const now = /* @__PURE__ */ new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+      const [velocityRow] = await db.select({
+        thisMonth: sql`sum(case when ${inspectionsTable.createdAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
+        lastMonth: sql`sum(case when ${inspectionsTable.createdAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.createdAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`
+      }).from(inspectionsTable).where(
+        and(
+          eq(inspectionsTable.companyId, companyId),
+          eq(inspectionsTable.status, "completed")
+        )
+      );
+      return res.json({
+        success: true,
+        metrics: {
+          // Pipeline
+          pipelineValue: Number(pipelineRow?.pipelineValue ?? 0),
+          openOpportunities: Number(pipelineRow?.openCount ?? 0),
+          wonOpportunities: Number(wonRow?.wonCount ?? 0),
+          // Quality & risk
+          totalScorecards: Number(scoreRow?.totalScorecards ?? 0),
+          avgQualityScore: Math.round(Number(scoreRow?.avgQuality ?? 0)),
+          riskDistribution: {
+            critical: Number(scoreRow?.criticalCount ?? 0),
+            high: Number(scoreRow?.highCount ?? 0),
+            medium: Number(scoreRow?.mediumCount ?? 0),
+            low: Number(scoreRow?.lowCount ?? 0)
+          },
+          // Technician leaderboard
+          topTechnicians: techRows.map((r) => ({
+            name: r.technicianName || "Unknown",
+            avgQuality: Math.round(Number(r.avgQuality ?? 0)),
+            inspectionCount: Number(r.inspectionCount)
+          })),
+          // Velocity
+          inspectionsThisMonth: Number(velocityRow?.thisMonth ?? 0),
+          inspectionsLastMonth: Number(velocityRow?.lastMonth ?? 0)
+        }
+      });
+    } catch (error40) {
+      console.error("executive intelligence error:", error40);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+var executive_default = router34;
+
+// src/routes/index.ts
+var router35 = (0, import_express36.Router)();
+router35.use(health_default);
+router35.use("/auth", auth_default);
+router35.use(storage_default);
+router35.use("/leads", leads_default);
+router35.use("/share", share_default);
+router35.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router35.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router35.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router35.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router35.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router35.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -123778,17 +123877,17 @@ router34.use(
   requireRole("manager"),
   intelligence_default
 );
-router34.use(
+router35.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router34.use("/branding", branding_default);
-router34.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router34.use("/beta", requireAuth, requireCompany, beta_default);
-router34.use(
+router35.use("/branding", branding_default);
+router35.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router35.use("/beta", requireAuth, requireCompany, beta_default);
+router35.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -123796,7 +123895,7 @@ router34.use(
   requireRole("sales"),
   opportunities_default
 );
-router34.use(
+router35.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -123804,7 +123903,7 @@ router34.use(
   requireRole("manager"),
   scorecards_default
 );
-router34.use(
+router35.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -123812,8 +123911,8 @@ router34.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router34.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router34.use(
+router35.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router35.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -123821,23 +123920,23 @@ router34.use(
   requireRole("sales"),
   proposals_default
 );
-router34.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router34.use(
+router35.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router35.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-router34.use("/products", requireAuth, requireBetaAccess, products_default);
-router34.use(
+router35.use("/products", requireAuth, requireBetaAccess, products_default);
+router35.use(
   "/inspections/:inspectionId/treatment-logs",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   treatment_logs_default
 );
-router34.use(
+router35.use(
   "/crm",
   requireAuth,
   requireCompany,
@@ -123845,7 +123944,7 @@ router34.use(
   requireRole("manager"),
   crm_default
 );
-router34.use(
+router35.use(
   "/integrations",
   requireAuth,
   requireCompany,
@@ -123853,15 +123952,16 @@ router34.use(
   requireRole("manager"),
   integrations_default
 );
-router34.use(
+router35.use(
   "/playbooks",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   playbooks_default
 );
-router34.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
-router34.use(
+router35.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
+router35.use(executive_default);
+router35.use(
   "/review-queue",
   requireAuth,
   requireCompany,
@@ -123869,15 +123969,15 @@ router34.use(
   requireRole("manager"),
   review_queue_default
 );
-router34.use("/meta-glasses", meta_glasses_default);
-router34.use("/billing", billing_default);
-router34.use("/admin", admin_default);
-router34.use(requireAuth, transcribe_default);
-var routes_default = router34;
+router35.use("/meta-glasses", meta_glasses_default);
+router35.use("/billing", billing_default);
+router35.use("/admin", admin_default);
+router35.use(requireAuth, transcribe_default);
+var routes_default = router35;
 
 // src/routes/faie.ts
-var import_express36 = __toESM(require_express2(), 1);
-var router35 = (0, import_express36.Router)();
+var import_express37 = __toESM(require_express2(), 1);
+var router36 = (0, import_express37.Router)();
 var storage2 = new ObjectStorageService();
 var DatasetIngestBody = external_exports.object({
   companyId: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
@@ -123911,7 +124011,7 @@ function toCompanyId(raw) {
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
-router35.post("/dataset/ingest", async (req, res) => {
+router36.post("/dataset/ingest", async (req, res) => {
   const parsed = DatasetIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123937,7 +124037,7 @@ router35.post("/dataset/ingest", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-router35.post("/training/ingest-global", async (req, res) => {
+router36.post("/training/ingest-global", async (req, res) => {
   const parsed = GlobalIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123966,7 +124066,7 @@ router35.post("/training/ingest-global", async (req, res) => {
   }
 });
 var PLATFORM_COMPANY_ID = 0;
-router35.post("/training/ingest-anonymized", async (req, res) => {
+router36.post("/training/ingest-anonymized", async (req, res) => {
   const parsed = AnonymizedIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -123990,7 +124090,7 @@ router35.post("/training/ingest-anonymized", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-var faie_default = router35;
+var faie_default = router36;
 
 // src/lib/webhookHandlers.ts
 var WebhookHandlers = class _WebhookHandlers {
@@ -124111,7 +124211,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // src/app.ts
-var app = (0, import_express37.default)();
+var app = (0, import_express38.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -124164,7 +124264,7 @@ app.use(
 );
 app.post(
   "/api/stripe/webhook",
-  import_express37.default.raw({ type: "application/json" }),
+  import_express38.default.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -124184,9 +124284,9 @@ app.post(
     }
   }
 );
-app.use("/v1/faie", import_express37.default.json({ limit: "20mb" }), faie_default);
-app.use(import_express37.default.json());
-app.use(import_express37.default.urlencoded({ extended: true }));
+app.use("/v1/faie", import_express38.default.json({ limit: "20mb" }), faie_default);
+app.use(import_express38.default.json());
+app.use(import_express38.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(

@@ -320,6 +320,7 @@ function Gate() {
       <Stack.Screen name="admin" />
       <Stack.Screen name="billing" options={{ presentation: "modal" }} />
       <Stack.Screen name="dataset" />
+      <Stack.Screen name="executive-dashboard" />
     </Stack>
   );
 }

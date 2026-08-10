@@ -369,6 +369,38 @@ export function deletePlaybook(token: string | null, id: number) {
   });
 }
 
+// ─── Executive Intelligence Dashboard ────────────────────────────────────────
+
+export interface ExecutiveTechnician {
+  name: string;
+  avgQuality: number;
+  inspectionCount: number;
+}
+
+export interface ExecutiveMetrics {
+  pipelineValue: number;
+  openOpportunities: number;
+  wonOpportunities: number;
+  totalScorecards: number;
+  avgQualityScore: number;
+  riskDistribution: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  topTechnicians: ExecutiveTechnician[];
+  inspectionsThisMonth: number;
+  inspectionsLastMonth: number;
+}
+
+export function fetchExecutiveMetrics(token: string | null) {
+  return request<{ success: true; metrics: ExecutiveMetrics }>(
+    "/api/executive/intelligence",
+    token,
+  );
+}
+
 // ─── Bulk dataset ingestion ───────────────────────────────────────────────────
 
 export interface BulkIngestMetadata {

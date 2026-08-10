@@ -38,6 +38,7 @@ import adminRouter from "./admin";
 import transcribeRouter from "./transcribe";
 import integrationsRouter from "./integrations";
 import playbooksRouter from "./playbooks";
+import executiveRouter from "./executive";
 
 const router: IRouter = Router();
 
@@ -178,6 +179,7 @@ router.use(
 // Sub-routes:  POST/GET /technician/daily-rig
 //              GET      /technician/daily-rig/recent-mixes
 router.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, dailyRigRouter);
+router.use(executiveRouter);
 
 // Manager rapid-review queue — yesterday's completed inspections for 20-min callback validation.
 router.use(

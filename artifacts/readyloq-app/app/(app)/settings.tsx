@@ -797,6 +797,22 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* ── Executive Intelligence (owners only) ─────────────────────── */}
+        {isOwner && (
+          <View>
+            <SectionHeader label="Executive Intelligence" />
+            <Card style={{ overflow: "hidden", padding: 0 }}>
+              <SettingRow
+                icon="bar-chart-outline"
+                label="Intelligence Dashboard"
+                sublabel="Pipeline, quality scores, risk & team performance"
+                onPress={() => router.push("/executive-dashboard" as any)}
+                isLast
+              />
+            </Card>
+          </View>
+        )}
+
         {/* ── Company Playbooks (owners only) ──────────────────────────── */}
         {isOwner && (
           <View>
