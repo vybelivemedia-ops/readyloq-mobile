@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 /**
@@ -620,5 +620,238 @@ describe("executive email-preview endpoint: cross-company isolation", () => {
     expect(res.body.html).toContain("Exec Test Co B");
     // B has 0 open opportunities — $5K (A's open pipeline) must not appear.
     expect(res.body.html).not.toContain("$5K");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Daily briefing endpoint tests (Task #282)
+// ---------------------------------------------------------------------------
+
+describe("executive briefing endpoint: authentication & role guards", () => {
+  it("returns 401 when unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when called by a technician (not an owner)", async () => {
+    asUser(EXEC_TECH_A);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("executive briefing endpoint: cross-company isolation", () => {
+  /**
+   * Each describe-level beforeAll seeds inspections, scorecards, and
+   * opportunities dated to *yesterday* so the briefing service's date window
+   * picks them up.  Data is distinct enough that cross-tenant bleed is
+   * immediately visible:
+   *
+   *   Company A yesterday — 2 completed inspections, 1 critical scorecard,
+   *                         $7,500 new pipeline value
+   *   Company B yesterday — 1 completed inspection, 0 critical scorecards,
+   *                         $9,200 new pipeline value
+   */
+
+  let briefingInspA1Id: number;
+  let briefingInspA2Id: number;
+  let briefingInspBId: number;
+
+  beforeAll(async () => {
+    // Midday yesterday — safely inside the 00:00–23:59 window the service uses.
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(12, 0, 0, 0);
+
+    // ── Company A: 2 completed inspections yesterday ──────────────────────
+    briefingInspA1Id = await createInspectionViaApi(EXEC_OWNER_A, "Briefing A1 St");
+    briefingInspA2Id = await createInspectionViaApi(EXEC_OWNER_A, "Briefing A2 St");
+
+    await db
+      .update(inspectionsTable)
+      .set({ status: "completed", createdAt: yesterday })
+      .where(inArray(inspectionsTable.id, [briefingInspA1Id, briefingInspA2Id]));
+
+    // 1 critical scorecard for A (briefingInspA1Id).
+    await db.insert(inspectionScorecardsTable).values({
+      companyId:      execCompanyAId,
+      inspectionId:   briefingInspA1Id,
+      technicianName: "Alice",
+      qualityScore:   35,
+      riskScore:      95,
+      riskLevel:      "critical",
+      components: {
+        photoCoverage: 30,
+        evidenceQuality: 40,
+        avgConfidence:   50,
+        recommendationCoverage: 20,
+      },
+    });
+
+    // $7,500 new pipeline opportunity for A, created yesterday.
+    await db.insert(opportunitiesTable).values({
+      companyId:            execCompanyAId,
+      inspectionId:         briefingInspA1Id,
+      propertyAddress:      "Briefing A1 St",
+      category:             "pest_activity" as OpportunityCategory,
+      title:                "Briefing A roach find",
+      rationale:            "Active infestation",
+      fingerprint:          "briefing-a-opp-daily",
+      estimatedValueTier:   "high" as OpportunityValueTier,
+      estimatedAnnualValue: 7500,
+      confidence:           0.9,
+      status:               "new" as OpportunityStatus,
+      createdAt:            yesterday,
+    });
+
+    // ── Company B: 1 completed inspection yesterday ───────────────────────
+    briefingInspBId = await createInspectionViaApi(EXEC_OWNER_B, "Briefing B Blvd");
+
+    await db
+      .update(inspectionsTable)
+      .set({ status: "completed", createdAt: yesterday })
+      .where(eq(inspectionsTable.id, briefingInspBId));
+
+    // No critical scorecards for B yesterday — keep it at 0.
+
+    // $9,200 new pipeline for B, created yesterday.
+    await db.insert(opportunitiesTable).values({
+      companyId:            execCompanyBId,
+      inspectionId:         briefingInspBId,
+      propertyAddress:      "Briefing B Blvd",
+      category:             "pest_activity" as OpportunityCategory,
+      title:                "Briefing B termite find",
+      rationale:            "Active colony",
+      fingerprint:          "briefing-b-opp-daily",
+      estimatedValueTier:   "high" as OpportunityValueTier,
+      estimatedAnnualValue: 9200,
+      confidence:           0.85,
+      status:               "new" as OpportunityStatus,
+      createdAt:            yesterday,
+    });
+  });
+
+  afterAll(async () => {
+    // Remove briefing-specific fixtures in FK-safe order.
+    await db
+      .delete(inspectionScorecardsTable)
+      .where(
+        inArray(inspectionScorecardsTable.inspectionId, [
+          briefingInspA1Id,
+          briefingInspA2Id,
+          briefingInspBId,
+        ]),
+      );
+    await db
+      .delete(opportunitiesTable)
+      .where(
+        inArray(opportunitiesTable.inspectionId, [
+          briefingInspA1Id,
+          briefingInspA2Id,
+          briefingInspBId,
+        ]),
+      );
+    await db
+      .delete(inspectionsTable)
+      .where(
+        inArray(inspectionsTable.id, [
+          briefingInspA1Id,
+          briefingInspA2Id,
+          briefingInspBId,
+        ]),
+      );
+  });
+
+  // ── Response shape ────────────────────────────────────────────────────────
+
+  it("returns success with a briefing object for an owner", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    const b = res.body.briefing;
+    expect(typeof b.date).toBe("string");
+    expect(typeof b.summary).toBe("string");
+    expect(b.summary.length).toBeGreaterThan(0);
+    expect(typeof b.inspectionsCount).toBe("number");
+    expect(typeof b.criticalRiskCount).toBe("number");
+    expect(typeof b.pipelineAdded).toBe("number");
+  });
+
+  // ── Company A isolation ───────────────────────────────────────────────────
+
+  it("company A's briefing reflects only company A's completed-inspection count (2, not 3)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    // A completed 2 inspections yesterday; B completed 1.
+    // The count must be exactly 2 — adding B's 1 would give 3.
+    expect(res.body.briefing.inspectionsCount).toBe(2);
+  });
+
+  it("company A's briefing reflects only company A's critical-risk count (1, not 0)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    // A has 1 critical scorecard yesterday; B has 0.
+    expect(res.body.briefing.criticalRiskCount).toBe(1);
+  });
+
+  it("company A's briefing reflects only company A's new pipeline value ($7,500, not $9,200 or combined)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    // A added $7,500; B added $9,200.  Combined would be $16,700.
+    expect(res.body.briefing.pipelineAdded).toBe(7500);
+  });
+
+  it("company A's briefing summary does not mention company B's pipeline value", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    const summary: string = res.body.briefing.summary;
+    // B's value ($9,200) or the combined total ($16,700) must not appear.
+    expect(summary).not.toMatch(/9[,.]?200|16[,.]?700/);
+    // A's own value ($7,500) should be in the summary.
+    expect(summary).toMatch(/7[,.]?500/);
+  });
+
+  // ── Company B isolation ───────────────────────────────────────────────────
+
+  it("company B's briefing reflects only company B's completed-inspection count (1, not 2 or 3)", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    // B completed 1 inspection yesterday; A completed 2.
+    // Adding A's 2 would give 3, adding just 1 of A's gives 2 — both wrong.
+    expect(res.body.briefing.inspectionsCount).toBe(1);
+  });
+
+  it("company B's briefing critical-risk count is 0 (not 1 from company A)", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    // B has no critical scorecards yesterday; A has 1.
+    expect(res.body.briefing.criticalRiskCount).toBe(0);
+  });
+
+  it("company B's briefing reflects only company B's new pipeline value ($9,200, not $7,500 or combined)", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    // B added $9,200; A added $7,500.  Combined would be $16,700.
+    expect(res.body.briefing.pipelineAdded).toBe(9200);
+  });
+
+  it("company B's briefing summary does not mention company A's pipeline value", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    const summary: string = res.body.briefing.summary;
+    // A's value ($7,500) or the combined total ($16,700) must not appear.
+    expect(summary).not.toMatch(/7[,.]?500|16[,.]?700/);
+    // B's own value ($9,200) should be in the summary.
+    expect(summary).toMatch(/9[,.]?200/);
   });
 });
