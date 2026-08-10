@@ -878,6 +878,7 @@ export default function ExecutiveDashboardScreen() {
                     ? `${metrics.openOpportunities} open · ${metrics.wonOpportunities} won`
                     : undefined
                 }
+                onPress={() => router.push("/reports-detail?filter=pipeline" as never)}
               />
               <KpiCard
                 label="Avg Quality Score"
@@ -893,6 +894,7 @@ export default function ExecutiveDashboardScreen() {
                         : C.danger
                 }
                 sublabel={`${metrics?.totalScorecards ?? 0} scored inspections`}
+                onPress={() => router.push("/reports-detail?filter=critical" as never)}
               />
               <KpiCard
                 label="Critical Risk Sites"
@@ -904,11 +906,7 @@ export default function ExecutiveDashboardScreen() {
                     ? `${metrics.riskDistribution.high} high · ${metrics.riskDistribution.medium} medium`
                     : undefined
                 }
-                onPress={
-                  metrics && metrics.riskDistribution.critical > 0
-                    ? () => router.push({ pathname: "/executive-risk-inspections", params: { riskLevel: "critical" } } as never)
-                    : undefined
-                }
+                onPress={() => router.push("/reports-detail?filter=critical" as never)}
               />
               <KpiCard
                 label="This Month"
