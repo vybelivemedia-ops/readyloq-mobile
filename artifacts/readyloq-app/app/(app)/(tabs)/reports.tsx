@@ -377,10 +377,29 @@ export default function ReportsScreen() {
   const listPane = (
     <View style={{ flex: 1 }}>
       {/* Header */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 24 }}>
           Reports
         </Text>
+        <Pressable
+          onPress={() => router.push("/reports-detail" as Href)}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            paddingHorizontal: 12,
+            paddingVertical: 7,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: pressed ? colors.muted : (colors.card ?? colors.background),
+          })}
+        >
+          <Ionicons name="clipboard-outline" size={14} color={colors.mutedForeground} />
+          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+            Audit
+          </Text>
+        </Pressable>
       </View>
 
       {/* Search bar */}

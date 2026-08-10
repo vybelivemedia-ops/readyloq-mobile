@@ -496,6 +496,14 @@ export function MissionControlDashboard({
             <Ionicons name="trending-up-outline" size={16} color={MC.accent} />
             <Text style={[styles.actionBtnText, { color: MC.accent }]}>Pipeline</Text>
           </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/reports-detail?filter=pending" as Href)}
+            style={({ pressed }) => [styles.actionBtn, styles.actionBtnOutline, { opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Ionicons name="clipboard-outline" size={16} color={MC.accent} />
+            <Text style={[styles.actionBtnText, { color: MC.accent }]}>Report Audit</Text>
+          </Pressable>
         </View>
 
         {/* ── VYBE Agents ─────────────────────────────────────────────────── */}
@@ -767,8 +775,8 @@ const styles = StyleSheet.create({
   alertBadgeText: { fontFamily: "Inter_700Bold", fontSize: 11 },
 
   // Quick actions
-  actionsRow:       { flexDirection: "row", gap: 8 },
-  actionBtn:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 10 },
+  actionsRow:       { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  actionBtn:        { width: "47%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 10 },
   actionBtnPrimary: { backgroundColor: MC.accent },
   actionBtnOutline: { backgroundColor: MC.surface, borderWidth: 1, borderColor: MC.accent + "55" },
   actionBtnText:    { fontFamily: "Inter_600SemiBold", fontSize: 12 },
