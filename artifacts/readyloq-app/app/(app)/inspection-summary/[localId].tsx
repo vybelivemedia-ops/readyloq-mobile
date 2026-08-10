@@ -633,6 +633,40 @@ function DeliverySection({
   const [methods, setMethods] = useState<DeliveryMethod[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Cache the generated PDF URI so subsequent Print / Share / Email taps reuse
+  // the same file instead of re-rendering from scratch.
+  const [cachedPdfUri, setCachedPdfUri] = useState<string | null>(null);
+
+  // Invalidate the cache whenever the underlying data changes so stale PDFs
+  // are never delivered. We track a stable key derived from the fields that
+  // affect PDF content: photo count + descriptions + findings count + analysis.
+  const cacheKey = useMemo(
+    () =>
+      [
+        record.localId,
+        record.photos.length,
+        record.photos.map((p) => p.description ?? "").join("|"),
+        findings.length,
+        analysisComplete ? "complete" : "pending",
+      ].join("::"),
+    [record.localId, record.photos, findings.length, analysisComplete],
+  );
+  const prevCacheKeyRef = React.useRef(cacheKey);
+  useEffect(() => {
+    if (prevCacheKeyRef.current !== cacheKey) {
+      prevCacheKeyRef.current = cacheKey;
+      setCachedPdfUri(null);
+    }
+  }, [cacheKey]);
+
+  // Also clear on unmount so a stale URI is never picked up if the component
+  // is remounted with different data.
+  useEffect(() => {
+    return () => {
+      setCachedPdfUri(null);
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     void getAvailableDeliveryMethods().then((m) => {
@@ -663,14 +697,20 @@ function DeliverySection({
   });
 
   const buildDeliveryContext = async () => {
-    const pdfUri = await generateReportPdf({
-      record,
-      findings,
-      recommendations,
-      riskLevel,
-      analysisComplete,
-      companyName,
-    });
+    // Reuse the cached URI when available — avoids a second render + copy for
+    // every Print / Share / Email tap after the technician has already previewed.
+    const pdfUri = cachedPdfUri ?? await (async () => {
+      const uri = await generateReportPdf({
+        record,
+        findings,
+        recommendations,
+        riskLevel,
+        analysisComplete,
+        companyName,
+      });
+      setCachedPdfUri(uri);
+      return uri;
+    })();
     return { pdfUri, ...buildSoftContext() };
   };
 
