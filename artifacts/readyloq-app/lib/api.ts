@@ -413,6 +413,19 @@ export interface ExecutiveRiskInspection {
   scoredAt: string;
 }
 
+export interface ExecutiveQualityWeek {
+  weekStart: string;
+  label: string;
+  avgQuality: number;
+}
+
+export function fetchExecutiveQualityTrend(token: string | null) {
+  return request<{ success: true; weeks: ExecutiveQualityWeek[] }>(
+    "/api/executive/quality-trend",
+    token,
+  );
+}
+
 export function fetchExecutiveInspections(
   token: string | null,
   riskLevel: ExecutiveRiskLevel,

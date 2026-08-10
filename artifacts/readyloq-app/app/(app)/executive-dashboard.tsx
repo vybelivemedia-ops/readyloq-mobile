@@ -18,10 +18,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@clerk/expo";
+import Svg, { Rect, Line, Text as SvgText } from "react-native-svg";
 import {
   fetchExecutiveMetrics,
+  fetchExecutiveQualityTrend,
   type ExecutiveMetrics,
   type ExecutiveTechnician,
+  type ExecutiveQualityWeek,
 } from "@/lib/api";
 
 // ─── Palette (dark command-centre tone) ───────────────────────────────────────
@@ -385,6 +388,129 @@ function VelocityTrend({
   );
 }
 
+// ─── Quality Trend Chart ──────────────────────────────────────────────────────
+
+function QualityTrendChart({ weeks }: { weeks: ExecutiveQualityWeek[] }) {
+  const CHART_W = 320;
+  const CHART_H = 100;
+  const BAR_GAP = 12;
+  const n = weeks.length;
+  const barW = (CHART_W - BAR_GAP * (n + 1)) / n;
+  const maxScore = 100;
+  const LABEL_H = 20;
+  const BAR_AREA_H = CHART_H - LABEL_H;
+
+  const allZero = weeks.every((w) => w.avgQuality === 0);
+
+  if (allZero) {
+    return (
+      <View
+        style={{
+          backgroundColor: C.surface,
+          borderWidth: 1,
+          borderColor: C.border,
+          borderRadius: 14,
+          padding: 20,
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        <Ionicons name="bar-chart-outline" size={28} color={C.muted} />
+        <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" }}>
+          No scored inspections in the past 4 weeks.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        backgroundColor: C.surface,
+        borderWidth: 1,
+        borderColor: C.border,
+        borderRadius: 14,
+        padding: 16,
+        gap: 8,
+      }}
+    >
+      {/* Legend row */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: C.primary }} />
+        <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+          Avg quality score — weekly
+        </Text>
+      </View>
+
+      {/* SVG chart */}
+      <View style={{ alignItems: "center" }}>
+        <Svg width={CHART_W} height={CHART_H}>
+          {/* Baseline */}
+          <Line
+            x1={0}
+            y1={BAR_AREA_H}
+            x2={CHART_W}
+            y2={BAR_AREA_H}
+            stroke={C.border}
+            strokeWidth={1}
+          />
+          {weeks.map((w, i) => {
+            const x = BAR_GAP + i * (barW + BAR_GAP);
+            const barH = w.avgQuality === 0 ? 0 : Math.max(4, (w.avgQuality / maxScore) * (BAR_AREA_H - 4));
+            const y = BAR_AREA_H - barH;
+            const barColor =
+              w.avgQuality === 0
+                ? C.border
+                : w.avgQuality >= 80
+                  ? C.success
+                  : w.avgQuality >= 60
+                    ? C.warning
+                    : C.danger;
+
+            return (
+              <React.Fragment key={w.weekStart}>
+                {/* Bar */}
+                <Rect
+                  x={x}
+                  y={y}
+                  width={barW}
+                  height={barH}
+                  rx={4}
+                  fill={barColor}
+                  opacity={0.85}
+                />
+                {/* Score label above bar */}
+                {w.avgQuality > 0 && (
+                  <SvgText
+                    x={x + barW / 2}
+                    y={y - 4}
+                    textAnchor="middle"
+                    fill={barColor}
+                    fontSize={10}
+                    fontWeight="bold"
+                  >
+                    {w.avgQuality}
+                  </SvgText>
+                )}
+                {/* Week label below baseline */}
+                <SvgText
+                  x={x + barW / 2}
+                  y={CHART_H - 4}
+                  textAnchor="middle"
+                  fill={C.muted}
+                  fontSize={9}
+                >
+                  {w.label}
+                </SvgText>
+              </React.Fragment>
+            );
+          })}
+        </Svg>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function ExecutiveDashboardScreen() {
@@ -393,6 +519,7 @@ export default function ExecutiveDashboardScreen() {
   const insets = useSafeAreaInsets();
 
   const [metrics, setMetrics] = useState<ExecutiveMetrics | null>(null);
+  const [qualityWeeks, setQualityWeeks] = useState<ExecutiveQualityWeek[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -403,8 +530,12 @@ export default function ExecutiveDashboardScreen() {
     setError(null);
     try {
       const token = await getToken();
-      const res = await fetchExecutiveMetrics(token);
-      setMetrics(res.metrics);
+      const [metricsRes, trendRes] = await Promise.all([
+        fetchExecutiveMetrics(token),
+        fetchExecutiveQualityTrend(token),
+      ]);
+      setMetrics(metricsRes.metrics);
+      setQualityWeeks(trendRes.weeks);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load metrics");
     } finally {
@@ -603,6 +734,27 @@ export default function ExecutiveDashboardScreen() {
               thisMonth={metrics?.inspectionsThisMonth ?? 0}
               lastMonth={metrics?.inspectionsLastMonth ?? 0}
             />
+          </View>
+
+          {/* ── Quality Trend ─────────────────────────────────────────── */}
+          <View style={{ gap: 8 }}>
+            <SectionTitle title="Quality Score — 4-Week Trend" />
+            {qualityWeeks ? (
+              <QualityTrendChart weeks={qualityWeeks} />
+            ) : (
+              <View
+                style={{
+                  backgroundColor: C.surface,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  borderRadius: 14,
+                  padding: 20,
+                  alignItems: "center",
+                }}
+              >
+                <ActivityIndicator size="small" color={C.primary} />
+              </View>
+            )}
           </View>
 
           {/* ── Risk Distribution ─────────────────────────────────────── */}

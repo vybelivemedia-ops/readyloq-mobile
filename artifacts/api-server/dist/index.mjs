@@ -123940,6 +123940,57 @@ router34.get(
     }
   }
 );
+router34.get(
+  "/executive/quality-trend",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+    try {
+      const rows = await db.select({
+        weekStart: sql`date_trunc('week', ${inspectionScorecardsTable.createdAt})::date`,
+        avgQuality: avg(inspectionScorecardsTable.qualityScore),
+        count: count(inspectionScorecardsTable.id)
+      }).from(inspectionScorecardsTable).where(
+        and(
+          eq(inspectionScorecardsTable.companyId, companyId),
+          sql`${inspectionScorecardsTable.createdAt} >= now() - interval '28 days'`
+        )
+      ).groupBy(sql`date_trunc('week', ${inspectionScorecardsTable.createdAt})::date`).orderBy(sql`date_trunc('week', ${inspectionScorecardsTable.createdAt})::date`);
+      const byWeek = /* @__PURE__ */ new Map();
+      for (const row of rows) {
+        byWeek.set(row.weekStart, Math.round(Number(row.avgQuality ?? 0)));
+      }
+      const now = /* @__PURE__ */ new Date();
+      const dayOfWeek = now.getUTCDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const thisMonday = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysToMonday)
+      );
+      const weeks = [];
+      for (let i = 3; i >= 0; i--) {
+        const monday = new Date(thisMonday.getTime() - i * 7 * 24 * 60 * 60 * 1e3);
+        const isoDate = monday.toISOString().slice(0, 10);
+        const label = monday.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC"
+        });
+        weeks.push({
+          weekStart: isoDate,
+          label,
+          avgQuality: byWeek.get(isoDate) ?? 0
+        });
+      }
+      return res.json({ success: true, weeks });
+    } catch (error40) {
+      console.error("executive quality-trend error:", error40);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
 var executive_default = router34;
 
 // src/routes/index.ts

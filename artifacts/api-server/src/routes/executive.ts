@@ -199,4 +199,77 @@ router.get(
   },
 );
 
+/**
+ * GET /executive/quality-trend
+ *
+ * Returns weekly average quality scores for the past 4 ISO weeks (last 28 days).
+ * Weeks with no scored inspections are returned as 0.
+ * Scoped to req.companyId — no cross-tenant leakage.
+ */
+router.get(
+  "/executive/quality-trend",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+
+    try {
+      // Fetch per-week averages for the last 28 days.
+      const rows = await db
+        .select({
+          weekStart: sql<string>`date_trunc('week', ${inspectionScorecardsTable.createdAt})::date`,
+          avgQuality: avg(inspectionScorecardsTable.qualityScore),
+          count: count(inspectionScorecardsTable.id),
+        })
+        .from(inspectionScorecardsTable)
+        .where(
+          and(
+            eq(inspectionScorecardsTable.companyId, companyId),
+            sql`${inspectionScorecardsTable.createdAt} >= now() - interval '28 days'`,
+          ),
+        )
+        .groupBy(sql`date_trunc('week', ${inspectionScorecardsTable.createdAt})::date`)
+        .orderBy(sql`date_trunc('week', ${inspectionScorecardsTable.createdAt})::date`);
+
+      // Build a map keyed by ISO-date string (YYYY-MM-DD Monday of each week).
+      const byWeek = new Map<string, number>();
+      for (const row of rows) {
+        byWeek.set(row.weekStart, Math.round(Number(row.avgQuality ?? 0)));
+      }
+
+      // Generate the 4 Monday-anchored week keys covering the past 28 days.
+      const now = new Date();
+      // Find the Monday of the current ISO week.
+      const dayOfWeek = now.getUTCDay(); // 0=Sun,1=Mon,...,6=Sat
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const thisMonday = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysToMonday),
+      );
+
+      const weeks: Array<{ weekStart: string; label: string; avgQuality: number }> = [];
+      for (let i = 3; i >= 0; i--) {
+        const monday = new Date(thisMonday.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+        const isoDate = monday.toISOString().slice(0, 10); // YYYY-MM-DD
+        const label = monday.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        });
+        weeks.push({
+          weekStart: isoDate,
+          label,
+          avgQuality: byWeek.get(isoDate) ?? 0,
+        });
+      }
+
+      return res.json({ success: true, weeks });
+    } catch (error) {
+      console.error("executive quality-trend error:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
 export default router;
