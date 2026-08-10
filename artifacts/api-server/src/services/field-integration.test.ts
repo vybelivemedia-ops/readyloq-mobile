@@ -78,25 +78,92 @@ describe("syncToPestPac", () => {
   });
 
   it("throws when the note POST fails (401 invalid API key) and makes no attachment calls", async () => {
+    vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(makeErrorResponse(401, "Unauthorized"));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
+    const assertion = expect(
       syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" }),
     ).rejects.toThrow("PestPac note POST failed (401)");
+    await vi.runAllTimersAsync();
+    await assertion;
 
-    // Only the note call was made — no attachments attempted
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toContain("/notes");
+    vi.useRealTimers();
+
+    // All 3 retry attempts were made for the note — no attachments were attempted
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [url] of fetchMock.mock.calls) {
+      expect(url).toContain("/notes");
+    }
   });
 
   it("throws when the note POST fails (500 server error) and surfaces status in message", async () => {
+    vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(makeErrorResponse(500, "Internal Server Error"));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
+    const assertion = expect(
       syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" }),
     ).rejects.toThrow("PestPac note POST failed (500)");
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    vi.useRealTimers();
+
+    // All 3 retry attempts were exhausted before throwing
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries the note POST on a transient failure and succeeds when the second attempt succeeds", async () => {
+    vi.useFakeTimers();
+    let callCount = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      // Call 1: note POST attempt 1 — transient 503
+      if (callCount === 1) return makeErrorResponse(503, "Service Unavailable");
+      // Call 2: note POST attempt 2 (retry) — succeeds
+      if (callCount === 2) return makeOkResponse();
+      // Calls 3+: attachment POSTs — all succeed
+      return makeOkResponse();
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" });
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    vi.useRealTimers();
+
+    expect(result.success).toBe(true);
+    expect(result.postedNotes).toBe(true);
+    // All 3 attachments should have posted successfully
+    expect(result.attachmentsPosted).toBe(3);
+    // 2 note attempts + 3 attachment calls = 5 total
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    // First two calls must be to the notes endpoint
+    expect(fetchMock.mock.calls[0][0]).toContain("/notes");
+    expect(fetchMock.mock.calls[1][0]).toContain("/notes");
+  });
+
+  it("throws and makes no attachment calls when the note POST exhausts all retry attempts", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(makeErrorResponse(503, "Service Unavailable"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const assertion = expect(
+      syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" }),
+    ).rejects.toThrow("PestPac note POST failed (503)");
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    vi.useRealTimers();
+
+    // Exactly 3 note attempts — no attachment calls made
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [url] of fetchMock.mock.calls) {
+      expect(url).toContain("/notes");
+      expect(url).not.toContain("/attachments");
+    }
   });
 
   it("continues uploading remaining photos when one attachment exhausts all retries (partial success)", async () => {

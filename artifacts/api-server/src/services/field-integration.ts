@@ -100,15 +100,19 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
   };
   const customerId = payload.accountId;
 
-  // 1 — Post AI narrative as a service note
-  const noteRes = await fetch(`${base}/customers/${customerId}/notes`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      note: `[ReadyLoq AI Report] ${payload.reportSummary}`,
-      date: payload.inspectionDate,
-    }),
-  });
+  // 1 — Post AI narrative as a service note (up to 3 attempts with exponential back-off)
+  const noteRes = await withRetry(
+    () =>
+      fetch(`${base}/customers/${customerId}/notes`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          note: `[ReadyLoq AI Report] ${payload.reportSummary}`,
+          date: payload.inspectionDate,
+        }),
+      }),
+    (res) => !res.ok,
+  );
   if (!noteRes.ok) {
     const body = await noteRes.text();
     throw new Error(`PestPac note POST failed (${noteRes.status}): ${body}`);
