@@ -38,11 +38,19 @@ function serializeReport(
   row: typeof reportsTable.$inferSelect,
   pipelineValue?: number | null,
 ) {
+  // Always pass findings through safeParseFindings so that:
+  //   - null DB values (legacy rows) become []
+  //   - malformed entries (missing category / description) are dropped
+  // This makes GET behaviour consistent with the POST write path.
   return {
     ...row,
-    findings: row.findings ?? [],
-    recommendations: row.recommendations ?? [],
-    exclusionOpportunities: row.exclusionOpportunities ?? [],
+    findings: safeParseFindings(row.findings),
+    recommendations: Array.isArray(row.recommendations)
+      ? (row.recommendations as unknown[]).filter((r): r is string => typeof r === "string")
+      : [],
+    exclusionOpportunities: Array.isArray(row.exclusionOpportunities)
+      ? (row.exclusionOpportunities as unknown[]).filter((r): r is string => typeof r === "string")
+      : [],
     createdAt: row.createdAt.toISOString(),
     ...(pipelineValue != null ? { pipelineValue } : {}),
   };

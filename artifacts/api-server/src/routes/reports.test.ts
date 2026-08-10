@@ -1,0 +1,286 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import request from "supertest";
+
+/**
+ * Reports route smoke tests — empty-findings safety.
+ *
+ * Verifies that:
+ *   1. GET /reports always returns findings/recommendations/exclusionOpportunities
+ *      as arrays (never null/undefined), even for legacy rows that have these
+ *      columns stored as null in the DB.
+ *   2. GET /reports/:id returns the same guarantees for a single report.
+ *   3. A report whose DB row stores malformed findings (missing required fields)
+ *      is served with findings: [] rather than crashing or leaking bad data.
+ *   4. POST /reports with includeAiFindings=false produces an empty-findings
+ *      report that serialises correctly.
+ *   5. Unauthenticated requests are rejected with 401.
+ */
+
+const { authState } = vi.hoisted(() => ({
+  authState: { userId: null as string | null },
+}));
+
+vi.mock("@clerk/express", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@clerk/express")>();
+  return {
+    ...actual,
+    getAuth: () => authState,
+    clerkMiddleware: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  };
+});
+
+// Stub the AI narrative so POST /reports/:id/generate-narrative doesn't hit a
+// real model. The narrative tests here don't exercise generation, only shape.
+vi.mock("../lib/report-narrative-ai", () => ({
+  generateReportNarrative: vi.fn(async () => "Stub narrative for testing."),
+  derivePropertyType: vi.fn(() => "residential"),
+}));
+
+// Stub object storage so HTML route doesn't need GCS.
+vi.mock("../lib/objectStorage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/objectStorage")>();
+  class ObjectStorageService {
+    async getObjectEntityUploadURL(companyId: number) {
+      return `https://signed.example.com/companies/${companyId}/uploads/obj`;
+    }
+    normalizeObjectEntityPath(url: string) { return url; }
+    async getObjectEntityFile(_path: string) { return {} as never; }
+    async downloadObject() {
+      return new Response("file-bytes", { headers: { "Content-Type": "application/octet-stream" } });
+    }
+  }
+  return { ...actual, ObjectStorageService };
+});
+
+import app from "../app";
+import {
+  db,
+  usersTable,
+  companiesTable,
+  inspectionsTable,
+  reportsTable,
+} from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+
+// ─── Stable Clerk IDs (prefixed to avoid cross-suite collisions) ──────────────
+
+const OWNER_ID  = "rpt_smoke_owner_clerk_id";
+const TECH_ID   = "rpt_smoke_tech_clerk_id";
+const OWNER_B_ID = "rpt_smoke_owner_b_clerk_id";
+
+let companyId: number;
+let companyBId: number;
+let inspectionId: number;
+
+function asUser(id: string | null) {
+  authState.userId = id;
+}
+
+async function findOrCreateCompany(name: string, slug: string): Promise<number> {
+  const [existing] = await db
+    .select()
+    .from(companiesTable)
+    .where(eq(companiesTable.slug, slug));
+  if (existing) return existing.id;
+  const [row] = await db.insert(companiesTable).values({ name, slug }).returning();
+  return row.id;
+}
+
+beforeAll(async () => {
+  companyId  = await findOrCreateCompany("Reports Smoke Co A", "rpt-smoke-co-a");
+  companyBId = await findOrCreateCompany("Reports Smoke Co B", "rpt-smoke-co-b");
+
+  // Clean up any rows left by a previous run of this suite
+  await db.delete(reportsTable).where(eq(reportsTable.companyId, companyId));
+  await db.delete(reportsTable).where(eq(reportsTable.companyId, companyBId));
+  await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyId));
+  await db.delete(usersTable).where(eq(usersTable.clerkUserId, OWNER_ID));
+  await db.delete(usersTable).where(eq(usersTable.clerkUserId, TECH_ID));
+  await db.delete(usersTable).where(eq(usersTable.clerkUserId, OWNER_B_ID));
+
+  await db.insert(usersTable).values([
+    { clerkUserId: OWNER_ID,   role: "owner",      companyId },
+    { clerkUserId: TECH_ID,    role: "technician",  companyId },
+    { clerkUserId: OWNER_B_ID, role: "owner",       companyId: companyBId },
+  ]);
+
+  // A real inspection to anchor reports created via the API
+  asUser(TECH_ID);
+  const res = await request(app)
+    .post("/api/inspections")
+    .send({ siteAddress: "42 Empty St", technicianName: "Smoky", clientName: "Client A", pestTypes: ["ants"] });
+  asUser(null);
+  if (res.status !== 201) throw new Error(`Seed inspection failed: ${JSON.stringify(res.body)}`);
+  inspectionId = res.body.id;
+});
+
+beforeEach(() => {
+  asUser(null);
+});
+
+// ─── Auth guard ───────────────────────────────────────────────────────────────
+
+describe("auth guard", () => {
+  it("rejects unauthenticated GET /reports with 401", async () => {
+    const res = await request(app).get("/api/reports");
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects unauthenticated GET /reports/:id with 401", async () => {
+    const res = await request(app).get("/api/reports/9999999");
+    expect(res.status).toBe(401);
+  });
+});
+
+// ─── Empty-findings safety ────────────────────────────────────────────────────
+
+describe("empty-findings shape guarantee", () => {
+  it("POST /reports with includeAiFindings=false returns correct empty arrays", async () => {
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/reports")
+      .send({ inspectionId, title: "No-AI report", includeAiFindings: false });
+
+    expect(res.status).toBe(201);
+    expect(Array.isArray(res.body.findings)).toBe(true);
+    expect(res.body.findings).toHaveLength(0);
+    expect(Array.isArray(res.body.recommendations)).toBe(true);
+    expect(res.body.recommendations).toHaveLength(0);
+    expect(Array.isArray(res.body.exclusionOpportunities)).toBe(true);
+    expect(res.body.exclusionOpportunities).toHaveLength(0);
+    // createdAt must be an ISO string, not null/undefined
+    expect(typeof res.body.createdAt).toBe("string");
+  });
+
+  it("GET /reports always returns arrays (never null/undefined)", async () => {
+    // Seed a legacy row directly into the DB with null findings columns —
+    // simulating a report created before the type-safety fix.
+    // Use raw SQL to bypass Drizzle's type-level coercion and actually store NULLs.
+    await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'Legacy null-findings report',
+              '42 Empty St', 'complete', NULL, NULL, NULL, 'Smoky', CURRENT_DATE)
+    `);
+
+    asUser(OWNER_ID);
+    const res = await request(app).get("/api/reports");
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThan(0);
+
+    for (const report of res.body) {
+      expect(Array.isArray(report.findings),              `findings not array on report ${report.id}`).toBe(true);
+      expect(Array.isArray(report.recommendations),       `recommendations not array on report ${report.id}`).toBe(true);
+      expect(Array.isArray(report.exclusionOpportunities),`exclusionOpportunities not array on report ${report.id}`).toBe(true);
+      expect(report.findings).not.toBeNull();
+      expect(report.recommendations).not.toBeNull();
+      expect(report.exclusionOpportunities).not.toBeNull();
+    }
+  });
+
+  it("GET /reports/:id returns arrays for a legacy null-findings row", async () => {
+    // Insert another legacy row and fetch it by ID.
+    // Use raw SQL to actually store NULLs in the jsonb columns.
+    const result = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'Legacy single null-findings report',
+              '42 Empty St', 'complete', NULL, NULL, NULL, 'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const legacy = { id: (result.rows[0] as { id: number }).id };
+
+    asUser(OWNER_ID);
+    const res = await request(app).get(`/api/reports/${legacy.id}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.findings)).toBe(true);
+    expect(res.body.findings).toHaveLength(0);
+    expect(Array.isArray(res.body.recommendations)).toBe(true);
+    expect(res.body.recommendations).toHaveLength(0);
+    expect(Array.isArray(res.body.exclusionOpportunities)).toBe(true);
+    expect(res.body.exclusionOpportunities).toHaveLength(0);
+  });
+
+  it("GET /reports/:id drops malformed findings (missing category or description)", async () => {
+    // Simulate a row with a mix of well-formed and malformed findings stored as
+    // raw JSON — as might exist from a pre-fix analysis pipeline.
+    const malformedFindings = [
+      // Well-formed: should survive
+      { category: "pest", description: "Live cockroach observed", severity: "high" },
+      // Missing description: should be dropped
+      { category: "structural" },
+      // Missing category: should be dropped
+      { description: "Water damage noted" },
+      // Null entry: should be dropped
+      null,
+      // Empty object: should be dropped
+      {},
+    ];
+
+    // Use raw SQL to insert the malformed JSONB exactly as-is, bypassing Drizzle's
+    // type coercion, which would normally prevent storing structurally invalid entries.
+    const malformedJson = JSON.stringify(malformedFindings);
+    const result = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'Malformed findings report',
+              '42 Empty St', 'complete',
+              ${malformedJson}::jsonb, NULL, NULL,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const row = { id: (result.rows[0] as { id: number }).id };
+
+    asUser(OWNER_ID);
+    const res = await request(app).get(`/api/reports/${row.id}`);
+
+    expect(res.status).toBe(200);
+    // Only the one well-formed finding should remain
+    expect(Array.isArray(res.body.findings)).toBe(true);
+    expect(res.body.findings).toHaveLength(1);
+    expect(res.body.findings[0].category).toBe("pest");
+    expect(res.body.findings[0].description).toBe("Live cockroach observed");
+    // recommendations and exclusionOpportunities must still be arrays
+    expect(Array.isArray(res.body.recommendations)).toBe(true);
+    expect(Array.isArray(res.body.exclusionOpportunities)).toBe(true);
+  });
+});
+
+// ─── Tenant isolation (reports are company-scoped) ────────────────────────────
+
+describe("tenant isolation", () => {
+  it("owner from company B cannot see company A's reports via list", async () => {
+    // Ensure company A has at least one report
+    asUser(OWNER_ID);
+    await request(app)
+      .post("/api/reports")
+      .send({ inspectionId, title: "A-only report", includeAiFindings: false });
+
+    asUser(OWNER_B_ID);
+    const res = await request(app).get("/api/reports");
+    expect(res.status).toBe(200);
+    // Company B sees an empty list — no company A reports leaked
+    for (const r of res.body) {
+      expect(r.companyId).not.toBe(companyId);
+    }
+  });
+
+  it("owner from company B gets 404 fetching company A's report by ID", async () => {
+    asUser(OWNER_ID);
+    const create = await request(app)
+      .post("/api/reports")
+      .send({ inspectionId, title: "Private report", includeAiFindings: false });
+    expect(create.status).toBe(201);
+    const reportId = create.body.id;
+
+    asUser(OWNER_B_ID);
+    const res = await request(app).get(`/api/reports/${reportId}`);
+    expect(res.status).toBe(404);
+  });
+});
