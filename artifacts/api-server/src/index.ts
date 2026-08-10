@@ -5,6 +5,7 @@ import { ensureProductsSeed } from "@workspace/db";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./lib/stripeClient";
 import { backfillOpportunityValues } from "./lib/backfill-opportunity-values";
+import { backfillPropertyMemory } from "./lib/backfill-property-memory";
 
 const rawPort = process.env["PORT"];
 
@@ -62,6 +63,13 @@ app.listen(port, (err) => {
   // before the tier-fallback fix. Idempotent — only updates NULL rows.
   void backfillOpportunityValues().catch((err) => {
     logger.warn({ err }, "Opportunity value backfill failed — pipeline totals may be incomplete");
+  });
+
+  // Backfill property_memory rows for completed inspections that predate the
+  // automatic memory-write pipeline.  Idempotent — skips addresses that
+  // already have a memory row.
+  void backfillPropertyMemory().catch((err) => {
+    logger.warn({ err }, "Property memory backfill failed — Prior Visit banner may be empty for legacy inspections");
   });
 
   // Idempotent product catalogue seed — inserts any missing seed products on

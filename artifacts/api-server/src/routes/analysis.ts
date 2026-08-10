@@ -667,6 +667,7 @@ router.post("/analyze", async (req, res) => {
         recommendations,
         photosAnalyzed: analyzedImagePaths.length,
       });
+
     }
 
     // Inspection Memory: compare this run against prior visits at the same

@@ -14,6 +14,7 @@ import { runOpportunitySynthesis } from "./opportunity-ai";
 import { runScorecardComputation } from "./scorecard";
 import { computeCoverage, zonesFromFinding } from "./zone-coverage";
 import { logErrorEvent } from "./error-events";
+import { writePropertyMemory } from "./property-memory-writer";
 
 /**
  * Explicit "Complete Inspection" finalization pipeline.
@@ -331,6 +332,26 @@ export async function runInspectionFinalization(input: {
       message: "Complete-inspection: scorecard computation failed",
       inspectionId,
       context: { stage: "complete_scorecard" },
+    });
+  }
+
+  // 6. Property Memory — recompute and persist the distilled visit history for
+  // this address so the "Prior Visit" banner fills in on the next inspection.
+  // Recomputes from ALL completed inspections at the address — idempotent on
+  // retry.  Best-effort: a failure here never affects the completion state.
+  try {
+    await writePropertyMemory({
+      companyId,
+      inspectionId,
+      siteAddress: inspection.siteAddress ?? "",
+    });
+  } catch {
+    void logErrorEvent("ai", {
+      companyId,
+      userId,
+      message: "Complete-inspection: property memory write failed",
+      inspectionId,
+      context: { stage: "complete_property_memory" },
     });
   }
 }
