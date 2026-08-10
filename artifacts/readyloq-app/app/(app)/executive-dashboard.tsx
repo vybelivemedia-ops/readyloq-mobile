@@ -54,26 +54,17 @@ function KpiCard({
   icon,
   accent,
   sublabel,
+  onPress,
 }: {
   label: string;
   value: string;
   icon: keyof typeof Ionicons.glyphMap;
   accent?: string;
   sublabel?: string;
+  onPress?: () => void;
 }) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        minWidth: "47%",
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 14,
-        padding: 16,
-        gap: 6,
-      }}
-    >
+  const inner = (
+    <>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
         <Ionicons name={icon} size={14} color={accent ?? C.primary} />
         <Text
@@ -88,6 +79,9 @@ function KpiCard({
         >
           {label}
         </Text>
+        {onPress ? (
+          <Ionicons name="chevron-forward" size={12} color={C.muted} />
+        ) : null}
       </View>
       <Text
         style={{
@@ -106,8 +100,33 @@ function KpiCard({
           {sublabel}
         </Text>
       ) : null}
-    </View>
+    </>
   );
+
+  const containerStyle = {
+    flex: 1,
+    minWidth: "47%" as const,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 14,
+    padding: 16,
+    gap: 6,
+  };
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.75}
+        style={containerStyle}
+      >
+        {inner}
+      </TouchableOpacity>
+    );
+  }
+
+  return <View style={containerStyle}>{inner}</View>;
 }
 
 function SectionTitle({ title }: { title: string }) {
@@ -127,7 +146,13 @@ function SectionTitle({ title }: { title: string }) {
   );
 }
 
-function RiskBar({ distribution }: { distribution: ExecutiveMetrics["riskDistribution"] }) {
+function RiskBar({
+  distribution,
+  onPressSegment,
+}: {
+  distribution: ExecutiveMetrics["riskDistribution"];
+  onPressSegment: (level: keyof ExecutiveMetrics["riskDistribution"]) => void;
+}) {
   const total =
     distribution.critical + distribution.high + distribution.medium + distribution.low;
   if (total === 0) {
@@ -167,24 +192,31 @@ function RiskBar({ distribution }: { distribution: ExecutiveMetrics["riskDistrib
         gap: 12,
       }}
     >
-      {/* Stacked bar */}
+      {/* Stacked bar — each segment is tappable */}
       <View style={{ flexDirection: "row", height: 10, borderRadius: 6, overflow: "hidden" }}>
         {segments.map(({ key }) => {
           const pct = (distribution[key] / total) * 100;
           if (pct === 0) return null;
           return (
-            <View
+            <TouchableOpacity
               key={key}
+              onPress={() => onPressSegment(key)}
+              activeOpacity={0.7}
               style={{ flex: pct, backgroundColor: RISK_COLOR[key] }}
             />
           );
         })}
       </View>
 
-      {/* Legend */}
+      {/* Legend — each item is tappable */}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
         {segments.map(({ key, label }) => (
-          <View key={key} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+          <TouchableOpacity
+            key={key}
+            onPress={() => onPressSegment(key)}
+            activeOpacity={0.7}
+            style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
+          >
             <View
               style={{
                 width: 8,
@@ -199,7 +231,7 @@ function RiskBar({ distribution }: { distribution: ExecutiveMetrics["riskDistrib
                 {" "}{distribution[key]}
               </Text>
             </Text>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
     </View>
@@ -538,6 +570,11 @@ export default function ExecutiveDashboardScreen() {
                     ? `${metrics.riskDistribution.high} high · ${metrics.riskDistribution.medium} medium`
                     : undefined
                 }
+                onPress={
+                  metrics && metrics.riskDistribution.critical > 0
+                    ? () => router.push({ pathname: "/executive-risk-inspections", params: { riskLevel: "critical" } } as never)
+                    : undefined
+                }
               />
               <KpiCard
                 label="This Month"
@@ -571,7 +608,12 @@ export default function ExecutiveDashboardScreen() {
           {/* ── Risk Distribution ─────────────────────────────────────── */}
           <View style={{ gap: 8 }}>
             <SectionTitle title="Risk Distribution" />
-            <RiskBar distribution={metrics?.riskDistribution ?? { critical: 0, high: 0, medium: 0, low: 0 }} />
+            <RiskBar
+              distribution={metrics?.riskDistribution ?? { critical: 0, high: 0, medium: 0, low: 0 }}
+              onPressSegment={(level) =>
+                router.push({ pathname: "/executive-risk-inspections", params: { riskLevel: level } } as never)
+              }
+            />
           </View>
 
           {/* ── Technician Leaderboard ────────────────────────────────── */}

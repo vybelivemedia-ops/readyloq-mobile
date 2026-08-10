@@ -128,4 +128,75 @@ router.get(
   },
 );
 
+/**
+ * GET /executive/inspections?riskLevel=critical|high|medium|low
+ *
+ * Returns the list of inspections at a given risk level for the owner's company.
+ * Joins scorecards → inspections to return site address, technician name,
+ * quality score, risk level, and inspection id (for deep-linking).
+ */
+router.get(
+  "/executive/inspections",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+    const riskLevel = req.query.riskLevel as string | undefined;
+
+    const VALID_RISK_LEVELS = ["critical", "high", "medium", "low"] as const;
+    type RiskLevel = (typeof VALID_RISK_LEVELS)[number];
+
+    if (!riskLevel || !VALID_RISK_LEVELS.includes(riskLevel as RiskLevel)) {
+      return res.status(400).json({
+        error: "riskLevel query param is required and must be one of: critical, high, medium, low",
+      });
+    }
+
+    try {
+      const rows = await db
+        .select({
+          inspectionId:    inspectionScorecardsTable.inspectionId,
+          siteAddress:     inspectionsTable.siteAddress,
+          technicianName:  inspectionScorecardsTable.technicianName,
+          qualityScore:    inspectionScorecardsTable.qualityScore,
+          riskLevel:       inspectionScorecardsTable.riskLevel,
+          riskScore:       inspectionScorecardsTable.riskScore,
+          scoredAt:        inspectionScorecardsTable.updatedAt,
+        })
+        .from(inspectionScorecardsTable)
+        .innerJoin(
+          inspectionsTable,
+          eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
+        )
+        .where(
+          and(
+            eq(inspectionScorecardsTable.companyId, companyId),
+            eq(inspectionScorecardsTable.riskLevel, riskLevel as RiskLevel),
+          ),
+        )
+        .orderBy(sql`${inspectionScorecardsTable.riskScore} desc`)
+        .limit(100);
+
+      return res.json({
+        success: true,
+        riskLevel,
+        inspections: rows.map((r) => ({
+          inspectionId:   r.inspectionId,
+          siteAddress:    r.siteAddress,
+          technicianName: r.technicianName || "Unknown",
+          qualityScore:   r.qualityScore,
+          riskLevel:      r.riskLevel,
+          riskScore:      r.riskScore,
+          scoredAt:       r.scoredAt,
+        })),
+      });
+    } catch (error) {
+      console.error("executive inspections error:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
 export default router;

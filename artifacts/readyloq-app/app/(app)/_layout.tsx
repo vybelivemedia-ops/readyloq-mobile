@@ -321,6 +321,7 @@ function Gate() {
       <Stack.Screen name="billing" options={{ presentation: "modal" }} />
       <Stack.Screen name="dataset" />
       <Stack.Screen name="executive-dashboard" />
+      <Stack.Screen name="executive-risk-inspections" />
     </Stack>
   );
 }

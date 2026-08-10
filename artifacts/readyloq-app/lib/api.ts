@@ -401,6 +401,29 @@ export function fetchExecutiveMetrics(token: string | null) {
   );
 }
 
+export type ExecutiveRiskLevel = "critical" | "high" | "medium" | "low";
+
+export interface ExecutiveRiskInspection {
+  inspectionId: number;
+  siteAddress: string;
+  technicianName: string;
+  qualityScore: number;
+  riskLevel: ExecutiveRiskLevel;
+  riskScore: number;
+  scoredAt: string;
+}
+
+export function fetchExecutiveInspections(
+  token: string | null,
+  riskLevel: ExecutiveRiskLevel,
+) {
+  return request<{
+    success: true;
+    riskLevel: ExecutiveRiskLevel;
+    inspections: ExecutiveRiskInspection[];
+  }>(`/api/executive/inspections?riskLevel=${riskLevel}`, token);
+}
+
 // ─── Bulk dataset ingestion ───────────────────────────────────────────────────
 
 export interface BulkIngestMetadata {

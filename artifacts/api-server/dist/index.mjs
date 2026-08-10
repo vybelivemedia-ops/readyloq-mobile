@@ -27061,7 +27061,7 @@ var require_atomic_sleep = __commonJS({
   "../../node_modules/.pnpm/atomic-sleep@1.0.0/node_modules/atomic-sleep/index.js"(exports, module) {
     "use strict";
     if (typeof SharedArrayBuffer !== "undefined" && typeof Atomics !== "undefined") {
-      let sleep5 = function(ms) {
+      let sleep6 = function(ms) {
         const valid = ms > 0 && ms < Infinity;
         if (valid === false) {
           if (typeof ms !== "number" && typeof ms !== "bigint") {
@@ -27072,9 +27072,9 @@ var require_atomic_sleep = __commonJS({
         Atomics.wait(nil, 0, 0, Number(ms));
       };
       const nil = new Int32Array(new SharedArrayBuffer(4));
-      module.exports = sleep5;
+      module.exports = sleep6;
     } else {
-      let sleep5 = function(ms) {
+      let sleep6 = function(ms) {
         const valid = ms > 0 && ms < Infinity;
         if (valid === false) {
           if (typeof ms !== "number" && typeof ms !== "bigint") {
@@ -27086,7 +27086,7 @@ var require_atomic_sleep = __commonJS({
         while (target > Date.now()) {
         }
       };
-      module.exports = sleep5;
+      module.exports = sleep6;
     }
   }
 });
@@ -27099,7 +27099,7 @@ var require_sonic_boom = __commonJS({
     var EventEmitter3 = __require("events");
     var inherits = __require("util").inherits;
     var path4 = __require("path");
-    var sleep5 = require_atomic_sleep();
+    var sleep6 = require_atomic_sleep();
     var assert2 = __require("assert");
     var BUSY_WRITE_TIMEOUT = 100;
     var kEmptyBuffer = Buffer.allocUnsafe(0);
@@ -27245,7 +27245,7 @@ var require_sonic_boom = __commonJS({
           if ((err.code === "EAGAIN" || err.code === "EBUSY") && this.retryEAGAIN(err, this._writingBuf.length, this._len - this._writingBuf.length)) {
             if (this.sync) {
               try {
-                sleep5(BUSY_WRITE_TIMEOUT);
+                sleep6(BUSY_WRITE_TIMEOUT);
                 this.release(void 0, 0);
               } catch (err2) {
                 this.release(err2);
@@ -27558,7 +27558,7 @@ var require_sonic_boom = __commonJS({
           if (shouldRetry && !this.retryEAGAIN(err, buf.length, this._len - buf.length)) {
             throw err;
           }
-          sleep5(BUSY_WRITE_TIMEOUT);
+          sleep6(BUSY_WRITE_TIMEOUT);
         }
       }
       try {
@@ -27595,7 +27595,7 @@ var require_sonic_boom = __commonJS({
           if (shouldRetry && !this.retryEAGAIN(err, buf.length, this._len - buf.length)) {
             throw err;
           }
-          sleep5(BUSY_WRITE_TIMEOUT);
+          sleep6(BUSY_WRITE_TIMEOUT);
         }
       }
     }
@@ -28336,7 +28336,7 @@ var require_transport = __commonJS({
     var { createRequire } = __require("module");
     var getCallers = require_caller();
     var { join: join2, isAbsolute, sep } = __require("node:path");
-    var sleep5 = require_atomic_sleep();
+    var sleep6 = require_atomic_sleep();
     var onExit = require_on_exit_leak_free();
     var ThreadStream = require_thread_stream();
     function setupOnExit(stream) {
@@ -28370,7 +28370,7 @@ var require_transport = __commonJS({
           return;
         }
         stream.flushSync();
-        sleep5(100);
+        sleep6(100);
         stream.end();
       }
       return stream;
@@ -123297,6 +123297,27 @@ var transcribe_default = router31;
 var import_express33 = __toESM(require_express2(), 1);
 
 // src/services/field-integration.ts
+async function withRetry(operation, shouldRetry, maxAttempts = 3, baseDelayMs = 500) {
+  let lastResult;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const result = await operation();
+      if (!shouldRetry(result)) return result;
+      lastResult = result;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      await sleep5(baseDelayMs * 2 ** (attempt - 1));
+      continue;
+    }
+    if (attempt < maxAttempts) {
+      await sleep5(baseDelayMs * 2 ** (attempt - 1));
+    }
+  }
+  return lastResult;
+}
+function sleep5(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 var PESTPAC_DEFAULT_BASE = "https://api.pestpac.com/v1";
 async function syncToPestPac(payload) {
   const base = payload.apiBaseUrl?.replace(/\/$/, "") ?? PESTPAC_DEFAULT_BASE;
@@ -123319,18 +123340,30 @@ async function syncToPestPac(payload) {
   }
   let attachmentsPosted = 0;
   for (const photo of payload.photos) {
-    const attachRes = await fetch(`${base}/customers/${customerId}/attachments`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        fileUrl: photo.url,
-        description: `${photo.severity.toUpperCase()}: ${photo.caption ?? ""}`
-      })
-    });
-    if (attachRes.ok) attachmentsPosted++;
-    else {
-      const body = await attachRes.text();
-      console.warn(`PestPac attachment POST failed (${attachRes.status}): ${body}`);
+    try {
+      const attachRes = await withRetry(
+        () => fetch(`${base}/customers/${customerId}/attachments`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            fileUrl: photo.url,
+            description: `${photo.severity.toUpperCase()}: ${photo.caption ?? ""}`
+          })
+        }),
+        (res) => !res.ok
+      );
+      if (attachRes.ok) {
+        attachmentsPosted++;
+      } else {
+        const body = await attachRes.text();
+        console.warn(
+          `PestPac attachment POST failed after retries (${attachRes.status}): ${body}`
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `PestPac attachment POST threw after retries for ${photo.url}: ${String(err)}`
+      );
     }
   }
   return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted };
@@ -123343,9 +123376,8 @@ async function syncToFieldRoutes(payload) {
     Authorization: `Bearer ${payload.apiKey}`
   };
   const customerId = payload.accountId;
-  const histRes = await fetch(
-    `${base}/customer/${customerId}/service-history`,
-    {
+  const histRes = await withRetry(
+    () => fetch(`${base}/customer/${customerId}/service-history`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -123359,7 +123391,8 @@ async function syncToFieldRoutes(payload) {
         mediaUrls: payload.photos.map((p) => p.url),
         date: payload.inspectionDate
       })
-    }
+    }),
+    (res) => !res.ok
   );
   if (!histRes.ok) {
     const body = await histRes.text();
@@ -123851,6 +123884,58 @@ router34.get(
       });
     } catch (error40) {
       console.error("executive intelligence error:", error40);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+router34.get(
+  "/executive/inspections",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+    const riskLevel = req.query.riskLevel;
+    const VALID_RISK_LEVELS = ["critical", "high", "medium", "low"];
+    if (!riskLevel || !VALID_RISK_LEVELS.includes(riskLevel)) {
+      return res.status(400).json({
+        error: "riskLevel query param is required and must be one of: critical, high, medium, low"
+      });
+    }
+    try {
+      const rows = await db.select({
+        inspectionId: inspectionScorecardsTable.inspectionId,
+        siteAddress: inspectionsTable.siteAddress,
+        technicianName: inspectionScorecardsTable.technicianName,
+        qualityScore: inspectionScorecardsTable.qualityScore,
+        riskLevel: inspectionScorecardsTable.riskLevel,
+        riskScore: inspectionScorecardsTable.riskScore,
+        scoredAt: inspectionScorecardsTable.updatedAt
+      }).from(inspectionScorecardsTable).innerJoin(
+        inspectionsTable,
+        eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId)
+      ).where(
+        and(
+          eq(inspectionScorecardsTable.companyId, companyId),
+          eq(inspectionScorecardsTable.riskLevel, riskLevel)
+        )
+      ).orderBy(sql`${inspectionScorecardsTable.riskScore} desc`).limit(100);
+      return res.json({
+        success: true,
+        riskLevel,
+        inspections: rows.map((r) => ({
+          inspectionId: r.inspectionId,
+          siteAddress: r.siteAddress,
+          technicianName: r.technicianName || "Unknown",
+          qualityScore: r.qualityScore,
+          riskLevel: r.riskLevel,
+          riskScore: r.riskScore,
+          scoredAt: r.scoredAt
+        }))
+      });
+    } catch (error40) {
+      console.error("executive inspections error:", error40);
       return res.status(500).json({ error: "Internal server error" });
     }
   }

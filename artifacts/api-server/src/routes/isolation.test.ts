@@ -95,6 +95,7 @@ import {
   intelligenceTagsTable,
   intelligenceReviewsTable,
   intelligenceVotesTable,
+  inspectionScorecardsTable,
   READYLOQ_DEFAULT_PROFILE,
 } from "@workspace/db";
 import { eq, isNull, or } from "drizzle-orm";
@@ -757,6 +758,115 @@ describe("intelligence analytics aggregate only the caller company", () => {
       "/api/intelligence-dataset/analytics",
     );
     expect(analyticsB.body.totalRecords).toBe(1);
+  });
+});
+
+describe("executive inspections drill-down is isolated per company", () => {
+  /** Seed a minimal scorecard row directly so we can test the endpoint without
+   *  running the full analysis pipeline. */
+  async function seedScorecard(
+    companyId: number,
+    inspectionId: number,
+    riskLevel: "critical" | "high" | "medium" | "low",
+  ) {
+    await db.insert(inspectionScorecardsTable).values({
+      companyId,
+      inspectionId,
+      technicianName: "Seeded Tech",
+      qualityScore: riskLevel === "critical" ? 25 : riskLevel === "high" ? 45 : riskLevel === "medium" ? 65 : 85,
+      riskScore: riskLevel === "critical" ? 90 : riskLevel === "high" ? 70 : riskLevel === "medium" ? 50 : 20,
+      riskLevel,
+      findingsCount: 3,
+      photosAnalyzed: 5,
+      components: { photoCoverage: 80, evidenceQuality: 70, avgConfidence: 60, recommendationCoverage: 50 },
+      missedOpportunities: [],
+    });
+  }
+
+  let inspAId: number;
+  let inspBId: number;
+
+  beforeAll(async () => {
+    // Clean up any scorecards left by other suites.
+    await db.delete(inspectionScorecardsTable);
+
+    // Create one inspection per company.
+    const aBody = await createInspection(OWNER_A_ID, "700 Exec A Street");
+    const bBody = await createInspection(OWNER_B_ID, "700 Exec B Street");
+    inspAId = aBody.id;
+    inspBId = bBody.id;
+
+    // Seed scorecards: A is critical, B is high.
+    await seedScorecard(companyAId, inspAId, "critical");
+    await seedScorecard(companyBId, inspBId, "high");
+  });
+
+  it("returns 401 when unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app).get("/api/executive/inspections?riskLevel=critical");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when called by a technician (owner-only route)", async () => {
+    asUser(TECH_A_ID);
+    const res = await request(app).get("/api/executive/inspections?riskLevel=critical");
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 for a missing riskLevel param", async () => {
+    asUser(OWNER_A_ID);
+    const res = await request(app).get("/api/executive/inspections");
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for an invalid riskLevel value", async () => {
+    asUser(OWNER_A_ID);
+    const res = await request(app).get("/api/executive/inspections?riskLevel=extreme");
+    expect(res.status).toBe(400);
+  });
+
+  it("returns only the calling company's inspections at the requested level", async () => {
+    asUser(OWNER_A_ID);
+    const res = await request(app).get("/api/executive/inspections?riskLevel=critical");
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.riskLevel).toBe("critical");
+    const ids = res.body.inspections.map((r: { inspectionId: number }) => r.inspectionId);
+    // Company A's critical inspection is present.
+    expect(ids).toContain(inspAId);
+    // Company B's inspection is NOT present (different tenant and different risk level).
+    expect(ids).not.toContain(inspBId);
+  });
+
+  it("company B sees its own high-risk inspection but not company A's critical one", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app).get("/api/executive/inspections?riskLevel=high");
+    expect(res.status).toBe(200);
+    const ids = res.body.inspections.map((r: { inspectionId: number }) => r.inspectionId);
+    expect(ids).toContain(inspBId);
+    expect(ids).not.toContain(inspAId);
+  });
+
+  it("company A gets an empty list when querying a level it has no scorecards for", async () => {
+    asUser(OWNER_A_ID);
+    const res = await request(app).get("/api/executive/inspections?riskLevel=low");
+    expect(res.status).toBe(200);
+    expect(res.body.inspections).toHaveLength(0);
+  });
+
+  it("response rows include required fields", async () => {
+    asUser(OWNER_A_ID);
+    const res = await request(app).get("/api/executive/inspections?riskLevel=critical");
+    expect(res.status).toBe(200);
+    const row = res.body.inspections[0];
+    expect(row).toHaveProperty("inspectionId");
+    expect(row).toHaveProperty("siteAddress");
+    expect(row).toHaveProperty("technicianName");
+    expect(row).toHaveProperty("qualityScore");
+    expect(row).toHaveProperty("riskLevel", "critical");
+    expect(row).toHaveProperty("riskScore");
+    expect(row).toHaveProperty("scoredAt");
+    expect(row.siteAddress).toBe("700 Exec A Street");
   });
 });
 
