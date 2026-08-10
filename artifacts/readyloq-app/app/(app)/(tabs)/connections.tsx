@@ -1,9 +1,12 @@
 /**
  * Connections tab — ReadyLoq
  *
- * Live BLE pairing screen for Meta Ray-Ban smart glasses and future hardware.
- * Uses smartGlassesBle (react-native-ble-plx) for scanning, pairing, and
- * connection lifecycle. Other device slots remain "coming soon".
+ * Pairing screen for all ReadyLoq hardware:
+ *   • Meta Ray-Ban smart glasses (BLE)
+ *   • Wi-Fi IP cameras (GoPro, generic MJPEG/JPEG endpoints)
+ *   • BLE measurement sensors (moisture, laser, temperature, CO₂, acoustic)
+ *
+ * USB scope and wearable body-cam remain coming soon.
  */
 
 import { Ionicons } from "@expo/vector-icons";
@@ -26,6 +29,7 @@ import { State as BleHwState } from "react-native-ble-plx";
 import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
 import { DeviceScannerModal } from "@/components/DeviceScannerModal";
+import { WifiCameraModal } from "@/components/WifiCameraModal";
 import { useColors } from "@/hooks/useColors";
 import {
   APP_VERSION,
@@ -42,6 +46,10 @@ import {
 } from "@/lib/ble";
 import { useDeviceRegistry } from "@/lib/platform/DeviceRegistryContext";
 import type { DiscoveredSensor } from "@/lib/ble/ble-sensor-adapter";
+import {
+  getWifiCameraConfig,
+  clearWifiCameraConfig,
+} from "@/lib/vision/wifi-camera-provider";
 
 // ─── Static device catalogue (Coming Soon entries) ───────────────────────────
 
@@ -54,14 +62,6 @@ interface ComingSoonDevice {
 }
 
 const COMING_SOON_DEVICES: ComingSoonDevice[] = [
-  {
-    id: "wifi-camera",
-    name: "Wi-Fi IP Camera",
-    description:
-      "Action cam or IP camera over the local network. Tap to configure the camera URL and capture stills on demand.",
-    icon: "wifi-outline",
-    transport: "Wi-Fi",
-  },
   {
     id: "usb-camera",
     name: "USB Scope / Borescope",
@@ -204,6 +204,10 @@ export default function ConnectionsScreen() {
   /** Track connected sensor IDs so cards re-render after connect/disconnect. */
   const [connectedSensorIds, setConnectedSensorIds] = useState<Set<string>>(new Set());
 
+  // ── Wi-Fi camera state ──────────────────────────────────────────────────────
+  const [wifiModalVisible, setWifiModalVisible] = useState(false);
+  const [wifiConfig, setWifiConfig] = useState(() => getWifiCameraConfig());
+
   const handleSensorConnect = useCallback(
     async (sensorId: string, device: DiscoveredSensor) => {
       setConnectingSensorId(sensorId);
@@ -242,10 +246,12 @@ export default function ConnectionsScreen() {
     [plugin],
   );
 
-  // ── #101 — Resync sensor connection state on tab focus ──────────────────────
+  // ── #101 — Resync sensor + Wi-Fi camera state on tab focus ─────────────────
   // connectedSensorIds is normally updated only via UI actions; when the user
   // navigates away and back, or a background reconnect fires, we re-read the
   // live provider state so cards reflect reality without a full re-mount.
+  // wifiConfig is also re-read here because DevicePlugin.initialize() restores
+  // it async at startup — by the time the user opens the tab it will be set.
   useFocusEffect(
     useCallback(() => {
       const live = new Set<string>();
@@ -256,8 +262,37 @@ export default function ConnectionsScreen() {
         }
       }
       setConnectedSensorIds(live);
+      setWifiConfig(getWifiCameraConfig());
     }, [plugin]),
   );
+
+  const handleWifiConnected = useCallback(() => {
+    const cfg = getWifiCameraConfig();
+    setWifiConfig(cfg);
+    // Register the newly configured camera with the DeviceRegistry so it's
+    // immediately available to the inspection workspace.
+    if (cfg) plugin.registerWifiCamera(cfg);
+    setWifiModalVisible(false);
+  }, [plugin]);
+
+  const handleWifiForget = useCallback(() => {
+    Alert.alert(
+      "Forget Wi-Fi camera?",
+      "The saved URL and label will be cleared. You can reconfigure at any time.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Forget",
+          style: "destructive",
+          onPress: () => {
+            clearWifiCameraConfig();
+            plugin.registry.unregister?.("wifi-camera");
+            setWifiConfig(null);
+          },
+        },
+      ],
+    );
+  }, [plugin]);
 
   // ── #89 — Acoustic bait station slot assignment ──────────────────────────────
   const [acousticSlot, setAcousticSlot] = useState("");
@@ -618,6 +653,88 @@ export default function ConnectionsScreen() {
           )}
         </Section>
 
+        {/* ── Wi-Fi Camera ─────────────────────────────────────────────────── */}
+        <Section title="Wi-Fi Camera" icon="wifi-outline">
+          <Card style={{ gap: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: wifiConfig ? "rgba(34,197,94,0.12)" : colors.accent,
+                alignItems: "center", justifyContent: "center",
+              }}>
+                <Ionicons
+                  name="wifi-outline"
+                  size={20}
+                  color={wifiConfig ? "#22c55e" : colors.mutedForeground}
+                />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  {wifiConfig?.label ?? "Wi-Fi IP Camera"}
+                </Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                  {wifiConfig
+                    ? wifiConfig.baseUrl
+                    : "GoPro, IP cam, or any JPEG endpoint on your local network"}
+                </Text>
+              </View>
+              {wifiConfig ? (
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  <Pressable
+                    onPress={() => setWifiModalVisible(true)}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+                      backgroundColor: colors.accent,
+                      borderWidth: 1, borderColor: colors.border,
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                      Edit
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleWifiForget}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+                      backgroundColor: "rgba(239,68,68,0.10)",
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Text style={{ color: "#ef4444", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                      Forget
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => setWifiModalVisible(true)}
+                  style={({ pressed }) => ({
+                    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+                    backgroundColor: colors.primary, opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Text style={{ color: colors.primaryForeground, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                    Configure
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            {wifiConfig && (
+              <View style={{
+                flexDirection: "row", alignItems: "center", gap: 6,
+                backgroundColor: "rgba(34,197,94,0.08)",
+                borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+              }}>
+                <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
+                <Text style={{ color: "#22c55e", fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                  Ready — available as a capture source in inspections
+                </Text>
+              </View>
+            )}
+          </Card>
+        </Section>
+
         {/* ── BLE Sensors ─────────────────────────────────────────────────── */}
         <Section title="Sensors" icon="hardware-chip-outline">
           {SENSOR_CATALOGUE.map((entry) => {
@@ -778,6 +895,13 @@ export default function ConnectionsScreen() {
             onClose={() => setActiveSensorId(null)}
           />
         ))}
+
+        {/* Wi-Fi camera modal */}
+        <WifiCameraModal
+          visible={wifiModalVisible}
+          onClose={() => setWifiModalVisible(false)}
+          onConnected={handleWifiConnected}
+        />
 
         {/* ── Coming soon ── */}
         <Section title="Coming soon" icon="time-outline">
