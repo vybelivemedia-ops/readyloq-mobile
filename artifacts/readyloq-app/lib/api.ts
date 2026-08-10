@@ -505,6 +505,13 @@ export function fetchExecutiveEmailPreview(token: string | null) {
   );
 }
 
+export function fetchExecutiveTextPreview(token: string | null) {
+  return request<{ success: true; text: string; subject: string }>(
+    "/api/executive/intelligence/email-preview?format=text",
+    token,
+  );
+}
+
 // ─── Bulk dataset ingestion ───────────────────────────────────────────────────
 
 export interface BulkIngestMetadata {

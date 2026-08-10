@@ -13,6 +13,7 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
+  Share,
   Text,
   TouchableOpacity,
   View,
@@ -26,6 +27,7 @@ import {
   fetchExecutiveQualityTrend,
   fetchDailyBriefing,
   fetchExecutiveEmailPreview,
+  fetchExecutiveTextPreview,
   type ExecutiveMetrics,
   type ExecutiveTechnician,
   type ExecutiveQualityWeek,
@@ -557,22 +559,21 @@ export default function ExecutiveDashboardScreen() {
     setSharing(true);
     try {
       const token = await getToken();
-      const { html, subject } = await fetchExecutiveEmailPreview(token);
-
       const available = await MailComposer.isAvailableAsync();
-      if (!available) {
-        Alert.alert(
-          "Email Not Available",
-          "No email account is configured on this device. Please set up a mail account in Settings and try again.",
-        );
-        return;
-      }
 
-      await MailComposer.composeAsync({
-        subject,
-        body: html,
-        isHtml: true,
-      });
+      if (available) {
+        // Primary path: compose a rich HTML email
+        const { html, subject } = await fetchExecutiveEmailPreview(token);
+        await MailComposer.composeAsync({
+          subject,
+          body: html,
+          isHtml: true,
+        });
+      } else {
+        // Fallback path: open the native share sheet with plain text
+        const { text, subject } = await fetchExecutiveTextPreview(token);
+        await Share.share({ message: text, title: subject });
+      }
     } catch (e) {
       Alert.alert(
         "Export Failed",
@@ -670,7 +671,7 @@ export default function ExecutiveDashboardScreen() {
           {sharing ? (
             <ActivityIndicator size="small" color={C.primary} />
           ) : (
-            <Ionicons name="mail-outline" size={18} color={loading ? C.muted : C.primary} />
+            <Ionicons name="share-outline" size={18} color={loading ? C.muted : C.primary} />
           )}
         </TouchableOpacity>
       </View>
