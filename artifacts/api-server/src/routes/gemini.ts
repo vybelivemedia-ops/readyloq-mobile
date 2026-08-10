@@ -197,13 +197,13 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     });
 
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-    res.end();
+    return res.end();
   } catch {
     if (!res.headersSent) {
       return res.status(500).json({ error: "Failed to send message" });
     }
     res.write(`data: ${JSON.stringify({ error: "Stream failed" })}\n\n`);
-    res.end();
+    return res.end();
   }
 });
 

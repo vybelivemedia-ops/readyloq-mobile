@@ -94141,7 +94141,7 @@ router21.post("/conversations/:id/messages", async (req, res) => {
     res.write(`data: ${JSON.stringify({ done: true })}
 
 `);
-    res.end();
+    return res.end();
   } catch {
     if (!res.headersSent) {
       return res.status(500).json({ error: "Failed to send message" });
@@ -94149,7 +94149,7 @@ router21.post("/conversations/:id/messages", async (req, res) => {
     res.write(`data: ${JSON.stringify({ error: "Stream failed" })}
 
 `);
-    res.end();
+    return res.end();
   }
 });
 router21.post("/generate-image", async (req, res) => {
@@ -94417,7 +94417,7 @@ router24.post("/", async (req, res) => {
         message: `${product.name} is not labelled for site "${data.siteClassification}". Approved sites: ${approvedSites.join(", ")}.`
       });
     }
-    const expectedChecklistCount = (labelRules.ppeRequired?.length ?? 0) + (labelRules.requiresSuit ? 1 : 0) + (labelRules.requiresRespirator ? 1 : 0) + (labelRules.mixingSteps?.length ?? 0);
+    const expectedChecklistCount = (labelRules.requiredEquipmentTypes?.length ?? 0) + (labelRules.mixingSteps?.length ?? 0);
     if (expectedChecklistCount > 0) {
       const submitted = data.checklistItems ?? [];
       if (submitted.length < expectedChecklistCount) {
@@ -123260,7 +123260,7 @@ router31.post("/transcribe", requireAuth, async (req, res) => {
     });
     res.json({ text: response.text, language: "en" });
   } catch (err) {
-    logErrorEvent("transcribe", err);
+    console.error("[transcribe] Whisper API error:", err);
     res.status(500).json({ error: "Transcription failed. Please try again." });
   }
 });
@@ -123476,8 +123476,7 @@ router32.post("/sync", async (req, res) => {
     const products = productIds.length > 0 ? await db.select({ id: productsTable.id, name: productsTable.name }).from(productsTable).where(inArray(productsTable.id, productIds)) : [];
     const analysis = analyses[0];
     const findings = analysis?.findings ?? [];
-    const narrative = analysis?.narrative ?? "";
-    const reportSummary = narrative || (findings.length > 0 ? findings.slice(0, 5).map((f) => `${f.category}: ${f.description}`).join(". ") : "No significant findings detected.");
+    const reportSummary = findings.length > 0 ? findings.slice(0, 5).map((f) => `${f.category}: ${f.description}`).join(". ") : "No significant findings detected.";
     const photos = media.filter((m) => m.mediaType === "photo" && m.url).map((m) => ({
       url: m.url,
       caption: m.caption ?? null,

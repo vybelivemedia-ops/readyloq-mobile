@@ -152,9 +152,7 @@ router.post("/", async (req: Request<Params>, res) => {
     // Reconstruct the expected checklist length from label rules and verify the
     // client submitted at least that many items, all checked.
     const expectedChecklistCount =
-      (labelRules.ppeRequired?.length ?? 0) +
-      (labelRules.requiresSuit ? 1 : 0) +
-      (labelRules.requiresRespirator ? 1 : 0) +
+      (labelRules.requiredEquipmentTypes?.length ?? 0) +
       (labelRules.mixingSteps?.length ?? 0);
 
     if (expectedChecklistCount > 0) {

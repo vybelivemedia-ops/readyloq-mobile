@@ -16,7 +16,6 @@ import { Router } from "express";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { toFile } from "openai";
 import { requireAuth } from "../middleware/require-auth";
-import { logErrorEvent } from "../lib/error-events";
 
 const router = Router();
 
@@ -46,7 +45,7 @@ router.post("/transcribe", requireAuth, async (req, res) => {
 
     res.json({ text: response.text, language: "en" });
   } catch (err) {
-    logErrorEvent("transcribe", err);
+    console.error("[transcribe] Whisper API error:", err);
     res.status(500).json({ error: "Transcription failed. Please try again." });
   }
 });
