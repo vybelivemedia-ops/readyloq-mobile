@@ -13,6 +13,19 @@ import { generateDailyExecutiveBriefing } from "../services/briefing";
 
 const router = Router();
 
+/**
+ * Escape user-supplied strings before interpolating them into an HTML template.
+ * Converts the five HTML-special characters to their named entity equivalents.
+ */
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 router.get(
   "/executive/intelligence",
   requireAuth,
@@ -352,6 +365,7 @@ router.get(
         .from(companiesTable)
         .where(eq(companiesTable.id, companyId));
       const companyName = companyRow?.name ?? "Your Company";
+      const companyNameHtml = escapeHtml(companyName);
 
       // Pipeline
       const [pipelineRow] = await db
@@ -455,6 +469,7 @@ router.get(
       const techRowsHtml = techRows.length > 0
         ? techRows.map((t, i) => {
           const name = t.technicianName || "Unknown";
+          const nameHtml = escapeHtml(name);
           const quality = Math.round(Number(t.avgQuality ?? 0));
           const count2 = Number(t.inspectionCount);
           const qColor = quality >= 80 ? "#3FB950" : quality >= 60 ? "#D29922" : "#F85149";
@@ -462,7 +477,7 @@ router.get(
           return `
             <tr style="border-bottom:1px solid #30363D;">
               <td style="padding:10px 14px;color:#8B949E;font-size:14px;">${medal}</td>
-              <td style="padding:10px 14px;color:#E6EDF3;font-size:14px;">${name}</td>
+              <td style="padding:10px 14px;color:#E6EDF3;font-size:14px;">${nameHtml}</td>
               <td style="padding:10px 14px;color:#8B949E;font-size:13px;">${count2} inspection${count2 !== 1 ? "s" : ""}</td>
               <td style="padding:10px 14px;text-align:right;">
                 <span style="color:${qColor};font-weight:700;font-size:14px;">${quality}</span>
@@ -480,7 +495,7 @@ router.get(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Executive Dashboard — ${companyName}</title>
+  <title>Executive Dashboard — ${companyNameHtml}</title>
 </head>
 <body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#0D1117;padding:24px 0;">
@@ -495,7 +510,7 @@ router.get(
                 <tr>
                   <td>
                     <div style="color:#17C4D3;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Executive Intelligence</div>
-                    <div style="color:#E6EDF3;font-size:22px;font-weight:800;margin-bottom:4px;">${companyName}</div>
+                    <div style="color:#E6EDF3;font-size:22px;font-weight:800;margin-bottom:4px;">${companyNameHtml}</div>
                     <div style="color:#8B949E;font-size:13px;">Performance snapshot · ${generatedAt}</div>
                   </td>
                   <td align="right" style="vertical-align:top;">

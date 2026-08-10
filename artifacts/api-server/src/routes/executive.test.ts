@@ -624,6 +624,121 @@ describe("executive email-preview endpoint: cross-company isolation", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Email preview endpoint: HTML-escaping of user-supplied strings
+// ---------------------------------------------------------------------------
+
+describe("executive email-preview endpoint: HTML escaping of user-supplied strings", () => {
+  /**
+   * A company whose name contains the five HTML-special characters.
+   * The email template must never interpolate these verbatim — each character
+   * must be replaced by its named HTML entity so corporate email gateways and
+   * HTML parsers don't misread the structure.
+   *
+   * Escaped form: "Acme &amp; Sons &lt;Pest&gt; &quot;Pros&quot; &#39;LLC&#39;"
+   */
+
+  const SPECIAL_OWNER_ID = "exec_special_chars_owner_clerk_id";
+  const SPECIAL_CO_SLUG  = "exec-special-chars-co";
+  // The raw company name contains all five HTML-special characters.
+  const RAW_COMPANY_NAME = `Acme & Sons <Pest> "Pros" 'LLC'`;
+  // What should appear in the HTML output instead.
+  const ESCAPED_COMPANY_NAME = "Acme &amp; Sons &lt;Pest&gt; &quot;Pros&quot; &#39;LLC&#39;";
+
+  let specialCompanyId: number;
+
+  beforeAll(async () => {
+    specialCompanyId = await findOrCreateCompany(RAW_COMPANY_NAME, SPECIAL_CO_SLUG);
+    await ensureActiveBranding(specialCompanyId, RAW_COMPANY_NAME);
+
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, SPECIAL_OWNER_ID));
+    await db.insert(usersTable).values({
+      clerkUserId: SPECIAL_OWNER_ID,
+      role:        "owner",
+      companyId:   specialCompanyId,
+    });
+  });
+
+  afterAll(async () => {
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, SPECIAL_OWNER_ID));
+    // Delete branding profiles first (FK references companies).
+    await db.delete(brandingProfilesTable).where(eq(brandingProfilesTable.companyId, specialCompanyId));
+    await db.delete(companiesTable).where(eq(companiesTable.slug, SPECIAL_CO_SLUG));
+  });
+
+  it("HTML-escapes the company name so special characters appear as entities, not raw markup", async () => {
+    asUser(SPECIAL_OWNER_ID);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+
+    const html: string = res.body.html;
+
+    // The escaped form must be present.
+    expect(html).toContain(ESCAPED_COMPANY_NAME);
+
+    // The raw ampersand, angle brackets, and quotes must NOT appear verbatim
+    // anywhere in the output (they would break the HTML structure).
+    expect(html).not.toContain("Acme & Sons");
+    expect(html).not.toContain("<Pest>");
+  });
+
+  it("HTML-escapes technician names that contain special characters", async () => {
+    // Seed a scorecard with a technician whose name contains angle brackets.
+    const specialInspId = await createInspectionViaApi(SPECIAL_OWNER_ID, "Special Tech St");
+
+    await db.insert(inspectionScorecardsTable).values({
+      companyId:      specialCompanyId,
+      inspectionId:   specialInspId,
+      technicianName: "J. <script>alert(1)</script> Smith",
+      qualityScore:   88,
+      riskScore:      25,
+      riskLevel:      "low",
+      components: {
+        photoCoverage: 80,
+        evidenceQuality: 80,
+        avgConfidence: 85,
+        recommendationCoverage: 90,
+      },
+    });
+
+    // Seed a second scorecard for the same technician so the leaderboard shows them.
+    const specialInspId2 = await createInspectionViaApi(SPECIAL_OWNER_ID, "Special Tech St 2");
+    await db.insert(inspectionScorecardsTable).values({
+      companyId:      specialCompanyId,
+      inspectionId:   specialInspId2,
+      technicianName: "J. <script>alert(1)</script> Smith",
+      qualityScore:   90,
+      riskScore:      20,
+      riskLevel:      "low",
+      components: {
+        photoCoverage: 85,
+        evidenceQuality: 85,
+        avgConfidence: 88,
+        recommendationCoverage: 92,
+      },
+    });
+
+    asUser(SPECIAL_OWNER_ID);
+    const res = await request(app).get("/api/executive/intelligence/email-preview");
+    expect(res.status).toBe(200);
+
+    const html: string = res.body.html;
+
+    // The raw <script> tag must never appear in the HTML output.
+    expect(html).not.toContain("<script>");
+    // The escaped form of the angle bracket should be present instead.
+    expect(html).toContain("&lt;script&gt;");
+
+    // Cleanup
+    await db.delete(inspectionScorecardsTable).where(
+      inArray(inspectionScorecardsTable.inspectionId, [specialInspId, specialInspId2]),
+    );
+    await db.delete(inspectionsTable).where(
+      inArray(inspectionsTable.id, [specialInspId, specialInspId2]),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Daily briefing endpoint tests (Task #282)
 // ---------------------------------------------------------------------------
 
