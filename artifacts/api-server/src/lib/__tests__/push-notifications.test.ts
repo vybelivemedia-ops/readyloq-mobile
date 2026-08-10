@@ -1,0 +1,482 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import request from "supertest";
+
+/**
+ * Integration tests for the critical-risk push notification pipeline.
+ *
+ * Coverage:
+ *  - notifyCriticalInspection sends correctly shaped payloads to opted-in owners
+ *  - Owners with pushNotificationsEnabled = false are excluded
+ *  - Owners with no token are excluded
+ *  - The Expo API is never called when there are no eligible tokens
+ *  - POST /auth/me/push-token validates the ExponentPushToken[ format
+ */
+
+// ── Clerk mock ─────────────────────────────────────────────────────────────────
+const { authState } = vi.hoisted(() => ({
+  authState: { userId: null as string | null },
+}));
+
+vi.mock("@clerk/express", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@clerk/express")>();
+  return {
+    ...actual,
+    getAuth: () => authState,
+    clerkMiddleware: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  };
+});
+
+// ── fetch mock (Expo push API) ─────────────────────────────────────────────────
+// Captures every call made to the Expo push endpoint so we can assert on
+// the payload without ever hitting the real Expo service.
+const { fetchState } = vi.hoisted(() => ({
+  fetchState: {
+    calls: [] as { url: string; body: unknown }[],
+    responseStatus: 200,
+    responseBody: { data: [{ status: "ok", id: "ticket-1" }] } as unknown,
+  },
+}));
+
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async (url: string, options?: RequestInit) => {
+    const body =
+      options?.body != null ? JSON.parse(options.body as string) : null;
+    fetchState.calls.push({ url, body });
+    const ok =
+      fetchState.responseStatus >= 200 && fetchState.responseStatus < 300;
+    return {
+      ok,
+      status: fetchState.responseStatus,
+      json: async () => fetchState.responseBody,
+      text: async () => JSON.stringify(fetchState.responseBody),
+    } as Response;
+  }),
+);
+
+// ── Imports (after mocks are wired) ───────────────────────────────────────────
+import app from "../../app";
+import { db, usersTable, companiesTable, inspectionsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { notifyCriticalInspection } from "../push-notifications";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fixture identifiers — unique slugs avoid cross-suite collisions in the
+// shared test DB.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OWNER_A_CLERK = "pn_test_owner_a";
+const OWNER_B_CLERK = "pn_test_owner_b";
+const TECH_CLERK = "pn_test_tech";
+const COMPANY_SLUG = "push-notif-test-co";
+
+const VALID_TOKEN_A = "ExponentPushToken[aaaaaaaaaaaaaaaaaaa]";
+const VALID_TOKEN_B = "ExponentPushToken[bbbbbbbbbbbbbbbbbbb]";
+const SITE_ADDRESS = "42 Push Test Boulevard";
+
+let companyId: number;
+let inspectionId: number;
+
+function asUser(id: string | null) {
+  authState.userId = id;
+}
+
+/** Expo push calls captured during this test. */
+function expoCalls() {
+  return fetchState.calls.filter((c) =>
+    typeof c.url === "string" && c.url.includes("exp.host"),
+  );
+}
+
+// ── Shared setup ──────────────────────────────────────────────────────────────
+
+beforeAll(async () => {
+  const [existing] = await db
+    .select()
+    .from(companiesTable)
+    .where(eq(companiesTable.slug, COMPANY_SLUG));
+  companyId = existing
+    ? existing.id
+    : (
+        await db
+          .insert(companiesTable)
+          .values({ name: "Push Notif Test Co", slug: COMPANY_SLUG })
+          .returning()
+      )[0].id;
+});
+
+beforeEach(async () => {
+  asUser(null);
+
+  // Reset fetch spy state.
+  fetchState.calls = [];
+  fetchState.responseStatus = 200;
+  fetchState.responseBody = { data: [{ status: "ok", id: "ticket-1" }] };
+
+  // Scope cleanup strictly to the fixture company so other suites are unaffected.
+  await db.delete(usersTable).where(eq(usersTable.companyId, companyId));
+  await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyId));
+
+  // Fresh inspection satisfying FK constraints for every test.
+  const [insp] = await db
+    .insert(inspectionsTable)
+    .values({
+      companyId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+      clientName: "Test Client",
+      pestTypes: ["rodents"],
+    })
+    .returning();
+  inspectionId = insp.id;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyCriticalInspection — delivery to opted-in owners
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("notifyCriticalInspection — sends to opted-in owners", () => {
+  it("calls the Expo API with a correctly shaped payload for a single opted-in owner", async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+    });
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(1);
+
+    const msg = messages[0];
+    expect(msg.to).toBe(VALID_TOKEN_A);
+    expect(typeof msg.title).toBe("string");
+    expect((msg.title as string).toLowerCase()).toContain("critical");
+    expect(msg.body).toContain(SITE_ADDRESS);
+    expect(msg.body).toContain("Alice");
+    expect(msg.sound).toBe("default");
+    expect(msg.channelId).toBe("critical-alerts");
+
+    const data = msg.data as Record<string, unknown>;
+    expect(data.inspectionId).toBe(inspectionId);
+    expect(data.companyId).toBe(companyId);
+    expect(data.screen).toBe("inspection");
+  });
+
+  it("batches a single Expo request for multiple opted-in owners", async () => {
+    await db.insert(usersTable).values([
+      {
+        clerkUserId: OWNER_A_CLERK,
+        role: "owner",
+        companyId,
+        pushToken: VALID_TOKEN_A,
+        pushNotificationsEnabled: true,
+      },
+      {
+        clerkUserId: OWNER_B_CLERK,
+        role: "owner",
+        companyId,
+        pushToken: VALID_TOKEN_B,
+        pushNotificationsEnabled: true,
+      },
+    ]);
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: null,
+    });
+
+    const calls = expoCalls();
+    // Expo batch: one HTTP request, two messages inside it.
+    expect(calls).toHaveLength(1);
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(2);
+    const tokens = messages.map((m) => m.to);
+    expect(tokens).toContain(VALID_TOKEN_A);
+    expect(tokens).toContain(VALID_TOKEN_B);
+  });
+
+  it("omits the technician name clause when technicianName is null", async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+    });
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: null,
+    });
+
+    const messages = expoCalls()[0].body as Array<Record<string, unknown>>;
+    // " by <name>" should be absent when no technician is provided.
+    expect(messages[0].body as string).not.toContain(" by ");
+  });
+
+  it("truncates addresses longer than 60 characters to keep the notification compact", async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+    });
+
+    const longAddress = "A".repeat(65) + " Boulevard";
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: longAddress,
+      technicianName: null,
+    });
+
+    const messages = expoCalls()[0].body as Array<Record<string, unknown>>;
+    const body = messages[0].body as string;
+    // The raw address is 75 chars — must be truncated and end with ellipsis.
+    expect(body).toContain("…");
+    // The truncated address portion must be ≤ 60 chars (57 + "…" = 58 chars).
+    const addressPortion = body.split(" — ")[0];
+    expect(addressPortion.length).toBeLessThanOrEqual(60);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyCriticalInspection — exclusion rules
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("notifyCriticalInspection — opted-out and tokenless owners are excluded", () => {
+  it("skips owners with pushNotificationsEnabled = false", async () => {
+    await db.insert(usersTable).values([
+      {
+        clerkUserId: OWNER_A_CLERK,
+        role: "owner",
+        companyId,
+        pushToken: VALID_TOKEN_A,
+        pushNotificationsEnabled: false, // opted out
+      },
+      {
+        clerkUserId: OWNER_B_CLERK,
+        role: "owner",
+        companyId,
+        pushToken: VALID_TOKEN_B,
+        pushNotificationsEnabled: true,
+      },
+    ]);
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Bob",
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    // Only the opted-in owner receives the notification.
+    expect(messages).toHaveLength(1);
+    expect(messages[0].to).toBe(VALID_TOKEN_B);
+  });
+
+  it("skips owners with no push token on file", async () => {
+    await db.insert(usersTable).values([
+      {
+        clerkUserId: OWNER_A_CLERK,
+        role: "owner",
+        companyId,
+        pushToken: null, // no token registered
+        pushNotificationsEnabled: true,
+      },
+      {
+        clerkUserId: OWNER_B_CLERK,
+        role: "owner",
+        companyId,
+        pushToken: VALID_TOKEN_B,
+        pushNotificationsEnabled: true,
+      },
+    ]);
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Bob",
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(1);
+    expect(messages[0].to).toBe(VALID_TOKEN_B);
+  });
+
+  it("skips non-ExponentPushToken values even when the token column is populated", async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: "fcm:invalidToken", // wrong format
+      pushNotificationsEnabled: true,
+    });
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: null,
+    });
+
+    // No eligible token — Expo must not be called.
+    expect(expoCalls()).toHaveLength(0);
+  });
+
+  it("does not call the Expo API at all when all owners are opted out", async () => {
+    await db.insert(usersTable).values([
+      {
+        clerkUserId: OWNER_A_CLERK,
+        role: "owner",
+        companyId,
+        pushToken: VALID_TOKEN_A,
+        pushNotificationsEnabled: false,
+      },
+      {
+        clerkUserId: OWNER_B_CLERK,
+        role: "owner",
+        companyId,
+        pushToken: VALID_TOKEN_B,
+        pushNotificationsEnabled: false,
+      },
+    ]);
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: null,
+    });
+
+    expect(expoCalls()).toHaveLength(0);
+  });
+
+  it("does not call the Expo API when the company has no owners (only technicians)", async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: TECH_CLERK,
+      role: "technician",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+    });
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Carol",
+    });
+
+    // Technician tokens must never be targeted — no Expo call.
+    expect(expoCalls()).toHaveLength(0);
+  });
+
+  it("does not call the Expo API when the company has no users at all", async () => {
+    // No users inserted for this company.
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: null,
+    });
+
+    expect(expoCalls()).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /auth/me/push-token — token format validation
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("POST /auth/me/push-token — token format validation", () => {
+  beforeEach(async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+    });
+    asUser(OWNER_A_CLERK);
+  });
+
+  it("accepts a valid ExponentPushToken and persists it", async () => {
+    const res = await request(app)
+      .post("/api/auth/me/push-token")
+      .send({ token: VALID_TOKEN_A });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+    expect(user.pushToken).toBe(VALID_TOKEN_A);
+  });
+
+  it("rejects a token that does not start with ExponentPushToken[", async () => {
+    const res = await request(app)
+      .post("/api/auth/me/push-token")
+      .send({ token: "fcm:some-gcm-token" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/invalid push token/i);
+  });
+
+  it("rejects an empty string token", async () => {
+    const res = await request(app)
+      .post("/api/auth/me/push-token")
+      .send({ token: "" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/invalid push token/i);
+  });
+
+  it("rejects a missing token field", async () => {
+    const res = await request(app)
+      .post("/api/auth/me/push-token")
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/invalid push token/i);
+  });
+
+  it("rejects a numeric token value", async () => {
+    const res = await request(app)
+      .post("/api/auth/me/push-token")
+      .send({ token: 12345 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/invalid push token/i);
+  });
+
+  it("returns 401 when the request is unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app)
+      .post("/api/auth/me/push-token")
+      .send({ token: VALID_TOKEN_A });
+
+    expect(res.status).toBe(401);
+  });
+});
