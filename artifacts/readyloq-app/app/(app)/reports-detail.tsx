@@ -24,6 +24,7 @@ import {
   Pressable,
   RefreshControl,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -281,6 +282,13 @@ export default function ReportsDetailScreen() {
   const [activeTab, setActiveTab] = useState<AuditFilter>(
     (filterParam as AuditFilter | undefined) ?? "all",
   );
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Clear search whenever the tab changes
+  const handleTabChange = (tab: AuditFilter) => {
+    setActiveTab(tab);
+    setSearchQuery("");
+  };
 
   const queryParams = useMemo(() => tabToParams(activeTab), [activeTab]);
 
@@ -288,7 +296,24 @@ export default function ReportsDetailScreen() {
     fetchReportsQueryOptions(queryParams),
   );
 
-  const reports = data ?? [];
+  // Client-side text search on top of the server-filtered tab data
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+  const reports = useMemo(() => {
+    const base = data ?? [];
+    if (!trimmedQuery) return base;
+    return base.filter((r) => {
+      const haystack = [
+        r.title,
+        r.siteAddress,
+        (r as Report & { clientName?: string | null }).clientName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(trimmedQuery);
+    });
+  }, [data, trimmedQuery]);
+
   const accent  = TAB_ACCENT[activeTab];
 
   return (
@@ -347,7 +372,7 @@ export default function ReportsDetailScreen() {
           return (
             <TouchableOpacity
               key={filter}
-              onPress={() => setActiveTab(filter)}
+              onPress={() => handleTabChange(filter)}
               activeOpacity={0.75}
               style={{
                 flex: 1,
@@ -380,6 +405,47 @@ export default function ReportsDetailScreen() {
             </TouchableOpacity>
           );
         })}
+      </View>
+
+      {/* ── Search bar ─────────────────────────────────────────────────────── */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          marginHorizontal: 16,
+          marginBottom: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: trimmedQuery ? C.primary + "55" : C.border,
+          backgroundColor: C.surface,
+          gap: 8,
+        }}
+      >
+        <Ionicons name="search-outline" size={16} color={trimmedQuery ? C.primary : C.muted} />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search by address or client…"
+          placeholderTextColor={C.muted}
+          style={{
+            flex: 1,
+            fontFamily: "Inter_400Regular",
+            fontSize: 14,
+            color: C.text,
+            padding: 0,
+          }}
+          returnKeyType="search"
+          autoCorrect={false}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
+        />
+        {searchQuery.length > 0 ? (
+          <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={C.muted} />
+          </Pressable>
+        ) : null}
       </View>
 
       {/* ── Active filter banner ────────────────────────────────────────────── */}
@@ -416,7 +482,7 @@ export default function ReportsDetailScreen() {
         </Text>
         {activeTab !== "all" ? (
           <TouchableOpacity
-            onPress={() => setActiveTab("all")}
+            onPress={() => handleTabChange("all")}
             activeOpacity={0.7}
             hitSlop={8}
           >
@@ -474,13 +540,33 @@ export default function ReportsDetailScreen() {
                 No reports
               </Text>
               <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", maxWidth: 240 }}>
-                {activeTab === "all"
+                {trimmedQuery
+                  ? `No results for "${searchQuery.trim()}".`
+                  : activeTab === "all"
                   ? "Complete an inspection to generate a report."
                   : `No reports match the "${TABS.find(t => t.filter === activeTab)?.label}" filter.`}
               </Text>
-              {activeTab !== "all" ? (
+              {trimmedQuery ? (
                 <TouchableOpacity
-                  onPress={() => setActiveTab("all")}
+                  onPress={() => setSearchQuery("")}
+                  activeOpacity={0.75}
+                  style={{
+                    paddingHorizontal: 18,
+                    paddingVertical: 9,
+                    borderRadius: 10,
+                    backgroundColor: C.primary + "22",
+                    borderWidth: 1,
+                    borderColor: C.primary + "55",
+                    marginTop: 4,
+                  }}
+                >
+                  <Text style={{ color: C.primary, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+                    Clear search
+                  </Text>
+                </TouchableOpacity>
+              ) : activeTab !== "all" ? (
+                <TouchableOpacity
+                  onPress={() => handleTabChange("all")}
                   activeOpacity={0.75}
                   style={{
                     paddingHorizontal: 18,
