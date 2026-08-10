@@ -22,9 +22,11 @@ import Svg, { Rect, Line, Text as SvgText } from "react-native-svg";
 import {
   fetchExecutiveMetrics,
   fetchExecutiveQualityTrend,
+  fetchDailyBriefing,
   type ExecutiveMetrics,
   type ExecutiveTechnician,
   type ExecutiveQualityWeek,
+  type DailyBriefing,
 } from "@/lib/api";
 
 // ─── Palette (dark command-centre tone) ───────────────────────────────────────
@@ -520,6 +522,7 @@ export default function ExecutiveDashboardScreen() {
 
   const [metrics, setMetrics] = useState<ExecutiveMetrics | null>(null);
   const [qualityWeeks, setQualityWeeks] = useState<ExecutiveQualityWeek[] | null>(null);
+  const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -530,12 +533,14 @@ export default function ExecutiveDashboardScreen() {
     setError(null);
     try {
       const token = await getToken();
-      const [metricsRes, trendRes] = await Promise.all([
+      const [metricsRes, trendRes, briefingRes] = await Promise.all([
         fetchExecutiveMetrics(token),
         fetchExecutiveQualityTrend(token),
+        fetchDailyBriefing(token).catch(() => null),
       ]);
       setMetrics(metricsRes.metrics);
       setQualityWeeks(trendRes.weeks);
+      if (briefingRes) setBriefing(briefingRes.briefing);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load metrics");
     } finally {
@@ -661,6 +666,149 @@ export default function ExecutiveDashboardScreen() {
             />
           }
         >
+          {/* ── Yesterday's Briefing ──────────────────────────────────── */}
+          {briefing && (
+            <View
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: briefing.criticalRiskCount > 0 ? C.danger + "55" : C.border,
+                borderRadius: 14,
+                padding: 16,
+                gap: 10,
+              }}
+            >
+              {/* Header row */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 10,
+                    backgroundColor:
+                      briefing.criticalRiskCount > 0 ? C.danger + "22" : C.primary + "22",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons
+                    name={briefing.criticalRiskCount > 0 ? "warning-outline" : "sunny-outline"}
+                    size={16}
+                    color={briefing.criticalRiskCount > 0 ? C.danger : C.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: C.text,
+                      fontFamily: "Inter_700Bold",
+                      fontSize: 13,
+                    }}
+                  >
+                    Yesterday's Briefing
+                  </Text>
+                  <Text
+                    style={{
+                      color: C.muted,
+                      fontFamily: "Inter_400Regular",
+                      fontSize: 11,
+                      marginTop: 1,
+                    }}
+                  >
+                    {briefing.date}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Summary */}
+              <Text
+                style={{
+                  color: "#C9D1D9",
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 13,
+                  lineHeight: 20,
+                }}
+              >
+                {briefing.summary}
+              </Text>
+
+              {/* Stat pills */}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {[
+                  {
+                    icon: "checkmark-circle-outline" as const,
+                    label: `${briefing.inspectionsCount} completed`,
+                    color: C.success,
+                  },
+                  {
+                    icon: "warning-outline" as const,
+                    label: `${briefing.criticalRiskCount} critical`,
+                    color: briefing.criticalRiskCount > 0 ? C.danger : C.muted,
+                  },
+                  {
+                    icon: "trending-up-outline" as const,
+                    label: `$${briefing.pipelineAdded.toLocaleString()} pipeline`,
+                    color: C.primary,
+                  },
+                ].map((pill) => (
+                  <View
+                    key={pill.label}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 4,
+                      backgroundColor: pill.color + "18",
+                      borderRadius: 20,
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                    }}
+                  >
+                    <Ionicons name={pill.icon} size={12} color={pill.color} />
+                    <Text
+                      style={{
+                        color: pill.color,
+                        fontFamily: "Inter_600SemiBold",
+                        fontSize: 11,
+                      }}
+                    >
+                      {pill.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Recommendation */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 8,
+                  paddingTop: 4,
+                  borderTopWidth: 1,
+                  borderTopColor: C.border,
+                }}
+              >
+                <Ionicons
+                  name="bulb-outline"
+                  size={14}
+                  color={C.warning}
+                  style={{ marginTop: 2 }}
+                />
+                <Text
+                  style={{
+                    color: C.muted,
+                    fontFamily: "Inter_400Regular",
+                    fontSize: 12,
+                    flex: 1,
+                    lineHeight: 18,
+                  }}
+                >
+                  {briefing.recommendation}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* ── KPI Grid ──────────────────────────────────────────────── */}
           <View>
             <SectionTitle title="Pipeline & Financials" />

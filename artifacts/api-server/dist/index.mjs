@@ -123804,6 +123804,64 @@ var playbooks_default = router33;
 
 // src/routes/executive.ts
 var import_express35 = __toESM(require_express2(), 1);
+
+// src/services/briefing.ts
+async function generateDailyExecutiveBriefing(companyId, targetDate) {
+  const startOfDay = new Date(targetDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(targetDate);
+  endOfDay.setHours(23, 59, 59, 999);
+  const [inspectionRow] = await db.select({ totalInspections: count(inspectionsTable.id) }).from(inspectionsTable).where(
+    and(
+      eq(inspectionsTable.companyId, companyId),
+      eq(inspectionsTable.status, "completed"),
+      gte(inspectionsTable.createdAt, startOfDay),
+      lt(inspectionsTable.createdAt, endOfDay)
+    )
+  );
+  const [riskRow] = await db.select({
+    criticalRisks: sql`
+        sum(case when ${inspectionScorecardsTable.riskLevel} = 'critical' then 1 else 0 end)
+      `
+  }).from(inspectionScorecardsTable).innerJoin(
+    inspectionsTable,
+    eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId)
+  ).where(
+    and(
+      eq(inspectionScorecardsTable.companyId, companyId),
+      gte(inspectionsTable.createdAt, startOfDay),
+      lt(inspectionsTable.createdAt, endOfDay)
+    )
+  );
+  const [oppRow] = await db.select({
+    newPipelineValue: sql`coalesce(sum(${opportunitiesTable.estimatedAnnualValue}), 0)`,
+    newOpportunities: count(opportunitiesTable.id)
+  }).from(opportunitiesTable).where(
+    and(
+      eq(opportunitiesTable.companyId, companyId),
+      gte(opportunitiesTable.createdAt, startOfDay),
+      lt(opportunitiesTable.createdAt, endOfDay)
+    )
+  );
+  const totalInspections = Number(inspectionRow?.totalInspections ?? 0);
+  const criticalRisks = Number(riskRow?.criticalRisks ?? 0);
+  const newPipelineValue = Number(oppRow?.newPipelineValue ?? 0);
+  const newOpportunities = Number(oppRow?.newOpportunities ?? 0);
+  const inspectionWord = totalInspections === 1 ? "inspection" : "inspections";
+  const alertPhrase = criticalRisks > 0 ? ` with ${criticalRisks} critical risk alert${criticalRisks === 1 ? "" : "s"} flagged` : " with no critical risk alerts";
+  const briefing = {
+    date: targetDate.toISOString().split("T")[0],
+    summary: `Yesterday your team completed ${totalInspections} ${inspectionWord}${alertPhrase}. New pipeline value added: $${newPipelineValue.toLocaleString()}.`,
+    inspectionsCount: totalInspections,
+    criticalRiskCount: criticalRisks,
+    newOpportunities,
+    pipelineAdded: newPipelineValue,
+    recommendation: criticalRisks > 0 ? "Prioritize reviewing the critical-risk sites flagged by Quinn before the day begins." : "Operations ran within normal quality thresholds \u2014 no critical compliance violations yesterday."
+  };
+  return { success: true, briefing };
+}
+
+// src/routes/executive.ts
 var router34 = (0, import_express35.Router)();
 router34.get(
   "/executive/intelligence",
@@ -123987,6 +124045,25 @@ router34.get(
       return res.json({ success: true, weeks });
     } catch (error40) {
       console.error("executive quality-trend error:", error40);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+router34.get(
+  "/executive/briefing/yesterday",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+    const yesterday = /* @__PURE__ */ new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    try {
+      const result = await generateDailyExecutiveBriefing(companyId, yesterday);
+      return res.json(result);
+    } catch (error40) {
+      console.error("executive briefing error:", error40);
       return res.status(500).json({ error: "Internal server error" });
     }
   }

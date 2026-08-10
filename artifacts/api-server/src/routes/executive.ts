@@ -9,6 +9,7 @@ import { db, opportunitiesTable, inspectionScorecardsTable, inspectionsTable } f
 import { and, avg, count, eq, inArray, isNotNull, sql, sum } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { requireAuth, requireCompany, requireBetaAccess, requireRole } from "../middleware/require-auth";
+import { generateDailyExecutiveBriefing } from "../services/briefing";
 
 const router = Router();
 
@@ -267,6 +268,35 @@ router.get(
       return res.json({ success: true, weeks });
     } catch (error) {
       console.error("executive quality-trend error:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+/**
+ * GET /executive/briefing/yesterday
+ *
+ * Returns a structured narrative digest of yesterday's operations:
+ * completed inspections, critical-risk count, and new pipeline value.
+ * Gated at requireRole("owner") — same scope as the rest of this router.
+ */
+router.get(
+  "/executive/briefing/yesterday",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    try {
+      const result = await generateDailyExecutiveBriefing(companyId, yesterday);
+      return res.json(result);
+    } catch (error) {
+      console.error("executive briefing error:", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   },

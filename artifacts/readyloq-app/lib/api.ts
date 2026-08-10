@@ -437,6 +437,25 @@ export function fetchExecutiveInspections(
   }>(`/api/executive/inspections?riskLevel=${riskLevel}`, token);
 }
 
+// ─── Executive daily briefing ─────────────────────────────────────────────────
+
+export interface DailyBriefing {
+  date: string;
+  summary: string;
+  inspectionsCount: number;
+  criticalRiskCount: number;
+  newOpportunities: number;
+  pipelineAdded: number;
+  recommendation: string;
+}
+
+export function fetchDailyBriefing(token: string | null) {
+  return request<{ success: true; briefing: DailyBriefing }>(
+    "/api/executive/briefing/yesterday",
+    token,
+  );
+}
+
 // ─── Bulk dataset ingestion ───────────────────────────────────────────────────
 
 export interface BulkIngestMetadata {

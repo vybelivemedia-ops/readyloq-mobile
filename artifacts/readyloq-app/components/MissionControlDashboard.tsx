@@ -38,6 +38,7 @@ import type {
   RoleBriefing,
 } from "@/lib/api-client";
 import type { AgentRegistryEntry } from "@platform/agent-registry";
+import { ExecutiveBriefingCard } from "@/components/briefing/ExecutiveBriefingCard";
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 
@@ -527,6 +528,9 @@ export function MissionControlDashboard({
 
         {/* ── Daily briefing body ──────────────────────────────────────────── */}
         <SectionLabel>DAILY BRIEFING</SectionLabel>
+
+        {/* Yesterday's aggregate executive digest — owners only, self-fetching */}
+        <ExecutiveBriefingCard />
 
         {isSoloOperator ? (
           /* Solo: field-execution summary */
