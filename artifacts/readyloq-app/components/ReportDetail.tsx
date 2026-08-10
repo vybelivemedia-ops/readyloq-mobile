@@ -6,8 +6,9 @@ import {
 import type { AiReportNarrative } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { useAuth } from "@clerk/expo";
 
 import { FindingCard } from "@/components/FindingCard";
 import { Badge } from "@/components/ui/Badge";
@@ -17,8 +18,15 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { FullScreenLoader } from "@/components/ui/Loader";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { formatDate, formatStatus, severityTone, statusTone } from "@/constants/inspection";
-import { ApiError } from "@/lib/api";
+import {
+  ApiError,
+  fetchIntegrationConfig,
+  triggerIntegrationSync,
+  type FieldIntegrationSystem,
+  type IntegrationConfigResponse,
+} from "@/lib/api";
 
 interface ReportDetailProps {
   id: number;
@@ -26,16 +34,59 @@ interface ReportDetailProps {
   embedded?: boolean;
 }
 
+const FINALIZED_STATUSES = new Set(["complete", "completed"]);
+
+const SYSTEM_LABEL: Record<FieldIntegrationSystem, string> = {
+  pestpac: "PestPac",
+  fieldroutes: "FieldRoutes",
+};
+
 export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
   const colors = useColors();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { getToken } = useAuth();
+  const { user } = useCurrentUser();
+  const isOwner = user?.effectiveRole === "owner";
 
   const reportQ = useQuery(getGetReportQueryOptions(id));
   const genNarrative = useGenerateReportNarrative();
   const [error, setError] = useState<string | null>(null);
 
+  // ── Field-service integration sync ─────────────────────────────────────────
+  const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfigResponse | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const report = reportQ.data;
+  const isFinalized = report ? FINALIZED_STATUSES.has(report.status) : false;
+
+  useEffect(() => {
+    if (!isOwner || !isFinalized) return;
+    getToken()
+      .then((token: string | null) => fetchIntegrationConfig(token))
+      .then(setIntegrationConfig)
+      .catch(() => { /* non-blocking — button simply won't appear */ });
+  }, [isOwner, isFinalized, getToken]);
+
+  const handleSync = async () => {
+    if (!report?.inspectionId || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const token = await getToken();
+      const result = await triggerIntegrationSync(token, report.inspectionId);
+      Alert.alert(
+        "Pushed to dispatch",
+        result.attachmentsPosted > 0
+          ? `Report and ${result.attachmentsPosted} photo${result.attachmentsPosted !== 1 ? "s" : ""} sent successfully.`
+          : "Inspection report and conditions were successfully sent.",
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      Alert.alert("Sync failed", `Could not push to dispatch software. ${msg}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const generate = async () => {
     setError(null);
@@ -151,6 +202,28 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
             <Text selectable style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 }}>
               {report.treatmentNotes}
             </Text>
+          </Card>
+        ) : null}
+
+        {/* Field-service integration sync — owner-only, finalized inspections */}
+        {isOwner && isFinalized && integrationConfig?.configured ? (
+          <Card style={{ gap: 10 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="cloud-upload-outline" size={18} color={colors.primary} />
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
+                Field-service integration
+              </Text>
+            </View>
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+              Push this inspection report, findings, and photos to{" "}
+              {SYSTEM_LABEL[integrationConfig.integration.systemType]}.
+            </Text>
+            <Button
+              title={`Sync to ${SYSTEM_LABEL[integrationConfig.integration.systemType]}`}
+              icon="cloud-upload-outline"
+              loading={isSyncing}
+              onPress={handleSync}
+            />
           </Card>
         ) : null}
       </ScrollView>
