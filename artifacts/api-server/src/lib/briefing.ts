@@ -260,7 +260,13 @@ async function buildManagerSection(companyId: number): Promise<ManagerBriefing> 
         createdAt: customerSummariesTable.createdAt,
       })
       .from(customerSummariesTable)
-      .innerJoin(inspectionsTable, eq(customerSummariesTable.inspectionId, inspectionsTable.id))
+      .innerJoin(
+        inspectionsTable,
+        and(
+          eq(customerSummariesTable.inspectionId, inspectionsTable.id),
+          eq(inspectionsTable.companyId, companyId), // tenant guard: ensures the joined row belongs to this company
+        ),
+      )
       .where(
         and(
           eq(customerSummariesTable.companyId, companyId),

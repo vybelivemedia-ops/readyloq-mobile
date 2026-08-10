@@ -465,6 +465,7 @@ router.post("/:id/media", async (req, res) => {
       .from(inspectionMediaTable)
       .where(
         and(
+          eq(inspectionMediaTable.companyId, companyId), // tenant guard: defense-in-depth alongside parent inspection check
           eq(inspectionMediaTable.inspectionId, inspectionId),
           eq(inspectionMediaTable.url, url),
         ),

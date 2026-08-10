@@ -295,6 +295,9 @@ router.post("/:id/generate-narrative", async (req, res) => {
       .where(and(eq(reportsTable.id, id), eq(reportsTable.companyId, companyId)))
       .returning();
 
+    if (!updated) {
+      return res.status(409).json({ error: "Report no longer exists" });
+    }
     return res.json(serializeReport(updated));
   } catch (err) {
     void logErrorEvent("report", {
