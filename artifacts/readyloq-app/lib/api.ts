@@ -453,6 +453,7 @@ export function fetchExecutiveQualityTrend(token: string | null) {
 export interface ExecutiveInspectionFilters {
   technicianName?: string;
   since?: string; // ISO date string, e.g. "2026-07-01"
+  offset?: number;
 }
 
 export function fetchExecutiveInspections(
@@ -463,10 +464,14 @@ export function fetchExecutiveInspections(
   const params = new URLSearchParams({ riskLevel });
   if (filters?.technicianName) params.set("technicianName", filters.technicianName);
   if (filters?.since) params.set("since", filters.since);
+  if (filters?.offset != null && filters.offset > 0) params.set("offset", String(filters.offset));
   return request<{
     success: true;
     riskLevel: ExecutiveRiskLevel;
     filters: { technicianName: string | null; since: string | null };
+    offset: number;
+    limit: number;
+    hasMore: boolean;
     inspections: ExecutiveRiskInspection[];
   }>(`/api/executive/inspections?${params.toString()}`, token);
 }

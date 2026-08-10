@@ -187,6 +187,13 @@ router.get(
       since = parsed.toISOString();
     }
 
+    // Offset-based pagination — page size is fixed at 100 rows.
+    // We fetch PAGE_SIZE + 1 rows and use the extra row to determine hasMore
+    // without a separate COUNT(*) query.
+    const PAGE_SIZE = 100;
+    const rawOffset = parseInt(String(req.query.offset ?? "0"), 10);
+    const offset = isNaN(rawOffset) || rawOffset < 0 ? 0 : rawOffset;
+
     try {
       const conditions = [
         eq(inspectionScorecardsTable.companyId, companyId),
@@ -212,7 +219,11 @@ router.get(
         )
         .where(and(...conditions))
         .orderBy(sql`${inspectionScorecardsTable.riskScore} desc`)
-        .limit(200);
+        .limit(PAGE_SIZE + 1)
+        .offset(offset);
+
+      const hasMore = rows.length > PAGE_SIZE;
+      const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
 
       return res.json({
         success: true,
@@ -221,7 +232,10 @@ router.get(
           technicianName: technicianName ?? null,
           since: since ?? null,
         },
-        inspections: rows.map((r) => ({
+        offset,
+        limit: PAGE_SIZE,
+        hasMore,
+        inspections: page.map((r) => ({
           inspectionId:   r.inspectionId,
           siteAddress:    r.siteAddress,
           technicianName: r.technicianName || "Unknown",

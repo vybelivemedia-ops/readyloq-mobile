@@ -317,7 +317,11 @@ export default function ExecutiveRiskInspectionsScreen() {
   const [items, setItems] = useState<ExecutiveRiskInspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Track loaded count so onEndReached knows the next offset to request.
+  const loadedCountRef = useRef(0);
 
   // ── Filter state — cleared on unmount (not persisted across navigation) ──
   const [filterTech, setFilterTech] = useState<string | null>(null);
@@ -332,16 +336,23 @@ export default function ExecutiveRiskInspectionsScreen() {
   const reqIdRef = useRef(0);
 
   // ── Stable fetch function — does NOT depend on filter state ──────────────
-  // Takes explicit (tech, days) params so callers control exactly what is fetched.
-  // useEffect and applyTech/applyDays call this directly; there is no secondary
-  // effect that watches filter state, so there is no double-fetch.
+  // Takes explicit (tech, days, offset, append) params so callers control exactly
+  // what is fetched. When append=true the new page is merged onto the existing
+  // list; when false (initial / refresh / filter change) the list is replaced.
   const fetchData = useCallback(
-    async (tech: string | null, days: number | null, isRefresh = false) => {
+    async (
+      tech: string | null,
+      days: number | null,
+      isRefresh = false,
+      offset = 0,
+      append = false,
+    ) => {
       const myReqId = ++reqIdRef.current;
 
-      if (isRefresh) setRefreshing(true);
+      if (append) setLoadingMore(true);
+      else if (isRefresh) setRefreshing(true);
       else setLoading(true);
-      setError(null);
+      if (!append) setError(null);
 
       try {
         const token = await getToken();
@@ -349,17 +360,28 @@ export default function ExecutiveRiskInspectionsScreen() {
         const filters = {
           ...(tech ? { technicianName: tech } : {}),
           ...(since ? { since } : {}),
+          ...(offset > 0 ? { offset } : {}),
         };
         const res = await fetchExecutiveInspections(token, riskLevel, filters);
 
         // Drop this response if a newer fetch has already been issued.
         if (myReqId !== reqIdRef.current) return;
 
-        setItems(res.inspections);
+        if (append) {
+          setItems((prev) => {
+            const merged = [...prev, ...res.inspections];
+            loadedCountRef.current = merged.length;
+            return merged;
+          });
+        } else {
+          setItems(res.inspections);
+          loadedCountRef.current = res.inspections.length;
+        }
+        setHasMore(res.hasMore);
 
         // Populate the technician picker from the initial unfiltered load only,
         // so the options list never shrinks when a filter is applied.
-        if (!tech && !since) {
+        if (!tech && !since && offset === 0) {
           const unique = Array.from(
             new Set(res.inspections.map((i) => i.technicianName).filter(Boolean)),
           ).sort();
@@ -367,12 +389,12 @@ export default function ExecutiveRiskInspectionsScreen() {
         }
       } catch (e) {
         if (myReqId !== reqIdRef.current) return;
-        setError(e instanceof Error ? e.message : "Failed to load inspections");
+        if (!append) setError(e instanceof Error ? e.message : "Failed to load inspections");
       } finally {
-        // Only clear loading flags if we're still the current request.
         if (myReqId === reqIdRef.current) {
           setLoading(false);
           setRefreshing(false);
+          setLoadingMore(false);
         }
       }
     },
@@ -384,6 +406,24 @@ export default function ExecutiveRiskInspectionsScreen() {
   useEffect(() => {
     void fetchData(null, null);
   }, [fetchData]);
+
+  // ── Load-more — called by FlatList onEndReached ───────────────────────────
+  // Reads filter state from refs to avoid stale closures.
+  const filterTechRef = useRef<string | null>(null);
+  const filterDaysRef = useRef<number | null>(null);
+  filterTechRef.current = filterTech;
+  filterDaysRef.current = filterDays;
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    void fetchData(
+      filterTechRef.current,
+      filterDaysRef.current,
+      false,
+      loadedCountRef.current,
+      true,
+    );
+  }, [loadingMore, hasMore, fetchData]);
 
   // ── Filter handlers — update state and issue one fetch, no double-effect ──
   const applyTech = useCallback(
@@ -699,7 +739,9 @@ export default function ExecutiveRiskInspectionsScreen() {
           )}
         </View>
       ) : (
-        <ScrollView
+        <FlatList
+          data={items}
+          keyExtractor={(item) => String(item.inspectionId)}
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           refreshControl={
             <RefreshControl
@@ -708,88 +750,135 @@ export default function ExecutiveRiskInspectionsScreen() {
               tintColor={C.primary}
             />
           }
-        >
-          {/* Summary strip */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              gap: 8,
-              borderBottomWidth: 1,
-              borderBottomColor: C.border,
-            }}
-          >
-            <Ionicons name={RISK_ICON[riskLevel]} size={16} color={accentColor} />
-            <Text
-              style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}
-            >
-              <Text style={{ color: accentColor, fontFamily: "Inter_700Bold" }}>
-                {items.length}
-              </Text>{" "}
-              {levelLabel.toLowerCase()} risk inspection{items.length !== 1 ? "s" : ""}{" · "}
-              {summaryText}
-            </Text>
-          </View>
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.3}
+          ListHeaderComponent={
+            <>
+              {/* Summary strip */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  gap: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: C.border,
+                }}
+              >
+                <Ionicons name={RISK_ICON[riskLevel]} size={16} color={accentColor} />
+                <Text
+                  style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}
+                >
+                  <Text style={{ color: accentColor, fontFamily: "Inter_700Bold" }}>
+                    {items.length}{hasMore ? "+" : ""}
+                  </Text>{" "}
+                  {levelLabel.toLowerCase()} risk inspection{items.length !== 1 ? "s" : ""}{" · "}
+                  {summaryText}
+                </Text>
+              </View>
 
-          {/* List */}
-          <View
-            style={{
-              marginHorizontal: 16,
-              marginTop: 16,
-              backgroundColor: C.surface,
-              borderWidth: 1,
-              borderColor: C.border,
-              borderRadius: 14,
-              overflow: "hidden",
-            }}
-          >
-            {/* Column header */}
+              {/* Card top: column header */}
+              <View
+                style={{
+                  marginHorizontal: 16,
+                  marginTop: 16,
+                  backgroundColor: C.surface,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                  borderTopLeftRadius: 14,
+                  borderTopRightRadius: 14,
+                  overflow: "hidden",
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderBottomWidth: 1,
+                    borderBottomColor: C.border,
+                    backgroundColor: "#ffffff06",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: C.muted,
+                      fontFamily: "Inter_600SemiBold",
+                      fontSize: 10,
+                      letterSpacing: 0.6,
+                      flex: 1,
+                      marginLeft: 48,
+                    }}
+                  >
+                    SITE / TECHNICIAN
+                  </Text>
+                  <Text
+                    style={{
+                      color: C.muted,
+                      fontFamily: "Inter_600SemiBold",
+                      fontSize: 10,
+                      letterSpacing: 0.6,
+                    }}
+                  >
+                    SCORE
+                  </Text>
+                </View>
+              </View>
+            </>
+          }
+          renderItem={({ item, index }) => (
             <View
               style={{
-                flexDirection: "row",
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-                borderBottomWidth: 1,
-                borderBottomColor: C.border,
-                backgroundColor: "#ffffff06",
+                marginHorizontal: 16,
+                backgroundColor: C.surface,
+                borderLeftWidth: 1,
+                borderRightWidth: 1,
+                borderColor: C.border,
               }}
             >
-              <Text
-                style={{
-                  color: C.muted,
-                  fontFamily: "Inter_600SemiBold",
-                  fontSize: 10,
-                  letterSpacing: 0.6,
-                  flex: 1,
-                  marginLeft: 48,
-                }}
-              >
-                SITE / TECHNICIAN
-              </Text>
-              <Text
-                style={{
-                  color: C.muted,
-                  fontFamily: "Inter_600SemiBold",
-                  fontSize: 10,
-                  letterSpacing: 0.6,
-                }}
-              >
-                SCORE
-              </Text>
-            </View>
-
-            {items.map((item, i) => (
               <InspectionRow
-                key={item.inspectionId}
                 item={item}
-                isLast={i === items.length - 1}
+                isLast={index === items.length - 1 && !hasMore}
                 onPress={() => router.push(`/inspection/${item.inspectionId}` as never)}
               />
-            ))}
-          </View>
-        </ScrollView>
+            </View>
+          )}
+          ListFooterComponent={
+            <View
+              style={{
+                marginHorizontal: 16,
+                backgroundColor: C.surface,
+                borderLeftWidth: 1,
+                borderRightWidth: 1,
+                borderBottomWidth: 1,
+                borderColor: C.border,
+                borderBottomLeftRadius: 14,
+                borderBottomRightRadius: 14,
+                overflow: "hidden",
+              }}
+            >
+              {loadingMore && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    paddingVertical: 16,
+                    borderTopWidth: 1,
+                    borderTopColor: C.border,
+                  }}
+                >
+                  <ActivityIndicator size="small" color={C.primary} />
+                  <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                    Loading more…
+                  </Text>
+                </View>
+              )}
+            </View>
+          }
+        />
       )}
 
       {/* ── Technician picker modal ──────────────────────────────────────── */}
