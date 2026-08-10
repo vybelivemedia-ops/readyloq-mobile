@@ -43,6 +43,7 @@ import { verifyEquipmentUsage } from "@/lib/audio/intelligence/EquipmentVerifier
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
 import { NativeCameraHealthBadge } from "@/components/NativeCameraHealthBadge";
+import { useAllDevicesHealthCheck } from "@/hooks/useAllDevicesHealthCheck";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
 import { useMetaGlassesSession, type GlassesEvent } from "@/hooks/useMetaGlassesSession";
 import { Button } from "@/components/ui/Button";
@@ -154,6 +155,10 @@ export default function NewInspectionScreen() {
     photoCount: photos.length,
     sessionActive: step === "capture",
   });
+  // Warm the DeviceRegistry health cache on mount and every 30 s so the
+  // NativeCameraHealthBadge and DeviceHealthStrip reflect current state
+  // without waiting for each chip to probe independently.
+  useAllDevicesHealthCheck();
   const [capturing, setCapturing] = useState(false);
   // Synchronous ref-based lock — prevents burst captures when the shutter is
   // tapped rapidly during a lag spike (React state updates are async, so the
