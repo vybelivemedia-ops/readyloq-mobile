@@ -382,6 +382,7 @@ function Gate() {
       <Stack.Screen name="dataset" />
       <Stack.Screen name="executive-dashboard" />
       <Stack.Screen name="executive-risk-inspections" />
+      <Stack.Screen name="reports-detail" />
     </Stack>
   );
 }
