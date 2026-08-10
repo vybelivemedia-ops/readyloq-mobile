@@ -158,10 +158,15 @@ export default function InspectionSummaryScreen() {
     setIsSyncing(true);
     try {
       const token = await getToken();
-      await triggerIntegrationSync(token, serverId);
+      const result = await triggerIntegrationSync(token, serverId);
+      const totalPhotos = record?.photos.length ?? 0;
+      const attached = result.attachmentsPosted;
+      const allAttached = attached >= totalPhotos;
       Alert.alert(
         "Pushed to dispatch",
-        "Inspection report, photos, and conditions were successfully sent.",
+        allAttached
+          ? "Inspection report, photos, and conditions were successfully sent."
+          : `Report and conditions sent. ${attached} of ${totalPhotos} photo${totalPhotos !== 1 ? "s" : ""} attached — you can push again to retry the remaining photos.`,
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";

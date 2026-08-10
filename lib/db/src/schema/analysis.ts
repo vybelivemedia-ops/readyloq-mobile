@@ -52,6 +52,9 @@ export interface Finding {
   // come straight from the vision model's assessment of a real photo — null /
   // absent means that photo showed no such evidence. Optional so findings
   // stored before these fields existed remain valid.
+  // Pest identification from the vision model. Mirrors the intelligence-dataset
+  // schema so findings stored from that pipeline are valid here too.
+  possiblePest?: string | null;
   species?: string | null;
   lifeStage?: string | null;
   conduciveCondition?: string | null;

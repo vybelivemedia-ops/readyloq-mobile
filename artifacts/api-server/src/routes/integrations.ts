@@ -195,17 +195,16 @@ router.post("/sync", async (req, res) => {
 
     const analysis = analyses[0];
     const findings = (analysis?.findings ?? []) as Finding[];
-    const narrative = analysis?.narrative ?? "";
 
-    // Build the summary — prefer the AI narrative, fall back to a structured list.
+    // Build the summary from findings (the AI narrative lives in the reports
+    // table and is not loaded here to keep this route lightweight).
     const reportSummary =
-      narrative ||
-      (findings.length > 0
+      findings.length > 0
         ? findings
             .slice(0, 5)
             .map((f) => `${f.category}: ${f.description}`)
             .join(". ")
-        : "No significant findings detected.");
+        : "No significant findings detected.";
 
     const photos = media
       .filter((m) => m.mediaType === "photo" && m.url)

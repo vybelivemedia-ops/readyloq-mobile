@@ -284,6 +284,7 @@ export interface Finding {
     treatment: string | null;
     exclusionOpportunity: boolean | null;
     evidenceQuality?: "excellent" | "good" | "fair" | null;
+    possiblePest?: string | null;
     species?: string | null;
     lifeStage?: string | null;
     conduciveCondition?: string | null;
