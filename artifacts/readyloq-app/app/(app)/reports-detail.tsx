@@ -89,18 +89,19 @@ const FILTER_DESCRIPTIONS: Record<AuditFilter, string> = {
   pending:  "Filtered by: Summaries Awaiting Approval",
 };
 
-// ─── Report card ──────────────────────────────────────────────────────────────
+// ─── Shared card shell ────────────────────────────────────────────────────────
 
-function ReportCard({ item, onPress }: { item: Report; onPress: () => void }) {
-  const severityColor =
-    item.severity === "critical"
-      ? C.danger
-      : item.severity === "high"
-      ? "#E3882A"
-      : item.severity === "medium"
-      ? C.warning
-      : C.success;
-
+function CardShell({
+  item,
+  accent,
+  onPress,
+  children,
+}: {
+  item: Report;
+  accent: string;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <TouchableOpacity
       activeOpacity={0.75}
@@ -109,79 +110,156 @@ function ReportCard({ item, onPress }: { item: Report; onPress: () => void }) {
         backgroundColor: C.surface,
         borderWidth: 1,
         borderColor: C.border,
+        borderLeftWidth: 3,
+        borderLeftColor: accent,
         borderRadius: 10,
         padding: 13,
         gap: 6,
       }}
     >
-      {/* Header row */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-        <Text
-          numberOfLines={2}
-          style={{ color: C.text, fontFamily: "Inter_600SemiBold", fontSize: 14, flex: 1, lineHeight: 20 }}
-        >
-          {item.title || item.siteAddress || "Untitled report"}
-        </Text>
-        {/* Status pill */}
-        <View
-          style={{
-            paddingHorizontal: 8,
-            paddingVertical: 3,
-            borderRadius: 20,
-            backgroundColor: C.surface,
-            borderWidth: 1,
-            borderColor: C.border,
-          }}
-        >
-          <Text style={{ color: C.muted, fontFamily: "Inter_600SemiBold", fontSize: 10, letterSpacing: 0.5 }}>
-            {formatStatus(item.status)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Site address */}
-      {item.siteAddress ? (
+      {/* Title */}
+      <Text
+        numberOfLines={2}
+        style={{ color: C.text, fontFamily: "Inter_600SemiBold", fontSize: 14, lineHeight: 20 }}
+      >
+        {item.title || item.siteAddress || "Untitled report"}
+      </Text>
+      {/* Address — always shown if different from title */}
+      {item.siteAddress && item.siteAddress !== item.title ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-          <Ionicons name="location-outline" size={13} color={C.muted} />
-          <Text
-            numberOfLines={1}
-            style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 12, flex: 1 }}
-          >
+          <Ionicons name="location-outline" size={12} color={C.muted} />
+          <Text numberOfLines={1} style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 12, flex: 1 }}>
             {item.siteAddress}
           </Text>
         </View>
       ) : null}
+      {/* Filter-specific body */}
+      {children}
+    </TouchableOpacity>
+  );
+}
 
-      {/* Meta row */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 2 }}>
-        {item.severity ? (
+// ─── Filter-aware card ────────────────────────────────────────────────────────
+
+function ReportCard({
+  item,
+  filter,
+  onPress,
+}: {
+  item: Report;
+  filter: AuditFilter;
+  onPress: () => void;
+}) {
+  const accent = TAB_ACCENT[filter];
+
+  // Days since creation — used for pending age
+  const daysOld = Math.floor(
+    (Date.now() - new Date(item.createdAt).getTime()) / 86_400_000,
+  );
+
+  const severityColor =
+    item.severity === "critical" ? C.danger
+    : item.severity === "high"   ? "#E3882A"
+    : item.severity === "medium" ? C.warning
+    : C.success;
+
+  // ── Pipeline: what matters is delivery status + date ─────────────────────
+  if (filter === "pipeline") {
+    return (
+      <CardShell item={item} accent={accent} onPress={onPress}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Ionicons name="paper-plane-outline" size={13} color={accent} />
+            <Text style={{ color: accent, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+              {formatStatus(item.status)}
+            </Text>
+          </View>
+          <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+            {formatDate(item.createdAt)}
+          </Text>
+        </View>
+      </CardShell>
+    );
+  }
+
+  // ── Critical: severity is the hero ───────────────────────────────────────
+  if (filter === "critical") {
+    return (
+      <CardShell item={item} accent={accent} onPress={onPress}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+          {/* Large severity badge */}
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 4,
-              paddingHorizontal: 7,
-              paddingVertical: 2,
+              gap: 6,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
               borderRadius: 20,
               backgroundColor: severityColor + "18",
               borderWidth: 1,
-              borderColor: severityColor + "40",
+              borderColor: severityColor + "44",
             }}
           >
+            <Ionicons name="warning-outline" size={13} color={severityColor} />
+            <Text style={{ color: severityColor, fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.5 }}>
+              {item.severity ? item.severity.toUpperCase() : "UNKNOWN"} RISK
+            </Text>
+          </View>
+          <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+            {formatDate(item.createdAt)}
+          </Text>
+        </View>
+      </CardShell>
+    );
+  }
+
+  // ── Pending: age waiting is what matters ─────────────────────────────────
+  if (filter === "pending") {
+    const ageColor = daysOld >= 7 ? C.danger : daysOld >= 3 ? C.warning : C.muted;
+    return (
+      <CardShell item={item} accent={accent} onPress={onPress}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <Ionicons name="time-outline" size={13} color={ageColor} />
+            <Text style={{ color: ageColor, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+              Waiting {daysOld} day{daysOld === 1 ? "" : "s"}
+            </Text>
+          </View>
+          <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+            Submitted {formatDate(item.createdAt)}
+          </Text>
+        </View>
+      </CardShell>
+    );
+  }
+
+  // ── All: show everything ─────────────────────────────────────────────────
+  return (
+    <CardShell item={item} accent={accent} onPress={onPress}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 2 }}>
+        {/* Status */}
+        <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20, backgroundColor: C.bg, borderWidth: 1, borderColor: C.border }}>
+          <Text style={{ color: C.muted, fontFamily: "Inter_600SemiBold", fontSize: 10, letterSpacing: 0.4 }}>
+            {formatStatus(item.status)}
+          </Text>
+        </View>
+        {/* Severity */}
+        {item.severity ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20, backgroundColor: severityColor + "18", borderWidth: 1, borderColor: severityColor + "40" }}>
             <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: severityColor }} />
             <Text style={{ color: severityColor, fontFamily: "Inter_600SemiBold", fontSize: 10, letterSpacing: 0.4 }}>
               {item.severity.toUpperCase()}
             </Text>
           </View>
         ) : null}
-
+        {/* AI narrative indicator */}
         {item.aiNarrative ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
             <Ionicons name="sparkles-outline" size={12} color={C.primary} />
-            <Text style={{ color: C.primary, fontFamily: "Inter_500Medium", fontSize: 11 }}>AI narrative</Text>
+            <Text style={{ color: C.primary, fontFamily: "Inter_500Medium", fontSize: 11 }}>AI</Text>
           </View>
         ) : null}
-
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginLeft: "auto" as const }}>
           <Ionicons name="calendar-outline" size={12} color={C.muted} />
           <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 11 }}>
@@ -189,7 +267,7 @@ function ReportCard({ item, onPress }: { item: Report; onPress: () => void }) {
           </Text>
         </View>
       </View>
-    </TouchableOpacity>
+    </CardShell>
   );
 }
 
@@ -385,6 +463,7 @@ export default function ReportsDetailScreen() {
           renderItem={({ item }) => (
             <ReportCard
               item={item}
+              filter={activeTab}
               onPress={() => router.push(`/report/${item.id}` as never)}
             />
           )}
