@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod/v4";
 import { db } from "@workspace/db";
 import {
   analysisResultsTable,
@@ -16,6 +17,84 @@ import { runOpportunitySynthesis } from "../lib/opportunity-ai";
 import { runScorecardComputation } from "../lib/scorecard";
 import { objectPathCompanyScope, ObjectStorageService } from "../lib/objectStorage";
 import { zoomGlassesFrame } from "../lib/glasses-zoom";
+
+// ---------------------------------------------------------------------------
+// Write-boundary Finding validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Zod schema matching the Finding interface (lib/db/src/schema/analysis.ts).
+ * Applied at EVERY DB insert so malformed AI output or client submissions can
+ * never enter the database. Invalid entries are stripped and logged rather
+ * than rejecting the whole request — the analysis still saves with whatever
+ * valid findings remain. safeParseFindings() in reports.ts remains as an
+ * independent read-side safety net.
+ */
+const findingSchema = z.object({
+  id: z.number(),
+  category: z.string(),
+  description: z.string(),
+  confidence: z.number(),
+  severity: z.string(),
+  location: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  treatment: z.string().nullable(),
+  exclusionOpportunity: z.boolean().nullable(),
+  evidenceQuality: z.enum(["excellent", "good", "fair"]).nullable().optional(),
+  possiblePest: z.string().nullable().optional(),
+  species: z.string().nullable().optional(),
+  lifeStage: z.string().nullable().optional(),
+  conduciveCondition: z.string().nullable().optional(),
+  harborage: z.string().nullable().optional(),
+  moisture: z.string().nullable().optional(),
+  structuralIssue: z.string().nullable().optional(),
+  measurementEstimate: z
+    .object({
+      linearFt: z.number().nullable().optional(),
+      gapWidthIn: z.number().nullable().optional(),
+      heightFt: z.number().nullable().optional(),
+      confidence: z.number(),
+      source: z.literal("ai_vision_estimate"),
+    })
+    .nullable()
+    .optional(),
+  zone: z.string().nullable().optional(),
+  candidates: z
+    .array(z.object({ species: z.string(), confidence: z.number() }))
+    .optional(),
+  confidenceLabel: z.enum(["identified", "possible", "unidentified"]).optional(),
+  reviewStatus: z.enum(["pending", "accepted", "corrected", "dismissed"]).optional(),
+  technicianSpecies: z.string().nullable().optional(),
+});
+
+/**
+ * Validates an array of raw findings against findingSchema. Invalid entries
+ * are stripped and logged; valid entries are returned as typed Finding[].
+ * Returns [validFindings, invalidCount] — callers may log the count to the
+ * error monitor when invalidCount > 0.
+ */
+function validateFindings(
+  raw: unknown,
+  context: string,
+): [Finding[], number] {
+  if (!Array.isArray(raw)) return [[], 0];
+  const valid: Finding[] = [];
+  let invalidCount = 0;
+  for (const item of raw) {
+    const result = findingSchema.safeParse(item);
+    if (result.success) {
+      valid.push(result.data as Finding);
+    } else {
+      invalidCount++;
+      // Log the first failing field for diagnostics without flooding output.
+      const first = result.error.issues[0];
+      console.error(
+        `[analysis] Invalid finding stripped (${context}): ${first?.message ?? "unknown"} at path "${first?.path?.join(".") ?? "-"}"`,
+      );
+    }
+  }
+  return [valid, invalidCount];
+}
 
 const objectStorageService = new ObjectStorageService();
 import { logErrorEvent } from "../lib/error-events";
@@ -276,13 +355,24 @@ router.post("/", async (req, res) => {
       );
     if (!inspection) return res.status(404).json({ error: "Inspection not found" });
 
+    // Validate findings at the write boundary before touching the DB.
+    const [validFindings, invalidFindingCount] = validateFindings(findings, "POST /analysis");
+    if (invalidFindingCount > 0) {
+      void logErrorEvent("ai", {
+        companyId,
+        userId: req.user?.id,
+        message: `${invalidFindingCount} malformed finding(s) stripped before DB insert`,
+        context: { stage: "write_validation", endpoint: "POST /analysis" },
+      });
+    }
+
     // Confidence is stored on a 0–1 scale (matching individual finding confidence
     // and the report/analysis UI, which multiplies by 100 for display).
     const computed =
       overallConfidence ??
-      (findings.length > 0
-        ? findings.reduce((s: number, f: any) => s + (f.confidence ?? 0), 0) /
-          findings.length
+      (validFindings.length > 0
+        ? validFindings.reduce((s: number, f: Finding) => s + (f.confidence ?? 0), 0) /
+          validFindings.length
         : 0);
 
     const [row] = await db
@@ -291,7 +381,7 @@ router.post("/", async (req, res) => {
         companyId,
         inspectionId,
         status: "complete",
-        findings,
+        findings: validFindings,
         recommendations,
         overallConfidence: computed,
       })
@@ -575,10 +665,25 @@ router.post("/analyze", async (req, res) => {
     }
 
     // Merge technician voice findings (renumbered after AI findings).
-    const mergedFindings: Finding[] = [
+    const rawMerged: Finding[] = [
       ...aiFindings,
       ...technicianFindings.map((f) => ({ ...f, id: nextId++ })),
     ];
+
+    // Validate every finding at the write boundary before touching the DB.
+    // Both server-built AI findings and client-submitted technician findings
+    // are checked. Invalid entries are stripped and logged; the analysis still
+    // saves with whatever valid findings remain.
+    const [mergedFindings, mergedInvalidCount] = validateFindings(rawMerged, "POST /analysis/analyze");
+    if (mergedInvalidCount > 0) {
+      void logErrorEvent("ai", {
+        companyId,
+        userId: req.user?.id,
+        message: `${mergedInvalidCount} malformed finding(s) stripped before DB insert`,
+        inspectionId,
+        context: { stage: "write_validation", endpoint: "POST /analysis/analyze" },
+      });
+    }
 
     // Recommendations: unique, non-empty corrective actions across all findings.
     const recommendations = Array.from(
