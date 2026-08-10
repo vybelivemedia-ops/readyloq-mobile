@@ -216,7 +216,10 @@ router.get(
           .from(inspectionScorecardsTable)
           .innerJoin(
             inspectionsTable,
-            eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
+            and(
+              eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
+              eq(inspectionsTable.companyId, companyId),
+            ),
           )
           .where(and(...conditions))
           .orderBy(

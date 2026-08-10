@@ -868,6 +868,41 @@ describe("executive inspections drill-down is isolated per company", () => {
     expect(row).toHaveProperty("scoredAt");
     expect(row.siteAddress).toBe("700 Exec A Street");
   });
+
+  it("does not surface another company's siteAddress when a cross-tenant inspectionId is seeded", async () => {
+    // Create a fresh company B inspection that has no scorecard yet, so we can
+    // insert a poisoned scorecard without hitting the unique constraint on inspection_id.
+    const bExtra = await createInspection(OWNER_B_ID, "800 Exec B Leaked Street");
+    const inspBExtraId: number = bExtra.id;
+
+    // Simulate a data-migration bug: a scorecard row is written for company A
+    // but its inspectionId points to an inspection that belongs to company B.
+    // Without the companyId guard on the join, this would expose
+    // "800 Exec B Leaked Street" to company A's owner.
+    await db.insert(inspectionScorecardsTable).values({
+      companyId: companyAId,      // scorecard owned by company A
+      inspectionId: inspBExtraId, // but the inspection belongs to company B
+      technicianName: "Poisoned Tech",
+      qualityScore: 65,
+      riskScore: 50,
+      riskLevel: "medium",
+      findingsCount: 1,
+      photosAnalyzed: 1,
+      components: { photoCoverage: 50, evidenceQuality: 50, avgConfidence: 50, recommendationCoverage: 50 },
+      missedOpportunities: [],
+    });
+
+    asUser(OWNER_A_ID);
+    const res = await request(app).get("/api/executive/inspections?riskLevel=medium");
+    expect(res.status).toBe(200);
+
+    // The poisoned scorecard must not expose company B's site address.
+    // With the companyId constraint on the join, the row is excluded entirely.
+    const addresses = res.body.inspections.map(
+      (r: { siteAddress: string | null }) => r.siteAddress,
+    );
+    expect(addresses).not.toContain("800 Exec B Leaked Street");
+  });
 });
 
 describe("DB invariant: every tenant row has a non-null company_id", () => {
