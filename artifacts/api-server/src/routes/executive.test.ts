@@ -251,8 +251,23 @@ beforeAll(async () => {
     },
   ]);
 
-  // ── Company B: 1 inspection + 1 critical-risk scorecard for "Bob" ────────
+  // ── Company B: 1 inspection + 1 won opportunity ($8000) + 1 critical scorecard ──
   inspBId = await createInspectionViaApi(EXEC_OWNER_B, "99 B Street");
+
+  // Company B's won opportunity — must never appear in Company A's wonOpportunities count.
+  await db.insert(opportunitiesTable).values({
+    companyId:            execCompanyBId,
+    inspectionId:         inspBId,
+    propertyAddress:      "99 B Street",
+    category:             "pest_activity" as OpportunityCategory,
+    title:                "Termite damage",
+    rationale:            "Active termite colony",
+    fingerprint:          "exec-b-won-termite",
+    estimatedValueTier:   "high" as OpportunityValueTier,
+    estimatedAnnualValue: 8000,
+    confidence:           0.85,
+    status:               "won" as OpportunityStatus,
+  });
 
   await db.insert(inspectionScorecardsTable).values({
     companyId:    execCompanyBId,
@@ -325,10 +340,11 @@ describe("executive intelligence endpoint: cross-company isolation", () => {
 
     const m = res.body.metrics;
 
-    // B has no opportunities at all — must not surface A's $5000 open pipeline.
+    // B has no open opportunities — must not surface A's $5000 open pipeline.
     expect(m.pipelineValue).toBe(0);
     expect(m.openOpportunities).toBe(0);
-    expect(m.wonOpportunities).toBe(0);
+    // B has exactly 1 won opportunity of its own ($8000) — not A's won deal.
+    expect(m.wonOpportunities).toBe(1);
   });
 
   it("company B cannot see company A's quality scores or technician leaderboard", async () => {
@@ -401,6 +417,37 @@ describe("executive intelligence endpoint: cross-company isolation", () => {
     expect(m.topTechnicians).toHaveLength(0);
     expect(m.inspectionsThisMonth).toBe(0);
     expect(m.inspectionsLastMonth).toBe(0);
+  });
+});
+
+describe("executive intelligence endpoint: won-opportunity isolation", () => {
+  /**
+   * Fixture (seeded in beforeAll):
+   *   Company A — 1 won opportunity ($2000, exec-a-won-moisture)
+   *   Company B — 1 won opportunity ($8000, exec-b-won-termite)
+   *
+   * Each company must count only its own won deals. Neither company should
+   * see the other's won opportunity reflected in its wonOpportunities metric.
+   */
+
+  it("company A's wonOpportunities count does not include company B's won deal", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/intelligence");
+    expect(res.status).toBe(200);
+
+    const m = res.body.metrics;
+    // A has exactly 1 won opportunity — not 2, which would expose B's won deal.
+    expect(m.wonOpportunities).toBe(1);
+  });
+
+  it("company B's wonOpportunities count does not include company A's won deal", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/intelligence");
+    expect(res.status).toBe(200);
+
+    const m = res.body.metrics;
+    // B has exactly 1 won opportunity — not 2, which would expose A's won deal.
+    expect(m.wonOpportunities).toBe(1);
   });
 });
 
