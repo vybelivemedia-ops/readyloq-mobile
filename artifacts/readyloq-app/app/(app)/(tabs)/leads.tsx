@@ -9,6 +9,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { type Href, useFocusEffect, useRouter } from "expo-router";
+import { formatMoney } from "@/lib/utils/money";
 import React, { useCallback, useState } from "react";
 import {
   FlatList,
@@ -93,12 +94,6 @@ const VALUE_LABELS: Record<string, string> = {
   medium: "Mid-tier",
   low:    "Entry",
 };
-
-function formatMoney(cents: number): string {
-  if (cents >= 100_000) return `$${(cents / 100_000).toFixed(0)}M+`;
-  if (cents >= 1_000)   return `$${(cents / 1_000).toFixed(0)}K`;
-  return `$${cents}`;
-}
 
 const FILTER_TABS: { key: LeadStatus | "all"; label: string }[] = [
   { key: "all",           label: "All" },

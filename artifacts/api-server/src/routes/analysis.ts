@@ -220,7 +220,7 @@ router.get("/summary", async (req, res) => {
       .from(analysisResultsTable)
       .where(eq(analysisResultsTable.companyId, companyId));
     const completed = rows.filter((r) => r.status === "complete");
-    const allFindings = completed.flatMap((r) => (r.findings ?? []) as any[]);
+    const allFindings = completed.flatMap((r) => (r.findings ?? []) as Array<{ category: string }>);
 
     const categoryMap: Record<string, number> = {};
     for (const f of allFindings) {

@@ -7,7 +7,7 @@
  */
 
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { type Href, useRouter } from "expo-router";
 import React from "react";
 import {
   ActivityIndicator,
@@ -867,7 +867,7 @@ export default function SettingsScreen() {
                 icon="bar-chart-outline"
                 label="Intelligence Dashboard"
                 sublabel="Pipeline, quality scores, risk & team performance"
-                onPress={() => router.push("/executive-dashboard" as any)}
+                onPress={() => router.push("/executive-dashboard" as Href)}
                 isLast
               />
             </Card>
@@ -883,7 +883,7 @@ export default function SettingsScreen() {
                 icon="book-outline"
                 label="Manage Playbooks"
                 sublabel="SOPs, required steps, and chemical restrictions"
-                onPress={() => router.push("/playbooks" as any)}
+                onPress={() => router.push("/playbooks" as Href)}
                 isLast
               />
             </Card>
@@ -921,7 +921,7 @@ export default function SettingsScreen() {
                 icon="people-outline"
                 label="Manage All Accounts"
                 sublabel="View and edit every user across all companies"
-                onPress={() => router.push("/admin" as any)}
+                onPress={() => router.push("/admin" as Href)}
               />
               <SettingRow
                 icon="shield-outline"

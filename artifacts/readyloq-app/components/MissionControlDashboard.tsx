@@ -16,6 +16,7 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { type Href, useRouter } from "expo-router";
+import { formatMoney } from "@/lib/utils/money";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
@@ -78,12 +79,6 @@ function LivePulse() {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatMoney(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `$${Math.round(n / 1_000)}K`;
-  return `$${n}`;
-}
 
 function formatTime(iso: string): string {
   try {

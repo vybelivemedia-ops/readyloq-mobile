@@ -209,7 +209,7 @@ export async function writePropertyMemory(
         lastInspectionId: inspectionId,
         lastVisitedAt,
         historicalPests,
-        historicalFindings: historicalFindings as any,
+        historicalFindings,
         updatedAt: now,
       })
       .where(
@@ -237,7 +237,7 @@ export async function writePropertyMemory(
       lastInspectionId: inspectionId,
       lastVisitedAt,
       historicalPests,
-      historicalFindings: historicalFindings as any,
+      historicalFindings,
     });
 
     logger.info(

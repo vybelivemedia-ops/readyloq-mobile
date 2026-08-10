@@ -232,6 +232,13 @@ router.get(
         db
           .select({ total: count(inspectionScorecardsTable.id) })
           .from(inspectionScorecardsTable)
+          .innerJoin(
+            inspectionsTable,
+            and(
+              eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
+              eq(inspectionsTable.companyId, companyId),
+            ),
+          )
           .where(and(...conditions)),
       ]);
 

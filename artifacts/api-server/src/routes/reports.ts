@@ -7,6 +7,7 @@ import {
   inspectionMediaTable,
   customerSummariesTable,
   opportunitiesTable,
+  type Finding,
 } from "@workspace/db";
 import { eq, and, desc, inArray, gte } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
@@ -18,6 +19,20 @@ import { logErrorEvent } from "../lib/error-events";
 import { buildServerReportHtml } from "../lib/report-html-server";
 
 const router = Router();
+
+/**
+ * Safely coerces a raw JSON value (from a DB jsonb column) into a typed
+ * Finding array. Entries that are missing required string fields are dropped
+ * so malformed DB data never reaches the API response or an insert.
+ */
+function safeParseFindings(raw: unknown): Finding[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item): item is Finding => {
+    if (!item || typeof item !== "object") return false;
+    const f = item as Record<string, unknown>;
+    return typeof f.category === "string" && typeof f.description === "string";
+  });
+}
 
 function serializeReport(
   row: typeof reportsTable.$inferSelect,
@@ -54,10 +69,14 @@ router.get("/", async (req, res) => {
     const sinceDays      = sinceDaysParam ? parseInt(sinceDaysParam, 10)              : null;
 
     // Build WHERE conditions
+    const VALID_SEVERITIES = ["low", "medium", "high", "critical"] as const;
+    type ReportSeverity = (typeof VALID_SEVERITIES)[number];
     const conditions = [eq(reportsTable.companyId, companyId)];
     if (severityValues?.length) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      conditions.push(inArray(reportsTable.severity as any, severityValues));
+      const safe = severityValues.filter((s): s is ReportSeverity =>
+        VALID_SEVERITIES.includes(s as ReportSeverity),
+      );
+      if (safe.length) conditions.push(inArray(reportsTable.severity, safe));
     }
     if (statusValues?.length) {
       conditions.push(inArray(reportsTable.status, statusValues));
@@ -105,7 +124,7 @@ router.post("/", async (req, res) => {
       );
     if (!inspection) return res.status(404).json({ error: "Inspection not found" });
 
-    let findings: any[] = [];
+    let findings: Finding[] = [];
     let recommendations: string[] = [];
     if (includeAiFindings !== false) {
       const analyses = await db
@@ -121,8 +140,10 @@ router.post("/", async (req, res) => {
         .limit(1);
       const latest = analyses[0];
       if (latest) {
-        findings = (latest.findings ?? []) as any[];
-        recommendations = (latest.recommendations ?? []) as string[];
+        findings = safeParseFindings(latest.findings);
+        recommendations = Array.isArray(latest.recommendations)
+          ? (latest.recommendations as unknown[]).filter((r): r is string => typeof r === "string")
+          : [];
       }
     }
 
@@ -247,11 +268,15 @@ router.post("/:id/generate-narrative", async (req, res) => {
     // Live report builder: re-snapshot findings/recommendations from the
     // inspection's latest AI analysis so the narrative always reflects the
     // most recent detections instead of the snapshot taken at report creation.
-    let reportFindings = report.findings ?? [];
-    let reportRecommendations = report.recommendations ?? [];
+    let reportFindings: Finding[] = safeParseFindings(report.findings);
+    let reportRecommendations: string[] = Array.isArray(report.recommendations)
+      ? (report.recommendations as unknown[]).filter((r): r is string => typeof r === "string")
+      : [];
     if (req.body?.refreshFindings === true && latestAnalysis) {
-      reportFindings = latestAnalysis.findings ?? [];
-      reportRecommendations = latestAnalysis.recommendations ?? [];
+      reportFindings = safeParseFindings(latestAnalysis.findings);
+      reportRecommendations = Array.isArray(latestAnalysis.recommendations)
+        ? (latestAnalysis.recommendations as unknown[]).filter((r): r is string => typeof r === "string")
+        : [];
       const exclusionOpportunities = reportFindings
         .filter((f) => f.exclusionOpportunity)
         .map((f) => `${f.category}: ${f.description}`);
