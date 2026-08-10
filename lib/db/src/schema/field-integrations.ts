@@ -41,7 +41,7 @@ export type CompanyFieldIntegration = typeof companyFieldIntegrationsTable.$infe
 export type InsertFieldIntegration = z.infer<typeof insertFieldIntegrationSchema>;
 
 // ─── Sync log ─────────────────────────────────────────────────────────────────
-// One row per successful push. Used to:
+// One row per sync attempt (success or failure). Used to:
 //   1. Return a cached result on duplicate taps within SYNC_COOLDOWN_SECONDS.
 //   2. Show owners a history of past pushes (GET /api/integrations/sync-history).
 export const inspectionSyncLogsTable = pgTable(
@@ -55,9 +55,13 @@ export const inspectionSyncLogsTable = pgTable(
       .notNull()
       .references(() => inspectionsTable.id, { onDelete: "cascade" }),
     systemType: text("system_type").$type<FieldIntegrationSystem>().notNull(),
+    // Whether the push to the external system succeeded.
+    success: boolean("success").notNull().default(true),
+    // Human-readable error from the external system (null on success).
+    errorMessage: text("error_message"),
     syncedAt: timestamp("synced_at").notNull().defaultNow(),
-    // Full SyncResult JSON stored so we can replay it without re-syncing.
-    resultJson: jsonb("result_json").notNull(),
+    // Full SyncResult JSON stored so we can replay it without re-syncing (null on failure).
+    resultJson: jsonb("result_json"),
   },
   (t) => [
     index("inspection_sync_logs_company_inspection_idx").on(t.companyId, t.inspectionId),

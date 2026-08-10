@@ -163,11 +163,11 @@ export declare const companyFieldIntegrationsTable: import("drizzle-orm/pg-core"
     dialect: "pg";
 }>;
 export declare const insertFieldIntegrationSchema: z.ZodObject<{
-    enabled: z.ZodOptional<z.ZodBoolean>;
     systemType: z.ZodString;
     accountId: z.ZodString;
     apiKey: z.ZodString;
     apiBaseUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    enabled: z.ZodOptional<z.ZodBoolean>;
 }, {
     out: {};
     in: {};
@@ -248,6 +248,40 @@ export declare const inspectionSyncLogsTable: import("drizzle-orm/pg-core").PgTa
         }, {}, {
             $type: FieldIntegrationSystem;
         }>;
+        success: import("drizzle-orm/pg-core").PgColumn<{
+            name: "success";
+            tableName: "inspection_sync_logs";
+            dataType: "boolean";
+            columnType: "PgBoolean";
+            data: boolean;
+            driverParam: boolean;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        errorMessage: import("drizzle-orm/pg-core").PgColumn<{
+            name: "error_message";
+            tableName: "inspection_sync_logs";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         syncedAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "synced_at";
             tableName: "inspection_sync_logs";
@@ -272,7 +306,7 @@ export declare const inspectionSyncLogsTable: import("drizzle-orm/pg-core").PgTa
             columnType: "PgJsonb";
             data: unknown;
             driverParam: unknown;
-            notNull: true;
+            notNull: false;
             hasDefault: false;
             isPrimaryKey: false;
             isAutoincrement: false;

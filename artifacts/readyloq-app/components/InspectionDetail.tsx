@@ -39,7 +39,15 @@ import {
   severityTone,
   statusTone,
 } from "@/constants/inspection";
-import { API_BASE, ApiError, reopenInspection } from "@/lib/api";
+import {
+  API_BASE,
+  ApiError,
+  reopenInspection,
+  fetchIntegrationConfig,
+  fetchSyncHistory,
+  triggerIntegrationSync,
+  type SyncHistoryEntry,
+} from "@/lib/api";
 import { ingestAnonymizedFaieData, sendPhotoToFaieDataset } from "@/lib/faie-ingest";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
 
@@ -79,6 +87,29 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const genReport = useGenerateReport();
   const [error, setError] = useState<string | null>(null);
   const [reopening, setReopening] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  // ── Integration sync ───────────────────────────────────────────────────────
+  const integrationConfigQ = useQuery({
+    queryKey: ["integration-config"],
+    queryFn: async () => {
+      const token = await getToken();
+      return fetchIntegrationConfig(token);
+    },
+    staleTime: 60_000,
+  });
+
+  const syncHistoryQ = useQuery({
+    queryKey: ["sync-history", id],
+    queryFn: async () => {
+      const token = await getToken();
+      return fetchSyncHistory(token, id);
+    },
+    staleTime: 15_000,
+    enabled: id > 0 && user?.role === "owner",
+  });
+
+  const lastSync: SyncHistoryEntry | null = syncHistoryQ.data?.logs[0] ?? null;
 
   // ── Inline finding correction state ───────────────────────────────────────
   // `reviewResults` maps findingId → action so FindingCard can highlight the
@@ -203,6 +234,22 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
       router.push(`/report/${report.id}` as Href);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : (e as Error).message);
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      await triggerIntegrationSync(token, id);
+      await syncHistoryQ.refetch();
+    } catch (e) {
+      // Still refetch so the failed log row appears immediately.
+      await syncHistoryQ.refetch();
+      setError(e instanceof ApiError ? e.message : "Sync failed — please try again");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -648,6 +695,56 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
             icon="flask-outline"
             onPress={() => setShowTreatmentWizard(true)}
           />
+        ) : null}
+
+        {/* ── Integration sync status (owners only, completed inspections) ── */}
+        {user?.role === "owner" &&
+          (inspection as unknown as Record<string, unknown>).status === "completed" &&
+          integrationConfigQ.data?.configured ? (
+          <Card style={{ gap: 10 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                {integrationConfigQ.data.integration.systemType === "pestpac"
+                  ? "PestPac Sync"
+                  : "FieldRoutes Sync"}
+              </Text>
+              {lastSync ? (
+                <Badge
+                  label={lastSync.success ? "Synced" : "Failed"}
+                  tone={lastSync.success ? "success" : "danger"}
+                />
+              ) : (
+                <Badge label="Not synced" tone="default" />
+              )}
+            </View>
+
+            {lastSync ? (
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                {lastSync.success
+                  ? `Last pushed ${formatDate(lastSync.syncedAt)}`
+                  : `Failed ${formatDate(lastSync.syncedAt)}${lastSync.errorMessage ? `: ${lastSync.errorMessage}` : ""}`}
+              </Text>
+            ) : null}
+
+            {/* Push / retry button */}
+            {!lastSync || !lastSync.success ? (
+              <Button
+                title={lastSync ? "Retry sync" : "Push to dispatch"}
+                variant="outline"
+                icon={lastSync ? "refresh-outline" : "cloud-upload-outline"}
+                loading={syncing}
+                onPress={handleSync}
+              />
+            ) : (
+              <Button
+                title="Push again"
+                variant="outline"
+                icon="cloud-upload-outline"
+                loading={syncing}
+                onPress={handleSync}
+              />
+            )}
+          </Card>
         ) : null}
 
         {/* Generate report */}

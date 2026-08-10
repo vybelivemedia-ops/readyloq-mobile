@@ -7,6 +7,7 @@ import { getStripeSync } from "./lib/stripeClient";
 import { backfillOpportunityValues } from "./lib/backfill-opportunity-values";
 import { backfillPropertyMemory } from "./lib/backfill-property-memory";
 import { migratePushNotificationColumns } from "./lib/migrate-push-notifications";
+import { migrateSyncLogs } from "./lib/migrate-sync-logs";
 
 const rawPort = process.env["PORT"];
 
@@ -27,6 +28,7 @@ async function startup() {
   // Must complete before the HTTP listener binds so no request can hit
   // column-dependent endpoints with a missing schema.
   await migratePushNotificationColumns();
+  await migrateSyncLogs();
 
   app.listen(port, (err) => {
     if (err) {

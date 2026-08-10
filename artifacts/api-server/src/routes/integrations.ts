@@ -9,8 +9,9 @@ import {
   treatmentLogsTable,
   productsTable,
   type Finding,
+  type FieldIntegrationSystem,
 } from "@workspace/db";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, isNotNull } from "drizzle-orm";
 import { z } from "zod/v4";
 import { getCompanyId } from "../lib/tenant";
 import { requireRole } from "../middleware/require-auth";
@@ -132,6 +133,16 @@ const syncInputSchema = z.object({
 });
 
 router.post("/sync", async (req, res) => {
+  // Captured after the inspection passes tenant validation — used by the catch
+  // block to safely write a failure log.  Must remain null until both the
+  // inspection and config are confirmed tenant-owned so the catch block never
+  // logs a foreign inspectionId.
+  let validatedSyncCtx: {
+    companyId: number;
+    inspectionId: number;
+    systemType: FieldIntegrationSystem;
+  } | null = null;
+
   try {
     const companyId = getCompanyId(req);
     const parsed = syncInputSchema.safeParse(req.body);
@@ -166,6 +177,10 @@ router.post("/sync", async (req, res) => {
       return res.status(422).json({ error: "Inspection is not yet finalized" });
     }
 
+    // ── Both inspection and config are now confirmed tenant-owned. ────────────
+    // Record this so the catch block can safely write a failure log.
+    validatedSyncCtx = { companyId, inspectionId, systemType: config.systemType };
+
     // ── Idempotency: run the rest inside a transaction so the advisory lock
     //    and the sync-log insert are atomic. ────────────────────────────────
     const result = await pool.connect().then(async (client) => {
@@ -184,23 +199,27 @@ router.post("/sync", async (req, res) => {
           return { _conflict: true } as const;
         }
 
-        // ── Cooldown: return cached result if last sync was recent. ────────
+        // ── Cooldown: return cached result only for recent *successful* syncs.
+        //    Failed attempts must remain retryable immediately so the owner
+        //    can correct transient external-system errors without waiting.
         const cooldownCutoff = new Date(Date.now() - SYNC_COOLDOWN_SECONDS * 1000);
-        const [recentLog] = await db
+        const [recentSuccess] = await db
           .select()
           .from(inspectionSyncLogsTable)
           .where(
             and(
               eq(inspectionSyncLogsTable.inspectionId, inspectionId),
               eq(inspectionSyncLogsTable.companyId, companyId),
+              eq(inspectionSyncLogsTable.success, true),
+              isNotNull(inspectionSyncLogsTable.resultJson),
             ),
           )
           .orderBy(desc(inspectionSyncLogsTable.syncedAt))
           .limit(1);
 
-        if (recentLog && recentLog.syncedAt >= cooldownCutoff) {
+        if (recentSuccess && recentSuccess.syncedAt >= cooldownCutoff) {
           await client.query("ROLLBACK");
-          return { _cached: true, result: recentLog.resultJson } as const;
+          return { _cached: true, result: recentSuccess.resultJson } as const;
         }
 
         // ── Not a duplicate: load data and call the external system. ───────
@@ -219,7 +238,7 @@ router.post("/sync", async (req, res) => {
       return res.status(409).json({ error: "Sync already in progress for this inspection" });
     }
     if (result._cached) {
-      return res.json({ ...result.result, _idempotent: true });
+      return res.json({ ...(result.result as Record<string, unknown>), _idempotent: true });
     }
 
     // Load analysis + media in parallel.
@@ -318,6 +337,8 @@ router.post("/sync", async (req, res) => {
       companyId,
       inspectionId,
       systemType: config.systemType,
+      success: true,
+      errorMessage: null,
       resultJson: syncResult,
     });
 
@@ -325,7 +346,76 @@ router.post("/sync", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed";
     console.error("[integrations/sync]", message);
+
+    // Best-effort failure log. Only written when validatedSyncCtx is set,
+    // meaning the inspection was positively tenant-validated before the error
+    // occurred.  This prevents the catch block from logging a foreign
+    // inspectionId when the error is raised before tenant validation.
+    if (validatedSyncCtx) {
+      await db
+        .insert(inspectionSyncLogsTable)
+        .values({
+          ...validatedSyncCtx,
+          success: false,
+          errorMessage: message,
+          resultJson: null,
+        })
+        .catch(() => {
+          // Swallow — must not mask the original error.
+        });
+    }
+
     return res.status(502).json({ error: message });
+  }
+});
+
+// ─── GET /api/integrations/sync-history ──────────────────────────────────────
+// Returns the sync log for the owner's company, newest first.
+// Optional query param ?inspectionId=N to filter to a single inspection.
+router.get("/sync-history", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+
+    const inspectionIdRaw = req.query["inspectionId"];
+    const inspectionId =
+      inspectionIdRaw !== undefined ? Number(inspectionIdRaw) : undefined;
+
+    if (inspectionId !== undefined && (!Number.isInteger(inspectionId) || inspectionId <= 0)) {
+      return res.status(400).json({ error: "Invalid inspectionId" });
+    }
+
+    const conditions = [eq(inspectionSyncLogsTable.companyId, companyId)];
+    if (inspectionId !== undefined) {
+      conditions.push(eq(inspectionSyncLogsTable.inspectionId, inspectionId));
+    }
+
+    const logs = await db
+      .select({
+        id: inspectionSyncLogsTable.id,
+        inspectionId: inspectionSyncLogsTable.inspectionId,
+        systemType: inspectionSyncLogsTable.systemType,
+        success: inspectionSyncLogsTable.success,
+        errorMessage: inspectionSyncLogsTable.errorMessage,
+        syncedAt: inspectionSyncLogsTable.syncedAt,
+        siteAddress: inspectionsTable.siteAddress,
+      })
+      .from(inspectionSyncLogsTable)
+      .leftJoin(
+        inspectionsTable,
+        // Scope the join to the same company so a foreign inspection row
+        // (same ID, different company) can never leak its siteAddress.
+        and(
+          eq(inspectionSyncLogsTable.inspectionId, inspectionsTable.id),
+          eq(inspectionsTable.companyId, companyId),
+        ),
+      )
+      .where(and(...conditions))
+      .orderBy(desc(inspectionSyncLogsTable.syncedAt))
+      .limit(100);
+
+    return res.json({ logs });
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch sync history" });
   }
 });
 

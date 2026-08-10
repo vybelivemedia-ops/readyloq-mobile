@@ -69923,9 +69923,13 @@ var inspectionSyncLogsTable = pgTable(
     companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
     inspectionId: integer("inspection_id").notNull().references(() => inspectionsTable.id, { onDelete: "cascade" }),
     systemType: text("system_type").$type().notNull(),
+    // Whether the push to the external system succeeded.
+    success: boolean("success").notNull().default(true),
+    // Human-readable error from the external system (null on success).
+    errorMessage: text("error_message"),
     syncedAt: timestamp("synced_at").notNull().defaultNow(),
-    // Full SyncResult JSON stored so we can replay it without re-syncing.
-    resultJson: jsonb("result_json").notNull()
+    // Full SyncResult JSON stored so we can replay it without re-syncing (null on failure).
+    resultJson: jsonb("result_json")
   },
   (t) => [
     index("inspection_sync_logs_company_inspection_idx").on(t.companyId, t.inspectionId)
@@ -123654,6 +123658,7 @@ var syncInputSchema = external_exports.object({
   inspectionId: external_exports.number().int().positive()
 });
 router32.post("/sync", async (req, res) => {
+  let validatedSyncCtx = null;
   try {
     const companyId = getCompanyId(req);
     const parsed = syncInputSchema.safeParse(req.body);
@@ -123675,6 +123680,7 @@ router32.post("/sync", async (req, res) => {
     if (inspection.status !== "complete" && inspection.status !== "completed") {
       return res.status(422).json({ error: "Inspection is not yet finalized" });
     }
+    validatedSyncCtx = { companyId, inspectionId, systemType: config2.systemType };
     const result = await pool.connect().then(async (client) => {
       try {
         await client.query("BEGIN");
@@ -123687,15 +123693,17 @@ router32.post("/sync", async (req, res) => {
           return { _conflict: true };
         }
         const cooldownCutoff = new Date(Date.now() - SYNC_COOLDOWN_SECONDS * 1e3);
-        const [recentLog] = await db.select().from(inspectionSyncLogsTable).where(
+        const [recentSuccess] = await db.select().from(inspectionSyncLogsTable).where(
           and(
             eq(inspectionSyncLogsTable.inspectionId, inspectionId),
-            eq(inspectionSyncLogsTable.companyId, companyId)
+            eq(inspectionSyncLogsTable.companyId, companyId),
+            eq(inspectionSyncLogsTable.success, true),
+            isNotNull(inspectionSyncLogsTable.resultJson)
           )
         ).orderBy(desc(inspectionSyncLogsTable.syncedAt)).limit(1);
-        if (recentLog && recentLog.syncedAt >= cooldownCutoff) {
+        if (recentSuccess && recentSuccess.syncedAt >= cooldownCutoff) {
           await client.query("ROLLBACK");
-          return { _cached: true, result: recentLog.resultJson };
+          return { _cached: true, result: recentSuccess.resultJson };
         }
         await client.query("COMMIT");
         return { _cached: false };
@@ -123772,13 +123780,58 @@ router32.post("/sync", async (req, res) => {
       companyId,
       inspectionId,
       systemType: config2.systemType,
+      success: true,
+      errorMessage: null,
       resultJson: syncResult
     });
     return res.json(syncResult);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed";
     console.error("[integrations/sync]", message);
+    if (validatedSyncCtx) {
+      await db.insert(inspectionSyncLogsTable).values({
+        ...validatedSyncCtx,
+        success: false,
+        errorMessage: message,
+        resultJson: null
+      }).catch(() => {
+      });
+    }
     return res.status(502).json({ error: message });
+  }
+});
+router32.get("/sync-history", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionIdRaw = req.query["inspectionId"];
+    const inspectionId = inspectionIdRaw !== void 0 ? Number(inspectionIdRaw) : void 0;
+    if (inspectionId !== void 0 && (!Number.isInteger(inspectionId) || inspectionId <= 0)) {
+      return res.status(400).json({ error: "Invalid inspectionId" });
+    }
+    const conditions = [eq(inspectionSyncLogsTable.companyId, companyId)];
+    if (inspectionId !== void 0) {
+      conditions.push(eq(inspectionSyncLogsTable.inspectionId, inspectionId));
+    }
+    const logs = await db.select({
+      id: inspectionSyncLogsTable.id,
+      inspectionId: inspectionSyncLogsTable.inspectionId,
+      systemType: inspectionSyncLogsTable.systemType,
+      success: inspectionSyncLogsTable.success,
+      errorMessage: inspectionSyncLogsTable.errorMessage,
+      syncedAt: inspectionSyncLogsTable.syncedAt,
+      siteAddress: inspectionsTable.siteAddress
+    }).from(inspectionSyncLogsTable).leftJoin(
+      inspectionsTable,
+      // Scope the join to the same company so a foreign inspection row
+      // (same ID, different company) can never leak its siteAddress.
+      and(
+        eq(inspectionSyncLogsTable.inspectionId, inspectionsTable.id),
+        eq(inspectionsTable.companyId, companyId)
+      )
+    ).where(and(...conditions)).orderBy(desc(inspectionSyncLogsTable.syncedAt)).limit(100);
+    return res.json({ logs });
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch sync history" });
   }
 });
 var integrations_default = router32;
@@ -124226,6 +124279,220 @@ router34.get(
       return res.json(result);
     } catch (error40) {
       console.error("executive briefing error:", error40);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+router34.get(
+  "/executive/intelligence/email-preview",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+    try {
+      const OPEN_STATUSES4 = ["new", "reviewed", "quoted"];
+      const [companyRow] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, companyId));
+      const companyName = companyRow?.name ?? "Your Company";
+      const [pipelineRow] = await db.select({
+        openCount: count(opportunitiesTable.id),
+        pipelineValue: sum(opportunitiesTable.estimatedAnnualValue)
+      }).from(opportunitiesTable).where(
+        and(
+          eq(opportunitiesTable.companyId, companyId),
+          inArray(opportunitiesTable.status, [...OPEN_STATUSES4])
+        )
+      );
+      const [wonRow] = await db.select({ wonCount: count(opportunitiesTable.id) }).from(opportunitiesTable).where(
+        and(
+          eq(opportunitiesTable.companyId, companyId),
+          eq(opportunitiesTable.status, "won")
+        )
+      );
+      const [scoreRow] = await db.select({
+        totalScorecards: count(inspectionScorecardsTable.id),
+        avgQuality: avg(inspectionScorecardsTable.qualityScore),
+        criticalCount: sql`sum(case when ${inspectionScorecardsTable.riskLevel} = 'critical' then 1 else 0 end)`,
+        highCount: sql`sum(case when ${inspectionScorecardsTable.riskLevel} = 'high'     then 1 else 0 end)`,
+        mediumCount: sql`sum(case when ${inspectionScorecardsTable.riskLevel} = 'medium'   then 1 else 0 end)`,
+        lowCount: sql`sum(case when ${inspectionScorecardsTable.riskLevel} = 'low'      then 1 else 0 end)`
+      }).from(inspectionScorecardsTable).where(eq(inspectionScorecardsTable.companyId, companyId));
+      const techRows = await db.select({
+        technicianName: inspectionScorecardsTable.technicianName,
+        avgQuality: avg(inspectionScorecardsTable.qualityScore),
+        inspectionCount: count(inspectionScorecardsTable.id)
+      }).from(inspectionScorecardsTable).where(eq(inspectionScorecardsTable.companyId, companyId)).groupBy(inspectionScorecardsTable.technicianName).having(sql`count(*) >= 2`).orderBy(sql`avg(${inspectionScorecardsTable.qualityScore}) desc`).limit(5);
+      const now = /* @__PURE__ */ new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+      const [velocityRow] = await db.select({
+        thisMonth: sql`sum(case when ${inspectionsTable.createdAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
+        lastMonth: sql`sum(case when ${inspectionsTable.createdAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.createdAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`
+      }).from(inspectionsTable).where(
+        and(
+          eq(inspectionsTable.companyId, companyId),
+          eq(inspectionsTable.status, "completed")
+        )
+      );
+      const pipelineValue = Number(pipelineRow?.pipelineValue ?? 0);
+      const openOpportunities = Number(pipelineRow?.openCount ?? 0);
+      const wonOpportunities = Number(wonRow?.wonCount ?? 0);
+      const totalScorecards = Number(scoreRow?.totalScorecards ?? 0);
+      const avgQualityScore = Math.round(Number(scoreRow?.avgQuality ?? 0));
+      const critical = Number(scoreRow?.criticalCount ?? 0);
+      const high = Number(scoreRow?.highCount ?? 0);
+      const medium = Number(scoreRow?.mediumCount ?? 0);
+      const low = Number(scoreRow?.lowCount ?? 0);
+      const thisMonth = Number(velocityRow?.thisMonth ?? 0);
+      const lastMonth = Number(velocityRow?.lastMonth ?? 0);
+      const pipelineFormatted = pipelineValue >= 1e6 ? `$${(pipelineValue / 1e6).toFixed(1)}M` : pipelineValue >= 1e3 ? `$${(pipelineValue / 1e3).toFixed(0)}K` : `$${pipelineValue.toLocaleString()}`;
+      const velocityDelta = lastMonth > 0 ? Math.round((thisMonth - lastMonth) / lastMonth * 100) : null;
+      const qualityColor = avgQualityScore >= 80 ? "#3FB950" : avgQualityScore >= 60 ? "#D29922" : "#F85149";
+      const techRowsHtml = techRows.length > 0 ? techRows.map((t, i) => {
+        const name = t.technicianName || "Unknown";
+        const quality = Math.round(Number(t.avgQuality ?? 0));
+        const count2 = Number(t.inspectionCount);
+        const qColor = quality >= 80 ? "#3FB950" : quality >= 60 ? "#D29922" : "#F85149";
+        const medal = i === 0 ? "\u{1F947}" : i === 1 ? "\u{1F948}" : i === 2 ? "\u{1F949}" : `${i + 1}.`;
+        return `
+            <tr style="border-bottom:1px solid #30363D;">
+              <td style="padding:10px 14px;color:#8B949E;font-size:14px;">${medal}</td>
+              <td style="padding:10px 14px;color:#E6EDF3;font-size:14px;">${name}</td>
+              <td style="padding:10px 14px;color:#8B949E;font-size:13px;">${count2} inspection${count2 !== 1 ? "s" : ""}</td>
+              <td style="padding:10px 14px;text-align:right;">
+                <span style="color:${qColor};font-weight:700;font-size:14px;">${quality}</span>
+              </td>
+            </tr>`;
+      }).join("") : `<tr><td colspan="4" style="padding:16px;color:#8B949E;font-size:13px;text-align:center;">No technicians with 2+ scored inspections yet.</td></tr>`;
+      const generatedAt = (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Executive Dashboard \u2014 ${companyName}</title>
+</head>
+<body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0D1117;padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#161B22;border:1px solid #30363D;border-radius:16px 16px 0 0;padding:28px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <div style="color:#17C4D3;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Executive Intelligence</div>
+                    <div style="color:#E6EDF3;font-size:22px;font-weight:800;margin-bottom:4px;">${companyName}</div>
+                    <div style="color:#8B949E;font-size:13px;">Performance snapshot \xB7 ${generatedAt}</div>
+                  </td>
+                  <td align="right" style="vertical-align:top;">
+                    <div style="background:#17C4D322;border:1px solid #17C4D344;border-radius:10px;padding:8px 14px;display:inline-block;">
+                      <span style="color:#17C4D3;font-size:11px;font-weight:700;letter-spacing:0.5px;">READYLOQ</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- KPI Row -->
+          <tr>
+            <td style="padding:0 0 0 0;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="50%" style="background:#161B22;border:1px solid #30363D;border-top:none;padding:20px 24px;">
+                    <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">Open Pipeline</div>
+                    <div style="color:#3FB950;font-size:28px;font-weight:800;margin-bottom:4px;">${pipelineFormatted}</div>
+                    <div style="color:#8B949E;font-size:12px;">${openOpportunities} open \xB7 ${wonOpportunities} won</div>
+                  </td>
+                  <td width="50%" style="background:#161B22;border:1px solid #30363D;border-top:none;border-left:none;padding:20px 24px;">
+                    <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">Avg Quality Score</div>
+                    <div style="color:${qualityColor};font-size:28px;font-weight:800;margin-bottom:4px;">${avgQualityScore}</div>
+                    <div style="color:#8B949E;font-size:12px;">${totalScorecards} scored inspections</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td width="50%" style="background:#161B22;border:1px solid #30363D;border-top:none;padding:20px 24px;">
+                    <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">Critical Risk Sites</div>
+                    <div style="color:${critical > 0 ? "#F85149" : "#3FB950"};font-size:28px;font-weight:800;margin-bottom:4px;">${critical}</div>
+                    <div style="color:#8B949E;font-size:12px;">${high} high \xB7 ${medium} medium</div>
+                  </td>
+                  <td width="50%" style="background:#161B22;border:1px solid #30363D;border-top:none;border-left:none;padding:20px 24px;">
+                    <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">This Month</div>
+                    <div style="color:#17C4D3;font-size:28px;font-weight:800;margin-bottom:4px;">${thisMonth}</div>
+                    <div style="color:#8B949E;font-size:12px;">vs ${lastMonth} last month${velocityDelta !== null ? ` \xB7 ${velocityDelta >= 0 ? "\u25B2" : "\u25BC"} ${Math.abs(velocityDelta)}%` : ""}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Risk Distribution -->
+          <tr>
+            <td style="background:#161B22;border:1px solid #30363D;border-top:none;padding:20px 24px;">
+              <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:14px;">Risk Distribution</div>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  ${[
+        { label: "Critical", count: critical, color: "#F85149" },
+        { label: "High", count: high, color: "#E3882A" },
+        { label: "Medium", count: medium, color: "#D29922" },
+        { label: "Low", count: low, color: "#3FB950" }
+      ].map((seg) => `
+                  <td style="text-align:center;padding:0 8px;">
+                    <div style="color:${seg.color};font-size:22px;font-weight:800;">${seg.count}</div>
+                    <div style="color:#8B949E;font-size:11px;margin-top:2px;">${seg.label}</div>
+                  </td>`).join("")}
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Technician Leaderboard -->
+          <tr>
+            <td style="background:#161B22;border:1px solid #30363D;border-top:none;padding:0;">
+              <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;padding:20px 24px 10px;">Top Technicians by Quality</div>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <thead>
+                  <tr style="background:#ffffff06;">
+                    <th style="padding:8px 14px;color:#8B949E;font-size:10px;letter-spacing:0.5px;text-align:left;font-weight:600;"></th>
+                    <th style="padding:8px 14px;color:#8B949E;font-size:10px;letter-spacing:0.5px;text-align:left;font-weight:600;">TECHNICIAN</th>
+                    <th style="padding:8px 14px;color:#8B949E;font-size:10px;letter-spacing:0.5px;text-align:left;font-weight:600;">INSPECTIONS</th>
+                    <th style="padding:8px 14px;color:#8B949E;font-size:10px;letter-spacing:0.5px;text-align:right;font-weight:600;">SCORE</th>
+                  </tr>
+                </thead>
+                <tbody>${techRowsHtml}</tbody>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#161B22;border:1px solid #30363D;border-top:none;border-radius:0 0 16px 16px;padding:20px 32px;text-align:center;">
+              <div style="color:#8B949E;font-size:12px;margin-bottom:4px;">This snapshot was generated from live dashboard data.</div>
+              <div style="color:#17C4D3;font-size:11px;font-weight:700;letter-spacing:0.5px;">Powered by ReadyLoq</div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+      const subject = `Executive Dashboard Snapshot \u2014 ${companyName} \xB7 ${generatedAt}`;
+      return res.json({ success: true, html, subject });
+    } catch (error40) {
+      console.error("executive email-preview error:", error40);
       return res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -124883,6 +125150,45 @@ async function migratePushNotificationColumns() {
   }
 }
 
+// src/lib/migrate-sync-logs.ts
+async function columnExists2(table, column) {
+  const result = await db.execute(
+    sql`SELECT 1 FROM information_schema.columns
+        WHERE table_name = ${table} AND column_name = ${column}`
+  );
+  return result.rows.length > 0;
+}
+async function migrateSyncLogs() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS inspection_sync_logs (
+      id            SERIAL PRIMARY KEY,
+      company_id    INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      inspection_id INTEGER NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
+      system_type   TEXT    NOT NULL,
+      success       BOOLEAN NOT NULL DEFAULT TRUE,
+      error_message TEXT,
+      synced_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+      result_json   JSONB
+    )
+  `);
+  if (!await columnExists2("inspection_sync_logs", "success")) {
+    await db.execute(
+      sql`ALTER TABLE inspection_sync_logs ADD COLUMN success BOOLEAN NOT NULL DEFAULT TRUE`
+    );
+    logger2.info("migrateSyncLogs: added inspection_sync_logs.success");
+  }
+  if (!await columnExists2("inspection_sync_logs", "error_message")) {
+    await db.execute(
+      sql`ALTER TABLE inspection_sync_logs ADD COLUMN error_message TEXT`
+    );
+    logger2.info("migrateSyncLogs: added inspection_sync_logs.error_message");
+  }
+  await db.execute(
+    sql`ALTER TABLE inspection_sync_logs ALTER COLUMN result_json DROP NOT NULL`
+  ).catch(() => {
+  });
+}
+
 // src/index.ts
 var rawPort = process.env["PORT"];
 if (!rawPort) {
@@ -124896,6 +125202,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 async function startup() {
   await migratePushNotificationColumns();
+  await migrateSyncLogs();
   app_default.listen(port, (err) => {
     if (err) {
       logger2.error({ err }, "Error listening on port");

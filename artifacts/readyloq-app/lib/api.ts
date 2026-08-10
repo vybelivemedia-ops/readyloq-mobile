@@ -239,6 +239,28 @@ export function deleteIntegrationConfig(token: string | null) {
   });
 }
 
+export interface SyncHistoryEntry {
+  id: number;
+  inspectionId: number;
+  systemType: FieldIntegrationSystem;
+  success: boolean;
+  errorMessage: string | null;
+  syncedAt: string;
+  siteAddress: string | null;
+}
+
+export interface SyncHistoryResponse {
+  logs: SyncHistoryEntry[];
+}
+
+export function fetchSyncHistory(
+  token: string | null,
+  inspectionId?: number,
+) {
+  const qs = inspectionId !== undefined ? `?inspectionId=${inspectionId}` : "";
+  return request<SyncHistoryResponse>(`/api/integrations/sync-history${qs}`, token);
+}
+
 // ─── Property memory ─────────────────────────────────────────────────────────
 
 export interface HistoricalFinding {
