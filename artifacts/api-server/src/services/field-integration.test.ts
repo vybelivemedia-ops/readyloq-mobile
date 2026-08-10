@@ -11,9 +11,11 @@ import {
  * network requests are made and no database is needed. The tests verify:
  *   1. Happy-path full sync (note + attachments all succeed)
  *   2. Note POST failure throws, no attachment calls are made
- *   3. Attachment partial failure — note posted, 2/3 attachments succeed, no crash
+ *   3. Attachment partial failure — note posted, only 1/3 attachments posted after all retries exhausted
  *   4. Invalid API key (401) surfaces as a clear thrown error
  *   5. Unknown external system throws exhaustive-check error
+ *   6. Retry path: first attachment attempt fails, second succeeds → attachmentsPosted reflects success
+ *   7. FieldRoutes retry: first call fails, second succeeds → overall success
  */
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -97,29 +99,98 @@ describe("syncToPestPac", () => {
     ).rejects.toThrow("PestPac note POST failed (500)");
   });
 
-  it("continues uploading remaining photos when one attachment fails (partial success)", async () => {
+  it("continues uploading remaining photos when one attachment exhausts all retries (partial success)", async () => {
+    vi.useFakeTimers();
     let callCount = 0;
-    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+    const fetchMock = vi.fn().mockImplementation(async () => {
       callCount++;
       // Call 1: note POST — succeeds
       if (callCount === 1) return makeOkResponse();
-      // Call 2: first attachment — succeeds
+      // Call 2: first attachment (attempt 1) — succeeds
       if (callCount === 2) return makeOkResponse();
-      // Call 3: second attachment — fails (e.g. rate-limited)
-      if (callCount === 3) return makeErrorResponse(429, "Too Many Requests");
-      // Call 4: third attachment — succeeds
+      // Calls 3–5: second attachment (all 3 retry attempts) — rate-limited every time
+      if (callCount === 3 || callCount === 4 || callCount === 5)
+        return makeErrorResponse(429, "Too Many Requests");
+      // Call 6: third attachment — succeeds
       return makeOkResponse();
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" });
+    const promise = syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" });
+    await vi.runAllTimersAsync();
+    const result = await promise;
 
-    // The sync succeeds overall — only 2 of 3 attachments were posted
+    vi.useRealTimers();
+
+    // The sync succeeds overall — only 2 of 3 attachments were posted (second exhausted retries)
     expect(result.success).toBe(true);
     expect(result.postedNotes).toBe(true);
     expect(result.attachmentsPosted).toBe(2);
-    // All 4 fetch calls were made (no early exit on attachment failure)
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // 1 note + 1 successful attachment + 3 retry attempts for failed attachment + 1 final attachment = 6
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
+  it("skips a photo and continues with remaining ones when fetch rejects (network error) on all retry attempts", async () => {
+    vi.useFakeTimers();
+    let callCount = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      // Call 1: note POST — succeeds
+      if (callCount === 1) return makeOkResponse();
+      // Calls 2–4: first attachment — fetch throws on every attempt (no network)
+      if (callCount <= 4) throw new Error("Network unreachable");
+      // Calls 5–6: second and third attachments — succeed
+      return makeOkResponse();
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" });
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    vi.useRealTimers();
+
+    // Sync still succeeds — the network-errored photo is skipped, not fatal
+    expect(result.success).toBe(true);
+    expect(result.postedNotes).toBe(true);
+    // First photo exhausted all retries and was skipped; 2nd and 3rd succeeded
+    expect(result.attachmentsPosted).toBe(2);
+    // 1 note + 3 attempts for failing attachment + 2 successful attachments = 6
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
+  it("retries a failed attachment and counts it as posted when the retry succeeds", async () => {
+    vi.useFakeTimers();
+    let callCount = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      // Call 1: note POST — succeeds
+      if (callCount === 1) return makeOkResponse();
+      // Call 2: first attachment attempt 1 — fails transiently
+      if (callCount === 2) return makeErrorResponse(503, "Service Unavailable");
+      // Call 3: first attachment attempt 2 (retry) — succeeds
+      if (callCount === 3) return makeOkResponse();
+      // Calls 4–5: remaining two attachments — succeed
+      return makeOkResponse();
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = syncInspectionToExternalSystem({
+      ...basePayload,
+      externalSystem: "pestpac",
+      // Use a single photo to keep the call sequence simple
+      photos: [{ url: "https://cdn.example.com/photo1.jpg", caption: "Front door", severity: "high" }],
+    });
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    vi.useRealTimers();
+
+    // Retry succeeded — the attachment must be counted as posted
+    expect(result.success).toBe(true);
+    expect(result.attachmentsPosted).toBe(1);
+    // 1 note + 2 fetch calls for the attachment (attempt + retry) = 3
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("uses the default PestPac base URL when apiBaseUrl is not provided", async () => {
@@ -201,22 +272,62 @@ describe("syncToFieldRoutes", () => {
     expect(body.date).toBe("2026-08-10");
   });
 
-  it("throws when the service-history POST fails (401 invalid API key)", async () => {
+  it("throws when the service-history POST fails (401 invalid API key) after exhausting retries", async () => {
+    vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(makeErrorResponse(401, "Unauthorized"));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(syncInspectionToExternalSystem(frPayload)).rejects.toThrow(
-      "FieldRoutes service-history POST failed (401)",
-    );
+    // Attach the rejection handler BEFORE advancing timers so the rejection
+    // is never unhandled.
+    const assertion = expect(
+      syncInspectionToExternalSystem(frPayload),
+    ).rejects.toThrow("FieldRoutes service-history POST failed (401)");
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    // All 3 attempts were made before giving up
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    vi.useRealTimers();
   });
 
-  it("throws when the service-history POST fails (503 service unavailable)", async () => {
+  it("throws when the service-history POST fails (503 service unavailable) after exhausting retries", async () => {
+    vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue(makeErrorResponse(503, "Service Unavailable"));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(syncInspectionToExternalSystem(frPayload)).rejects.toThrow(
-      "FieldRoutes service-history POST failed (503)",
-    );
+    const assertion = expect(
+      syncInspectionToExternalSystem(frPayload),
+    ).rejects.toThrow("FieldRoutes service-history POST failed (503)");
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    vi.useRealTimers();
+  });
+
+  it("retries on a transient failure and succeeds when the second attempt succeeds", async () => {
+    vi.useFakeTimers();
+    let callCount = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      // First attempt — transient 503
+      if (callCount === 1) return makeErrorResponse(503, "Service Unavailable");
+      // Second attempt — succeeds
+      return makeOkResponse("{}");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = syncInspectionToExternalSystem(frPayload);
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    vi.useRealTimers();
+
+    expect(result.success).toBe(true);
+    expect(result.externalSystem).toBe("fieldroutes");
+    expect(result.attachmentsPosted).toBe(3);
+    // Exactly 2 fetch calls: 1 failed + 1 successful retry
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("uses the default FieldRoutes base URL when apiBaseUrl is not provided", async () => {
