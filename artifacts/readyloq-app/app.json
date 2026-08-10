@@ -2,7 +2,7 @@
   "expo": {
     "name": "ReadyLoq",
     "slug": "readyloq-app",
-    "version": "0.9.0",
+    "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "readyloq-app",
@@ -25,32 +25,17 @@
         "NSBluetoothAlwaysUsageDescription": "ReadyLoq connects to BLE sensors and Meta Ray-Ban smart glasses for hands-free inspection capture and environmental measurement.",
         "NSBluetoothPeripheralUsageDescription": "ReadyLoq uses Bluetooth to pair with smart glasses and measurement sensors.",
         "UIBackgroundModes": [
-          "bluetooth-central",
           "bluetooth-central"
         ]
       },
       "backgroundModes": [
-        "bluetooth-central",
         "bluetooth-central"
       ]
     },
     "android": {
       "package": "com.hgwashingllc.readyloqmobile",
-      "versionCode": 119,
+      "versionCode": 120,
       "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": false,
-          "data": [
-            {
-              "scheme": "readyloq-app"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        },
         {
           "action": "VIEW",
           "autoVerify": false,
@@ -66,16 +51,6 @@
         }
       ],
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN",
-        "android.permission.BLUETOOTH_SCAN",
-        "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.BLUETOOTH_ADVERTISE",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
