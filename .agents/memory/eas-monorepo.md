@@ -1,59 +1,76 @@
 ---
 name: EAS build setup
-description: Monorepo EAS build quirks — vendor script, EAS_NO_VCS, metro watchFolders, ENOSPC fix
+description: EAS monorepo build configuration, Metro config pitfalls, and pnpm symlink resolution for cloud builds.
 ---
 
-## Key constraints
+# EAS Build Setup
 
-- **Vendor script**: workspace `*` deps must be vendored before EAS upload; the upload contains node_modules.
-- **EAS_NO_VCS=1**: required because the sandbox has no git remote reachable by EAS.
-- **EAS_SKIP_AUTO_FINGERPRINT=1**: prevents EAS from re-fingerprinting the build.
-- **metro transformIgnorePatterns**: `@platform/*` packages must be included (not excluded) in the Metro transform list.
-- **EAS Build workflow 120s bash timeout**: use `--no-wait` flag to submit and exit; the build runs async on EAS servers.
+## EAS workflow flags
+- `EAS_NO_VCS=1` — required; repo is not a bare git checkout on Replit
+- `EAS_SKIP_AUTO_FINGERPRINT=1` — avoid fingerprint mismatch noise
+- `ble-plx > expo` override in root `package.json` avoids tar@6.2.1 firewall block
 
-## pnpm override for react-native-ble-plx
+## Root cause of "Unknown error in Bundle JavaScript phase" (all historical failures)
 
-`react-native-ble-plx@3.2.1` ships `"expo": "^51.0.14"` as a runtime dep, which pulls `@expo/cli@0.18 → tar@6.2.1`. The Replit firewall blocks `tar-6.2.1`.
-
-**Fix** (root `package.json`):
-```json
-"pnpm": {
-  "overrides": {
-    "react-native-ble-plx>expo": "54.0.36"
-  }
-}
+Gradle's `build.gradle` resolves the entry file at build time:
+```groovy
+entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
 ```
 
-This redirects ble-plx's expo dep to the already-installed expo@54, avoiding the old CLI chain.
+`expo/scripts/resolveAppEntry` follows pnpm symlinks and returns the **real path**
+into `.pnpm/`, e.g.:
+```
+workspaceRoot/node_modules/.pnpm/expo-router@6.0.24_.../node_modules/expo-router/entry.js
+```
 
-## Metro ENOSPC fix
+Metro must have this path inside `projectRoot` or `watchFolders`.
 
-The inotify watcher limit (65536) in the Replit container cannot be raised. Metro exhausts the limit when watching `node_modules/.pnpm` (thousands of static directories).
+On **Replit**: `getDefaultConfig()` auto-discovers the pnpm workspace and adds
+`workspaceRoot/node_modules` to `watchFolders`. ✓
 
-**Fix** in `metro.config.js`:
-- Remove `workspaceRoot` from `watchFolders` — only add specific source dirs (`lib/`, platform packages).
-- Do NOT add `node_modules/.pnpm` to `blockList` — see below.
+On **EAS cloud**: `getDefaultConfig()` auto-discovery fails (Metro starts from a
+different CWD), so `workspaceRoot/node_modules` is never in `watchFolders`. Metro
+cannot find the entry file → UNKNOWN_ERROR.
 
-**Why:** Metro only watches `projectRoot` + `watchFolders`. Since `.pnpm` is in neither, it won't be watched. The blockList is unnecessary for ENOSPC and harmful for EAS.
+## Metro config — three rules that must ALL hold
 
-## CRITICAL: watchFolders must include workspaceRoot on EAS (not on Replit)
+### 1. Pin `config.projectRoot` to an absolute path
+`getDefaultConfig(__dirname)` returns `projectRoot: '.'` (CWD-relative). On EAS
+cloud the bundle phase may run from a different working directory, making `.`
+resolve to the wrong place.
 
-Metro refuses to bundle files whose symlink-resolved real path lands **outside** `projectRoot + watchFolders`. All pnpm packages are symlinked into `node_modules/.pnpm` at the monorepo root. Without `workspaceRoot` in `watchFolders`, Metro throws "Unable to resolve module expo-router/entry.js" in the EAGER_BUNDLE phase.
+**Fix:** `config.projectRoot = __dirname` (the absolute path of the app dir).
 
-**Replit constraint:** Watching workspaceRoot hits the inotify limit (~65k watches) because `.pnpm` has 200k+ entries → ENOSPC.
+### 2. Explicitly add `rootNodeModules` to `watchFolders`
+Do NOT rely on `getDefaultConfig()` auto-discovery for this — it works on Replit
+but silently omits it on EAS. Compute it via `path.resolve(__dirname, '../../node_modules')`.
 
-**EAS:** No meaningful inotify cap — watching workspaceRoot is safe.
-
-**Fix (verified working):** Gate on `REPLIT_DEV_DOMAIN` (always set in Replit dev, never on EAS):
+**Fix:**
 ```js
-const isReplit = !!process.env.REPLIT_DEV_DOMAIN;
-if (!isReplit && fs.existsSync(workspaceRoot)) {
-  extraWatchFolders.push(workspaceRoot);
-}
+const rootNodeModules = path.resolve(__dirname, '../../node_modules');
+const extra = new Set(config.watchFolders ?? []);
+if (fs.existsSync(rootNodeModules)) extra.add(rootNodeModules);
+extra.add(libRoot);
+extra.add(platformPackagesRoot);
+config.watchFolders = [...extra];
 ```
 
-**Do NOT put `node_modules/.pnpm` in `blockList`** — blockList prevents file reads (not just watching), breaking symlink resolution for all pnpm-managed packages.
+**Why:**  pnpm symlinks in the app's `node_modules/` resolve to real paths in
+`workspaceRoot/node_modules/.pnpm/`. Both the entry file (resolved by Gradle)
+and all transitive imports land there. Metro must watch that tree.
 
-## react-native-ble-plx symlink
+### 3. Pin `nodeModulesPaths` to both app and workspace node_modules
+```js
+config.resolver.nodeModulesPaths = [appNodeModules, rootNodeModules];
+```
 
-The package is in the pnpm virtual store at `node_modules/.pnpm/react-native-ble-plx@3.2.1_<hash>/node_modules/react-native-ble-plx`. Symlink it to `artifacts/readyloq-app/node_modules/react-native-ble-plx` for TypeScript resolution. The EAS cloud build installs it natively.
+## Verification checklist before triggering EAS
+1. `cd artifacts/readyloq-app && npx expo export --platform android` must produce
+   a `.hbc` file in `dist/` locally.
+2. Commit + push before triggering EAS (EAS reads from the archive, not live files).
+3. Only trigger ONE build per fix attempt — the archive upload + queue adds cost.
+
+## Other EAS flags / notes
+- `EAS_SKIP_AUTO_FINGERPRINT=1` avoids fingerprint mismatch if `.expo/` is stale
+- Archive is 485 MB (whole workspace, node_modules excluded by `.easignore`)
+- `autoIncrement: true` in preview/production bumps `versionCode` on each build
