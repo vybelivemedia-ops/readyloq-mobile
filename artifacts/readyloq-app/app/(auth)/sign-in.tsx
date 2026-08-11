@@ -12,14 +12,7 @@ import { TextField } from "@/components/ui/TextField";
 import { useColors } from "@/hooks/useColors";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { clerkErrorMessage } from "@/lib/clerkErrors";
-
-const OFFLINE_MESSAGE = "No internet connection — check your signal and try again.";
-
-function isNetworkError(err: unknown): boolean {
-  if (!err) return false;
-  const msg = (err as { message?: string }).message ?? String(err);
-  return /network|fetch|failed to fetch|no internet|offline|econnrefused|etimedout/i.test(msg);
-}
+import { isNetworkError, OFFLINE_MESSAGE } from "@/lib/auth/networkError";
 
 export default function SignInScreen() {
   const colors = useColors();
