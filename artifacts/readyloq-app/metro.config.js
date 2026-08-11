@@ -9,44 +9,31 @@ const rootNodeModules = path.resolve(workspaceRoot, "node_modules");
 
 const config = getDefaultConfig(projectRoot);
 
-// ── watchFolders: different strategy for Replit dev vs EAS cloud build ────────
-//
-// Problem: pnpm symlinks packages through node_modules/.pnpm (the virtual
-// store). When Metro follows a symlink, the real file's absolute path lands
-// inside .pnpm. Metro silently refuses to bundle files whose real path is
-// outside all watched directories (projectRoot + watchFolders), so if the
-// workspace root isn't watched, any pnpm-linked module fails to resolve.
-//
-// Replit constraint: the Replit container's inotify limit is ~65 536 watches.
-// Watching the full workspace root (including node_modules/.pnpm which has
-// ~200k+ entries) exhausts that limit immediately → ENOSPC / build hang.
-//
-// Solution: on Replit (REPLIT_DEV_DOMAIN is always set), only watch specific
-// source dirs; on EAS (no REPLIT_DEV_DOMAIN), watch the workspace root so
-// Metro can follow .pnpm symlinks. EAS VMs have no meaningful inotify cap.
-const isReplit = !!process.env.REPLIT_DEV_DOMAIN;
-const extraWatchFolders = [];
-// Always watch shared lib packages (source only)
-const libRoot = path.resolve(workspaceRoot, "lib");
-if (fs.existsSync(libRoot)) extraWatchFolders.push(libRoot);
-// Always watch platform packages (source only)
-if (fs.existsSync(platformPackagesRoot)) {
-  extraWatchFolders.push(platformPackagesRoot);
-}
-// On EAS: watch workspace root so Metro can resolve pnpm virtual-store symlinks.
-// On Replit: omit to stay within the inotify limit.
-if (!isReplit && fs.existsSync(workspaceRoot)) {
-  extraWatchFolders.push(workspaceRoot);
-}
-config.watchFolders = extraWatchFolders;
+// ── Anchor the project root to an absolute path ────────────────────────────────
+// getDefaultConfig() returns projectRoot as "." (relative to CWD). During
+// EAS cloud builds Metro may be started from the workspace root rather than
+// the app directory, making "." resolve to the wrong place. Setting an
+// explicit absolute path guarantees Metro always treats artifacts/readyloq-app
+// as the project root regardless of the working directory.
+config.projectRoot = projectRoot;
 
-// NOTE: do NOT add node_modules/.pnpm to blockedPaths.  Metro resolves
-// pnpm-managed packages by following symlinks into .pnpm/; blocking that
-// path prevents Metro from reading the real files behind those symlinks and
-// causes "Unable to resolve module" errors on EAS (EAGER_BUNDLE phase).
-// The ENOSPC watcher fix is handled by keeping .pnpm out of watchFolders
-// (above), which is sufficient — Metro doesn't watch paths outside of
-// watchFolders and the projectRoot regardless.
+// ── watchFolders ──────────────────────────────────────────────────────────────
+// getDefaultConfig() already discovers pnpm workspace packages and adds
+// node_modules to watchFolders via @expo/config workspace detection. We MERGE
+// (not replace) with our additional source trees so that:
+//   1. node_modules stays in watchFolders — Metro can follow pnpm symlinks
+//      through node_modules/.pnpm to their real package locations.
+//   2. lib/ and repos/platform/packages/ are also watched for hot-reload.
+//
+// Note: inotify usage is low (~9 FDs active), so watching node_modules does
+// not exhaust the 65 536-watch limit in practice.
+const extraWatchFolders = new Set(config.watchFolders ?? []);
+const libRoot = path.resolve(workspaceRoot, "lib");
+if (fs.existsSync(libRoot)) extraWatchFolders.add(libRoot);
+if (fs.existsSync(platformPackagesRoot)) extraWatchFolders.add(platformPackagesRoot);
+config.watchFolders = [...extraWatchFolders];
+
+// ── Blocked paths ─────────────────────────────────────────────────────────────
 const homeDir = process.env.HOME || "/home/runner";
 const blockedPaths = [
   path.join(homeDir, ".config"),
