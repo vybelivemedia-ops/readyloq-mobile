@@ -1,11 +1,12 @@
 import { useAuth, useSignUp } from "@clerk/expo";
 import { type Href, Link, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
+import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
 import { useColors } from "@/hooks/useColors";
@@ -34,6 +35,13 @@ export default function SignUpScreen() {
 
   const submitting = fetchStatus === "fetching";
   const isOffline = !network.isConnected || network.isInternetReachable === false;
+
+  // Clear the offline-specific error automatically once connectivity is restored
+  useEffect(() => {
+    if (!isOffline && formError === OFFLINE_MESSAGE) {
+      setFormError(null);
+    }
+  }, [isOffline, formError]);
 
   const handleSubmit = async () => {
     if (isOffline) {
@@ -107,26 +115,7 @@ export default function SignUpScreen() {
           contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center", gap: 24 }}
           keyboardShouldPersistTaps="handled"
         >
-          {isOffline && (
-            <View
-              style={{
-                backgroundColor: colors.destructive,
-                borderRadius: 8,
-                padding: 12,
-              }}
-            >
-              <Text
-                style={{
-                  color: "#fff",
-                  fontFamily: "Inter_400Regular",
-                  fontSize: 14,
-                  textAlign: "center",
-                }}
-              >
-                {OFFLINE_MESSAGE}
-              </Text>
-            </View>
-          )}
+          <OfflineBanner isOffline={isOffline} message={OFFLINE_MESSAGE} />
 
           <View style={{ alignItems: "center", gap: 12 }}>
             <Logo size={32} />
@@ -188,26 +177,7 @@ export default function SignUpScreen() {
         contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: "center", gap: 24 }}
         keyboardShouldPersistTaps="handled"
       >
-        {isOffline && (
-          <View
-            style={{
-              backgroundColor: colors.destructive,
-              borderRadius: 8,
-              padding: 12,
-            }}
-          >
-            <Text
-              style={{
-                color: "#fff",
-                fontFamily: "Inter_400Regular",
-                fontSize: 14,
-                textAlign: "center",
-              }}
-            >
-              {OFFLINE_MESSAGE}
-            </Text>
-          </View>
-        )}
+        <OfflineBanner isOffline={isOffline} message={OFFLINE_MESSAGE} />
 
         <View style={{ alignItems: "center", gap: 12 }}>
           <Logo size={32} />
