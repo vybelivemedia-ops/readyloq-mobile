@@ -16,29 +16,30 @@ This only manifests in `export:embed` (the EAS/Gradle bundling path). `expo expo
 
 **Why `babel.config.js` (same process) works but `babel-preset-expo` inside a worker doesn't:** `babel.config.js` is evaluated in the main CLI process during Metro startup. The worker processes inherit Node.js module resolution but `require.resolve('expo-router')` from deep inside the pnpm virtual store's `babel-preset-expo` directory fails because pnpm does not hoist that package's peer into the worker's reachable `node_modules`.
 
-## Fix applied
+## Fix applied (final — fully inlined, zero external requires)
 
-Added `expoRouterBabelPlugin` directly to `babel.config.js` as an explicit plugin, bypassing the `hasModule` check entirely:
+The `.easignore` excludes `node_modules/` entirely. EAS runs a fresh `pnpm install` after
+extracting the archive. A top-level `require("babel-preset-expo/build/expo-router-plugin")`
+in `babel.config.js` runs before Metro workers are even warm, so pnpm resolution timing
+can cause it to fail.
 
-```js
-const { expoRouterBabelPlugin } = require("babel-preset-expo/build/expo-router-plugin");
+**Final fix**: the plugin logic is fully inlined in `babel.config.js` as a plain JS function
+with only `require("node:path")` (always available). No dependency on `babel-preset-expo`
+resolution from `babel.config.js` at all.
 
-module.exports = function (api) {
-  api.cache(true);
-  return {
-    presets: [["babel-preset-expo", { unstable_transformImportMeta: true }]],
-    plugins: [
-      "react-native-reanimated/plugin",
-      expoRouterBabelPlugin, // ensures EXPO_ROUTER_APP_ROOT is always inlined
-    ],
-  };
-};
-```
+The inlined function (`inlineExpoRouterEnvVars`) mirrors `expoRouterBabelPlugin` exactly:
+- `api.caller(c => c?.projectRoot)` — gets project root from Metro caller
+- `api.caller(c => c?.routerRoot)` — gets router root (`"app"`) from Metro caller
+- Visitor replaces `process.env.EXPO_ROUTER_APP_ROOT` with `path.relative(dirname(file), absAppRoot)`
 
-Also added `babel-preset-expo: "~54.0.0"` to the app's `devDependencies` so it is always a direct, resolvable dep on EAS.
+Also added `babel-preset-expo: "~54.0.0"` to the app's `devDependencies` (harmless extra).
 
 ## How to apply
 
-If this error reappears after Expo SDK upgrades: verify `expoRouterBabelPlugin` is still exported from `babel-preset-expo/build/expo-router-plugin.js` and that the explicit plugin in `babel.config.js` still uses the correct import path.
+If this error reappears after Expo SDK upgrades: re-read `babel-preset-expo/build/expo-router-plugin.js`
+and `common.js` to check if the caller keys (`routerRoot`, `projectRoot`, `asyncRoutes`) changed,
+then update the inline function in `babel.config.js`.
 
-**Why:** The plugin is stateless for non-ctx files (visitor only triggers on `process.env.EXPO_ROUTER_APP_ROOT` member expressions), so double-application via the preset AND the explicit entry is harmless.
+**Why:** The plugin is stateless for non-ctx files (visitor only triggers on specific
+`process.env.*` member expressions). Double-application via the preset AND the explicit entry
+is harmless — the second pass finds no matching nodes.

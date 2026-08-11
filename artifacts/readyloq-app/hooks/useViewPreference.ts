@@ -19,20 +19,28 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
-import { EventEmitter } from "events";
 
 export type ViewMode = "solo" | "enterprise";
 
 const STORAGE_KEY = "@readyloq/view_mode";
 
-// Module-level emitter — one instance for the lifetime of the JS bundle.
-// All hook instances subscribe to this so writes in any one instance
-// immediately propagate to all others.
-const emitter = new EventEmitter();
+// Tiny inline emitter — avoids importing Node's `events` module which is not
+// available in React Native's Metro bundler on EAS cloud builds.
+type Listener = (...args: unknown[]) => void;
+const listeners: Map<string, Set<Listener>> = new Map();
+const emitter = {
+  on(event: string, fn: Listener) {
+    if (!listeners.has(event)) listeners.set(event, new Set());
+    listeners.get(event)!.add(fn);
+  },
+  off(event: string, fn: Listener) {
+    listeners.get(event)?.delete(fn);
+  },
+  emit(event: string, ...args: unknown[]) {
+    listeners.get(event)?.forEach((fn) => fn(...args));
+  },
+};
 const CHANGE_EVENT = "viewModeChanged";
-
-// Avoid Node's default 10-listener warning; realistically only a few tabs mount.
-emitter.setMaxListeners(20);
 
 export interface UseViewPreferenceResult {
   /** Persisted preference, or null while loading / never set. */
