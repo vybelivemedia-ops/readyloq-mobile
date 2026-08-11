@@ -40,6 +40,28 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+
+    // Crash reporter: captures the exact native exception before it kills the process.
+    // The file is written to app-external storage (no permission needed) so the user
+    // can read it with a file manager at:
+    //   Android/data/com.hgwashingllc.readyloqmobile/files/crash.txt
+    val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+      try {
+        val dir = getExternalFilesDir(null)
+        if (dir != null) {
+          val file = java.io.File(dir, "crash.txt")
+          file.writeText(
+            "Thread: ${thread.name}\n" +
+            "Time: ${java.util.Date()}\n\n" +
+            throwable.stackTraceToString()
+          )
+        }
+      } catch (_: Exception) {}
+      previousHandler?.uncaughtException(thread, throwable)
+        ?: android.os.Process.killProcess(android.os.Process.myPid())
+    }
+
     DefaultNewArchitectureEntryPoint.releaseLevel = try {
       ReleaseLevel.valueOf(BuildConfig.REACT_NATIVE_RELEASE_LEVEL.uppercase())
     } catch (e: IllegalArgumentException) {
