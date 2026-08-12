@@ -131,8 +131,61 @@ async function getSettings(companyId: number): Promise<OpportunitySettings> {
     enabled: true,
     minConfidence: 0.5,
     enabledCategories: null,
+    synthesisFailuresSinceLastSuccess: 0,
     updatedAt: new Date(),
   };
+}
+
+/**
+ * Increments the synthesis failure counter for a company (best-effort — never
+ * throws so it cannot disturb the caller's error handling).
+ */
+async function incrementSynthesisFailures(companyId: number): Promise<void> {
+  try {
+    await db
+      .insert(opportunitySettingsTable)
+      .values({
+        companyId,
+        synthesisFailuresSinceLastSuccess: 1,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: opportunitySettingsTable.companyId,
+        set: {
+          synthesisFailuresSinceLastSuccess: sql`${opportunitySettingsTable.synthesisFailuresSinceLastSuccess} + 1`,
+          updatedAt: new Date(),
+        },
+      });
+  } catch (err) {
+    logger.warn({ companyId, err: err instanceof Error ? err.message : String(err) },
+      "[opportunity-synthesis] failed to increment failure counter");
+  }
+}
+
+/**
+ * Resets the synthesis failure counter to 0 after a successful run
+ * (best-effort — never throws).
+ */
+async function resetSynthesisFailures(companyId: number): Promise<void> {
+  try {
+    await db
+      .insert(opportunitySettingsTable)
+      .values({
+        companyId,
+        synthesisFailuresSinceLastSuccess: 0,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: opportunitySettingsTable.companyId,
+        set: {
+          synthesisFailuresSinceLastSuccess: 0,
+          updatedAt: new Date(),
+        },
+      });
+  } catch (err) {
+    logger.warn({ companyId, err: err instanceof Error ? err.message : String(err) },
+      "[opportunity-synthesis] failed to reset failure counter");
+  }
 }
 
 /**
@@ -603,6 +656,9 @@ export async function runOpportunitySynthesis(input: {
   const { companyId, inspectionId } = input;
   try {
     await runOpportunitySynthesisCore(input);
+    // Reset the failure counter on every successful completion so the owner
+    // briefing warning clears automatically once synthesis is healthy again.
+    void resetSynthesisFailures(companyId);
   } catch (err) {
     // Never let opportunity mining disturb the inspection flow.
     // Log with enough detail to distinguish an AI call error from a DB/parse
@@ -618,5 +674,7 @@ export async function runOpportunitySynthesis(input: {
       message: "Opportunity synthesis failed",
       context: { stage: "opportunity_synthesis", inspectionId, error: errMessage },
     });
+    // Increment the per-company counter so owners can see a catch-up is needed.
+    void incrementSynthesisFailures(companyId);
   }
 }

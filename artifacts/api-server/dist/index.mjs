@@ -69537,6 +69537,12 @@ var opportunitySettingsTable = pgTable("opportunity_settings", {
   enabled: boolean("enabled").notNull().default(true),
   minConfidence: real("min_confidence").notNull().default(0.5),
   enabledCategories: jsonb("enabled_categories").$type(),
+  /**
+   * Counts synthesis failures since the last successful run. Reset to 0 on
+   * any successful synthesis completion. Owners can see this on the briefing
+   * screen and trigger a catch-up run when it is > 0.
+   */
+  synthesisFailuresSinceLastSuccess: integer("synthesis_failures_since_last_success").notNull().default(0),
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });
 var opportunityNotesTable = pgTable(
@@ -87152,6 +87158,24 @@ async function generateCustomerSummaryBody(input) {
   return summary;
 }
 
+// src/lib/logger.ts
+var import_pino = __toESM(require_pino(), 1);
+var isProduction = process.env.NODE_ENV === "production";
+var logger2 = (0, import_pino.default)({
+  level: process.env.LOG_LEVEL ?? "info",
+  redact: [
+    "req.headers.authorization",
+    "req.headers.cookie",
+    "res.headers['set-cookie']"
+  ],
+  ...isProduction ? {} : {
+    transport: {
+      target: "pino-pretty",
+      options: { colorize: true }
+    }
+  }
+});
+
 // src/lib/pricing.ts
 var PRICING_MATRIX = {
   restaurant: { annualMin: 3e3, annualMax: 7200, defaultSqFt: 2500, perSqFtAnnual: 0.6 },
@@ -87248,8 +87272,49 @@ async function getSettings(companyId) {
     enabled: true,
     minConfidence: 0.5,
     enabledCategories: null,
+    synthesisFailuresSinceLastSuccess: 0,
     updatedAt: /* @__PURE__ */ new Date()
   };
+}
+async function incrementSynthesisFailures(companyId) {
+  try {
+    await db.insert(opportunitySettingsTable).values({
+      companyId,
+      synthesisFailuresSinceLastSuccess: 1,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).onConflictDoUpdate({
+      target: opportunitySettingsTable.companyId,
+      set: {
+        synthesisFailuresSinceLastSuccess: sql`${opportunitySettingsTable.synthesisFailuresSinceLastSuccess} + 1`,
+        updatedAt: /* @__PURE__ */ new Date()
+      }
+    });
+  } catch (err) {
+    logger2.warn(
+      { companyId, err: err instanceof Error ? err.message : String(err) },
+      "[opportunity-synthesis] failed to increment failure counter"
+    );
+  }
+}
+async function resetSynthesisFailures(companyId) {
+  try {
+    await db.insert(opportunitySettingsTable).values({
+      companyId,
+      synthesisFailuresSinceLastSuccess: 0,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).onConflictDoUpdate({
+      target: opportunitySettingsTable.companyId,
+      set: {
+        synthesisFailuresSinceLastSuccess: 0,
+        updatedAt: /* @__PURE__ */ new Date()
+      }
+    });
+  } catch (err) {
+    logger2.warn(
+      { companyId, err: err instanceof Error ? err.message : String(err) },
+      "[opportunity-synthesis] failed to reset failure counter"
+    );
+  }
 }
 async function propertySpeciesTrend(companyId, siteAddress) {
   const inspections = await db.select({ id: inspectionsTable.id }).from(inspectionsTable).where(
@@ -87400,9 +87465,9 @@ async function callAiWithRetry(messages2) {
     } catch (err) {
       lastErr = err;
       if (attempt === 0) {
-        console.warn(
-          `[opportunity-synthesis] AI call failed on attempt 1, retrying in ${RETRY_DELAY_MS}ms:`,
-          err instanceof Error ? err.message : String(err)
+        logger2.warn(
+          { err: err instanceof Error ? err.message : String(err), retryDelayMs: RETRY_DELAY_MS },
+          "[opportunity-synthesis] AI call failed on attempt 1, retrying"
         );
         await sleep3(RETRY_DELAY_MS);
       }
@@ -87579,16 +87644,19 @@ async function runOpportunitySynthesis(input) {
   const { companyId, inspectionId } = input;
   try {
     await runOpportunitySynthesisCore(input);
+    void resetSynthesisFailures(companyId);
   } catch (err) {
     const errMessage = err instanceof Error ? err.message : String(err);
-    console.error(
-      `[opportunity-synthesis] ERROR \u2014 synthesis failed for inspectionId=${inspectionId} companyId=${companyId}: ${errMessage}`
+    logger2.error(
+      { inspectionId, companyId, err: errMessage },
+      "[opportunity-synthesis] synthesis failed"
     );
     void logErrorEvent("ai", {
       companyId,
       message: "Opportunity synthesis failed",
       context: { stage: "opportunity_synthesis", inspectionId, error: errMessage }
     });
+    void incrementSynthesisFailures(companyId);
   }
 }
 
@@ -87945,24 +88013,6 @@ function deriveRecurringIssues(entries) {
     sampleDescription: v.sample
   })).sort((a, b) => b.count - a.count || severityRank(b.severity) - severityRank(a.severity));
 }
-
-// src/lib/logger.ts
-var import_pino = __toESM(require_pino(), 1);
-var isProduction = process.env.NODE_ENV === "production";
-var logger2 = (0, import_pino.default)({
-  level: process.env.LOG_LEVEL ?? "info",
-  redact: [
-    "req.headers.authorization",
-    "req.headers.cookie",
-    "res.headers['set-cookie']"
-  ],
-  ...isProduction ? {} : {
-    transport: {
-      target: "pino-pretty",
-      options: { colorize: true }
-    }
-  }
-});
 
 // src/lib/property-memory-writer.ts
 function findingPestName(f) {
@@ -88749,12 +88799,20 @@ router3.post("/:id/media", async (req, res) => {
     const { mediaType, url: url2, filename, caption, durationSec, captureSource, qualityScore, captureMetadata } = req.body;
     if (!mediaType || !url2)
       return res.status(400).json({ error: "mediaType and url are required" });
+    const VALID_MEDIA_TYPES = ["image", "video", "document", "audio"];
+    if (!VALID_MEDIA_TYPES.includes(mediaType)) {
+      return res.status(400).json({
+        error: `Invalid mediaType. Must be one of: ${VALID_MEDIA_TYPES.join(", ")}`
+      });
+    }
     const [inspection] = await db.select().from(inspectionsTable).where(
       and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
     );
     if (!inspection) return res.status(404).json({ error: "Not found" });
     const [existing] = await db.select().from(inspectionMediaTable).where(
       and(
+        eq(inspectionMediaTable.companyId, companyId),
+        // tenant guard: defense-in-depth alongside parent inspection check
         eq(inspectionMediaTable.inspectionId, inspectionId),
         eq(inspectionMediaTable.url, url2)
       )
@@ -89906,6 +89964,56 @@ function computeInspectionMemory(priorVisits, current) {
 }
 
 // src/routes/analysis.ts
+var findingSchema = external_exports.object({
+  id: external_exports.number(),
+  category: external_exports.string(),
+  description: external_exports.string(),
+  confidence: external_exports.number(),
+  severity: external_exports.string(),
+  location: external_exports.string().nullable(),
+  imageUrl: external_exports.string().nullable(),
+  treatment: external_exports.string().nullable(),
+  exclusionOpportunity: external_exports.boolean().nullable(),
+  evidenceQuality: external_exports.enum(["excellent", "good", "fair"]).nullable().optional(),
+  possiblePest: external_exports.string().nullable().optional(),
+  species: external_exports.string().nullable().optional(),
+  lifeStage: external_exports.string().nullable().optional(),
+  conduciveCondition: external_exports.string().nullable().optional(),
+  harborage: external_exports.string().nullable().optional(),
+  moisture: external_exports.string().nullable().optional(),
+  structuralIssue: external_exports.string().nullable().optional(),
+  measurementEstimate: external_exports.object({
+    linearFt: external_exports.number().nullable().optional(),
+    gapWidthIn: external_exports.number().nullable().optional(),
+    heightFt: external_exports.number().nullable().optional(),
+    confidence: external_exports.number(),
+    source: external_exports.literal("ai_vision_estimate")
+  }).nullable().optional(),
+  zone: external_exports.string().nullable().optional(),
+  candidates: external_exports.array(external_exports.object({ species: external_exports.string(), confidence: external_exports.number() })).optional(),
+  confidenceLabel: external_exports.enum(["identified", "possible", "unidentified"]).optional(),
+  reviewStatus: external_exports.enum(["pending", "accepted", "corrected", "dismissed"]).optional(),
+  technicianSpecies: external_exports.string().nullable().optional()
+});
+function validateFindings(raw, context) {
+  if (!Array.isArray(raw)) return [[], 0];
+  const valid = [];
+  let invalidCount = 0;
+  for (const item of raw) {
+    const result = findingSchema.safeParse(item);
+    if (result.success) {
+      valid.push(result.data);
+    } else {
+      invalidCount++;
+      const first = result.error.issues[0];
+      logger2.error(
+        { context, message: first?.message, path: first?.path?.join(".") },
+        "[analysis] Invalid finding stripped"
+      );
+    }
+  }
+  return [valid, invalidCount];
+}
 var objectStorageService = new ObjectStorageService();
 var router4 = (0, import_express5.Router)();
 async function cropPhonePhotos(companyId, candidates) {
@@ -90063,12 +90171,21 @@ router4.post("/", async (req, res) => {
       and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
     );
     if (!inspection) return res.status(404).json({ error: "Inspection not found" });
-    const computed = overallConfidence ?? (findings.length > 0 ? findings.reduce((s2, f) => s2 + (f.confidence ?? 0), 0) / findings.length : 0);
+    const [validFindings, invalidFindingCount] = validateFindings(findings, "POST /analysis");
+    if (invalidFindingCount > 0) {
+      void logErrorEvent("ai", {
+        companyId,
+        userId: req.user?.id,
+        message: `${invalidFindingCount} malformed finding(s) stripped before DB insert`,
+        context: { stage: "write_validation", endpoint: "POST /analysis" }
+      });
+    }
+    const computed = overallConfidence ?? (validFindings.length > 0 ? validFindings.reduce((s2, f) => s2 + (f.confidence ?? 0), 0) / validFindings.length : 0);
     const [row] = await db.insert(analysisResultsTable).values({
       companyId,
       inspectionId,
       status: "complete",
-      findings,
+      findings: validFindings,
       recommendations,
       overallConfidence: computed
     }).returning();
@@ -90220,10 +90337,20 @@ router4.post("/analyze", async (req, res) => {
         context: { failedPhotos: analysisErrors, stage: "vision_model" }
       });
     }
-    const mergedFindings = [
+    const rawMerged = [
       ...aiFindings,
       ...technicianFindings.map((f) => ({ ...f, id: nextId++ }))
     ];
+    const [mergedFindings, mergedInvalidCount] = validateFindings(rawMerged, "POST /analysis/analyze");
+    if (mergedInvalidCount > 0) {
+      void logErrorEvent("ai", {
+        companyId,
+        userId: req.user?.id,
+        message: `${mergedInvalidCount} malformed finding(s) stripped before DB insert`,
+        inspectionId,
+        context: { stage: "write_validation", endpoint: "POST /analysis/analyze" }
+      });
+    }
     const recommendations = Array.from(
       new Set(
         mergedFindings.map((f) => f.treatment).filter((t) => typeof t === "string" && t.trim().length > 0)
@@ -90596,12 +90723,20 @@ function buildServerReportHtml(report, inspection) {
 
 // src/routes/reports.ts
 var router6 = (0, import_express7.Router)();
+function safeParseFindings(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((item) => {
+    if (!item || typeof item !== "object") return false;
+    const f = item;
+    return typeof f.category === "string" && typeof f.description === "string";
+  });
+}
 function serializeReport(row, pipelineValue) {
   return {
     ...row,
-    findings: row.findings ?? [],
-    recommendations: row.recommendations ?? [],
-    exclusionOpportunities: row.exclusionOpportunities ?? [],
+    findings: safeParseFindings(row.findings),
+    recommendations: Array.isArray(row.recommendations) ? row.recommendations.filter((r) => typeof r === "string") : [],
+    exclusionOpportunities: Array.isArray(row.exclusionOpportunities) ? row.exclusionOpportunities.filter((r) => typeof r === "string") : [],
     createdAt: row.createdAt.toISOString(),
     ...pipelineValue != null ? { pipelineValue } : {}
   };
@@ -90615,9 +90750,13 @@ router6.get("/", async (req, res) => {
     const severityValues = severityParam ? severityParam.split(",").filter(Boolean) : null;
     const statusValues = statusParam ? statusParam.split(",").filter(Boolean) : null;
     const sinceDays = sinceDaysParam ? parseInt(sinceDaysParam, 10) : null;
+    const VALID_SEVERITIES = ["low", "medium", "high", "critical"];
     const conditions = [eq(reportsTable.companyId, companyId)];
     if (severityValues?.length) {
-      conditions.push(inArray(reportsTable.severity, severityValues));
+      const safe = severityValues.filter(
+        (s2) => VALID_SEVERITIES.includes(s2)
+      );
+      if (safe.length) conditions.push(inArray(reportsTable.severity, safe));
     }
     if (statusValues?.length) {
       conditions.push(inArray(reportsTable.status, statusValues));
@@ -90662,8 +90801,8 @@ router6.post("/", async (req, res) => {
       ).orderBy(desc(analysisResultsTable.createdAt)).limit(1);
       const latest = analyses[0];
       if (latest) {
-        findings = latest.findings ?? [];
-        recommendations = latest.recommendations ?? [];
+        findings = safeParseFindings(latest.findings);
+        recommendations = Array.isArray(latest.recommendations) ? latest.recommendations.filter((r) => typeof r === "string") : [];
       }
     }
     const exclusionOpportunities = findings.filter((f) => f.exclusionOpportunity).map((f) => `${f.category}: ${f.description}`);
@@ -90737,11 +90876,11 @@ router6.post("/:id/generate-narrative", async (req, res) => {
     ).orderBy(desc(analysisResultsTable.createdAt)).limit(1);
     const latestAnalysis = analyses[0];
     const riskLevel = latestAnalysis?.riskLevel ?? null;
-    let reportFindings = report.findings ?? [];
-    let reportRecommendations = report.recommendations ?? [];
+    let reportFindings = safeParseFindings(report.findings);
+    let reportRecommendations = Array.isArray(report.recommendations) ? report.recommendations.filter((r) => typeof r === "string") : [];
     if (req.body?.refreshFindings === true && latestAnalysis) {
-      reportFindings = latestAnalysis.findings ?? [];
-      reportRecommendations = latestAnalysis.recommendations ?? [];
+      reportFindings = safeParseFindings(latestAnalysis.findings);
+      reportRecommendations = Array.isArray(latestAnalysis.recommendations) ? latestAnalysis.recommendations.filter((r) => typeof r === "string") : [];
       const exclusionOpportunities = reportFindings.filter((f) => f.exclusionOpportunity).map((f) => `${f.category}: ${f.description}`);
       await db.update(reportsTable).set({
         findings: reportFindings,
@@ -90770,6 +90909,9 @@ router6.post("/:id/generate-narrative", async (req, res) => {
       riskLevel
     });
     const [updated] = await db.update(reportsTable).set({ aiNarrative: narrative }).where(and(eq(reportsTable.id, id), eq(reportsTable.companyId, companyId))).returning();
+    if (!updated) {
+      return res.status(409).json({ error: "Report no longer exists" });
+    }
     return res.json(serializeReport(updated));
   } catch (err) {
     void logErrorEvent("report", {
@@ -93165,6 +93307,7 @@ router15.get("/settings", requireRole("owner"), async (req, res) => {
       enabled: true,
       minConfidence: 0.5,
       enabledCategories: null,
+      synthesisFailuresSinceLastSuccess: 0,
       updatedAt: (/* @__PURE__ */ new Date()).toISOString()
     });
   } catch {
@@ -93851,6 +93994,9 @@ var import_express20 = __toESM(require_express2(), 1);
 
 // src/lib/briefing.ts
 var DAY_MS = 864e5;
+var STALE_OPPORTUNITY_DAYS = 14;
+var REPORTING_WINDOW_DAYS = 30;
+var LOW_QUALITY_SCORE_THRESHOLD = 60;
 var OPEN_OPPORTUNITY_STATUSES = ["new", "reviewed", "quoted"];
 async function buildTechnicianSection(companyId) {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
@@ -93882,7 +94028,7 @@ async function buildTechnicianSection(companyId) {
   };
 }
 async function buildSalesSection(companyId) {
-  const staleBefore = new Date(Date.now() - 14 * DAY_MS);
+  const staleBefore = new Date(Date.now() - STALE_OPPORTUNITY_DAYS * DAY_MS);
   const [oppCounts, top, proposalCounts] = await Promise.all([
     db.select({
       status: opportunitiesTable.status,
@@ -93936,7 +94082,7 @@ async function buildSalesSection(companyId) {
   };
 }
 async function buildManagerSection(companyId) {
-  const monthAgo = new Date(Date.now() - 30 * DAY_MS);
+  const monthAgo = new Date(Date.now() - REPORTING_WINDOW_DAYS * DAY_MS);
   const now = Date.now();
   const [queue, [pending], [teamAgg], perTech, recentCompletions] = await Promise.all([
     db.select({
@@ -93944,7 +94090,14 @@ async function buildManagerSection(companyId) {
       inspectionId: customerSummariesTable.inspectionId,
       siteAddress: inspectionsTable.siteAddress,
       createdAt: customerSummariesTable.createdAt
-    }).from(customerSummariesTable).innerJoin(inspectionsTable, eq(customerSummariesTable.inspectionId, inspectionsTable.id)).where(
+    }).from(customerSummariesTable).innerJoin(
+      inspectionsTable,
+      and(
+        eq(customerSummariesTable.inspectionId, inspectionsTable.id),
+        eq(inspectionsTable.companyId, companyId)
+        // tenant guard: ensures the joined row belongs to this company
+      )
+    ).where(
       and(
         eq(customerSummariesTable.companyId, companyId),
         eq(customerSummariesTable.status, "draft")
@@ -94010,8 +94163,8 @@ async function buildManagerSection(companyId) {
 }
 async function buildOwnerSection(companyId) {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
-  const monthAgo = new Date(Date.now() - 30 * DAY_MS);
-  const staleBefore = new Date(Date.now() - 14 * DAY_MS);
+  const monthAgo = new Date(Date.now() - REPORTING_WINDOW_DAYS * DAY_MS);
+  const staleBefore = new Date(Date.now() - STALE_OPPORTUNITY_DAYS * DAY_MS);
   const approvalsAgingBefore = new Date(Date.now() - 3 * DAY_MS);
   const nowDate = /* @__PURE__ */ new Date();
   const weekAhead = new Date(Date.now() + 7 * DAY_MS);
@@ -94031,7 +94184,7 @@ async function buildOwnerSection(companyId) {
     ),
     db.select({
       avgQuality: sql`round(avg(${inspectionScorecardsTable.qualityScore}))::int`,
-      lowQuality: sql`count(*) filter (where ${inspectionScorecardsTable.qualityScore} < 60)::int`,
+      lowQuality: sql`count(*) filter (where ${inspectionScorecardsTable.qualityScore} < ${LOW_QUALITY_SCORE_THRESHOLD})::int`,
       highRisk: sql`count(*) filter (where ${inspectionScorecardsTable.riskLevel} in ('high', 'critical'))::int`
     }).from(inspectionScorecardsTable).where(
       and(
@@ -94086,7 +94239,7 @@ async function buildOwnerSection(companyId) {
     alerts.push({
       type: "quality_low",
       severity: "warning",
-      message: `${lowQuality} inspection${lowQuality === 1 ? "" : "s"} scored below 60 quality in the last 30 days`,
+      message: `${lowQuality} inspection${lowQuality === 1 ? "" : "s"} scored below ${LOW_QUALITY_SCORE_THRESHOLD} quality in the last ${REPORTING_WINDOW_DAYS} days`,
       count: lowQuality
     });
   }
@@ -95173,7 +95326,7 @@ router27.get("/", async (req, res) => {
       totalCount: items.length
     });
   } catch (err) {
-    console.error("review-queue GET:", err);
+    logger2.error({ err }, "review-queue GET error");
     return res.status(500).json({ error: "Failed to fetch review queue" });
   }
 });
@@ -105132,7 +105285,7 @@ router28.post(
     const rawBody = req.rawBody ?? Buffer.alloc(0);
     const signature = req.headers["x-hub-signature-256"];
     if (!verifySignature(rawBody, signature)) {
-      console.warn("[meta-glasses] webhook: invalid HMAC signature");
+      logger2.warn("[meta-glasses] webhook: invalid HMAC signature");
       return res.status(401).json({ error: "Invalid signature" });
     }
     const sessionId = String(req.query.session ?? "");
@@ -123210,7 +123363,7 @@ router29.get("/plans", async (_req, res) => {
     }
     return res.json({ data: Array.from(productsMap.values()) });
   } catch (err) {
-    console.error("[billing] /plans error:", err);
+    logger2.error({ err }, "[billing] /plans error");
     return res.status(500).json({ error: "Failed to load plans" });
   }
 });
@@ -123221,7 +123374,7 @@ router29.get("/license", ...memberAuth, async (req, res) => {
     );
     return res.json(licenseStatus);
   } catch (err) {
-    console.error("[billing] /license error:", err);
+    logger2.error({ err }, "[billing] /license error");
     return res.status(500).json({ error: "Failed to fetch license status" });
   }
 });
@@ -123239,7 +123392,7 @@ router29.get("/subscription", ...ownerOnly, async (req, res) => {
     );
     return res.json({ subscription, items });
   } catch (err) {
-    console.error("[billing] /subscription error:", err);
+    logger2.error({ err }, "[billing] /subscription error");
     return res.status(500).json({ error: "Failed to fetch subscription" });
   }
 });
@@ -123273,7 +123426,7 @@ router29.post("/checkout", ...ownerOnly, async (req, res) => {
     });
     return res.json({ url: session.url, sessionId: session.id });
   } catch (err) {
-    console.error("[billing] /checkout error:", err);
+    logger2.error({ err }, "[billing] /checkout error");
     return res.status(500).json({ error: err.message || "Failed to create checkout session" });
   }
 });
@@ -123297,7 +123450,7 @@ router29.patch("/seats", ...ownerOnly, async (req, res) => {
     await stripeService.updateSubscriptionSeats(company.id, seats);
     return res.json({ ok: true, additionalSeats: seats });
   } catch (err) {
-    console.error("[billing] /seats error:", err);
+    logger2.error({ err }, "[billing] /seats error");
     return res.status(500).json({ error: "Failed to update seat count" });
   }
 });
@@ -123315,7 +123468,7 @@ router29.post("/portal", ...ownerOnly, async (req, res) => {
     );
     return res.json({ url: session.url });
   } catch (err) {
-    console.error("[billing] /portal error:", err);
+    logger2.error({ err }, "[billing] /portal error");
     return res.status(500).json({ error: "Failed to open billing portal" });
   }
 });
@@ -123453,7 +123606,7 @@ router31.post("/transcribe", requireAuth, async (req, res) => {
     });
     res.json({ text: response.text, language: "en" });
   } catch (err) {
-    console.error("[transcribe] Whisper API error:", err);
+    logger2.error({ err }, "[transcribe] Whisper API error");
     res.status(500).json({ error: "Transcription failed. Please try again." });
   }
 });
@@ -123525,13 +123678,15 @@ async function syncToPestPac(payload) {
         attachmentsPosted++;
       } else {
         const body = await attachRes.text();
-        console.warn(
-          `PestPac attachment POST failed after retries (${attachRes.status}): ${body}`
+        logger2.warn(
+          { status: attachRes.status, body },
+          "PestPac attachment POST failed after retries"
         );
       }
     } catch (err) {
-      console.warn(
-        `PestPac attachment POST threw after retries for ${photo.url}: ${String(err)}`
+      logger2.warn(
+        { url: photo.url, err: String(err) },
+        "PestPac attachment POST threw after retries"
       );
     }
   }
@@ -123790,7 +123945,7 @@ router32.post("/sync", async (req, res) => {
     return res.json(syncResult);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed";
-    console.error("[integrations/sync]", message);
+    logger2.error({ message }, "[integrations/sync] error");
     if (validatedSyncCtx) {
       await db.insert(inspectionSyncLogsTable).values({
         ...validatedSyncCtx,
@@ -123915,7 +124070,7 @@ router33.get("/active", async (req, res) => {
     ).orderBy(companyPlaybooksTable.title);
     return res.json({ success: true, playbooks });
   } catch (err) {
-    console.error("[playbooks] GET /active error:", err);
+    logger2.error({ err }, "[playbooks] GET /active error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -123948,7 +124103,7 @@ router33.get("/compliance", async (req, res) => {
     const result = evaluatePlaybookCompliance(findings, productNames, playbooks);
     return res.json({ success: true, ...result });
   } catch (err) {
-    console.error("[playbooks] GET /compliance error:", err);
+    logger2.error({ err }, "[playbooks] GET /compliance error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -123958,7 +124113,7 @@ router33.get("/", requireRole("manager"), async (req, res) => {
     const playbooks = await db.select().from(companyPlaybooksTable).where(eq(companyPlaybooksTable.companyId, companyId)).orderBy(companyPlaybooksTable.title);
     return res.json({ success: true, playbooks });
   } catch (err) {
-    console.error("[playbooks] GET / error:", err);
+    logger2.error({ err }, "[playbooks] GET / error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -123972,7 +124127,7 @@ router33.post("/", requireRole("owner"), async (req, res) => {
     const [created] = await db.insert(companyPlaybooksTable).values({ ...parsed.data, companyId, notes: parsed.data.notes ?? null }).returning();
     return res.status(201).json({ success: true, playbook: created });
   } catch (err) {
-    console.error("[playbooks] POST / error:", err);
+    logger2.error({ err }, "[playbooks] POST / error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -123995,7 +124150,7 @@ router33.put("/:id", requireRole("owner"), async (req, res) => {
     if (!updated) return res.status(404).json({ error: "Playbook not found" });
     return res.json({ success: true, playbook: updated });
   } catch (err) {
-    console.error("[playbooks] PUT /:id error:", err);
+    logger2.error({ err }, "[playbooks] PUT /:id error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -124014,7 +124169,7 @@ router33.delete("/:id", requireRole("owner"), async (req, res) => {
       return res.status(404).json({ error: "Playbook not found" });
     return res.json({ success: true });
   } catch (err) {
-    console.error("[playbooks] DELETE /:id error:", err);
+    logger2.error({ err }, "[playbooks] DELETE /:id error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -124162,7 +124317,7 @@ router34.get(
         }
       });
     } catch (error40) {
-      console.error("executive intelligence error:", error40);
+      logger2.error({ err: error40 }, "executive intelligence error");
       return res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -124215,12 +124370,21 @@ router34.get(
           scoredAt: inspectionScorecardsTable.updatedAt
         }).from(inspectionScorecardsTable).innerJoin(
           inspectionsTable,
-          eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId)
+          and(
+            eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
+            eq(inspectionsTable.companyId, companyId)
+          )
         ).where(and(...conditions)).orderBy(
           sql`${inspectionScorecardsTable.riskScore} desc`,
           sql`${inspectionScorecardsTable.id} asc`
         ).limit(PAGE_SIZE).offset(offset),
-        db.select({ total: count(inspectionScorecardsTable.id) }).from(inspectionScorecardsTable).where(and(...conditions))
+        db.select({ total: count(inspectionScorecardsTable.id) }).from(inspectionScorecardsTable).innerJoin(
+          inspectionsTable,
+          and(
+            eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
+            eq(inspectionsTable.companyId, companyId)
+          )
+        ).where(and(...conditions))
       ]);
       const total = Number(countRow?.total ?? 0);
       const hasMore = offset + rows.length < total;
@@ -124251,7 +124415,7 @@ router34.get(
         }))
       });
     } catch (error40) {
-      console.error("executive inspections error:", error40);
+      logger2.error({ err: error40 }, "executive inspections error");
       return res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -124302,7 +124466,7 @@ router34.get(
       }
       return res.json({ success: true, weeks });
     } catch (error40) {
-      console.error("executive quality-trend error:", error40);
+      logger2.error({ err: error40 }, "executive quality-trend error");
       return res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -124321,7 +124485,7 @@ router34.get(
       const result = await generateDailyExecutiveBriefing(companyId, yesterday);
       return res.json(result);
     } catch (error40) {
-      console.error("executive briefing error:", error40);
+      logger2.error({ err: error40 }, "executive briefing error");
       return res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -124569,7 +124733,7 @@ router34.get(
       }
       return res.json({ success: true, html, subject });
     } catch (error40) {
-      console.error("executive email-preview error:", error40);
+      logger2.error({ err: error40 }, "executive email-preview error");
       return res.status(500).json({ error: "Internal server error" });
     }
   }

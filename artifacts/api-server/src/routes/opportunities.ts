@@ -154,6 +154,7 @@ router.get("/settings", requireRole("owner"), async (req, res) => {
       enabled: true,
       minConfidence: 0.5,
       enabledCategories: null,
+      synthesisFailuresSinceLastSuccess: 0,
       updatedAt: new Date().toISOString(),
     });
   } catch {

@@ -170,6 +170,14 @@ export const opportunitySettingsTable = pgTable("opportunity_settings", {
   enabled: boolean("enabled").notNull().default(true),
   minConfidence: real("min_confidence").notNull().default(0.5),
   enabledCategories: jsonb("enabled_categories").$type<OpportunityCategory[] | null>(),
+  /**
+   * Counts synthesis failures since the last successful run. Reset to 0 on
+   * any successful synthesis completion. Owners can see this on the briefing
+   * screen and trigger a catch-up run when it is > 0.
+   */
+  synthesisFailuresSinceLastSuccess: integer("synthesis_failures_since_last_success")
+    .notNull()
+    .default(0),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

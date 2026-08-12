@@ -1562,6 +1562,7 @@ export interface OpportunitySettings {
   minConfidence: number;
   /** @nullable */
   enabledCategories: string[] | null;
+  synthesisFailuresSinceLastSuccess: number;
   updatedAt: string;
 }
 

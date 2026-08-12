@@ -6,15 +6,16 @@
  */
 
 import { Ionicons } from "@expo/vector-icons";
-import { type RoleBriefing } from "@/lib/api-client";
+import { type RoleBriefing, useGetOpportunitySettings } from "@/lib/api-client";
 import { type Href, useRouter } from "expo-router";
-import React from "react";
-import { Text, View } from "react-native";
+import React, { useState } from "react";
+import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from "react-native";
 
 import { Card } from "@/components/ui/Card";
 import { useColors } from "@/hooks/useColors";
 import { formatRelative } from "@/constants/inspection";
 import { filterIntent } from "@/lib/filterIntent";
+import { customFetch } from "@/lib/api-client/custom-fetch";
 
 import { EmptyCard, formatMoney, ListRow, SectionTitle, StatGrid } from "./BriefingShared";
 
@@ -250,6 +251,11 @@ const ALERT_FILTER: Record<string, { filter: string; timeframe?: string }> = {
 function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
   const colors = useColors();
   const router = useRouter();
+  const [retrying, setRetrying] = useState(false);
+
+  // Poll opportunity settings to detect accumulated synthesis failures.
+  const { data: oppSettings, refetch: refetchSettings } = useGetOpportunitySettings();
+  const failureCount = oppSettings?.synthesisFailuresSinceLastSuccess ?? 0;
 
   const toReports = (filter: string, timeframe?: string) => () => {
     const params: Record<string, string> = { filter };
@@ -264,6 +270,33 @@ function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
         ? colors.warning
         : colors.info;
 
+  const handleRetrySynthesis = async () => {
+    if (retrying) return;
+    setRetrying(true);
+    try {
+      const result = await customFetch<{ total: number; processed: number; failed: number }>(
+        "/api/opportunities/resynthesize",
+        { method: "POST" },
+      );
+      await refetchSettings();
+      if (result.failed === 0) {
+        Alert.alert(
+          "Synthesis complete",
+          `Processed ${result.processed} inspection${result.processed !== 1 ? "s" : ""} successfully.`,
+        );
+      } else {
+        Alert.alert(
+          "Partial success",
+          `${result.processed} succeeded, ${result.failed} failed. Try again shortly.`,
+        );
+      }
+    } catch {
+      Alert.alert("Error", "Could not run synthesis. Please try again later.");
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   return (
     <>
       <StatGrid
@@ -276,6 +309,47 @@ function OwnerSection({ data }: { data: NonNullable<RoleBriefing["owner"]> }) {
           { label: "Approved summaries", value: data.kpis.approvedSummaries30d,   icon: "shield-checkmark-outline", tone: colors.success, onPress: toReports("approved") },
         ]}
       />
+
+      {failureCount > 0 && (
+        <Card style={{ borderColor: colors.warning, borderWidth: 1, gap: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+            <Ionicons name="warning-outline" size={18} color={colors.warning} style={{ marginTop: 1 }} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                Opportunity synthesis needs attention
+              </Text>
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                {failureCount} failure{failureCount !== 1 ? "s" : ""} since the last successful run. New inspections may be missing opportunities.
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={handleRetrySynthesis}
+            disabled={retrying}
+            style={{
+              backgroundColor: colors.warning,
+              borderRadius: 8,
+              paddingVertical: 9,
+              paddingHorizontal: 16,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              opacity: retrying ? 0.6 : 1,
+            }}
+          >
+            {retrying ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="refresh-outline" size={16} color="#fff" />
+            )}
+            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+              {retrying ? "Running…" : "Retry synthesis"}
+            </Text>
+          </TouchableOpacity>
+        </Card>
+      )}
+
       <View style={{ gap: 12 }}>
         <SectionTitle>Needs attention</SectionTitle>
         {data.alerts.length ? (

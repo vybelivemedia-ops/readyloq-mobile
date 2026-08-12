@@ -590,6 +590,23 @@ export declare const opportunitySettingsTable: import("drizzle-orm/pg-core").PgT
         }, {}, {
             $type: OpportunityCategory[] | null;
         }>;
+        synthesisFailuresSinceLastSuccess: import("drizzle-orm/pg-core").PgColumn<{
+            name: "synthesis_failures_since_last_success";
+            tableName: "opportunity_settings";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         updatedAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "updated_at";
             tableName: "opportunity_settings";
