@@ -54,3 +54,37 @@ export async function withRetry<T>(
   // Return the last non-throw result (shouldRetry was true every time)
   return lastResult as T;
 }
+
+/**
+ * Same behaviour as `withRetry` but also returns how many retries were needed.
+ *
+ * `retries` is the number of *extra* attempts beyond the first (0 = succeeded
+ * on the first try, 1 = one retry needed, etc.).  This lets callers surface
+ * flakiness to operators without changing the existing `withRetry` signature.
+ */
+export async function withRetryTracked<T>(
+  operation: () => Promise<T>,
+  shouldRetry: (result: T) => boolean,
+  maxAttempts = 3,
+  baseDelayMs = 500,
+): Promise<{ result: T; retries: number }> {
+  let lastResult: T | undefined;
+  let attempts = 0;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    attempts = attempt;
+    try {
+      const result = await operation();
+      if (!shouldRetry(result)) return { result, retries: attempt - 1 };
+      lastResult = result;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      await sleep(baseDelayMs * 2 ** (attempt - 1));
+      continue;
+    }
+    if (attempt < maxAttempts) {
+      await sleep(baseDelayMs * 2 ** (attempt - 1));
+    }
+  }
+  // All attempts exhausted — return the last non-throw result
+  return { result: lastResult as T, retries: attempts - 1 };
+}

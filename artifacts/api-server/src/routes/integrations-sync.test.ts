@@ -62,6 +62,8 @@ const { syncMock } = vi.hoisted(() => ({
     externalSystem: "pestpac" as const,
     postedNotes: true,
     attachmentsPosted: 0,
+    noteRetries: 0,
+    attachmentRetries: 0,
   })),
 }));
 
@@ -370,6 +372,8 @@ describe("POST /api/integrations/sync", () => {
         externalSystem: "pestpac" as const,
         postedNotes: true,
         attachmentsPosted: 3,
+        noteRetries: 0,
+        attachmentRetries: 0,
       });
 
       asUser(OWNER_ID);

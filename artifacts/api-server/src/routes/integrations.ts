@@ -398,6 +398,7 @@ router.get("/sync-history", requireRole("owner"), async (req, res) => {
         success: inspectionSyncLogsTable.success,
         errorMessage: inspectionSyncLogsTable.errorMessage,
         syncedAt: inspectionSyncLogsTable.syncedAt,
+        resultJson: inspectionSyncLogsTable.resultJson,
         siteAddress: inspectionsTable.siteAddress,
       })
       .from(inspectionSyncLogsTable)

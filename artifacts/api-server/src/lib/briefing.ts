@@ -231,7 +231,7 @@ async function buildTechnicianSection(companyId: number): Promise<TechnicianBrie
       ...r,
       createdAt: r.createdAt.toISOString(),
     })),
-    siteHistory: (siteHistoryRows as Array<{
+    siteHistory: (siteHistoryRows as unknown as Array<{
       siteAddress: string;
       visitCount: number;
       lastVisitedAt: Date | null;

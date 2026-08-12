@@ -11,7 +11,7 @@
 
 import type { FieldIntegrationSystem } from "@workspace/db";
 import { logger } from "../lib/logger";
-import { withRetry } from "../lib/retry";
+import { withRetry, withRetryTracked } from "../lib/retry";
 
 /**
  * Returns true only for errors that are worth retrying.
@@ -62,6 +62,10 @@ export interface SyncResult {
   externalSystem: FieldIntegrationSystem;
   postedNotes: boolean;
   attachmentsPosted: number;
+  /** Number of retries needed to post the note (0 = succeeded on first attempt). */
+  noteRetries: number;
+  /** Total number of retries across all attachment uploads (0 = all succeeded first try). */
+  attachmentRetries: number;
   error?: string;
 }
 
@@ -78,7 +82,7 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
   const customerId = payload.accountId;
 
   // 1 — Post AI narrative as a service note (up to 3 attempts with exponential back-off)
-  const noteRes = await withRetry(
+  const { result: noteRes, retries: noteRetries } = await withRetryTracked(
     () =>
       fetch(`${base}/customers/${customerId}/notes`, {
         method: "POST",
@@ -97,9 +101,10 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
 
   // 2 — Attach photos (up to 3 attempts each with exponential back-off)
   let attachmentsPosted = 0;
+  let attachmentRetries = 0;
   for (const photo of payload.photos) {
     try {
-      const attachRes = await withRetry(
+      const { result: attachRes, retries } = await withRetryTracked(
         () =>
           fetch(`${base}/customers/${customerId}/attachments`, {
             method: "POST",
@@ -111,6 +116,7 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
           }),
         isRetryableResponse,
       );
+      attachmentRetries += retries;
       if (attachRes.ok) {
         attachmentsPosted++;
       } else {
@@ -123,6 +129,8 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
       }
     } catch (err) {
       // Network-level error (fetch threw) after all retries — non-fatal, skip this photo.
+      // Count the retries that were consumed before the throw (maxAttempts - 1 = 2).
+      attachmentRetries += 2;
       logger.warn(
         { url: photo.url, err: String(err) },
         "PestPac attachment POST threw after retries",
@@ -130,7 +138,7 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
     }
   }
 
-  return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted };
+  return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted, noteRetries, attachmentRetries };
 }
 
 // ─── FieldRoutes ──────────────────────────────────────────────────────────────
@@ -146,7 +154,7 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
   const customerId = payload.accountId;
 
   // Retry the service-history POST up to 3 times before surfacing a hard error.
-  const histRes = await withRetry(
+  const { result: histRes, retries: noteRetries } = await withRetryTracked(
     () =>
       fetch(`${base}/customer/${customerId}/service-history`, {
         method: "POST",
@@ -171,11 +179,15 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
     throw new Error(`FieldRoutes service-history POST failed (${histRes.status}): ${body}`);
   }
 
+  // FieldRoutes bundles media into the service-history POST — no separate
+  // attachment step, so attachmentRetries is always 0.
   return {
     success: true,
     externalSystem: "fieldroutes",
     postedNotes: true,
     attachmentsPosted: payload.photos.length,
+    noteRetries,
+    attachmentRetries: 0,
   };
 }
 
