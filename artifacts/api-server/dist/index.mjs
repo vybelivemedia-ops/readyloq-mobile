@@ -94000,7 +94000,7 @@ var LOW_QUALITY_SCORE_THRESHOLD = 60;
 var OPEN_OPPORTUNITY_STATUSES = ["new", "reviewed", "quoted"];
 async function buildTechnicianSection(companyId) {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
-  const [[counts], recent] = await Promise.all([
+  const [[counts], recent, siteHistoryRows] = await Promise.all([
     db.select({
       total: sql`count(*)::int`,
       completed: sql`count(*) filter (where ${inspectionsTable.status} = 'completed')::int`,
@@ -94012,7 +94012,45 @@ async function buildTechnicianSection(companyId) {
       status: inspectionsTable.status,
       findingsCount: inspectionsTable.findingsCount,
       createdAt: inspectionsTable.createdAt
-    }).from(inspectionsTable).where(eq(inspectionsTable.companyId, companyId)).orderBy(desc(inspectionsTable.createdAt)).limit(5)
+    }).from(inspectionsTable).where(eq(inspectionsTable.companyId, companyId)).orderBy(desc(inspectionsTable.createdAt)).limit(5),
+    // Site history: unique addresses this company has completed, most-recent first.
+    // Aggregates all pest types ever recorded at each address so techs know what
+    // conditions to expect before arriving.
+    db.execute(sql`
+      WITH address_stats AS (
+        SELECT
+          site_address,
+          count(*)::int                                                         AS visit_count,
+          max(completed_at)                                                     AS last_visited_at,
+          (array_agg(id            ORDER BY completed_at DESC NULLS LAST))[1]  AS last_inspection_id,
+          (array_agg(findings_count ORDER BY completed_at DESC NULLS LAST))[1] AS last_findings_count
+        FROM inspections
+        WHERE company_id = ${companyId} AND status = 'completed'
+        GROUP BY site_address
+        ORDER BY max(completed_at) DESC NULLS LAST
+        LIMIT 8
+      ),
+      address_pests AS (
+        SELECT
+          i.site_address,
+          array_agg(DISTINCT pt ORDER BY pt)::text[] AS pest_types
+        FROM inspections i,
+             jsonb_array_elements_text(i.pest_types) AS pt
+        WHERE i.company_id = ${companyId}
+          AND i.status = 'completed'
+          AND jsonb_array_length(i.pest_types) > 0
+        GROUP BY i.site_address
+      )
+      SELECT
+        s.site_address        AS "siteAddress",
+        s.visit_count         AS "visitCount",
+        s.last_visited_at     AS "lastVisitedAt",
+        s.last_inspection_id  AS "lastInspectionId",
+        s.last_findings_count AS "lastFindingsCount",
+        COALESCE(p.pest_types, ARRAY[]::text[]) AS "pestTypes"
+      FROM address_stats s
+      LEFT JOIN address_pests p ON p.site_address = s.site_address
+    `)
   ]);
   const total = counts?.total ?? 0;
   const completed = counts?.completed ?? 0;
@@ -94024,6 +94062,14 @@ async function buildTechnicianSection(companyId) {
     recentInspections: recent.map((r) => ({
       ...r,
       createdAt: r.createdAt.toISOString()
+    })),
+    siteHistory: siteHistoryRows.map((r) => ({
+      siteAddress: r.siteAddress,
+      visitCount: r.visitCount,
+      lastVisitedAt: r.lastVisitedAt ? r.lastVisitedAt.toISOString() : null,
+      lastInspectionId: Number(r.lastInspectionId),
+      lastFindingsCount: r.lastFindingsCount ?? 0,
+      pestTypes: r.pestTypes ?? []
     }))
   };
 }
@@ -124283,12 +124329,13 @@ router34.get(
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
       const [velocityRow] = await db.select({
-        thisMonth: sql`sum(case when ${inspectionsTable.createdAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
-        lastMonth: sql`sum(case when ${inspectionsTable.createdAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.createdAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`
+        thisMonth: sql`sum(case when ${inspectionsTable.completedAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
+        lastMonth: sql`sum(case when ${inspectionsTable.completedAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.completedAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`
       }).from(inspectionsTable).where(
         and(
           eq(inspectionsTable.companyId, companyId),
-          eq(inspectionsTable.status, "completed")
+          eq(inspectionsTable.status, "completed"),
+          isNotNull(inspectionsTable.completedAt)
         )
       );
       return res.json({
@@ -124596,12 +124643,13 @@ router34.get(
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
       const [velocityRow] = await db.select({
-        thisMonth: sql`sum(case when ${inspectionsTable.createdAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
-        lastMonth: sql`sum(case when ${inspectionsTable.createdAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.createdAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`
+        thisMonth: sql`sum(case when ${inspectionsTable.completedAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
+        lastMonth: sql`sum(case when ${inspectionsTable.completedAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.completedAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`
       }).from(inspectionsTable).where(
         and(
           eq(inspectionsTable.companyId, companyId),
-          eq(inspectionsTable.status, "completed")
+          eq(inspectionsTable.status, "completed"),
+          isNotNull(inspectionsTable.completedAt)
         )
       );
       const pipelineValue = Number(pipelineRow?.pipelineValue ?? 0);

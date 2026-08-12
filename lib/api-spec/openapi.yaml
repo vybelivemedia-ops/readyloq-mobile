@@ -3546,10 +3546,23 @@ components:
         findingsCount: { type: integer }
         createdAt:     { type: string }
 
+    BriefingSiteHistory:
+      type: object
+      required: [siteAddress, visitCount, lastInspectionId, lastFindingsCount, pestTypes]
+      properties:
+        siteAddress:        { type: string }
+        visitCount:         { type: integer }
+        lastVisitedAt:      { type: string, nullable: true }
+        lastInspectionId:   { type: integer }
+        lastFindingsCount:  { type: integer }
+        pestTypes:
+          type: array
+          items: { type: string }
+
     TechnicianBriefing:
       type: object
       required:
-        [totalInspections, completedInspections, openInspections, completedThisWeek, recentInspections]
+        [totalInspections, completedInspections, openInspections, completedThisWeek, recentInspections, siteHistory]
       properties:
         totalInspections:     { type: integer }
         completedInspections: { type: integer }
@@ -3558,6 +3571,9 @@ components:
         recentInspections:
           type: array
           items: { $ref: "#/components/schemas/BriefingRecentInspection" }
+        siteHistory:
+          type: array
+          items: { $ref: "#/components/schemas/BriefingSiteHistory" }
 
     BriefingTopOpportunity:
       type: object

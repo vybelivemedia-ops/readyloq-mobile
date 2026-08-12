@@ -49,6 +49,16 @@ export interface TechnicianBriefing {
     findingsCount: number;
     createdAt: string;
   }[];
+  /** Per-building history: unique addresses this tech has visited, most recent first. */
+  siteHistory: {
+    siteAddress: string;
+    visitCount: number;
+    lastVisitedAt: string | null;
+    lastInspectionId: number;
+    lastFindingsCount: number;
+    /** Union of all pest types ever recorded at this address. */
+    pestTypes: string[];
+  }[];
 }
 
 export interface SalesBriefing {
@@ -147,7 +157,8 @@ const OPEN_OPPORTUNITY_STATUSES = ["new", "reviewed", "quoted"] as const;
 
 async function buildTechnicianSection(companyId: number): Promise<TechnicianBriefing> {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
-  const [[counts], recent] = await Promise.all([
+
+  const [[counts], recent, siteHistoryRows] = await Promise.all([
     db
       .select({
         total: sql<number>`count(*)::int`,
@@ -168,9 +179,49 @@ async function buildTechnicianSection(companyId: number): Promise<TechnicianBrie
       .where(eq(inspectionsTable.companyId, companyId))
       .orderBy(desc(inspectionsTable.createdAt))
       .limit(5),
+    // Site history: unique addresses this company has completed, most-recent first.
+    // Aggregates all pest types ever recorded at each address so techs know what
+    // conditions to expect before arriving.
+    db.execute(sql`
+      WITH address_stats AS (
+        SELECT
+          site_address,
+          count(*)::int                                                         AS visit_count,
+          max(completed_at)                                                     AS last_visited_at,
+          (array_agg(id            ORDER BY completed_at DESC NULLS LAST))[1]  AS last_inspection_id,
+          (array_agg(findings_count ORDER BY completed_at DESC NULLS LAST))[1] AS last_findings_count
+        FROM inspections
+        WHERE company_id = ${companyId} AND status = 'completed'
+        GROUP BY site_address
+        ORDER BY max(completed_at) DESC NULLS LAST
+        LIMIT 8
+      ),
+      address_pests AS (
+        SELECT
+          i.site_address,
+          array_agg(DISTINCT pt ORDER BY pt)::text[] AS pest_types
+        FROM inspections i,
+             jsonb_array_elements_text(i.pest_types) AS pt
+        WHERE i.company_id = ${companyId}
+          AND i.status = 'completed'
+          AND jsonb_array_length(i.pest_types) > 0
+        GROUP BY i.site_address
+      )
+      SELECT
+        s.site_address        AS "siteAddress",
+        s.visit_count         AS "visitCount",
+        s.last_visited_at     AS "lastVisitedAt",
+        s.last_inspection_id  AS "lastInspectionId",
+        s.last_findings_count AS "lastFindingsCount",
+        COALESCE(p.pest_types, ARRAY[]::text[]) AS "pestTypes"
+      FROM address_stats s
+      LEFT JOIN address_pests p ON p.site_address = s.site_address
+    `),
   ]);
+
   const total = counts?.total ?? 0;
   const completed = counts?.completed ?? 0;
+
   return {
     totalInspections: total,
     completedInspections: completed,
@@ -179,6 +230,21 @@ async function buildTechnicianSection(companyId: number): Promise<TechnicianBrie
     recentInspections: recent.map((r) => ({
       ...r,
       createdAt: r.createdAt.toISOString(),
+    })),
+    siteHistory: (siteHistoryRows as Array<{
+      siteAddress: string;
+      visitCount: number;
+      lastVisitedAt: Date | null;
+      lastInspectionId: number;
+      lastFindingsCount: number;
+      pestTypes: string[];
+    }>).map((r) => ({
+      siteAddress: r.siteAddress,
+      visitCount: r.visitCount,
+      lastVisitedAt: r.lastVisitedAt ? r.lastVisitedAt.toISOString() : null,
+      lastInspectionId: Number(r.lastInspectionId),
+      lastFindingsCount: r.lastFindingsCount ?? 0,
+      pestTypes: r.pestTypes ?? [],
     })),
   };
 }

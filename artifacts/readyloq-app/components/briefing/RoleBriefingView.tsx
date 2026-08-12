@@ -30,6 +30,11 @@ export function RoleBriefingView({ briefing }: { briefing: RoleBriefing }) {
 
 // ── Technician ────────────────────────────────────────────────────────────────
 
+/** Capitalise first letter of a pest/condition label for display. */
+function formatPestLabel(raw: string) {
+  return raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, " ");
+}
+
 function TechnicianSection({ data }: { data: NonNullable<RoleBriefing["technician"]> }) {
   const colors = useColors();
   const router = useRouter();
@@ -43,30 +48,106 @@ function TechnicianSection({ data }: { data: NonNullable<RoleBriefing["technicia
           { label: "This week", value: data.completedThisWeek, icon: "calendar-outline", tone: colors.info },
         ]}
       />
+
+      {/* ── Building / site history ─────────────────────────────────────── */}
       <View style={{ gap: 12 }}>
-        <SectionTitle>My recent inspections</SectionTitle>
-        {data.recentInspections.length ? (
-          <Card padded={false}>
-            {data.recentInspections.map((insp, i) => (
+        <SectionTitle>Building history</SectionTitle>
+        {data.siteHistory.length ? (
+          <View style={{ gap: 10 }}>
+            {data.siteHistory.map((site) => (
               <Card
-                key={insp.id}
-                padded={false}
-                style={{ borderWidth: 0, borderRadius: 0 }}
-                onPress={() => router.push(`/inspection/${insp.id}` as Href)}
+                key={site.siteAddress}
+                onPress={() => router.push(`/inspection/${site.lastInspectionId}` as Href)}
+                style={{ gap: 10 }}
               >
-                <ListRow
-                  first={i === 0}
-                  icon={insp.status === "completed" ? "checkmark-circle-outline" : "time-outline"}
-                  tone={insp.status === "completed" ? colors.success : colors.warning}
-                  title={insp.siteAddress}
-                  subtitle={`${insp.status} · ${insp.findingsCount} findings · ${formatRelative(insp.createdAt)}`}
-                  right={<Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />}
-                />
+                {/* Address + visit meta */}
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+                  <Ionicons
+                    name="business-outline"
+                    size={18}
+                    color={colors.primary}
+                    style={{ marginTop: 2 }}
+                  />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text
+                      style={{
+                        color: colors.foreground,
+                        fontFamily: "Inter_600SemiBold",
+                        fontSize: 14,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {site.siteAddress}
+                    </Text>
+                    <Text
+                      style={{
+                        color: colors.mutedForeground,
+                        fontFamily: "Inter_400Regular",
+                        fontSize: 12,
+                      }}
+                    >
+                      {site.visitCount === 1 ? "1 visit" : `${site.visitCount} visits`}
+                      {site.lastVisitedAt
+                        ? ` · last ${formatRelative(site.lastVisitedAt)}`
+                        : ""}
+                      {" · "}
+                      {site.lastFindingsCount === 1
+                        ? "1 finding"
+                        : `${site.lastFindingsCount} findings`}{" "}
+                      last visit
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+                </View>
+
+                {/* Pest / condition chips */}
+                {site.pestTypes.length > 0 && (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 28 }}>
+                    {site.pestTypes.map((pest) => (
+                      <View
+                        key={pest}
+                        style={{
+                          backgroundColor: colors.destructive + "18",
+                          borderRadius: 6,
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <Ionicons name="bug-outline" size={11} color={colors.destructive} />
+                        <Text
+                          style={{
+                            color: colors.destructive,
+                            fontFamily: "Inter_500Medium",
+                            fontSize: 11,
+                          }}
+                        >
+                          {formatPestLabel(pest)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {site.pestTypes.length === 0 && (
+                  <View style={{ paddingLeft: 28 }}>
+                    <Text
+                      style={{
+                        color: colors.mutedForeground,
+                        fontFamily: "Inter_400Regular",
+                        fontSize: 12,
+                      }}
+                    >
+                      No pest activity recorded
+                    </Text>
+                  </View>
+                )}
               </Card>
             ))}
-          </Card>
+          </View>
         ) : (
-          <EmptyCard text="No inspections yet. Start your first inspection above." />
+          <EmptyCard text="No completed inspections yet. Site history will appear here after your first visit." />
         )}
       </View>
     </>

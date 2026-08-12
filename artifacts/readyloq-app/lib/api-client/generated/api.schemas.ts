@@ -1770,12 +1770,23 @@ export interface BriefingRecentInspection {
   createdAt: string;
 }
 
+export interface BriefingSiteHistory {
+  siteAddress: string;
+  visitCount: number;
+  /** @nullable */
+  lastVisitedAt?: string | null;
+  lastInspectionId: number;
+  lastFindingsCount: number;
+  pestTypes: string[];
+}
+
 export interface TechnicianBriefing {
   totalInspections: number;
   completedInspections: number;
   openInspections: number;
   completedThisWeek: number;
   recentInspections: BriefingRecentInspection[];
+  siteHistory: BriefingSiteHistory[];
 }
 
 export interface BriefingTopOpportunity {
