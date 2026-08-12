@@ -83,7 +83,7 @@ timeoutMs = 120000
 
 [nix]
 channel = "stable-25_05"
-packages = ["eas-cli"]
+packages = ["eas-cli", "android-tools"]
 
 [[ports]]
 localPort = 8081
