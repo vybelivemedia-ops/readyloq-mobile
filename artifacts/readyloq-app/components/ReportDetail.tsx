@@ -23,9 +23,11 @@ import { formatDate, formatStatus, severityTone, statusTone } from "@/constants/
 import {
   ApiError,
   fetchIntegrationConfig,
+  fetchSyncHistory,
   triggerIntegrationSync,
   type FieldIntegrationSystem,
   type IntegrationConfigResponse,
+  type SyncHistoryEntry,
 } from "@/lib/api";
 
 interface ReportDetailProps {
@@ -56,17 +58,36 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
   // ── Field-service integration sync ─────────────────────────────────────────
   const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfigResponse | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
 
   const report = reportQ.data;
   const isFinalized = report ? FINALIZED_STATUSES.has(report.status) : false;
 
+  const loadSyncHistory = React.useCallback(
+    async (token: string | null, inspectionId: number) => {
+      try {
+        const data = await fetchSyncHistory(token, inspectionId);
+        setSyncHistory(data.logs);
+      } catch {
+        // non-blocking — history simply won't show
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (!isOwner || !isFinalized) return;
-    getToken()
-      .then((token: string | null) => fetchIntegrationConfig(token))
-      .then(setIntegrationConfig)
-      .catch(() => { /* non-blocking — button simply won't appear */ });
-  }, [isOwner, isFinalized, getToken]);
+    if (!isOwner || !isFinalized || !report?.inspectionId) return;
+    let cancelled = false;
+    getToken().then(async (token: string | null) => {
+      if (cancelled) return;
+      const [config] = await Promise.all([
+        fetchIntegrationConfig(token),
+        loadSyncHistory(token, report.inspectionId),
+      ]);
+      if (!cancelled) setIntegrationConfig(config);
+    }).catch(() => { /* non-blocking */ });
+    return () => { cancelled = true; };
+  }, [isOwner, isFinalized, report?.inspectionId, getToken, loadSyncHistory]);
 
   const handleSync = async () => {
     if (!report?.inspectionId || isSyncing) return;
@@ -74,6 +95,8 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
     try {
       const token = await getToken();
       const result = await triggerIntegrationSync(token, report.inspectionId);
+      // Refresh history to show the new successful sync timestamp.
+      await loadSyncHistory(token, report.inspectionId);
       Alert.alert(
         "Pushed to dispatch",
         result.attachmentsPosted > 0
@@ -82,6 +105,10 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
+      // Refresh history in case the failure was logged server-side.
+      getToken()
+        .then((token) => loadSyncHistory(token, report.inspectionId))
+        .catch(() => {});
       Alert.alert("Sync failed", `Could not push to dispatch software. ${msg}`);
     } finally {
       setIsSyncing(false);
@@ -218,6 +245,10 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
               Push this inspection report, findings, and photos to{" "}
               {SYSTEM_LABEL[integrationConfig.integration.systemType]}.
             </Text>
+
+            {/* Last sync status */}
+            <SyncHistoryBadge history={syncHistory} colors={colors} />
+
             <Button
               title={`Sync to ${SYSTEM_LABEL[integrationConfig.integration.systemType]}`}
               icon="cloud-upload-outline"
@@ -337,6 +368,39 @@ function BulletRow({ text, colors }: { text: string; colors: ReturnType<typeof u
       <Text style={{ color: colors.primary, fontSize: 14, lineHeight: 21 }}>•</Text>
       <Text selectable style={{ color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 21, flex: 1 }}>
         {text}
+      </Text>
+    </View>
+  );
+}
+
+function SyncHistoryBadge({
+  history,
+  colors,
+}: {
+  history: SyncHistoryEntry[];
+  colors: ReturnType<typeof useColors>;
+}) {
+  // Always derive status from the newest entry (API returns newest-first).
+  const latest = history[0];
+  if (!latest) return null;
+
+  if (latest.success) {
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <Ionicons name="checkmark-circle" size={15} color="#22c55e" />
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+          Last synced {formatDate(latest.syncedAt)}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
+      <Ionicons name="alert-circle-outline" size={15} color={colors.destructive} style={{ marginTop: 1 }} />
+      <Text style={{ color: colors.destructive, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
+        Last sync failed · {formatDate(latest.syncedAt)}
+        {latest.errorMessage ? `\n${latest.errorMessage}` : ""}
       </Text>
     </View>
   );
