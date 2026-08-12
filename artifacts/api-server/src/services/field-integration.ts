@@ -13,6 +13,23 @@ import type { FieldIntegrationSystem } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { withRetry } from "../lib/retry";
 
+/**
+ * Returns true only for errors that are worth retrying.
+ *
+ * Permanent client-side failures (4xx except 408 Request Timeout and
+ * 429 Too Many Requests) can never succeed on a retry — the credential is
+ * dead or the request is malformed.  Retrying them only wastes time and
+ * burns through the back-off budget.  Transient server errors (5xx) and
+ * rate-limit / timeout responses (429, 408) are still retried.
+ */
+function isRetryableResponse(res: Response): boolean {
+  if (res.ok) return false;
+  if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+    return false; // permanent auth / client error — fail fast
+  }
+  return true;
+}
+
 export interface PhotoSyncItem {
   url: string;
   caption: string | null;
@@ -71,7 +88,7 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
           date: payload.inspectionDate,
         }),
       }),
-    (res) => !res.ok,
+    isRetryableResponse,
   );
   if (!noteRes.ok) {
     const body = await noteRes.text();
@@ -92,7 +109,7 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
               description: `${photo.severity.toUpperCase()}: ${photo.caption ?? ""}`,
             }),
           }),
-        (res) => !res.ok,
+        isRetryableResponse,
       );
       if (attachRes.ok) {
         attachmentsPosted++;
@@ -146,7 +163,7 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
           date: payload.inspectionDate,
         }),
       }),
-    (res) => !res.ok,
+    isRetryableResponse,
   );
 
   if (!histRes.ok) {

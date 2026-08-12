@@ -77,24 +77,30 @@ describe("syncToPestPac", () => {
     });
   });
 
-  it("throws when the note POST fails (401 invalid API key) and makes no attachment calls", async () => {
-    vi.useFakeTimers();
+  it("throws immediately on 401 (dead credential) with exactly 1 attempt and no attachment calls", async () => {
     const fetchMock = vi.fn().mockResolvedValue(makeErrorResponse(401, "Unauthorized"));
     vi.stubGlobal("fetch", fetchMock);
 
-    const assertion = expect(
+    await expect(
       syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" }),
     ).rejects.toThrow("PestPac note POST failed (401)");
-    await vi.runAllTimersAsync();
-    await assertion;
 
-    vi.useRealTimers();
+    // 401 is a permanent auth failure — must not retry, so exactly 1 attempt
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toContain("/notes");
+  });
 
-    // All 3 retry attempts were made for the note — no attachments were attempted
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    for (const [url] of fetchMock.mock.calls) {
-      expect(url).toContain("/notes");
-    }
+  it("throws immediately on 403 (forbidden credential) with exactly 1 attempt and no attachment calls", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeErrorResponse(403, "Forbidden"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" }),
+    ).rejects.toThrow("PestPac note POST failed (403)");
+
+    // 403 is a permanent auth failure — must not retry, so exactly 1 attempt
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toContain("/notes");
   });
 
   it("throws when the note POST fails (500 server error) and surfaces status in message", async () => {
@@ -339,22 +345,28 @@ describe("syncToFieldRoutes", () => {
     expect(body.date).toBe("2026-08-10");
   });
 
-  it("throws when the service-history POST fails (401 invalid API key) after exhausting retries", async () => {
-    vi.useFakeTimers();
+  it("throws immediately on 401 (dead credential) with exactly 1 attempt", async () => {
     const fetchMock = vi.fn().mockResolvedValue(makeErrorResponse(401, "Unauthorized"));
     vi.stubGlobal("fetch", fetchMock);
 
-    // Attach the rejection handler BEFORE advancing timers so the rejection
-    // is never unhandled.
-    const assertion = expect(
+    await expect(
       syncInspectionToExternalSystem(frPayload),
     ).rejects.toThrow("FieldRoutes service-history POST failed (401)");
-    await vi.runAllTimersAsync();
-    await assertion;
 
-    // All 3 attempts were made before giving up
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    vi.useRealTimers();
+    // 401 is a permanent auth failure — must not retry, so exactly 1 attempt
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws immediately on 403 (forbidden credential) with exactly 1 attempt", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeErrorResponse(403, "Forbidden"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      syncInspectionToExternalSystem(frPayload),
+    ).rejects.toThrow("FieldRoutes service-history POST failed (403)");
+
+    // 403 is a permanent auth failure — must not retry, so exactly 1 attempt
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("throws when the service-history POST fails (503 service unavailable) after exhausting retries", async () => {
