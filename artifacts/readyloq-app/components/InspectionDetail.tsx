@@ -13,7 +13,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
@@ -123,17 +123,26 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const [viewerSaving,  setViewerSaving]  = useState(false);
   const [viewerCopying, setViewerCopying] = useState(false);
 
-  // #117 — pinch-to-zoom for the full-screen viewer
-  const viewerScale     = useSharedValue(1);
-  const viewerBaseScale = useSharedValue(1);
+  // #117 — pinch-to-zoom + pan for the full-screen viewer
+  const { width: _viewerScreenW, height: _viewerScreenH } = useWindowDimensions();
+  const viewerScale      = useSharedValue(1);
+  const viewerBaseScale  = useSharedValue(1);
+  const viewerTranslateX = useSharedValue(0);
+  const viewerTranslateY = useSharedValue(0);
+  const viewerBaseTX     = useSharedValue(0);
+  const viewerBaseTY     = useSharedValue(0);
 
-  // Reset zoom whenever the viewer closes
+  // Reset zoom + pan whenever the viewer closes
   useEffect(() => {
     if (viewerPath === null) {
-      viewerScale.value     = 1;
-      viewerBaseScale.value = 1;
+      viewerScale.value      = 1;
+      viewerBaseScale.value  = 1;
+      viewerTranslateX.value = 0;
+      viewerTranslateY.value = 0;
+      viewerBaseTX.value     = 0;
+      viewerBaseTY.value     = 0;
     }
-  }, [viewerPath, viewerScale, viewerBaseScale]);
+  }, [viewerPath, viewerScale, viewerBaseScale, viewerTranslateX, viewerTranslateY, viewerBaseTX, viewerBaseTY]);
 
   const viewerPinch = Gesture.Pinch()
     .onUpdate((e) => {
@@ -143,16 +152,36 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
       viewerBaseScale.value = viewerScale.value;
     });
 
+  const viewerPan = Gesture.Pan()
+    .onUpdate((e) => {
+      const maxX = (_viewerScreenW * (viewerScale.value - 1)) / 2;
+      const maxY = (_viewerScreenH * (viewerScale.value - 1)) / 2;
+      viewerTranslateX.value = Math.max(-maxX, Math.min(viewerBaseTX.value + e.translationX, maxX));
+      viewerTranslateY.value = Math.max(-maxY, Math.min(viewerBaseTY.value + e.translationY, maxY));
+    })
+    .onEnd(() => {
+      viewerBaseTX.value = viewerTranslateX.value;
+      viewerBaseTY.value = viewerTranslateY.value;
+    });
+
   const viewerDoubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
-      viewerScale.value     = withTiming(1, { duration: 250 });
-      viewerBaseScale.value = 1;
+      viewerScale.value      = withTiming(1, { duration: 250 });
+      viewerBaseScale.value  = 1;
+      viewerTranslateX.value = withTiming(0, { duration: 250 });
+      viewerTranslateY.value = withTiming(0, { duration: 250 });
+      viewerBaseTX.value     = 0;
+      viewerBaseTY.value     = 0;
     });
 
-  const viewerGesture   = Gesture.Simultaneous(viewerPinch, viewerDoubleTap);
+  const viewerGesture   = Gesture.Simultaneous(viewerPinch, viewerPan, viewerDoubleTap);
   const viewerAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: viewerScale.value }],
+    transform: [
+      { translateX: viewerTranslateX.value },
+      { translateY: viewerTranslateY.value },
+      { scale: viewerScale.value },
+    ],
   }));
 
   const handleSaveViewerImage = async () => {
@@ -560,9 +589,9 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
               <Ionicons name="close" size={22} color="#fff" />
             </Pressable>
 
-            {/* Pinch-to-zoom image (double-tap to reset) */}
+            {/* Pinch-to-zoom + pan image (double-tap to reset) */}
             <GestureDetector gesture={viewerGesture}>
-              <Reanimated.View style={[{ flex: 1, overflow: "hidden" }, viewerAnimStyle]}>
+              <Reanimated.View style={[{ flex: 1 }, viewerAnimStyle]}>
                 {viewerPath ? (
                   <AuthedImage
                     path={viewerPath}

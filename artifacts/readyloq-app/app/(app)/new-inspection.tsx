@@ -23,6 +23,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
@@ -723,16 +724,25 @@ export default function NewInspectionScreen() {
   // #110 — full-screen viewer for glasses-captured frames
   const [glassesViewerPath, setGlassesViewerPath] = useState<string | null>(null);
 
-  // #117 — pinch-to-zoom for the glasses viewer
-  const glassesViewerScale     = useSharedValue(1);
-  const glassesViewerBaseScale = useSharedValue(1);
+  // #117 — pinch-to-zoom + pan for the glasses viewer
+  const { width: _glassesScreenW, height: _glassesScreenH } = useWindowDimensions();
+  const glassesViewerScale      = useSharedValue(1);
+  const glassesViewerBaseScale  = useSharedValue(1);
+  const glassesViewerTranslateX = useSharedValue(0);
+  const glassesViewerTranslateY = useSharedValue(0);
+  const glassesViewerBaseTX     = useSharedValue(0);
+  const glassesViewerBaseTY     = useSharedValue(0);
 
   useEffect(() => {
     if (glassesViewerPath === null) {
-      glassesViewerScale.value     = 1;
-      glassesViewerBaseScale.value = 1;
+      glassesViewerScale.value      = 1;
+      glassesViewerBaseScale.value  = 1;
+      glassesViewerTranslateX.value = 0;
+      glassesViewerTranslateY.value = 0;
+      glassesViewerBaseTX.value     = 0;
+      glassesViewerBaseTY.value     = 0;
     }
-  }, [glassesViewerPath, glassesViewerScale, glassesViewerBaseScale]);
+  }, [glassesViewerPath, glassesViewerScale, glassesViewerBaseScale, glassesViewerTranslateX, glassesViewerTranslateY, glassesViewerBaseTX, glassesViewerBaseTY]);
 
   const glassesViewerPinch = Gesture.Pinch()
     .onUpdate((e) => {
@@ -742,16 +752,36 @@ export default function NewInspectionScreen() {
       glassesViewerBaseScale.value = glassesViewerScale.value;
     });
 
+  const glassesViewerPan = Gesture.Pan()
+    .onUpdate((e) => {
+      const maxX = (_glassesScreenW * (glassesViewerScale.value - 1)) / 2;
+      const maxY = (_glassesScreenH * (glassesViewerScale.value - 1)) / 2;
+      glassesViewerTranslateX.value = Math.max(-maxX, Math.min(glassesViewerBaseTX.value + e.translationX, maxX));
+      glassesViewerTranslateY.value = Math.max(-maxY, Math.min(glassesViewerBaseTY.value + e.translationY, maxY));
+    })
+    .onEnd(() => {
+      glassesViewerBaseTX.value = glassesViewerTranslateX.value;
+      glassesViewerBaseTY.value = glassesViewerTranslateY.value;
+    });
+
   const glassesViewerDoubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
-      glassesViewerScale.value     = withTiming(1, { duration: 250 });
-      glassesViewerBaseScale.value = 1;
+      glassesViewerScale.value      = withTiming(1, { duration: 250 });
+      glassesViewerBaseScale.value  = 1;
+      glassesViewerTranslateX.value = withTiming(0, { duration: 250 });
+      glassesViewerTranslateY.value = withTiming(0, { duration: 250 });
+      glassesViewerBaseTX.value     = 0;
+      glassesViewerBaseTY.value     = 0;
     });
 
-  const glassesViewerGesture   = Gesture.Simultaneous(glassesViewerPinch, glassesViewerDoubleTap);
+  const glassesViewerGesture   = Gesture.Simultaneous(glassesViewerPinch, glassesViewerPan, glassesViewerDoubleTap);
   const glassesViewerAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: glassesViewerScale.value }],
+    transform: [
+      { translateX: glassesViewerTranslateX.value },
+      { translateY: glassesViewerTranslateY.value },
+      { scale: glassesViewerScale.value },
+    ],
   }));
 
   // ── Meta glasses session (Ray-Ban Live AI hands-free integration) ──────────
@@ -1773,9 +1803,9 @@ export default function NewInspectionScreen() {
             <Ionicons name="close" size={22} color="#fff" />
           </Pressable>
 
-          {/* Pinch-to-zoom image (double-tap to reset) */}
+          {/* Pinch-to-zoom + pan image (double-tap to reset) */}
           <GestureDetector gesture={glassesViewerGesture}>
-            <Reanimated.View style={[{ flex: 1, overflow: "hidden" }, glassesViewerAnimStyle]}>
+            <Reanimated.View style={[{ flex: 1 }, glassesViewerAnimStyle]}>
               {glassesViewerPath ? (
                 <AuthedImage
                   path={glassesViewerPath}
@@ -1789,7 +1819,7 @@ export default function NewInspectionScreen() {
           <Text
             style={{ position: "absolute", bottom: 48, alignSelf: "center", color: "rgba(255,255,255,0.5)", fontSize: 12 }}
           >
-            Pinch to zoom · Double-tap to reset
+            Pinch to zoom · Drag to pan · Double-tap to reset
           </Text>
         </View>
       </Modal>
