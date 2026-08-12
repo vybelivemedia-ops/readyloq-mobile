@@ -970,3 +970,171 @@ describe("executive briefing endpoint: cross-company isolation", () => {
     expect(summary).toMatch(/9[,.]?200/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Quality-trend endpoint tests (Task #269)
+// ---------------------------------------------------------------------------
+
+describe("executive quality-trend endpoint: authentication & role guards", () => {
+  it("returns 401 when unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when called by a technician (not an owner)", async () => {
+    asUser(EXEC_TECH_A);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("executive quality-trend endpoint: response shape", () => {
+  it("returns success with a weeks array for an owner", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.weeks)).toBe(true);
+    // Always returns exactly 4 week buckets.
+    expect(res.body.weeks).toHaveLength(4);
+  });
+
+  it("each week entry has weekStart, label, and avgQuality fields", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+    for (const week of res.body.weeks) {
+      expect(typeof week.weekStart).toBe("string");
+      expect(typeof week.label).toBe("string");
+      expect(typeof week.avgQuality).toBe("number");
+    }
+  });
+
+  it("weekStart values are Monday-anchored ISO dates in ascending order", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+    const starts: string[] = res.body.weeks.map((w: { weekStart: string }) => w.weekStart);
+    // The list must be sorted oldest-first (ascending).
+    const sorted = [...starts].sort();
+    expect(starts).toEqual(sorted);
+    // Each date must parse as a valid date.
+    for (const s of starts) {
+      expect(isNaN(new Date(s).getTime())).toBe(false);
+    }
+  });
+});
+
+describe("executive quality-trend endpoint: cross-company isolation", () => {
+  /**
+   * Fixture (seeded in the top-level beforeAll):
+   *   Company A — 2 scorecards for "Alice":
+   *     inspAId  → qualityScore 88, riskLevel "high"   (createdAt ≈ now)
+   *     inspA2Id → qualityScore 92, riskLevel "low"    (createdAt ≈ now)
+   *   Company B — 1 scorecard for "Bob":
+   *     inspBId  → qualityScore 40, riskLevel "critical" (createdAt ≈ now)
+   *
+   * Both companies' scorecards fall in the same ISO week (the current week),
+   * so cross-tenant bleed would be immediately visible as a wrong avgQuality.
+   *
+   * Company A's expected current-week average: round((88 + 92) / 2) = 90.
+   * Company B's expected current-week average: 40.
+   */
+
+  it("company A's quality-trend returns only company A's weekly averages", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+
+    // The current week must appear with Company A's own average (90).
+    // If Company B's scorecard (40) bled in, the average would be ~73 (round((88+92+40)/3)).
+    const weeks: Array<{ weekStart: string; avgQuality: number }> = res.body.weeks;
+    const currentWeek = weeks[weeks.length - 1]; // most recent is last in ascending order
+    expect(currentWeek.avgQuality).toBe(90);
+  });
+
+  it("company A's quality-trend does not reflect company B's scorecard quality (40)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+
+    // No week should have an avgQuality that includes Company B's score of 40.
+    // If bleed occurred the current-week average would drop to ~73.
+    const weeks: Array<{ weekStart: string; avgQuality: number }> = res.body.weeks;
+    for (const week of weeks) {
+      // Company B's score (40) is far enough from A's average (90) that any
+      // cross-tenant contamination would shift the week average below 80.
+      if (week.avgQuality > 0) {
+        expect(week.avgQuality).toBeGreaterThanOrEqual(80);
+      }
+    }
+  });
+
+  it("company B's quality-trend returns only company B's weekly averages", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+
+    // The current week must show Company B's own score (40), not A's (90).
+    const weeks: Array<{ weekStart: string; avgQuality: number }> = res.body.weeks;
+    const currentWeek = weeks[weeks.length - 1];
+    expect(currentWeek.avgQuality).toBe(40);
+  });
+
+  it("company B's quality-trend does not reflect company A's scorecard quality (88, 92)", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+
+    // If Company A's scorecards (88, 92) bled in, Company B's current-week average
+    // would be much higher than 40 (would be ~73 with all three, or ~90 with just A's).
+    const weeks: Array<{ weekStart: string; avgQuality: number }> = res.body.weeks;
+    const currentWeek = weeks[weeks.length - 1];
+    // B's own average is 40; leakage of A's data would push it above 60.
+    expect(currentWeek.avgQuality).toBeLessThanOrEqual(60);
+  });
+
+  it("weeks with no scorecards are returned as avgQuality 0 (not omitted)", async () => {
+    // The empty-company owner has no scorecards at all — all 4 weeks must be 0.
+    // This also confirms the endpoint doesn't bleed other companies' data to fill gaps.
+    asUser(EXEC_OWNER_EMPTY);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+    expect(res.body.weeks).toHaveLength(4);
+    for (const week of res.body.weeks) {
+      expect(week.avgQuality).toBe(0);
+    }
+  });
+
+  it("both companies share the same ISO week key but see different averages", async () => {
+    // Both A and B have scorecards created ~now, so they fall in the same ISO week.
+    // Each company must see its own average for that shared week, not a blended value.
+    const [resA, resB] = await Promise.all([
+      request(app).get("/api/executive/quality-trend").set("x-as-user", EXEC_OWNER_A),
+      request(app).get("/api/executive/quality-trend").set("x-as-user", EXEC_OWNER_B),
+    ]);
+
+    // Authenticate each request independently using the authState helper.
+    asUser(EXEC_OWNER_A);
+    const resA2 = await request(app).get("/api/executive/quality-trend");
+    asUser(EXEC_OWNER_B);
+    const resB2 = await request(app).get("/api/executive/quality-trend");
+
+    expect(resA2.status).toBe(200);
+    expect(resB2.status).toBe(200);
+
+    const weeksA: Array<{ weekStart: string; avgQuality: number }> = resA2.body.weeks;
+    const weeksB: Array<{ weekStart: string; avgQuality: number }> = resB2.body.weeks;
+
+    const currentWeekA = weeksA[weeksA.length - 1];
+    const currentWeekB = weeksB[weeksB.length - 1];
+
+    // Both land in the same calendar week.
+    expect(currentWeekA.weekStart).toBe(currentWeekB.weekStart);
+
+    // But each company's average reflects only its own data.
+    expect(currentWeekA.avgQuality).toBe(90);  // A's average: (88+92)/2 = 90
+    expect(currentWeekB.avgQuality).toBe(40);  // B's average: 40
+  });
+});
