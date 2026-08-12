@@ -378,6 +378,106 @@ describe("DELETE /api/integrations/config — disconnect", () => {
   });
 });
 
+describe("tenant isolation — sync button cannot target another company's inspection", () => {
+  const SYNC_OWNER_A_ID = "sync_tenant_owner_a_clerk_id";
+  const SYNC_OWNER_B_ID = "sync_tenant_owner_b_clerk_id";
+
+  let companyAId: number;
+  let companyBId: number;
+  let inspectionBId: number;
+
+  beforeAll(async () => {
+    // Create two separate companies.
+    companyAId = await findOrCreateCompany("Sync Tenant Co A", "sync-tenant-co-a");
+    companyBId = await findOrCreateCompany("Sync Tenant Co B", "sync-tenant-co-b");
+
+    // Ensure owner users exist for each.
+    for (const [clerkId, cid] of [
+      [SYNC_OWNER_A_ID, companyAId],
+      [SYNC_OWNER_B_ID, companyBId],
+    ] as [string, number][]) {
+      const existing = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.clerkUserId, clerkId));
+      if (existing.length === 0) {
+        await db.insert(usersTable).values({ clerkUserId: clerkId, role: "owner", companyId: cid });
+      }
+    }
+
+    // Seed a completed inspection belonging to company B.
+    authState.userId = SYNC_OWNER_B_ID;
+    const inspRes = await request(app)
+      .post("/api/inspections")
+      .send({
+        siteAddress: "42 Roach Ave",
+        technicianName: "Tech B",
+        clientName: "Client B",
+        pestTypes: ["roaches"],
+      });
+    expect(inspRes.status).toBe(201);
+    inspectionBId = inspRes.body.id;
+
+    // Mark the inspection as completed so the sync route doesn't reject it as unfinished.
+    await db
+      .update(inspectionsTable)
+      .set({ status: "completed", completedAt: new Date() })
+      .where(eq(inspectionsTable.id, inspectionBId));
+
+    // Give company A a valid integration config.
+    await db.delete(companyFieldIntegrationsTable).where(
+      eq(companyFieldIntegrationsTable.companyId, companyAId),
+    );
+    await db.insert(companyFieldIntegrationsTable).values({
+      companyId: companyAId,
+      systemType: "pestpac",
+      accountId: "sync-a-acct",
+      apiKey: "sync-a-key",
+      enabled: true,
+    });
+  });
+
+  it("returns 404 when company A's owner tries to sync an inspection owned by company B", async () => {
+    // Act as company A's owner — their token is valid, but the inspection belongs to B.
+    authState.userId = SYNC_OWNER_A_ID;
+
+    const res = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: inspectionBId });
+
+    // The route must enforce tenant isolation and return 404 (not 200 or 502).
+    expect(res.status).toBe(404);
+  });
+
+  it("company B's owner can still sync their own inspection successfully", async () => {
+    // Give company B a valid integration config too.
+    await db.delete(companyFieldIntegrationsTable).where(
+      eq(companyFieldIntegrationsTable.companyId, companyBId),
+    );
+    await db.insert(companyFieldIntegrationsTable).values({
+      companyId: companyBId,
+      systemType: "pestpac",
+      accountId: "sync-b-acct",
+      apiKey: "sync-b-key",
+      enabled: true,
+    });
+
+    authState.userId = SYNC_OWNER_B_ID;
+
+    const res = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: inspectionBId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    // Clean up.
+    await db.delete(companyFieldIntegrationsTable).where(
+      eq(companyFieldIntegrationsTable.companyId, companyBId),
+    );
+  });
+});
+
 describe("tenant isolation — config is scoped per company", () => {
   it("two companies each hold their own independent config", async () => {
     const otherCompanyId = await findOrCreateCompany("Other Intg Co", "other-intg-co");
