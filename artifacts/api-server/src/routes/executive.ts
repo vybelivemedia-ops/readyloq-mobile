@@ -353,6 +353,83 @@ router.get(
 );
 
 /**
+ * GET /executive/quality-trend/inspections?weekStart=YYYY-MM-DD
+ *
+ * Returns all inspections scored during the ISO week that begins on weekStart.
+ * Scoped to req.companyId — no cross-tenant leakage.
+ * Gated at requireRole("owner").
+ */
+router.get(
+  "/executive/quality-trend/inspections",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+
+    const weekStartRaw = typeof req.query.weekStart === "string" ? req.query.weekStart.trim() : "";
+    if (!weekStartRaw) {
+      return res.status(400).json({ error: "weekStart query param is required (YYYY-MM-DD)" });
+    }
+    const weekStartDate = new Date(weekStartRaw);
+    if (isNaN(weekStartDate.getTime())) {
+      return res.status(400).json({ error: "weekStart must be a valid ISO date string (e.g. 2026-07-14)" });
+    }
+
+    // Compute the exclusive upper bound: weekStart + 7 days.
+    const weekEndDate = new Date(weekStartDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const weekStart = weekStartDate.toISOString();
+    const weekEnd = weekEndDate.toISOString();
+
+    try {
+      const rows = await db
+        .select({
+          inspectionId:   inspectionScorecardsTable.inspectionId,
+          siteAddress:    inspectionsTable.siteAddress,
+          technicianName: inspectionScorecardsTable.technicianName,
+          qualityScore:   inspectionScorecardsTable.qualityScore,
+          riskLevel:      inspectionScorecardsTable.riskLevel,
+          scoredAt:       inspectionScorecardsTable.createdAt,
+        })
+        .from(inspectionScorecardsTable)
+        .innerJoin(
+          inspectionsTable,
+          and(
+            eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
+            eq(inspectionsTable.companyId, companyId),
+          ),
+        )
+        .where(
+          and(
+            eq(inspectionScorecardsTable.companyId, companyId),
+            sql`${inspectionScorecardsTable.createdAt} >= ${weekStart}::timestamptz`,
+            sql`${inspectionScorecardsTable.createdAt} < ${weekEnd}::timestamptz`,
+          ),
+        )
+        .orderBy(sql`${inspectionScorecardsTable.qualityScore} asc`);
+
+      return res.json({
+        success: true,
+        weekStart: weekStartRaw,
+        count: rows.length,
+        inspections: rows.map((r) => ({
+          inspectionId:   r.inspectionId,
+          siteAddress:    r.siteAddress,
+          technicianName: r.technicianName || "Unknown",
+          qualityScore:   r.qualityScore,
+          riskLevel:      r.riskLevel,
+          scoredAt:       r.scoredAt,
+        })),
+      });
+    } catch (error) {
+      logger.error({ err: error }, "executive quality-trend inspections error");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+/**
  * GET /executive/briefing/yesterday
  *
  * Returns a structured narrative digest of yesterday's operations:

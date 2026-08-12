@@ -123615,7 +123615,10 @@ var transcribe_default = router31;
 // src/routes/integrations.ts
 var import_express33 = __toESM(require_express2(), 1);
 
-// src/services/field-integration.ts
+// src/lib/retry.ts
+function sleep5(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 async function withRetry(operation, shouldRetry, maxAttempts = 3, baseDelayMs = 500) {
   let lastResult;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -123634,9 +123637,8 @@ async function withRetry(operation, shouldRetry, maxAttempts = 3, baseDelayMs = 
   }
   return lastResult;
 }
-function sleep5(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+
+// src/services/field-integration.ts
 var PESTPAC_DEFAULT_BASE = "https://api.pestpac.com/v1";
 async function syncToPestPac(payload) {
   const base = payload.apiBaseUrl?.replace(/\/$/, "") ?? PESTPAC_DEFAULT_BASE;
@@ -124467,6 +124469,65 @@ router34.get(
       return res.json({ success: true, weeks });
     } catch (error40) {
       logger2.error({ err: error40 }, "executive quality-trend error");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+router34.get(
+  "/executive/quality-trend/inspections",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+    const weekStartRaw = typeof req.query.weekStart === "string" ? req.query.weekStart.trim() : "";
+    if (!weekStartRaw) {
+      return res.status(400).json({ error: "weekStart query param is required (YYYY-MM-DD)" });
+    }
+    const weekStartDate = new Date(weekStartRaw);
+    if (isNaN(weekStartDate.getTime())) {
+      return res.status(400).json({ error: "weekStart must be a valid ISO date string (e.g. 2026-07-14)" });
+    }
+    const weekEndDate = new Date(weekStartDate.getTime() + 7 * 24 * 60 * 60 * 1e3);
+    const weekStart = weekStartDate.toISOString();
+    const weekEnd = weekEndDate.toISOString();
+    try {
+      const rows = await db.select({
+        inspectionId: inspectionScorecardsTable.inspectionId,
+        siteAddress: inspectionsTable.siteAddress,
+        technicianName: inspectionScorecardsTable.technicianName,
+        qualityScore: inspectionScorecardsTable.qualityScore,
+        riskLevel: inspectionScorecardsTable.riskLevel,
+        scoredAt: inspectionScorecardsTable.createdAt
+      }).from(inspectionScorecardsTable).innerJoin(
+        inspectionsTable,
+        and(
+          eq(inspectionsTable.id, inspectionScorecardsTable.inspectionId),
+          eq(inspectionsTable.companyId, companyId)
+        )
+      ).where(
+        and(
+          eq(inspectionScorecardsTable.companyId, companyId),
+          sql`${inspectionScorecardsTable.createdAt} >= ${weekStart}::timestamptz`,
+          sql`${inspectionScorecardsTable.createdAt} < ${weekEnd}::timestamptz`
+        )
+      ).orderBy(sql`${inspectionScorecardsTable.qualityScore} asc`);
+      return res.json({
+        success: true,
+        weekStart: weekStartRaw,
+        count: rows.length,
+        inspections: rows.map((r) => ({
+          inspectionId: r.inspectionId,
+          siteAddress: r.siteAddress,
+          technicianName: r.technicianName || "Unknown",
+          qualityScore: r.qualityScore,
+          riskLevel: r.riskLevel,
+          scoredAt: r.scoredAt
+        }))
+      });
+    } catch (error40) {
+      logger2.error({ err: error40 }, "executive quality-trend inspections error");
       return res.status(500).json({ error: "Internal server error" });
     }
   }

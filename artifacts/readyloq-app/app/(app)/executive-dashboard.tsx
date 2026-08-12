@@ -20,7 +20,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@clerk/expo";
-import Svg, { Rect, Line, Text as SvgText } from "react-native-svg";
+import Svg, { G, Rect, Line, Text as SvgText } from "react-native-svg";
 import * as MailComposer from "expo-mail-composer";
 import {
   fetchExecutiveMetrics,
@@ -397,7 +397,13 @@ function VelocityTrend({
 
 // ─── Quality Trend Chart ──────────────────────────────────────────────────────
 
-function QualityTrendChart({ weeks }: { weeks: ExecutiveQualityWeek[] }) {
+function QualityTrendChart({
+  weeks,
+  onPressWeek,
+}: {
+  weeks: ExecutiveQualityWeek[];
+  onPressWeek?: (week: ExecutiveQualityWeek) => void;
+}) {
   const CHART_W = 320;
   const CHART_H = 100;
   const BAR_GAP = 12;
@@ -473,9 +479,21 @@ function QualityTrendChart({ weeks }: { weeks: ExecutiveQualityWeek[] }) {
                   : w.avgQuality >= 60
                     ? C.warning
                     : C.danger;
+            const isTappable = w.avgQuality > 0 && !!onPressWeek;
 
             return (
-              <React.Fragment key={w.weekStart}>
+              <G
+                key={w.weekStart}
+                onPress={isTappable ? () => onPressWeek?.(w) : undefined}
+              >
+                {/* Transparent hit-area covering entire column */}
+                <Rect
+                  x={x}
+                  y={0}
+                  width={barW}
+                  height={CHART_H}
+                  fill="transparent"
+                />
                 {/* Bar */}
                 <Rect
                   x={x}
@@ -499,6 +517,19 @@ function QualityTrendChart({ weeks }: { weeks: ExecutiveQualityWeek[] }) {
                     {w.avgQuality}
                   </SvgText>
                 )}
+                {/* Tap hint chevron for non-zero bars */}
+                {isTappable && (
+                  <SvgText
+                    x={x + barW / 2}
+                    y={BAR_AREA_H - 2}
+                    textAnchor="middle"
+                    fill={barColor}
+                    fontSize={7}
+                    opacity={0.6}
+                  >
+                    ▲
+                  </SvgText>
+                )}
                 {/* Week label below baseline */}
                 <SvgText
                   x={x + barW / 2}
@@ -509,7 +540,7 @@ function QualityTrendChart({ weeks }: { weeks: ExecutiveQualityWeek[] }) {
                 >
                   {w.label}
                 </SvgText>
-              </React.Fragment>
+              </G>
             );
           })}
         </Svg>
@@ -941,7 +972,15 @@ export default function ExecutiveDashboardScreen() {
           <View style={{ gap: 8 }}>
             <SectionTitle title="Quality Score — 4-Week Trend" />
             {qualityWeeks ? (
-              <QualityTrendChart weeks={qualityWeeks} />
+              <QualityTrendChart
+                weeks={qualityWeeks}
+                onPressWeek={(week) =>
+                  router.push({
+                    pathname: "/executive-week-inspections",
+                    params: { weekStart: week.weekStart, weekLabel: week.label },
+                  } as never)
+                }
+              />
             ) : (
               <View
                 style={{

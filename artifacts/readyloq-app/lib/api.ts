@@ -484,6 +484,34 @@ export function fetchExecutiveInspections(
   );
 }
 
+// ─── Weekly quality drill-down ────────────────────────────────────────────────
+
+export interface WeeklyQualityInspection {
+  inspectionId: number;
+  siteAddress: string;
+  technicianName: string;
+  qualityScore: number;
+  riskLevel: string;
+  scoredAt: string;
+}
+
+export interface WeeklyQualityInspectionsResponse {
+  success: true;
+  weekStart: string;
+  count: number;
+  inspections: WeeklyQualityInspection[];
+}
+
+export function fetchWeeklyQualityInspections(
+  token: string | null,
+  weekStart: string,
+) {
+  return request<WeeklyQualityInspectionsResponse>(
+    `/api/executive/quality-trend/inspections?weekStart=${encodeURIComponent(weekStart)}`,
+    token,
+  );
+}
+
 /** Register (or refresh) the device Expo push token for this user. */
 export function registerPushToken(token: string | null, pushToken: string) {
   return request<{ success: boolean }>("/api/auth/me/push-token", token, {
