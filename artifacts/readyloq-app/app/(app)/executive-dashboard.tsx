@@ -339,9 +339,13 @@ function TechnicianRow({
 function VelocityTrend({
   thisMonth,
   lastMonth,
+  onPressThisMonth,
+  onPressLastMonth,
 }: {
   thisMonth: number;
   lastMonth: number;
+  onPressThisMonth?: () => void;
+  onPressLastMonth?: () => void;
 }) {
   const delta = thisMonth - lastMonth;
   const up = delta >= 0;
@@ -351,46 +355,101 @@ function VelocityTrend({
       : Math.round(Math.abs(delta / lastMonth) * 100);
 
   return (
-    <View
-      style={{
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 14,
-        padding: 16,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 14,
-      }}
-    >
-      <View
+    <View style={{ gap: 10 }}>
+      {/* This Month card */}
+      <TouchableOpacity
+        onPress={onPressThisMonth}
+        activeOpacity={onPressThisMonth ? 0.7 : 1}
         style={{
-          width: 42,
-          height: 42,
-          borderRadius: 21,
-          backgroundColor: C.primary + "18",
+          backgroundColor: C.surface,
+          borderWidth: 1,
+          borderColor: C.border,
+          borderRadius: 14,
+          padding: 16,
+          flexDirection: "row",
           alignItems: "center",
-          justifyContent: "center",
+          gap: 14,
         }}
       >
-        <Ionicons name="trending-up" size={22} color={C.primary} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: C.text, fontFamily: "Inter_700Bold", fontSize: 20 }}>
-          {thisMonth}
-          <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13 }}>
-            {" "}this month
-          </Text>
-        </Text>
-        <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>
-          vs {lastMonth} last month
-          {lastMonth > 0 || thisMonth > 0 ? (
-            <Text style={{ color: up ? C.success : C.danger, fontFamily: "Inter_600SemiBold" }}>
-              {" "}{up ? "▲" : "▼"} {pct}%
+        <View
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            backgroundColor: C.primary + "18",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="trending-up" size={22} color={C.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: C.text, fontFamily: "Inter_700Bold", fontSize: 20 }}>
+            {thisMonth}
+            <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+              {" "}this month
             </Text>
-          ) : null}
-        </Text>
-      </View>
+          </Text>
+          <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>
+            Tap to see completed inspections
+          </Text>
+        </View>
+        {onPressThisMonth ? (
+          <Ionicons name="chevron-forward" size={16} color={C.muted} />
+        ) : null}
+      </TouchableOpacity>
+
+      {/* Last Month card */}
+      <TouchableOpacity
+        onPress={onPressLastMonth}
+        activeOpacity={onPressLastMonth ? 0.7 : 1}
+        style={{
+          backgroundColor: C.surface,
+          borderWidth: 1,
+          borderColor: C.border,
+          borderRadius: 14,
+          padding: 16,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 14,
+        }}
+      >
+        <View
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            backgroundColor: "#ffffff0A",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="calendar-outline" size={20} color={C.muted} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: C.text, fontFamily: "Inter_700Bold", fontSize: 20 }}>
+            {lastMonth}
+            <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+              {" "}last month
+            </Text>
+          </Text>
+          <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>
+            {lastMonth > 0 || thisMonth > 0 ? (
+              <>
+                <Text style={{ color: up ? C.success : C.danger, fontFamily: "Inter_600SemiBold" }}>
+                  {up ? "▲" : "▼"} {pct}%
+                </Text>
+                {" "}vs prior period · tap to review
+              </>
+            ) : (
+              "Tap to review prior completions"
+            )}
+          </Text>
+        </View>
+        {onPressLastMonth ? (
+          <Ionicons name="chevron-forward" size={16} color={C.muted} />
+        ) : null}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -965,6 +1024,18 @@ export default function ExecutiveDashboardScreen() {
             <VelocityTrend
               thisMonth={metrics?.inspectionsThisMonth ?? 0}
               lastMonth={metrics?.inspectionsLastMonth ?? 0}
+              onPressThisMonth={() =>
+                router.push({
+                  pathname: "/executive-velocity-inspections",
+                  params: { month: "current" },
+                } as never)
+              }
+              onPressLastMonth={() =>
+                router.push({
+                  pathname: "/executive-velocity-inspections",
+                  params: { month: "last" },
+                } as never)
+              }
             />
           </View>
 

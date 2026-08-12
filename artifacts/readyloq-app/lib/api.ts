@@ -484,6 +484,32 @@ export function fetchExecutiveInspections(
   );
 }
 
+// ─── Monthly velocity drill-down ─────────────────────────────────────────────
+
+export type VelocityMonth = "current" | "last";
+
+export interface VelocityInspection {
+  inspectionId: number;
+  siteAddress: string;
+  technicianName: string;
+  completedAt: string;
+}
+
+export interface VelocityDetailResponse {
+  success: true;
+  month: VelocityMonth;
+  label: string;
+  count: number;
+  inspections: VelocityInspection[];
+}
+
+export function fetchVelocityDetail(token: string | null, month: VelocityMonth) {
+  return request<VelocityDetailResponse>(
+    `/api/executive/velocity-detail?month=${encodeURIComponent(month)}`,
+    token,
+  );
+}
+
 // ─── Weekly quality drill-down ────────────────────────────────────────────────
 
 export interface WeeklyQualityInspection {

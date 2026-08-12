@@ -355,6 +355,82 @@ router.get(
 );
 
 /**
+ * GET /executive/velocity-detail?month=current|last
+ *
+ * Returns the list of inspections completed in the specified calendar month,
+ * scoped to the authenticated owner's company.
+ * `month=current` → the current calendar month (UTC).
+ * `month=last`    → the previous calendar month (UTC).
+ */
+router.get(
+  "/executive/velocity-detail",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+
+    const monthParam = typeof req.query.month === "string" ? req.query.month.trim() : "current";
+    if (monthParam !== "current" && monthParam !== "last") {
+      return res.status(400).json({ error: "month must be 'current' or 'last'" });
+    }
+
+    const now = new Date();
+    let monthStart: Date;
+    let monthEnd: Date;
+    let label: string;
+
+    if (monthParam === "current") {
+      monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      monthEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+      label      = monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    } else {
+      monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+      monthEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      label      = monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    }
+
+    try {
+      const rows = await db
+        .select({
+          inspectionId:   inspectionsTable.id,
+          siteAddress:    inspectionsTable.siteAddress,
+          technicianName: inspectionsTable.technicianName,
+          completedAt:    inspectionsTable.completedAt,
+        })
+        .from(inspectionsTable)
+        .where(
+          and(
+            eq(inspectionsTable.companyId, companyId),
+            eq(inspectionsTable.status, "completed"),
+            isNotNull(inspectionsTable.completedAt),
+            sql`${inspectionsTable.completedAt} >= ${monthStart.toISOString()}::timestamptz`,
+            sql`${inspectionsTable.completedAt} < ${monthEnd.toISOString()}::timestamptz`,
+          ),
+        )
+        .orderBy(sql`${inspectionsTable.completedAt} desc`);
+
+      return res.json({
+        success: true,
+        month: monthParam,
+        label,
+        count: rows.length,
+        inspections: rows.map((r) => ({
+          inspectionId:   r.inspectionId,
+          siteAddress:    r.siteAddress,
+          technicianName: r.technicianName || "Unknown",
+          completedAt:    r.completedAt,
+        })),
+      });
+    } catch (error) {
+      logger.error({ err: error }, "executive velocity-detail error");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+/**
  * GET /executive/quality-trend/inspections?weekStart=YYYY-MM-DD
  *
  * Returns all inspections scored during the ISO week that begins on weekStart.
