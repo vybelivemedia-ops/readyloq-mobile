@@ -50,6 +50,13 @@ import {
 } from "@/lib/api";
 import { ingestAnonymizedFaieData, sendPhotoToFaieDataset } from "@/lib/faie-ingest";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
+import {
+  clampZoom,
+  clampViewerTranslation,
+  commitPinch,
+  commitPan,
+  viewerIdentityTransform,
+} from "@/lib/vision/photo-viewer-logic";
 
 type ReviewAction = "accept" | "correct" | "dismiss";
 
@@ -135,44 +142,44 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   // Reset zoom + pan whenever the viewer closes
   useEffect(() => {
     if (viewerPath === null) {
-      viewerScale.value      = 1;
-      viewerBaseScale.value  = 1;
-      viewerTranslateX.value = 0;
-      viewerTranslateY.value = 0;
-      viewerBaseTX.value     = 0;
-      viewerBaseTY.value     = 0;
+      const reset = viewerIdentityTransform();
+      viewerScale.value      = reset.scale;
+      viewerBaseScale.value  = reset.baseScale;
+      viewerTranslateX.value = reset.translateX;
+      viewerTranslateY.value = reset.translateY;
+      viewerBaseTX.value     = reset.baseTX;
+      viewerBaseTY.value     = reset.baseTY;
     }
   }, [viewerPath, viewerScale, viewerBaseScale, viewerTranslateX, viewerTranslateY, viewerBaseTX, viewerBaseTY]);
 
   const viewerPinch = Gesture.Pinch()
     .onUpdate((e) => {
-      viewerScale.value = Math.max(1, Math.min(viewerBaseScale.value * e.scale, 8));
+      viewerScale.value = clampZoom(viewerBaseScale.value, e.scale);
     })
     .onEnd(() => {
-      viewerBaseScale.value = viewerScale.value;
+      viewerBaseScale.value = commitPinch(viewerScale.value);
     });
 
   const viewerPan = Gesture.Pan()
     .onUpdate((e) => {
-      const maxX = (_viewerScreenW * (viewerScale.value - 1)) / 2;
-      const maxY = (_viewerScreenH * (viewerScale.value - 1)) / 2;
-      viewerTranslateX.value = Math.max(-maxX, Math.min(viewerBaseTX.value + e.translationX, maxX));
-      viewerTranslateY.value = Math.max(-maxY, Math.min(viewerBaseTY.value + e.translationY, maxY));
+      viewerTranslateX.value = clampViewerTranslation(viewerBaseTX.value, e.translationX, _viewerScreenW, viewerScale.value);
+      viewerTranslateY.value = clampViewerTranslation(viewerBaseTY.value, e.translationY, _viewerScreenH, viewerScale.value);
     })
     .onEnd(() => {
-      viewerBaseTX.value = viewerTranslateX.value;
-      viewerBaseTY.value = viewerTranslateY.value;
+      viewerBaseTX.value = commitPan(viewerTranslateX.value);
+      viewerBaseTY.value = commitPan(viewerTranslateY.value);
     });
 
   const viewerDoubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
-      viewerScale.value      = withTiming(1, { duration: 250 });
-      viewerBaseScale.value  = 1;
-      viewerTranslateX.value = withTiming(0, { duration: 250 });
-      viewerTranslateY.value = withTiming(0, { duration: 250 });
-      viewerBaseTX.value     = 0;
-      viewerBaseTY.value     = 0;
+      const reset = viewerIdentityTransform();
+      viewerScale.value      = withTiming(reset.scale, { duration: 250 });
+      viewerBaseScale.value  = reset.baseScale;
+      viewerTranslateX.value = withTiming(reset.translateX, { duration: 250 });
+      viewerTranslateY.value = withTiming(reset.translateY, { duration: 250 });
+      viewerBaseTX.value     = reset.baseTX;
+      viewerBaseTY.value     = reset.baseTY;
     });
 
   const viewerGesture   = Gesture.Simultaneous(viewerPinch, viewerPan, viewerDoubleTap);
