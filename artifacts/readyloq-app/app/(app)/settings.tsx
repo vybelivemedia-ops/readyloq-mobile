@@ -12,6 +12,7 @@ import React from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -855,6 +856,39 @@ export default function SettingsScreen() {
                 ? "You'll be notified immediately when a completed inspection scores as critical risk."
                 : "Critical risk alerts are off. Enable to get instant push notifications."}
             </Text>
+
+            {/* Stale-token warning: push is on but the token was cleared (e.g.
+                DeviceNotRegistered after an OS update or reinstall). */}
+            {pushEnabled && user?.hasPushToken === false && (
+              <Pressable
+                onPress={() => void Linking.openSettings()}
+                style={({ pressed }) => ({
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  marginTop: 10,
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: "#f97316" + "18",
+                  borderWidth: 1,
+                  borderColor: "#f97316" + "44",
+                  opacity: pressed ? 0.75 : 1,
+                })}
+              >
+                <Ionicons name="warning-outline" size={16} color="#f97316" style={{ marginTop: 1 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#f97316", fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 2 }}>
+                    Alerts may not be reaching you
+                  </Text>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 }}>
+                    Your push token expired or was cleared. Re-open the app to
+                    re-register, or check that notifications are allowed in your
+                    device Settings.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} style={{ marginTop: 2 }} />
+              </Pressable>
+            )}
           </View>
         )}
 

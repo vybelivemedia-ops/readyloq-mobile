@@ -62,8 +62,16 @@ async function sendExpoPush(messages: ExpoPushMessage[], ctx: PushContext): Prom
     }
     const json = (await response.json()) as { data?: ExpoPushTicket[] };
     const tickets = json.data ?? [];
-    for (const ticket of tickets) {
-      if (ticket.status === "error") {
+    const staleTokens: string[] = [];
+    for (let i = 0; i < tickets.length; i++) {
+      const ticket = tickets[i];
+      if (ticket.status !== "error") continue;
+      if (ticket.details?.error === "DeviceNotRegistered") {
+        // The token is no longer valid (device reinstall, OS reset, etc.).
+        // Clear it so the owner is prompted to re-register on next app open.
+        const staleToken = messages[i]?.to;
+        if (staleToken) staleTokens.push(staleToken);
+      } else {
         void logErrorEvent("notification", {
           companyId: ctx.companyId,
           inspectionId: ctx.inspectionId,
@@ -71,6 +79,22 @@ async function sendExpoPush(messages: ExpoPushMessage[], ctx: PushContext): Prom
           context: { errorCode: ticket.details?.error },
         });
       }
+    }
+    // Clear all stale tokens in a single pass. Each update is scoped to the
+    // exact token value so it is safe even across tenants.
+    for (const staleToken of staleTokens) {
+      void db
+        .update(usersTable)
+        .set({ pushToken: null })
+        .where(eq(usersTable.pushToken, staleToken))
+        .catch((err: unknown) => {
+          void logErrorEvent("notification", {
+            companyId: ctx.companyId,
+            inspectionId: ctx.inspectionId,
+            message: `Failed to clear stale push token: ${err instanceof Error ? err.message : String(err)}`,
+            context: { stage: "clear_stale_token" },
+          });
+        });
     }
   } catch (err) {
     void logErrorEvent("notification", {

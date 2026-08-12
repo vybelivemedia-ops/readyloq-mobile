@@ -82,6 +82,7 @@ router.get("/me", requireAuth, async (req, res) => {
       betaAccess: user.betaAccess,
       company,
       pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
+      hasPushToken: user.pushToken != null,
     });
   } catch {
     return res.status(500).json({ error: "Failed to load user" });

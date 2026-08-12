@@ -82,6 +82,8 @@ export interface CurrentUser {
   company?: CurrentCompany | null;
   /** Whether push notifications are enabled for this user. */
   pushNotificationsEnabled: boolean;
+  /** True when a valid Expo push token is stored server-side for this user. */
+  hasPushToken: boolean;
 }
 
 export interface AdminUser {
