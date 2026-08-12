@@ -37,20 +37,11 @@ import { configureSyncEngine } from "@/lib/sync/engine";
 import { speechService } from "@/lib/vision";
 import { createCompany } from "@/lib/api";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-
-/** Returns true when the thrown value looks like a network/connectivity failure. */
-function isNetworkError(e: unknown): boolean {
-  if (e instanceof TypeError) return true;
-  const msg = e instanceof Error ? e.message.toLowerCase() : "";
-  return (
-    msg.includes("network") ||
-    msg.includes("fetch") ||
-    msg.includes("offline") ||
-    msg.includes("econnrefused") ||
-    msg.includes("timeout") ||
-    msg.includes("socket")
-  );
-}
+import {
+  isNetworkError,
+  shouldRetryAutoCreate,
+  shouldShowOfflineBanner,
+} from "@/lib/gate/offline-flow";
 
 export default function AppLayout() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -181,7 +172,15 @@ function Gate() {
     }
 
     // Case 2: profile loaded but auto-create failed due to a network error.
-    if (autoCreateNetworkError && derivedNameRef.current && !autoCreating) {
+    if (
+      shouldRetryAutoCreate({
+        wasOffline,
+        online,
+        autoCreateNetworkError,
+        hasDerivedName: !!derivedNameRef.current,
+        autoCreating,
+      })
+    ) {
       autoCreateAttempted.current = false;
       runAutoCreate(derivedNameRef.current);
     }
@@ -355,7 +354,7 @@ function Gate() {
       <Onboarding
         onDone={refetch}
         isOffline={!online}
-        showOfflineBanner={autoCreateNetworkError && !online}
+        showOfflineBanner={shouldShowOfflineBanner(autoCreateNetworkError, online)}
       />
     );
   }

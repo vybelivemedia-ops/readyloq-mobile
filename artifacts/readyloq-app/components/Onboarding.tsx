@@ -9,6 +9,7 @@ import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
 import { useColors } from "@/hooks/useColors";
 import { acceptInvite, ApiError, createCompany } from "@/lib/api";
+import { isSubmitBlocked } from "@/lib/gate/offline-flow";
 
 type Mode = "create" | "join";
 
@@ -40,7 +41,7 @@ export function Onboarding({ onDone, isOffline = false, showOfflineBanner = fals
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
-    if (isOffline) return; // guard — button should already be disabled
+    if (isSubmitBlocked(isOffline)) return; // guard — button should already be disabled
     setError(null);
     setSubmitting(true);
     try {
@@ -188,7 +189,7 @@ export function Onboarding({ onDone, isOffline = false, showOfflineBanner = fals
           size="lg"
           onPress={submit}
           loading={submitting}
-          disabled={isOffline || submitting}
+          disabled={isSubmitBlocked(isOffline) || submitting}
         />
 
         {isOffline ? (
