@@ -285,27 +285,34 @@ beforeAll(async () => {
   });
 
   // ── Velocity: mark inspections completed with controlled timestamps ────────
-  // Company A: inspAId → completed this month; inspA2Id → completed last month.
-  // Company B: inspBId → completed this month.
-  // The velocity query filters on status="completed" + companyId, so these
-  // dates let us assert per-company month counts without ambiguity.
+  // We intentionally set createdAt to a DIFFERENT month than completedAt so the
+  // test proves the endpoint buckets by completedAt (completion month), not
+  // createdAt (creation month).
+  //
+  //   inspAId  — created last month, COMPLETED this month → thisMonth bucket
+  //   inspA2Id — created two months ago, COMPLETED last month → lastMonth bucket
+  //   inspBId  — created last month, COMPLETED this month → B's thisMonth bucket
   const now = new Date();
-  const thisMonthTs  = new Date(now.getFullYear(), now.getMonth(), 5);     // 5th of current month
-  const lastMonthTs  = new Date(now.getFullYear(), now.getMonth() - 1, 10); // 10th of prior month
+  const thisMonthTs      = new Date(now.getFullYear(), now.getMonth(), 5);      // 5th of this month
+  const lastMonthTs      = new Date(now.getFullYear(), now.getMonth() - 1, 10); // 10th of last month
+  const twoMonthsAgoTs   = new Date(now.getFullYear(), now.getMonth() - 2, 15); // 15th of 2 months ago
 
+  // inspAId: created last month, completed this month (cross-month scenario)
   await db
     .update(inspectionsTable)
-    .set({ status: "completed", createdAt: thisMonthTs })
+    .set({ status: "completed", createdAt: lastMonthTs, completedAt: thisMonthTs })
     .where(eq(inspectionsTable.id, inspAId));
 
+  // inspA2Id: created two months ago, completed last month (cross-month scenario)
   await db
     .update(inspectionsTable)
-    .set({ status: "completed", createdAt: lastMonthTs })
+    .set({ status: "completed", createdAt: twoMonthsAgoTs, completedAt: lastMonthTs })
     .where(eq(inspectionsTable.id, inspA2Id));
 
+  // inspBId: created last month, completed this month (cross-month scenario for B)
   await db
     .update(inspectionsTable)
-    .set({ status: "completed", createdAt: thisMonthTs })
+    .set({ status: "completed", createdAt: lastMonthTs, completedAt: thisMonthTs })
     .where(eq(inspectionsTable.id, inspBId));
 });
 
@@ -453,10 +460,14 @@ describe("executive intelligence endpoint: won-opportunity isolation", () => {
 
 describe("executive intelligence endpoint: inspection velocity is scoped per company", () => {
   /**
-   * Fixture (seeded in beforeAll):
-   *   Company A — inspAId:  status="completed", createdAt = 5th of THIS month
-   *               inspA2Id: status="completed", createdAt = 10th of LAST month
-   *   Company B — inspBId:  status="completed", createdAt = 5th of THIS month
+   * Fixture (seeded in beforeAll) — cross-month design:
+   *   Company A — inspAId:  createdAt = last month, completedAt = THIS month → thisMonth bucket
+   *               inspA2Id: createdAt = 2 months ago, completedAt = LAST month → lastMonth bucket
+   *   Company B — inspBId:  createdAt = last month, completedAt = THIS month → B's thisMonth bucket
+   *
+   * createdAt and completedAt are intentionally in different months so the tests
+   * prove the query buckets by completedAt (when the work finished), not createdAt
+   * (when the record was created).
    *
    * Correct isolation means A sees thisMonth=1, lastMonth=1 and B sees
    * thisMonth=1, lastMonth=0 — neither owner sees the other company's counts.
@@ -501,6 +512,47 @@ describe("executive intelligence endpoint: inspection velocity is scoped per com
     expect(res.status).toBe(200);
     // B's count must equal 1 (its own inspection only), not 2.
     expect(res.body.metrics.inspectionsThisMonth).toBe(1);
+  });
+});
+
+describe("executive intelligence endpoint: velocity buckets by completedAt, not createdAt", () => {
+  /**
+   * The fixture (seeded in beforeAll) is specifically designed for cross-month
+   * verification:
+   *
+   *   inspAId  — createdAt = last month,    completedAt = THIS month
+   *   inspA2Id — createdAt = 2 months ago,  completedAt = LAST month
+   *
+   * If the query erroneously buckets by createdAt:
+   *   • inspAId  would appear in lastMonth  (wrong — it was completed this month)
+   *   • inspA2Id would appear in neither    (wrong — it was completed last month)
+   *
+   * Correct behaviour (bucket by completedAt):
+   *   • inspAId  → thisMonth  = 1
+   *   • inspA2Id → lastMonth  = 1
+   */
+
+  it("an inspection created last month but completed this month counts in thisMonth", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/intelligence");
+    expect(res.status).toBe(200);
+
+    const m = res.body.metrics;
+    // inspAId: createdAt = last month, completedAt = this month → must be in thisMonth
+    expect(m.inspectionsThisMonth).toBe(1);
+    // inspA2Id: createdAt = 2 months ago, completedAt = last month → must be in lastMonth
+    expect(m.inspectionsLastMonth).toBe(1);
+  });
+
+  it("an inspection created two months ago but completed last month counts in lastMonth", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/intelligence");
+    expect(res.status).toBe(200);
+
+    // inspA2Id has createdAt 2 months ago — if the query used createdAt it would
+    // return 0 for lastMonth (since the creation date is outside the [lastMonth, thisMonth) window).
+    // Correct behaviour: completedAt falls in last month → lastMonth = 1.
+    expect(res.body.metrics.inspectionsLastMonth).toBe(1);
   });
 });
 

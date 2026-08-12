@@ -90,21 +90,23 @@ router.get(
         .orderBy(sql`avg(${inspectionScorecardsTable.qualityScore}) desc`)
         .limit(5);
 
-      // Velocity
+      // Velocity — bucket by completedAt so an inspection created in March
+      // but completed in April counts in April, not March.
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
 
       const [velocityRow] = await db
         .select({
-          thisMonth:  sql<number>`sum(case when ${inspectionsTable.createdAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
-          lastMonth:  sql<number>`sum(case when ${inspectionsTable.createdAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.createdAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`,
+          thisMonth:  sql<number>`sum(case when ${inspectionsTable.completedAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
+          lastMonth:  sql<number>`sum(case when ${inspectionsTable.completedAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.completedAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`,
         })
         .from(inspectionsTable)
         .where(
           and(
             eq(inspectionsTable.companyId, companyId),
             eq(inspectionsTable.status, "completed"),
+            isNotNull(inspectionsTable.completedAt),
           ),
         );
 
@@ -536,21 +538,23 @@ router.get(
         .orderBy(sql`avg(${inspectionScorecardsTable.qualityScore}) desc`)
         .limit(5);
 
-      // Velocity
+      // Velocity — bucket by completedAt so an inspection created in March
+      // but completed in April counts in April, not March.
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
 
       const [velocityRow] = await db
         .select({
-          thisMonth:  sql<number>`sum(case when ${inspectionsTable.createdAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
-          lastMonth:  sql<number>`sum(case when ${inspectionsTable.createdAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.createdAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`,
+          thisMonth:  sql<number>`sum(case when ${inspectionsTable.completedAt} >= ${startOfMonth}::timestamptz then 1 else 0 end)`,
+          lastMonth:  sql<number>`sum(case when ${inspectionsTable.completedAt} >= ${startOfLastMonth}::timestamptz and ${inspectionsTable.completedAt} < ${startOfMonth}::timestamptz then 1 else 0 end)`,
         })
         .from(inspectionsTable)
         .where(
           and(
             eq(inspectionsTable.companyId, companyId),
             eq(inspectionsTable.status, "completed"),
+            isNotNull(inspectionsTable.completedAt),
           ),
         );
 
