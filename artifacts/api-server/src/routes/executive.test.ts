@@ -791,6 +791,158 @@ describe("executive email-preview endpoint: HTML escaping of user-supplied strin
 });
 
 // ---------------------------------------------------------------------------
+// email-preview ?format=text endpoint tests — share-sheet fallback path
+//
+// When MailComposer is unavailable on device (no mail app configured), the
+// mobile client calls GET /api/executive/intelligence/email-preview?format=text
+// and passes the returned `text` field to Share.share().  These tests confirm:
+//   1. The endpoint returns a non-empty `text` field and a `subject` field.
+//   2. The text contains all expected dashboard sections.
+//   3. Auth/role guards apply identically to the text format.
+//   4. Cross-tenant isolation holds — Company A's text never contains B's data.
+// ---------------------------------------------------------------------------
+
+describe("executive email-preview ?format=text: authentication & role guards", () => {
+  it("returns 401 when unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when called by a technician (not an owner)", async () => {
+    asUser(EXEC_TECH_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("executive email-preview ?format=text: response structure", () => {
+  it("returns success:true with a non-empty text field and a subject field", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    // text must be a non-empty string — the share sheet has something to show.
+    expect(typeof res.body.text).toBe("string");
+    expect(res.body.text.length).toBeGreaterThan(0);
+
+    // subject must also be a non-empty string.
+    expect(typeof res.body.subject).toBe("string");
+    expect(res.body.subject.length).toBeGreaterThan(0);
+  });
+
+  it("text contains all four expected section headers", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+
+    const text: string = res.body.text;
+    // These section separators are hard-coded in the server's text template.
+    expect(text).toContain("PIPELINE");
+    expect(text).toContain("QUALITY & RISK");
+    expect(text).toContain("INSPECTION VELOCITY");
+    expect(text).toContain("TOP TECHNICIANS");
+  });
+
+  it("text embeds the requesting company's name", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.text).toContain("Exec Test Co A");
+    expect(res.body.subject).toContain("Exec Test Co A");
+  });
+
+  it("text contains numeric KPI values (pipeline and quality score)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+    const text: string = res.body.text;
+
+    // Company A has a $5K open pipeline — should appear in the text.
+    expect(text).toContain("$5K");
+
+    // Quality section must list a numeric average score.
+    expect(text).toMatch(/Avg quality score:\s*\d+/);
+  });
+
+  it("does not return an html field when format=text is requested", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+    // The text branch must not include the html field — that's the mail path.
+    expect(res.body.html).toBeUndefined();
+  });
+});
+
+describe("executive email-preview ?format=text: cross-company isolation", () => {
+  it("company A's text does not contain company B's technician name (Bob)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.text).not.toContain("Bob");
+  });
+
+  it("company A's text does not contain company B's company name", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.text).not.toContain("Exec Test Co B");
+    expect(res.body.subject).not.toContain("Exec Test Co B");
+  });
+
+  it("company B's text does not contain company A's technician name (Alice)", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.text).not.toContain("Alice");
+  });
+
+  it("company A's text shows its own pipeline value and not company B's", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+    // A has $5K open pipeline — must appear.
+    expect(res.body.text).toContain("$5K");
+    // Company B's $8K pipeline must not bleed in.
+    expect(res.body.text).not.toMatch(/\$8K|\$8,000|\$13K|\$13,000/);
+  });
+
+  it("company A's text shows zero critical risk (A has no critical scorecards)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+    const text: string = res.body.text;
+    // The risk breakdown line looks like "0 critical · N high · …"
+    expect(text).toMatch(/0 critical/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Daily briefing endpoint tests (Task #282)
 // ---------------------------------------------------------------------------
 
