@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@clerk/expo";
 import Svg, { G, Rect, Line, Text as SvgText } from "react-native-svg";
+import * as Clipboard from "expo-clipboard";
 import * as MailComposer from "expo-mail-composer";
 import {
   fetchExecutiveMetrics,
@@ -622,6 +623,8 @@ export default function ExecutiveDashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [copyLabel, setCopyLabel] = useState<"copy" | "copied">("copy");
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -671,6 +674,24 @@ export default function ExecutiveDashboardScreen() {
       );
     } finally {
       setSharing(false);
+    }
+  }, [getToken]);
+
+  const handleCopy = useCallback(async () => {
+    setCopying(true);
+    try {
+      const token = await getToken();
+      const { text } = await fetchExecutiveTextPreview(token);
+      await Clipboard.setStringAsync(text);
+      setCopyLabel("copied");
+      setTimeout(() => setCopyLabel("copy"), 2000);
+    } catch (e) {
+      Alert.alert(
+        "Copy Failed",
+        e instanceof Error ? e.message : "Could not copy dashboard snapshot.",
+      );
+    } finally {
+      setCopying(false);
     }
   }, [getToken]);
 
@@ -744,6 +765,34 @@ export default function ExecutiveDashboardScreen() {
         >
           <Ionicons name="refresh" size={18} color={C.muted} />
         </TouchableOpacity>
+        {/* Copy snapshot button */}
+        <TouchableOpacity
+          onPress={() => void handleCopy()}
+          disabled={copying || loading}
+          style={{
+            height: 36,
+            borderRadius: 18,
+            paddingHorizontal: copyLabel === "copied" ? 12 : 0,
+            width: copyLabel === "copied" ? undefined : 36,
+            backgroundColor: copyLabel === "copied" ? C.success + "22" : copying ? "#ffffff12" : "#ffffff08",
+            borderWidth: copyLabel === "copied" ? 1 : 0,
+            borderColor: C.success + "55",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {copying ? (
+            <ActivityIndicator size="small" color={C.muted} />
+          ) : copyLabel === "copied" ? (
+            <Text style={{ color: C.success, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+              Copied!
+            </Text>
+          ) : (
+            <Ionicons name="copy-outline" size={18} color={loading ? C.muted : C.text} />
+          )}
+        </TouchableOpacity>
+
+        {/* Share / email button */}
         <TouchableOpacity
           onPress={() => void handleShare()}
           disabled={sharing || loading}
