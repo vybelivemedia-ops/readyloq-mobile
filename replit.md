@@ -143,6 +143,8 @@ Required env: `DATABASE_URL` (Postgres), `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_
 
 ## User preferences
 
+- Do NOT propose tasks that push the product toward CRM functionality (lead tracking, contact management, pipeline stages, etc.). Keep feature scope focused on inspection, compliance, and pest intelligence workflows.
+
 - Preserve the product vision above; keep ReadyLoq an AI assistant, not a form.
 - Deprioritize dashboards/settings/analytics/admin behind the 8 field pillars.
 - For hardware: build the abstraction, do **not** integrate real devices unless explicitly asked.
