@@ -789,6 +789,28 @@ describe("executive email-preview endpoint: HTML escaping of user-supplied strin
       inArray(inspectionsTable.id, [specialInspId, specialInspId2]),
     );
   });
+
+  it("plain-text format contains the raw company name (not escaped) and omits the html field", async () => {
+    // The ?format=text branch produces plain text — HTML entities are not
+    // appropriate there.  The raw company name must appear as-is and the
+    // response must not include an html field (confirming the text branch is
+    // active, not the HTML branch which would need escaping).
+    asUser(SPECIAL_OWNER_ID);
+    const res = await request(app).get(
+      "/api/executive/intelligence/email-preview?format=text",
+    );
+    expect(res.status).toBe(200);
+
+    // The text field must contain the raw company name — ampersands and angle
+    // brackets are valid plain-text characters and must not be entity-encoded.
+    expect(typeof res.body.text).toBe("string");
+    expect(res.body.text).toContain("Acme & Sons");
+    expect(res.body.text).toContain("<Pest>");
+
+    // The html field must be absent — its presence would indicate the wrong
+    // branch was taken and the output might be missing proper escaping.
+    expect(res.body.html).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
