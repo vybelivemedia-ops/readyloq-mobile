@@ -785,6 +785,49 @@ describe("PATCH /auth/me/push-notifications — toggle preference", () => {
     expect(user.pushNotificationsEnabled).toBe(true);
   });
 
+  it("stops future critical-alert pushes immediately after the flag is toggled off, even though the token is still in the DB", async () => {
+    // ── Before toggle: owner is opted in ──────────────────────────────────────
+    // Confirm the Expo API IS called when pushNotificationsEnabled = true.
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    expect(expoCalls()).toHaveLength(1);
+    expect((expoCalls()[0].body as Array<Record<string, unknown>>)[0].to).toBe(VALID_TOKEN_A);
+
+    // Clear the captured calls so the post-toggle assertion starts clean.
+    fetchState.calls = [];
+
+    // ── Toggle off via the PATCH route ────────────────────────────────────────
+    const toggleRes = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: false });
+
+    expect(toggleRes.status).toBe(200);
+    expect(toggleRes.body.pushNotificationsEnabled).toBe(false);
+
+    // Verify the token column is still populated (opt-out must not clear it).
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken, pushNotificationsEnabled: usersTable.pushNotificationsEnabled })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+    expect(user.pushToken).toBe(VALID_TOKEN_A); // token intact
+    expect(user.pushNotificationsEnabled).toBe(false); // flag flipped
+
+    // ── After toggle: Expo must NOT be called even with a valid token on file ──
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    expect(expoCalls()).toHaveLength(0);
+  });
+
   it("rejects a string value for enabled with 400", async () => {
     const res = await request(app)
       .patch("/api/auth/me/push-notifications")
