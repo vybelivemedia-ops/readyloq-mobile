@@ -1,0 +1,130 @@
+import { type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ClerkProvider } from '@clerk/clerk-react';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import NotFound from '@/pages/not-found';
+import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
+
+import { IndexRedirect } from '@/pages/index';
+import { Login } from '@/pages/login';
+import { NoCompany } from '@/pages/no-company';
+import { Dashboard } from '@/pages/dashboard';
+import { InspectionsList } from '@/pages/inspections/list';
+import { InspectionDetail } from '@/pages/inspections/detail';
+import { Reports } from '@/pages/reports';
+import { Team } from '@/pages/team';
+import { Opportunities } from '@/pages/opportunities';
+import { Properties } from '@/pages/properties';
+import { Analytics } from '@/pages/analytics';
+import { Layout } from '@/components/layout';
+
+const queryClient = new QueryClient();
+
+// Protected route wrapper
+function ProtectedRoute({ component: Component, roles }: { component: any, roles?: string[] }) {
+  const { isLoaded, isSignedIn, me } = useAuth();
+  const [, setLocation] = useLocation();
+
+  if (!isLoaded) return null;
+  if (!isSignedIn) {
+    setLocation('/login');
+    return null;
+  }
+  if (!me?.companyId) {
+    setLocation('/no-company');
+    return null;
+  }
+  if (roles && !roles.includes(me.effectiveRole)) {
+    setLocation('/');
+    return null;
+  }
+
+  return <Component />;
+}
+
+// Ensure useAuth can be imported above or we define it:
+import { useAuth } from '@/hooks/use-auth';
+
+function Router() {
+  return (
+    <RoutedErrorBoundary>
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/no-company" component={NoCompany} />
+        <Route path="/">
+          <IndexRedirect />
+        </Route>
+        
+        {/* Protected routes wrapped in Layout */}
+        <Route path="/:rest*">
+          <Layout>
+            <Switch>
+              <Route path="/dashboard">
+                <ProtectedRoute component={Dashboard} roles={['owner', 'manager']} />
+              </Route>
+              <Route path="/inspections">
+                <ProtectedRoute component={InspectionsList} roles={['owner', 'manager', 'sales', 'technician']} />
+              </Route>
+              <Route path="/inspections/:id">
+                <ProtectedRoute component={InspectionDetail} roles={['owner', 'manager', 'sales', 'technician']} />
+              </Route>
+              <Route path="/reports">
+                <ProtectedRoute component={Reports} roles={['owner', 'manager', 'sales']} />
+              </Route>
+              <Route path="/team">
+                <ProtectedRoute component={Team} roles={['owner', 'manager']} />
+              </Route>
+              <Route path="/opportunities">
+                <ProtectedRoute component={Opportunities} roles={['owner', 'sales']} />
+              </Route>
+              <Route path="/properties">
+                <ProtectedRoute component={Properties} roles={['owner', 'manager', 'technician']} />
+              </Route>
+              <Route path="/analytics">
+                <ProtectedRoute component={Analytics} roles={['owner', 'manager']} />
+              </Route>
+              <Route component={NotFound} />
+            </Switch>
+          </Layout>
+        </Route>
+      </Switch>
+    </RoutedErrorBoundary>
+  );
+}
+
+function RoutedErrorBoundary({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
+}
+
+function App() {
+  const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+  if (!clerkPubKey) {
+    return <div className="p-8 text-destructive">Error: VITE_CLERK_PUBLISHABLE_KEY is not set.</div>;
+  }
+
+  // Proxy Clerk's Frontend API through our own domain in production only.
+  // The server-side proxy middleware at /api/__clerk activates only for live
+  // keys (sk_live_*). For test/dev keys it is a no-op, so the ClerkProvider
+  // must NOT set proxyUrl or Clerk will route Frontend API traffic to an
+  // unhandled path and fail to initialise.
+  const isLiveKey = clerkPubKey.startsWith('pk_live_');
+  const clerkProxyUrl = isLiveKey ? `${window.location.origin}/api/__clerk` : undefined;
+
+  return (
+    <ClerkProvider publishableKey={clerkPubKey} proxyUrl={clerkProxyUrl}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+}
+
+export default App;
