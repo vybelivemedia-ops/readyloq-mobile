@@ -73,6 +73,7 @@ vi.mock("../lib/intelligence-ai", () => ({
 }));
 
 import app from "../app";
+import { generateDailyExecutiveBriefing } from "../services/briefing";
 import {
   db,
   usersTable,
@@ -1172,6 +1173,151 @@ describe("executive briefing endpoint: cross-company isolation", () => {
     expect(summary).not.toMatch(/7[,.]?500|16[,.]?700/);
     // B's own value ($9,200) should be in the summary.
     expect(summary).toMatch(/9[,.]?200/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Daily briefing: midnight boundary accuracy (Task #304)
+// ---------------------------------------------------------------------------
+
+describe("executive briefing: midnight boundary accuracy", () => {
+  /**
+   * A dedicated company is used so these fixtures cannot interfere with the
+   * cross-company isolation tests above.
+   *
+   * We pick a target date 5 days in the past so it doesn't coincide with
+   * "yesterday" (used by the HTTP endpoint) or "today".
+   *
+   * Three inspections are seeded around the midnight boundaries of targetDate:
+   *   insp1 — 23:59:59 of targetDate          → inside the window (1 s before midnight)
+   *   insp2 — 00:00:01 of (targetDate + 1 d)  → outside the window (1 s after midnight)
+   *   insp3 — 23:59:59 of (targetDate - 1 d)  → outside the window (end of the prior day)
+   *
+   * The service window is [00:00:00.000, 23:59:59.999) of targetDate, so only
+   * insp1 should appear in the briefing for that day.
+   */
+
+  const MIDNIGHT_OWNER_ID = "exec_midnight_owner_clerk_id";
+  const MIDNIGHT_CO_SLUG  = "exec-midnight-co";
+
+  let midnightCompanyId: number;
+  let midnightInspIds: number[] = [];
+
+  // Build boundary timestamps once, relative to a stable target date.
+  const _now = new Date();
+  const targetDate = new Date(
+    _now.getFullYear(),
+    _now.getMonth(),
+    _now.getDate() - 5, // 5 days ago — well clear of "yesterday" and "today"
+  );
+
+  // 1 second before the end of targetDate (23:59:59.000 → inside window)
+  const oneSecBeforeMidnight = new Date(targetDate);
+  oneSecBeforeMidnight.setHours(23, 59, 59, 0);
+
+  // 1 second after midnight of the NEXT day (00:00:01.000 of targetDate + 1)
+  const oneSecAfterMidnight = new Date(targetDate);
+  oneSecAfterMidnight.setDate(oneSecAfterMidnight.getDate() + 1);
+  oneSecAfterMidnight.setHours(0, 0, 1, 0);
+
+  // End of the day BEFORE targetDate (23:59:59.000 of targetDate - 1)
+  const endOfPreviousDay = new Date(targetDate);
+  endOfPreviousDay.setDate(endOfPreviousDay.getDate() - 1);
+  endOfPreviousDay.setHours(23, 59, 59, 0);
+
+  beforeAll(async () => {
+    midnightCompanyId = await findOrCreateCompany("Exec Midnight Co", MIDNIGHT_CO_SLUG);
+    await ensureActiveBranding(midnightCompanyId, "Exec Midnight Co Brand");
+
+    // Full teardown so reruns start clean.
+    await db.delete(inspectionScorecardsTable).where(eq(inspectionScorecardsTable.companyId, midnightCompanyId));
+    await db.delete(opportunitiesTable).where(eq(opportunitiesTable.companyId, midnightCompanyId));
+    await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, midnightCompanyId));
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, MIDNIGHT_OWNER_ID));
+
+    await db.insert(usersTable).values({
+      clerkUserId: MIDNIGHT_OWNER_ID,
+      role: "owner",
+      companyId: midnightCompanyId,
+    });
+
+    // insp1: one second before the end of targetDate → must appear in targetDate's briefing.
+    const insp1 = await createInspectionViaApi(MIDNIGHT_OWNER_ID, "Midnight Boundary 1 St");
+    await db.update(inspectionsTable)
+      .set({ status: "completed", createdAt: oneSecBeforeMidnight })
+      .where(eq(inspectionsTable.id, insp1));
+
+    // insp2: one second after midnight of the following day → must NOT appear.
+    const insp2 = await createInspectionViaApi(MIDNIGHT_OWNER_ID, "Midnight Boundary 2 St");
+    await db.update(inspectionsTable)
+      .set({ status: "completed", createdAt: oneSecAfterMidnight })
+      .where(eq(inspectionsTable.id, insp2));
+
+    // insp3: end of the previous day → must NOT appear.
+    const insp3 = await createInspectionViaApi(MIDNIGHT_OWNER_ID, "Midnight Boundary 3 St");
+    await db.update(inspectionsTable)
+      .set({ status: "completed", createdAt: endOfPreviousDay })
+      .where(eq(inspectionsTable.id, insp3));
+
+    midnightInspIds = [insp1, insp2, insp3];
+  });
+
+  afterAll(async () => {
+    if (midnightInspIds.length) {
+      await db.delete(inspectionScorecardsTable).where(
+        inArray(inspectionScorecardsTable.inspectionId, midnightInspIds),
+      );
+      await db.delete(inspectionsTable).where(inArray(inspectionsTable.id, midnightInspIds));
+    }
+    await db.delete(opportunitiesTable).where(eq(opportunitiesTable.companyId, midnightCompanyId));
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, MIDNIGHT_OWNER_ID));
+    await db.delete(brandingProfilesTable).where(eq(brandingProfilesTable.companyId, midnightCompanyId));
+    await db.delete(companiesTable).where(eq(companiesTable.slug, MIDNIGHT_CO_SLUG));
+  });
+
+  it("counts an inspection created one second before midnight as part of that day's briefing", async () => {
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDate);
+    expect(result.success).toBe(true);
+    // insp1 (23:59:59 of targetDate) is inside the [00:00:00, 23:59:59.999) window.
+    // insp2 and insp3 are outside — the count must be exactly 1.
+    expect(result.briefing.inspectionsCount).toBe(1);
+  });
+
+  it("does not count an inspection created one second after midnight (start of the next day)", async () => {
+    // Request the briefing for targetDate — insp2 belongs to targetDate + 1,
+    // so it must not appear regardless of how close to midnight it was created.
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDate);
+    expect(result.success).toBe(true);
+    // If insp2 leaked in, the count would be 2; it must stay at 1.
+    expect(result.briefing.inspectionsCount).toBe(1);
+  });
+
+  it("does not count an inspection from the day before the target date", async () => {
+    // insp3 was created at end-of-day of (targetDate - 1), which is before the
+    // window's lower bound (00:00:00.000 of targetDate).
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDate);
+    expect(result.success).toBe(true);
+    // If insp3 leaked in, the count would be 2; it must stay at 1.
+    expect(result.briefing.inspectionsCount).toBe(1);
+  });
+
+  it("a briefing for 'yesterday' does not include inspections from two days ago", async () => {
+    // targetDate is 5 days ago; none of our fixtures fall in yesterday's window.
+    // This confirms the date window is anchored to the requested day, not a rolling range.
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, yesterday);
+    expect(result.success).toBe(true);
+    expect(result.briefing.inspectionsCount).toBe(0);
+  });
+
+  it("a briefing for 'yesterday' does not include inspections from today", async () => {
+    // Same fixture company — none of our inspections are dated today.
+    // Requesting today's briefing should also return 0.
+    const today = new Date();
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, today);
+    expect(result.success).toBe(true);
+    expect(result.briefing.inspectionsCount).toBe(0);
   });
 });
 
