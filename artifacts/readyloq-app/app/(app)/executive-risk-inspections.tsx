@@ -12,6 +12,7 @@
  * is no secondary useEffect that watches filter state, so there is no double-fetch.
  */
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -32,6 +33,58 @@ import {
   type ExecutiveRiskInspection,
   type ExecutiveRiskLevel,
 } from "@/lib/api";
+
+// ─── Persisted filter helpers ─────────────────────────────────────────────────
+
+interface PersistedFilter {
+  tech: string | null;
+  days: number | null;
+}
+
+// Key is scoped to userId so separate accounts on the same device cannot
+// read or overwrite each other's saved preferences.
+function filterStorageKey(userId: string, riskLevel: ExecutiveRiskLevel): string {
+  return `exec_risk_filter_v1_${userId}_${riskLevel}`;
+}
+
+async function loadPersistedFilter(
+  userId: string,
+  riskLevel: ExecutiveRiskLevel,
+): Promise<PersistedFilter | null> {
+  try {
+    const raw = await AsyncStorage.getItem(filterStorageKey(userId, riskLevel));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const p = parsed as Record<string, unknown>;
+    return {
+      tech: typeof p.tech === "string" ? p.tech : null,
+      days: typeof p.days === "number" ? p.days : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function savePersistedFilter(
+  userId: string,
+  riskLevel: ExecutiveRiskLevel,
+  filter: PersistedFilter,
+): Promise<void> {
+  try {
+    await AsyncStorage.setItem(filterStorageKey(userId, riskLevel), JSON.stringify(filter));
+  } catch {
+    // Non-critical — silently ignore storage errors
+  }
+}
+
+async function clearPersistedFilter(userId: string, riskLevel: ExecutiveRiskLevel): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(filterStorageKey(userId, riskLevel));
+  } catch {
+    // Non-critical
+  }
+}
 
 const C = {
   bg: "#0D1117",
@@ -307,7 +360,7 @@ export default function ExecutiveRiskInspectionsScreen() {
   const params = useLocalSearchParams<{ riskLevel: string }>();
   const riskLevel = (params.riskLevel ?? "critical") as ExecutiveRiskLevel;
 
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -322,7 +375,7 @@ export default function ExecutiveRiskInspectionsScreen() {
   // Track loaded count so onEndReached knows the next offset to request.
   const loadedCountRef = useRef(0);
 
-  // ── Filter state — cleared on unmount (not persisted across navigation) ──
+  // ── Filter state — persisted to AsyncStorage and restored on mount ──────
   const [filterTech, setFilterTech] = useState<string | null>(null);
   const [filterDays, setFilterDays] = useState<number | null>(null);
   const [showTechPicker, setShowTechPicker] = useState(false);
@@ -402,10 +455,48 @@ export default function ExecutiveRiskInspectionsScreen() {
     [getToken, riskLevel],
   );
 
-  // Initial load — runs once when the screen mounts (or riskLevel changes).
+  // Initial load — restores persisted filter from AsyncStorage then fetches.
+  // The effect depends on userId so it re-runs on account switch, preventing
+  // one user's saved filter from leaking into a different user's session.
   useEffect(() => {
-    void fetchData(null, null);
-  }, [fetchData]);
+    if (!userId) return; // not authenticated yet
+    let cancelled = false;
+    void (async () => {
+      const saved = await loadPersistedFilter(userId, riskLevel);
+      if (cancelled) return;
+      if (saved && (saved.tech !== null || saved.days !== null)) {
+        setFilterTech(saved.tech);
+        setFilterDays(saved.days);
+        // Fetch filtered list AND unfiltered technician list in parallel so
+        // the picker is fully populated even when a tech filter is restored.
+        void fetchData(saved.tech, saved.days);
+        if (saved.tech) {
+          // Fire a separate unfiltered request just to populate allTechnicians.
+          // It uses a background request that won't interfere with the main list.
+          void (async () => {
+            try {
+              const token = await getToken();
+              const res = await fetchExecutiveInspections(token, riskLevel, {});
+              if (cancelled) return;
+              const unique = Array.from(
+                new Set(res.inspections.map((i) => i.technicianName).filter(Boolean)),
+              ).sort();
+              setAllTechnicians(unique);
+            } catch {
+              // Non-critical — picker will populate after the next unfiltered load
+            }
+          })();
+        }
+      } else {
+        void fetchData(null, null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  // fetchData / getToken are stable references.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, riskLevel]);
 
   // ── Load-more — called by FlatList onEndReached ───────────────────────────
   // Reads filter state from refs to avoid stale closures.
@@ -425,36 +516,39 @@ export default function ExecutiveRiskInspectionsScreen() {
     );
   }, [loadingMore, hasMore, fetchData]);
 
-  // ── Filter handlers — update state and issue one fetch, no double-effect ──
+  // ── Filter handlers — update state, persist, and issue one fetch ─────────
   const applyTech = useCallback(
     (tech: string | null) => {
       setFilterTech(tech);
       // Read filterDays from a ref-like closure: we use a functional form to
       // access the latest value without creating a new callback on each render.
       setFilterDays((currentDays) => {
+        if (userId) void savePersistedFilter(userId, riskLevel, { tech, days: currentDays });
         void fetchData(tech, currentDays);
         return currentDays; // leave days unchanged
       });
     },
-    [fetchData],
+    [fetchData, riskLevel, userId],
   );
 
   const applyDays = useCallback(
     (days: number | null) => {
       setFilterDays(days);
       setFilterTech((currentTech) => {
+        if (userId) void savePersistedFilter(userId, riskLevel, { tech: currentTech, days });
         void fetchData(currentTech, days);
         return currentTech; // leave tech unchanged
       });
     },
-    [fetchData],
+    [fetchData, riskLevel, userId],
   );
 
   const clearFilters = useCallback(() => {
     setFilterTech(null);
     setFilterDays(null);
+    if (userId) void clearPersistedFilter(userId, riskLevel);
     void fetchData(null, null);
-  }, [fetchData]);
+  }, [fetchData, riskLevel, userId]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const accentColor = RISK_COLOR[riskLevel];
