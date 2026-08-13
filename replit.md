@@ -143,7 +143,8 @@ Required env: `DATABASE_URL` (Postgres), `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_
 
 ## User preferences
 
-- Do NOT propose tasks that push the product toward CRM functionality (lead tracking, contact management, pipeline stages, etc.). Keep feature scope focused on inspection, compliance, and pest intelligence workflows.
+- Do NOT propose tasks that push the product toward CRM functionality (lead tracking, contact management, pipeline stages, etc.).
+- ReadyLoq is NOT competing with PestPac or broad field-service management suites. Do NOT propose features around route optimization, technician scheduling, billing workflows, or customer databases. Keep feature scope tightly focused on AI-powered pest intelligence: capture, analysis, compliance insight, and reporting.
 
 - Preserve the product vision above; keep ReadyLoq an AI assistant, not a form.
 - Deprioritize dashboards/settings/analytics/admin behind the 8 field pillars.
