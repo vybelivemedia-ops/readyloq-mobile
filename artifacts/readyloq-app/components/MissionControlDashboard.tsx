@@ -163,6 +163,14 @@ export interface MissionControlDashboardProps {
   agents?:          AgentRegistryEntry[];
   /** True when the last remote agent-status sync failed (agents still render from cache). */
   agentsSyncFailed?: boolean;
+  /**
+   * ISO timestamp of the most recent push delivery failure for this owner, or
+   * null/undefined when no failure is recorded. When non-null a dismissible
+   * banner is shown prompting the owner to re-enable alerts.
+   */
+  pushLastFailedAt?: string | null;
+  /** Called when the owner taps "Dismiss" on the push-failure banner. */
+  onDismissPushFailure?: () => void;
   onRefresh:        () => void;
   onSignOut:        () => void;
 }
@@ -236,6 +244,8 @@ export function MissionControlDashboard({
   license,
   agents,
   agentsSyncFailed,
+  pushLastFailedAt,
+  onDismissPushFailure,
   onRefresh,
   onSignOut,
 }: MissionControlDashboardProps) {
@@ -323,6 +333,34 @@ export function MissionControlDashboard({
             <Text style={styles.statusText}>Solo operator</Text>
           )}
         </View>
+
+        {/* ── Push-failure banner ──────────────────────────────────────────── */}
+        {pushLastFailedAt ? (
+          <View style={styles.pushFailBanner}>
+            <Ionicons name="notifications-off-outline" size={18} color={MC.warning} style={{ marginTop: 1 }} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.pushFailTitle}>Alert delivery failed</Text>
+              <Text style={styles.pushFailSub}>
+                A critical-risk push notification couldn't be delivered. Go to Settings to
+                re-enable alerts and re-register your device.
+              </Text>
+            </View>
+            <View style={{ gap: 6, alignItems: "flex-end" }}>
+              <Pressable
+                onPress={() => router.push("/settings" as Href)}
+                style={({ pressed }) => [styles.pushFailBtn, { opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={styles.pushFailBtnText}>Fix</Text>
+              </Pressable>
+              <Pressable
+                onPress={onDismissPushFailure}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 2 })}
+              >
+                <Text style={styles.pushFailDismiss}>Dismiss</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         {/* ── KPI tiles ───────────────────────────────────────────────────── */}
         <SectionLabel>PERFORMANCE</SectionLabel>
@@ -788,6 +826,30 @@ const styles = StyleSheet.create({
   licenseActiveDot: { width: 7, height: 7, borderRadius: 4 },
   licenseTitle:   { fontFamily: "Inter_600SemiBold", fontSize: 13 },
   licenseSub:     { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 1 },
+
+  // Push-failure banner
+  pushFailBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 12,
+    backgroundColor: `${MC.warning}0D`,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: `${MC.warning}40`,
+    borderLeftWidth: 3,
+    borderLeftColor: MC.warning,
+  },
+  pushFailTitle:   { color: MC.text,    fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  pushFailSub:     { color: MC.muted,   fontFamily: "Inter_400Regular",  fontSize: 12, lineHeight: 17 },
+  pushFailBtn: {
+    backgroundColor: MC.warning,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  pushFailBtnText:  { color: "#000", fontFamily: "Inter_700Bold", fontSize: 11 },
+  pushFailDismiss:  { color: MC.muted, fontFamily: "Inter_400Regular", fontSize: 11 },
 
   // Skeleton
   skeleton: { backgroundColor: MC.surface, borderRadius: 10, borderWidth: 1, borderColor: MC.border },

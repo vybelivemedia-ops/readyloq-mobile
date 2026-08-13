@@ -84,6 +84,13 @@ export interface CurrentUser {
   pushNotificationsEnabled: boolean;
   /** True when a valid Expo push token is stored server-side for this user. */
   hasPushToken: boolean;
+  /**
+   * ISO timestamp of the last Expo push delivery failure for this user,
+   * or null when no failure is recorded. Set server-side when a push ticket
+   * returns an error; cleared when the owner dismisses the banner or
+   * re-registers their push token.
+   */
+  pushLastFailedAt: string | null;
 }
 
 export interface AdminUser {
@@ -614,6 +621,13 @@ export function bulkIngestDataset(
 /** Remove the stored push token (opt-out path). */
 export function removePushToken(token: string | null) {
   return request<{ success: boolean }>("/api/auth/me/push-token", token, {
+    method: "DELETE",
+  });
+}
+
+/** Dismiss the push-failure banner by clearing the server-side failure flag. */
+export function dismissPushFailure(token: string | null) {
+  return request<{ success: boolean }>("/api/auth/me/push-failure", token, {
     method: "DELETE",
   });
 }

@@ -83,6 +83,7 @@ router.get("/me", requireAuth, async (req, res) => {
       company,
       pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
       hasPushToken: user.pushToken != null,
+      pushLastFailedAt: user.pushLastFailedAt?.toISOString() ?? null,
     });
   } catch {
     return res.status(500).json({ error: "Failed to load user" });
@@ -244,9 +245,10 @@ router.post("/me/push-token", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Invalid push token format" });
   }
   try {
+    // Clear pushLastFailedAt on re-registration so the dashboard banner hides.
     await db
       .update(usersTable)
-      .set({ pushToken: token })
+      .set({ pushToken: token, pushLastFailedAt: null })
       .where(eq(usersTable.id, user.id));
     return res.json({ success: true });
   } catch {
@@ -265,6 +267,23 @@ router.delete("/me/push-token", requireAuth, async (req, res) => {
     return res.json({ success: true });
   } catch {
     return res.status(500).json({ error: "Failed to remove push token" });
+  }
+});
+
+// ── DELETE /me/push-failure — dismiss the push-failure banner ─────────────────
+// Clears the pushLastFailedAt flag so the owner dashboard banner hides. Owners
+// call this after visiting Settings to re-register their token or re-enable
+// push notifications.
+router.delete("/me/push-failure", requireAuth, async (req, res) => {
+  const user = req.user!;
+  try {
+    await db
+      .update(usersTable)
+      .set({ pushLastFailedAt: null })
+      .where(eq(usersTable.id, user.id));
+    return res.json({ success: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to dismiss push failure" });
   }
 });
 

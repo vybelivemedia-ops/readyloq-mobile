@@ -7,7 +7,7 @@
  */
 
 import { db, usersTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { logErrorEvent } from "./error-events";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
@@ -63,29 +63,32 @@ async function sendExpoPush(messages: ExpoPushMessage[], ctx: PushContext): Prom
     const json = (await response.json()) as { data?: ExpoPushTicket[] };
     const tickets = json.data ?? [];
     const staleTokens: string[] = [];
+    const failedTokens: string[] = [];
     for (let i = 0; i < tickets.length; i++) {
       const ticket = tickets[i];
       if (ticket.status !== "error") continue;
+      const token = messages[i]?.to;
       if (ticket.details?.error === "DeviceNotRegistered") {
         // The token is no longer valid (device reinstall, OS reset, etc.).
         // Clear it so the owner is prompted to re-register on next app open.
-        const staleToken = messages[i]?.to;
-        if (staleToken) staleTokens.push(staleToken);
+        if (token) staleTokens.push(token);
       } else {
         void logErrorEvent("notification", {
           companyId: ctx.companyId,
           inspectionId: ctx.inspectionId,
           message: `Expo push ticket error: ${ticket.message ?? "unknown"}`,
-          context: { errorCode: ticket.details?.error },
+          context: { stage: "push_ticket", reason: ticket.details?.error ?? "unknown" },
         });
+        // Record the failure on the owner's row so the dashboard can surface it.
+        if (token) failedTokens.push(token);
       }
     }
-    // Clear all stale tokens in a single pass. Each update is scoped to the
-    // exact token value so it is safe even across tenants.
+    // Clear all stale tokens and mark delivery failure in a single pass. Each
+    // update is scoped to the exact token value so it is safe even across tenants.
     for (const staleToken of staleTokens) {
       void db
         .update(usersTable)
-        .set({ pushToken: null })
+        .set({ pushToken: null, pushLastFailedAt: sql`now()` })
         .where(eq(usersTable.pushToken, staleToken))
         .catch((err: unknown) => {
           void logErrorEvent("notification", {
@@ -93,6 +96,22 @@ async function sendExpoPush(messages: ExpoPushMessage[], ctx: PushContext): Prom
             inspectionId: ctx.inspectionId,
             message: `Failed to clear stale push token: ${err instanceof Error ? err.message : String(err)}`,
             context: { stage: "clear_stale_token" },
+          });
+        });
+    }
+    // For non-DeviceNotRegistered errors the token is still potentially valid,
+    // but we still want to surface the failure to the owner.
+    for (const failedToken of failedTokens) {
+      void db
+        .update(usersTable)
+        .set({ pushLastFailedAt: sql`now()` })
+        .where(eq(usersTable.pushToken, failedToken))
+        .catch((err: unknown) => {
+          void logErrorEvent("notification", {
+            companyId: ctx.companyId,
+            inspectionId: ctx.inspectionId,
+            message: `Failed to record push delivery failure: ${err instanceof Error ? err.message : String(err)}`,
+            context: { stage: "record_push_failure" },
           });
         });
     }

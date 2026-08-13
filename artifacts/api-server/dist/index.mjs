@@ -69082,7 +69082,12 @@ var usersTable = pgTable("users", {
   pushToken: text("push_token"),
   // Owner opt-out toggle. When false, no critical-risk push is sent even if
   // a token is on file. Default true so pushes fire immediately on registration.
-  pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(true)
+  pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(true),
+  // Set when the Expo push API returns a ticket error for this user's token
+  // (e.g. MessageRateExceeded, InvalidCredentials) or when the token is cleared
+  // due to DeviceNotRegistered. Cleared when the owner dismisses the banner or
+  // re-registers their push token. Null means no known delivery failure.
+  pushLastFailedAt: timestamp("push_last_failed_at")
 });
 
 // ../../lib/db/src/schema/properties.ts
@@ -76962,7 +76967,9 @@ router2.get("/me", requireAuth, async (req, res) => {
       companyId: user.companyId,
       betaAccess: user.betaAccess,
       company,
-      pushNotificationsEnabled: user.pushNotificationsEnabled ?? true
+      pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
+      hasPushToken: user.pushToken != null,
+      pushLastFailedAt: user.pushLastFailedAt?.toISOString() ?? null
     });
   } catch {
     return res.status(500).json({ error: "Failed to load user" });
@@ -77084,7 +77091,7 @@ router2.post("/me/push-token", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Invalid push token format" });
   }
   try {
-    await db.update(usersTable).set({ pushToken: token }).where(eq(usersTable.id, user.id));
+    await db.update(usersTable).set({ pushToken: token, pushLastFailedAt: null }).where(eq(usersTable.id, user.id));
     return res.json({ success: true });
   } catch {
     return res.status(500).json({ error: "Failed to save push token" });
@@ -77097,6 +77104,15 @@ router2.delete("/me/push-token", requireAuth, async (req, res) => {
     return res.json({ success: true });
   } catch {
     return res.status(500).json({ error: "Failed to remove push token" });
+  }
+});
+router2.delete("/me/push-failure", requireAuth, async (req, res) => {
+  const user = req.user;
+  try {
+    await db.update(usersTable).set({ pushLastFailedAt: null }).where(eq(usersTable.id, user.id));
+    return res.json({ success: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to dismiss push failure" });
   }
 });
 router2.patch("/me/push-notifications", requireAuth, async (req, res) => {
@@ -88185,15 +88201,43 @@ async function sendExpoPush(messages2, ctx) {
     }
     const json3 = await response.json();
     const tickets = json3.data ?? [];
-    for (const ticket of tickets) {
-      if (ticket.status === "error") {
+    const staleTokens = [];
+    const failedTokens = [];
+    for (let i = 0; i < tickets.length; i++) {
+      const ticket = tickets[i];
+      if (ticket.status !== "error") continue;
+      const token = messages2[i]?.to;
+      if (ticket.details?.error === "DeviceNotRegistered") {
+        if (token) staleTokens.push(token);
+      } else {
         void logErrorEvent("notification", {
           companyId: ctx.companyId,
           inspectionId: ctx.inspectionId,
           message: `Expo push ticket error: ${ticket.message ?? "unknown"}`,
-          context: { errorCode: ticket.details?.error }
+          context: { stage: "push_ticket", reason: ticket.details?.error ?? "unknown" }
         });
+        if (token) failedTokens.push(token);
       }
+    }
+    for (const staleToken of staleTokens) {
+      void db.update(usersTable).set({ pushToken: null, pushLastFailedAt: sql`now()` }).where(eq(usersTable.pushToken, staleToken)).catch((err) => {
+        void logErrorEvent("notification", {
+          companyId: ctx.companyId,
+          inspectionId: ctx.inspectionId,
+          message: `Failed to clear stale push token: ${err instanceof Error ? err.message : String(err)}`,
+          context: { stage: "clear_stale_token" }
+        });
+      });
+    }
+    for (const failedToken of failedTokens) {
+      void db.update(usersTable).set({ pushLastFailedAt: sql`now()` }).where(eq(usersTable.pushToken, failedToken)).catch((err) => {
+        void logErrorEvent("notification", {
+          companyId: ctx.companyId,
+          inspectionId: ctx.inspectionId,
+          message: `Failed to record push delivery failure: ${err instanceof Error ? err.message : String(err)}`,
+          context: { stage: "record_push_failure" }
+        });
+      });
     }
   } catch (err) {
     void logErrorEvent("notification", {
@@ -123665,12 +123709,14 @@ var import_express33 = __toESM(require_express2(), 1);
 function sleep5(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-async function withRetry(operation, shouldRetry, maxAttempts = 3, baseDelayMs = 500) {
+async function withRetryTracked(operation, shouldRetry, maxAttempts = 3, baseDelayMs = 500) {
   let lastResult;
+  let attempts = 0;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    attempts = attempt;
     try {
       const result = await operation();
-      if (!shouldRetry(result)) return result;
+      if (!shouldRetry(result)) return { result, retries: attempt - 1 };
       lastResult = result;
     } catch (err) {
       if (attempt === maxAttempts) throw err;
@@ -123681,10 +123727,17 @@ async function withRetry(operation, shouldRetry, maxAttempts = 3, baseDelayMs = 
       await sleep5(baseDelayMs * 2 ** (attempt - 1));
     }
   }
-  return lastResult;
+  return { result: lastResult, retries: attempts - 1 };
 }
 
 // src/services/field-integration.ts
+function isRetryableResponse(res) {
+  if (res.ok) return false;
+  if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
+    return false;
+  }
+  return true;
+}
 var PESTPAC_DEFAULT_BASE = "https://api.pestpac.com/v1";
 async function syncToPestPac(payload) {
   const base = payload.apiBaseUrl?.replace(/\/$/, "") ?? PESTPAC_DEFAULT_BASE;
@@ -123693,7 +123746,7 @@ async function syncToPestPac(payload) {
     Authorization: `Bearer ${payload.apiKey}`
   };
   const customerId = payload.accountId;
-  const noteRes = await withRetry(
+  const { result: noteRes, retries: noteRetries } = await withRetryTracked(
     () => fetch(`${base}/customers/${customerId}/notes`, {
       method: "POST",
       headers,
@@ -123702,16 +123755,17 @@ async function syncToPestPac(payload) {
         date: payload.inspectionDate
       })
     }),
-    (res) => !res.ok
+    isRetryableResponse
   );
   if (!noteRes.ok) {
     const body = await noteRes.text();
     throw new Error(`PestPac note POST failed (${noteRes.status}): ${body}`);
   }
   let attachmentsPosted = 0;
+  let attachmentRetries = 0;
   for (const photo of payload.photos) {
     try {
-      const attachRes = await withRetry(
+      const { result: attachRes, retries } = await withRetryTracked(
         () => fetch(`${base}/customers/${customerId}/attachments`, {
           method: "POST",
           headers,
@@ -123720,8 +123774,9 @@ async function syncToPestPac(payload) {
             description: `${photo.severity.toUpperCase()}: ${photo.caption ?? ""}`
           })
         }),
-        (res) => !res.ok
+        isRetryableResponse
       );
+      attachmentRetries += retries;
       if (attachRes.ok) {
         attachmentsPosted++;
       } else {
@@ -123732,13 +123787,14 @@ async function syncToPestPac(payload) {
         );
       }
     } catch (err) {
+      attachmentRetries += 2;
       logger2.warn(
         { url: photo.url, err: String(err) },
         "PestPac attachment POST threw after retries"
       );
     }
   }
-  return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted };
+  return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted, noteRetries, attachmentRetries };
 }
 var FIELDROUTES_DEFAULT_BASE = "https://api.fieldroutes.com/api/v1";
 async function syncToFieldRoutes(payload) {
@@ -123748,7 +123804,7 @@ async function syncToFieldRoutes(payload) {
     Authorization: `Bearer ${payload.apiKey}`
   };
   const customerId = payload.accountId;
-  const histRes = await withRetry(
+  const { result: histRes, retries: noteRetries } = await withRetryTracked(
     () => fetch(`${base}/customer/${customerId}/service-history`, {
       method: "POST",
       headers,
@@ -123764,7 +123820,7 @@ async function syncToFieldRoutes(payload) {
         date: payload.inspectionDate
       })
     }),
-    (res) => !res.ok
+    isRetryableResponse
   );
   if (!histRes.ok) {
     const body = await histRes.text();
@@ -123774,7 +123830,9 @@ async function syncToFieldRoutes(payload) {
     success: true,
     externalSystem: "fieldroutes",
     postedNotes: true,
-    attachmentsPosted: payload.photos.length
+    attachmentsPosted: payload.photos.length,
+    noteRetries,
+    attachmentRetries: 0
   };
 }
 async function syncInspectionToExternalSystem(payload) {
@@ -124025,6 +124083,7 @@ router32.get("/sync-history", requireRole("owner"), async (req, res) => {
       success: inspectionSyncLogsTable.success,
       errorMessage: inspectionSyncLogsTable.errorMessage,
       syncedAt: inspectionSyncLogsTable.syncedAt,
+      resultJson: inspectionSyncLogsTable.resultJson,
       siteAddress: inspectionsTable.siteAddress
     }).from(inspectionSyncLogsTable).leftJoin(
       inspectionsTable,
@@ -124516,6 +124575,64 @@ router34.get(
       return res.json({ success: true, weeks });
     } catch (error40) {
       logger2.error({ err: error40 }, "executive quality-trend error");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+router34.get(
+  "/executive/velocity-detail",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("owner"),
+  async (req, res) => {
+    const companyId = getCompanyId(req);
+    const monthParam = typeof req.query.month === "string" ? req.query.month.trim() : "current";
+    if (monthParam !== "current" && monthParam !== "last") {
+      return res.status(400).json({ error: "month must be 'current' or 'last'" });
+    }
+    const now = /* @__PURE__ */ new Date();
+    let monthStart;
+    let monthEnd;
+    let label;
+    if (monthParam === "current") {
+      monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+      label = monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    } else {
+      monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+      monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      label = monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    }
+    try {
+      const rows = await db.select({
+        inspectionId: inspectionsTable.id,
+        siteAddress: inspectionsTable.siteAddress,
+        technicianName: inspectionsTable.technicianName,
+        completedAt: inspectionsTable.completedAt
+      }).from(inspectionsTable).where(
+        and(
+          eq(inspectionsTable.companyId, companyId),
+          eq(inspectionsTable.status, "completed"),
+          isNotNull(inspectionsTable.completedAt),
+          sql`${inspectionsTable.completedAt} >= ${monthStart.toISOString()}::timestamptz`,
+          sql`${inspectionsTable.completedAt} < ${monthEnd.toISOString()}::timestamptz`
+        )
+      ).orderBy(sql`${inspectionsTable.completedAt} desc`);
+      return res.json({
+        success: true,
+        month: monthParam,
+        label,
+        count: rows.length,
+        inspections: rows.map((r) => ({
+          inspectionId: r.inspectionId,
+          siteAddress: r.siteAddress,
+          technicianName: r.technicianName || "Unknown",
+          completedAt: r.completedAt
+        }))
+      });
+    } catch (error40) {
+      logger2.error({ err: error40 }, "executive velocity-detail error");
       return res.status(500).json({ error: "Internal server error" });
     }
   }
@@ -125491,6 +125608,10 @@ async function migratePushNotificationColumns() {
       sql`ALTER TABLE users ADD COLUMN push_notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE`
     );
     logger2.info("migratePushNotifications: added users.push_notifications_enabled");
+  }
+  if (!await columnExists("users", "push_last_failed_at")) {
+    await db.execute(sql`ALTER TABLE users ADD COLUMN push_last_failed_at TIMESTAMPTZ`);
+    logger2.info("migratePushNotifications: added users.push_last_failed_at");
   }
   if (!await columnExists("inspection_scorecards", "critical_alert_sent")) {
     await db.execute(

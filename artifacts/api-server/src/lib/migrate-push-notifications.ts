@@ -36,6 +36,12 @@ export async function migratePushNotificationColumns(): Promise<void> {
     logger.info("migratePushNotifications: added users.push_notifications_enabled");
   }
 
+  // Push failure flag on users — surfaces delivery errors in the owner dashboard
+  if (!(await columnExists("users", "push_last_failed_at"))) {
+    await db.execute(sql`ALTER TABLE users ADD COLUMN push_last_failed_at TIMESTAMPTZ`);
+    logger.info("migratePushNotifications: added users.push_last_failed_at");
+  }
+
   // Delivery idempotency flag on inspection_scorecards
   if (!(await columnExists("inspection_scorecards", "critical_alert_sent"))) {
     await db.execute(

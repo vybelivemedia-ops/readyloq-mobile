@@ -37,6 +37,11 @@ export const usersTable = pgTable("users", {
   // Owner opt-out toggle. When false, no critical-risk push is sent even if
   // a token is on file. Default true so pushes fire immediately on registration.
   pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(true),
+  // Set when the Expo push API returns a ticket error for this user's token
+  // (e.g. MessageRateExceeded, InvalidCredentials) or when the token is cleared
+  // due to DeviceNotRegistered. Cleared when the owner dismisses the banner or
+  // re-registers their push token. Null means no known delivery failure.
+  pushLastFailedAt: timestamp("push_last_failed_at"),
 });
 
 export type User = typeof usersTable.$inferSelect;

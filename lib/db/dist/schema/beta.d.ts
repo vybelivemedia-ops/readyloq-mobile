@@ -563,13 +563,13 @@ export declare const betaChecklistStateTable: import("drizzle-orm/pg-core").PgTa
 }>;
 export declare const insertBetaFeedbackSchema: z.ZodObject<{
     companyId: z.ZodInt;
-    userId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
-    type: z.ZodString;
+    status: z.ZodOptional<z.ZodString>;
+    severity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    inspectionId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     title: z.ZodString;
     description: z.ZodString;
-    severity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    status: z.ZodOptional<z.ZodString>;
-    inspectionId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
+    userId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
+    type: z.ZodString;
     analysisId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     reportId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     context: z.ZodOptional<z.ZodNullable<z.ZodType<import("drizzle-zod").Json, unknown, z.core.$ZodTypeInternals<import("drizzle-zod").Json, unknown>>>>;

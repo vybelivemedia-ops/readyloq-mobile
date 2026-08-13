@@ -19,10 +19,11 @@ import {
   getGetBriefingQueryOptions,
   getListReportsQueryOptions,
 } from "@/lib/api-client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
-import React from "react";
+import React, { useCallback } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { dismissPushFailure } from "@/lib/api";
 
 import { MissionControlDashboard } from "@/components/MissionControlDashboard";
 import { RoleBriefingView } from "@/components/briefing/RoleBriefingView";
@@ -468,6 +469,22 @@ export default function DashboardScreen() {
   const isOwner   = role === "owner";
 
   const { viewMode } = useViewPreference();
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Dismiss the push-failure banner: clear the server flag, then refetch the
+  // current-user cache so the banner hides without a full page reload.
+  const handleDismissPushFailure = useCallback(async () => {
+    try {
+      const token = await getToken();
+      await dismissPushFailure(token);
+      queryClient.setQueryData<typeof user>(["current-user"], (prev) =>
+        prev ? { ...prev, pushLastFailedAt: null } : prev,
+      );
+    } catch {
+      // Best-effort — banner will hide on next /me refetch anyway.
+    }
+  }, [getToken, queryClient]);
 
   const briefing = useQuery(getGetBriefingQueryOptions());
   const dash     = useQuery(getGetAnalyticsDashboardQueryOptions());
@@ -611,6 +628,8 @@ export default function DashboardScreen() {
         license={license}
         agents={vybeAgents.agents}
         agentsSyncFailed={vybeAgents.syncFailed}
+        pushLastFailedAt={user?.pushLastFailedAt ?? null}
+        onDismissPushFailure={() => { void handleDismissPushFailure(); }}
         onRefresh={() => { onRefresh(); vybeAgents.refresh(); }}
         onSignOut={() => { void signOut(); }}
       />
@@ -683,6 +702,52 @@ export default function DashboardScreen() {
               </Pressable>
             </View>
           </View>
+
+          {/* ── Push-failure banner ──────────────────────────────────────── */}
+          {user?.pushLastFailedAt ? (
+            <View style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: 10,
+              padding: 12,
+              backgroundColor: "rgba(245,158,11,0.05)",
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: "rgba(245,158,11,0.25)",
+              borderLeftWidth: 3,
+              borderLeftColor: "#f59e0b",
+            }}>
+              <Ionicons name="notifications-off-outline" size={18} color="#f59e0b" style={{ marginTop: 1 }} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: MC_TEXT, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+                  Alert delivery failed
+                </Text>
+                <Text style={{ color: MC_MUTED, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 }}>
+                  A critical-risk push notification couldn't be delivered. Go to Settings to re-enable alerts.
+                </Text>
+              </View>
+              <View style={{ gap: 6, alignItems: "flex-end" }}>
+                <Pressable
+                  onPress={() => router.push("/settings" as Href)}
+                  style={({ pressed }) => ({
+                    backgroundColor: "#f59e0b",
+                    borderRadius: 6,
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Text style={{ color: "#000", fontFamily: "Inter_700Bold", fontSize: 11 }}>Fix</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { void handleDismissPushFailure(); }}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 2 })}
+                >
+                  <Text style={{ color: MC_MUTED, fontFamily: "Inter_400Regular", fontSize: 11 }}>Dismiss</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
 
           {/* ── Start Inspection hero ────────────────────────────────────── */}
           <Pressable
