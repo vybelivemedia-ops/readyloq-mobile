@@ -45,7 +45,7 @@ export default function Login() {
             colorText: "#f1f5f9",
           },
         }}
-        forceRedirectUrl="/dashboard"
+        forceRedirectUrl={`${import.meta.env.BASE_URL}dashboard`}
       />
     </div>
   );
