@@ -11,10 +11,10 @@ export function Login() {
               <ShieldCheck className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Property Manager Portal
+              ReadyLoq Commercial &amp; Client Portal
             </h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              Sign in to view your building inspection reports
+              Sign in to view your building reports and activity
             </p>
           </div>
           <SignIn

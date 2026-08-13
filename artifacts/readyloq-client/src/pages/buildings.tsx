@@ -33,7 +33,7 @@ export function Buildings() {
         <p className="text-muted-foreground mt-1 text-sm">
           {me?.company
             ? `Serviced by ${me.company.name}`
-            : 'Pest inspection history for your properties'}
+            : 'Inspection history for your properties'}
         </p>
       </div>
 
@@ -61,7 +61,7 @@ export function Buildings() {
           <Building2 className="w-12 h-12 text-muted-foreground/30 mb-4" />
           <p className="font-medium text-foreground">No buildings yet</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Inspections will appear here once your pest control company has completed a visit.
+            Inspections will appear here once your ReadyLoq provider has completed a visit.
           </p>
         </div>
       )}

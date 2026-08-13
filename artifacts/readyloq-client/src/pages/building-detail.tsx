@@ -60,7 +60,7 @@ function TrendChart({ address }: { address: string }) {
     return (
       <div className="flex flex-col items-center justify-center h-40 text-center">
         <Bug className="w-8 h-8 text-muted-foreground/30 mb-2" />
-        <p className="text-sm text-muted-foreground">No pest trend data yet</p>
+        <p className="text-sm text-muted-foreground">No activity trend data yet</p>
       </div>
     );
   }
@@ -144,7 +144,7 @@ export function BuildingDetail() {
       {/* Pest trend chart */}
       <Card className="mb-6 border-border">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">12-Month Pest Activity</CardTitle>
+          <CardTitle className="text-base">12-Month Activity Trends</CardTitle>
         </CardHeader>
         <CardContent>
           <TrendChart address={address} />

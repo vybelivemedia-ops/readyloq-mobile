@@ -13,7 +13,7 @@ export function NoAccess() {
         <h1 className="text-xl font-bold text-foreground mb-2">No portal access</h1>
         <p className="text-muted-foreground text-sm mb-6">
           Your account doesn't have access to any properties yet. Please contact your
-          pest control service provider to be granted access.
+          ReadyLoq service provider to be granted access.
         </p>
         <Button
           variant="outline"
