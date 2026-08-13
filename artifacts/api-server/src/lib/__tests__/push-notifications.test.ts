@@ -54,11 +54,40 @@ vi.stubGlobal(
   }),
 );
 
+// ── AI / pipeline mocks — keep the heavy steps inert so tests that call
+// runInspectionFinalization can pre-seed their own scorecard and have it
+// survive to step 5 without the real computation overwriting it.  Only
+// push-notifications is left unblocked; that's the unit under test.
+vi.mock("../scorecard", () => ({
+  runScorecardComputation: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("../opportunity-ai", () => ({
+  runOpportunitySynthesis: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("../report-narrative-ai", () => ({
+  generateReportNarrative: vi.fn().mockResolvedValue("mocked narrative"),
+  derivePropertyType: vi.fn().mockReturnValue("residential"),
+}));
+vi.mock("../customer-summary-ai", () => ({
+  generateCustomerSummaryBody: vi.fn().mockResolvedValue("mocked summary"),
+  SummaryFidelityError: class SummaryFidelityError extends Error {},
+}));
+vi.mock("../property-memory-writer", () => ({
+  writePropertyMemory: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ── Imports (after mocks are wired) ───────────────────────────────────────────
 import app from "../../app";
-import { db, usersTable, companiesTable, inspectionsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import {
+  db,
+  usersTable,
+  companiesTable,
+  inspectionsTable,
+  inspectionScorecardsTable,
+} from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 import { notifyCriticalInspection } from "../push-notifications";
+import { runInspectionFinalization } from "../inspection-complete";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fixture identifiers — unique slugs avoid cross-suite collisions in the
@@ -591,5 +620,113 @@ describe("POST /auth/me/push-token — token format validation", () => {
       .send({ token: VALID_TOKEN_A });
 
     expect(res.status).toBe(401);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// runInspectionFinalization — exactly-once critical-push under concurrent retries
+//
+// The finalization pipeline uses an atomic UPDATE … WHERE critical_alert_sent =
+// FALSE (step 5) to guarantee exactly-once Expo delivery even when two calls
+// race or when the same inspection is retried after a crash.
+//
+// The AI / scorecard / opportunity steps are mocked at the top of this file so
+// the pre-seeded critical scorecard (criticalAlertSent = false) is never
+// overwritten before step 5 runs.  push-notifications itself is the real
+// implementation so the Expo fetch call is observable via the global stub.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("runInspectionFinalization — exactly-once critical-push under concurrent retries", () => {
+  const OWNER_CLAIM_CLERK = "pn_test_owner_claim";
+  const VALID_TOKEN_CLAIM = "ExponentPushToken[ccccccccccccccccccc]";
+  const CLAIM_SITE = "1 Claim Test Lane";
+
+  let claimInspectionId: number;
+
+  beforeEach(async () => {
+    // Seed an owner with a valid push token so notifyCriticalInspection has a
+    // real target — the Expo HTTP call is only attempted when the claim wins.
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_CLAIM_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_CLAIM,
+      pushNotificationsEnabled: true,
+    });
+
+    // Dedicated inspection for this suite.
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: CLAIM_SITE,
+        technicianName: "Dave",
+        clientName: "Claim Client",
+        pestTypes: ["rodents"],
+      })
+      .returning();
+    claimInspectionId = insp.id;
+
+    // Pre-seed a critical scorecard with criticalAlertSent = false.
+    // runScorecardComputation is mocked as a no-op (see top of file) so this
+    // row survives to step 5 unchanged, giving the atomic claim something to
+    // race over.
+    await db.insert(inspectionScorecardsTable).values({
+      companyId,
+      inspectionId: claimInspectionId,
+      technicianName: "Dave",
+      qualityScore: 42,
+      riskScore: 90,
+      riskLevel: "critical",
+      findingsCount: 3,
+      photosAnalyzed: 5,
+      components: {} as never,
+      missedOpportunities: [],
+      criticalAlertSent: false,
+    });
+  });
+
+  it("sends the critical push exactly once when two runInspectionFinalization calls race concurrently", async () => {
+    // Both paths are launched together — the atomic claim ensures only one wins.
+    await Promise.all([
+      runInspectionFinalization({ companyId, inspectionId: claimInspectionId, reportId: null }),
+      runInspectionFinalization({ companyId, inspectionId: claimInspectionId, reportId: null }),
+    ]);
+
+    // Expo must have been called exactly once across both concurrent calls.
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+
+    // The single winning call must target the opted-in owner.
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(1);
+    expect(messages[0].to).toBe(VALID_TOKEN_CLAIM);
+  });
+
+  it("persists criticalAlertSent = true in the DB after both concurrent finalization calls settle", async () => {
+    await Promise.all([
+      runInspectionFinalization({ companyId, inspectionId: claimInspectionId, reportId: null }),
+      runInspectionFinalization({ companyId, inspectionId: claimInspectionId, reportId: null }),
+    ]);
+
+    const [scorecard] = await db
+      .select({ criticalAlertSent: inspectionScorecardsTable.criticalAlertSent })
+      .from(inspectionScorecardsTable)
+      .where(eq(inspectionScorecardsTable.inspectionId, claimInspectionId));
+
+    expect(scorecard.criticalAlertSent).toBe(true);
+  });
+
+  it("does not send any push when criticalAlertSent is already true before finalization runs", async () => {
+    // Simulate a prior successful delivery having already claimed the send.
+    await db
+      .update(inspectionScorecardsTable)
+      .set({ criticalAlertSent: true })
+      .where(eq(inspectionScorecardsTable.inspectionId, claimInspectionId));
+
+    await runInspectionFinalization({ companyId, inspectionId: claimInspectionId, reportId: null });
+
+    // The idempotency guard must prevent a second delivery — Expo must not be called.
+    expect(expoCalls()).toHaveLength(0);
   });
 });
