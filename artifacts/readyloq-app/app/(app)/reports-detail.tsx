@@ -17,7 +17,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -274,15 +274,42 @@ function ReportCard({
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+/** Accepted values for the `filter` URL param. */
+const VALID_FILTERS = new Set<AuditFilter>(["all", "pipeline", "critical", "pending"]);
+
+/**
+ * Coerce a raw URL param value (string | string[] | undefined) to a valid
+ * AuditFilter. Falls back to "all" for missing or unrecognised values so a
+ * bad deep-link never lands on an undefined tab.
+ */
+function normalizeFilterParam(raw: string | string[] | undefined): AuditFilter {
+  const val = Array.isArray(raw) ? raw[0] : raw;
+  return val && VALID_FILTERS.has(val as AuditFilter) ? (val as AuditFilter) : "all";
+}
+
 export default function ReportsDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { filter: filterParam } = useLocalSearchParams<{ filter?: AuditFilter }>();
+  // Typed as string so expo-router doesn't infer the narrower AuditFilter union
+  // before we have a chance to validate — normalizeFilterParam handles that.
+  const { filter: filterParam } = useLocalSearchParams<{ filter?: string }>();
 
   const [activeTab, setActiveTab] = useState<AuditFilter>(
-    (filterParam as AuditFilter | undefined) ?? "all",
+    normalizeFilterParam(filterParam),
   );
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Keep the active tab in sync with the URL param.
+  // useState's initializer only runs at first mount; if expo-router reuses
+  // the mounted screen instance (e.g. the route is already in the stack and
+  // a second push arrives with a different filter), filterParam changes but
+  // activeTab would be stale without this effect.
+  useEffect(() => {
+    setActiveTab(normalizeFilterParam(filterParam));
+    // Reset search whenever the deep-link target changes so old results
+    // don't bleed into the newly selected tab.
+    setSearchQuery("");
+  }, [filterParam]);
 
   // Clear search whenever the tab changes
   const handleTabChange = (tab: AuditFilter) => {
