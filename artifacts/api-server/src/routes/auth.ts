@@ -84,6 +84,7 @@ router.get("/me", requireAuth, async (req, res) => {
       pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
       hasPushToken: user.pushToken != null,
       pushLastFailedAt: user.pushLastFailedAt?.toISOString() ?? null,
+      briefingEmailOptOut: user.briefingEmailOptOut ?? false,
     });
   } catch {
     return res.status(500).json({ error: "Failed to load user" });
@@ -302,6 +303,24 @@ router.patch("/me/push-notifications", requireAuth, async (req, res) => {
     return res.json({ success: true, pushNotificationsEnabled: enabled });
   } catch {
     return res.status(500).json({ error: "Failed to update push notification preference" });
+  }
+});
+
+// ── PATCH /me/briefing-email — toggle daily briefing email preference ──────────
+router.patch("/me/briefing-email", requireAuth, async (req, res) => {
+  const user = req.user!;
+  const { optOut } = req.body as { optOut?: unknown };
+  if (typeof optOut !== "boolean") {
+    return res.status(400).json({ error: "optOut must be a boolean" });
+  }
+  try {
+    await db
+      .update(usersTable)
+      .set({ briefingEmailOptOut: optOut })
+      .where(eq(usersTable.id, user.id));
+    return res.json({ success: true, briefingEmailOptOut: optOut });
+  } catch {
+    return res.status(500).json({ error: "Failed to update briefing email preference" });
   }
 });
 

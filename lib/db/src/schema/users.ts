@@ -42,6 +42,11 @@ export const usersTable = pgTable("users", {
   // due to DeviceNotRegistered. Cleared when the owner dismisses the banner or
   // re-registers their push token. Null means no known delivery failure.
   pushLastFailedAt: timestamp("push_last_failed_at"),
+  // ── Daily Briefing Email ────────────────────────────────────────────────────
+  // When true, the 07:00 UTC scheduled email is suppressed for this owner.
+  // Default false so every new owner receives the briefing automatically;
+  // they can opt out from the app's notification settings.
+  briefingEmailOptOut: boolean("briefing_email_opt_out").notNull().default(false),
 });
 
 export type User = typeof usersTable.$inferSelect;

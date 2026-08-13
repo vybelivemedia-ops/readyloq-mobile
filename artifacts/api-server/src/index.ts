@@ -8,6 +8,8 @@ import { backfillOpportunityValues } from "./lib/backfill-opportunity-values";
 import { backfillPropertyMemory } from "./lib/backfill-property-memory";
 import { migratePushNotificationColumns } from "./lib/migrate-push-notifications";
 import { migrateSyncLogs } from "./lib/migrate-sync-logs";
+import { migrateBriefingEmailColumn } from "./lib/migrate-briefing-email";
+import { startBriefingScheduler } from "./lib/briefing-scheduler";
 
 const rawPort = process.env["PORT"];
 
@@ -29,6 +31,7 @@ async function startup() {
   // column-dependent endpoints with a missing schema.
   await migratePushNotificationColumns();
   await migrateSyncLogs();
+  await migrateBriefingEmailColumn();
 
   app.listen(port, (err) => {
     if (err) {
@@ -59,6 +62,9 @@ async function startup() {
     void ensureProductsSeed().catch((seedErr) => {
       logger.warn({ err: seedErr }, "Product seed failed — catalogue may be incomplete");
     });
+
+    // Start the daily 07:00 UTC briefing email scheduler.
+    startBriefingScheduler();
 
     // Fire-and-forget: register native OAuth redirect URLs with Clerk so
     // Google sign-in works in the standalone mobile app (production

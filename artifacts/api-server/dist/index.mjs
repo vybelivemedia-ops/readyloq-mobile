@@ -18531,8 +18531,8 @@ var require_escape_html = __commonJS({
   "../../node_modules/.pnpm/escape-html@1.0.3/node_modules/escape-html/index.js"(exports, module) {
     "use strict";
     var matchHtmlRegExp = /["'&<>]/;
-    module.exports = escapeHtml2;
-    function escapeHtml2(string4) {
+    module.exports = escapeHtml3;
+    function escapeHtml3(string4) {
       var str4 = "" + string4;
       var match2 = matchHtmlRegExp.exec(str4);
       if (!match2) {
@@ -18663,13 +18663,13 @@ var require_finalhandler = __commonJS({
     "use strict";
     var debug7 = require_src()("finalhandler");
     var encodeUrl = require_encodeurl();
-    var escapeHtml2 = require_escape_html();
+    var escapeHtml3 = require_escape_html();
     var onFinished = require_on_finished();
     var parseUrl = require_parseurl();
     var statuses = require_statuses();
     var isFinished = onFinished.isFinished;
     function createHtmlDocument(message) {
-      var body = escapeHtml2(message).replaceAll("\n", "<br>").replaceAll("  ", " &nbsp;");
+      var body = escapeHtml3(message).replaceAll("\n", "<br>").replaceAll("  ", " &nbsp;");
       return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>Error</title>\n</head>\n<body>\n<pre>' + body + "</pre>\n</body>\n</html>\n";
     }
     module.exports = finalhandler;
@@ -22553,7 +22553,7 @@ var require_send = __commonJS({
     var createError = require_http_errors();
     var debug7 = require_src()("send");
     var encodeUrl = require_encodeurl();
-    var escapeHtml2 = require_escape_html();
+    var escapeHtml3 = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
     var fs2 = __require("fs");
@@ -22606,7 +22606,7 @@ var require_send = __commonJS({
       }
       var res = this.res;
       var msg = statuses.message[status] || String(status);
-      var doc = createHtmlDocument("Error", escapeHtml2(msg));
+      var doc = createHtmlDocument("Error", escapeHtml3(msg));
       clearHeaders(res);
       if (err && err.headers) {
         setHeaders(res, err.headers);
@@ -22706,7 +22706,7 @@ var require_send = __commonJS({
         return;
       }
       var loc = encodeUrl(collapseLeadingSlashes(this.path + "/"));
-      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
+      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml3(loc));
       res.statusCode = 301;
       res.setHeader("Content-Type", "text/html; charset=UTF-8");
       res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -23110,7 +23110,7 @@ var require_response = __commonJS({
     var createError = require_http_errors();
     var deprecate = require_depd()("express");
     var encodeUrl = require_encodeurl();
-    var escapeHtml2 = require_escape_html();
+    var escapeHtml3 = require_escape_html();
     var http4 = __require("node:http");
     var onFinished = require_on_finished();
     var mime = require_mime_types();
@@ -23449,7 +23449,7 @@ var require_response = __commonJS({
           body = statuses.message[status] + ". Redirecting to " + address;
         },
         html: function() {
-          var u = escapeHtml2(address);
+          var u = escapeHtml3(address);
           body = "<p>" + statuses.message[status] + ". Redirecting to " + u + "</p>";
         },
         default: function() {
@@ -23577,7 +23577,7 @@ var require_serve_static = __commonJS({
   "../../node_modules/.pnpm/serve-static@2.2.1/node_modules/serve-static/index.js"(exports, module) {
     "use strict";
     var encodeUrl = require_encodeurl();
-    var escapeHtml2 = require_escape_html();
+    var escapeHtml3 = require_escape_html();
     var parseUrl = require_parseurl();
     var resolve = __require("path").resolve;
     var send = require_send();
@@ -23663,7 +23663,7 @@ var require_serve_static = __commonJS({
         originalUrl.path = null;
         originalUrl.pathname = collapseLeadingSlashes(originalUrl.pathname + "/");
         var loc = encodeUrl(url2.format(originalUrl));
-        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
+        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml3(loc));
         res.statusCode = 301;
         res.setHeader("Content-Type", "text/html; charset=UTF-8");
         res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -24627,23 +24627,23 @@ var require_helpers = __commonJS({
   "../../node_modules/.pnpm/ip-address@10.2.0/node_modules/ip-address/dist/v6/helpers.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.escapeHtml = escapeHtml2;
+    exports.escapeHtml = escapeHtml3;
     exports.spanAllZeroes = spanAllZeroes;
     exports.spanAll = spanAll;
     exports.spanLeadingZeroes = spanLeadingZeroes;
     exports.simpleGroup = simpleGroup;
-    function escapeHtml2(s2) {
+    function escapeHtml3(s2) {
       return s2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
     function spanAllZeroes(s2) {
-      return escapeHtml2(s2).replace(/(0+)/g, '<span class="zero">$1</span>');
+      return escapeHtml3(s2).replace(/(0+)/g, '<span class="zero">$1</span>');
     }
     function spanAll(s2, offset = 0) {
       const letters = s2.split("");
-      return letters.map((n, i) => `<span class="digit value-${escapeHtml2(n)} position-${i + offset}">${spanAllZeroes(n)}</span>`).join("");
+      return letters.map((n, i) => `<span class="digit value-${escapeHtml3(n)} position-${i + offset}">${spanAllZeroes(n)}</span>`).join("");
     }
     function spanLeadingZeroesSimple(group) {
-      return escapeHtml2(group).replace(/^(0+)/, '<span class="zero">$1</span>');
+      return escapeHtml3(group).replace(/^(0+)/, '<span class="zero">$1</span>');
     }
     function spanLeadingZeroes(address) {
       const groups = address.split(":");
@@ -69092,7 +69092,12 @@ var usersTable = pgTable("users", {
   // (e.g. MessageRateExceeded, InvalidCredentials) or when the token is cleared
   // due to DeviceNotRegistered. Cleared when the owner dismisses the banner or
   // re-registers their push token. Null means no known delivery failure.
-  pushLastFailedAt: timestamp("push_last_failed_at")
+  pushLastFailedAt: timestamp("push_last_failed_at"),
+  // ── Daily Briefing Email ────────────────────────────────────────────────────
+  // When true, the 07:00 UTC scheduled email is suppressed for this owner.
+  // Default false so every new owner receives the briefing automatically;
+  // they can opt out from the app's notification settings.
+  briefingEmailOptOut: boolean("briefing_email_opt_out").notNull().default(false)
 });
 
 // ../../lib/db/src/schema/properties.ts
@@ -77171,7 +77176,8 @@ router2.get("/me", requireAuth, async (req, res) => {
       company,
       pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
       hasPushToken: user.pushToken != null,
-      pushLastFailedAt: user.pushLastFailedAt?.toISOString() ?? null
+      pushLastFailedAt: user.pushLastFailedAt?.toISOString() ?? null,
+      briefingEmailOptOut: user.briefingEmailOptOut ?? false
     });
   } catch {
     return res.status(500).json({ error: "Failed to load user" });
@@ -77328,6 +77334,19 @@ router2.patch("/me/push-notifications", requireAuth, async (req, res) => {
     return res.json({ success: true, pushNotificationsEnabled: enabled });
   } catch {
     return res.status(500).json({ error: "Failed to update push notification preference" });
+  }
+});
+router2.patch("/me/briefing-email", requireAuth, async (req, res) => {
+  const user = req.user;
+  const { optOut } = req.body;
+  if (typeof optOut !== "boolean") {
+    return res.status(400).json({ error: "optOut must be a boolean" });
+  }
+  try {
+    await db.update(usersTable).set({ briefingEmailOptOut: optOut }).where(eq(usersTable.id, user.id));
+    return res.json({ success: true, briefingEmailOptOut: optOut });
+  } catch {
+    return res.status(500).json({ error: "Failed to update briefing email preference" });
   }
 });
 router2.post("/accept-invite", requireAuth, async (req, res) => {
@@ -126242,6 +126261,363 @@ async function migrateSyncLogs() {
   });
 }
 
+// src/lib/migrate-briefing-email.ts
+async function columnExists3(table, column) {
+  const result = await db.execute(
+    sql`SELECT 1 FROM information_schema.columns
+        WHERE table_name = ${table} AND column_name = ${column}`
+  );
+  return result.rows.length > 0;
+}
+async function migrateBriefingEmailColumn() {
+  if (!await columnExists3("users", "briefing_email_opt_out")) {
+    await db.execute(
+      sql`ALTER TABLE users ADD COLUMN briefing_email_opt_out BOOLEAN NOT NULL DEFAULT FALSE`
+    );
+    logger2.info("migrateBriefingEmail: added users.briefing_email_opt_out");
+  }
+}
+
+// src/lib/briefing-scheduler.ts
+import cron from "node-cron";
+
+// src/lib/mailer.ts
+import nodemailer from "nodemailer";
+function resolveResendFrom() {
+  return process.env["RESEND_FROM"] ?? process.env["SMTP_FROM"] ?? null;
+}
+function resolveSmtpFrom() {
+  return process.env["RESEND_FROM"] ?? process.env["SMTP_FROM"] ?? "ReadyLoq <noreply@readyloq.com>";
+}
+async function sendViaResend(opts) {
+  const apiKey = process.env["RESEND_API_KEY"];
+  const from = resolveResendFrom();
+  if (!from) {
+    logger2.warn(
+      { to: opts.to },
+      "mailer: RESEND_API_KEY is set but no verified sender configured \u2014 set RESEND_FROM to a Resend-verified address; email not delivered"
+    );
+    return { delivered: false, reason: "no_transport" };
+  }
+  const body = {
+    from,
+    to: [opts.to],
+    subject: opts.subject,
+    html: opts.html
+  };
+  if (opts.text) body["text"] = opts.text;
+  let res;
+  try {
+    res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+  } catch (err) {
+    logger2.error({ err, to: opts.to }, "mailer: Resend fetch failed (network error)");
+    return { delivered: false, reason: "resend_error" };
+  }
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "(unreadable)");
+    logger2.error(
+      { to: opts.to, status: res.status, body: errBody },
+      "mailer: Resend delivery failed"
+    );
+    return { delivered: false, reason: "resend_error" };
+  }
+  logger2.info({ to: opts.to, subject: opts.subject }, "mailer: email delivered via Resend");
+  return { delivered: true };
+}
+async function sendViaSmtp(opts) {
+  const host = process.env["SMTP_HOST"];
+  const user = process.env["SMTP_USER"];
+  const pass = process.env["SMTP_PASS"];
+  const transport = nodemailer.createTransport({
+    host,
+    port: Number(process.env["SMTP_PORT"] ?? 587),
+    secure: process.env["SMTP_SECURE"] === "true",
+    auth: { user, pass }
+  });
+  try {
+    await transport.sendMail({
+      from: resolveSmtpFrom(),
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text
+    });
+    logger2.info({ to: opts.to, subject: opts.subject }, "mailer: email delivered via SMTP");
+    return { delivered: true };
+  } catch (err) {
+    logger2.error({ err, to: opts.to }, "mailer: SMTP delivery failed");
+    return { delivered: false, reason: "smtp_error" };
+  }
+}
+async function sendMail(opts) {
+  if (process.env["RESEND_API_KEY"]) {
+    return sendViaResend(opts);
+  }
+  const smtpReady = process.env["SMTP_HOST"] && process.env["SMTP_USER"] && process.env["SMTP_PASS"];
+  if (smtpReady) {
+    return sendViaSmtp(opts);
+  }
+  logger2.warn(
+    { to: opts.to, subject: opts.subject },
+    "mailer: no transport configured (set RESEND_API_KEY or SMTP_HOST/SMTP_USER/SMTP_PASS) \u2014 email not delivered"
+  );
+  return { delivered: false, reason: "no_transport" };
+}
+
+// src/lib/briefing-scheduler.ts
+var CLERK_API_BASE2 = "https://api.clerk.com/v1";
+async function getClerkUserEmail(clerkUserId) {
+  const secretKey = process.env["CLERK_SECRET_KEY"];
+  if (!secretKey) {
+    logger2.warn("briefing-scheduler: CLERK_SECRET_KEY not set \u2014 cannot look up owner emails");
+    return null;
+  }
+  try {
+    const res = await fetch(`${CLERK_API_BASE2}/users/${clerkUserId}`, {
+      headers: { Authorization: `Bearer ${secretKey}` }
+    });
+    if (!res.ok) {
+      logger2.warn(
+        { clerkUserId, status: res.status },
+        "briefing-scheduler: Clerk user lookup failed"
+      );
+      return null;
+    }
+    const data = await res.json();
+    const primaryId = data.primary_email_address_id;
+    const match2 = data.email_addresses?.find((e) => e.id === primaryId);
+    return match2?.email_address ?? null;
+  } catch (err) {
+    logger2.warn({ err, clerkUserId }, "briefing-scheduler: Clerk user lookup error");
+    return null;
+  }
+}
+function escapeHtml2(raw) {
+  return raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function buildBriefingEmail(opts) {
+  const {
+    companyName,
+    date: date6,
+    summary,
+    inspectionsCount,
+    criticalRiskCount,
+    newOpportunities,
+    pipelineAdded,
+    recommendation
+  } = opts;
+  const companyNameHtml = escapeHtml2(companyName);
+  const summaryHtml = escapeHtml2(summary);
+  const recommendationHtml = escapeHtml2(recommendation);
+  const formattedDate = (/* @__PURE__ */ new Date(date6 + "T12:00:00Z")).toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC"
+  });
+  const pipelineFormatted = pipelineAdded >= 1e6 ? `$${(pipelineAdded / 1e6).toFixed(1)}M` : pipelineAdded >= 1e3 ? `$${(pipelineAdded / 1e3).toFixed(0)}K` : `$${pipelineAdded.toLocaleString()}`;
+  const criticalColor = criticalRiskCount > 0 ? "#F85149" : "#3FB950";
+  const inspectionsColor = "#17C4D3";
+  const subject = `Daily Briefing \u2014 ${companyName} \xB7 ${formattedDate}`;
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Briefing \u2014 ${companyNameHtml}</title>
+</head>
+<body style="margin:0;padding:0;background:#0D1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0D1117;padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#161B22;border:1px solid #30363D;border-radius:16px 16px 0 0;padding:28px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <div style="color:#17C4D3;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Daily Executive Briefing</div>
+                    <div style="color:#E6EDF3;font-size:22px;font-weight:800;margin-bottom:4px;">${companyNameHtml}</div>
+                    <div style="color:#8B949E;font-size:13px;">Operations snapshot \xB7 ${escapeHtml2(formattedDate)}</div>
+                  </td>
+                  <td align="right" style="vertical-align:top;">
+                    <div style="background:#17C4D322;border:1px solid #17C4D344;border-radius:10px;padding:8px 14px;display:inline-block;">
+                      <span style="color:#17C4D3;font-size:11px;font-weight:700;letter-spacing:0.5px;">READYLOQ</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- KPI Row -->
+          <tr>
+            <td style="padding:0;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="33%" style="background:#161B22;border:1px solid #30363D;border-top:none;padding:20px 24px;">
+                    <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">Inspections</div>
+                    <div style="color:${inspectionsColor};font-size:28px;font-weight:800;margin-bottom:4px;">${inspectionsCount}</div>
+                    <div style="color:#8B949E;font-size:12px;">completed yesterday</div>
+                  </td>
+                  <td width="33%" style="background:#161B22;border:1px solid #30363D;border-top:none;border-left:none;padding:20px 24px;">
+                    <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">Critical Risks</div>
+                    <div style="color:${criticalColor};font-size:28px;font-weight:800;margin-bottom:4px;">${criticalRiskCount}</div>
+                    <div style="color:#8B949E;font-size:12px;">sites flagged</div>
+                  </td>
+                  <td width="34%" style="background:#161B22;border:1px solid #30363D;border-top:none;border-left:none;padding:20px 24px;">
+                    <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">New Pipeline</div>
+                    <div style="color:#3FB950;font-size:28px;font-weight:800;margin-bottom:4px;">${escapeHtml2(pipelineFormatted)}</div>
+                    <div style="color:#8B949E;font-size:12px;">${newOpportunities} new opportunit${newOpportunities === 1 ? "y" : "ies"}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Summary -->
+          <tr>
+            <td style="background:#161B22;border:1px solid #30363D;border-top:none;padding:20px 32px;">
+              <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;">Yesterday's Summary</div>
+              <div style="color:#E6EDF3;font-size:15px;line-height:1.6;">${summaryHtml}</div>
+            </td>
+          </tr>
+
+          <!-- Recommendation -->
+          <tr>
+            <td style="background:#161B22;border:1px solid #30363D;border-top:none;padding:20px 32px;">
+              <div style="color:#8B949E;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;">Quinn's Recommendation</div>
+              <div style="background:${criticalRiskCount > 0 ? "#F8514918" : "#3FB95018"};border-left:3px solid ${criticalRiskCount > 0 ? "#F85149" : "#3FB950"};border-radius:0 8px 8px 0;padding:14px 18px;">
+                <div style="color:#E6EDF3;font-size:14px;line-height:1.6;">${recommendationHtml}</div>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#161B22;border:1px solid #30363D;border-top:none;border-radius:0 0 16px 16px;padding:20px 32px;text-align:center;">
+              <div style="color:#8B949E;font-size:12px;margin-bottom:4px;">You're receiving this because you're an owner on ReadyLoq.</div>
+              <div style="color:#8B949E;font-size:12px;margin-bottom:8px;">To unsubscribe, turn off Daily Briefing Email in your app settings.</div>
+              <div style="color:#17C4D3;font-size:11px;font-weight:700;letter-spacing:0.5px;">Powered by ReadyLoq</div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  const text2 = [
+    `DAILY EXECUTIVE BRIEFING`,
+    `${companyName} \xB7 ${formattedDate}`,
+    ``,
+    `\u2500\u2500 YESTERDAY'S OPERATIONS \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+    `Inspections completed: ${inspectionsCount}`,
+    `Critical risk sites:   ${criticalRiskCount}`,
+    `New pipeline value:    ${pipelineFormatted} (${newOpportunities} new opportunit${newOpportunities === 1 ? "y" : "ies"})`,
+    ``,
+    `\u2500\u2500 SUMMARY \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+    summary,
+    ``,
+    `\u2500\u2500 QUINN'S RECOMMENDATION \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+    recommendation,
+    ``,
+    `You're receiving this because you're an owner on ReadyLoq.`,
+    `To unsubscribe, turn off Daily Briefing Email in your app settings.`,
+    ``,
+    `Powered by ReadyLoq`
+  ].join("\n");
+  return { html, text: text2, subject };
+}
+async function runDailyBriefingJob() {
+  const yesterday = /* @__PURE__ */ new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  yesterday.setUTCHours(0, 0, 0, 0);
+  logger2.info({ date: yesterday.toISOString().split("T")[0] }, "briefing-scheduler: job started");
+  const companies = await db.select({ id: companiesTable.id, name: companiesTable.name }).from(companiesTable);
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  let noTransport = 0;
+  for (const company of companies) {
+    try {
+      const owners = await db.select({ id: usersTable.id, clerkUserId: usersTable.clerkUserId }).from(usersTable).where(
+        and(
+          eq(usersTable.companyId, company.id),
+          eq(usersTable.role, "owner"),
+          eq(usersTable.briefingEmailOptOut, false)
+        )
+      );
+      if (owners.length === 0) {
+        skipped++;
+        continue;
+      }
+      const { briefing } = await generateDailyExecutiveBriefing(company.id, yesterday);
+      const { html, text: text2, subject } = buildBriefingEmail({
+        companyName: company.name,
+        date: briefing.date,
+        summary: briefing.summary,
+        inspectionsCount: briefing.inspectionsCount,
+        criticalRiskCount: briefing.criticalRiskCount,
+        newOpportunities: briefing.newOpportunities,
+        pipelineAdded: briefing.pipelineAdded,
+        recommendation: briefing.recommendation
+      });
+      for (const owner of owners) {
+        const email3 = await getClerkUserEmail(owner.clerkUserId);
+        if (!email3) {
+          logger2.warn(
+            { companyId: company.id, userId: owner.id },
+            "briefing-scheduler: no email found for owner \u2014 skipping"
+          );
+          skipped++;
+          continue;
+        }
+        const result = await sendMail({ to: email3, subject, html, text: text2 });
+        if (result.delivered) {
+          sent++;
+        } else if (result.reason === "no_transport") {
+          noTransport++;
+        } else {
+          failed++;
+        }
+      }
+    } catch (err) {
+      logger2.error(
+        { err, companyId: company.id },
+        "briefing-scheduler: failed to process company"
+      );
+      failed++;
+    }
+  }
+  const summary = { sent, skipped, failed, noTransport, total: companies.length };
+  logger2.info(summary, "briefing-scheduler: job complete");
+  return summary;
+}
+function startBriefingScheduler() {
+  cron.schedule(
+    "0 7 * * *",
+    () => {
+      void runDailyBriefingJob().catch((err) => {
+        logger2.error({ err }, "briefing-scheduler: unhandled job error");
+      });
+    },
+    { timezone: "UTC" }
+  );
+  logger2.info("briefing-scheduler: registered daily 07:00 UTC cron job");
+}
+
 // src/index.ts
 var rawPort = process.env["PORT"];
 if (!rawPort) {
@@ -126256,6 +126632,7 @@ if (Number.isNaN(port) || port <= 0) {
 async function startup() {
   await migratePushNotificationColumns();
   await migrateSyncLogs();
+  await migrateBriefingEmailColumn();
   app_default.listen(port, (err) => {
     if (err) {
       logger2.error({ err }, "Error listening on port");
@@ -126272,6 +126649,7 @@ async function startup() {
     void ensureProductsSeed().catch((seedErr) => {
       logger2.warn({ err: seedErr }, "Product seed failed \u2014 catalogue may be incomplete");
     });
+    startBriefingScheduler();
     void ensureClerkNativeRedirectUrls();
   });
 }
