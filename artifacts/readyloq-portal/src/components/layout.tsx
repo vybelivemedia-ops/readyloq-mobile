@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { Link, useLocation } from 'wouter';
-import { LayoutDashboard, ClipboardCheck, FileText, Users, DollarSign, Building2, BarChart3, LogOut, Loader2, Menu } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, FileText, Users, DollarSign, Building2, BarChart3, CalendarDays, LogOut, Loader2, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useClerk } from '@clerk/clerk-react';
@@ -34,6 +34,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: '/reports', label: 'Reports', icon: FileText, roles: ['owner', 'manager', 'sales'] },
     { href: '/opportunities', label: 'Opportunities', icon: DollarSign, roles: ['owner', 'sales'] },
     { href: '/properties', label: 'Properties', icon: Building2, roles: ['owner', 'manager', 'technician'] },
+    { href: '/schedule', label: 'Schedule', icon: CalendarDays, roles: ['owner', 'manager'] },
     { href: '/team', label: 'Team', icon: Users, roles: ['owner', 'manager'] },
     { href: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['owner', 'manager'] },
   ].filter(item => item.roles.includes(me.effectiveRole));

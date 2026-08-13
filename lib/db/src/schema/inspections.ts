@@ -32,6 +32,10 @@ export const inspectionsTable = pgTable(
     // Client-generated idempotency key (UUID) so the offline-first mobile app can
     // retry inspection creation safely — a lost response never duplicates a row.
     clientKey: text("client_key"),
+    // Optional future-scheduled date set by managers/dispatchers via the
+    // scheduling calendar. Null means "unscheduled" (treated as same-day
+    // on the calendar by falling back to createdAt for historical rows).
+    scheduledDate: timestamp("scheduled_date"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     completedAt: timestamp("completed_at"),
   },

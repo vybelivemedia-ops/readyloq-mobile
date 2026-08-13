@@ -39,6 +39,7 @@ import transcribeRouter from "./transcribe";
 import integrationsRouter from "./integrations";
 import playbooksRouter from "./playbooks";
 import executiveRouter from "./executive";
+import scheduleRouter from "./schedule";
 
 const router: IRouter = Router();
 
@@ -180,6 +181,18 @@ router.use(
 //              GET      /technician/daily-rig/recent-mixes
 router.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, dailyRigRouter);
 router.use(executiveRouter);
+
+// Scheduling calendar — read and mutate scheduled dates / technician assignments.
+// Manager+ only: dispatchers/managers need to see and change routes; technicians
+// and sales staff are excluded.
+router.use(
+  "/schedule",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  scheduleRouter,
+);
 
 // Manager rapid-review queue — yesterday's completed inspections for 20-min callback validation.
 router.use(

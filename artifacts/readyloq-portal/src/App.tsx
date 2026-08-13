@@ -18,6 +18,7 @@ import { Team } from '@/pages/team';
 import { Opportunities } from '@/pages/opportunities';
 import { Properties } from '@/pages/properties';
 import { Analytics } from '@/pages/analytics';
+import { Schedule } from '@/pages/schedule';
 import { Layout } from '@/components/layout';
 
 const queryClient = new QueryClient();
@@ -84,6 +85,9 @@ function Router() {
               </Route>
               <Route path="/analytics">
                 <ProtectedRoute component={Analytics} roles={['owner', 'manager']} />
+              </Route>
+              <Route path="/schedule">
+                <ProtectedRoute component={Schedule} roles={['owner', 'manager']} />
               </Route>
               <Route component={NotFound} />
             </Switch>

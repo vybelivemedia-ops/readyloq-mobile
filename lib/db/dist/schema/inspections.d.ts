@@ -243,6 +243,23 @@ export declare const inspectionsTable: import("drizzle-orm/pg-core").PgTableWith
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        scheduledDate: import("drizzle-orm/pg-core").PgColumn<{
+            name: "scheduled_date";
+            tableName: "inspections";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "inspections";
@@ -520,6 +537,7 @@ export declare const insertInspectionSchema: z.ZodObject<{
     severity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     notes: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     clientKey: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    scheduledDate: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
     completedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
 }, {
     out: {};

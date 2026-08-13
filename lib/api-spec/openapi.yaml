@@ -9,6 +9,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: schedule
+    description: Dispatch scheduling calendar (manager+)
   - name: inspections
     description: Inspection management
   - name: analysis
@@ -33,6 +35,61 @@ tags:
     description: Gemini AI chat and image operations
 
 paths:
+  # ── SCHEDULE ─────────────────────────────────────────────────────────────────
+  /schedule:
+    get:
+      operationId: getSchedule
+      tags: [schedule]
+      summary: List inspections for the scheduling calendar (manager+)
+      parameters:
+        - name: start
+          in: query
+          required: true
+          schema: { type: string, format: date }
+          description: Start date (YYYY-MM-DD), inclusive
+        - name: end
+          in: query
+          required: true
+          schema: { type: string, format: date }
+          description: End date (YYYY-MM-DD), inclusive
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScheduleEntry"
+        "400":
+          description: Missing or invalid date params
+
+  /schedule/{id}:
+    patch:
+      operationId: reassignInspection
+      tags: [schedule]
+      summary: Reschedule or reassign a technician (manager+)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReassignInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleEntry"
+        "404":
+          description: Inspection not found
+
   /healthz:
     get:
       operationId: healthCheck
@@ -2014,6 +2071,33 @@ components:
         teamSize:    { type: string, maxLength: 50 }
         message:     { type: string, maxLength: 5000 }
         source:      { type: string, maxLength: 200 }
+
+    # ── SCHEDULE SCHEMAS ────────────────────────────────────────────────────────
+    ScheduleEntry:
+      type: object
+      required: [id, siteAddress, technicianName, status, calendarDate, createdAt]
+      properties:
+        id:            { type: integer }
+        siteAddress:   { type: string }
+        clientName:    { type: ["string", "null"] }
+        technicianName: { type: string }
+        technicianId:  { type: ["string", "null"] }
+        status:        { type: string }
+        severity:      { type: ["string", "null"] }
+        pestTypes:
+          type: array
+          items: { type: string }
+        scheduledDate: { type: ["string", "null"], description: "ISO-8601 datetime when explicitly scheduled by a manager" }
+        calendarDate:  { type: string, description: "YYYY-MM-DD date used to place the entry on the grid (scheduledDate ?? createdAt)" }
+        createdAt:     { type: string }
+        completedAt:   { type: ["string", "null"] }
+
+    ReassignInput:
+      type: object
+      properties:
+        scheduledDate:   { type: ["string", "null"], description: "ISO-8601 datetime; null clears an existing scheduled date" }
+        technicianName:  { type: string, minLength: 1 }
+        technicianId:    { type: ["string", "null"] }
 
     # ── INSPECTION SCHEMAS ──────────────────────────────────────────────────────
     Inspection:
