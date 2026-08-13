@@ -105,6 +105,16 @@ const ALERT_FILTER: Record<string, string> = {
   stale_pipeline:  "opportunities",
 };
 
+/**
+ * Alert types that should deep-link into the Management Report Audit screen
+ * instead of the standard reports tab. The value is the AuditFilter param to
+ * pass (matches the `filter` URL param accepted by reports-detail.tsx).
+ */
+const AUDIT_DEEP_LINK: Record<string, string> = {
+  approvals_aging: "pending",
+  high_risk:       "critical",
+};
+
 // ─── KPI Tile ─────────────────────────────────────────────────────────────────
 
 interface KpiTileProps {
@@ -468,8 +478,13 @@ export function MissionControlDashboard({
                   <Pressable
                     key={`${alert.type}-${i}`}
                     onPress={() => {
-                      if (filterKey) filterIntent.set("reports", filterKey);
-                      router.push("/(tabs)/reports" as Href);
+                      const auditFilter = AUDIT_DEEP_LINK[alert.type];
+                      if (auditFilter) {
+                        router.push(`/reports-detail?filter=${auditFilter}` as Href);
+                      } else {
+                        if (filterKey) filterIntent.set("reports", filterKey);
+                        router.push("/(tabs)/reports" as Href);
+                      }
                     }}
                     style={({ pressed }) => [
                       styles.alertRow,
