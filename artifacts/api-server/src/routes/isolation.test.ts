@@ -905,6 +905,95 @@ describe("executive inspections drill-down is isolated per company", () => {
   });
 });
 
+describe("executive inspections technicianName filter cannot cross tenant boundary", () => {
+  /**
+   * Both companies have a technician whose name is identical ("Shared Tech").
+   * Filtering by that name as company A must only surface company A's rows.
+   */
+
+  const SHARED_TECH = "Shared Tech";
+
+  let inspSharedAId: number;
+  let inspSharedBId: number;
+
+  async function seedScorecardForTech(
+    companyId: number,
+    inspectionId: number,
+    techName: string,
+    riskLevel: "critical" | "high" | "medium" | "low",
+  ) {
+    await db.insert(inspectionScorecardsTable).values({
+      companyId,
+      inspectionId,
+      technicianName: techName,
+      qualityScore: riskLevel === "critical" ? 20 : 80,
+      riskScore: riskLevel === "critical" ? 95 : 15,
+      riskLevel,
+      findingsCount: 2,
+      photosAnalyzed: 3,
+      components: {
+        photoCoverage: 70,
+        evidenceQuality: 70,
+        avgConfidence: 70,
+        recommendationCoverage: 70,
+      },
+      missedOpportunities: [],
+    });
+  }
+
+  beforeAll(async () => {
+    // Create one critical-risk inspection per company, both attributed to the shared name.
+    const aSharedBody = await createInspection(OWNER_A_ID, "900 Shared Tech A Street");
+    const bSharedBody = await createInspection(OWNER_B_ID, "900 Shared Tech B Street");
+    inspSharedAId = aSharedBody.id;
+    inspSharedBId = bSharedBody.id;
+
+    await seedScorecardForTech(companyAId, inspSharedAId, SHARED_TECH, "critical");
+    await seedScorecardForTech(companyBId, inspSharedBId, SHARED_TECH, "critical");
+  });
+
+  it("company A filtered by shared tech name returns only company A's inspection", async () => {
+    asUser(OWNER_A_ID);
+    const res = await request(app).get(
+      `/api/executive/inspections?riskLevel=critical&technicianName=${encodeURIComponent(SHARED_TECH)}`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.filters.technicianName).toBe(SHARED_TECH);
+
+    const ids = res.body.inspections.map((r: { inspectionId: number }) => r.inspectionId);
+    // Company A's inspection is present.
+    expect(ids).toContain(inspSharedAId);
+    // Company B's inspection with the same technician name must NOT appear.
+    expect(ids).not.toContain(inspSharedBId);
+  });
+
+  it("company B filtered by shared tech name returns only company B's inspection", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app).get(
+      `/api/executive/inspections?riskLevel=critical&technicianName=${encodeURIComponent(SHARED_TECH)}`,
+    );
+    expect(res.status).toBe(200);
+
+    const ids = res.body.inspections.map((r: { inspectionId: number }) => r.inspectionId);
+    expect(ids).toContain(inspSharedBId);
+    expect(ids).not.toContain(inspSharedAId);
+  });
+
+  it("total count in the response reflects only the calling company's matches", async () => {
+    asUser(OWNER_A_ID);
+    const res = await request(app).get(
+      `/api/executive/inspections?riskLevel=critical&technicianName=${encodeURIComponent(SHARED_TECH)}`,
+    );
+    expect(res.status).toBe(200);
+    // The count must match the inspections array length (company-A rows only).
+    expect(res.body.total).toBe(res.body.inspections.length);
+    // And the site address must belong to company A, not B.
+    const addresses = res.body.inspections.map((r: { siteAddress: string }) => r.siteAddress);
+    expect(addresses).not.toContain("900 Shared Tech B Street");
+  });
+});
+
 describe("DB invariant: every tenant row has a non-null company_id", () => {
   it("no tenant table contains a null company_id, and ids belong to A or B", async () => {
     const valid = new Set([companyAId, companyBId, platformCompanyId]);
