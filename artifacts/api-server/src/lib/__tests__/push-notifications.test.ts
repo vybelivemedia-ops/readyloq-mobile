@@ -730,3 +730,154 @@ describe("runInspectionFinalization — exactly-once critical-push under concurr
     expect(expoCalls()).toHaveLength(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /auth/me/push-notifications — toggle notification preference
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("PATCH /auth/me/push-notifications — toggle preference", () => {
+  beforeEach(async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+    });
+    asUser(OWNER_A_CLERK);
+  });
+
+  it("sets pushNotificationsEnabled = false in the DB when toggled off", async () => {
+    const res = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.pushNotificationsEnabled).toBe(false);
+
+    const [user] = await db
+      .select({ pushNotificationsEnabled: usersTable.pushNotificationsEnabled })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+    expect(user.pushNotificationsEnabled).toBe(false);
+  });
+
+  it("sets pushNotificationsEnabled = true in the DB when re-enabled", async () => {
+    // First opt out.
+    await db
+      .update(usersTable)
+      .set({ pushNotificationsEnabled: false })
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+
+    const res = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.pushNotificationsEnabled).toBe(true);
+
+    const [user] = await db
+      .select({ pushNotificationsEnabled: usersTable.pushNotificationsEnabled })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+    expect(user.pushNotificationsEnabled).toBe(true);
+  });
+
+  it("rejects a string value for enabled with 400", async () => {
+    const res = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: "false" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/boolean/i);
+  });
+
+  it("rejects a numeric value for enabled with 400", async () => {
+    const res = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: 0 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/boolean/i);
+  });
+
+  it("rejects a missing enabled field with 400", async () => {
+    const res = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/boolean/i);
+  });
+
+  it("returns 401 when the request is unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: false });
+
+    expect(res.status).toBe(401);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /auth/me/push-token — remove push token (opt out)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DELETE /auth/me/push-token — clear device token", () => {
+  beforeEach(async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+    });
+    asUser(OWNER_A_CLERK);
+  });
+
+  it("clears the push token to null in the DB", async () => {
+    const res = await request(app).delete("/api/auth/me/push-token");
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+    expect(user.pushToken).toBeNull();
+  });
+
+  it("returns 401 when the request is unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app).delete("/api/auth/me/push-token");
+
+    expect(res.status).toBe(401);
+  });
+
+  it("sends nothing to the deleted token when a critical inspection fires after opt-out", async () => {
+    // Delete the push token via the route.
+    await request(app).delete("/api/auth/me/push-token");
+
+    // Verify the token is gone.
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+    expect(user.pushToken).toBeNull();
+
+    // Now fire a critical push for this company — should reach nobody.
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    // The Expo API must not be called because the only owner has no token.
+    expect(expoCalls()).toHaveLength(0);
+  });
+});
