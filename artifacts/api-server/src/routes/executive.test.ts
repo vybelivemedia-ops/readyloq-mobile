@@ -1177,6 +1177,234 @@ describe("executive briefing endpoint: cross-company isolation", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Daily briefing: ?date=YYYY-MM-DD param — validation and isolation (Task #305)
+// ---------------------------------------------------------------------------
+
+describe("executive briefing ?date param: input validation", () => {
+  /**
+   * The endpoint must reject bad date strings before hitting the service so no
+   * malformed value ever reaches the DB query.  These tests use EXEC_OWNER_A
+   * (already seeded) just to get past auth guards.
+   */
+
+  it("returns 400 when ?date is today", async () => {
+    asUser(EXEC_OWNER_A);
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await request(app).get(`/api/executive/briefing/yesterday?date=${today}`);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/future|today/i);
+  });
+
+  it("returns 400 when ?date is a future date", async () => {
+    asUser(EXEC_OWNER_A);
+    const future = new Date();
+    future.setDate(future.getDate() + 7);
+    const futureStr = future.toISOString().slice(0, 10);
+    const res = await request(app).get(`/api/executive/briefing/yesterday?date=${futureStr}`);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/future|today/i);
+  });
+
+  it("returns 400 when ?date is more than 90 days ago", async () => {
+    asUser(EXEC_OWNER_A);
+    const old = new Date();
+    old.setDate(old.getDate() - 91);
+    const oldStr = old.toISOString().slice(0, 10);
+    const res = await request(app).get(`/api/executive/briefing/yesterday?date=${oldStr}`);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/90 days/i);
+  });
+
+  it("returns 400 when ?date is not in YYYY-MM-DD format", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/briefing/yesterday?date=not-a-date");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/YYYY-MM-DD/i);
+  });
+
+  it("returns 400 when ?date is present but empty (e.g. ?date=)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/briefing/yesterday?date=");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/YYYY-MM-DD/i);
+  });
+
+  it("returns 400 when ?date appears more than once (e.g. ?date=X&date=Y)", async () => {
+    asUser(EXEC_OWNER_A);
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const dateStr = twoDaysAgo.toISOString().slice(0, 10);
+    // Both values are individually valid past dates; repeated keys must still be rejected.
+    const res = await request(app).get(
+      `/api/executive/briefing/yesterday?date=${dateStr}&date=${dateStr}`,
+    );
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/exactly once/i);
+  });
+
+  it("returns 400 when ?date is an impossible calendar date like 2026-02-30", async () => {
+    asUser(EXEC_OWNER_A);
+    // JS Date normalises 2026-02-30 → 2026-03-02, which would be a valid past date.
+    // The endpoint must detect and reject the roll-over.
+    const res = await request(app).get("/api/executive/briefing/yesterday?date=2026-02-30");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not a valid calendar date/i);
+  });
+
+  it("accepts a valid past date within 90 days and returns success", async () => {
+    asUser(EXEC_OWNER_A);
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const dateStr = twoDaysAgo.toISOString().slice(0, 10);
+    const res = await request(app).get(`/api/executive/briefing/yesterday?date=${dateStr}`);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    // The returned date must match the requested date.
+    expect(res.body.briefing.date).toBe(dateStr);
+  });
+
+  it("omitting ?date still defaults to yesterday (existing behaviour preserved)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/briefing/yesterday");
+    expect(res.status).toBe(200);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const expectedDate = yesterday.toISOString().slice(0, 10);
+    expect(res.body.briefing.date).toBe(expectedDate);
+  });
+});
+
+describe("executive briefing ?date param: date-scoped queries honour companyId", () => {
+  /**
+   * Two companies both have an inspection on the SAME historical date (4 days ago).
+   * When company A requests a briefing for that date, it must see only company A's
+   * inspection — not company B's — confirming the date param does not weaken
+   * the per-company isolation guarantee.
+   */
+
+  const DATE_ISO_OWNER_A  = "exec_date_iso_owner_a_clerk_id";
+  const DATE_ISO_OWNER_B  = "exec_date_iso_owner_b_clerk_id";
+  const DATE_ISO_CO_A_SLUG = "exec-date-iso-co-a";
+  const DATE_ISO_CO_B_SLUG = "exec-date-iso-co-b";
+
+  let dateIsoCoAId: number;
+  let dateIsoCoBId: number;
+  let dateIsoInspAId: number;
+  let dateIsoInspBId: number;
+
+  // Choose a stable historical date 4 days ago (safely within the 90-day window
+  // and well clear of "yesterday" and "today" so fixtures don't collide).
+  const historicalDate = new Date();
+  historicalDate.setDate(historicalDate.getDate() - 4);
+  historicalDate.setHours(0, 0, 0, 0);
+  const historicalDateStr = historicalDate.toISOString().slice(0, 10);
+
+  // Midday on the historical date — safely inside the 00:00–23:59 window.
+  const historicalMidday = new Date(historicalDate);
+  historicalMidday.setHours(12, 0, 0, 0);
+
+  beforeAll(async () => {
+    dateIsoCoAId = await findOrCreateCompany("Date ISO Co A", DATE_ISO_CO_A_SLUG);
+    dateIsoCoBId = await findOrCreateCompany("Date ISO Co B", DATE_ISO_CO_B_SLUG);
+
+    await ensureActiveBranding(dateIsoCoAId, "Date ISO Co A Brand");
+    await ensureActiveBranding(dateIsoCoBId, "Date ISO Co B Brand");
+
+    // Teardown any stale fixtures from previous runs.
+    for (const slug of [DATE_ISO_CO_A_SLUG, DATE_ISO_CO_B_SLUG]) {
+      const [co] = await db.select().from(companiesTable).where(eq(companiesTable.slug, slug));
+      if (co) {
+        await db.delete(inspectionScorecardsTable).where(eq(inspectionScorecardsTable.companyId, co.id));
+        await db.delete(opportunitiesTable).where(eq(opportunitiesTable.companyId, co.id));
+        await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, co.id));
+      }
+    }
+    await db.delete(usersTable).where(
+      inArray(usersTable.clerkUserId, [DATE_ISO_OWNER_A, DATE_ISO_OWNER_B]),
+    );
+
+    await db.insert(usersTable).values([
+      { clerkUserId: DATE_ISO_OWNER_A, role: "owner", companyId: dateIsoCoAId },
+      { clerkUserId: DATE_ISO_OWNER_B, role: "owner", companyId: dateIsoCoBId },
+    ]);
+
+    // Seed one completed inspection per company, both timestamped to the same historical day.
+    dateIsoInspAId = await createInspectionViaApi(DATE_ISO_OWNER_A, "Date ISO A Site");
+    dateIsoInspBId = await createInspectionViaApi(DATE_ISO_OWNER_B, "Date ISO B Site");
+
+    await db
+      .update(inspectionsTable)
+      .set({ status: "completed", createdAt: historicalMidday })
+      .where(eq(inspectionsTable.id, dateIsoInspAId));
+
+    await db
+      .update(inspectionsTable)
+      .set({ status: "completed", createdAt: historicalMidday })
+      .where(eq(inspectionsTable.id, dateIsoInspBId));
+  });
+
+  afterAll(async () => {
+    await db.delete(inspectionScorecardsTable).where(
+      inArray(inspectionScorecardsTable.inspectionId, [dateIsoInspAId, dateIsoInspBId]),
+    );
+    await db.delete(opportunitiesTable).where(
+      inArray(opportunitiesTable.companyId, [dateIsoCoAId, dateIsoCoBId]),
+    );
+    await db.delete(inspectionsTable).where(
+      inArray(inspectionsTable.id, [dateIsoInspAId, dateIsoInspBId]),
+    );
+    await db.delete(usersTable).where(
+      inArray(usersTable.clerkUserId, [DATE_ISO_OWNER_A, DATE_ISO_OWNER_B]),
+    );
+    await db.delete(brandingProfilesTable).where(
+      inArray(brandingProfilesTable.companyId, [dateIsoCoAId, dateIsoCoBId]),
+    );
+    await db.delete(companiesTable).where(
+      inArray(companiesTable.slug, [DATE_ISO_CO_A_SLUG, DATE_ISO_CO_B_SLUG]),
+    );
+  });
+
+  it("company A sees only its own inspection count when requesting a shared historical date", async () => {
+    asUser(DATE_ISO_OWNER_A);
+    const res = await request(app).get(
+      `/api/executive/briefing/yesterday?date=${historicalDateStr}`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    // A has exactly 1 inspection on that date; B also has 1.
+    // If isolation fails the count would be 2.
+    expect(res.body.briefing.inspectionsCount).toBe(1);
+    expect(res.body.briefing.date).toBe(historicalDateStr);
+  });
+
+  it("company B sees only its own inspection count when requesting a shared historical date", async () => {
+    asUser(DATE_ISO_OWNER_B);
+    const res = await request(app).get(
+      `/api/executive/briefing/yesterday?date=${historicalDateStr}`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    // B has exactly 1 inspection on that date; if A's data bled in the count would be 2.
+    expect(res.body.briefing.inspectionsCount).toBe(1);
+  });
+
+  it("company A requesting a date with no data returns zero counts (not B's data)", async () => {
+    asUser(DATE_ISO_OWNER_A);
+    // Request a different historical date (3 days ago) where neither company has data.
+    const otherDate = new Date();
+    otherDate.setDate(otherDate.getDate() - 3);
+    const otherDateStr = otherDate.toISOString().slice(0, 10);
+    const res = await request(app).get(
+      `/api/executive/briefing/yesterday?date=${otherDateStr}`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.briefing.inspectionsCount).toBe(0);
+    expect(res.body.briefing.criticalRiskCount).toBe(0);
+    expect(res.body.briefing.pipelineAdded).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Daily briefing: midnight boundary accuracy (Task #304)
 // ---------------------------------------------------------------------------
 

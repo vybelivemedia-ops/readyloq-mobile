@@ -508,10 +508,15 @@ router.get(
 );
 
 /**
- * GET /executive/briefing/yesterday
+ * GET /executive/briefing/yesterday[?date=YYYY-MM-DD]
  *
- * Returns a structured narrative digest of yesterday's operations:
+ * Returns a structured narrative digest of the requested day's operations:
  * completed inspections, critical-risk count, and new pipeline value.
+ *
+ * Query params:
+ *   date — optional YYYY-MM-DD; omit to default to yesterday.
+ *           Future dates → 400. Dates older than 90 days → 400.
+ *
  * Gated at requireRole("owner") — same scope as the rest of this router.
  */
 router.get(
@@ -523,11 +528,92 @@ router.get(
   async (req, res) => {
     const companyId = getCompanyId(req);
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    let targetDate: Date;
+
+    const rawDateParam = req.query.date;
+
+    // If the key appears in the query string at all (even as empty string or
+    // multiple values), it must be a single, non-empty YYYY-MM-DD value.
+    // Silently falling back to yesterday when the key is present would mask
+    // client bugs and return data for an unexpected date.
+    if (rawDateParam !== undefined) {
+      // Repeated keys produce an array in Express — reject immediately.
+      if (Array.isArray(rawDateParam)) {
+        return res.status(400).json({
+          error: "date query param must appear exactly once",
+        });
+      }
+
+      // Present but empty / whitespace-only → reject rather than silently default.
+      if (typeof rawDateParam !== "string" || !rawDateParam.trim()) {
+        return res.status(400).json({
+          error: "date query param must be in YYYY-MM-DD format (e.g. 2026-07-15)",
+        });
+      }
+
+      const raw = rawDateParam.trim();
+
+      // Accept only YYYY-MM-DD to avoid timezone-ambiguous full ISO strings.
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return res.status(400).json({
+          error: "date query param must be in YYYY-MM-DD format (e.g. 2026-07-15)",
+        });
+      }
+
+      const parsed = new Date(`${raw}T00:00:00`);
+      if (isNaN(parsed.getTime())) {
+        return res.status(400).json({
+          error: "date query param is not a valid calendar date",
+        });
+      }
+
+      // Guard against JS Date normalization of impossible dates such as
+      // 2026-02-30 → 2026-03-02. After parsing, the year/month/day components
+      // must match the original string exactly.
+      const [yearStr, monthStr, dayStr] = raw.split("-");
+      const parsedYear  = parsed.getFullYear();
+      const parsedMonth = parsed.getMonth() + 1; // getMonth() is 0-indexed
+      const parsedDay   = parsed.getDate();
+      if (
+        parsedYear  !== Number(yearStr)  ||
+        parsedMonth !== Number(monthStr) ||
+        parsedDay   !== Number(dayStr)
+      ) {
+        return res.status(400).json({
+          error: "date query param is not a valid calendar date",
+        });
+      }
+
+      // Compare against the start of today (local server time, same as the
+      // service window) to decide if the requested date is in the future.
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      if (parsed >= todayStart) {
+        return res.status(400).json({
+          error: "date must be in the past — future and today's dates are not allowed",
+        });
+      }
+
+      // 90-day guard: dates older than 90 days are rejected.
+      // Use midnight-normalised arithmetic so DST transitions don't cause
+      // off-by-one errors at the boundary.
+      const ninetyDaysAgoStart = new Date(todayStart);
+      ninetyDaysAgoStart.setDate(ninetyDaysAgoStart.getDate() - 90);
+      if (parsed < ninetyDaysAgoStart) {
+        return res.status(400).json({
+          error: "date is more than 90 days in the past — historical queries are limited to 90 days",
+        });
+      }
+
+      targetDate = parsed;
+    } else {
+      // No date key at all — default to yesterday.
+      targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() - 1);
+    }
 
     try {
-      const result = await generateDailyExecutiveBriefing(companyId, yesterday);
+      const result = await generateDailyExecutiveBriefing(companyId, targetDate);
       return res.json(result);
     } catch (error) {
       logger.error({ err: error }, "executive briefing error");
