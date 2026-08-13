@@ -18,6 +18,41 @@ declare global {
   }
 }
 
+/**
+ * Lightweight Clerk-only auth for the client portal (external property managers).
+ *
+ * Unlike `requireAuth`, this NEVER auto-creates a usersTable row. External
+ * property managers authenticate with Clerk but are NOT internal company
+ * staff — inserting a phantom "technician" row for them would pollute the
+ * usersTable and could grant unintended role-based access.
+ *
+ * If the caller already has a usersTable row (i.e. they are ALSO an internal
+ * company member), that row is attached to `req.user` so downstream middleware
+ * such as `requireCompany` / `requireRole` still works correctly for the
+ * invite-management routes.
+ *
+ * Access decisions for read-only portal routes use clientPortalAccessTable,
+ * not req.user.
+ */
+export const requireClerkAuth = async (req: Request, res: Response, next: NextFunction) => {
+  const auth = getAuth(req);
+  if (!auth?.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    // Read-only lookup — never INSERT.
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, auth.userId));
+    if (user) req.user = user;
+    return next();
+  } catch {
+    return res.status(500).json({ error: "Auth lookup failed" });
+  }
+};
+
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   const auth = getAuth(req);
   if (!auth?.userId) {

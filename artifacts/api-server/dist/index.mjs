@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router37;
+    module.exports = Router39;
     module.exports.Route = Route;
-    function Router37(options) {
-      if (!(this instanceof Router37)) {
-        return new Router37(options);
+    function Router39(options) {
+      if (!(this instanceof Router39)) {
+        return new Router39(options);
       }
       const opts = options || {};
-      function router37(req, res, next) {
-        router37.handle(req, res, next);
+      function router39(req, res, next) {
+        router39.handle(req, res, next);
       }
-      Object.setPrototypeOf(router37, this);
-      router37.caseSensitive = opts.caseSensitive;
-      router37.mergeParams = opts.mergeParams;
-      router37.params = {};
-      router37.strict = opts.strict;
-      router37.stack = [];
-      return router37;
+      Object.setPrototypeOf(router39, this);
+      router39.caseSensitive = opts.caseSensitive;
+      router39.mergeParams = opts.mergeParams;
+      router39.params = {};
+      router39.strict = opts.strict;
+      router39.stack = [];
+      return router39;
     }
-    Router37.prototype = function() {
+    Router39.prototype = function() {
     };
-    Router37.prototype.param = function param(name, fn) {
+    Router39.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router37.prototype.handle = function handle(req, res, callback) {
+    Router39.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router37.prototype.use = function use(handler) {
+    Router39.prototype.use = function use(handler) {
       let offset = 0;
       let path4 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router37.prototype.route = function route(path4) {
+    Router39.prototype.route = function route(path4) {
       const route2 = new Route(path4);
       const layer = new Layer(path4, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router37.prototype[method] = function(path4) {
+      Router39.prototype[method] = function(path4) {
         const route = this.route(path4);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router37 = require_router();
+    var Router39 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router37 = null;
+      var router39 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router37 === null) {
-            router37 = new Router37({
+          if (router39 === null) {
+            router39 = new Router39({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router37;
+          return router39;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router37 = this.router;
+      var router39 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router37.use(path4, fn2);
+          return router39.use(path4, fn2);
         }
         debug7(".use app under %s", path4);
         fn2.mountpath = path4;
         fn2.parent = this;
-        router37.use(path4, function mounted_app(req, res, next) {
+        router39.use(path4, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23684,7 +23684,7 @@ var require_express = __commonJS({
     var EventEmitter3 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router37 = require_router();
+    var Router39 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router37.Route;
-    exports.Router = Router37;
+    exports.Route = Router39.Route;
+    exports.Router = Router39;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express38 = __toESM(require_express2(), 1);
+var import_express41 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router37 = config2.router;
-  if (isPlainObject(router37)) {
-    newTarget = getTargetFromProxyTable(req, router37);
-  } else if (typeof router37 === "function") {
-    newTarget = await router37(req, res, config2);
+  const router39 = config2.router;
+  if (isPlainObject(router39)) {
+    newTarget = getTargetFromProxyTable(req, router39);
+  } else if (typeof router39 === "function") {
+    newTarget = await router39(req, res, config2);
   }
   return newTarget;
 }
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express36 = __toESM(require_express2(), 1);
+var import_express39 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -57286,6 +57286,7 @@ __export(schema_exports, {
   betaFeedbackTable: () => betaFeedbackTable,
   brandingProfilesTable: () => brandingProfilesTable,
   callbacksTable: () => callbacksTable,
+  clientPortalAccessTable: () => clientPortalAccessTable,
   companiesTable: () => companiesTable,
   companyFieldIntegrationsTable: () => companyFieldIntegrationsTable,
   companyInvitesTable: () => companyInvitesTable,
@@ -68825,6 +68826,10 @@ var inspectionsTable = pgTable(
     // Client-generated idempotency key (UUID) so the offline-first mobile app can
     // retry inspection creation safely — a lost response never duplicates a row.
     clientKey: text("client_key"),
+    // Optional future-scheduled date set by managers/dispatchers via the
+    // scheduling calendar. Null means "unscheduled" (treated as same-day
+    // on the calendar by falling back to createdAt for historical rows).
+    scheduledDate: timestamp("scheduled_date"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     completedAt: timestamp("completed_at")
   },
@@ -69969,6 +69974,35 @@ var insertPlaybookSchema = createInsertSchema(
   companyPlaybooksTable
 ).omit({ id: true, companyId: true, createdAt: true, updatedAt: true });
 
+// ../../lib/db/src/schema/client-portal.ts
+var clientPortalAccessTable = pgTable(
+  "client_portal_access",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+    // Clerk user ID of the property manager (external customer, not in usersTable).
+    clerkUserId: text("clerk_user_id").notNull(),
+    // Human-readable label set by the granting manager (e.g. "Jane Smith – 123 Main St").
+    label: text("label"),
+    // Email address for display/reference; not used for auth (Clerk handles that).
+    email: text("email"),
+    // The building addresses this property manager may view. Must be a non-empty
+    // subset of the company's siteAddress values in the inspections table.
+    siteAddresses: jsonb("site_addresses").$type().notNull().default([]),
+    // Drizzle userId of the manager who granted access (nullable: set to null if
+    // the granting user is later removed from the company).
+    grantedByUserId: integer("granted_by_user_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow()
+  },
+  (t) => [
+    // A single Clerk user can have at most one access record per company
+    // (managers extend their siteAddresses list rather than creating duplicates).
+    uniqueIndex("client_portal_access_company_clerk_uq").on(t.companyId, t.clerkUserId),
+    index("client_portal_access_clerk_idx").on(t.clerkUserId),
+    index("client_portal_access_company_idx").on(t.companyId)
+  ]
+);
+
 // ../../lib/db/src/seed/products.ts
 var SEED_PRODUCTS = [
   {
@@ -70336,6 +70370,19 @@ async function logErrorEvent(category, input) {
 
 // src/middleware/require-auth.ts
 var LAST_SEEN_THROTTLE_MS = 5 * 60 * 1e3;
+var requireClerkAuth = async (req, res, next) => {
+  const auth = getAuth(req);
+  if (!auth?.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkUserId, auth.userId));
+    if (user) req.user = user;
+    return next();
+  } catch {
+    return res.status(500).json({ error: "Auth lookup failed" });
+  }
+};
 var requireAuth = async (req, res, next) => {
   const auth = getAuth(req);
   if (!auth?.userId) {
@@ -70413,6 +70460,118 @@ var requireCompany = (req, res, next) => {
 
 // src/routes/health.ts
 var import_express2 = __toESM(require_express2(), 1);
+
+// ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/external.js
+var external_exports2 = {};
+__export(external_exports2, {
+  BRAND: () => BRAND,
+  DIRTY: () => DIRTY,
+  EMPTY_PATH: () => EMPTY_PATH,
+  INVALID: () => INVALID,
+  NEVER: () => NEVER2,
+  OK: () => OK,
+  ParseStatus: () => ParseStatus,
+  Schema: () => ZodType2,
+  ZodAny: () => ZodAny2,
+  ZodArray: () => ZodArray2,
+  ZodBigInt: () => ZodBigInt2,
+  ZodBoolean: () => ZodBoolean2,
+  ZodBranded: () => ZodBranded,
+  ZodCatch: () => ZodCatch2,
+  ZodDate: () => ZodDate2,
+  ZodDefault: () => ZodDefault2,
+  ZodDiscriminatedUnion: () => ZodDiscriminatedUnion2,
+  ZodEffects: () => ZodEffects,
+  ZodEnum: () => ZodEnum2,
+  ZodError: () => ZodError2,
+  ZodFirstPartyTypeKind: () => ZodFirstPartyTypeKind,
+  ZodFunction: () => ZodFunction,
+  ZodIntersection: () => ZodIntersection2,
+  ZodIssueCode: () => ZodIssueCode2,
+  ZodLazy: () => ZodLazy2,
+  ZodLiteral: () => ZodLiteral2,
+  ZodMap: () => ZodMap2,
+  ZodNaN: () => ZodNaN2,
+  ZodNativeEnum: () => ZodNativeEnum,
+  ZodNever: () => ZodNever2,
+  ZodNull: () => ZodNull2,
+  ZodNullable: () => ZodNullable2,
+  ZodNumber: () => ZodNumber2,
+  ZodObject: () => ZodObject2,
+  ZodOptional: () => ZodOptional2,
+  ZodParsedType: () => ZodParsedType,
+  ZodPipeline: () => ZodPipeline,
+  ZodPromise: () => ZodPromise2,
+  ZodReadonly: () => ZodReadonly2,
+  ZodRecord: () => ZodRecord2,
+  ZodSchema: () => ZodType2,
+  ZodSet: () => ZodSet2,
+  ZodString: () => ZodString2,
+  ZodSymbol: () => ZodSymbol2,
+  ZodTransformer: () => ZodEffects,
+  ZodTuple: () => ZodTuple2,
+  ZodType: () => ZodType2,
+  ZodUndefined: () => ZodUndefined2,
+  ZodUnion: () => ZodUnion2,
+  ZodUnknown: () => ZodUnknown2,
+  ZodVoid: () => ZodVoid2,
+  addIssueToContext: () => addIssueToContext,
+  any: () => anyType,
+  array: () => arrayType,
+  bigint: () => bigIntType,
+  boolean: () => booleanType,
+  coerce: () => coerce,
+  custom: () => custom2,
+  date: () => dateType,
+  datetimeRegex: () => datetimeRegex,
+  defaultErrorMap: () => en_default2,
+  discriminatedUnion: () => discriminatedUnionType,
+  effect: () => effectsType,
+  enum: () => enumType,
+  function: () => functionType,
+  getErrorMap: () => getErrorMap2,
+  getParsedType: () => getParsedType2,
+  instanceof: () => instanceOfType,
+  intersection: () => intersectionType,
+  isAborted: () => isAborted,
+  isAsync: () => isAsync,
+  isDirty: () => isDirty,
+  isValid: () => isValid,
+  late: () => late,
+  lazy: () => lazyType,
+  literal: () => literalType,
+  makeIssue: () => makeIssue,
+  map: () => mapType,
+  nan: () => nanType,
+  nativeEnum: () => nativeEnumType,
+  never: () => neverType,
+  null: () => nullType,
+  nullable: () => nullableType,
+  number: () => numberType,
+  object: () => objectType,
+  objectUtil: () => objectUtil,
+  oboolean: () => oboolean,
+  onumber: () => onumber,
+  optional: () => optionalType,
+  ostring: () => ostring,
+  pipeline: () => pipelineType,
+  preprocess: () => preprocessType,
+  promise: () => promiseType,
+  quotelessJson: () => quotelessJson,
+  record: () => recordType,
+  set: () => setType,
+  setErrorMap: () => setErrorMap2,
+  strictObject: () => strictObjectType,
+  string: () => stringType,
+  symbol: () => symbolType,
+  transformer: () => effectsType,
+  tuple: () => tupleType,
+  undefined: () => undefinedType,
+  union: () => unionType,
+  unknown: () => unknownType,
+  util: () => util,
+  void: () => voidType
+});
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/helpers/util.js
 var util;
@@ -70567,6 +70726,10 @@ var ZodIssueCode2 = util.arrayToEnum([
   "not_multiple_of",
   "not_finite"
 ]);
+var quotelessJson = (obj) => {
+  const json3 = JSON.stringify(obj, null, 2);
+  return json3.replace(/"([^"]+)":/g, "$1:");
+};
 var ZodError2 = class _ZodError extends Error {
   get errors() {
     return this.issues;
@@ -70767,6 +70930,9 @@ var en_default2 = errorMap;
 
 // ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/errors.js
 var overrideErrorMap = en_default2;
+function setErrorMap2(map2) {
+  overrideErrorMap = map2;
+}
 function getErrorMap2() {
   return overrideErrorMap;
 }
@@ -70797,6 +70963,7 @@ var makeIssue = (params) => {
     message: errorMessage
   };
 };
+var EMPTY_PATH = [];
 function addIssueToContext(ctx, issueData) {
   const overrideMap = getErrorMap2();
   const issue2 = makeIssue({
@@ -74122,6 +74289,7 @@ ZodNaN2.create = (params) => {
     ...processCreateParams(params)
   });
 };
+var BRAND = /* @__PURE__ */ Symbol("zod_brand");
 var ZodBranded = class extends ZodType2 {
   _parse(input) {
     const { ctx } = this._processInputParams(input);
@@ -74213,6 +74381,33 @@ ZodReadonly2.create = (type, params) => {
     ...processCreateParams(params)
   });
 };
+function cleanParams(params, data) {
+  const p = typeof params === "function" ? params(data) : typeof params === "string" ? { message: params } : params;
+  const p2 = typeof p === "string" ? { message: p } : p;
+  return p2;
+}
+function custom2(check2, _params = {}, fatal) {
+  if (check2)
+    return ZodAny2.create().superRefine((data, ctx) => {
+      const r = check2(data);
+      if (r instanceof Promise) {
+        return r.then((r2) => {
+          if (!r2) {
+            const params = cleanParams(_params, data);
+            const _fatal = params.fatal ?? fatal ?? true;
+            ctx.addIssue({ code: "custom", ...params, fatal: _fatal });
+          }
+        });
+      }
+      if (!r) {
+        const params = cleanParams(_params, data);
+        const _fatal = params.fatal ?? fatal ?? true;
+        ctx.addIssue({ code: "custom", ...params, fatal: _fatal });
+      }
+      return;
+    });
+  return ZodAny2.create();
+}
 var late = {
   object: ZodObject2.lazycreate
 };
@@ -74255,6 +74450,9 @@ var ZodFirstPartyTypeKind;
   ZodFirstPartyTypeKind2["ZodPipeline"] = "ZodPipeline";
   ZodFirstPartyTypeKind2["ZodReadonly"] = "ZodReadonly";
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
+var instanceOfType = (cls, params = {
+  message: `Input not instance of ${cls.name}`
+}) => custom2((data) => data instanceof cls, params);
 var stringType = ZodString2.create;
 var numberType = ZodNumber2.create;
 var nanType = ZodNaN2.create;
@@ -74289,6 +74487,9 @@ var optionalType = ZodOptional2.create;
 var nullableType = ZodNullable2.create;
 var preprocessType = ZodEffects.createWithPreprocess;
 var pipelineType = ZodPipeline.create;
+var ostring = () => stringType().optional();
+var onumber = () => numberType().optional();
+var oboolean = () => booleanType().optional();
 var coerce = {
   string: ((arg) => ZodString2.create({ ...arg, coerce: true })),
   number: ((arg) => ZodNumber2.create({ ...arg, coerce: true })),
@@ -74299,6 +74500,7 @@ var coerce = {
   bigint: ((arg) => ZodBigInt2.create({ ...arg, coerce: true })),
   date: ((arg) => ZodDate2.create({ ...arg, coerce: true }))
 };
+var NEVER2 = INVALID;
 
 // ../../lib/api-zod/src/generated/api.ts
 var HealthCheckResponse = objectType({
@@ -124966,19 +125168,390 @@ router34.get(
 );
 var executive_default = router34;
 
-// src/routes/index.ts
+// src/routes/schedule.ts
+var import_express36 = __toESM(require_express2(), 1);
 var router35 = (0, import_express36.Router)();
-router35.use(health_default);
-router35.use("/auth", auth_default);
-router35.use(storage_default);
-router35.use("/leads", leads_default);
-router35.use("/share", share_default);
-router35.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router35.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router35.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router35.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router35.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router35.use(
+function toISODate(d) {
+  return d.toISOString().slice(0, 10);
+}
+router35.get("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const startStr = typeof req.query.start === "string" ? req.query.start : null;
+    const endStr = typeof req.query.end === "string" ? req.query.end : null;
+    if (!startStr || !endStr) {
+      return res.status(400).json({ error: "start and end query params (YYYY-MM-DD) are required" });
+    }
+    const startDate = /* @__PURE__ */ new Date(`${startStr}T00:00:00.000Z`);
+    const endDate = /* @__PURE__ */ new Date(`${endStr}T23:59:59.999Z`);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({ error: "Invalid date format \u2014 use YYYY-MM-DD" });
+    }
+    const rows = await db.select().from(inspectionsTable).where(eq(inspectionsTable.companyId, companyId));
+    const entries = rows.map((r) => {
+      const calDate = r.scheduledDate ?? r.createdAt;
+      return {
+        id: r.id,
+        siteAddress: r.siteAddress,
+        clientName: r.clientName ?? null,
+        technicianName: r.technicianName,
+        technicianId: r.technicianId ?? null,
+        status: r.status,
+        severity: r.severity ?? null,
+        pestTypes: r.pestTypes ?? [],
+        scheduledDate: r.scheduledDate?.toISOString() ?? null,
+        calendarDate: toISODate(calDate),
+        // YYYY-MM-DD — used by the grid
+        createdAt: r.createdAt.toISOString(),
+        completedAt: r.completedAt?.toISOString() ?? null
+      };
+    }).filter((e) => {
+      const d = /* @__PURE__ */ new Date(e.calendarDate + "T00:00:00.000Z");
+      return d >= startDate && d <= endDate;
+    });
+    return res.json(entries);
+  } catch {
+    return res.status(500).json({ error: "Failed to load schedule" });
+  }
+});
+var reassignSchema = external_exports2.object({
+  scheduledDate: external_exports2.string().datetime({ offset: true }).optional().nullable(),
+  technicianName: external_exports2.string().min(1).optional(),
+  technicianId: external_exports2.string().optional().nullable()
+});
+router35.patch("/:id", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    const parse4 = reassignSchema.safeParse(req.body);
+    if (!parse4.success) {
+      return res.status(400).json({ error: "Invalid request body", details: parse4.error.issues });
+    }
+    const { scheduledDate, technicianName, technicianId } = parse4.data;
+    const [existing] = await db.select({ id: inspectionsTable.id, companyId: inspectionsTable.companyId }).from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+    if (!existing) {
+      return res.status(404).json({ error: "Inspection not found" });
+    }
+    const update = {};
+    if (scheduledDate !== void 0) {
+      update.scheduledDate = scheduledDate ? new Date(scheduledDate) : null;
+    }
+    if (technicianName !== void 0) update.technicianName = technicianName;
+    if (technicianId !== void 0) update.technicianId = technicianId ?? null;
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ error: "Nothing to update" });
+    }
+    const [updated] = await db.update(inspectionsTable).set(update).where(eq(inspectionsTable.id, id)).returning();
+    const calDate = updated.scheduledDate ?? updated.createdAt;
+    return res.json({
+      id: updated.id,
+      siteAddress: updated.siteAddress,
+      clientName: updated.clientName ?? null,
+      technicianName: updated.technicianName,
+      technicianId: updated.technicianId ?? null,
+      status: updated.status,
+      severity: updated.severity ?? null,
+      pestTypes: updated.pestTypes ?? [],
+      scheduledDate: updated.scheduledDate?.toISOString() ?? null,
+      calendarDate: toISODate(calDate),
+      createdAt: updated.createdAt.toISOString(),
+      completedAt: updated.completedAt?.toISOString() ?? null
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to update schedule entry" });
+  }
+});
+var schedule_default = router35;
+
+// src/routes/client-portal.ts
+var import_express37 = __toESM(require_express2(), 1);
+var router36 = (0, import_express37.Router)();
+async function getClientAccess(req) {
+  const { userId } = getAuth(req);
+  if (!userId) return null;
+  const [access] = await db.select().from(clientPortalAccessTable).where(eq(clientPortalAccessTable.clerkUserId, userId));
+  return access ?? null;
+}
+router36.get("/me", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+  const [company] = await db.select({ id: companiesTable.id, name: companiesTable.name, slug: companiesTable.slug }).from(companiesTable).where(eq(companiesTable.id, access.companyId));
+  return res.json({
+    id: access.id,
+    label: access.label ?? null,
+    email: access.email ?? null,
+    siteAddresses: access.siteAddresses,
+    company: company ?? null,
+    createdAt: access.createdAt.toISOString()
+  });
+});
+router36.get("/buildings", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+  if (!access.siteAddresses.length) return res.json([]);
+  const rows = await db.execute(sql`
+    SELECT
+      site_address                                                            AS "siteAddress",
+      count(*)::int                                                           AS "totalInspections",
+      count(*) filter (where status = 'completed')::int                      AS "completedInspections",
+      max(completed_at)                                                       AS "lastVisitedAt",
+      (array_agg(id ORDER BY completed_at DESC NULLS LAST))[1]               AS "lastInspectionId",
+      array_agg(DISTINCT pt ORDER BY pt)
+        FILTER (where pt IS NOT NULL)                                         AS "pestTypes"
+    FROM inspections,
+         LATERAL (
+           SELECT jsonb_array_elements_text(pest_types) AS pt
+           WHERE jsonb_array_length(pest_types) > 0
+           UNION ALL
+           SELECT NULL::text WHERE jsonb_array_length(pest_types) = 0
+         ) pest_unnest
+    WHERE company_id = ${access.companyId}
+      AND site_address = ANY(${access.siteAddresses}::text[])
+    GROUP BY site_address
+    ORDER BY max(completed_at) DESC NULLS LAST
+  `);
+  const buildings = rows.map((r) => ({
+    siteAddress: r.siteAddress,
+    totalInspections: r.totalInspections,
+    completedInspections: r.completedInspections,
+    lastVisitedAt: r.lastVisitedAt?.toISOString() ?? null,
+    lastInspectionId: r.lastInspectionId ? Number(r.lastInspectionId) : null,
+    pestTypes: (r.pestTypes ?? []).filter(Boolean)
+  }));
+  return res.json(buildings);
+});
+router36.get("/buildings/:address/inspections", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+  const address = decodeURIComponent(req.params.address);
+  if (!access.siteAddresses.includes(address)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+  const rows = await db.select({
+    id: inspectionsTable.id,
+    status: inspectionsTable.status,
+    technicianName: inspectionsTable.technicianName,
+    pestTypes: inspectionsTable.pestTypes,
+    severity: inspectionsTable.severity,
+    findingsCount: inspectionsTable.findingsCount,
+    mediaCount: inspectionsTable.mediaCount,
+    createdAt: inspectionsTable.createdAt,
+    completedAt: inspectionsTable.completedAt
+  }).from(inspectionsTable).where(
+    and(
+      eq(inspectionsTable.companyId, access.companyId),
+      eq(inspectionsTable.siteAddress, address)
+    )
+  ).orderBy(desc(inspectionsTable.createdAt));
+  return res.json(
+    rows.map((r) => ({
+      ...r,
+      pestTypes: r.pestTypes ?? [],
+      createdAt: r.createdAt.toISOString(),
+      completedAt: r.completedAt?.toISOString() ?? null
+    }))
+  );
+});
+router36.get("/buildings/:address/reports", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+  const address = decodeURIComponent(req.params.address);
+  if (!access.siteAddresses.includes(address)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+  const rows = await db.select({
+    id: reportsTable.id,
+    inspectionId: reportsTable.inspectionId,
+    title: reportsTable.title,
+    status: reportsTable.status,
+    severity: reportsTable.severity,
+    technicianName: reportsTable.technicianName,
+    inspectionDate: reportsTable.inspectionDate,
+    pdfUrl: reportsTable.pdfUrl,
+    exclusionOpportunities: reportsTable.exclusionOpportunities,
+    createdAt: reportsTable.createdAt
+  }).from(reportsTable).where(
+    and(
+      eq(reportsTable.companyId, access.companyId),
+      eq(reportsTable.siteAddress, address),
+      eq(reportsTable.status, "approved")
+      // clients only see approved reports
+    )
+  ).orderBy(desc(reportsTable.createdAt));
+  return res.json(
+    rows.map((r) => ({
+      ...r,
+      exclusionOpportunities: Array.isArray(r.exclusionOpportunities) ? r.exclusionOpportunities : [],
+      createdAt: r.createdAt.toISOString()
+    }))
+  );
+});
+router36.get("/buildings/:address/trends", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+  const address = decodeURIComponent(req.params.address);
+  if (!access.siteAddresses.includes(address)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+  const twelveMonthsAgo = /* @__PURE__ */ new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const rows = await db.execute(sql`
+    SELECT
+      to_char(date_trunc('month', completed_at), 'YYYY-MM') AS "month",
+      pt                                                      AS "pestType",
+      count(*)::int                                           AS "count"
+    FROM inspections,
+         LATERAL jsonb_array_elements_text(pest_types) AS pt
+    WHERE company_id    = ${access.companyId}
+      AND site_address  = ${address}
+      AND status        = 'completed'
+      AND completed_at >= ${twelveMonthsAgo}
+      AND jsonb_array_length(pest_types) > 0
+    GROUP BY 1, 2
+    ORDER BY 1, 3 DESC
+  `);
+  const countRows = await db.execute(sql`
+    SELECT
+      to_char(date_trunc('month', completed_at), 'YYYY-MM') AS "month",
+      count(*)::int                                           AS "inspections"
+    FROM inspections
+    WHERE company_id    = ${access.companyId}
+      AND site_address  = ${address}
+      AND status        = 'completed'
+      AND completed_at >= ${twelveMonthsAgo}
+    GROUP BY 1
+    ORDER BY 1
+  `);
+  return res.json({
+    pestTrends: rows,
+    inspectionCounts: countRows
+  });
+});
+router36.get("/reports/:id/html", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).send("No client portal access");
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).send("Invalid id");
+  const [report] = await db.select().from(reportsTable).where(
+    and(
+      eq(reportsTable.id, id),
+      eq(reportsTable.companyId, access.companyId),
+      eq(reportsTable.status, "approved")
+    )
+  );
+  if (!report) return res.status(404).send("Report not found");
+  if (!access.siteAddresses.includes(report.siteAddress)) {
+    return res.status(403).send("Access denied to this building");
+  }
+  const [inspection] = await db.select().from(inspectionsTable).where(
+    and(
+      eq(inspectionsTable.id, report.inspectionId),
+      eq(inspectionsTable.companyId, access.companyId)
+    )
+  );
+  if (!inspection) return res.status(404).send("Inspection not found");
+  const html = buildServerReportHtml(report, inspection);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "private, max-age=300");
+  return res.send(html);
+});
+router36.get("/reports/:id", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [report] = await db.select().from(reportsTable).where(
+    and(
+      eq(reportsTable.id, id),
+      eq(reportsTable.companyId, access.companyId),
+      eq(reportsTable.status, "approved")
+    )
+  );
+  if (!report) return res.status(404).json({ error: "Report not found" });
+  if (!access.siteAddresses.includes(report.siteAddress)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+  return res.json({
+    ...report,
+    findings: Array.isArray(report.findings) ? report.findings : [],
+    recommendations: Array.isArray(report.recommendations) ? report.recommendations : [],
+    exclusionOpportunities: Array.isArray(report.exclusionOpportunities) ? report.exclusionOpportunities : [],
+    createdAt: report.createdAt.toISOString()
+  });
+});
+var grantSchema = external_exports2.object({
+  clerkUserId: external_exports2.string().min(1),
+  email: external_exports2.string().email().optional(),
+  label: external_exports2.string().optional(),
+  siteAddresses: external_exports2.array(external_exports2.string().min(1)).min(1)
+});
+router36.post("/invites", requireCompany, requireRole("manager"), async (req, res) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) return res.status(401).json({ error: "Unauthorized" });
+  const parse4 = grantSchema.safeParse(req.body);
+  if (!parse4.success) {
+    return res.status(400).json({ error: "Invalid request", details: parse4.error.issues });
+  }
+  const { clerkUserId, email: email3, label, siteAddresses } = parse4.data;
+  const [existing] = await db.select().from(clientPortalAccessTable).where(
+    and(
+      eq(clientPortalAccessTable.companyId, companyId),
+      eq(clientPortalAccessTable.clerkUserId, clerkUserId)
+    )
+  );
+  if (existing) {
+    const merged = Array.from(/* @__PURE__ */ new Set([...existing.siteAddresses, ...siteAddresses]));
+    const [updated] = await db.update(clientPortalAccessTable).set({ siteAddresses: merged, label: label ?? existing.label, email: email3 ?? existing.email }).where(eq(clientPortalAccessTable.id, existing.id)).returning();
+    return res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
+  }
+  const [created] = await db.insert(clientPortalAccessTable).values({
+    companyId,
+    clerkUserId,
+    email: email3 ?? null,
+    label: label ?? null,
+    siteAddresses,
+    grantedByUserId: req.user?.id ?? null
+  }).returning();
+  return res.status(201).json({ ...created, createdAt: created.createdAt.toISOString() });
+});
+router36.get("/invites", requireCompany, requireRole("manager"), async (req, res) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) return res.status(401).json({ error: "Unauthorized" });
+  const rows = await db.select().from(clientPortalAccessTable).where(eq(clientPortalAccessTable.companyId, companyId)).orderBy(desc(clientPortalAccessTable.createdAt));
+  return res.json(rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })));
+});
+router36.delete("/invites/:id", requireCompany, requireRole("manager"), async (req, res) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) return res.status(401).json({ error: "Unauthorized" });
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [deleted] = await db.delete(clientPortalAccessTable).where(
+    and(
+      eq(clientPortalAccessTable.id, id),
+      eq(clientPortalAccessTable.companyId, companyId)
+    )
+  ).returning();
+  if (!deleted) return res.status(404).json({ error: "Access record not found" });
+  return res.status(204).send();
+});
+var client_portal_default = router36;
+
+// src/routes/index.ts
+var router37 = (0, import_express39.Router)();
+router37.use(health_default);
+router37.use("/auth", auth_default);
+router37.use(storage_default);
+router37.use("/leads", leads_default);
+router37.use("/share", share_default);
+router37.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router37.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router37.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router37.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router37.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router37.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -124986,17 +125559,17 @@ router35.use(
   requireRole("manager"),
   intelligence_default
 );
-router35.use(
+router37.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router35.use("/branding", branding_default);
-router35.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router35.use("/beta", requireAuth, requireCompany, beta_default);
-router35.use(
+router37.use("/branding", branding_default);
+router37.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router37.use("/beta", requireAuth, requireCompany, beta_default);
+router37.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -125004,7 +125577,7 @@ router35.use(
   requireRole("sales"),
   opportunities_default
 );
-router35.use(
+router37.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -125012,7 +125585,7 @@ router35.use(
   requireRole("manager"),
   scorecards_default
 );
-router35.use(
+router37.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -125020,8 +125593,8 @@ router35.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router35.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router35.use(
+router37.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router37.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -125029,23 +125602,23 @@ router35.use(
   requireRole("sales"),
   proposals_default
 );
-router35.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router35.use(
+router37.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router37.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-router35.use("/products", requireAuth, requireBetaAccess, products_default);
-router35.use(
+router37.use("/products", requireAuth, requireBetaAccess, products_default);
+router37.use(
   "/inspections/:inspectionId/treatment-logs",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   treatment_logs_default
 );
-router35.use(
+router37.use(
   "/crm",
   requireAuth,
   requireCompany,
@@ -125053,7 +125626,7 @@ router35.use(
   requireRole("manager"),
   crm_default
 );
-router35.use(
+router37.use(
   "/integrations",
   requireAuth,
   requireCompany,
@@ -125061,16 +125634,25 @@ router35.use(
   requireRole("manager"),
   integrations_default
 );
-router35.use(
+router37.use(
   "/playbooks",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   playbooks_default
 );
-router35.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
-router35.use(executive_default);
-router35.use(
+router37.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
+router37.use(executive_default);
+router37.use("/client", requireClerkAuth, client_portal_default);
+router37.use(
+  "/schedule",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  requireRole("manager"),
+  schedule_default
+);
+router37.use(
   "/review-queue",
   requireAuth,
   requireCompany,
@@ -125078,15 +125660,15 @@ router35.use(
   requireRole("manager"),
   review_queue_default
 );
-router35.use("/meta-glasses", meta_glasses_default);
-router35.use("/billing", billing_default);
-router35.use("/admin", admin_default);
-router35.use(requireAuth, transcribe_default);
-var routes_default = router35;
+router37.use("/meta-glasses", meta_glasses_default);
+router37.use("/billing", billing_default);
+router37.use("/admin", admin_default);
+router37.use(requireAuth, transcribe_default);
+var routes_default = router37;
 
 // src/routes/faie.ts
-var import_express37 = __toESM(require_express2(), 1);
-var router36 = (0, import_express37.Router)();
+var import_express40 = __toESM(require_express2(), 1);
+var router38 = (0, import_express40.Router)();
 var storage2 = new ObjectStorageService();
 var DatasetIngestBody = external_exports.object({
   companyId: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
@@ -125120,7 +125702,7 @@ function toCompanyId(raw) {
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
-router36.post("/dataset/ingest", async (req, res) => {
+router38.post("/dataset/ingest", async (req, res) => {
   const parsed = DatasetIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -125146,7 +125728,7 @@ router36.post("/dataset/ingest", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-router36.post("/training/ingest-global", async (req, res) => {
+router38.post("/training/ingest-global", async (req, res) => {
   const parsed = GlobalIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -125175,7 +125757,7 @@ router36.post("/training/ingest-global", async (req, res) => {
   }
 });
 var PLATFORM_COMPANY_ID = 0;
-router36.post("/training/ingest-anonymized", async (req, res) => {
+router38.post("/training/ingest-anonymized", async (req, res) => {
   const parsed = AnonymizedIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -125199,7 +125781,7 @@ router36.post("/training/ingest-anonymized", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-var faie_default = router36;
+var faie_default = router38;
 
 // src/lib/webhookHandlers.ts
 var WebhookHandlers = class _WebhookHandlers {
@@ -125320,7 +125902,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // src/app.ts
-var app = (0, import_express38.default)();
+var app = (0, import_express41.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -125373,7 +125955,7 @@ app.use(
 );
 app.post(
   "/api/stripe/webhook",
-  import_express38.default.raw({ type: "application/json" }),
+  import_express41.default.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -125393,9 +125975,9 @@ app.post(
     }
   }
 );
-app.use("/v1/faie", import_express38.default.json({ limit: "20mb" }), faie_default);
-app.use(import_express38.default.json());
-app.use(import_express38.default.urlencoded({ extended: true }));
+app.use("/v1/faie", import_express41.default.json({ limit: "20mb" }), faie_default);
+app.use(import_express41.default.json());
+app.use(import_express41.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(

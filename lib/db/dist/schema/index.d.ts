@@ -24,4 +24,5 @@ export * from "./daily-rigs";
 export * from "./faie-training";
 export * from "./field-integrations";
 export * from "./playbooks";
+export * from "./client-portal";
 //# sourceMappingURL=index.d.ts.map

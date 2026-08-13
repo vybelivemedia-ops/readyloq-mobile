@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import {
   requireAuth,
+  requireClerkAuth,
   requireCompany,
   requireRole,
   requireBetaAccess,
@@ -40,6 +41,7 @@ import integrationsRouter from "./integrations";
 import playbooksRouter from "./playbooks";
 import executiveRouter from "./executive";
 import scheduleRouter from "./schedule";
+import clientPortalRouter from "./client-portal";
 
 const router: IRouter = Router();
 
@@ -181,6 +183,13 @@ router.use(
 //              GET      /technician/daily-rig/recent-mixes
 router.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, dailyRigRouter);
 router.use(executiveRouter);
+
+// Client portal — read-only access for external property managers.
+// Uses requireClerkAuth (not requireAuth) so external PM logins never
+// auto-create a usersTable row. Internal managers who also use the invite
+// endpoints still get req.user attached (read-only lookup) so the inline
+// requireCompany + requireRole("manager") guards inside the router work.
+router.use("/client", requireClerkAuth, clientPortalRouter);
 
 // Scheduling calendar — read and mutate scheduled dates / technician assignments.
 // Manager+ only: dispatchers/managers need to see and change routes; technicians

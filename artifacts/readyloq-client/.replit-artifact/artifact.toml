@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/readyloq-client/"
+title = "ReadyLoq Client Portal"
+description = "A read-only self-serve portal for property managers. Lets building owners and facility managers log in with Clerk, view the inspection history for their buildings, read approved AI-generated pest reports, and see 12-month pest trend charts — without needing to contact the pest control company's office staff."
+version = "1.0.0"
+id = "artifacts/readyloq-client"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/readyloq-client/" ]
+localPort = 23868
+
+[services.development]
+run = "pnpm --filter @workspace/readyloq-client run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/readyloq-client", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/readyloq-client/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23868"
+BASE_PATH = "/readyloq-client/"
