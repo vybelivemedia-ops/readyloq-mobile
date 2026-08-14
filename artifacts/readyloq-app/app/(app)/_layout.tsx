@@ -12,13 +12,14 @@ import { registerPushToken } from "@/lib/api";
 // Without this, Expo does not present incoming notifications while the app is
 // foregrounded. Set it at module scope so it is registered before any push
 // arrives, regardless of which screen the user is on.
+// shouldShowAlert is deprecated in expo-notifications v0.32.x (SDK 54) —
+// use shouldShowBanner and shouldShowList instead.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
     shouldShowBanner: true,
     shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
   }),
 });
 
@@ -222,13 +223,11 @@ function Gate() {
           });
         }
 
-        // expo-notifications v57 types omit `granted` from the top-level
-        // NotificationPermissionsStatus but it IS present at runtime (inherited
-        // from PermissionResponse in expo). Cast through unknown to satisfy TS.
-        type GrantedResult = { granted: boolean };
-        const existingPerm = (await Notifications.getPermissionsAsync()) as unknown as GrantedResult;
+        // NotificationPermissionsStatus extends PermissionResponse from
+        // expo-modules-core, so `granted` is present in the type in v0.32.x.
+        const existingPerm = await Notifications.getPermissionsAsync();
         if (!existingPerm.granted) {
-          const requested = (await Notifications.requestPermissionsAsync()) as unknown as GrantedResult;
+          const requested = await Notifications.requestPermissionsAsync();
           if (!requested.granted) return; // user denied — silently skip
         }
 

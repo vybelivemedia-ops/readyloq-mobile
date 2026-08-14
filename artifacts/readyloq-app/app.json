@@ -115,9 +115,7 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#0d1117",
-          "sounds": [],
-          "androidMode": "default",
-          "androidCollapsedTitle": "#{unread_notifications} new alerts"
+          "sounds": []
         }
       ],
       "expo-mail-composer",
