@@ -1,49 +1,84 @@
 /**
  * /api/admin — Platform super-admin endpoints
  *
- * All routes except /bootstrap require requireSuperAdmin.
- * /bootstrap is protected by SUPER_ADMIN_BOOTSTRAP_TOKEN env var (one-time use).
+ * POST /token-auth   — no Clerk required; exchange SUPER_ADMIN_BOOTSTRAP_TOKEN
+ *                      for a short-lived HMAC session token.
+ * All other routes   — require a valid admin session token (Bearer header).
  */
+import { createHmac, timingSafeEqual } from "crypto";
 import { Router, type IRouter } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { db } from "@workspace/db";
 import { usersTable, companiesTable, analysisResultsTable, type UserRole } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { runOpportunitySynthesisCore } from "../lib/opportunity-ai";
-import { requireAuth, requireSuperAdmin } from "../middleware/require-auth";
 
 const router: IRouter = Router();
 
 const VALID_ROLES: UserRole[] = ["owner", "manager", "sales", "technician"];
+const ADMIN_TOKEN_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
-// ── POST /bootstrap ───────────────────────────────────────────────────────────
-// One-time call: caller presents SUPER_ADMIN_BOOTSTRAP_TOKEN, gets isSuperAdmin.
-// Designed to be called exactly once by the platform owner to seed the first
-// super admin. Subsequent calls by already-elevated accounts are safe no-ops.
-router.post("/bootstrap", requireAuth, async (req, res) => {
+// ── HMAC token helpers ────────────────────────────────────────────────────────
+
+function signAdminToken(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET not configured");
+  const ts = Date.now().toString();
+  const mac = createHmac("sha256", secret).update(`readyloq-admin:${ts}`).digest("hex");
+  return `${ts}.${mac}`;
+}
+
+function verifyAdminToken(token: string): boolean {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) return false;
+  const dot = token.lastIndexOf(".");
+  if (dot === -1) return false;
+  const ts = token.slice(0, dot);
+  const mac = token.slice(dot + 1);
+  const age = Date.now() - parseInt(ts, 10);
+  if (isNaN(age) || age < 0 || age > ADMIN_TOKEN_TTL_MS) return false;
+  const expected = createHmac("sha256", secret).update(`readyloq-admin:${ts}`).digest("hex");
+  try {
+    const macBuf = Buffer.from(mac, "hex");
+    const expBuf = Buffer.from(expected, "hex");
+    if (macBuf.length !== expBuf.length) return false;
+    return timingSafeEqual(macBuf, expBuf);
+  } catch {
+    return false;
+  }
+}
+
+/** Middleware: requires a valid admin HMAC token in Authorization: Bearer header. */
+const requireAdminToken = (req: Request, res: Response, next: NextFunction) => {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) {
+    if (verifyAdminToken(auth.slice(7))) return next();
+  }
+  return res.status(403).json({ error: "Valid admin session token required" });
+};
+
+// ── POST /token-auth ──────────────────────────────────────────────────────────
+// Exchange SUPER_ADMIN_BOOTSTRAP_TOKEN for a short-lived HMAC session token.
+// No Clerk auth required — the bootstrap token IS the credential.
+router.post("/token-auth", async (req, res) => {
   const envToken = process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN;
   if (!envToken) {
-    return res.status(503).json({ error: "Bootstrap token not configured" });
+    return res.status(503).json({ error: "Admin access not configured" });
   }
   const { token } = req.body as { token?: string };
   if (!token || token !== envToken) {
-    return res.status(403).json({ error: "Invalid bootstrap token" });
+    return res.status(403).json({ error: "Invalid token" });
   }
-  const user = req.user!;
-  const [updated] = await db
-    .update(usersTable)
-    .set({ isSuperAdmin: true })
-    .where(eq(usersTable.id, user.id))
-    .returning();
-  return res.json({
-    success: true,
-    message: "Super admin access granted",
-    isSuperAdmin: updated.isSuperAdmin,
-  });
+  try {
+    return res.json({ adminToken: signAdminToken() });
+  } catch {
+    return res.status(500).json({ error: "Could not issue session token" });
+  }
 });
 
 // ── GET /users ────────────────────────────────────────────────────────────────
 // All users across all companies, with their company name.
-router.get("/users", requireAuth, requireSuperAdmin, async (_req, res) => {
+router.get("/users", requireAdminToken, async (_req, res) => {
   const rows = await db
     .select({
       id: usersTable.id,
@@ -72,7 +107,7 @@ router.get("/users", requireAuth, requireSuperAdmin, async (_req, res) => {
 
 // ── PATCH /users/:id ──────────────────────────────────────────────────────────
 // Update any user's role, betaAccess, or isSuperAdmin flag.
-router.patch("/users/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+router.patch("/users/:id", requireAdminToken, async (req, res) => {
   const userId = parseInt(req.params["id"] as string, 10);
   if (isNaN(userId)) return res.status(400).json({ error: "Invalid user id" });
 

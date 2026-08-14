@@ -1,52 +1,71 @@
-import { SignIn, useAuth } from "@clerk/clerk-react";
-import { useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
+import { apiUrl } from "@/config";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { RefreshCw } from "lucide-react";
 
 export default function Login() {
-  const { isLoaded, isSignedIn } = useAuth();
   const [, navigate] = useLocation();
+  const [token, setToken] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // If already signed in, skip the form and go straight to dashboard.
-  useEffect(() => {
-    if (isLoaded && isSignedIn) navigate("/dashboard");
-  }, [isLoaded, isSignedIn, navigate]);
+  const handleSubmit = async () => {
+    if (!token || loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(apiUrl("/admin/token-auth"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (res.ok) {
+        const { adminToken } = await res.json() as { adminToken: string };
+        sessionStorage.setItem("readyloq_admin_token", adminToken);
+        navigate("/dashboard");
+      } else {
+        const body = await res.json() as { error?: string };
+        setError(body.error ?? "Invalid token");
+      }
+    } catch {
+      setError("Connection error — please try again");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-slate-950 px-4">
       <div className="mb-8 text-center">
         <p className="text-xs font-mono uppercase tracking-widest text-slate-500 mb-2">Platform</p>
         <h1 className="text-2xl font-bold text-white">ReadyLoq Admin</h1>
-        <p className="text-slate-400 text-sm mt-1">Sign in to manage companies, users, and billing</p>
+        <p className="text-slate-400 text-sm mt-1">Enter your admin token to continue</p>
       </div>
 
-      <SignIn
-        appearance={{
-          elements: {
-            rootBox: "w-full max-w-[420px]",
-            card: "bg-slate-900 border border-slate-800 shadow-2xl rounded-xl",
-            headerTitle: "text-white",
-            headerSubtitle: "text-slate-400",
-            socialButtonsBlockButton:
-              "border-slate-700 text-slate-200 bg-slate-800 hover:bg-slate-700",
-            dividerLine: "bg-slate-700",
-            dividerText: "text-slate-500 text-xs",
-            formFieldLabel: "text-slate-300 text-sm",
-            formFieldInput:
-              "bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:border-slate-500",
-            formButtonPrimary:
-              "bg-primary hover:bg-primary/90 text-primary-foreground font-semibold",
-            footerActionLink: "text-primary hover:text-primary/80",
-            identityPreviewText: "text-slate-200",
-            identityPreviewEditButton: "text-primary",
-          },
-          variables: {
-            colorBackground: "#0f172a",
-            colorInputBackground: "#1e293b",
-            colorText: "#f1f5f9",
-          },
-        }}
-        forceRedirectUrl={`${import.meta.env.BASE_URL}dashboard`}
-      />
+      <div className="w-full max-w-sm space-y-3">
+        <Input
+          type="password"
+          placeholder="Admin token"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:border-slate-500 h-11"
+          autoFocus
+        />
+        {error && (
+          <p className="text-red-400 text-sm">{error}</p>
+        )}
+        <Button
+          className="w-full h-11 font-semibold"
+          disabled={!token || loading}
+          onClick={handleSubmit}
+        >
+          {loading ? <RefreshCw size={16} className="animate-spin mr-2" /> : null}
+          Sign in
+        </Button>
+      </div>
     </div>
   );
 }
