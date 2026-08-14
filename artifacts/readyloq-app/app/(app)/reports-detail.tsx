@@ -36,6 +36,14 @@ import {
 } from "@/lib/api-client/reports";
 import type { Report } from "@/lib/api-client/generated/api.schemas";
 import { formatDate, formatStatus, severityTone, statusTone } from "@/constants/inspection";
+import {
+  filterReports,
+  emptyStateMessage,
+  applyTabChange,
+  applyFilterParamChange,
+  normalizeFilterParam as _normalizeFilterParam,
+  type AuditScreenState,
+} from "@/lib/reports/audit-search";
 
 // ─── Palette (dark command-centre, matching executive screens) ────────────────
 
@@ -274,18 +282,8 @@ function ReportCard({
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-/** Accepted values for the `filter` URL param. */
-const VALID_FILTERS = new Set<AuditFilter>(["all", "pipeline", "critical", "pending"]);
-
-/**
- * Coerce a raw URL param value (string | string[] | undefined) to a valid
- * AuditFilter. Falls back to "all" for missing or unrecognised values so a
- * bad deep-link never lands on an undefined tab.
- */
-function normalizeFilterParam(raw: string | string[] | undefined): AuditFilter {
-  const val = Array.isArray(raw) ? raw[0] : raw;
-  return val && VALID_FILTERS.has(val as AuditFilter) ? (val as AuditFilter) : "all";
-}
+// Re-export the normalise helper under the local name so usages below are unchanged.
+const normalizeFilterParam = _normalizeFilterParam;
 
 export default function ReportsDetailScreen() {
   const router = useRouter();
@@ -305,16 +303,17 @@ export default function ReportsDetailScreen() {
   // a second push arrives with a different filter), filterParam changes but
   // activeTab would be stale without this effect.
   useEffect(() => {
-    setActiveTab(normalizeFilterParam(filterParam));
-    // Reset search whenever the deep-link target changes so old results
-    // don't bleed into the newly selected tab.
-    setSearchQuery("");
+    const next = applyFilterParamChange({ activeTab, searchQuery }, filterParam);
+    setActiveTab(next.activeTab);
+    setSearchQuery(next.searchQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterParam]);
 
-  // Clear search whenever the tab changes
+  // Clear search whenever the user manually switches tabs.
   const handleTabChange = (tab: AuditFilter) => {
-    setActiveTab(tab);
-    setSearchQuery("");
+    const next = applyTabChange({ activeTab, searchQuery }, tab);
+    setActiveTab(next.activeTab);
+    setSearchQuery(next.searchQuery);
   };
 
   const queryParams = useMemo(() => tabToParams(activeTab), [activeTab]);
@@ -325,21 +324,10 @@ export default function ReportsDetailScreen() {
 
   // Client-side text search on top of the server-filtered tab data
   const trimmedQuery = searchQuery.trim().toLowerCase();
-  const reports = useMemo(() => {
-    const base = data ?? [];
-    if (!trimmedQuery) return base;
-    return base.filter((r) => {
-      const haystack = [
-        r.title,
-        r.siteAddress,
-        (r as Report & { clientName?: string | null }).clientName,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(trimmedQuery);
-    });
-  }, [data, trimmedQuery]);
+  const reports = useMemo(
+    () => filterReports(data ?? [], searchQuery),
+    [data, searchQuery],
+  );
 
   const accent  = TAB_ACCENT[activeTab];
 
@@ -567,11 +555,11 @@ export default function ReportsDetailScreen() {
                 No reports
               </Text>
               <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", maxWidth: 240 }}>
-                {trimmedQuery
-                  ? `No results for "${searchQuery.trim()}".`
-                  : activeTab === "all"
-                  ? "Complete an inspection to generate a report."
-                  : `No reports match the "${TABS.find(t => t.filter === activeTab)?.label}" filter.`}
+                {emptyStateMessage(
+                  searchQuery,
+                  activeTab,
+                  TABS.find(t => t.filter === activeTab)?.label ?? activeTab,
+                )}
               </Text>
               {trimmedQuery ? (
                 <TouchableOpacity
