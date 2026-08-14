@@ -466,3 +466,140 @@ describe("runOpportunitySynthesisCore — retry and failure behavior", () => {
     expect(rows).toHaveLength(0);
   }, 10_000);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Failure counter — synthesisFailuresSinceLastSuccess
+//
+// runOpportunitySynthesis (fire-and-forget wrapper) must:
+//   - increment synthesisFailuresSinceLastSuccess in opportunity_settings on
+//     every total AI failure (both retries exhausted)
+//   - reset it to 0 after any successful synthesis run, including when the
+//     first attempt failed but the retry succeeded
+//
+// resetSynthesisFailures / incrementSynthesisFailures are called with `void`
+// inside the wrapper, so they complete asynchronously after the wrapper
+// resolves. We poll the DB until the expected value lands (up to 2 s) rather
+// than relying on a fixed sleep, so the tests are both deterministic and fast.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Read synthesisFailuresSinceLastSuccess from the DB for a given company. */
+async function readFailureCounter(cId: number): Promise<number> {
+  const [row] = await db
+    .select({ synthesisFailuresSinceLastSuccess: opportunitySettingsTable.synthesisFailuresSinceLastSuccess })
+    .from(opportunitySettingsTable)
+    .where(eq(opportunitySettingsTable.companyId, cId))
+    .limit(1);
+  // If no settings row exists yet the counter is implicitly 0.
+  return row?.synthesisFailuresSinceLastSuccess ?? 0;
+}
+
+/**
+ * Poll until the counter equals `expected` or 2 000 ms elapses.
+ * Throws the vitest assertion on timeout so the failure message is clear.
+ */
+async function waitForCounter(cId: number, expected: number): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    const value = await readFailureCounter(cId);
+    if (value === expected) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  // Final read — let vitest format the mismatch.
+  expect(await readFailureCounter(cId)).toBe(expected);
+}
+
+/** One-tick flush to drain void writes left over from a previous test. */
+function flushPendingWrites(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 50));
+}
+
+describe("runOpportunitySynthesis — synthesisFailuresSinceLastSuccess counter", () => {
+  // The outer beforeEach cleans opportunitySettingsTable, but void DB writes
+  // from the preceding test suite may land asynchronously AFTER that cleanup.
+  // This inner beforeEach flushes those stale writes and re-cleans so each
+  // counter test starts from a known-zero baseline.
+  beforeEach(async () => {
+    await flushPendingWrites();
+    await db
+      .delete(opportunitySettingsTable)
+      .where(eq(opportunitySettingsTable.companyId, companyId));
+  });
+
+  it("increments the counter to 1 when both AI attempts fail", async () => {
+    // Both retries throw → wrapper calls incrementSynthesisFailures.
+    aiState.errorCalls = [0, 1];
+
+    await runOpportunitySynthesis({ companyId, inspectionId, findings });
+
+    // Poll until the void DB write lands — deterministic, no fixed sleep.
+    await waitForCounter(companyId, 1);
+  }, 10_000);
+
+  it("increments the counter to 2 after two consecutive total failures", async () => {
+    // First failure.
+    aiState.errorCalls = [0, 1];
+    await runOpportunitySynthesis({ companyId, inspectionId, findings });
+    await waitForCounter(companyId, 1);
+
+    // Reset AI call index so the second run also uses indices 0 and 1.
+    aiState.callCount = 0;
+    aiState.errorCalls = [0, 1];
+
+    // A second fresh inspection is needed so the inspection FK is valid.
+    const [insp2] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: "500 Opp AI Test Avenue",
+        technicianName: "Tester",
+        clientName: "Client",
+        pestTypes: ["rodents"],
+      })
+      .returning();
+
+    await runOpportunitySynthesis({ companyId, inspectionId: insp2.id, findings });
+    await waitForCounter(companyId, 2);
+  }, 15_000);
+
+  it("resets the counter to 0 after a retry-success (first attempt fails, second succeeds)", async () => {
+    // Seed the counter at 1 via a total failure so there is a non-zero value
+    // to reset — this mirrors the real "catch-up after outage" scenario.
+    aiState.errorCalls = [0, 1];
+    await runOpportunitySynthesis({ companyId, inspectionId, findings });
+    await waitForCounter(companyId, 1);
+
+    // Now re-run synthesis on a fresh inspection where the FIRST AI attempt
+    // fails but the SECOND (retry) succeeds.  This is the exact scenario the
+    // task title describes: "a successful retry" must reset the counter.
+    aiState.callCount = 0;
+    aiState.errorCalls = [0]; // index 0 throws; index 1 returns successContent
+    aiState.response = aiResponse("medium");
+
+    const [insp2] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: "500 Opp AI Test Avenue",
+        technicianName: "Tester",
+        clientName: "Client",
+        pestTypes: ["rodents"],
+      })
+      .returning();
+
+    await runOpportunitySynthesis({ companyId, inspectionId: insp2.id, findings });
+
+    // The wrapper called resetSynthesisFailures (void); poll until it lands.
+    await waitForCounter(companyId, 0);
+
+    // Confirm the retry also made two AI calls (first-fail + retry-succeed).
+    expect(aiState.callCount).toBe(2);
+  }, 15_000);
+
+  it("counter stays at 0 when synthesis succeeds on the first attempt", async () => {
+    aiState.errorCalls = [];
+    aiState.response = aiResponse("low");
+
+    await runOpportunitySynthesis({ companyId, inspectionId, findings });
+    await waitForCounter(companyId, 0);
+  }, 10_000);
+});
