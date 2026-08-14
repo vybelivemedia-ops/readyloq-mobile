@@ -36,9 +36,11 @@ import {
   fetchIntegrationConfig,
   saveIntegrationConfig,
   deleteIntegrationConfig,
+  testIntegrationCredentials,
   setPushNotificationsEnabled,
   type FieldIntegrationSystem,
   type IntegrationConfigResponse,
+  type IntegrationProbeResult,
 } from "@/lib/api";
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
@@ -224,6 +226,8 @@ function DispatchIntegrationSection() {
   const [apiKey, setApiKey] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [disconnecting, setDisconnecting] = React.useState(false);
+  const [testResult, setTestResult] = React.useState<IntegrationProbeResult | null>(null);
+  const [testing, setTesting] = React.useState(false);
 
   // Load config on mount
   React.useEffect(() => {
@@ -252,14 +256,29 @@ function DispatchIntegrationSection() {
       return;
     }
     setSaving(true);
+    setTestResult(null);
     try {
       const token = await getToken();
       await saveIntegrationConfig(token, { systemType: platform, accountId: accountId.trim(), apiKey: apiKey.trim() });
       const updated = await fetchIntegrationConfig(token);
       setConfig(updated);
-      setShowForm(false);
       setApiKey(""); // clear key from memory
-      Alert.alert("Connected", `${platform === "pestpac" ? "PestPac" : "FieldRoutes"} integration saved.`);
+
+      // Probe the external system to confirm credentials are actually accepted.
+      setTesting(true);
+      try {
+        const probe = await testIntegrationCredentials(token);
+        setTestResult(probe);
+        if (probe.ok) {
+          // Credentials verified — close the form automatically.
+          setShowForm(false);
+        }
+        // If probe failed, leave the form open so the owner can correct the key.
+      } catch {
+        setTestResult({ ok: false, reason: "network_error", message: "Could not reach the external system to verify your key." });
+      } finally {
+        setTesting(false);
+      }
     } catch (e: unknown) {
       Alert.alert("Save failed", e instanceof Error ? e.message : "Could not save integration.");
     } finally {
@@ -407,7 +426,7 @@ function DispatchIntegrationSection() {
               </Text>
               <TextInput
                 value={accountId}
-                onChangeText={setAccountId}
+                onChangeText={(v) => { setAccountId(v); setTestResult(null); }}
                 placeholder="Your account identifier…"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="none"
@@ -427,7 +446,7 @@ function DispatchIntegrationSection() {
               </Text>
               <TextInput
                 value={apiKey}
-                onChangeText={setApiKey}
+                onChangeText={(v) => { setApiKey(v); setTestResult(null); }}
                 placeholder={isConnected ? "Enter new key to rotate…" : "Paste your API key…"}
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="none"
@@ -464,14 +483,14 @@ function DispatchIntegrationSection() {
               )}
               <Pressable
                 onPress={handleSave}
-                disabled={saving || !accountId.trim() || !apiKey.trim()}
+                disabled={saving || testing || !accountId.trim() || !apiKey.trim()}
                 style={({ pressed }) => ({
                   flex: 2, paddingVertical: 12, borderRadius: 10, alignItems: "center",
                   backgroundColor: colors.primary,
-                  opacity: pressed || saving || !accountId.trim() || !apiKey.trim() ? 0.6 : 1,
+                  opacity: pressed || saving || testing || !accountId.trim() || !apiKey.trim() ? 0.6 : 1,
                 })}
               >
-                {saving
+                {saving || testing
                   ? <ActivityIndicator color="#fff" />
                   : <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
                       {isConnected ? "Update" : "Connect"}
@@ -479,6 +498,54 @@ function DispatchIntegrationSection() {
                 }
               </Pressable>
             </View>
+
+            {/* Inline connection-test result */}
+            {testing && (
+              <View style={{
+                flexDirection: "row", alignItems: "center", gap: 8,
+                paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10,
+                backgroundColor: colors.muted,
+              }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                  Verifying credentials…
+                </Text>
+              </View>
+            )}
+            {!testing && testResult !== null && (
+              <View style={{
+                flexDirection: "row", alignItems: "flex-start", gap: 10,
+                paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10,
+                backgroundColor: testResult.ok ? "#05966914" : "#dc262614",
+              }}>
+                <Ionicons
+                  name={testResult.ok ? "checkmark-circle" : (testResult.reason === "auth_failed" ? "key-outline" : "wifi-outline")}
+                  size={18}
+                  color={testResult.ok ? "#059669" : "#dc2626"}
+                  style={{ marginTop: 1 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{
+                    fontFamily: "Inter_600SemiBold", fontSize: 13,
+                    color: testResult.ok ? "#059669" : "#dc2626",
+                  }}>
+                    {testResult.ok
+                      ? "Connected ✓"
+                      : testResult.reason === "auth_failed"
+                        ? "Connection failed — check your key"
+                        : "Connection failed — network unreachable"}
+                  </Text>
+                  {!testResult.ok && testResult.message ? (
+                    <Text style={{
+                      fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2,
+                      color: "#dc2626", opacity: 0.85, lineHeight: 16,
+                    }}>
+                      {testResult.message}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            )}
           </View>
         )}
       </Card>

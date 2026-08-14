@@ -191,6 +191,98 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
   };
 }
 
+// ─── Credential probe ─────────────────────────────────────────────────────────
+
+export type ProbeFailureReason = "auth_failed" | "network_error";
+
+export interface ProbeResult {
+  ok: boolean;
+  reason?: ProbeFailureReason;
+  message?: string;
+}
+
+/**
+ * Fires a single lightweight read against the external system's auth endpoint
+ * to confirm the stored credentials are accepted.  No data is written.
+ *
+ * Returns { ok: true } on success.
+ * Returns { ok: false, reason: "auth_failed"  } on 401 / 403.
+ * Returns { ok: false, reason: "network_error" } on fetch-level failures or
+ * unexpected 5xx that indicate the host is unreachable / unavailable.
+ */
+async function probePestPac(apiKey: string, accountId: string, apiBaseUrl?: string | null): Promise<ProbeResult> {
+  const base = apiBaseUrl?.replace(/\/$/, "") ?? PESTPAC_DEFAULT_BASE;
+  try {
+    const res = await fetch(`${base}/customers/${encodeURIComponent(accountId)}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      // Short timeout — we only want to confirm auth, not wait for a slow response.
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (res.ok) return { ok: true };
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, reason: "auth_failed", message: `Authentication rejected (HTTP ${res.status}) — check your API key.` };
+    }
+    // Treat 404 as auth-ok (the account ID might not exist in the sandbox,
+    // but the credential itself was accepted).
+    if (res.status === 404) return { ok: true };
+    return { ok: false, reason: "network_error", message: `Unexpected response from PestPac (HTTP ${res.status}).` };
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.name === "TimeoutError";
+    return {
+      ok: false,
+      reason: "network_error",
+      message: isTimeout
+        ? "PestPac did not respond within 8 seconds — check your network connection."
+        : `Could not reach PestPac: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+async function probeFieldRoutes(apiKey: string, accountId: string, apiBaseUrl?: string | null): Promise<ProbeResult> {
+  const base = apiBaseUrl?.replace(/\/$/, "") ?? FIELDROUTES_DEFAULT_BASE;
+  try {
+    const res = await fetch(`${base}/customer/${encodeURIComponent(accountId)}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (res.ok) return { ok: true };
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, reason: "auth_failed", message: `Authentication rejected (HTTP ${res.status}) — check your API key.` };
+    }
+    if (res.status === 404) return { ok: true };
+    return { ok: false, reason: "network_error", message: `Unexpected response from FieldRoutes (HTTP ${res.status}).` };
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.name === "TimeoutError";
+    return {
+      ok: false,
+      reason: "network_error",
+      message: isTimeout
+        ? "FieldRoutes did not respond within 8 seconds — check your network connection."
+        : `Could not reach FieldRoutes: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+export async function probeIntegrationCredentials(
+  systemType: FieldIntegrationSystem,
+  apiKey: string,
+  accountId: string,
+  apiBaseUrl?: string | null,
+): Promise<ProbeResult> {
+  switch (systemType) {
+    case "pestpac":
+      return probePestPac(apiKey, accountId, apiBaseUrl);
+    case "fieldroutes":
+      return probeFieldRoutes(apiKey, accountId, apiBaseUrl);
+    default: {
+      const exhaustive: never = systemType;
+      throw new Error(`Unknown external system: ${String(exhaustive)}`);
+    }
+  }
+}
+
 // ─── Public entrypoint ────────────────────────────────────────────────────────
 
 export async function syncInspectionToExternalSystem(

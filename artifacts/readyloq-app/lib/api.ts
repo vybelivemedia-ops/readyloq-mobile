@@ -248,6 +248,24 @@ export function deleteIntegrationConfig(token: string | null) {
   });
 }
 
+export type IntegrationProbeFailureReason = "auth_failed" | "network_error";
+
+export interface IntegrationProbeResult {
+  ok: boolean;
+  reason?: IntegrationProbeFailureReason;
+  message?: string;
+}
+
+/**
+ * Fires a lightweight auth probe against the stored credentials.
+ * The api_key is read from the server DB — no credential is sent from the app.
+ */
+export function testIntegrationCredentials(token: string | null) {
+  return request<IntegrationProbeResult>("/api/integrations/test", token, {
+    method: "POST",
+  });
+}
+
 export interface SyncHistoryEntry {
   id: number;
   inspectionId: number;

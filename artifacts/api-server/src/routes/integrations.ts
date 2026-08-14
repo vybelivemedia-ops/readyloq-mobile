@@ -16,7 +16,7 @@ import { eq, and, inArray, desc, isNotNull } from "drizzle-orm";
 import { z } from "zod/v4";
 import { getCompanyId } from "../lib/tenant";
 import { requireRole } from "../middleware/require-auth";
-import { syncInspectionToExternalSystem } from "../services/field-integration";
+import { syncInspectionToExternalSystem, probeIntegrationCredentials } from "../services/field-integration";
 
 /** Duplicate taps within this window (seconds) return the cached result. */
 const SYNC_COOLDOWN_SECONDS = 60;
@@ -367,6 +367,38 @@ router.post("/sync", async (req, res) => {
     }
 
     return res.status(502).json({ error: message });
+  }
+});
+
+// ─── POST /api/integrations/test ─────────────────────────────────────────────
+// Probes the stored credentials against the external system's auth endpoint.
+// Owner-only. Reads the api_key from the DB — no credential accepted from the
+// client. Returns { ok, reason?, message? } where reason is "auth_failed" or
+// "network_error" when ok is false.
+router.post("/test", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const [config] = await db
+      .select()
+      .from(companyFieldIntegrationsTable)
+      .where(eq(companyFieldIntegrationsTable.companyId, companyId))
+      .limit(1);
+
+    if (!config) {
+      return res.status(422).json({ ok: false, reason: "network_error", message: "No integration configured for this company." });
+    }
+
+    const result = await probeIntegrationCredentials(
+      config.systemType,
+      config.apiKey,
+      config.accountId,
+      config.apiBaseUrl,
+    );
+
+    return res.json(result);
+  } catch (err) {
+    logger.error({ err }, "[integrations/test] probe error");
+    return res.json({ ok: false, reason: "network_error", message: "Probe failed — could not reach the external system." });
   }
 });
 
