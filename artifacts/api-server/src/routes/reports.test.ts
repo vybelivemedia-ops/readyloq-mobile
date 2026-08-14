@@ -319,6 +319,104 @@ describe("generate-narrative — empty findings", () => {
   });
 });
 
+// ─── Non-empty exclusionOpportunities round-trip ─────────────────────────────
+
+describe("exclusionOpportunities — non-empty count", () => {
+  /**
+   * Seeds a report row directly with a known exclusionOpportunities array so
+   * we are not sensitive to the AI analysis pipeline.  The critical assertion
+   * is that serializeReport passes the strings through unchanged and the
+   * mobile list consumer will therefore receive the correct count.
+   */
+  it("GET /reports/:id returns the correct exclusionOpportunities count", async () => {
+    const opportunities = [
+      "structural: Gap around pipe penetration behind sink",
+      "entry_point: Missing door sweep on rear access door",
+    ];
+    const opportunitiesJson = JSON.stringify(opportunities);
+
+    const result = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'Exclusion opps report',
+              '42 Empty St', 'complete', NULL, NULL,
+              ${opportunitiesJson}::jsonb,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const reportId = (result.rows[0] as { id: number }).id;
+
+    asUser(OWNER_ID);
+    const res = await request(app).get(`/api/reports/${reportId}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.exclusionOpportunities)).toBe(true);
+    // Must reflect the actual stored opportunities — not zero
+    expect(res.body.exclusionOpportunities).toHaveLength(opportunities.length);
+    expect(res.body.exclusionOpportunities).toEqual(opportunities);
+  });
+
+  it("GET /reports list includes the report with correct exclusionOpportunities count", async () => {
+    const opportunities = ["pest: Active rodent harborage under HVAC unit"];
+    const opportunitiesJson = JSON.stringify(opportunities);
+
+    await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'List exclusion opps report',
+              '42 Empty St', 'complete', NULL, NULL,
+              ${opportunitiesJson}::jsonb,
+              'Smoky', CURRENT_DATE)
+    `);
+
+    asUser(OWNER_ID);
+    const res = await request(app).get("/api/reports");
+
+    expect(res.status).toBe(200);
+    const target = (res.body as Array<{ title: string; exclusionOpportunities: string[] }>)
+      .find((r) => r.title === "List exclusion opps report");
+
+    expect(target).toBeDefined();
+    expect(Array.isArray(target!.exclusionOpportunities)).toBe(true);
+    // The mobile list consumer reads .exclusionOpportunities.length — must be > 0
+    expect(target!.exclusionOpportunities.length).toBeGreaterThan(0);
+    expect(target!.exclusionOpportunities).toEqual(opportunities);
+  });
+
+  it("exclusionOpportunities strings survive the filter (non-strings are stripped)", async () => {
+    // Simulate a corrupted DB row where one entry is not a string
+    const corruptedJson = JSON.stringify([
+      "valid: Seal gap at conduit entry",
+      42,
+      null,
+      { not: "a string" },
+    ]);
+
+    const result = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'Corrupted exclusion opps report',
+              '42 Empty St', 'complete', NULL, NULL,
+              ${corruptedJson}::jsonb,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const reportId = (result.rows[0] as { id: number }).id;
+
+    asUser(OWNER_ID);
+    const res = await request(app).get(`/api/reports/${reportId}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.exclusionOpportunities)).toBe(true);
+    // Only the valid string must survive — mobile count must never over-report
+    expect(res.body.exclusionOpportunities).toHaveLength(1);
+    expect(res.body.exclusionOpportunities[0]).toBe("valid: Seal gap at conduit entry");
+  });
+});
+
 // ─── Tenant isolation (reports are company-scoped) ────────────────────────────
 
 describe("tenant isolation", () => {
