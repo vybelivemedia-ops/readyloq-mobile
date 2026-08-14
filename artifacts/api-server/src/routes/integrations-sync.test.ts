@@ -523,6 +523,87 @@ describe("POST /api/integrations/sync", () => {
     });
   });
 
+  describe("cooldown — failed attempts are always retryable", () => {
+    // Ensure company has an active config and the completed inspection's sync
+    // logs are wiped so each test starts from a known state.
+    beforeEach(async () => {
+      await db
+        .delete(companyFieldIntegrationsTable)
+        .where(eq(companyFieldIntegrationsTable.companyId, companyId));
+      await db.insert(companyFieldIntegrationsTable).values({
+        companyId,
+        systemType: "pestpac",
+        accountId: "acc-retry",
+        apiKey: "key-retry",
+        enabled: true,
+      });
+
+      await db
+        .delete(inspectionSyncLogsTable)
+        .where(
+          and(
+            eq(inspectionSyncLogsTable.inspectionId, completedInspectionId),
+            eq(inspectionSyncLogsTable.companyId, companyId),
+          ),
+        );
+    });
+
+    it("proceeds when the only recent log is a failure — does not return 409 or a cached response", async () => {
+      // Seed a failed log inside the cooldown window.
+      await db.insert(inspectionSyncLogsTable).values({
+        companyId,
+        inspectionId: completedInspectionId,
+        systemType: "pestpac",
+        success: false,
+        errorMessage: "External system returned 500",
+        resultJson: null,
+      });
+
+      asUser(OWNER_ID);
+      const res = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+
+      // Must not be a cooldown rejection (409) or a cached response.
+      expect(res.status).toBe(200);
+      expect(res.body._idempotent).toBeUndefined();
+      // The external adapter must have been called exactly once.
+      expect(syncMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns the cached result when the only recent log is a success — contrast test", async () => {
+      // Seed a successful log inside the cooldown window.
+      const cachedResult = {
+        success: true,
+        externalSystem: "pestpac",
+        postedNotes: true,
+        attachmentsPosted: 2,
+        noteRetries: 0,
+        attachmentRetries: 0,
+      };
+      await db.insert(inspectionSyncLogsTable).values({
+        companyId,
+        inspectionId: completedInspectionId,
+        systemType: "pestpac",
+        success: true,
+        errorMessage: null,
+        resultJson: cachedResult,
+      });
+
+      asUser(OWNER_ID);
+      const res = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+
+      // Must return the cached result with the _idempotent flag set.
+      expect(res.status).toBe(200);
+      expect(res.body._idempotent).toBe(true);
+      expect(res.body.attachmentsPosted).toBe(2);
+      // The external adapter must NOT have been called.
+      expect(syncMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("input validation", () => {
     it("returns 400 for a missing inspectionId", async () => {
       asUser(OWNER_ID);
