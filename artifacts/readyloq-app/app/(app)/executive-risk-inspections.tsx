@@ -505,8 +505,16 @@ export default function ExecutiveRiskInspectionsScreen() {
   filterTechRef.current = filterTech;
   filterDaysRef.current = filterDays;
 
+  // Mirror `loading` in a ref so loadMore can guard against firing while a
+  // filter-change (non-append) fetch is still in flight without introducing a
+  // stale closure over the state variable.
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+
   const loadMore = useCallback(() => {
-    if (loadingMore || !hasMore) return;
+    // Block if an initial/filter-change fetch is already in progress — the
+    // offset in loadedCountRef may still reflect the previous filter's page.
+    if (loadingMore || loadingRef.current || !hasMore) return;
     void fetchData(
       filterTechRef.current,
       filterDaysRef.current,
@@ -520,6 +528,9 @@ export default function ExecutiveRiskInspectionsScreen() {
   const applyTech = useCallback(
     (tech: string | null) => {
       setFilterTech(tech);
+      // Reset the loaded-count offset immediately so that any loadMore() call
+      // that fires before the fetch completes cannot use the old page offset.
+      loadedCountRef.current = 0;
       // Read filterDays from a ref-like closure: we use a functional form to
       // access the latest value without creating a new callback on each render.
       setFilterDays((currentDays) => {
@@ -534,6 +545,9 @@ export default function ExecutiveRiskInspectionsScreen() {
   const applyDays = useCallback(
     (days: number | null) => {
       setFilterDays(days);
+      // Reset the loaded-count offset immediately so that any loadMore() call
+      // that fires before the fetch completes cannot use the old page offset.
+      loadedCountRef.current = 0;
       setFilterTech((currentTech) => {
         if (userId) void savePersistedFilter(userId, riskLevel, { tech: currentTech, days });
         void fetchData(currentTech, days);
@@ -546,6 +560,8 @@ export default function ExecutiveRiskInspectionsScreen() {
   const clearFilters = useCallback(() => {
     setFilterTech(null);
     setFilterDays(null);
+    // Reset offset so loadMore cannot carry over the old page count.
+    loadedCountRef.current = 0;
     if (userId) void clearPersistedFilter(userId, riskLevel);
     void fetchData(null, null);
   }, [fetchData, riskLevel, userId]);
