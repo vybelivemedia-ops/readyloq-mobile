@@ -380,28 +380,148 @@ function SyncHistoryBadge({
   history: SyncHistoryEntry[];
   colors: ReturnType<typeof useColors>;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   // Always derive status from the newest entry (API returns newest-first).
   const latest = history[0];
   if (!latest) return null;
 
-  if (latest.success) {
-    return (
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <Ionicons name="checkmark-circle" size={15} color="#22c55e" />
-        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
-          Last synced {formatDate(latest.syncedAt)}
-        </Text>
-      </View>
-    );
-  }
+  // Show all entries returned by the API (up to the server-side limit of 100).
+  const entries = history;
+
+  const summaryIcon = latest.success
+    ? <Ionicons name="checkmark-circle" size={15} color="#22c55e" />
+    : <Ionicons name="alert-circle-outline" size={15} color={colors.destructive} style={{ marginTop: 1 }} />;
+
+  const summaryText = latest.success
+    ? `Last synced ${formatDate(latest.syncedAt)}`
+    : `Last sync failed · ${formatDate(latest.syncedAt)}`;
+
+  const summaryColor = latest.success ? colors.mutedForeground : colors.destructive;
+
+  // Only expandable when there are multiple entries to show.
+  const isExpandable = entries.length > 1;
 
   return (
-    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
-      <Ionicons name="alert-circle-outline" size={15} color={colors.destructive} style={{ marginTop: 1 }} />
-      <Text style={{ color: colors.destructive, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
-        Last sync failed · {formatDate(latest.syncedAt)}
-        {latest.errorMessage ? `\n${latest.errorMessage}` : ""}
-      </Text>
+    <View style={{ gap: 6 }}>
+      {/* Summary row — always visible; tappable only when there's more history to reveal */}
+      <Pressable
+        onPress={isExpandable ? () => setExpanded((v) => !v) : undefined}
+        style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+        accessibilityRole={isExpandable ? "button" : "text"}
+        accessibilityLabel={
+          isExpandable
+            ? expanded
+              ? "Collapse sync history"
+              : "Expand sync history"
+            : summaryText
+        }
+      >
+        {summaryIcon}
+        <Text style={{ color: summaryColor, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
+          {summaryText}
+        </Text>
+        {isExpandable && (
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={14}
+            color={colors.mutedForeground}
+          />
+        )}
+      </Pressable>
+
+      {/* Always show the error detail for the latest failed entry */}
+      {!latest.success && latest.errorMessage ? (
+        <Text
+          style={{
+            color: colors.destructive,
+            fontFamily: "Inter_400Regular",
+            fontSize: 12,
+            lineHeight: 16,
+            marginLeft: 21, // align under the text, past the icon + gap
+          }}
+        >
+          {latest.errorMessage}
+        </Text>
+      ) : null}
+
+      {/* Collapsible history list — only shown when multiple entries exist */}
+      {expanded && isExpandable && (
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            paddingTop: 8,
+            gap: 6,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+              marginBottom: 2,
+            }}
+          >
+            Sync history ({entries.length} {entries.length === 1 ? "attempt" : "attempts"})
+          </Text>
+
+          {entries.map((entry) => (
+            <View
+              key={entry.id}
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 8,
+                paddingVertical: 4,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border,
+              }}
+            >
+              <Ionicons
+                name={entry.success ? "checkmark-circle" : "close-circle"}
+                size={14}
+                color={entry.success ? "#22c55e" : colors.destructive}
+                style={{ marginTop: 1 }}
+              />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text
+                  style={{
+                    color: colors.mutedForeground,
+                    fontFamily: "Inter_400Regular",
+                    fontSize: 12,
+                  }}
+                >
+                  {formatDate(entry.syncedAt)}
+                  {" · "}
+                  <Text
+                    style={{
+                      color: entry.success ? "#22c55e" : colors.destructive,
+                      fontFamily: "Inter_600SemiBold",
+                    }}
+                  >
+                    {entry.success ? "Success" : "Failed"}
+                  </Text>
+                </Text>
+                {!entry.success && entry.errorMessage ? (
+                  <Text
+                    style={{
+                      color: colors.destructive,
+                      fontFamily: "Inter_400Regular",
+                      fontSize: 11,
+                      lineHeight: 15,
+                    }}
+                  >
+                    {entry.errorMessage}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
