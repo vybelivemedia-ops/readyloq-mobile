@@ -266,3 +266,101 @@ describe("applyFilterParamChange — deep-link navigation clears search query", 
     expect(next).not.toBe(original);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. KPI deep-link navigation — executive dashboard tiles open the correct tab
+//
+//  executive-dashboard.tsx pushes two distinct filter values:
+//    "Open Pipeline" KPI        → /reports-detail?filter=pipeline
+//    "Avg Quality Score" KPI    → /reports-detail?filter=critical
+//    "Critical Risk Sites" KPI  → /reports-detail?filter=critical
+//
+//  reports-detail.tsx seeds activeTab via normalizeFilterParam(filterParam) on
+//  first mount and re-syncs via applyFilterParamChange in a useEffect when the
+//  param changes. Both paths are exercised here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("KPI deep-link — 'Open Pipeline' tile opens the Pipeline tab", () => {
+  // Simulate first mount: useState initializer uses normalizeFilterParam.
+  it("normalizes 'pipeline' param to the pipeline tab on first mount", () => {
+    const tab = normalizeFilterParam("pipeline");
+    expect(tab).toBe("pipeline");
+  });
+
+  // Simulate param-change effect: applyFilterParamChange mirrors the useEffect.
+  it("applyFilterParamChange sets activeTab to 'pipeline' when param is 'pipeline'", () => {
+    const initial: AuditScreenState = { activeTab: "all", searchQuery: "" };
+    const next = applyFilterParamChange(initial, "pipeline");
+    expect(next.activeTab).toBe("pipeline");
+  });
+
+  it("does not accidentally land on 'all' for the pipeline param", () => {
+    expect(normalizeFilterParam("pipeline")).not.toBe("all");
+  });
+});
+
+describe("KPI deep-link — 'Critical Risk Sites' tile opens the Critical Risks tab", () => {
+  // Simulate first mount.
+  it("normalizes 'critical' param to the critical tab on first mount", () => {
+    const tab = normalizeFilterParam("critical");
+    expect(tab).toBe("critical");
+  });
+
+  // Simulate param-change effect.
+  it("applyFilterParamChange sets activeTab to 'critical' when param is 'critical'", () => {
+    const initial: AuditScreenState = { activeTab: "all", searchQuery: "" };
+    const next = applyFilterParamChange(initial, "critical");
+    expect(next.activeTab).toBe("critical");
+  });
+
+  it("does not accidentally land on 'all' for the critical param", () => {
+    expect(normalizeFilterParam("critical")).not.toBe("all");
+  });
+});
+
+describe("KPI deep-link — back navigation and return behaviour", () => {
+  // When the user presses back from reports-detail and then re-enters via
+  // the same KPI tile, expo-router may either reuse the mounted screen with
+  // unchanged params or push a fresh instance.  Either way the param-change
+  // effect fires and must resolve to the correct tab.
+
+  it("re-entering with filter=pipeline still lands on pipeline (idempotent)", () => {
+    // Screen already on pipeline; param fires again with same value.
+    const alreadyOnPipeline: AuditScreenState = { activeTab: "pipeline", searchQuery: "" };
+    const next = applyFilterParamChange(alreadyOnPipeline, "pipeline");
+    expect(next.activeTab).toBe("pipeline");
+  });
+
+  it("re-entering with filter=critical still lands on critical (idempotent)", () => {
+    const alreadyOnCritical: AuditScreenState = { activeTab: "critical", searchQuery: "" };
+    const next = applyFilterParamChange(alreadyOnCritical, "critical");
+    expect(next.activeTab).toBe("critical");
+  });
+
+  it("navigating back (no filter param) resets gracefully to 'all' without throwing", () => {
+    // When the user presses back, the route may no longer carry the filter
+    // param.  The screen should fall back to 'all' rather than staying stale.
+    const onPipeline: AuditScreenState = { activeTab: "pipeline", searchQuery: "" };
+    const next = applyFilterParamChange(onPipeline, undefined);
+    expect(next.activeTab).toBe("all");
+    expect(next.searchQuery).toBe("");
+  });
+
+  it("returning to reports-detail from back and then re-tapping pipeline restores pipeline", () => {
+    // Step 1: back — param is gone, resets to 'all'.
+    const step1 = applyFilterParamChange({ activeTab: "pipeline", searchQuery: "" }, undefined);
+    expect(step1.activeTab).toBe("all");
+
+    // Step 2: user taps "Open Pipeline" KPI again — param is 'pipeline'.
+    const step2 = applyFilterParamChange(step1, "pipeline");
+    expect(step2.activeTab).toBe("pipeline");
+  });
+
+  it("search query entered in one tab does not bleed into the tab opened via deep-link", () => {
+    // User searched while on 'all', then taps a KPI tile → query must clear.
+    const withSearch: AuditScreenState = { activeTab: "all", searchQuery: "oak street" };
+    const next = applyFilterParamChange(withSearch, "critical");
+    expect(next.activeTab).toBe("critical");
+    expect(next.searchQuery).toBe("");
+  });
+});
