@@ -290,6 +290,32 @@ describe("pipeline permissions", () => {
   });
 });
 
+describe("settings default — no settings row", () => {
+  it("returns synthesisFailuresSinceLastSuccess: 0 when no settings row exists", async () => {
+    // beforeEach already deletes opportunitySettingsTable, so companyAId has no row.
+    asUser(OWNER_A_ID);
+    const res = await request(app).get("/api/opportunities/settings");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("synthesisFailuresSinceLastSuccess", 0);
+  });
+
+  it("synthesisFailuresSinceLastSuccess is 0 in the fallback even when PATCH has never been called", async () => {
+    // Verify: no upsert path has ever run for companyAId in this test.
+    const rows = await db
+      .select()
+      .from(opportunitySettingsTable)
+      .where(eq(opportunitySettingsTable.companyId, companyAId));
+    expect(rows).toHaveLength(0);
+
+    asUser(OWNER_A_ID);
+    const res = await request(app).get("/api/opportunities/settings");
+    expect(res.status).toBe(200);
+    // The field must be present (not undefined) so mobile can safely compare > 0.
+    expect(res.body).toHaveProperty("synthesisFailuresSinceLastSuccess");
+    expect(res.body.synthesisFailuresSinceLastSuccess).toBe(0);
+  });
+});
+
 describe("synthesis grounding (no fabrication)", () => {
   const findings: Finding[] = [
     {
