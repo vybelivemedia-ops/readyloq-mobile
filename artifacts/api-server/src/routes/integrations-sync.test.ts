@@ -433,6 +433,96 @@ describe("POST /api/integrations/sync", () => {
     });
   });
 
+  describe("cooldown cache — cross-tenant isolation", () => {
+    // Ensure both companies have active integration configs and there is a
+    // recent successful sync log seeded for company A's inspection.
+    beforeEach(async () => {
+      // Company A config
+      await db
+        .delete(companyFieldIntegrationsTable)
+        .where(eq(companyFieldIntegrationsTable.companyId, companyId));
+      await db.insert(companyFieldIntegrationsTable).values({
+        companyId,
+        systemType: "pestpac",
+        accountId: "acc-cooldown-a",
+        apiKey: "key-cooldown-a",
+        enabled: true,
+      });
+
+      // Company B config
+      await db
+        .delete(companyFieldIntegrationsTable)
+        .where(eq(companyFieldIntegrationsTable.companyId, otherCompanyId));
+      await db.insert(companyFieldIntegrationsTable).values({
+        companyId: otherCompanyId,
+        systemType: "pestpac",
+        accountId: "acc-cooldown-b",
+        apiKey: "key-cooldown-b",
+        enabled: true,
+      });
+
+      // Seed a fresh successful sync log for company A's inspection so the
+      // cooldown window is active.
+      await db
+        .delete(inspectionSyncLogsTable)
+        .where(eq(inspectionSyncLogsTable.inspectionId, completedInspectionId));
+      await db.insert(inspectionSyncLogsTable).values({
+        companyId,
+        inspectionId: completedInspectionId,
+        systemType: "pestpac",
+        success: true,
+        errorMessage: null,
+        resultJson: {
+          success: true,
+          externalSystem: "pestpac",
+          postedNotes: true,
+          attachmentsPosted: 0,
+          noteRetries: 0,
+          attachmentRetries: 0,
+        },
+      });
+    });
+
+    it("company B is not served company A's cached cooldown result for the same inspectionId", async () => {
+      // Company A owns completedInspectionId. Company B attempting to sync
+      // that same ID must receive a 404 (inspection not found), NOT a 200
+      // carrying company A's cached result.
+      asUser(OUTSIDER_ID);
+      const res = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toMatch(/not found/i);
+      // The external sync adapter must never be called — the route must have
+      // rejected before reaching the cooldown or sync stage.
+      expect(syncMock).not.toHaveBeenCalled();
+    });
+
+    it("company A still receives its own cached result after company B's rejected attempt", async () => {
+      // First confirm company B is rejected.
+      asUser(OUTSIDER_ID);
+      const rejectedRes = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+      expect(rejectedRes.status).toBe(404);
+
+      // Now company A's request should hit the cooldown and get the cached
+      // result (pool mock returns locked=true and the real DB has the log row).
+      // We have to make the pool mock's cooldown path return the cached row via
+      // the drizzle query (which is not mocked — it hits the real test DB).
+      asUser(OWNER_ID);
+      const res = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+
+      // Cooldown cache hit → 200 with _idempotent flag, no external call.
+      expect(res.status).toBe(200);
+      expect(res.body._idempotent).toBe(true);
+      expect(syncMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("input validation", () => {
     it("returns 400 for a missing inspectionId", async () => {
       asUser(OWNER_ID);
