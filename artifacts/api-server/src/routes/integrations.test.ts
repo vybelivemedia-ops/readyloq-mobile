@@ -45,6 +45,7 @@ import {
   companiesTable,
   companyFieldIntegrationsTable,
   inspectionsTable,
+  inspectionSyncLogsTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -475,6 +476,84 @@ describe("tenant isolation — sync button cannot target another company's inspe
     await db.delete(companyFieldIntegrationsTable).where(
       eq(companyFieldIntegrationsTable.companyId, companyBId),
     );
+  });
+});
+
+describe("tenant isolation — sync-history cannot expose another company's logs", () => {
+  const HIST_OWNER_A_ID = "hist_tenant_owner_a_clerk_id";
+  const HIST_OWNER_B_ID = "hist_tenant_owner_b_clerk_id";
+
+  let histCompanyAId: number;
+  let histCompanyBId: number;
+  let histInspectionBId: number;
+
+  beforeAll(async () => {
+    histCompanyAId = await findOrCreateCompany("Hist Tenant Co A", "hist-tenant-co-a");
+    histCompanyBId = await findOrCreateCompany("Hist Tenant Co B", "hist-tenant-co-b");
+
+    for (const [clerkId, cid] of [
+      [HIST_OWNER_A_ID, histCompanyAId],
+      [HIST_OWNER_B_ID, histCompanyBId],
+    ] as [string, number][]) {
+      const existing = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.clerkUserId, clerkId));
+      if (existing.length === 0) {
+        await db.insert(usersTable).values({ clerkUserId: clerkId, role: "owner", companyId: cid });
+      }
+    }
+
+    // Seed a completed inspection belonging to company B.
+    authState.userId = HIST_OWNER_B_ID;
+    const inspRes = await request(app)
+      .post("/api/inspections")
+      .send({
+        siteAddress: "99 Moth Lane",
+        technicianName: "Tech B",
+        clientName: "Client B",
+        pestTypes: ["moths"],
+      });
+    expect(inspRes.status).toBe(201);
+    histInspectionBId = inspRes.body.id;
+
+    // Mark the inspection as completed.
+    await db
+      .update(inspectionsTable)
+      .set({ status: "completed", completedAt: new Date() })
+      .where(eq(inspectionsTable.id, histInspectionBId));
+
+    // Seed a sync log entry for company B's inspection directly into the DB.
+    await db.insert(inspectionSyncLogsTable).values({
+      companyId: histCompanyBId,
+      inspectionId: histInspectionBId,
+      systemType: "pestpac",
+      success: true,
+      errorMessage: null,
+      resultJson: { externalId: "ext-b-001" },
+    });
+  });
+
+  it("returns 200 with an empty logs array when company A queries company B's inspectionId", async () => {
+    authState.userId = HIST_OWNER_A_ID;
+
+    const res = await request(app)
+      .get(`/api/integrations/sync-history?inspectionId=${histInspectionBId}`);
+
+    expect(res.status).toBe(200);
+    // The response must not leak company B's sync log entry.
+    expect(res.body.logs).toEqual([]);
+  });
+
+  it("company B can still read its own sync history for the same inspectionId", async () => {
+    authState.userId = HIST_OWNER_B_ID;
+
+    const res = await request(app)
+      .get(`/api/integrations/sync-history?inspectionId=${histInspectionBId}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.logs).toHaveLength(1);
+    expect(res.body.logs[0].inspectionId).toBe(histInspectionBId);
   });
 });
 
