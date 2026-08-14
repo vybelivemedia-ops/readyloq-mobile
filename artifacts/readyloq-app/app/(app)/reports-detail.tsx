@@ -290,24 +290,27 @@ export default function ReportsDetailScreen() {
   const insets = useSafeAreaInsets();
   // Typed as string so expo-router doesn't infer the narrower AuditFilter union
   // before we have a chance to validate — normalizeFilterParam handles that.
-  const { filter: filterParam } = useLocalSearchParams<{ filter?: string }>();
+  const { filter: filterParam, q: qParam } = useLocalSearchParams<{ filter?: string; q?: string }>();
 
   const [activeTab, setActiveTab] = useState<AuditFilter>(
     normalizeFilterParam(filterParam),
   );
-  const [searchQuery, setSearchQuery] = useState("");
+  // Seed the search input from the `q` URL param on first mount.
+  const [searchQuery, setSearchQuery] = useState(
+    Array.isArray(qParam) ? (qParam[0] ?? "") : (qParam ?? ""),
+  );
 
-  // Keep the active tab in sync with the URL param.
+  // Keep the active tab (and search query) in sync with the URL params.
   // useState's initializer only runs at first mount; if expo-router reuses
   // the mounted screen instance (e.g. the route is already in the stack and
-  // a second push arrives with a different filter), filterParam changes but
-  // activeTab would be stale without this effect.
+  // a second push arrives with different params), filterParam/qParam change
+  // but the local state would be stale without this effect.
   useEffect(() => {
-    const next = applyFilterParamChange({ activeTab, searchQuery }, filterParam);
+    const next = applyFilterParamChange({ activeTab, searchQuery }, filterParam, qParam);
     setActiveTab(next.activeTab);
     setSearchQuery(next.searchQuery);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterParam]);
+  }, [filterParam, qParam]);
 
   // Clear search whenever the user manually switches tabs.
   const handleTabChange = (tab: AuditFilter) => {

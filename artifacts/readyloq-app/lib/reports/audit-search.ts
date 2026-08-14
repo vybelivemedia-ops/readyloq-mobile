@@ -107,16 +107,19 @@ export function applyTabChange(
 }
 
 /**
- * Pure state transition for when the `filter` URL param changes (deep-link or
- * back-navigation).
+ * Pure state transition for when the `filter` (and optional `q`) URL params
+ * change (deep-link or back-navigation).
  *
- * Mirrors the `useEffect([filterParam])` in ReportsDetailScreen: normalises
- * the raw param, updates the active tab, and clears the search query so
- * results from the previous tab don't leak.
+ * Mirrors the `useEffect([filterParam, qParam])` in ReportsDetailScreen:
+ * normalises the raw filter param, updates the active tab, and seeds the
+ * search query from `rawQ` when provided (falling back to "" so results from
+ * the previous tab don't leak when no search term is supplied).
  */
 export function applyFilterParamChange(
   state: AuditScreenState,
   rawParam: string | string[] | undefined,
+  rawQ?: string | string[] | undefined,
 ): AuditScreenState {
-  return { activeTab: normalizeFilterParam(rawParam), searchQuery: "" };
+  const q = Array.isArray(rawQ) ? (rawQ[0] ?? "") : (rawQ ?? "");
+  return { activeTab: normalizeFilterParam(rawParam), searchQuery: q };
 }
