@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import request from "supertest";
 
 /**
@@ -30,9 +30,26 @@ vi.mock("@clerk/express", async (importOriginal) => {
 });
 
 // Stub the AI narrative so POST /reports/:id/generate-narrative doesn't hit a
-// real model. The narrative tests here don't exercise generation, only shape.
+// real model. Returns a minimal but fully-typed AiReportNarrative object.
+const STUB_NARRATIVE = {
+  executiveSummary: "Stub executive summary.",
+  inspectionFindings: "Stub findings.",
+  evidenceObserved: "Stub evidence.",
+  pestActivityAssessment: "Stub assessment.",
+  structuralDeficiencies: "None observed.",
+  sanitationConcerns: "None observed.",
+  recommendedCorrectiveActions: ["Stub action 1"],
+  monitoringRecommendations: ["Stub monitoring 1"],
+  followUpSchedule: "30 days.",
+  technicianNotes: "Stub notes.",
+  managerReviewNotes: "Stub manager notes.",
+  propertyType: "residential",
+  model: "stub-model",
+  generatedAt: new Date(0).toISOString(),
+};
+
 vi.mock("../lib/report-narrative-ai", () => ({
-  generateReportNarrative: vi.fn(async () => "Stub narrative for testing."),
+  generateReportNarrative: vi.fn(async () => STUB_NARRATIVE),
   derivePropertyType: vi.fn(() => "residential"),
 }));
 
@@ -61,6 +78,7 @@ import {
   reportsTable,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
+import * as reportNarrativeAi from "../lib/report-narrative-ai";
 
 // ─── Stable Clerk IDs (prefixed to avoid cross-suite collisions) ──────────────
 
@@ -249,6 +267,55 @@ describe("empty-findings shape guarantee", () => {
     // recommendations and exclusionOpportunities must still be arrays
     expect(Array.isArray(res.body.recommendations)).toBe(true);
     expect(Array.isArray(res.body.exclusionOpportunities)).toBe(true);
+  });
+});
+
+// ─── Narrative generation — empty findings ────────────────────────────────────
+
+describe("generate-narrative — empty findings", () => {
+  it("returns 200, persists aiNarrative object, and calls generator with findings: []", async () => {
+    // Reset call history so we can assert on this specific invocation
+    vi.mocked(reportNarrativeAi.generateReportNarrative).mockClear();
+
+    // Create a report with no AI findings so the findings array is empty
+    asUser(OWNER_ID);
+    const createRes = await request(app)
+      .post("/api/reports")
+      .send({ inspectionId, title: "Empty-findings narrative test", includeAiFindings: false });
+    expect(createRes.status).toBe(201);
+    const reportId: number = createRes.body.id;
+    expect(createRes.body.findings).toHaveLength(0);
+
+    // Call the narrative generator
+    const narRes = await request(app)
+      .post(`/api/reports/${reportId}/generate-narrative`)
+      .send({});
+
+    expect(narRes.status).toBe(200);
+
+    // The stub was called exactly once, with an empty findings array — confirming
+    // the route doesn't hallucinate findings or crash before reaching the generator.
+    expect(reportNarrativeAi.generateReportNarrative).toHaveBeenCalledOnce();
+    const callArg = vi.mocked(reportNarrativeAi.generateReportNarrative).mock.calls[0]![0];
+    expect(Array.isArray(callArg.findings)).toBe(true);
+    expect(callArg.findings).toHaveLength(0);
+
+    // The returned aiNarrative must be the normalized object (not a string)
+    expect(narRes.body.aiNarrative).toBeDefined();
+    expect(typeof narRes.body.aiNarrative).toBe("object");
+    expect(typeof narRes.body.aiNarrative.executiveSummary).toBe("string");
+    expect(narRes.body.aiNarrative.executiveSummary.length).toBeGreaterThan(0);
+
+    // The DB row must also have been updated with the AiReportNarrative object
+    const [row] = await db
+      .select()
+      .from(reportsTable)
+      .where(eq(reportsTable.id, reportId));
+    expect(row).toBeDefined();
+    expect(row.aiNarrative).toBeDefined();
+    expect(typeof row.aiNarrative).toBe("object");
+    expect(typeof row.aiNarrative!.executiveSummary).toBe("string");
+    expect(row.aiNarrative!.executiveSummary.length).toBeGreaterThan(0);
   });
 });
 
