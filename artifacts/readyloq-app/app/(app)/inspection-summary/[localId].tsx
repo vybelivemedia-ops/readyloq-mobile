@@ -310,25 +310,92 @@ export default function InspectionSummaryScreen() {
           </View>
         </Card>
 
-        {/* AI results — appear as the server finishes finalization. */}
+        {/* AI results — appear as the server finishes finalization.
+            Status semantics (AnalysisResult.status):
+              "complete"  — server finished the pipeline; findings may be empty (clean inspection)
+              anything else — still processing or a terminal failure
+            analysisErrors (number | null) — count of per-image errors during the run;
+              > 0 on an otherwise "complete" result means partial generation. */}
         {finalized ? (
-          findings.length > 0 || analysisQ.isSuccess ? (
+          analysisQ.isError ? (
+            // HTTP-level failure: the query itself failed (network, 500, auth).
+            <Card style={{ gap: 8 }}>
+              <SectionTitle icon="sparkles" title="AI findings" />
+              <SectionNotGenerated
+                reason="AI analysis couldn't be retrieved. This may be a temporary issue — try viewing the full inspection or contact support if it persists."
+                icon="alert-circle-outline"
+                tone="error"
+              />
+            </Card>
+          ) : analysisQ.isSuccess && analysis != null && analysis.status !== "complete" ? (
+            // Result returned but the pipeline didn't finish (status != "complete").
+            <Card style={{ gap: 8 }}>
+              <SectionTitle icon="sparkles" title="AI findings" />
+              <SectionNotGenerated
+                reason="AI analysis didn't complete for this inspection. The server may have skipped it or encountered an error — no action needed."
+                icon="alert-circle-outline"
+                tone="error"
+              />
+            </Card>
+          ) : analysisQ.isSuccess && analysis != null ? (
+            // Pipeline completed (status === "complete"). Show findings or clean-inspection copy.
             <Card style={{ gap: 8 }}>
               <SectionTitle icon="sparkles" title={`AI findings (${findings.length})`} />
-              {findings.length === 0 ? (
+              {(analysis.analysisErrors ?? 0) > 0 && findings.length === 0 ? (
+                // Completed with errors and zero usable findings — partial failure.
+                <SectionNotGenerated
+                  reason={`Analysis completed with ${analysis.analysisErrors} error${(analysis.analysisErrors ?? 0) !== 1 ? "s" : ""}. Some or all photos couldn't be processed — check the full inspection for details.`}
+                  icon="alert-circle-outline"
+                  tone="error"
+                />
+              ) : findings.length === 0 && record.photos.length === 0 ? (
+                // No photos captured at all — AI had nothing to work with.
+                <SectionNotGenerated
+                  reason="No photos were captured for this inspection, so AI analysis was skipped."
+                  icon="camera-outline"
+                />
+              ) : findings.length === 0 ? (
+                // Completed successfully with zero findings (clean inspection).
                 <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
                   No pest activity or conducive conditions detected in the evidence.
                 </Text>
               ) : (
                 findings.slice(0, 5).map((f) => <FindingRow key={f.id} finding={f} />)
               )}
+              {(analysis.analysisErrors ?? 0) > 0 && findings.length > 0 ? (
+                // Completed with some errors but still produced findings — warn without hiding.
+                <SectionNotGenerated
+                  reason={`${analysis.analysisErrors} photo${(analysis.analysisErrors ?? 0) !== 1 ? "s" : ""} couldn't be processed — findings above may be incomplete.`}
+                  icon="alert-circle-outline"
+                  tone="error"
+                />
+              ) : null}
               {findings.length > 5 ? (
                 <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
                   +{findings.length - 5} more — view the full inspection for everything.
                 </Text>
               ) : null}
             </Card>
+          ) : analysisQ.isSuccess && analysis == null ? (
+            // Server finalized the inspection but produced no analysis record at all —
+            // the AI pipeline was skipped (e.g. no analyzable photos or a server-side
+            // skip). This is a stable terminal state, not a loading state.
+            <Card style={{ gap: 8 }}>
+              <SectionTitle icon="sparkles" title="AI findings" />
+              {record.photos.length === 0 ? (
+                <SectionNotGenerated
+                  reason="No photos were captured for this inspection, so AI analysis was skipped."
+                  icon="camera-outline"
+                />
+              ) : (
+                <SectionNotGenerated
+                  reason="AI analysis wasn't generated for this inspection. This can happen when photos couldn't be processed — no action is needed."
+                  icon="sparkles-outline"
+                />
+              )}
+            </Card>
           ) : (
+            // Query still in flight — show progress indicator.
             <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
@@ -631,6 +698,9 @@ function DeliverySection({
 }) {
   const colors = useColors();
   const [methods, setMethods] = useState<DeliveryMethod[]>([]);
+  // Track whether the async registry probe has finished so we never show
+  // "unavailable" during the brief window before the Promise resolves.
+  const [methodsLoaded, setMethodsLoaded] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   // Cache the generated PDF URI so subsequent Print / Share / Email taps reuse
@@ -675,6 +745,7 @@ function DeliverySection({
         const preview = m.filter((x) => x.id === "preview");
         const rest = m.filter((x) => x.id !== "preview");
         setMethods([...preview, ...rest]);
+        setMethodsLoaded(true);
       }
     });
     return () => {
@@ -682,7 +753,22 @@ function DeliverySection({
     };
   }, []);
 
-  if (methods.length === 0) return null;
+  // While the registry is still probing available channels, render nothing —
+  // the Promise resolves in milliseconds and we don't want a flash of
+  // "unavailable" before the methods list is known.
+  if (!methodsLoaded) return null;
+
+  if (methods.length === 0) {
+    return (
+      <Card style={{ gap: 8 }}>
+        <SectionTitle icon="paper-plane-outline" title="Deliver report" />
+        <SectionNotGenerated
+          reason="No delivery channels are available on this device. Try again after the app updates."
+          icon="alert-circle-outline"
+        />
+      </Card>
+    );
+  }
 
   // Soft context (no pdfUri) — used both for delivery and for queueing failures.
   const buildSoftContext = () => ({
@@ -989,7 +1075,16 @@ function SyncStatusCard({
   syncAttempts?: number;
 }) {
   const colors = useColors();
-  if (!phase) return null;
+  if (!phase) {
+    return (
+      <Card style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <Ionicons name="cloud-offline-outline" size={22} color={colors.mutedForeground} />
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
+          Sync status unavailable
+        </Text>
+      </Card>
+    );
+  }
 
   const failedDetail = [
     error ?? "Something went wrong. We'll keep retrying automatically.",
@@ -1348,6 +1443,44 @@ function PhotoViewer({
 }
 
 // ─── Small pieces ────────────────────────────────────────────────────────────
+
+/**
+ * Lightweight "not generated" placeholder for report sections that couldn't
+ * be produced. Distinguishes between three causes so technicians know whether
+ * to recapture, wait, or report a bug:
+ *   - no photos captured          → icon "camera-outline"
+ *   - AI skipped / no data        → icon "sparkles-outline" (default)
+ *   - generation / retrieval error → icon "alert-circle-outline", tone "error"
+ */
+function SectionNotGenerated({
+  reason,
+  icon = "sparkles-outline",
+  tone = "muted",
+}: {
+  reason: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  /** "muted" = neutral grey; "error" = destructive red */
+  tone?: "muted" | "error";
+}) {
+  const colors = useColors();
+  const iconColor = tone === "error" ? colors.destructive : colors.mutedForeground;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 2 }}>
+      <Ionicons name={icon} size={15} color={iconColor} style={{ marginTop: 1 }} />
+      <Text
+        style={{
+          color: tone === "error" ? colors.destructive : colors.mutedForeground,
+          fontFamily: "Inter_400Regular",
+          fontSize: 13,
+          lineHeight: 19,
+          flex: 1,
+        }}
+      >
+        {reason}
+      </Text>
+    </View>
+  );
+}
 
 function SectionTitle({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
   const colors = useColors();

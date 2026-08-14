@@ -253,6 +253,23 @@ export declare const analysisResultsTable: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        analysisErrors: import("drizzle-orm/pg-core").PgColumn<{
+            name: "analysis_errors";
+            tableName: "analysis_results";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "analysis_results";
@@ -503,6 +520,7 @@ export declare const insertAnalysisResultSchema: z.ZodObject<{
     riskLevel: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     technicianFeedback: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     feedbackStatus: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    analysisErrors: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
 }, {
     out: {};
     in: {};

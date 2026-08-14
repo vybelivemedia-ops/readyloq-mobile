@@ -68898,6 +68898,10 @@ var analysisResultsTable = pgTable("analysis_results", {
   riskLevel: text("risk_level"),
   technicianFeedback: text("technician_feedback"),
   feedbackStatus: text("feedback_status"),
+  // Count of photos that failed AI analysis in the most recent analyze run
+  // (storage/model/parse errors). Null = pre-migration row or no run yet;
+  // 0 = run completed with zero failures; >0 = partial failure.
+  analysisErrors: integer("analysis_errors"),
   createdAt: timestamp("created_at").notNull().defaultNow()
 });
 var insertAnalysisResultSchema = createInsertSchema(analysisResultsTable).omit({ id: true, createdAt: true, companyId: true });
@@ -77384,7 +77388,7 @@ router2.post("/accept-invite", requireAuth, async (req, res) => {
 var auth_default = router2;
 
 // src/routes/inspections.ts
-var import_express4 = __toESM(require_express2(), 1);
+var import_express5 = __toESM(require_express2(), 1);
 
 // src/lib/tenant.ts
 function getCompanyId(req) {
@@ -88172,950 +88176,8 @@ function computeCoverage(input) {
   };
 }
 
-// src/lib/property-intelligence.ts
-var STREET_SUFFIXES = {
-  street: "st",
-  st: "st",
-  avenue: "ave",
-  ave: "ave",
-  boulevard: "blvd",
-  blvd: "blvd",
-  road: "rd",
-  rd: "rd",
-  drive: "dr",
-  dr: "dr",
-  lane: "ln",
-  ln: "ln",
-  court: "ct",
-  ct: "ct",
-  place: "pl",
-  pl: "pl",
-  parkway: "pkwy",
-  pkwy: "pkwy",
-  highway: "hwy",
-  hwy: "hwy"
-};
-var UNIT_TOKENS = /* @__PURE__ */ new Set(["suite", "ste", "unit", "apt", "apartment", "fl", "floor", "bldg", "building"]);
-function normalizeAddressKey(siteAddress) {
-  if (!siteAddress) return "";
-  const cleaned = siteAddress.toLowerCase().replace(/[.,#]/g, " ").replace(/\s+/g, " ").trim();
-  const tokens = cleaned.split(" ");
-  const out = [];
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i];
-    if (!t) continue;
-    if (UNIT_TOKENS.has(t)) {
-      i++;
-      continue;
-    }
-    out.push(STREET_SUFFIXES[t] ?? t);
-  }
-  return out.join("-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
-}
-function propertyTypeFor(clientName, siteAddress) {
-  const s2 = `${clientName ?? ""} ${siteAddress}`.toLowerCase();
-  if (s2.includes("warehouse") || s2.includes("industrial")) return "Warehouse";
-  if (s2.includes("restaurant") || s2.includes("bakery") || s2.includes("cafe") || s2.includes("kitchen")) return "Restaurant";
-  if (s2.includes("apartment") || s2.includes("hoa") || s2.includes("residence hall") || s2.includes("campus")) return "Multifamily";
-  if (s2.includes("office") || s2.includes("commerce") || s2.includes("square")) return "Commercial";
-  if (s2.includes("residence") || s2.includes("home") || s2.includes("house")) return "Single Family";
-  return "Commercial";
-}
-function severityRank(sev) {
-  if (sev === "critical") return 4;
-  if (sev === "high") return 3;
-  if (sev === "medium") return 2;
-  if (sev === "low") return 1;
-  return 0;
-}
-function deriveRecurringIssues(entries) {
-  const map2 = /* @__PURE__ */ new Map();
-  for (const entry of entries) {
-    const ts = entry.date ? new Date(entry.date).getTime() : null;
-    for (const f of entry.findings ?? []) {
-      const cat = f.category || "Observation";
-      const cur = map2.get(cat) ?? { count: 0, severity: f.severity ?? "low", lastSeen: ts, sample: f.description ?? null };
-      cur.count += 1;
-      if (severityRank(f.severity) > severityRank(cur.severity)) cur.severity = f.severity ?? cur.severity;
-      if (ts !== null && (cur.lastSeen === null || ts > cur.lastSeen)) cur.lastSeen = ts;
-      if (!cur.sample && f.description) cur.sample = f.description;
-      map2.set(cat, cur);
-    }
-  }
-  return Array.from(map2.entries()).map(([category, v]) => ({
-    category,
-    count: v.count,
-    severity: v.severity,
-    lastSeen: v.lastSeen !== null ? new Date(v.lastSeen).toISOString() : null,
-    sampleDescription: v.sample
-  })).sort((a, b) => b.count - a.count || severityRank(b.severity) - severityRank(a.severity));
-}
-
-// src/lib/property-memory-writer.ts
-function findingPestName(f) {
-  const raw = f.reviewStatus === "corrected" ? f.technicianSpecies ?? f.species : f.species;
-  if (!raw?.trim()) return null;
-  return raw.replace(/^Possible:\s*/i, "").trim() || null;
-}
-async function writePropertyMemory(input) {
-  const { companyId, inspectionId, siteAddress } = input;
-  const addressKey = normalizeAddressKey(siteAddress);
-  if (!addressKey) {
-    logger2.debug(
-      { companyId, inspectionId },
-      "writePropertyMemory: empty address key \u2014 skipping"
-    );
-    return;
-  }
-  const allInspections = await db.select().from(inspectionsTable).where(
-    and(
-      eq(inspectionsTable.companyId, companyId),
-      eq(inspectionsTable.status, "completed")
-    )
-  );
-  const matchedInspections = allInspections.filter(
-    (i) => normalizeAddressKey(i.siteAddress ?? "") === addressKey
-  );
-  if (matchedInspections.length === 0) {
-    logger2.debug(
-      { companyId, inspectionId, addressKey },
-      "writePropertyMemory: no completed inspections at address \u2014 skipping"
-    );
-    return;
-  }
-  const inspectionIds = matchedInspections.map((i) => i.id);
-  const analyses = await db.select().from(analysisResultsTable).where(
-    and(
-      eq(analysisResultsTable.companyId, companyId),
-      eq(analysisResultsTable.status, "complete"),
-      inArray(analysisResultsTable.inspectionId, inspectionIds)
-    )
-  ).orderBy(desc(analysisResultsTable.createdAt));
-  const latestByInspection = /* @__PURE__ */ new Map();
-  for (const row of analyses) {
-    if (row.inspectionId == null || latestByInspection.has(row.inspectionId)) continue;
-    latestByInspection.set(row.inspectionId, row);
-  }
-  const pestsSeen = /* @__PURE__ */ new Set();
-  const historicalPests = [];
-  const findingFreq = /* @__PURE__ */ new Map();
-  for (const insp of matchedInspections) {
-    const analysis = latestByInspection.get(insp.id);
-    const findings = analysis?.findings ?? [];
-    for (const f of findings) {
-      const name = findingPestName(f);
-      if (!name) continue;
-      const key = name.toLowerCase();
-      if (!pestsSeen.has(key)) {
-        pestsSeen.add(key);
-        historicalPests.push(name);
-      }
-    }
-    const seenThisInsp = /* @__PURE__ */ new Set();
-    for (const f of findings) {
-      const cat = f.category ?? "observation";
-      const desc2 = f.description ?? cat;
-      const key = `${cat}::${desc2}`;
-      if (seenThisInsp.has(key)) continue;
-      seenThisInsp.add(key);
-      const entry = findingFreq.get(key);
-      if (entry) {
-        entry.count++;
-        entry.hf.severity = f.severity ?? entry.hf.severity;
-      } else {
-        findingFreq.set(key, {
-          hf: {
-            category: cat,
-            description: desc2,
-            frequency: 1,
-            severity: f.severity ?? void 0
-          },
-          count: 1
-        });
-      }
-    }
-  }
-  const historicalFindings = Array.from(findingFreq.values()).map(
-    ({ hf, count: count2 }) => ({ ...hf, frequency: count2 })
-  );
-  const lastVisitedAt = matchedInspections.reduce((best, i) => {
-    const ts = i.completedAt ? new Date(i.completedAt) : null;
-    if (!ts) return best;
-    return best === null || ts > best ? ts : best;
-  }, null);
-  const [existing] = await db.select().from(propertyMemoryTable).where(
-    and(
-      eq(propertyMemoryTable.companyId, companyId),
-      eq(propertyMemoryTable.addressKey, addressKey)
-    )
-  ).limit(1);
-  const now = /* @__PURE__ */ new Date();
-  if (existing) {
-    await db.update(propertyMemoryTable).set({
-      siteAddress,
-      lastInspectionId: inspectionId,
-      lastVisitedAt,
-      historicalPests,
-      historicalFindings,
-      updatedAt: now
-    }).where(
-      and(
-        eq(propertyMemoryTable.companyId, companyId),
-        eq(propertyMemoryTable.addressKey, addressKey)
-      )
-    );
-    logger2.info(
-      {
-        companyId,
-        inspectionId,
-        addressKey,
-        pests: historicalPests.length,
-        findings: historicalFindings.length
-      },
-      "writePropertyMemory: updated"
-    );
-  } else {
-    await db.insert(propertyMemoryTable).values({
-      companyId,
-      addressKey,
-      siteAddress,
-      lastInspectionId: inspectionId,
-      lastVisitedAt,
-      historicalPests,
-      historicalFindings
-    });
-    logger2.info(
-      {
-        companyId,
-        inspectionId,
-        addressKey,
-        pests: historicalPests.length,
-        findings: historicalFindings.length
-      },
-      "writePropertyMemory: created"
-    );
-  }
-}
-
-// src/lib/push-notifications.ts
-var EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
-async function sendExpoPush(messages2, ctx) {
-  if (messages2.length === 0) return;
-  try {
-    const response = await fetch(EXPO_PUSH_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json"
-      },
-      body: JSON.stringify(messages2)
-    });
-    if (!response.ok) {
-      const body = await response.text().catch(() => "(unreadable)");
-      void logErrorEvent("notification", {
-        companyId: ctx.companyId,
-        inspectionId: ctx.inspectionId,
-        message: `Expo push API returned ${response.status}: ${body}`,
-        context: { stage: "push_send", tokenCount: messages2.length }
-      });
-      return;
-    }
-    const json3 = await response.json();
-    const tickets = json3.data ?? [];
-    const staleTokens = [];
-    const failedTokens = [];
-    for (let i = 0; i < tickets.length; i++) {
-      const ticket = tickets[i];
-      if (ticket.status !== "error") continue;
-      const token = messages2[i]?.to;
-      if (ticket.details?.error === "DeviceNotRegistered") {
-        if (token) staleTokens.push(token);
-      } else {
-        void logErrorEvent("notification", {
-          companyId: ctx.companyId,
-          inspectionId: ctx.inspectionId,
-          message: `Expo push ticket error: ${ticket.message ?? "unknown"}`,
-          context: { stage: "push_ticket", reason: ticket.details?.error ?? "unknown" }
-        });
-        if (token) failedTokens.push(token);
-      }
-    }
-    for (const staleToken of staleTokens) {
-      void db.update(usersTable).set({ pushToken: null, pushLastFailedAt: sql`now()` }).where(eq(usersTable.pushToken, staleToken)).catch((err) => {
-        void logErrorEvent("notification", {
-          companyId: ctx.companyId,
-          inspectionId: ctx.inspectionId,
-          message: `Failed to clear stale push token: ${err instanceof Error ? err.message : String(err)}`,
-          context: { stage: "clear_stale_token" }
-        });
-      });
-    }
-    for (const failedToken of failedTokens) {
-      void db.update(usersTable).set({ pushLastFailedAt: sql`now()` }).where(eq(usersTable.pushToken, failedToken)).catch((err) => {
-        void logErrorEvent("notification", {
-          companyId: ctx.companyId,
-          inspectionId: ctx.inspectionId,
-          message: `Failed to record push delivery failure: ${err instanceof Error ? err.message : String(err)}`,
-          context: { stage: "record_push_failure" }
-        });
-      });
-    }
-  } catch (err) {
-    void logErrorEvent("notification", {
-      companyId: ctx.companyId,
-      inspectionId: ctx.inspectionId,
-      message: `Expo push send failed: ${err instanceof Error ? err.message : String(err)}`,
-      context: { stage: "push_send", tokenCount: messages2.length }
-    });
-  }
-}
-async function notifyCriticalInspection(input) {
-  const { companyId, inspectionId, siteAddress, technicianName } = input;
-  const ctx = { companyId, inspectionId };
-  let owners = [];
-  try {
-    owners = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(
-      and(
-        eq(usersTable.companyId, companyId),
-        eq(usersTable.role, "owner"),
-        eq(usersTable.pushNotificationsEnabled, true)
-      )
-    );
-  } catch (err) {
-    void logErrorEvent("notification", {
-      companyId,
-      inspectionId,
-      message: `Failed to fetch owner push tokens: ${err instanceof Error ? err.message : String(err)}`,
-      context: { stage: "push_fetch_tokens" }
-    });
-    return;
-  }
-  const tokens = owners.map((o) => o.pushToken).filter((t) => typeof t === "string" && t.startsWith("ExponentPushToken["));
-  if (tokens.length === 0) return;
-  const tech = technicianName ? ` by ${technicianName}` : "";
-  const shortAddress = siteAddress.length > 60 ? siteAddress.slice(0, 57) + "\u2026" : siteAddress;
-  const messages2 = tokens.map((token) => ({
-    to: token,
-    title: "\u{1F6A8} Critical Risk Inspection Completed",
-    body: `${shortAddress}${tech} \u2014 tap to view`,
-    sound: "default",
-    channelId: "critical-alerts",
-    data: {
-      screen: "inspection",
-      inspectionId,
-      companyId
-    }
-  }));
-  await sendExpoPush(messages2, ctx);
-}
-
-// src/lib/inspection-complete.ts
-async function ensureReportForInspection(input) {
-  const { companyId, inspectionId } = input;
-  const [existing] = await db.select().from(reportsTable).where(
-    and(eq(reportsTable.companyId, companyId), eq(reportsTable.inspectionId, inspectionId))
-  ).orderBy(desc(reportsTable.createdAt)).limit(1);
-  if (existing) return existing;
-  const [inspection] = await db.select().from(inspectionsTable).where(
-    and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
-  );
-  if (!inspection) return null;
-  const [latest] = await db.select().from(analysisResultsTable).where(
-    and(
-      eq(analysisResultsTable.companyId, companyId),
-      eq(analysisResultsTable.inspectionId, inspectionId)
-    )
-  ).orderBy(desc(analysisResultsTable.createdAt)).limit(1);
-  const findings = latest?.findings ?? [];
-  const recommendations = latest?.recommendations ?? [];
-  const exclusionOpportunities = findings.filter((f) => f.exclusionOpportunity).map((f) => `${f.category}: ${f.description}`);
-  const [row] = await db.insert(reportsTable).values({
-    companyId,
-    inspectionId,
-    title: `Inspection Report \u2014 ${inspection.siteAddress}`,
-    clientName: inspection.clientName ?? null,
-    siteAddress: inspection.siteAddress,
-    status: "complete",
-    findings,
-    recommendations,
-    treatmentNotes: null,
-    exclusionOpportunities,
-    technicianName: inspection.technicianName,
-    inspectionDate: inspection.createdAt.toISOString().split("T")[0],
-    severity: inspection.severity ?? null
-  }).returning();
-  return row ?? null;
-}
-async function runInspectionFinalization(input) {
-  const { companyId, inspectionId, reportId, userId } = input;
-  const [inspection] = await db.select().from(inspectionsTable).where(
-    and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
-  );
-  if (!inspection) return;
-  const [latestAnalysis] = await db.select().from(analysisResultsTable).where(
-    and(
-      eq(analysisResultsTable.companyId, companyId),
-      eq(analysisResultsTable.inspectionId, inspectionId)
-    )
-  ).orderBy(desc(analysisResultsTable.createdAt)).limit(1);
-  const findings = latestAnalysis?.findings ?? [];
-  const recommendations = latestAnalysis?.recommendations ?? [];
-  if (latestAnalysis) {
-    try {
-      const photoZones = latestAnalysis.photoZones ?? {};
-      const coveredZoneSlugs = [
-        ...Object.values(photoZones),
-        ...findings.flatMap((f) => zonesFromFinding(f))
-      ];
-      const coverage = computeCoverage({
-        propertyType: derivePropertyType(inspection.notes),
-        pestTypes: inspection.pestTypes ?? [],
-        coveredZoneSlugs
-      });
-      await db.update(analysisResultsTable).set({ coverage }).where(
-        and(
-          eq(analysisResultsTable.id, latestAnalysis.id),
-          eq(analysisResultsTable.companyId, companyId)
-        )
-      );
-    } catch {
-      void logErrorEvent("ai", {
-        companyId,
-        userId,
-        message: "Complete-inspection: coverage recompute failed",
-        inspectionId,
-        context: { stage: "complete_coverage" }
-      });
-    }
-  }
-  if (reportId !== null) {
-    try {
-      const [report] = await db.select().from(reportsTable).where(and(eq(reportsTable.id, reportId), eq(reportsTable.companyId, companyId)));
-      if (report) {
-        let reportFindings = report.findings ?? [];
-        let reportRecommendations = report.recommendations ?? [];
-        if (latestAnalysis) {
-          reportFindings = findings;
-          reportRecommendations = recommendations;
-          const exclusionOpportunities = reportFindings.filter((f) => f.exclusionOpportunity).map((f) => `${f.category}: ${f.description}`);
-          await db.update(reportsTable).set({
-            findings: reportFindings,
-            recommendations: reportRecommendations,
-            exclusionOpportunities,
-            severity: inspection.severity ?? report.severity ?? null
-          }).where(
-            and(eq(reportsTable.id, reportId), eq(reportsTable.companyId, companyId))
-          );
-        }
-        const media = await db.select().from(inspectionMediaTable).where(
-          and(
-            eq(inspectionMediaTable.inspectionId, inspectionId),
-            eq(inspectionMediaTable.companyId, companyId)
-          )
-        );
-        const voiceTranscripts = media.filter((m) => m.mediaType === "voice").map((m) => m.caption ?? m.filename ?? "").filter((s2) => s2.length > 0);
-        const photoMedia = media.filter((m) => m.mediaType === "photo");
-        const photoLabels = photoMedia.map((m) => [m.filename, m.caption].filter(Boolean).join(" \u2014 ")).filter((s2) => s2.length > 0);
-        const narrative = await generateReportNarrative({
-          title: report.title,
-          siteAddress: report.siteAddress,
-          clientName: report.clientName ?? null,
-          technicianName: report.technicianName,
-          inspectionDate: report.inspectionDate,
-          severity: inspection.severity ?? report.severity ?? null,
-          propertyType: derivePropertyType(inspection.notes),
-          inspectionType: null,
-          pestTypes: inspection.pestTypes ?? [],
-          fieldNotes: inspection.notes ?? null,
-          treatmentNotes: report.treatmentNotes ?? null,
-          findings: reportFindings,
-          recommendations: reportRecommendations,
-          voiceTranscripts,
-          photoLabels,
-          photoCount: photoMedia.length,
-          riskLevel: latestAnalysis?.riskLevel ?? null
-        });
-        await db.update(reportsTable).set({ aiNarrative: narrative, pdfUrl: `/api/reports/${reportId}/html` }).where(and(eq(reportsTable.id, reportId), eq(reportsTable.companyId, companyId)));
-      }
-    } catch {
-      void logErrorEvent("report", {
-        companyId,
-        userId,
-        message: "Complete-inspection: report narrative generation failed",
-        inspectionId,
-        context: { stage: "complete_narrative" }
-      });
-    }
-  }
-  if (latestAnalysis) {
-    try {
-      const [existing] = await db.select().from(customerSummariesTable).where(
-        and(
-          eq(customerSummariesTable.inspectionId, inspectionId),
-          eq(customerSummariesTable.companyId, companyId)
-        )
-      ).limit(1);
-      if (!existing || existing.status !== "approved") {
-        const body = await generateCustomerSummaryBody({
-          siteAddress: inspection.siteAddress,
-          technicianName: inspection.technicianName,
-          inspectionDate: inspection.createdAt,
-          findings,
-          recommendations
-        });
-        if (existing) {
-          await db.update(customerSummariesTable).set({ body, updatedAt: /* @__PURE__ */ new Date() }).where(
-            and(
-              eq(customerSummariesTable.id, existing.id),
-              eq(customerSummariesTable.companyId, companyId)
-            )
-          );
-        } else {
-          await db.insert(customerSummariesTable).values({ companyId, inspectionId, body, status: "draft" });
-        }
-      }
-    } catch (err) {
-      void logErrorEvent("ai", {
-        companyId,
-        userId,
-        message: err instanceof SummaryFidelityError ? "Complete-inspection: customer summary failed fidelity check" : "Complete-inspection: customer summary generation failed",
-        inspectionId,
-        context: { stage: "complete_customer_summary" }
-      });
-    }
-  }
-  try {
-    await runOpportunitySynthesis({ companyId, inspectionId, findings });
-  } catch {
-    void logErrorEvent("ai", {
-      companyId,
-      userId,
-      message: "Complete-inspection: opportunity synthesis failed",
-      inspectionId,
-      context: { stage: "complete_opportunities" }
-    });
-  }
-  try {
-    await runScorecardComputation({
-      companyId,
-      inspectionId,
-      findings,
-      recommendations,
-      photosAnalyzed: (latestAnalysis?.analyzedImagePaths ?? []).length
-    });
-  } catch {
-    void logErrorEvent("ai", {
-      companyId,
-      userId,
-      message: "Complete-inspection: scorecard computation failed",
-      inspectionId,
-      context: { stage: "complete_scorecard" }
-    });
-  }
-  try {
-    const claimed = await db.update(inspectionScorecardsTable).set({ criticalAlertSent: true }).where(
-      and(
-        eq(inspectionScorecardsTable.inspectionId, inspectionId),
-        eq(inspectionScorecardsTable.companyId, companyId),
-        eq(inspectionScorecardsTable.riskLevel, "critical"),
-        eq(inspectionScorecardsTable.criticalAlertSent, false)
-      )
-    ).returning({ id: inspectionScorecardsTable.id });
-    if (claimed.length > 0) {
-      await notifyCriticalInspection({
-        companyId,
-        inspectionId,
-        siteAddress: inspection.siteAddress ?? "",
-        technicianName: inspection.technicianName ?? null
-      });
-    }
-  } catch {
-    void logErrorEvent("notification", {
-      companyId,
-      userId,
-      message: "Complete-inspection: critical-risk push notification failed",
-      inspectionId,
-      context: { stage: "complete_push_notification" }
-    });
-  }
-  try {
-    await writePropertyMemory({
-      companyId,
-      inspectionId,
-      siteAddress: inspection.siteAddress ?? ""
-    });
-  } catch {
-    void logErrorEvent("ai", {
-      companyId,
-      userId,
-      message: "Complete-inspection: property memory write failed",
-      inspectionId,
-      context: { stage: "complete_property_memory" }
-    });
-  }
-}
-
-// src/routes/inspections.ts
-var router3 = (0, import_express4.Router)();
-router3.get("/", async (req, res) => {
-  try {
-    const companyId = getCompanyId(req);
-    const { status, technicianId } = req.query;
-    const rows = await db.select().from(inspectionsTable).where(eq(inspectionsTable.companyId, companyId)).orderBy(desc(inspectionsTable.createdAt));
-    let filtered = rows;
-    if (status) filtered = filtered.filter((r) => r.status === status);
-    if (technicianId) filtered = filtered.filter((r) => r.technicianId === technicianId);
-    const withMedia = await Promise.all(
-      filtered.map(async (insp) => {
-        const media = await db.select().from(inspectionMediaTable).where(
-          and(
-            eq(inspectionMediaTable.companyId, companyId),
-            eq(inspectionMediaTable.inspectionId, insp.id)
-          )
-        );
-        return {
-          ...insp,
-          pestTypes: insp.pestTypes ?? [],
-          media,
-          createdAt: insp.createdAt.toISOString(),
-          completedAt: insp.completedAt?.toISOString() ?? null
-        };
-      })
-    );
-    return res.json(withMedia);
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to list inspections" });
-  }
-});
-router3.post("/", async (req, res) => {
-  try {
-    const companyId = getCompanyId(req);
-    const { siteAddress, clientName, technicianName, technicianId, notes, pestTypes, clientKey } = req.body;
-    if (!siteAddress || !technicianName) {
-      return res.status(400).json({ error: "siteAddress and technicianName are required" });
-    }
-    const key = typeof clientKey === "string" && clientKey.trim() ? clientKey.trim() : null;
-    if (key) {
-      const [existing] = await db.select().from(inspectionsTable).where(
-        and(eq(inspectionsTable.companyId, companyId), eq(inspectionsTable.clientKey, key))
-      );
-      if (existing) {
-        return res.status(200).json({
-          ...existing,
-          pestTypes: existing.pestTypes ?? [],
-          media: [],
-          createdAt: existing.createdAt.toISOString(),
-          completedAt: existing.completedAt?.toISOString() ?? null
-        });
-      }
-    }
-    const [row] = await db.insert(inspectionsTable).values({
-      companyId,
-      siteAddress,
-      clientName: clientName ?? null,
-      technicianName,
-      technicianId: technicianId ?? null,
-      notes: notes ?? null,
-      pestTypes: pestTypes ?? [],
-      status: "pending",
-      clientKey: key
-    }).onConflictDoNothing({
-      target: [inspectionsTable.companyId, inspectionsTable.clientKey]
-    }).returning();
-    if (!row && key) {
-      const [winner] = await db.select().from(inspectionsTable).where(
-        and(eq(inspectionsTable.companyId, companyId), eq(inspectionsTable.clientKey, key))
-      );
-      if (winner) {
-        return res.status(200).json({
-          ...winner,
-          pestTypes: winner.pestTypes ?? [],
-          media: [],
-          createdAt: winner.createdAt.toISOString(),
-          completedAt: winner.completedAt?.toISOString() ?? null
-        });
-      }
-    }
-    if (!row) return res.status(500).json({ error: "Failed to create inspection" });
-    return res.status(201).json({
-      ...row,
-      pestTypes: row.pestTypes ?? [],
-      media: [],
-      createdAt: row.createdAt.toISOString(),
-      completedAt: null
-    });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to create inspection" });
-  }
-});
-router3.get("/:id", async (req, res) => {
-  try {
-    const companyId = getCompanyId(req);
-    const id = parseInt(req.params.id);
-    const [row] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
-    if (!row) return res.status(404).json({ error: "Not found" });
-    const media = await db.select().from(inspectionMediaTable).where(
-      and(
-        eq(inspectionMediaTable.companyId, companyId),
-        eq(inspectionMediaTable.inspectionId, id)
-      )
-    );
-    return res.json({
-      ...row,
-      pestTypes: row.pestTypes ?? [],
-      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
-      createdAt: row.createdAt.toISOString(),
-      completedAt: row.completedAt?.toISOString() ?? null
-    });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to get inspection" });
-  }
-});
-router3.patch("/:id", async (req, res) => {
-  try {
-    const companyId = getCompanyId(req);
-    const id = parseInt(req.params.id);
-    const { status, notes, severity, pestTypes, completedAt } = req.body;
-    const updateData = {};
-    if (status !== void 0) updateData.status = status;
-    if (notes !== void 0) updateData.notes = notes;
-    if (severity !== void 0) updateData.severity = severity;
-    if (pestTypes !== void 0) updateData.pestTypes = pestTypes;
-    if (completedAt !== void 0) updateData.completedAt = new Date(completedAt);
-    if (Object.keys(updateData).length === 0) {
-      const [current] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
-      if (!current) return res.status(404).json({ error: "Not found" });
-      const media2 = await db.select().from(inspectionMediaTable).where(
-        and(
-          eq(inspectionMediaTable.companyId, companyId),
-          eq(inspectionMediaTable.inspectionId, id)
-        )
-      );
-      return res.json({
-        ...current,
-        pestTypes: current.pestTypes ?? [],
-        media: media2.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
-        createdAt: current.createdAt.toISOString(),
-        completedAt: current.completedAt?.toISOString() ?? null
-      });
-    }
-    const [row] = await db.update(inspectionsTable).set(updateData).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId))).returning();
-    if (!row) return res.status(404).json({ error: "Not found" });
-    const media = await db.select().from(inspectionMediaTable).where(
-      and(
-        eq(inspectionMediaTable.companyId, companyId),
-        eq(inspectionMediaTable.inspectionId, id)
-      )
-    );
-    return res.json({
-      ...row,
-      pestTypes: row.pestTypes ?? [],
-      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
-      createdAt: row.createdAt.toISOString(),
-      completedAt: row.completedAt?.toISOString() ?? null
-    });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to update inspection" });
-  }
-});
-router3.post("/:id/complete", async (req, res) => {
-  try {
-    const companyId = getCompanyId(req);
-    const id = parseInt(req.params.id);
-    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-    const [inspection] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
-    if (!inspection) return res.status(404).json({ error: "Not found" });
-    const serializeWithMedia = async (row) => {
-      const media = await db.select().from(inspectionMediaTable).where(
-        and(
-          eq(inspectionMediaTable.companyId, companyId),
-          eq(inspectionMediaTable.inspectionId, id)
-        )
-      );
-      return {
-        ...row,
-        pestTypes: row.pestTypes ?? [],
-        media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
-        createdAt: row.createdAt.toISOString(),
-        completedAt: row.completedAt?.toISOString() ?? null
-      };
-    };
-    const latestReportId = async () => {
-      const [report2] = await db.select().from(reportsTable).where(
-        and(eq(reportsTable.companyId, companyId), eq(reportsTable.inspectionId, id))
-      ).orderBy(desc(reportsTable.createdAt)).limit(1);
-      return report2?.id ?? null;
-    };
-    if (inspection.status === "completed") {
-      return res.json({
-        inspection: await serializeWithMedia(inspection),
-        reportId: await latestReportId(),
-        alreadyCompleted: true,
-        finalization: "skipped"
-      });
-    }
-    const [updated] = await db.update(inspectionsTable).set({ status: "completed", completedAt: /* @__PURE__ */ new Date() }).where(
-      and(
-        eq(inspectionsTable.id, id),
-        eq(inspectionsTable.companyId, companyId),
-        ne(inspectionsTable.status, "completed")
-      )
-    ).returning();
-    if (!updated) {
-      const [current] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
-      return res.json({
-        inspection: await serializeWithMedia(current ?? inspection),
-        reportId: await latestReportId(),
-        alreadyCompleted: true,
-        finalization: "skipped"
-      });
-    }
-    const report = await ensureReportForInspection({ companyId, inspectionId: id });
-    void runInspectionFinalization({
-      companyId,
-      inspectionId: id,
-      reportId: report?.id ?? null,
-      userId: req.user?.id
-    }).catch(() => {
-      void logErrorEvent("ai", {
-        companyId,
-        userId: req.user?.id,
-        message: "Inspection finalization pipeline crashed",
-        inspectionId: id,
-        context: { stage: "complete_pipeline" }
-      });
-    });
-    return res.json({
-      inspection: await serializeWithMedia(updated),
-      reportId: report?.id ?? null,
-      alreadyCompleted: false,
-      finalization: "started"
-    });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to complete inspection" });
-  }
-});
-router3.post("/:id/reopen", async (req, res) => {
-  try {
-    const companyId = getCompanyId(req);
-    const id = parseInt(req.params.id);
-    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-    const [inspection] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
-    if (!inspection) return res.status(404).json({ error: "Not found" });
-    const user = req.user;
-    const ROLE_RANK2 = { technician: 0, sales: 1, manager: 2, owner: 3 };
-    const isPrivileged = (ROLE_RANK2[user.role] ?? 0) >= ROLE_RANK2.manager;
-    const isOwnInspection = inspection.technicianId === user.clerkUserId;
-    if (!isPrivileged && !isOwnInspection) {
-      return res.status(403).json({
-        error: "You can only reopen your own inspections. Ask a manager or owner to reopen this one."
-      });
-    }
-    if (inspection.status !== "completed") {
-      const media2 = await db.select().from(inspectionMediaTable).where(
-        and(
-          eq(inspectionMediaTable.companyId, companyId),
-          eq(inspectionMediaTable.inspectionId, id)
-        )
-      );
-      return res.json({
-        ...inspection,
-        pestTypes: inspection.pestTypes ?? [],
-        media: media2.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
-        createdAt: inspection.createdAt.toISOString(),
-        completedAt: null,
-        alreadyOpen: true
-      });
-    }
-    const [updated] = await db.update(inspectionsTable).set({ status: "pending", completedAt: null }).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId))).returning();
-    if (!updated) return res.status(404).json({ error: "Not found" });
-    const media = await db.select().from(inspectionMediaTable).where(
-      and(
-        eq(inspectionMediaTable.companyId, companyId),
-        eq(inspectionMediaTable.inspectionId, id)
-      )
-    );
-    return res.json({
-      ...updated,
-      pestTypes: updated.pestTypes ?? [],
-      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
-      createdAt: updated.createdAt.toISOString(),
-      completedAt: null,
-      alreadyOpen: false
-    });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to reopen inspection" });
-  }
-});
-router3.delete("/:id", async (req, res) => {
-  try {
-    const companyId = getCompanyId(req);
-    const id = parseInt(req.params.id);
-    await db.delete(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
-    return res.status(204).send();
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to delete inspection" });
-  }
-});
-router3.post("/:id/media", async (req, res) => {
-  try {
-    const companyId = getCompanyId(req);
-    const inspectionId = parseInt(req.params.id);
-    const { mediaType, url: url2, filename, caption, durationSec, captureSource, qualityScore, captureMetadata } = req.body;
-    if (!mediaType || !url2)
-      return res.status(400).json({ error: "mediaType and url are required" });
-    const VALID_MEDIA_TYPES = ["image", "video", "document", "audio"];
-    if (!VALID_MEDIA_TYPES.includes(mediaType)) {
-      return res.status(400).json({
-        error: `Invalid mediaType. Must be one of: ${VALID_MEDIA_TYPES.join(", ")}`
-      });
-    }
-    const [inspection] = await db.select().from(inspectionsTable).where(
-      and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
-    );
-    if (!inspection) return res.status(404).json({ error: "Not found" });
-    const [existing] = await db.select().from(inspectionMediaTable).where(
-      and(
-        eq(inspectionMediaTable.companyId, companyId),
-        // tenant guard: defense-in-depth alongside parent inspection check
-        eq(inspectionMediaTable.inspectionId, inspectionId),
-        eq(inspectionMediaTable.url, url2)
-      )
-    ).limit(1);
-    if (existing) {
-      return res.status(200).json({ ...existing, createdAt: existing.createdAt.toISOString() });
-    }
-    const [row] = await db.insert(inspectionMediaTable).values({
-      companyId,
-      inspectionId,
-      mediaType,
-      url: url2,
-      filename: filename ?? null,
-      caption: caption ?? null,
-      durationSec: durationSec ?? null,
-      // Vision Platform provenance (optional; validated to safe shapes).
-      captureSource: typeof captureSource === "string" ? captureSource : "phone_camera",
-      qualityScore: typeof qualityScore === "number" && Number.isFinite(qualityScore) ? Math.max(0, Math.min(100, Math.round(qualityScore))) : null,
-      captureMetadata: captureMetadata && typeof captureMetadata === "object" && !Array.isArray(captureMetadata) ? captureMetadata : null
-    }).returning();
-    const mediaForInspection = await db.select().from(inspectionMediaTable).where(
-      and(
-        eq(inspectionMediaTable.companyId, companyId),
-        eq(inspectionMediaTable.inspectionId, inspectionId)
-      )
-    );
-    await db.update(inspectionsTable).set({ mediaCount: mediaForInspection.length }).where(
-      and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
-    );
-    return res.status(201).json({ ...row, createdAt: row.createdAt.toISOString() });
-  } catch (err) {
-    return res.status(500).json({ error: "Failed to add media" });
-  }
-});
-var inspections_default = router3;
-
 // src/routes/analysis.ts
-var import_express5 = __toESM(require_express2(), 1);
+var import_express4 = __toESM(require_express2(), 1);
 
 // src/lib/objectStorage.ts
 import { Storage } from "@google-cloud/storage";
@@ -90030,7 +89092,7 @@ function iso(date6) {
   const t = millis(date6);
   return t ? new Date(t).toISOString() : null;
 }
-function severityRank2(sev) {
+function severityRank(sev) {
   if (sev === "critical") return 4;
   if (sev === "high") return 3;
   if (sev === "medium") return 2;
@@ -90113,7 +89175,7 @@ function computeInspectionMemory(priorVisits, current) {
         const cur = pestMap.get(key);
         if (cur) {
           cur.visits += 1;
-          if (severityRank2(f.severity) > severityRank2(cur.severity)) {
+          if (severityRank(f.severity) > severityRank(cur.severity)) {
             cur.severity = f.severity ?? cur.severity;
           }
           if (vts > millis(cur.lastSeen)) cur.lastSeen = vIso;
@@ -90214,7 +89276,7 @@ function computeInspectionMemory(priorVisits, current) {
   highlights.sort(
     (a, b) => typeRank[a.type] - typeRank[b.type] || (a.zone ?? "").localeCompare(b.zone ?? "")
   );
-  const pestActivity = Array.from(pestMap.values()).sort((a, b) => b.visits - a.visits || severityRank2(b.severity) - severityRank2(a.severity)).slice(0, MAX_PESTS);
+  const pestActivity = Array.from(pestMap.values()).sort((a, b) => b.visits - a.visits || severityRank(b.severity) - severityRank(a.severity)).slice(0, MAX_PESTS);
   return {
     hasPriorVisits: true,
     priorVisitCount: visits.length,
@@ -90226,6 +89288,85 @@ function computeInspectionMemory(priorVisits, current) {
     treatments: dedupeNewest(treatList, MAX_LIST),
     highlights
   };
+}
+
+// src/lib/property-intelligence.ts
+var STREET_SUFFIXES = {
+  street: "st",
+  st: "st",
+  avenue: "ave",
+  ave: "ave",
+  boulevard: "blvd",
+  blvd: "blvd",
+  road: "rd",
+  rd: "rd",
+  drive: "dr",
+  dr: "dr",
+  lane: "ln",
+  ln: "ln",
+  court: "ct",
+  ct: "ct",
+  place: "pl",
+  pl: "pl",
+  parkway: "pkwy",
+  pkwy: "pkwy",
+  highway: "hwy",
+  hwy: "hwy"
+};
+var UNIT_TOKENS = /* @__PURE__ */ new Set(["suite", "ste", "unit", "apt", "apartment", "fl", "floor", "bldg", "building"]);
+function normalizeAddressKey(siteAddress) {
+  if (!siteAddress) return "";
+  const cleaned = siteAddress.toLowerCase().replace(/[.,#]/g, " ").replace(/\s+/g, " ").trim();
+  const tokens = cleaned.split(" ");
+  const out = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (!t) continue;
+    if (UNIT_TOKENS.has(t)) {
+      i++;
+      continue;
+    }
+    out.push(STREET_SUFFIXES[t] ?? t);
+  }
+  return out.join("-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+function propertyTypeFor(clientName, siteAddress) {
+  const s2 = `${clientName ?? ""} ${siteAddress}`.toLowerCase();
+  if (s2.includes("warehouse") || s2.includes("industrial")) return "Warehouse";
+  if (s2.includes("restaurant") || s2.includes("bakery") || s2.includes("cafe") || s2.includes("kitchen")) return "Restaurant";
+  if (s2.includes("apartment") || s2.includes("hoa") || s2.includes("residence hall") || s2.includes("campus")) return "Multifamily";
+  if (s2.includes("office") || s2.includes("commerce") || s2.includes("square")) return "Commercial";
+  if (s2.includes("residence") || s2.includes("home") || s2.includes("house")) return "Single Family";
+  return "Commercial";
+}
+function severityRank2(sev) {
+  if (sev === "critical") return 4;
+  if (sev === "high") return 3;
+  if (sev === "medium") return 2;
+  if (sev === "low") return 1;
+  return 0;
+}
+function deriveRecurringIssues(entries) {
+  const map2 = /* @__PURE__ */ new Map();
+  for (const entry of entries) {
+    const ts = entry.date ? new Date(entry.date).getTime() : null;
+    for (const f of entry.findings ?? []) {
+      const cat = f.category || "Observation";
+      const cur = map2.get(cat) ?? { count: 0, severity: f.severity ?? "low", lastSeen: ts, sample: f.description ?? null };
+      cur.count += 1;
+      if (severityRank2(f.severity) > severityRank2(cur.severity)) cur.severity = f.severity ?? cur.severity;
+      if (ts !== null && (cur.lastSeen === null || ts > cur.lastSeen)) cur.lastSeen = ts;
+      if (!cur.sample && f.description) cur.sample = f.description;
+      map2.set(cat, cur);
+    }
+  }
+  return Array.from(map2.entries()).map(([category, v]) => ({
+    category,
+    count: v.count,
+    severity: v.severity,
+    lastSeen: v.lastSeen !== null ? new Date(v.lastSeen).toISOString() : null,
+    sampleDescription: v.sample
+  })).sort((a, b) => b.count - a.count || severityRank2(b.severity) - severityRank2(a.severity));
 }
 
 // src/routes/analysis.ts
@@ -90280,7 +89421,7 @@ function validateFindings(raw, context) {
   return [valid, invalidCount];
 }
 var objectStorageService = new ObjectStorageService();
-var router4 = (0, import_express5.Router)();
+var router3 = (0, import_express4.Router)();
 async function cropPhonePhotos(companyId, candidates) {
   for (const { storagePath, confidence, species } of candidates) {
     try {
@@ -90372,7 +89513,7 @@ async function loadPriorVisits(companyId, current) {
   }
   return visits;
 }
-router4.get("/", async (req, res) => {
+router3.get("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const inspectionId = req.query.inspectionId ? parseInt(req.query.inspectionId) : void 0;
@@ -90394,7 +89535,7 @@ router4.get("/", async (req, res) => {
     return res.status(500).json({ error: "Failed to list analysis results" });
   }
 });
-router4.get("/summary", async (req, res) => {
+router3.get("/summary", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const rows = await db.select().from(analysisResultsTable).where(eq(analysisResultsTable.companyId, companyId));
@@ -90422,7 +89563,7 @@ router4.get("/summary", async (req, res) => {
     return res.status(500).json({ error: "Failed to get summary" });
   }
 });
-router4.post("/", async (req, res) => {
+router3.post("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const {
@@ -90459,7 +89600,7 @@ router4.post("/", async (req, res) => {
     return res.status(500).json({ error: "Failed to create analysis result" });
   }
 });
-router4.post("/analyze", async (req, res) => {
+router3.post("/analyze", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const {
@@ -90643,7 +89784,10 @@ router4.post("/analyze", async (req, res) => {
       photoZones,
       coverage,
       overallConfidence,
-      riskLevel
+      riskLevel,
+      // Persist the failure count so GET endpoints can surface it to the
+      // summary screen without relying on the ephemeral POST response.
+      analysisErrors: analysisErrors > 0 ? analysisErrors : 0
     }).returning();
     if (cropCandidates.length > 0) {
       void cropPhonePhotos(companyId, cropCandidates);
@@ -90674,7 +89818,7 @@ router4.post("/analyze", async (req, res) => {
     return res.status(500).json({ error: "Failed to analyze inspection" });
   }
 });
-router4.get("/:id", async (req, res) => {
+router3.get("/:id", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
@@ -90697,7 +89841,7 @@ router4.get("/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to get analysis" });
   }
 });
-router4.post("/:id/feedback", async (req, res) => {
+router3.post("/:id/feedback", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
@@ -90710,7 +89854,7 @@ router4.post("/:id/feedback", async (req, res) => {
     return res.status(500).json({ error: "Failed to submit feedback" });
   }
 });
-router4.patch("/:id/findings/correct", async (req, res) => {
+router3.patch("/:id/findings/correct", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
@@ -90784,7 +89928,893 @@ router4.patch("/:id/findings/correct", async (req, res) => {
     return res.status(500).json({ error: "Failed to correct finding" });
   }
 });
-var analysis_default = router4;
+var analysis_default = router3;
+
+// src/lib/property-memory-writer.ts
+function findingPestName(f) {
+  const raw = f.reviewStatus === "corrected" ? f.technicianSpecies ?? f.species : f.species;
+  if (!raw?.trim()) return null;
+  return raw.replace(/^Possible:\s*/i, "").trim() || null;
+}
+async function writePropertyMemory(input) {
+  const { companyId, inspectionId, siteAddress } = input;
+  const addressKey = normalizeAddressKey(siteAddress);
+  if (!addressKey) {
+    logger2.debug(
+      { companyId, inspectionId },
+      "writePropertyMemory: empty address key \u2014 skipping"
+    );
+    return;
+  }
+  const allInspections = await db.select().from(inspectionsTable).where(
+    and(
+      eq(inspectionsTable.companyId, companyId),
+      eq(inspectionsTable.status, "completed")
+    )
+  );
+  const matchedInspections = allInspections.filter(
+    (i) => normalizeAddressKey(i.siteAddress ?? "") === addressKey
+  );
+  if (matchedInspections.length === 0) {
+    logger2.debug(
+      { companyId, inspectionId, addressKey },
+      "writePropertyMemory: no completed inspections at address \u2014 skipping"
+    );
+    return;
+  }
+  const inspectionIds = matchedInspections.map((i) => i.id);
+  const analyses = await db.select().from(analysisResultsTable).where(
+    and(
+      eq(analysisResultsTable.companyId, companyId),
+      eq(analysisResultsTable.status, "complete"),
+      inArray(analysisResultsTable.inspectionId, inspectionIds)
+    )
+  ).orderBy(desc(analysisResultsTable.createdAt));
+  const latestByInspection = /* @__PURE__ */ new Map();
+  for (const row of analyses) {
+    if (row.inspectionId == null || latestByInspection.has(row.inspectionId)) continue;
+    latestByInspection.set(row.inspectionId, row);
+  }
+  const pestsSeen = /* @__PURE__ */ new Set();
+  const historicalPests = [];
+  const findingFreq = /* @__PURE__ */ new Map();
+  for (const insp of matchedInspections) {
+    const analysis = latestByInspection.get(insp.id);
+    const findings = analysis?.findings ?? [];
+    for (const f of findings) {
+      const name = findingPestName(f);
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (!pestsSeen.has(key)) {
+        pestsSeen.add(key);
+        historicalPests.push(name);
+      }
+    }
+    const seenThisInsp = /* @__PURE__ */ new Set();
+    for (const f of findings) {
+      const cat = f.category ?? "observation";
+      const desc2 = f.description ?? cat;
+      const key = `${cat}::${desc2}`;
+      if (seenThisInsp.has(key)) continue;
+      seenThisInsp.add(key);
+      const entry = findingFreq.get(key);
+      if (entry) {
+        entry.count++;
+        entry.hf.severity = f.severity ?? entry.hf.severity;
+      } else {
+        findingFreq.set(key, {
+          hf: {
+            category: cat,
+            description: desc2,
+            frequency: 1,
+            severity: f.severity ?? void 0
+          },
+          count: 1
+        });
+      }
+    }
+  }
+  const historicalFindings = Array.from(findingFreq.values()).map(
+    ({ hf, count: count2 }) => ({ ...hf, frequency: count2 })
+  );
+  const lastVisitedAt = matchedInspections.reduce((best, i) => {
+    const ts = i.completedAt ? new Date(i.completedAt) : null;
+    if (!ts) return best;
+    return best === null || ts > best ? ts : best;
+  }, null);
+  const [existing] = await db.select().from(propertyMemoryTable).where(
+    and(
+      eq(propertyMemoryTable.companyId, companyId),
+      eq(propertyMemoryTable.addressKey, addressKey)
+    )
+  ).limit(1);
+  const now = /* @__PURE__ */ new Date();
+  if (existing) {
+    await db.update(propertyMemoryTable).set({
+      siteAddress,
+      lastInspectionId: inspectionId,
+      lastVisitedAt,
+      historicalPests,
+      historicalFindings,
+      updatedAt: now
+    }).where(
+      and(
+        eq(propertyMemoryTable.companyId, companyId),
+        eq(propertyMemoryTable.addressKey, addressKey)
+      )
+    );
+    logger2.info(
+      {
+        companyId,
+        inspectionId,
+        addressKey,
+        pests: historicalPests.length,
+        findings: historicalFindings.length
+      },
+      "writePropertyMemory: updated"
+    );
+  } else {
+    await db.insert(propertyMemoryTable).values({
+      companyId,
+      addressKey,
+      siteAddress,
+      lastInspectionId: inspectionId,
+      lastVisitedAt,
+      historicalPests,
+      historicalFindings
+    });
+    logger2.info(
+      {
+        companyId,
+        inspectionId,
+        addressKey,
+        pests: historicalPests.length,
+        findings: historicalFindings.length
+      },
+      "writePropertyMemory: created"
+    );
+  }
+}
+
+// src/lib/push-notifications.ts
+var EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+async function sendExpoPush(messages2, ctx) {
+  if (messages2.length === 0) return;
+  try {
+    const response = await fetch(EXPO_PUSH_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(messages2)
+    });
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(unreadable)");
+      void logErrorEvent("notification", {
+        companyId: ctx.companyId,
+        inspectionId: ctx.inspectionId,
+        message: `Expo push API returned ${response.status}: ${body}`,
+        context: { stage: "push_send", tokenCount: messages2.length }
+      });
+      return;
+    }
+    const json3 = await response.json();
+    const tickets = json3.data ?? [];
+    const staleTokens = [];
+    const failedTokens = [];
+    for (let i = 0; i < tickets.length; i++) {
+      const ticket = tickets[i];
+      if (ticket.status !== "error") continue;
+      const token = messages2[i]?.to;
+      if (ticket.details?.error === "DeviceNotRegistered") {
+        if (token) staleTokens.push(token);
+      } else {
+        void logErrorEvent("notification", {
+          companyId: ctx.companyId,
+          inspectionId: ctx.inspectionId,
+          message: `Expo push ticket error: ${ticket.message ?? "unknown"}`,
+          context: { stage: "push_ticket", reason: ticket.details?.error ?? "unknown" }
+        });
+        if (token) failedTokens.push(token);
+      }
+    }
+    for (const staleToken of staleTokens) {
+      void db.update(usersTable).set({ pushToken: null, pushLastFailedAt: sql`now()` }).where(eq(usersTable.pushToken, staleToken)).catch((err) => {
+        void logErrorEvent("notification", {
+          companyId: ctx.companyId,
+          inspectionId: ctx.inspectionId,
+          message: `Failed to clear stale push token: ${err instanceof Error ? err.message : String(err)}`,
+          context: { stage: "clear_stale_token" }
+        });
+      });
+    }
+    for (const failedToken of failedTokens) {
+      void db.update(usersTable).set({ pushLastFailedAt: sql`now()` }).where(eq(usersTable.pushToken, failedToken)).catch((err) => {
+        void logErrorEvent("notification", {
+          companyId: ctx.companyId,
+          inspectionId: ctx.inspectionId,
+          message: `Failed to record push delivery failure: ${err instanceof Error ? err.message : String(err)}`,
+          context: { stage: "record_push_failure" }
+        });
+      });
+    }
+  } catch (err) {
+    void logErrorEvent("notification", {
+      companyId: ctx.companyId,
+      inspectionId: ctx.inspectionId,
+      message: `Expo push send failed: ${err instanceof Error ? err.message : String(err)}`,
+      context: { stage: "push_send", tokenCount: messages2.length }
+    });
+  }
+}
+async function notifyCriticalInspection(input) {
+  const { companyId, inspectionId, siteAddress, technicianName } = input;
+  const ctx = { companyId, inspectionId };
+  let owners = [];
+  try {
+    owners = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(
+      and(
+        eq(usersTable.companyId, companyId),
+        eq(usersTable.role, "owner"),
+        eq(usersTable.pushNotificationsEnabled, true)
+      )
+    );
+  } catch (err) {
+    void logErrorEvent("notification", {
+      companyId,
+      inspectionId,
+      message: `Failed to fetch owner push tokens: ${err instanceof Error ? err.message : String(err)}`,
+      context: { stage: "push_fetch_tokens" }
+    });
+    return;
+  }
+  const tokens = owners.map((o) => o.pushToken).filter((t) => typeof t === "string" && t.startsWith("ExponentPushToken["));
+  if (tokens.length === 0) return;
+  const tech = technicianName ? ` by ${technicianName}` : "";
+  const shortAddress = siteAddress.length > 60 ? siteAddress.slice(0, 57) + "\u2026" : siteAddress;
+  const messages2 = tokens.map((token) => ({
+    to: token,
+    title: "\u{1F6A8} Critical Risk Inspection Completed",
+    body: `${shortAddress}${tech} \u2014 tap to view`,
+    sound: "default",
+    channelId: "critical-alerts",
+    data: {
+      screen: "inspection",
+      inspectionId,
+      companyId
+    }
+  }));
+  await sendExpoPush(messages2, ctx);
+}
+
+// src/lib/inspection-complete.ts
+async function ensureReportForInspection(input) {
+  const { companyId, inspectionId } = input;
+  const [existing] = await db.select().from(reportsTable).where(
+    and(eq(reportsTable.companyId, companyId), eq(reportsTable.inspectionId, inspectionId))
+  ).orderBy(desc(reportsTable.createdAt)).limit(1);
+  if (existing) return existing;
+  const [inspection] = await db.select().from(inspectionsTable).where(
+    and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
+  );
+  if (!inspection) return null;
+  const [latest] = await db.select().from(analysisResultsTable).where(
+    and(
+      eq(analysisResultsTable.companyId, companyId),
+      eq(analysisResultsTable.inspectionId, inspectionId)
+    )
+  ).orderBy(desc(analysisResultsTable.createdAt)).limit(1);
+  const [findings, invalidFindingCount0] = validateFindings(
+    latest?.findings ?? [],
+    "ensureReportForInspection"
+  );
+  if (invalidFindingCount0 > 0) {
+    void logErrorEvent("ai", {
+      companyId,
+      message: `${invalidFindingCount0} malformed finding(s) stripped before report insert`,
+      inspectionId,
+      context: { stage: "write_validation", endpoint: "ensureReportForInspection" }
+    });
+  }
+  const recommendations = latest?.recommendations ?? [];
+  const exclusionOpportunities = findings.filter((f) => f.exclusionOpportunity).map((f) => `${f.category}: ${f.description}`);
+  const [row] = await db.insert(reportsTable).values({
+    companyId,
+    inspectionId,
+    title: `Inspection Report \u2014 ${inspection.siteAddress}`,
+    clientName: inspection.clientName ?? null,
+    siteAddress: inspection.siteAddress,
+    status: "complete",
+    findings,
+    recommendations,
+    treatmentNotes: null,
+    exclusionOpportunities,
+    technicianName: inspection.technicianName,
+    inspectionDate: inspection.createdAt.toISOString().split("T")[0],
+    severity: inspection.severity ?? null
+  }).returning();
+  return row ?? null;
+}
+async function runInspectionFinalization(input) {
+  const { companyId, inspectionId, reportId, userId } = input;
+  const [inspection] = await db.select().from(inspectionsTable).where(
+    and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
+  );
+  if (!inspection) return;
+  const [latestAnalysis] = await db.select().from(analysisResultsTable).where(
+    and(
+      eq(analysisResultsTable.companyId, companyId),
+      eq(analysisResultsTable.inspectionId, inspectionId)
+    )
+  ).orderBy(desc(analysisResultsTable.createdAt)).limit(1);
+  const [findings, invalidFindingCount] = validateFindings(
+    latestAnalysis?.findings ?? [],
+    "runInspectionFinalization"
+  );
+  if (invalidFindingCount > 0) {
+    void logErrorEvent("ai", {
+      companyId,
+      userId,
+      message: `${invalidFindingCount} malformed finding(s) stripped before finalization writes`,
+      inspectionId,
+      context: { stage: "write_validation", endpoint: "runInspectionFinalization" }
+    });
+  }
+  const recommendations = latestAnalysis?.recommendations ?? [];
+  if (latestAnalysis) {
+    try {
+      const photoZones = latestAnalysis.photoZones ?? {};
+      const coveredZoneSlugs = [
+        ...Object.values(photoZones),
+        ...findings.flatMap((f) => zonesFromFinding(f))
+      ];
+      const coverage = computeCoverage({
+        propertyType: derivePropertyType(inspection.notes),
+        pestTypes: inspection.pestTypes ?? [],
+        coveredZoneSlugs
+      });
+      await db.update(analysisResultsTable).set({ coverage }).where(
+        and(
+          eq(analysisResultsTable.id, latestAnalysis.id),
+          eq(analysisResultsTable.companyId, companyId)
+        )
+      );
+    } catch {
+      void logErrorEvent("ai", {
+        companyId,
+        userId,
+        message: "Complete-inspection: coverage recompute failed",
+        inspectionId,
+        context: { stage: "complete_coverage" }
+      });
+    }
+  }
+  if (reportId !== null) {
+    try {
+      const [report] = await db.select().from(reportsTable).where(and(eq(reportsTable.id, reportId), eq(reportsTable.companyId, companyId)));
+      if (report) {
+        let reportFindings = report.findings ?? [];
+        let reportRecommendations = report.recommendations ?? [];
+        if (latestAnalysis) {
+          reportFindings = findings;
+          reportRecommendations = recommendations;
+          const exclusionOpportunities = reportFindings.filter((f) => f.exclusionOpportunity).map((f) => `${f.category}: ${f.description}`);
+          await db.update(reportsTable).set({
+            findings: reportFindings,
+            recommendations: reportRecommendations,
+            exclusionOpportunities,
+            severity: inspection.severity ?? report.severity ?? null
+          }).where(
+            and(eq(reportsTable.id, reportId), eq(reportsTable.companyId, companyId))
+          );
+        }
+        const media = await db.select().from(inspectionMediaTable).where(
+          and(
+            eq(inspectionMediaTable.inspectionId, inspectionId),
+            eq(inspectionMediaTable.companyId, companyId)
+          )
+        );
+        const voiceTranscripts = media.filter((m) => m.mediaType === "voice").map((m) => m.caption ?? m.filename ?? "").filter((s2) => s2.length > 0);
+        const photoMedia = media.filter((m) => m.mediaType === "photo");
+        const photoLabels = photoMedia.map((m) => [m.filename, m.caption].filter(Boolean).join(" \u2014 ")).filter((s2) => s2.length > 0);
+        const narrative = await generateReportNarrative({
+          title: report.title,
+          siteAddress: report.siteAddress,
+          clientName: report.clientName ?? null,
+          technicianName: report.technicianName,
+          inspectionDate: report.inspectionDate,
+          severity: inspection.severity ?? report.severity ?? null,
+          propertyType: derivePropertyType(inspection.notes),
+          inspectionType: null,
+          pestTypes: inspection.pestTypes ?? [],
+          fieldNotes: inspection.notes ?? null,
+          treatmentNotes: report.treatmentNotes ?? null,
+          findings: reportFindings,
+          recommendations: reportRecommendations,
+          voiceTranscripts,
+          photoLabels,
+          photoCount: photoMedia.length,
+          riskLevel: latestAnalysis?.riskLevel ?? null
+        });
+        await db.update(reportsTable).set({ aiNarrative: narrative, pdfUrl: `/api/reports/${reportId}/html` }).where(and(eq(reportsTable.id, reportId), eq(reportsTable.companyId, companyId)));
+      }
+    } catch {
+      void logErrorEvent("report", {
+        companyId,
+        userId,
+        message: "Complete-inspection: report narrative generation failed",
+        inspectionId,
+        context: { stage: "complete_narrative" }
+      });
+    }
+  }
+  if (latestAnalysis) {
+    try {
+      const [existing] = await db.select().from(customerSummariesTable).where(
+        and(
+          eq(customerSummariesTable.inspectionId, inspectionId),
+          eq(customerSummariesTable.companyId, companyId)
+        )
+      ).limit(1);
+      if (!existing || existing.status !== "approved") {
+        const body = await generateCustomerSummaryBody({
+          siteAddress: inspection.siteAddress,
+          technicianName: inspection.technicianName,
+          inspectionDate: inspection.createdAt,
+          findings,
+          recommendations
+        });
+        if (existing) {
+          await db.update(customerSummariesTable).set({ body, updatedAt: /* @__PURE__ */ new Date() }).where(
+            and(
+              eq(customerSummariesTable.id, existing.id),
+              eq(customerSummariesTable.companyId, companyId)
+            )
+          );
+        } else {
+          await db.insert(customerSummariesTable).values({ companyId, inspectionId, body, status: "draft" });
+        }
+      }
+    } catch (err) {
+      void logErrorEvent("ai", {
+        companyId,
+        userId,
+        message: err instanceof SummaryFidelityError ? "Complete-inspection: customer summary failed fidelity check" : "Complete-inspection: customer summary generation failed",
+        inspectionId,
+        context: { stage: "complete_customer_summary" }
+      });
+    }
+  }
+  try {
+    await runOpportunitySynthesis({ companyId, inspectionId, findings });
+  } catch {
+    void logErrorEvent("ai", {
+      companyId,
+      userId,
+      message: "Complete-inspection: opportunity synthesis failed",
+      inspectionId,
+      context: { stage: "complete_opportunities" }
+    });
+  }
+  try {
+    await runScorecardComputation({
+      companyId,
+      inspectionId,
+      findings,
+      recommendations,
+      photosAnalyzed: (latestAnalysis?.analyzedImagePaths ?? []).length
+    });
+  } catch {
+    void logErrorEvent("ai", {
+      companyId,
+      userId,
+      message: "Complete-inspection: scorecard computation failed",
+      inspectionId,
+      context: { stage: "complete_scorecard" }
+    });
+  }
+  try {
+    const claimed = await db.update(inspectionScorecardsTable).set({ criticalAlertSent: true }).where(
+      and(
+        eq(inspectionScorecardsTable.inspectionId, inspectionId),
+        eq(inspectionScorecardsTable.companyId, companyId),
+        eq(inspectionScorecardsTable.riskLevel, "critical"),
+        eq(inspectionScorecardsTable.criticalAlertSent, false)
+      )
+    ).returning({ id: inspectionScorecardsTable.id });
+    if (claimed.length > 0) {
+      await notifyCriticalInspection({
+        companyId,
+        inspectionId,
+        siteAddress: inspection.siteAddress ?? "",
+        technicianName: inspection.technicianName ?? null
+      });
+    }
+  } catch {
+    void logErrorEvent("notification", {
+      companyId,
+      userId,
+      message: "Complete-inspection: critical-risk push notification failed",
+      inspectionId,
+      context: { stage: "complete_push_notification" }
+    });
+  }
+  try {
+    await writePropertyMemory({
+      companyId,
+      inspectionId,
+      siteAddress: inspection.siteAddress ?? ""
+    });
+  } catch {
+    void logErrorEvent("ai", {
+      companyId,
+      userId,
+      message: "Complete-inspection: property memory write failed",
+      inspectionId,
+      context: { stage: "complete_property_memory" }
+    });
+  }
+}
+
+// src/routes/inspections.ts
+var router4 = (0, import_express5.Router)();
+router4.get("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const { status, technicianId } = req.query;
+    const rows = await db.select().from(inspectionsTable).where(eq(inspectionsTable.companyId, companyId)).orderBy(desc(inspectionsTable.createdAt));
+    let filtered = rows;
+    if (status) filtered = filtered.filter((r) => r.status === status);
+    if (technicianId) filtered = filtered.filter((r) => r.technicianId === technicianId);
+    const withMedia = await Promise.all(
+      filtered.map(async (insp) => {
+        const media = await db.select().from(inspectionMediaTable).where(
+          and(
+            eq(inspectionMediaTable.companyId, companyId),
+            eq(inspectionMediaTable.inspectionId, insp.id)
+          )
+        );
+        return {
+          ...insp,
+          pestTypes: insp.pestTypes ?? [],
+          media,
+          createdAt: insp.createdAt.toISOString(),
+          completedAt: insp.completedAt?.toISOString() ?? null
+        };
+      })
+    );
+    return res.json(withMedia);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to list inspections" });
+  }
+});
+router4.post("/", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const { siteAddress, clientName, technicianName, technicianId, notes, pestTypes, clientKey } = req.body;
+    if (!siteAddress || !technicianName) {
+      return res.status(400).json({ error: "siteAddress and technicianName are required" });
+    }
+    const key = typeof clientKey === "string" && clientKey.trim() ? clientKey.trim() : null;
+    if (key) {
+      const [existing] = await db.select().from(inspectionsTable).where(
+        and(eq(inspectionsTable.companyId, companyId), eq(inspectionsTable.clientKey, key))
+      );
+      if (existing) {
+        return res.status(200).json({
+          ...existing,
+          pestTypes: existing.pestTypes ?? [],
+          media: [],
+          createdAt: existing.createdAt.toISOString(),
+          completedAt: existing.completedAt?.toISOString() ?? null
+        });
+      }
+    }
+    const [row] = await db.insert(inspectionsTable).values({
+      companyId,
+      siteAddress,
+      clientName: clientName ?? null,
+      technicianName,
+      technicianId: technicianId ?? null,
+      notes: notes ?? null,
+      pestTypes: pestTypes ?? [],
+      status: "pending",
+      clientKey: key
+    }).onConflictDoNothing({
+      target: [inspectionsTable.companyId, inspectionsTable.clientKey]
+    }).returning();
+    if (!row && key) {
+      const [winner] = await db.select().from(inspectionsTable).where(
+        and(eq(inspectionsTable.companyId, companyId), eq(inspectionsTable.clientKey, key))
+      );
+      if (winner) {
+        return res.status(200).json({
+          ...winner,
+          pestTypes: winner.pestTypes ?? [],
+          media: [],
+          createdAt: winner.createdAt.toISOString(),
+          completedAt: winner.completedAt?.toISOString() ?? null
+        });
+      }
+    }
+    if (!row) return res.status(500).json({ error: "Failed to create inspection" });
+    return res.status(201).json({
+      ...row,
+      pestTypes: row.pestTypes ?? [],
+      media: [],
+      createdAt: row.createdAt.toISOString(),
+      completedAt: null
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to create inspection" });
+  }
+});
+router4.get("/:id", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    const [row] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+    if (!row) return res.status(404).json({ error: "Not found" });
+    const media = await db.select().from(inspectionMediaTable).where(
+      and(
+        eq(inspectionMediaTable.companyId, companyId),
+        eq(inspectionMediaTable.inspectionId, id)
+      )
+    );
+    return res.json({
+      ...row,
+      pestTypes: row.pestTypes ?? [],
+      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+      createdAt: row.createdAt.toISOString(),
+      completedAt: row.completedAt?.toISOString() ?? null
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to get inspection" });
+  }
+});
+router4.patch("/:id", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    const { status, notes, severity, pestTypes, completedAt } = req.body;
+    const updateData = {};
+    if (status !== void 0) updateData.status = status;
+    if (notes !== void 0) updateData.notes = notes;
+    if (severity !== void 0) updateData.severity = severity;
+    if (pestTypes !== void 0) updateData.pestTypes = pestTypes;
+    if (completedAt !== void 0) updateData.completedAt = new Date(completedAt);
+    if (Object.keys(updateData).length === 0) {
+      const [current] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+      if (!current) return res.status(404).json({ error: "Not found" });
+      const media2 = await db.select().from(inspectionMediaTable).where(
+        and(
+          eq(inspectionMediaTable.companyId, companyId),
+          eq(inspectionMediaTable.inspectionId, id)
+        )
+      );
+      return res.json({
+        ...current,
+        pestTypes: current.pestTypes ?? [],
+        media: media2.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        createdAt: current.createdAt.toISOString(),
+        completedAt: current.completedAt?.toISOString() ?? null
+      });
+    }
+    const [row] = await db.update(inspectionsTable).set(updateData).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId))).returning();
+    if (!row) return res.status(404).json({ error: "Not found" });
+    const media = await db.select().from(inspectionMediaTable).where(
+      and(
+        eq(inspectionMediaTable.companyId, companyId),
+        eq(inspectionMediaTable.inspectionId, id)
+      )
+    );
+    return res.json({
+      ...row,
+      pestTypes: row.pestTypes ?? [],
+      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+      createdAt: row.createdAt.toISOString(),
+      completedAt: row.completedAt?.toISOString() ?? null
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to update inspection" });
+  }
+});
+router4.post("/:id/complete", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const [inspection] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+    if (!inspection) return res.status(404).json({ error: "Not found" });
+    const serializeWithMedia = async (row) => {
+      const media = await db.select().from(inspectionMediaTable).where(
+        and(
+          eq(inspectionMediaTable.companyId, companyId),
+          eq(inspectionMediaTable.inspectionId, id)
+        )
+      );
+      return {
+        ...row,
+        pestTypes: row.pestTypes ?? [],
+        media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        createdAt: row.createdAt.toISOString(),
+        completedAt: row.completedAt?.toISOString() ?? null
+      };
+    };
+    const latestReportId = async () => {
+      const [report2] = await db.select().from(reportsTable).where(
+        and(eq(reportsTable.companyId, companyId), eq(reportsTable.inspectionId, id))
+      ).orderBy(desc(reportsTable.createdAt)).limit(1);
+      return report2?.id ?? null;
+    };
+    if (inspection.status === "completed") {
+      return res.json({
+        inspection: await serializeWithMedia(inspection),
+        reportId: await latestReportId(),
+        alreadyCompleted: true,
+        finalization: "skipped"
+      });
+    }
+    const [updated] = await db.update(inspectionsTable).set({ status: "completed", completedAt: /* @__PURE__ */ new Date() }).where(
+      and(
+        eq(inspectionsTable.id, id),
+        eq(inspectionsTable.companyId, companyId),
+        ne(inspectionsTable.status, "completed")
+      )
+    ).returning();
+    if (!updated) {
+      const [current] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+      return res.json({
+        inspection: await serializeWithMedia(current ?? inspection),
+        reportId: await latestReportId(),
+        alreadyCompleted: true,
+        finalization: "skipped"
+      });
+    }
+    const report = await ensureReportForInspection({ companyId, inspectionId: id });
+    void runInspectionFinalization({
+      companyId,
+      inspectionId: id,
+      reportId: report?.id ?? null,
+      userId: req.user?.id
+    }).catch(() => {
+      void logErrorEvent("ai", {
+        companyId,
+        userId: req.user?.id,
+        message: "Inspection finalization pipeline crashed",
+        inspectionId: id,
+        context: { stage: "complete_pipeline" }
+      });
+    });
+    return res.json({
+      inspection: await serializeWithMedia(updated),
+      reportId: report?.id ?? null,
+      alreadyCompleted: false,
+      finalization: "started"
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to complete inspection" });
+  }
+});
+router4.post("/:id/reopen", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const [inspection] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+    if (!inspection) return res.status(404).json({ error: "Not found" });
+    const user = req.user;
+    const ROLE_RANK2 = { technician: 0, sales: 1, manager: 2, owner: 3 };
+    const isPrivileged = (ROLE_RANK2[user.role] ?? 0) >= ROLE_RANK2.manager;
+    const isOwnInspection = inspection.technicianId === user.clerkUserId;
+    if (!isPrivileged && !isOwnInspection) {
+      return res.status(403).json({
+        error: "You can only reopen your own inspections. Ask a manager or owner to reopen this one."
+      });
+    }
+    if (inspection.status !== "completed") {
+      const media2 = await db.select().from(inspectionMediaTable).where(
+        and(
+          eq(inspectionMediaTable.companyId, companyId),
+          eq(inspectionMediaTable.inspectionId, id)
+        )
+      );
+      return res.json({
+        ...inspection,
+        pestTypes: inspection.pestTypes ?? [],
+        media: media2.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        createdAt: inspection.createdAt.toISOString(),
+        completedAt: null,
+        alreadyOpen: true
+      });
+    }
+    const [updated] = await db.update(inspectionsTable).set({ status: "pending", completedAt: null }).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId))).returning();
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    const media = await db.select().from(inspectionMediaTable).where(
+      and(
+        eq(inspectionMediaTable.companyId, companyId),
+        eq(inspectionMediaTable.inspectionId, id)
+      )
+    );
+    return res.json({
+      ...updated,
+      pestTypes: updated.pestTypes ?? [],
+      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+      createdAt: updated.createdAt.toISOString(),
+      completedAt: null,
+      alreadyOpen: false
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to reopen inspection" });
+  }
+});
+router4.delete("/:id", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const id = parseInt(req.params.id);
+    await db.delete(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+    return res.status(204).send();
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to delete inspection" });
+  }
+});
+router4.post("/:id/media", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = parseInt(req.params.id);
+    const { mediaType, url: url2, filename, caption, durationSec, captureSource, qualityScore, captureMetadata } = req.body;
+    if (!mediaType || !url2)
+      return res.status(400).json({ error: "mediaType and url are required" });
+    const VALID_MEDIA_TYPES = ["image", "video", "document", "audio"];
+    if (!VALID_MEDIA_TYPES.includes(mediaType)) {
+      return res.status(400).json({
+        error: `Invalid mediaType. Must be one of: ${VALID_MEDIA_TYPES.join(", ")}`
+      });
+    }
+    const [inspection] = await db.select().from(inspectionsTable).where(
+      and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
+    );
+    if (!inspection) return res.status(404).json({ error: "Not found" });
+    const [existing] = await db.select().from(inspectionMediaTable).where(
+      and(
+        eq(inspectionMediaTable.companyId, companyId),
+        // tenant guard: defense-in-depth alongside parent inspection check
+        eq(inspectionMediaTable.inspectionId, inspectionId),
+        eq(inspectionMediaTable.url, url2)
+      )
+    ).limit(1);
+    if (existing) {
+      return res.status(200).json({ ...existing, createdAt: existing.createdAt.toISOString() });
+    }
+    const [row] = await db.insert(inspectionMediaTable).values({
+      companyId,
+      inspectionId,
+      mediaType,
+      url: url2,
+      filename: filename ?? null,
+      caption: caption ?? null,
+      durationSec: durationSec ?? null,
+      // Vision Platform provenance (optional; validated to safe shapes).
+      captureSource: typeof captureSource === "string" ? captureSource : "phone_camera",
+      qualityScore: typeof qualityScore === "number" && Number.isFinite(qualityScore) ? Math.max(0, Math.min(100, Math.round(qualityScore))) : null,
+      captureMetadata: captureMetadata && typeof captureMetadata === "object" && !Array.isArray(captureMetadata) ? captureMetadata : null
+    }).returning();
+    const mediaForInspection = await db.select().from(inspectionMediaTable).where(
+      and(
+        eq(inspectionMediaTable.companyId, companyId),
+        eq(inspectionMediaTable.inspectionId, inspectionId)
+      )
+    );
+    await db.update(inspectionsTable).set({ mediaCount: mediaForInspection.length }).where(
+      and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))
+    );
+    return res.status(201).json({ ...row, createdAt: row.createdAt.toISOString() });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to add media" });
+  }
+});
+var inspections_default = router4;
 
 // src/routes/dataset.ts
 var import_express6 = __toESM(require_express2(), 1);
@@ -94860,6 +94890,8 @@ router22.post("/", async (req, res) => {
     const companyId = getCompanyId(req);
     const inspectionId = Number(req.params.inspectionId);
     if (isNaN(inspectionId)) return res.status(400).json({ error: "Invalid inspection ID" });
+    const [inspection] = await db.select({ id: inspectionsTable.id }).from(inspectionsTable).where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
     const parse4 = upsertSchema.safeParse(req.body);
     if (!parse4.success) return res.status(400).json({ error: "Invalid body", detail: parse4.error.issues });
     const [row] = await db.insert(baitStationsTable).values({
@@ -94915,13 +94947,14 @@ router22.delete("/:stationId", async (req, res) => {
     const inspectionId = Number(req.params.inspectionId);
     const stationId = Number(req.params.stationId);
     if (isNaN(inspectionId) || isNaN(stationId)) return res.status(400).json({ error: "Invalid ID" });
-    await db.delete(baitStationsTable).where(
+    const deleted = await db.delete(baitStationsTable).where(
       and(
         eq(baitStationsTable.id, stationId),
         eq(baitStationsTable.inspectionId, inspectionId),
         eq(baitStationsTable.companyId, companyId)
       )
-    );
+    ).returning({ id: baitStationsTable.id });
+    if (deleted.length === 0) return res.status(404).json({ error: "Bait station not found" });
     return res.status(204).send();
   } catch {
     return res.status(500).json({ error: "Failed to delete bait station" });
@@ -124056,6 +124089,65 @@ async function syncToFieldRoutes(payload) {
     attachmentRetries: 0
   };
 }
+async function probePestPac(apiKey, accountId, apiBaseUrl) {
+  const base = apiBaseUrl?.replace(/\/$/, "") ?? PESTPAC_DEFAULT_BASE;
+  try {
+    const res = await fetch(`${base}/customers/${encodeURIComponent(accountId)}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      // Short timeout — we only want to confirm auth, not wait for a slow response.
+      signal: AbortSignal.timeout(8e3)
+    });
+    if (res.ok) return { ok: true };
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, reason: "auth_failed", message: `Authentication rejected (HTTP ${res.status}) \u2014 check your API key.` };
+    }
+    if (res.status === 404) return { ok: true };
+    return { ok: false, reason: "network_error", message: `Unexpected response from PestPac (HTTP ${res.status}).` };
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.name === "TimeoutError";
+    return {
+      ok: false,
+      reason: "network_error",
+      message: isTimeout ? "PestPac did not respond within 8 seconds \u2014 check your network connection." : `Could not reach PestPac: ${err instanceof Error ? err.message : String(err)}`
+    };
+  }
+}
+async function probeFieldRoutes(apiKey, accountId, apiBaseUrl) {
+  const base = apiBaseUrl?.replace(/\/$/, "") ?? FIELDROUTES_DEFAULT_BASE;
+  try {
+    const res = await fetch(`${base}/customer/${encodeURIComponent(accountId)}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(8e3)
+    });
+    if (res.ok) return { ok: true };
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, reason: "auth_failed", message: `Authentication rejected (HTTP ${res.status}) \u2014 check your API key.` };
+    }
+    if (res.status === 404) return { ok: true };
+    return { ok: false, reason: "network_error", message: `Unexpected response from FieldRoutes (HTTP ${res.status}).` };
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.name === "TimeoutError";
+    return {
+      ok: false,
+      reason: "network_error",
+      message: isTimeout ? "FieldRoutes did not respond within 8 seconds \u2014 check your network connection." : `Could not reach FieldRoutes: ${err instanceof Error ? err.message : String(err)}`
+    };
+  }
+}
+async function probeIntegrationCredentials(systemType, apiKey, accountId, apiBaseUrl) {
+  switch (systemType) {
+    case "pestpac":
+      return probePestPac(apiKey, accountId, apiBaseUrl);
+    case "fieldroutes":
+      return probeFieldRoutes(apiKey, accountId, apiBaseUrl);
+    default: {
+      const exhaustive = systemType;
+      throw new Error(`Unknown external system: ${String(exhaustive)}`);
+    }
+  }
+}
 async function syncInspectionToExternalSystem(payload) {
   switch (payload.externalSystem) {
     case "pestpac":
@@ -124283,6 +124375,25 @@ router32.post("/sync", async (req, res) => {
       });
     }
     return res.status(502).json({ error: message });
+  }
+});
+router32.post("/test", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const [config2] = await db.select().from(companyFieldIntegrationsTable).where(eq(companyFieldIntegrationsTable.companyId, companyId)).limit(1);
+    if (!config2) {
+      return res.status(422).json({ ok: false, reason: "network_error", message: "No integration configured for this company." });
+    }
+    const result = await probeIntegrationCredentials(
+      config2.systemType,
+      config2.apiKey,
+      config2.accountId,
+      config2.apiBaseUrl
+    );
+    return res.json(result);
+  } catch (err) {
+    logger2.error({ err }, "[integrations/test] probe error");
+    return res.json({ ok: false, reason: "network_error", message: "Probe failed \u2014 could not reach the external system." });
   }
 });
 router32.get("/sync-history", requireRole("owner"), async (req, res) => {
@@ -124925,10 +125036,61 @@ router34.get(
   requireRole("owner"),
   async (req, res) => {
     const companyId = getCompanyId(req);
-    const yesterday = /* @__PURE__ */ new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    let targetDate;
+    const rawDateParam = req.query.date;
+    if (rawDateParam !== void 0) {
+      if (Array.isArray(rawDateParam)) {
+        return res.status(400).json({
+          error: "date query param must appear exactly once"
+        });
+      }
+      if (typeof rawDateParam !== "string" || !rawDateParam.trim()) {
+        return res.status(400).json({
+          error: "date query param must be in YYYY-MM-DD format (e.g. 2026-07-15)"
+        });
+      }
+      const raw = rawDateParam.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return res.status(400).json({
+          error: "date query param must be in YYYY-MM-DD format (e.g. 2026-07-15)"
+        });
+      }
+      const parsed = /* @__PURE__ */ new Date(`${raw}T00:00:00`);
+      if (isNaN(parsed.getTime())) {
+        return res.status(400).json({
+          error: "date query param is not a valid calendar date"
+        });
+      }
+      const [yearStr, monthStr, dayStr] = raw.split("-");
+      const parsedYear = parsed.getFullYear();
+      const parsedMonth = parsed.getMonth() + 1;
+      const parsedDay = parsed.getDate();
+      if (parsedYear !== Number(yearStr) || parsedMonth !== Number(monthStr) || parsedDay !== Number(dayStr)) {
+        return res.status(400).json({
+          error: "date query param is not a valid calendar date"
+        });
+      }
+      const todayStart = /* @__PURE__ */ new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      if (parsed >= todayStart) {
+        return res.status(400).json({
+          error: "date must be in the past \u2014 future and today's dates are not allowed"
+        });
+      }
+      const ninetyDaysAgoStart = new Date(todayStart);
+      ninetyDaysAgoStart.setDate(ninetyDaysAgoStart.getDate() - 90);
+      if (parsed < ninetyDaysAgoStart) {
+        return res.status(400).json({
+          error: "date is more than 90 days in the past \u2014 historical queries are limited to 90 days"
+        });
+      }
+      targetDate = parsed;
+    } else {
+      targetDate = /* @__PURE__ */ new Date();
+      targetDate.setDate(targetDate.getDate() - 1);
+    }
     try {
-      const result = await generateDailyExecutiveBriefing(companyId, yesterday);
+      const result = await generateDailyExecutiveBriefing(companyId, targetDate);
       return res.json(result);
     } catch (error40) {
       logger2.error({ err: error40 }, "executive briefing error");
@@ -126278,6 +126440,23 @@ async function migrateBriefingEmailColumn() {
   }
 }
 
+// src/lib/migrate-analysis-errors.ts
+async function columnExists4(table, column) {
+  const result = await db.execute(
+    sql`SELECT 1 FROM information_schema.columns
+        WHERE table_name = ${table} AND column_name = ${column}`
+  );
+  return result.rows.length > 0;
+}
+async function migrateAnalysisErrors() {
+  if (!await columnExists4("analysis_results", "analysis_errors")) {
+    await db.execute(
+      sql`ALTER TABLE analysis_results ADD COLUMN analysis_errors INTEGER`
+    );
+    logger2.info("migrateAnalysisErrors: added analysis_results.analysis_errors");
+  }
+}
+
 // src/lib/briefing-scheduler.ts
 import cron from "node-cron";
 
@@ -126633,6 +126812,7 @@ async function startup() {
   await migratePushNotificationColumns();
   await migrateSyncLogs();
   await migrateBriefingEmailColumn();
+  await migrateAnalysisErrors();
   app_default.listen(port, (err) => {
     if (err) {
       logger2.error({ err }, "Error listening on port");

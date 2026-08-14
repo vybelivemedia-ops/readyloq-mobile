@@ -9,6 +9,7 @@ import { backfillPropertyMemory } from "./lib/backfill-property-memory";
 import { migratePushNotificationColumns } from "./lib/migrate-push-notifications";
 import { migrateSyncLogs } from "./lib/migrate-sync-logs";
 import { migrateBriefingEmailColumn } from "./lib/migrate-briefing-email";
+import { migrateAnalysisErrors } from "./lib/migrate-analysis-errors";
 import { startBriefingScheduler } from "./lib/briefing-scheduler";
 
 const rawPort = process.env["PORT"];
@@ -32,6 +33,7 @@ async function startup() {
   await migratePushNotificationColumns();
   await migrateSyncLogs();
   await migrateBriefingEmailColumn();
+  await migrateAnalysisErrors();
 
   app.listen(port, (err) => {
     if (err) {

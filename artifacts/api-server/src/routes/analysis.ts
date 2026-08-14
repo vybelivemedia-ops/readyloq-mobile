@@ -743,6 +743,9 @@ router.post("/analyze", async (req, res) => {
         coverage,
         overallConfidence,
         riskLevel,
+        // Persist the failure count so GET endpoints can surface it to the
+        // summary screen without relying on the ephemeral POST response.
+        analysisErrors: analysisErrors > 0 ? analysisErrors : 0,
       })
       .returning();
 

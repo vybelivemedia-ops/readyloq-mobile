@@ -34,6 +34,10 @@ export const analysisResultsTable = pgTable("analysis_results", {
   riskLevel: text("risk_level"),
   technicianFeedback: text("technician_feedback"),
   feedbackStatus: text("feedback_status"),
+  // Count of photos that failed AI analysis in the most recent analyze run
+  // (storage/model/parse errors). Null = pre-migration row or no run yet;
+  // 0 = run completed with zero failures; >0 = partial failure.
+  analysisErrors: integer("analysis_errors"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
