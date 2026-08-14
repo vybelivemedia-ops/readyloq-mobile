@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { apiUrl } from "@/config";
 import {
   LogOut, Users, Building2, CreditCard,
-  Search, RefreshCw, ShieldCheck, Zap,
+  Search, RefreshCw, ShieldCheck, Zap, KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +93,10 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
 
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [needsBootstrap, setNeedsBootstrap] = useState(false);
+  const [bootstrapToken, setBootstrapToken] = useState("");
+  const [bootstrapError, setBootstrapError] = useState("");
+  const [bootstrapping, setBootstrapping] = useState(false);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [tab, setTab] = useState<Tab>("users");
@@ -107,13 +111,38 @@ export default function Dashboard() {
     void (async () => {
       try {
         const res = await fetch(apiUrl("/me"), { credentials: "include" });
-        if (!res.ok) { navigate("/"); return; }
+        if (!res.ok) { setNeedsBootstrap(true); return; }
         const me = await res.json() as { isSuperAdmin: boolean };
-        if (!me.isSuperAdmin) { navigate("/"); return; }
+        if (!me.isSuperAdmin) { setNeedsBootstrap(true); return; }
         setAuthorized(true);
-      } catch { navigate("/"); }
+      } catch { setNeedsBootstrap(true); }
     })();
   }, [isLoaded, isSignedIn, navigate]);
+
+  // ── Bootstrap handler ──────────────────────────────────────────────────────
+  const handleBootstrap = useCallback(async () => {
+    setBootstrapping(true);
+    setBootstrapError("");
+    try {
+      const res = await fetch(apiUrl("/admin/bootstrap"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: bootstrapToken }),
+      });
+      if (res.ok) {
+        setNeedsBootstrap(false);
+        setAuthorized(true);
+      } else {
+        const body = await res.json() as { error?: string };
+        setBootstrapError(body.error ?? "Invalid token");
+      }
+    } catch {
+      setBootstrapError("Network error — make sure you're connected");
+    } finally {
+      setBootstrapping(false);
+    }
+  }, [bootstrapToken]);
 
   // ── Load data ──────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -177,10 +206,54 @@ export default function Dashboard() {
   }
 
   // ── Guard ──────────────────────────────────────────────────────────────────
-  if (!isLoaded || authorized === null) {
+  if (!isLoaded || (authorized === null && !needsBootstrap)) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-slate-950">
         <RefreshCw className="animate-spin text-slate-500" size={24} />
+      </div>
+    );
+  }
+
+  if (needsBootstrap) {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-slate-950 px-4">
+        <div className="mb-8 text-center">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <KeyRound size={22} className="text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-white">Claim admin access</h1>
+          <p className="text-slate-400 text-sm mt-2 max-w-sm">
+            Your account is signed in but not yet elevated. Enter the bootstrap token to grant yourself super-admin access.
+          </p>
+        </div>
+        <div className="w-full max-w-sm space-y-3">
+          <Input
+            type="password"
+            placeholder="Bootstrap token"
+            value={bootstrapToken}
+            onChange={e => setBootstrapToken(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && !bootstrapping && bootstrapToken && handleBootstrap()}
+            className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+          />
+          {bootstrapError && (
+            <p className="text-red-400 text-sm">{bootstrapError}</p>
+          )}
+          <Button
+            className="w-full"
+            disabled={!bootstrapToken || bootstrapping}
+            onClick={handleBootstrap}
+          >
+            {bootstrapping ? <RefreshCw size={16} className="animate-spin mr-2" /> : null}
+            Claim access
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full text-slate-500"
+            onClick={() => signOut(() => navigate("/login"))}
+          >
+            Sign out
+          </Button>
+        </div>
       </div>
     );
   }
