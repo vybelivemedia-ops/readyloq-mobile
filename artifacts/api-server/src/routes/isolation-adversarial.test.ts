@@ -73,6 +73,15 @@ vi.mock("../lib/report-narrative-ai", () => ({
   derivePropertyType: () => "residential",
 }));
 
+// generateCustomerSummaryBody is stubbed so tests that call the generate
+// endpoint never hit the real OpenAI call. The isolation tests below seed
+// summaries directly via the DB, but the mock is required because the module
+// is imported at app-load time.
+vi.mock("../lib/customer-summary-ai", () => ({
+  generateCustomerSummaryBody: vi.fn(async () => "Stubbed customer summary body"),
+  SummaryFidelityError: class SummaryFidelityError extends Error {},
+}));
+
 // ─── App + DB imports (after all mocks are in place) ─────────────────────────
 
 import app from "../app";
@@ -428,5 +437,156 @@ describe("POST /reports/:id/generate-narrative — 409 when report deleted mid-f
     asUser(ADV_OWNER_B);
     const res = await request(app).post(`/api/reports/${report.id}/generate-narrative`);
     expect(res.status).toBe(404);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4. Customer-summaries write routes — PATCH, approve, and revoke must all
+//    return 404 when the summary id belongs to a different company.
+//
+//    The companyId guard is applied at the initial SELECT in every write
+//    handler, so a cross-tenant id resolves to an empty result set and the
+//    handler short-circuits to 404 before any mutation can occur.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("customer-summaries write routes — cross-tenant manager is always 404", () => {
+  let summaryAId: number;   // draft summary owned by company A
+  let approvedSummaryAId: number; // approved summary owned by company A (for revoke test)
+
+  beforeAll(async () => {
+    // Create an inspection for company A so FK constraints are satisfied.
+    const inspDraft = await createInspection(ADV_OWNER_A, "77 Summary Draft Lane");
+    const inspApproved = await createInspection(ADV_OWNER_A, "78 Summary Approved Lane");
+
+    // Seed a DRAFT summary for company A directly (avoids needing the AI
+    // generate endpoint, which is stubbed and not the subject of these tests).
+    const [draftRow] = await db
+      .insert(customerSummariesTable)
+      .values({
+        companyId: companyAId,
+        inspectionId: inspDraft.id,
+        status: "draft",
+        body: "Original draft body — must not be altered by company B",
+      })
+      .returning();
+    summaryAId = draftRow.id;
+
+    // Seed an APPROVED summary for company A so the revoke test has a share
+    // token to attempt revoking from a cross-tenant position.
+    // Use a unique token per run to avoid the share_token unique index collision.
+    const uniqueShareToken = `revoke-isolation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const [approvedRow] = await db
+      .insert(customerSummariesTable)
+      .values({
+        companyId: companyAId,
+        inspectionId: inspApproved.id,
+        status: "approved",
+        body: "Approved body — frozen",
+        shareToken: uniqueShareToken,
+        shareExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        approvedAt: new Date(),
+      })
+      .returning();
+    approvedSummaryAId = approvedRow.id;
+  });
+
+  it("PATCH /api/customer-summaries/:id — company B manager gets 404 for company A's summary id", async () => {
+    asUser(ADV_MANAGER_B);
+    const res = await request(app)
+      .patch(`/api/customer-summaries/${summaryAId}`)
+      .send({ body: "Injected body from company B" });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("PATCH does not modify company A's summary body", async () => {
+    // Confirm the body is still the original value after the cross-tenant PATCH.
+    const [row] = await db
+      .select()
+      .from(customerSummariesTable)
+      .where(eq(customerSummariesTable.id, summaryAId));
+
+    expect(row.body).toBe("Original draft body — must not be altered by company B");
+    expect(row.status).toBe("draft");
+  });
+
+  it("POST /api/customer-summaries/:id/approve — company B manager gets 404 for company A's summary id", async () => {
+    asUser(ADV_MANAGER_B);
+    const res = await request(app)
+      .post(`/api/customer-summaries/${summaryAId}/approve`)
+      .send({ expiresInDays: 30 });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("approve does not change company A's draft summary status to approved", async () => {
+    const [row] = await db
+      .select()
+      .from(customerSummariesTable)
+      .where(eq(customerSummariesTable.id, summaryAId));
+
+    // Still draft; no share token was minted by the cross-tenant attempt.
+    expect(row.status).toBe("draft");
+    expect(row.shareToken).toBeNull();
+    expect(row.approvedAt).toBeNull();
+  });
+
+  it("POST /api/customer-summaries/:id/revoke — company B manager gets 404 for company A's approved summary id", async () => {
+    asUser(ADV_MANAGER_B);
+    const res = await request(app)
+      .post(`/api/customer-summaries/${approvedSummaryAId}/revoke`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it("revoke does not clear company A's share token", async () => {
+    const [row] = await db
+      .select()
+      .from(customerSummariesTable)
+      .where(eq(customerSummariesTable.id, approvedSummaryAId));
+
+    // Share token must still be intact after the cross-tenant revoke attempt.
+    expect(row.shareToken).not.toBeNull();
+    expect(row.shareExpiresAt).not.toBeNull();
+  });
+
+  it("company A's own manager can still PATCH, approve, and revoke their summaries", async () => {
+    // Sanity check: a legitimate manager from company A can operate on their
+    // own summaries without being blocked by the tenant guard.
+    const MGR_A = "adv_mgr_a_summaries_clerk";
+    // Use onConflictDoNothing: on re-runs the user may already exist and have
+    // approved_by_user_id references that prevent deletion.
+    await db
+      .insert(usersTable)
+      .values({ clerkUserId: MGR_A, role: "manager", companyId: companyAId })
+      .onConflictDoNothing();
+
+    // PATCH draft body.
+    asUser(MGR_A);
+    const patch = await request(app)
+      .patch(`/api/customer-summaries/${summaryAId}`)
+      .send({ body: "Updated by legitimate company A manager" });
+    expect(patch.status).toBe(200);
+    expect(patch.body.body).toBe("Updated by legitimate company A manager");
+
+    // Approve the draft (mints a share token).
+    const approve = await request(app)
+      .post(`/api/customer-summaries/${summaryAId}/approve`)
+      .send({ expiresInDays: 7 });
+    expect(approve.status).toBe(200);
+    expect(approve.body.status).toBe("approved");
+    expect(approve.body.shareToken).toBeTruthy();
+
+    // Revoke the approved summary's share link.
+    const revoke = await request(app)
+      .post(`/api/customer-summaries/${summaryAId}/revoke`);
+    expect(revoke.status).toBe(200);
+    expect(revoke.body.shareToken).toBeNull();
+
+    // Note: MGR_A is not deleted here because the approve step wrote
+    // approved_by_user_id → users.id, creating a FK reference that prevents
+    // deletion. The user is confined to companyAId and scoped to the _adv_
+    // test namespace, so it does not affect other test suites.
+    asUser(null);
   });
 });
