@@ -96,6 +96,7 @@ import {
   intelligenceReviewsTable,
   intelligenceVotesTable,
   inspectionScorecardsTable,
+  baitStationsTable,
   READYLOQ_DEFAULT_PROFILE,
 } from "@workspace/db";
 import { eq, isNull, or } from "drizzle-orm";
@@ -991,6 +992,79 @@ describe("executive inspections technicianName filter cannot cross tenant bounda
     // And the site address must belong to company A, not B.
     const addresses = res.body.inspections.map((r: { siteAddress: string }) => r.siteAddress);
     expect(addresses).not.toContain("900 Shared Tech B Street");
+  });
+});
+
+describe("bait-station writes are isolated per company", () => {
+  let inspAId: number;
+  let stationAId: number;
+
+  beforeAll(async () => {
+    // Clean up any bait stations from other suites.
+    await db.delete(baitStationsTable);
+
+    // Create a real inspection owned by company A.
+    const insp = await createInspection(OWNER_A_ID, "300 Bait A Street");
+    inspAId = insp.id;
+
+    // Create a real bait station on that inspection as company A.
+    asUser(OWNER_A_ID);
+    const stationRes = await request(app)
+      .post(`/api/inspections/${inspAId}/bait-stations`)
+      .send({ label: "Station Alpha", status: "active" });
+    expect(stationRes.status).toBe(201);
+    stationAId = stationRes.body.id;
+    asUser(null);
+  });
+
+  it("POST returns 404 when the parent inspection belongs to another company", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app)
+      .post(`/api/inspections/${inspAId}/bait-stations`)
+      .send({ label: "Stolen Station", status: "active" });
+    expect(res.status).toBe(404);
+  });
+
+  it("POST does not create a bait station when the inspection is cross-tenant", async () => {
+    // Confirm the failed POST left no bait station behind.
+    const rows = await db
+      .select()
+      .from(baitStationsTable)
+      .then((r) => r.filter((s) => s.label === "Stolen Station"));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("PATCH returns 404 for a cross-tenant stationId", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app)
+      .patch(`/api/inspections/${inspAId}/bait-stations/${stationAId}`)
+      .send({ status: "missing" });
+    expect(res.status).toBe(404);
+  });
+
+  it("PATCH leaves the original bait station unchanged after a cross-tenant attempt", async () => {
+    asUser(OWNER_A_ID);
+    const res = await request(app).get(`/api/inspections/${inspAId}/bait-stations`);
+    expect(res.status).toBe(200);
+    const station = res.body.find((s: { id: number }) => s.id === stationAId);
+    expect(station).toBeDefined();
+    expect(station.status).toBe("active"); // not "missing"
+  });
+
+  it("DELETE returns 404 for a cross-tenant stationId", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app).delete(
+      `/api/inspections/${inspAId}/bait-stations/${stationAId}`,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("DELETE leaves the original bait station intact after a cross-tenant attempt", async () => {
+    asUser(OWNER_A_ID);
+    const res = await request(app).get(`/api/inspections/${inspAId}/bait-stations`);
+    expect(res.status).toBe(200);
+    const ids = res.body.map((s: { id: number }) => s.id);
+    expect(ids).toContain(stationAId);
   });
 });
 

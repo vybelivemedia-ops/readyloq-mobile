@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 import { db } from "@workspace/db";
-import { baitStationsTable } from "@workspace/db";
+import { baitStationsTable, inspectionsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { z } from "zod/v4";
@@ -51,6 +51,13 @@ router.post("/", async (req: Request<Params>, res) => {
     const companyId = getCompanyId(req);
     const inspectionId = Number(req.params.inspectionId);
     if (isNaN(inspectionId)) return res.status(400).json({ error: "Invalid inspection ID" });
+
+    // Verify the parent inspection belongs to this company before writing.
+    const [inspection] = await db
+      .select({ id: inspectionsTable.id })
+      .from(inspectionsTable)
+      .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
 
     const parse = upsertSchema.safeParse(req.body);
     if (!parse.success) return res.status(400).json({ error: "Invalid body", detail: parse.error.issues });
@@ -125,7 +132,7 @@ router.delete("/:stationId", async (req: Request<Params>, res) => {
     const stationId = Number(req.params.stationId);
     if (isNaN(inspectionId) || isNaN(stationId)) return res.status(400).json({ error: "Invalid ID" });
 
-    await db
+    const deleted = await db
       .delete(baitStationsTable)
       .where(
         and(
@@ -133,8 +140,10 @@ router.delete("/:stationId", async (req: Request<Params>, res) => {
           eq(baitStationsTable.inspectionId, inspectionId),
           eq(baitStationsTable.companyId, companyId),
         ),
-      );
+      )
+      .returning({ id: baitStationsTable.id });
 
+    if (deleted.length === 0) return res.status(404).json({ error: "Bait station not found" });
     return res.status(204).send();
   } catch {
     return res.status(500).json({ error: "Failed to delete bait station" });
