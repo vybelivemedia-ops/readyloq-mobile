@@ -1063,6 +1063,12 @@ export default function ExecutiveDashboardScreen() {
                     ? `${velocityDelta >= 0 ? "▲" : "▼"} ${Math.abs(velocityDelta)}% vs last month`
                     : "No prior month data"
                 }
+                onPress={() =>
+                  router.push({
+                    pathname: "/executive-velocity-inspections",
+                    params: { month: "current" },
+                  } as never)
+                }
               />
             </View>
           </View>
