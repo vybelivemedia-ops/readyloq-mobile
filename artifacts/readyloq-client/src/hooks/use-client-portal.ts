@@ -70,22 +70,40 @@ export interface BuildingTrends {
 
 // ── API fetcher ───────────────────────────────────────────────────────────────
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(apiUrl(path), { credentials: 'include' });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error ?? 'API error');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(apiUrl(path), {
+      credentials: 'include',
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error ?? 'API error');
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 
-export function useClientMe() {
+/**
+ * Only fires when `enabled` is true (i.e. the Clerk session is confirmed).
+ * Passing enabled=false prevents the API call from running for unauthenticated
+ * visitors, which would cause a hanging 401 and an infinite spinner.
+ */
+export function useClientMe(enabled = true) {
   return useQuery<ClientMe>({
     queryKey: ['client', 'me'],
     queryFn: () => apiFetch('/client/me'),
     retry: false,
+    enabled,
+    staleTime: 60_000,
   });
 }
 
