@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider } from '@clerk/clerk-react';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -19,28 +19,28 @@ import { Opportunities } from '@/pages/opportunities';
 import { Properties } from '@/pages/properties';
 import { Analytics } from '@/pages/analytics';
 import { Schedule } from '@/pages/schedule';
+import { ClientAccess } from '@/pages/client-access';
 import { Layout } from '@/components/layout';
 
 const queryClient = new QueryClient();
 
-// Protected route wrapper
+// Protected route wrapper — redirects via useEffect to avoid setState-during-render warnings.
 function ProtectedRoute({ component: Component, roles }: { component: any, roles?: string[] }) {
   const { isLoaded, isSignedIn, me } = useAuth();
   const [, setLocation] = useLocation();
 
-  if (!isLoaded) return null;
-  if (!isSignedIn) {
-    setLocation('/login');
-    return null;
-  }
-  if (!me?.companyId) {
-    setLocation('/no-company');
-    return null;
-  }
-  if (roles && !roles.includes(me.effectiveRole)) {
-    setLocation('/');
-    return null;
-  }
+  const redirectTo =
+    !isLoaded ? null
+    : !isSignedIn ? '/login'
+    : !me?.companyId ? '/no-company'
+    : roles && !roles.includes(me.effectiveRole) ? '/'
+    : null;
+
+  useEffect(() => {
+    if (redirectTo) setLocation(redirectTo);
+  }, [redirectTo, setLocation]);
+
+  if (!isLoaded || redirectTo) return null;
 
   return <Component />;
 }
@@ -88,6 +88,9 @@ function Router() {
               </Route>
               <Route path="/schedule">
                 <ProtectedRoute component={Schedule} roles={['owner', 'manager']} />
+              </Route>
+              <Route path="/client-access">
+                <ProtectedRoute component={ClientAccess} roles={['owner', 'manager']} />
               </Route>
               <Route component={NotFound} />
             </Switch>
