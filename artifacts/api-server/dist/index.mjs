@@ -123820,26 +123820,59 @@ var billing_default = router29;
 
 // src/routes/admin.ts
 var import_express31 = __toESM(require_express2(), 1);
+import { createHmac as createHmac2, timingSafeEqual as timingSafeEqual2 } from "crypto";
 var router30 = (0, import_express31.Router)();
 var VALID_ROLES = ["owner", "manager", "sales", "technician"];
-router30.post("/bootstrap", requireAuth, async (req, res) => {
+var ADMIN_TOKEN_TTL_MS = 8 * 60 * 60 * 1e3;
+function signAdminToken() {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET not configured");
+  const ts = Date.now().toString();
+  const mac = createHmac2("sha256", secret).update(`readyloq-admin:${ts}`).digest("hex");
+  return `${ts}.${mac}`;
+}
+function verifyAdminToken(token) {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) return false;
+  const dot = token.lastIndexOf(".");
+  if (dot === -1) return false;
+  const ts = token.slice(0, dot);
+  const mac = token.slice(dot + 1);
+  const age = Date.now() - parseInt(ts, 10);
+  if (isNaN(age) || age < 0 || age > ADMIN_TOKEN_TTL_MS) return false;
+  const expected = createHmac2("sha256", secret).update(`readyloq-admin:${ts}`).digest("hex");
+  try {
+    const macBuf = Buffer.from(mac, "hex");
+    const expBuf = Buffer.from(expected, "hex");
+    if (macBuf.length !== expBuf.length) return false;
+    return timingSafeEqual2(macBuf, expBuf);
+  } catch {
+    return false;
+  }
+}
+var requireAdminToken = (req, res, next) => {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) {
+    if (verifyAdminToken(auth.slice(7))) return next();
+  }
+  return res.status(403).json({ error: "Valid admin session token required" });
+};
+router30.post("/token-auth", async (req, res) => {
   const envToken = process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN;
   if (!envToken) {
-    return res.status(503).json({ error: "Bootstrap token not configured" });
+    return res.status(503).json({ error: "Admin access not configured" });
   }
   const { token } = req.body;
   if (!token || token !== envToken) {
-    return res.status(403).json({ error: "Invalid bootstrap token" });
+    return res.status(403).json({ error: "Invalid token" });
   }
-  const user = req.user;
-  const [updated] = await db.update(usersTable).set({ isSuperAdmin: true }).where(eq(usersTable.id, user.id)).returning();
-  return res.json({
-    success: true,
-    message: "Super admin access granted",
-    isSuperAdmin: updated.isSuperAdmin
-  });
+  try {
+    return res.json({ adminToken: signAdminToken() });
+  } catch {
+    return res.status(500).json({ error: "Could not issue session token" });
+  }
 });
-router30.get("/users", requireAuth, requireSuperAdmin, async (_req, res) => {
+router30.get("/users", requireAdminToken, async (_req, res) => {
   const rows = await db.select({
     id: usersTable.id,
     clerkUserId: usersTable.clerkUserId,
@@ -123860,7 +123893,7 @@ router30.get("/users", requireAuth, requireSuperAdmin, async (_req, res) => {
     }))
   );
 });
-router30.patch("/users/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+router30.patch("/users/:id", requireAdminToken, async (req, res) => {
   const userId = parseInt(req.params["id"], 10);
   if (isNaN(userId)) return res.status(400).json({ error: "Invalid user id" });
   const { role, isSuperAdmin, betaAccess } = req.body;
