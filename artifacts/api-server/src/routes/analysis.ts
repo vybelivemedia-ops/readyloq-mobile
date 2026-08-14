@@ -74,7 +74,7 @@ const findingSchema = z.object({
  * Returns [validFindings, invalidCount] — callers may log the count to the
  * error monitor when invalidCount > 0.
  */
-function validateFindings(
+export function validateFindings(
   raw: unknown,
   context: string,
 ): [Finding[], number] {

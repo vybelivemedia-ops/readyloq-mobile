@@ -15,6 +15,7 @@ import { runOpportunitySynthesis } from "./opportunity-ai";
 import { runScorecardComputation } from "./scorecard";
 import { computeCoverage, zonesFromFinding } from "./zone-coverage";
 import { logErrorEvent } from "./error-events";
+import { validateFindings } from "../routes/analysis";
 import { writePropertyMemory } from "./property-memory-writer";
 import { notifyCriticalInspection } from "./push-notifications";
 
@@ -72,7 +73,18 @@ export async function ensureReportForInspection(input: {
     )
     .orderBy(desc(analysisResultsTable.createdAt))
     .limit(1);
-  const findings = (latest?.findings ?? []) as Finding[];
+  const [findings, invalidFindingCount0] = validateFindings(
+    latest?.findings ?? [],
+    "ensureReportForInspection",
+  );
+  if (invalidFindingCount0 > 0) {
+    void logErrorEvent("ai", {
+      companyId,
+      message: `${invalidFindingCount0} malformed finding(s) stripped before report insert`,
+      inspectionId,
+      context: { stage: "write_validation", endpoint: "ensureReportForInspection" },
+    });
+  }
   const recommendations = (latest?.recommendations ?? []) as string[];
   const exclusionOpportunities = findings
     .filter((f) => f.exclusionOpportunity)
@@ -131,7 +143,19 @@ export async function runInspectionFinalization(input: {
     )
     .orderBy(desc(analysisResultsTable.createdAt))
     .limit(1);
-  const findings = (latestAnalysis?.findings ?? []) as Finding[];
+  const [findings, invalidFindingCount] = validateFindings(
+    latestAnalysis?.findings ?? [],
+    "runInspectionFinalization",
+  );
+  if (invalidFindingCount > 0) {
+    void logErrorEvent("ai", {
+      companyId,
+      userId,
+      message: `${invalidFindingCount} malformed finding(s) stripped before finalization writes`,
+      inspectionId,
+      context: { stage: "write_validation", endpoint: "runInspectionFinalization" },
+    });
+  }
   const recommendations = (latestAnalysis?.recommendations ?? []) as string[];
 
   // 0. Coverage — recompute the authoritative completeness snapshot from the
