@@ -590,3 +590,104 @@ describe("customer-summaries write routes — cross-tenant manager is always 404
     asUser(null);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 5. POST /reports/:id/share — cross-tenant isolation and share-token guard
+//
+//    Two properties are locked in here:
+//      a) Company B cannot generate a share URL for company A's report even
+//         when they know the numeric report id (scoped WHERE companyId guard).
+//      b) The owning company gets 404 when the report exists but no approved
+//         customer summary with a shareToken has been minted yet.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("POST /reports/:id/share — cross-tenant isolation and share-token guard", () => {
+  let reportAId: number;
+  let inspAId: number;
+  // Generated fresh each test-run to avoid clashing with the unique shareToken index.
+  let approvedShareToken: string;
+
+  beforeAll(async () => {
+    // Create a company A inspection and report.
+    const inspA = await createInspection(ADV_OWNER_A, "77 Share Link Avenue A");
+    inspAId = inspA.id;
+    const reportA = await createReport(ADV_OWNER_A, inspAId);
+    reportAId = reportA.id;
+
+    // Generate a unique token per run so re-runs against the same DB don't
+    // collide on the globally-unique share_token index.
+    approvedShareToken = `adv-share-tok-323-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    // Seed an APPROVED customer summary with a share token for company A's
+    // inspection so the positive-path test has something to return.
+    await db.insert(customerSummariesTable).values({
+      companyId: companyAId,
+      inspectionId: inspAId,
+      status: "approved",
+      body: "Approved summary for share-link isolation test",
+      shareToken: approvedShareToken,
+      approvedAt: new Date(),
+      shareExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+  });
+
+  it("company B gets 404 when trying to generate a share link for company A's report", async () => {
+    asUser(ADV_OWNER_B);
+    const res = await request(app).post(`/api/reports/${reportAId}/share`);
+
+    // The companyId WHERE clause on the reports fetch means company B's owner
+    // sees no row for reportAId → 404.
+    expect(res.status).toBe(404);
+  });
+
+  it("share link attempt by company B does not expose company A's shareToken", async () => {
+    asUser(ADV_OWNER_B);
+    const res = await request(app).post(`/api/reports/${reportAId}/share`);
+
+    // The response body must not contain the real share token or a share URL.
+    const body = JSON.stringify(res.body);
+    expect(body).not.toContain(approvedShareToken);
+    expect(body).not.toContain("shareUrl");
+  });
+
+  it("company A's owner gets the share URL for their own approved report", async () => {
+    asUser(ADV_OWNER_A);
+    const res = await request(app).post(`/api/reports/${reportAId}/share`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.shareUrl).toBeTruthy();
+    expect(res.body.shareUrl).toContain(approvedShareToken);
+  });
+
+  it("returns 404 when the owning company's report has no approved summary yet", async () => {
+    // Create a fresh inspection+report for company A with NO customer summary.
+    const inspNoSummary = await createInspection(ADV_OWNER_A, "78 No Summary Road");
+    const reportNoSummary = await createReport(ADV_OWNER_A, inspNoSummary.id);
+
+    asUser(ADV_OWNER_A);
+    const res = await request(app).post(`/api/reports/${reportNoSummary.id}/share`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/no approved summary/i);
+  });
+
+  it("returns 404 when the owning company's report has only a draft summary (no shareToken)", async () => {
+    // Create an inspection+report for company A with a DRAFT summary (no token).
+    const inspDraft = await createInspection(ADV_OWNER_A, "79 Draft Only Street");
+    const reportDraft = await createReport(ADV_OWNER_A, inspDraft.id);
+
+    await db.insert(customerSummariesTable).values({
+      companyId: companyAId,
+      inspectionId: inspDraft.id,
+      status: "draft",
+      body: "Draft — no share token yet",
+      shareToken: null,
+    });
+
+    asUser(ADV_OWNER_A);
+    const res = await request(app).post(`/api/reports/${reportDraft.id}/share`);
+
+    // Draft summaries never have a shareToken → the guard returns 404.
+    expect(res.status).toBe(404);
+  });
+});
