@@ -8,6 +8,7 @@ import {
   CheckCircle2, Clock, MapPin, X, RefreshCw, Calendar, Plus, GripVertical,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 import {
   useSchedule, useReassignInspection, useCreateInspection,
   type ScheduleEntry,
@@ -450,6 +451,7 @@ export function Schedule() {
   const { data: members = [] } = useCompanyMembers();
   const reassign = useReassignInspection();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   // Unique technician names from this week's data
   const technicians = useMemo(() => {
@@ -583,6 +585,10 @@ export function Schedule() {
         onError: () => {
           // Revert optimistic update on failure
           if (previous) qc.setQueryData(queryKey, previous);
+          toast({
+            title: "Couldn't reschedule — please try again",
+            variant: 'destructive',
+          });
         },
       },
     );
