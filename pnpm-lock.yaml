@@ -752,6 +752,9 @@ importers:
       '@platform/measurement-core':
         specifier: workspace:*
         version: link:../../repos/platform/packages/measurement-core
+      '@platform/meta-wearables':
+        specifier: workspace:*
+        version: link:../../repos/platform/packages/meta-wearables
       '@platform/provider-registry':
         specifier: workspace:*
         version: link:../../repos/platform/packages/provider-registry

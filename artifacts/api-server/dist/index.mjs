@@ -57331,6 +57331,7 @@ __export(schema_exports, {
   intelligenceVotesTable: () => intelligenceVotesTable,
   leadsTable: () => leadsTable,
   messages: () => messages,
+  metaGlassesSessionsTable: () => metaGlassesSessionsTable,
   opportunitiesTable: () => opportunitiesTable,
   opportunityEventsTable: () => opportunityEventsTable,
   opportunityNotesTable: () => opportunityNotesTable,
@@ -70009,6 +70010,35 @@ var clientPortalAccessTable = pgTable(
     uniqueIndex("client_portal_access_company_clerk_uq").on(t.companyId, t.clerkUserId),
     index("client_portal_access_clerk_idx").on(t.clerkUserId),
     index("client_portal_access_company_idx").on(t.companyId)
+  ]
+);
+
+// ../../lib/db/src/schema/meta-glasses.ts
+var metaGlassesSessionsTable = pgTable(
+  "meta_glasses_sessions",
+  {
+    id: serial("id").primaryKey(),
+    /** UUID that identifies the session — used as the polling bearer token. */
+    sessionId: text("session_id").notNull().unique(),
+    /** 6-char human-readable code the technician enters in the Meta glasses app. */
+    code: text("code").notNull(),
+    inspectionId: integer("inspection_id").notNull().references(() => inspectionsTable.id, { onDelete: "cascade" }),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id),
+    /** Clerk/DB user ID of the technician who started the session. */
+    userId: integer("user_id").notNull(),
+    /**
+     * Ring buffer of GlassesEvent objects (max 100).
+     * Persisted as JSONB so sessions survive API restarts.
+     */
+    events: jsonb("events").$type().notNull().default([]),
+    /** When the session automatically expires (24 h from creation). */
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow()
+  },
+  (t) => [
+    index("meta_glasses_sessions_company_idx").on(t.companyId),
+    index("meta_glasses_sessions_inspection_idx").on(t.inspectionId),
+    index("meta_glasses_sessions_expires_idx").on(t.expiresAt)
   ]
 );
 
@@ -90240,6 +90270,84 @@ async function notifyCriticalInspection(input) {
   }));
   await sendExpoPush(messages2, ctx);
 }
+async function notifyTechnicianRouteUpdated(input) {
+  const { companyId, inspectionId, technicianClerkIds, scheduledDate, siteAddress } = input;
+  if (technicianClerkIds.length === 0) return;
+  const uniqueIds = [...new Set(technicianClerkIds)];
+  const ctx = { companyId, inspectionId };
+  let allTechRows = [];
+  try {
+    allTechRows = await db.select({
+      pushToken: usersTable.pushToken,
+      clerkUserId: usersTable.clerkUserId,
+      pushNotificationsEnabled: usersTable.pushNotificationsEnabled
+    }).from(usersTable).where(
+      and(
+        eq(usersTable.companyId, companyId),
+        eq(usersTable.role, "technician")
+      )
+    );
+  } catch (err) {
+    void logErrorEvent("notification", {
+      companyId,
+      inspectionId,
+      message: `Failed to fetch technician push tokens: ${err instanceof Error ? err.message : String(err)}`,
+      context: { stage: "push_fetch_tokens" }
+    });
+    return;
+  }
+  const techRowByClerkId = new Map(allTechRows.map((r) => [r.clerkUserId, r]));
+  for (const clerkId of uniqueIds) {
+    const row = techRowByClerkId.get(clerkId);
+    if (!row) {
+      void logErrorEvent("notification", {
+        companyId,
+        inspectionId,
+        message: `Route-update notification skipped: technician Clerk ID has no user record yet (new hire)`,
+        context: { stage: "push_skip_no_user_record", clerkUserId: clerkId }
+      });
+    } else if (!row.pushNotificationsEnabled) {
+      void logErrorEvent("notification", {
+        companyId,
+        inspectionId,
+        message: `Route-update notification skipped: technician has push notifications disabled`,
+        context: { stage: "push_skip_notifications_disabled", clerkUserId: clerkId }
+      });
+    } else if (!row.pushToken || !row.pushToken.startsWith("ExponentPushToken[")) {
+      void logErrorEvent("notification", {
+        companyId,
+        inspectionId,
+        message: `Route-update notification skipped: technician has no valid push token registered`,
+        context: { stage: "push_skip_no_token", clerkUserId: clerkId }
+      });
+    }
+  }
+  const rows = allTechRows.filter(
+    (r) => uniqueIds.includes(r.clerkUserId) && r.pushNotificationsEnabled
+  );
+  const tokens = rows.map((r) => r.pushToken).filter((t) => typeof t === "string" && t.startsWith("ExponentPushToken["));
+  if (tokens.length === 0) return;
+  const dateLabel = scheduledDate ? scheduledDate.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC"
+  }) : "upcoming";
+  const shortAddress = siteAddress.length > 50 ? siteAddress.slice(0, 47) + "\u2026" : siteAddress;
+  const messages2 = tokens.map((token) => ({
+    to: token,
+    title: "Route Updated",
+    body: `Your ${dateLabel} route at ${shortAddress} has been updated by your manager`,
+    sound: "default",
+    channelId: "route-updates",
+    data: {
+      screen: "inspection",
+      inspectionId,
+      companyId
+    }
+  }));
+  await sendExpoPush(messages2, ctx);
+}
 
 // src/lib/inspection-complete.ts
 async function ensureReportForInspection(input) {
@@ -91105,9 +91213,11 @@ router6.get("/", async (req, res) => {
     const severityParam = typeof req.query.severity === "string" ? req.query.severity : null;
     const statusParam = typeof req.query.status === "string" ? req.query.status : null;
     const sinceDaysParam = typeof req.query.since_days === "string" ? req.query.since_days : null;
+    const opportunitiesParam = typeof req.query.opportunities === "string" ? req.query.opportunities : null;
     const severityValues = severityParam ? severityParam.split(",").filter(Boolean) : null;
     const statusValues = statusParam ? statusParam.split(",").filter(Boolean) : null;
     const sinceDays = sinceDaysParam ? parseInt(sinceDaysParam, 10) : null;
+    const filterOpportunities = opportunitiesParam === "true";
     const VALID_SEVERITIES = ["low", "medium", "high", "critical"];
     const conditions = [eq(reportsTable.companyId, companyId)];
     if (severityValues?.length) {
@@ -91122,6 +91232,11 @@ router6.get("/", async (req, res) => {
     if (sinceDays != null && !isNaN(sinceDays) && sinceDays > 0) {
       const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1e3);
       conditions.push(gte(reportsTable.createdAt, since));
+    }
+    if (filterOpportunities) {
+      conditions.push(
+        sql`jsonb_array_length(COALESCE(${reportsTable.exclusionOpportunities}, '[]'::jsonb)) > 0`
+      );
     }
     const rows = await db.select({
       report: reportsTable,
@@ -105522,7 +105637,30 @@ setInterval(() => {
   for (const [id, session] of sessions) {
     if (session.createdAt < cutoff) sessions.delete(id);
   }
+  void db.delete(metaGlassesSessionsTable).where(lt(metaGlassesSessionsTable.expiresAt, /* @__PURE__ */ new Date())).catch(() => {
+  });
 }, 15 * 60 * 1e3).unref();
+void (async () => {
+  try {
+    const rows = await db.select().from(metaGlassesSessionsTable).where(gt(metaGlassesSessionsTable.expiresAt, /* @__PURE__ */ new Date()));
+    for (const row of rows) {
+      sessions.set(row.sessionId, {
+        sessionId: row.sessionId,
+        code: row.code,
+        inspectionId: row.inspectionId,
+        companyId: row.companyId,
+        userId: row.userId,
+        createdAt: row.createdAt.getTime(),
+        events: row.events ?? []
+      });
+    }
+    if (rows.length > 0) {
+      console.log(`[meta-glasses] Restored ${rows.length} active session(s) from DB`);
+    }
+  } catch (err) {
+    console.warn("[meta-glasses] Could not restore sessions from DB:", String(err));
+  }
+})();
 function makeCode() {
   return crypto2.randomBytes(3).toString("hex").toUpperCase();
 }
@@ -105532,6 +105670,9 @@ function makeSessionId() {
 function pushEvent(session, event) {
   session.events.push(event);
   if (session.events.length > MAX_EVENTS) session.events.shift();
+  void db.update(metaGlassesSessionsTable).set({ events: session.events }).where(eq(metaGlassesSessionsTable.sessionId, session.sessionId)).catch(
+    (err) => logger2.warn("[meta-glasses] DB event sync failed: " + String(err))
+  );
 }
 function verifySignature(rawBody, header) {
   const secret = process.env.META_APP_SECRET;
@@ -105657,6 +105798,17 @@ router28.post(
       createdAt: Date.now(),
       events: []
     });
+    void db.insert(metaGlassesSessionsTable).values({
+      sessionId,
+      code,
+      inspectionId,
+      companyId,
+      userId: req.user.id,
+      events: [],
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS)
+    }).catch(
+      (err) => logger2.warn("[meta-glasses] DB session insert failed: " + String(err))
+    );
     console.log(`[meta-glasses] session created: ${sessionId} inspection=${inspectionId} company=${companyId}`);
     return res.json({ sessionId, code });
   }
@@ -124714,17 +124866,77 @@ var playbooks_default = router33;
 var import_express36 = __toESM(require_express2(), 1);
 
 // src/services/briefing.ts
-async function generateDailyExecutiveBriefing(companyId, targetDate) {
-  const startOfDay = new Date(targetDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(targetDate);
-  endOfDay.setHours(23, 59, 59, 999);
+function getOffsetAtInstant(timezone, utcInstant) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).formatToParts(utcInstant);
+  const p = {};
+  for (const { type, value } of parts) p[type] = value;
+  const hour = parseInt(p.hour ?? "0", 10) % 24;
+  const localAsUtcMs = Date.UTC(
+    parseInt(p.year ?? "1970", 10),
+    parseInt(p.month ?? "1", 10) - 1,
+    parseInt(p.day ?? "1", 10),
+    hour,
+    parseInt(p.minute ?? "0", 10),
+    parseInt(p.second ?? "0", 10),
+    0
+  );
+  return localAsUtcMs - utcInstant.getTime();
+}
+function localDateComponents(utcInstant, timezone) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(utcInstant);
+  const p = {};
+  for (const { type, value } of parts) p[type] = value;
+  return {
+    y: parseInt(p.year ?? "0", 10),
+    m: parseInt(p.month ?? "0", 10),
+    d: parseInt(p.day ?? "0", 10)
+  };
+}
+function dayBoundsInTimezone(isoDate, timezone) {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  function resolveLocalMidnight(utcY, utcM, utcD, expectedY, expectedM, expectedD) {
+    const utcMidnight = new Date(Date.UTC(utcY, utcM - 1, utcD, 0, 0, 0, 0));
+    const offset0 = getOffsetAtInstant(timezone, utcMidnight);
+    const estimate = new Date(utcMidnight.getTime() - offset0);
+    const offset1 = getOffsetAtInstant(timezone, estimate);
+    const corrected = offset1 !== offset0 ? new Date(utcMidnight.getTime() - offset1) : estimate;
+    const { y, m, d } = localDateComponents(corrected, timezone);
+    if (y !== expectedY || m !== expectedM || d !== expectedD) {
+      return estimate;
+    }
+    return corrected;
+  }
+  const start = resolveLocalMidnight(year, month, day, year, month, day);
+  const nextDayUtc = new Date(Date.UTC(year, month - 1, day + 1));
+  const ny = nextDayUtc.getUTCFullYear();
+  const nm = nextDayUtc.getUTCMonth() + 1;
+  const nd = nextDayUtc.getUTCDate();
+  const end = resolveLocalMidnight(ny, nm, nd, ny, nm, nd);
+  return { start, end };
+}
+async function generateDailyExecutiveBriefing(companyId, isoDate, timezone = "UTC") {
+  const { start: startOfDay, end: endOfDay } = dayBoundsInTimezone(isoDate, timezone);
   const [inspectionRow] = await db.select({ totalInspections: count(inspectionsTable.id) }).from(inspectionsTable).where(
     and(
       eq(inspectionsTable.companyId, companyId),
       eq(inspectionsTable.status, "completed"),
       gte(inspectionsTable.createdAt, startOfDay),
       lt(inspectionsTable.createdAt, endOfDay)
+      // exclusive upper bound
     )
   );
   const [riskRow] = await db.select({
@@ -124739,6 +124951,7 @@ async function generateDailyExecutiveBriefing(companyId, targetDate) {
       eq(inspectionScorecardsTable.companyId, companyId),
       gte(inspectionsTable.createdAt, startOfDay),
       lt(inspectionsTable.createdAt, endOfDay)
+      // exclusive upper bound
     )
   );
   const [oppRow] = await db.select({
@@ -124749,6 +124962,7 @@ async function generateDailyExecutiveBriefing(companyId, targetDate) {
       eq(opportunitiesTable.companyId, companyId),
       gte(opportunitiesTable.createdAt, startOfDay),
       lt(opportunitiesTable.createdAt, endOfDay)
+      // exclusive upper bound
     )
   );
   const totalInspections = Number(inspectionRow?.totalInspections ?? 0);
@@ -124758,7 +124972,7 @@ async function generateDailyExecutiveBriefing(companyId, targetDate) {
   const inspectionWord = totalInspections === 1 ? "inspection" : "inspections";
   const alertPhrase = criticalRisks > 0 ? ` with ${criticalRisks} critical risk alert${criticalRisks === 1 ? "" : "s"} flagged` : " with no critical risk alerts";
   const briefing = {
-    date: targetDate.toISOString().split("T")[0],
+    date: isoDate,
     summary: `Yesterday your team completed ${totalInspections} ${inspectionWord}${alertPhrase}. New pipeline value added: $${newPipelineValue.toLocaleString()}.`,
     inspectionsCount: totalInspections,
     criticalRiskCount: criticalRisks,
@@ -125132,7 +125346,30 @@ router34.get(
   requireRole("owner"),
   async (req, res) => {
     const companyId = getCompanyId(req);
-    let targetDate;
+    let timezone = "UTC";
+    if (req.query.tz !== void 0) {
+      if (typeof req.query.tz !== "string" || !req.query.tz.trim()) {
+        return res.status(400).json({
+          error: "tz query param must be a valid IANA timezone string (e.g. America/New_York)"
+        });
+      }
+      const rawTz = req.query.tz.trim();
+      try {
+        Intl.DateTimeFormat(void 0, { timeZone: rawTz });
+        timezone = rawTz;
+      } catch {
+        return res.status(400).json({
+          error: `tz '${rawTz}' is not a recognised IANA timezone (e.g. America/New_York, Europe/London)`
+        });
+      }
+    }
+    const todayInOwnerTz = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(/* @__PURE__ */ new Date());
+    let isoDate;
     const rawDateParam = req.query.date;
     if (rawDateParam !== void 0) {
       if (Array.isArray(rawDateParam)) {
@@ -125151,42 +125388,35 @@ router34.get(
           error: "date query param must be in YYYY-MM-DD format (e.g. 2026-07-15)"
         });
       }
-      const parsed = /* @__PURE__ */ new Date(`${raw}T00:00:00`);
-      if (isNaN(parsed.getTime())) {
-        return res.status(400).json({
-          error: "date query param is not a valid calendar date"
-        });
-      }
       const [yearStr, monthStr, dayStr] = raw.split("-");
-      const parsedYear = parsed.getFullYear();
-      const parsedMonth = parsed.getMonth() + 1;
-      const parsedDay = parsed.getDate();
-      if (parsedYear !== Number(yearStr) || parsedMonth !== Number(monthStr) || parsedDay !== Number(dayStr)) {
+      const y = Number(yearStr), m = Number(monthStr), d = Number(dayStr);
+      const probe = new Date(Date.UTC(y, m - 1, d));
+      if (isNaN(probe.getTime()) || probe.getUTCFullYear() !== y || probe.getUTCMonth() + 1 !== m || probe.getUTCDate() !== d) {
         return res.status(400).json({
           error: "date query param is not a valid calendar date"
         });
       }
-      const todayStart = /* @__PURE__ */ new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      if (parsed >= todayStart) {
+      if (raw >= todayInOwnerTz) {
         return res.status(400).json({
           error: "date must be in the past \u2014 future and today's dates are not allowed"
         });
       }
-      const ninetyDaysAgoStart = new Date(todayStart);
-      ninetyDaysAgoStart.setDate(ninetyDaysAgoStart.getDate() - 90);
-      if (parsed < ninetyDaysAgoStart) {
+      const [ty, tm, td] = todayInOwnerTz.split("-").map(Number);
+      const ninetyDaysAgo = new Date(Date.UTC(ty, tm - 1, td - 90));
+      const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().slice(0, 10);
+      if (raw < ninetyDaysAgoStr) {
         return res.status(400).json({
           error: "date is more than 90 days in the past \u2014 historical queries are limited to 90 days"
         });
       }
-      targetDate = parsed;
+      isoDate = raw;
     } else {
-      targetDate = /* @__PURE__ */ new Date();
-      targetDate.setDate(targetDate.getDate() - 1);
+      const [ty, tm, td] = todayInOwnerTz.split("-").map(Number);
+      const yesterday = new Date(Date.UTC(ty, tm - 1, td - 1));
+      isoDate = yesterday.toISOString().slice(0, 10);
     }
     try {
-      const result = await generateDailyExecutiveBriefing(companyId, targetDate);
+      const result = await generateDailyExecutiveBriefing(companyId, isoDate, timezone);
       return res.json(result);
     } catch (error40) {
       logger2.error({ err: error40 }, "executive briefing error");
@@ -125496,6 +125726,26 @@ var reassignSchema = external_exports2.object({
   technicianName: external_exports2.string().min(1).optional(),
   technicianId: external_exports2.string().optional().nullable()
 });
+async function resolveTechnicianClerkId(companyId, technicianName) {
+  const [prior] = await db.select({ technicianId: inspectionsTable.technicianId }).from(inspectionsTable).where(
+    and(
+      eq(inspectionsTable.companyId, companyId),
+      eq(inspectionsTable.technicianName, technicianName),
+      isNotNull(inspectionsTable.technicianId)
+    )
+  ).orderBy(desc(inspectionsTable.id)).limit(1);
+  return prior?.technicianId ?? null;
+}
+async function validateTechnicianClerkId(companyId, clerkUserId) {
+  const [row] = await db.select({ id: usersTable.id }).from(usersTable).where(
+    and(
+      eq(usersTable.companyId, companyId),
+      eq(usersTable.clerkUserId, clerkUserId),
+      eq(usersTable.role, "technician")
+    )
+  ).limit(1);
+  return !!row;
+}
 router35.patch("/:id", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
@@ -125508,7 +125758,14 @@ router35.patch("/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid request body", details: parse4.error.issues });
     }
     const { scheduledDate, technicianName, technicianId } = parse4.data;
-    const [existing] = await db.select({ id: inspectionsTable.id, companyId: inspectionsTable.companyId }).from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+    const [existing] = await db.select({
+      id: inspectionsTable.id,
+      companyId: inspectionsTable.companyId,
+      technicianId: inspectionsTable.technicianId,
+      technicianName: inspectionsTable.technicianName,
+      siteAddress: inspectionsTable.siteAddress,
+      scheduledDate: inspectionsTable.scheduledDate
+    }).from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
     if (!existing) {
       return res.status(404).json({ error: "Inspection not found" });
     }
@@ -125517,13 +125774,58 @@ router35.patch("/:id", async (req, res) => {
       update.scheduledDate = scheduledDate ? new Date(scheduledDate) : null;
     }
     if (technicianName !== void 0) update.technicianName = technicianName;
-    if (technicianId !== void 0) update.technicianId = technicianId ?? null;
-    if (Object.keys(update).length === 0) {
+    if (Object.keys(update).length === 0 && technicianId === void 0) {
       return res.status(400).json({ error: "Nothing to update" });
+    }
+    const prevTechClerkId = existing.technicianId ?? null;
+    let newTechClerkId = prevTechClerkId;
+    let resolvedToSamePerson = false;
+    let unresolvedNewTechName = null;
+    if (technicianId !== void 0) {
+      if (technicianId === null) {
+        newTechClerkId = null;
+        update.technicianId = null;
+      } else {
+        const isValidTech = await validateTechnicianClerkId(companyId, technicianId);
+        if (isValidTech) {
+          newTechClerkId = technicianId;
+          update.technicianId = technicianId;
+          if (technicianId === prevTechClerkId) resolvedToSamePerson = true;
+        } else {
+          const nameAlsoChanging = technicianName !== void 0 && technicianName !== existing.technicianName;
+          if (nameAlsoChanging) {
+            newTechClerkId = null;
+            update.technicianId = null;
+          }
+        }
+      }
+    } else if (technicianName !== void 0 && technicianName !== existing.technicianName) {
+      const resolved = await resolveTechnicianClerkId(companyId, technicianName);
+      if (resolved !== null) {
+        const isValidTech = await validateTechnicianClerkId(companyId, resolved);
+        if (isValidTech) {
+          newTechClerkId = resolved;
+          update.technicianId = resolved;
+          if (resolved === prevTechClerkId) resolvedToSamePerson = true;
+        } else {
+          newTechClerkId = null;
+          update.technicianId = null;
+        }
+      } else {
+        newTechClerkId = null;
+        update.technicianId = null;
+        unresolvedNewTechName = technicianName;
+      }
     }
     const [updated] = await db.update(inspectionsTable).set(update).where(eq(inspectionsTable.id, id)).returning();
     const calDate = updated.scheduledDate ?? updated.createdAt;
-    return res.json({
+    const warnings = [];
+    if (unresolvedNewTechName !== null) {
+      warnings.push(
+        `Technician "${unresolvedNewTechName}" has no Clerk account record yet \u2014 they will not receive a push notification until they sign in to the mobile app.`
+      );
+    }
+    const responsePayload = {
       id: updated.id,
       siteAddress: updated.siteAddress,
       clientName: updated.clientName ?? null,
@@ -125536,7 +125838,32 @@ router35.patch("/:id", async (req, res) => {
       calendarDate: toISODate(calDate),
       createdAt: updated.createdAt.toISOString(),
       completedAt: updated.completedAt?.toISOString() ?? null
-    });
+    };
+    if (warnings.length > 0) {
+      responsePayload.warnings = warnings;
+    }
+    const actingClerkId = req.user?.clerkUserId ?? null;
+    const prevDateMs = existing.scheduledDate?.getTime() ?? null;
+    const newDateMs = updated.scheduledDate?.getTime() ?? null;
+    const scheduledDateChanged = prevDateMs !== newDateMs;
+    const nameChanged = technicianName !== void 0 && technicianName !== existing.technicianName;
+    const technicianChanged = prevTechClerkId !== newTechClerkId || nameChanged && !resolvedToSamePerson;
+    if (scheduledDateChanged || technicianChanged) {
+      const toNotify = /* @__PURE__ */ new Set();
+      if (prevTechClerkId) toNotify.add(prevTechClerkId);
+      if (newTechClerkId) toNotify.add(newTechClerkId);
+      if (actingClerkId) toNotify.delete(actingClerkId);
+      if (toNotify.size > 0) {
+        void notifyTechnicianRouteUpdated({
+          companyId,
+          inspectionId: id,
+          technicianClerkIds: [...toNotify],
+          scheduledDate: updated.scheduledDate,
+          siteAddress: updated.siteAddress
+        });
+      }
+    }
+    return res.json(responsePayload);
   } catch {
     return res.status(500).json({ error: "Failed to update schedule entry" });
   }
@@ -125734,6 +126061,26 @@ router36.get("/reports/:id/html", async (req, res) => {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "private, max-age=300");
   return res.send(html);
+});
+router36.post("/reports/:id/pdf", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  const [report] = await db.select().from(reportsTable).where(
+    and(
+      eq(reportsTable.id, id),
+      eq(reportsTable.companyId, access.companyId),
+      eq(reportsTable.status, "approved")
+    )
+  );
+  if (!report) return res.status(404).json({ error: "Report not found" });
+  if (!access.siteAddresses.includes(report.siteAddress)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+  const baseUrl = process.env.PUBLIC_BASE_URL ?? `https://${process.env.REPLIT_DEV_DOMAIN ?? "localhost"}`;
+  const pdfUrl = `${baseUrl}/api/client/reports/${id}/html`;
+  return res.json({ pdfUrl });
 });
 router36.get("/reports/:id", async (req, res) => {
   const access = await getClientAccess(req);
@@ -126815,11 +127162,27 @@ function buildBriefingEmail(opts) {
   ].join("\n");
   return { html, text: text2, subject };
 }
+var IDEMPOTENCY_WINDOW_MS = 60 * 60 * 1e3;
+var acceptedRuns = /* @__PURE__ */ new Map();
 async function runDailyBriefingJob() {
   const yesterday = /* @__PURE__ */ new Date();
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
   yesterday.setUTCHours(0, 0, 0, 0);
-  logger2.info({ date: yesterday.toISOString().split("T")[0] }, "briefing-scheduler: job started");
+  const dateKey = yesterday.toISOString().split("T")[0];
+  const cutoff = Date.now() - 25 * 60 * 60 * 1e3;
+  for (const [key, ts] of acceptedRuns) {
+    if (ts < cutoff) acceptedRuns.delete(key);
+  }
+  const firstAccepted = acceptedRuns.get(dateKey);
+  if (firstAccepted !== void 0 && Date.now() - firstAccepted < IDEMPOTENCY_WINDOW_MS) {
+    logger2.warn(
+      { dateKey, firstAcceptedAt: new Date(firstAccepted).toISOString() },
+      "briefing-scheduler: duplicate invocation within 1-hour window \u2014 skipping"
+    );
+    return { sent: 0, skipped: 0, failed: 0, noTransport: 0, total: 0, duplicate: true };
+  }
+  acceptedRuns.set(dateKey, Date.now());
+  logger2.info({ date: dateKey }, "briefing-scheduler: job started");
   const companies = await db.select({ id: companiesTable.id, name: companiesTable.name }).from(companiesTable);
   let sent = 0;
   let skipped = 0;
@@ -126838,7 +127201,7 @@ async function runDailyBriefingJob() {
         skipped++;
         continue;
       }
-      const { briefing } = await generateDailyExecutiveBriefing(company.id, yesterday);
+      const { briefing } = await generateDailyExecutiveBriefing(company.id, dateKey, "UTC");
       const { html, text: text2, subject } = buildBriefingEmail({
         companyName: company.name,
         date: briefing.date,
