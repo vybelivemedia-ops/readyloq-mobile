@@ -79,6 +79,60 @@ export function useSmartGlassesBleFrames({
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
 
+  // Tracks every cache file written this session so they can all be deleted on unmount.
+  // Using a ref (not state) avoids re-renders and survives the async frame callbacks.
+  const writtenUrisRef = useRef<string[]>([]);
+
+  // ── Startup: delete orphan files from any previous session that crashed ──
+  //
+  // If the app crashed (or was force-killed) during an inspection, the unmount
+  // cleanup below never ran, leaving behind `glasses_ble_*` files. Scan the
+  // cache dir on mount and remove them so they don't accumulate across sessions.
+  useEffect(() => {
+    const baseDir =
+      FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? "";
+    if (!baseDir) return;
+    void (async () => {
+      try {
+        const files = await FileSystem.readDirectoryAsync(baseDir);
+        const orphans = files.filter((f) => f.startsWith("glasses_ble_"));
+        await Promise.all(
+          orphans.map((f) =>
+            FileSystem.deleteAsync(`${baseDir}${f}`, {
+              idempotent: true,
+            }).catch(() => {}),
+          ),
+        );
+      } catch {
+        // Non-fatal — best-effort orphan cleanup on startup
+      }
+    })();
+  }, []);
+
+  // ── Unmount: delete all cache files written during this session ───────────
+  //
+  // Each successfully written JPEG is tracked in writtenUrisRef. When the
+  // inspection screen unmounts (inspection ends, navigation away, or component
+  // teardown), every tracked file is deleted. This is the primary storage-
+  // reclaim path for the normal (non-crash) lifecycle.
+  //
+  // FAIE reads the file asynchronously after onFrame is called, so we wait
+  // until unmount rather than deleting immediately after handoff — giving FAIE
+  // the full inspection lifetime to upload the photo before the file disappears.
+  useEffect(() => {
+    return () => {
+      const uris = writtenUrisRef.current;
+      if (uris.length > 0) {
+        void Promise.all(
+          uris.map((uri) =>
+            FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {}),
+          ),
+        );
+        writtenUrisRef.current = [];
+      }
+    };
+  }, []);
+
   // ── Track BLE connection state ───────────────────────────────────────────
   useEffect(() => {
     // Sync initial state
@@ -127,6 +181,8 @@ export function useSmartGlassesBleFrames({
             encoding: FileSystem.EncodingType.Base64,
           });
 
+          // Track the URI so it can be deleted on unmount (storage reclaim).
+          writtenUrisRef.current.push(cacheUri);
           setFrameCount((prev) => prev + 1);
           onFrameRef.current(cacheUri);
         } catch {
