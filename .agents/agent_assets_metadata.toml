@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "L_PcY2SttNnETdWLBYfN4"
+uri = "file://attached_assets/readyloq-app-icon-512-final.png"
+type = "image"
+title = "ReadyLoq App Icon — 512×512 PNG"
+description = "Google Play ready: 512×512 px, PNG, 256 KB (under 1 MB limit). Shield + pest targeting crosshair + circuit traces on navy-teal gradient."
