@@ -22,6 +22,15 @@ export interface ReassignPayload {
   technicianId?: string | null;
 }
 
+export interface CreateInspectionPayload {
+  siteAddress: string;
+  clientName?: string;
+  technicianName: string;
+  scheduledDate?: string | null;
+  pestTypes?: string[];
+  notes?: string;
+}
+
 export function useSchedule(start: string, end: string) {
   return useQuery<ScheduleEntry[]>({
     queryKey: ['schedule', start, end],
@@ -33,7 +42,8 @@ export function useSchedule(start: string, end: string) {
       return res.json();
     },
     enabled: Boolean(start && end),
-    staleTime: 30_000,
+    staleTime: 15_000,
+    refetchInterval: 30_000, // real-time status updates for dispatchers
   });
 }
 
@@ -52,6 +62,28 @@ export function useReassignInspection() {
         throw new Error(err.error ?? 'Failed to update');
       }
       return res.json() as Promise<ScheduleEntry>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['schedule'] });
+    },
+  });
+}
+
+export function useCreateInspection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: CreateInspectionPayload) => {
+      const res = await fetch(apiUrl('/inspections'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? 'Failed to create inspection');
+      }
+      return res.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['schedule'] });
