@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useRoute, Link } from 'wouter';
 import { useClientReport } from '@/hooks/use-client-portal';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
   FileText,
@@ -7,12 +9,15 @@ import {
   CheckCircle,
   ExternalLink,
   ShieldCheck,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { apiUrl } from '@/config';
 
 const SEVERITY_STYLES: Record<string, string> = {
   critical: 'bg-red-100 text-red-700 border-red-200',
@@ -36,6 +41,33 @@ export function ReportViewer() {
   const id = params ? Number(params.id) : null;
 
   const { data: report, isLoading, error } = useClientReport(id);
+  const queryClient = useQueryClient();
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  async function handleDownloadPdf() {
+    if (!id) return;
+    setPdfGenerating(true);
+    setPdfError(null);
+    try {
+      const res = await fetch(apiUrl(`/client/reports/${id}/pdf`), {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(body.error ?? 'Failed to generate PDF');
+      }
+      const { pdfUrl } = await res.json();
+      // Invalidate so the cached report reflects the new pdfUrl
+      void queryClient.invalidateQueries({ queryKey: ['client', 'reports', id] });
+      window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setPdfError((err as Error).message ?? 'PDF generation failed');
+    } finally {
+      setPdfGenerating(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -99,9 +131,9 @@ export function ReportViewer() {
       </div>
 
       {/* Report document — links to client-scoped HTML endpoint (not company-portal URL) */}
-      <div className="mb-6 flex gap-3 flex-wrap">
+      <div className="mb-6 flex gap-3 flex-wrap items-center">
         <a
-          href={`/api/client/reports/${report.id}/html`}
+          href={apiUrl(`/client/reports/${report.id}/html`)}
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -110,13 +142,26 @@ export function ReportViewer() {
             View Full Report
           </Button>
         </a>
-        {report.pdfUrl && (
-          <a href={report.pdfUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" className="gap-2">
-              <ExternalLink className="w-4 h-4" />
-              Download PDF
-            </Button>
-          </a>
+
+        {/* Always use the client-scoped POST endpoint — the stored pdfUrl on the
+            report record points to the internal company-portal route which
+            requires company-user auth and is inaccessible to property managers. */}
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={handleDownloadPdf}
+          disabled={pdfGenerating}
+        >
+          {pdfGenerating ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+          {pdfGenerating ? 'Generating PDF…' : 'Download PDF'}
+        </Button>
+
+        {pdfError && (
+          <p className="text-sm text-destructive">{pdfError}</p>
         )}
       </div>
 

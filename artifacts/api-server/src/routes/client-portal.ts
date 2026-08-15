@@ -295,6 +295,48 @@ router.get("/reports/:id/html", async (req, res) => {
   return res.send(html);
 });
 
+// ─── POST /client/reports/:id/pdf ────────────────────────────────────────────
+// Returns a client-scoped, print-ready URL for an approved report.
+// The stored pdfUrl on the report record is the internal company-portal route
+// which requires company-user auth — property managers cannot access it.
+// This endpoint always derives a client-authorized URL so the caller can open
+// or print the report without needing company-portal credentials.
+// No DB write is performed; the stored pdfUrl field is intentionally untouched.
+
+router.post("/reports/:id/pdf", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const [report] = await db
+    .select()
+    .from(reportsTable)
+    .where(
+      and(
+        eq(reportsTable.id, id),
+        eq(reportsTable.companyId, access.companyId),
+        eq(reportsTable.status, "approved"),
+      ),
+    );
+
+  if (!report) return res.status(404).json({ error: "Report not found" });
+
+  if (!access.siteAddresses.includes(report.siteAddress)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+
+  // Always derive a client-scoped URL — the internal /api/reports/:id/html route
+  // requires company-user authentication and is not usable by property managers.
+  const baseUrl =
+    process.env.PUBLIC_BASE_URL ??
+    `https://${process.env.REPLIT_DEV_DOMAIN ?? "localhost"}`;
+  const pdfUrl = `${baseUrl}/api/client/reports/${id}/html`;
+
+  return res.json({ pdfUrl });
+});
+
 // ─── GET /client/reports/:id ──────────────────────────────────────────────────
 
 router.get("/reports/:id", async (req, res) => {
