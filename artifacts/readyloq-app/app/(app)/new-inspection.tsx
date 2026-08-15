@@ -48,6 +48,7 @@ import { useAllDevicesHealthCheck } from "@/hooks/useAllDevicesHealthCheck";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
 import { useMetaGlassesSession, type GlassesEvent } from "@/hooks/useMetaGlassesSession";
 import { useSmartGlassesBleFrames } from "@/hooks/useSmartGlassesBleFrames";
+import { getBleBadgeStyle } from "@/lib/ble/badge-display";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
@@ -1716,42 +1717,43 @@ export default function NewInspectionScreen() {
         {/* Connection-mode badge row — BLE direct vs cloud relay */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           {/* BLE / Cloud badge */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4,
-              backgroundColor: bleGlasses.isBleConnected
-                ? "rgba(34,197,94,0.22)"
-                : "rgba(245,158,11,0.22)",
-              borderRadius: 5,
-              paddingHorizontal: 7,
-              paddingVertical: 3,
-              borderWidth: 1,
-              borderColor: bleGlasses.isBleConnected
-                ? "rgba(34,197,94,0.55)"
-                : "rgba(245,158,11,0.55)",
-            }}
-          >
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: bleGlasses.isBleConnected ? "#22c55e" : "#f59e0b",
-              }}
-            />
-            <Text
-              style={{
-                color: bleGlasses.isBleConnected ? "#86efac" : "#fcd34d",
-                fontFamily: "Inter_600SemiBold",
-                fontSize: 10,
-                letterSpacing: 0.3,
-              }}
-            >
-              {bleGlasses.isBleConnected ? "BLE · direct" : "Cloud · relay"}
-            </Text>
-          </View>
+          {(() => {
+            const badgeStyle = getBleBadgeStyle(bleGlasses.isBleConnected);
+            return (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  backgroundColor: badgeStyle.bgColor,
+                  borderRadius: 5,
+                  paddingHorizontal: 7,
+                  paddingVertical: 3,
+                  borderWidth: 1,
+                  borderColor: badgeStyle.borderColor,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: badgeStyle.dotColor,
+                  }}
+                />
+                <Text
+                  style={{
+                    color: badgeStyle.textColor,
+                    fontFamily: "Inter_600SemiBold",
+                    fontSize: 10,
+                    letterSpacing: 0.3,
+                  }}
+                >
+                  {badgeStyle.label}
+                </Text>
+              </View>
+            );
+          })()}
           {/* BLE frame count — shown only when BLE has received frames */}
           {bleGlasses.isBleConnected && bleGlasses.frameCount > 0 ? (
             <Text style={{ color: "rgba(255,255,255,0.65)", fontFamily: "Inter_400Regular", fontSize: 10 }}>
