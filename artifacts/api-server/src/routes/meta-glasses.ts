@@ -39,7 +39,7 @@ import crypto from "node:crypto";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { toFile } from "openai";
 import { db, inspectionsTable, inspectionMediaTable, metaGlassesSessionsTable } from "@workspace/db";
-import { eq, gt, lt } from "drizzle-orm";
+import { and, eq, gt, lt } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 const objectStorageService = new ObjectStorageService();
@@ -307,11 +307,12 @@ router.post(
     }
 
     const companyId = req.user!.companyId!;
-    // Verify inspection belongs to this company
+    // Verify inspection belongs to this company — filters by both id AND
+    // companyId so a technician at Company A cannot hijack Company B's session.
     const [inspection] = await db
       .select({ id: inspectionsTable.id })
       .from(inspectionsTable)
-      .where(eq(inspectionsTable.id, inspectionId))
+      .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)))
       .limit(1);
 
     if (!inspection) {
