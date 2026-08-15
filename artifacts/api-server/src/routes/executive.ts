@@ -528,7 +528,41 @@ router.get(
   async (req, res) => {
     const companyId = getCompanyId(req);
 
-    let targetDate: Date;
+    // Optional ?tz= query param — an IANA timezone string (e.g. "America/New_York").
+    // When provided, day boundaries and the default "yesterday" are computed in
+    // the owner's local timezone instead of UTC so inspections completed after
+    // 7 pm in a UTC-N zone are never silently shifted to the next day's briefing.
+    // Omitting it defaults to UTC (backward-compatible behaviour).
+    let timezone = "UTC";
+    if (req.query.tz !== undefined) {
+      if (typeof req.query.tz !== "string" || !req.query.tz.trim()) {
+        return res.status(400).json({
+          error: "tz query param must be a valid IANA timezone string (e.g. America/New_York)",
+        });
+      }
+      const rawTz = req.query.tz.trim();
+      try {
+        // Validate: Intl.DateTimeFormat throws RangeError for unknown timezones.
+        Intl.DateTimeFormat(undefined, { timeZone: rawTz });
+        timezone = rawTz;
+      } catch {
+        return res.status(400).json({
+          error: `tz '${rawTz}' is not a recognised IANA timezone (e.g. America/New_York, Europe/London)`,
+        });
+      }
+    }
+
+    // ── Today's date in the owner's timezone (YYYY-MM-DD) ─────────────────
+    // Used for validation and the default "yesterday" computation.
+    // en-CA locale reliably formats as YYYY-MM-DD regardless of locale settings.
+    const todayInOwnerTz = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date()); // "YYYY-MM-DD"
+
+    let isoDate: string;
 
     const rawDateParam = req.query.date;
 
@@ -560,60 +594,54 @@ router.get(
         });
       }
 
-      const parsed = new Date(`${raw}T00:00:00`);
-      if (isNaN(parsed.getTime())) {
-        return res.status(400).json({
-          error: "date query param is not a valid calendar date",
-        });
-      }
-
-      // Guard against JS Date normalization of impossible dates such as
-      // 2026-02-30 → 2026-03-02. After parsing, the year/month/day components
-      // must match the original string exactly.
+      // Validate the calendar date by round-tripping through Date.UTC so the
+      // check is server-timezone-independent.  An impossible date like 2026-02-30
+      // normalises to a different date; the mismatch is caught below.
       const [yearStr, monthStr, dayStr] = raw.split("-");
-      const parsedYear  = parsed.getFullYear();
-      const parsedMonth = parsed.getMonth() + 1; // getMonth() is 0-indexed
-      const parsedDay   = parsed.getDate();
+      const y = Number(yearStr), m = Number(monthStr), d = Number(dayStr);
+      const probe = new Date(Date.UTC(y, m - 1, d));
       if (
-        parsedYear  !== Number(yearStr)  ||
-        parsedMonth !== Number(monthStr) ||
-        parsedDay   !== Number(dayStr)
+        isNaN(probe.getTime()) ||
+        probe.getUTCFullYear()  !== y ||
+        probe.getUTCMonth() + 1 !== m ||
+        probe.getUTCDate()      !== d
       ) {
         return res.status(400).json({
           error: "date query param is not a valid calendar date",
         });
       }
 
-      // Compare against the start of today (local server time, same as the
-      // service window) to decide if the requested date is in the future.
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      if (parsed >= todayStart) {
+      // YYYY-MM-DD strings are lexicographically comparable when zero-padded.
+      // Compare against today in the owner's timezone so a UTC-N owner doesn't
+      // accidentally get a "future date" rejection for their current local day.
+      if (raw >= todayInOwnerTz) {
         return res.status(400).json({
           error: "date must be in the past — future and today's dates are not allowed",
         });
       }
 
-      // 90-day guard: dates older than 90 days are rejected.
-      // Use midnight-normalised arithmetic so DST transitions don't cause
-      // off-by-one errors at the boundary.
-      const ninetyDaysAgoStart = new Date(todayStart);
-      ninetyDaysAgoStart.setDate(ninetyDaysAgoStart.getDate() - 90);
-      if (parsed < ninetyDaysAgoStart) {
+      // 90-day guard: compute what date was 90 days before today in the owner's TZ.
+      // We use UTC date arithmetic on today's date components to get a stable result.
+      const [ty, tm, td] = todayInOwnerTz.split("-").map(Number);
+      const ninetyDaysAgo = new Date(Date.UTC(ty, tm - 1, td - 90));
+      const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().slice(0, 10);
+      if (raw < ninetyDaysAgoStr) {
         return res.status(400).json({
           error: "date is more than 90 days in the past — historical queries are limited to 90 days",
         });
       }
 
-      targetDate = parsed;
+      isoDate = raw;
     } else {
-      // No date key at all — default to yesterday.
-      targetDate = new Date();
-      targetDate.setDate(targetDate.getDate() - 1);
+      // No date key — default to yesterday in the owner's timezone.
+      // Subtract one calendar day from today's date components (UTC-safe arithmetic).
+      const [ty, tm, td] = todayInOwnerTz.split("-").map(Number);
+      const yesterday = new Date(Date.UTC(ty, tm - 1, td - 1));
+      isoDate = yesterday.toISOString().slice(0, 10);
     }
 
     try {
-      const result = await generateDailyExecutiveBriefing(companyId, targetDate);
+      const result = await generateDailyExecutiveBriefing(companyId, isoDate, timezone);
       return res.json(result);
     } catch (error) {
       logger.error({ err: error }, "executive briefing error");

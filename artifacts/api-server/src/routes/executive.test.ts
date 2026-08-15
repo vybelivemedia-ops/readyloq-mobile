@@ -73,7 +73,7 @@ vi.mock("../lib/intelligence-ai", () => ({
 }));
 
 import app from "../app";
-import { generateDailyExecutiveBriefing } from "../services/briefing";
+import { generateDailyExecutiveBriefing, dayBoundsInTimezone } from "../services/briefing";
 import {
   db,
   usersTable,
@@ -1454,26 +1454,28 @@ describe("executive briefing: midnight boundary accuracy", () => {
   let midnightInspIds: number[] = [];
 
   // Build boundary timestamps once, relative to a stable target date.
+  // All dates and timestamps use UTC so the test is server-timezone-independent.
   const _now = new Date();
-  const targetDate = new Date(
-    _now.getFullYear(),
-    _now.getMonth(),
-    _now.getDate() - 5, // 5 days ago — well clear of "yesterday" and "today"
+  const targetDateUTC = new Date(
+    Date.UTC(_now.getUTCFullYear(), _now.getUTCMonth(), _now.getUTCDate() - 5),
+  );
+  // YYYY-MM-DD string for the target date — passed directly to the service.
+  const targetDateStr = targetDateUTC.toISOString().slice(0, 10);
+
+  // 1 second before the end of targetDate (23:59:59 UTC → inside window)
+  const oneSecBeforeMidnight = new Date(
+    Date.UTC(_now.getUTCFullYear(), _now.getUTCMonth(), _now.getUTCDate() - 5, 23, 59, 59, 0),
   );
 
-  // 1 second before the end of targetDate (23:59:59.000 → inside window)
-  const oneSecBeforeMidnight = new Date(targetDate);
-  oneSecBeforeMidnight.setHours(23, 59, 59, 0);
+  // 1 second after midnight of the NEXT day (00:00:01 UTC of targetDate + 1)
+  const oneSecAfterMidnight = new Date(
+    Date.UTC(_now.getUTCFullYear(), _now.getUTCMonth(), _now.getUTCDate() - 5 + 1, 0, 0, 1, 0),
+  );
 
-  // 1 second after midnight of the NEXT day (00:00:01.000 of targetDate + 1)
-  const oneSecAfterMidnight = new Date(targetDate);
-  oneSecAfterMidnight.setDate(oneSecAfterMidnight.getDate() + 1);
-  oneSecAfterMidnight.setHours(0, 0, 1, 0);
-
-  // End of the day BEFORE targetDate (23:59:59.000 of targetDate - 1)
-  const endOfPreviousDay = new Date(targetDate);
-  endOfPreviousDay.setDate(endOfPreviousDay.getDate() - 1);
-  endOfPreviousDay.setHours(23, 59, 59, 0);
+  // End of the day BEFORE targetDate (23:59:59 UTC of targetDate - 1)
+  const endOfPreviousDay = new Date(
+    Date.UTC(_now.getUTCFullYear(), _now.getUTCMonth(), _now.getUTCDate() - 5 - 1, 23, 59, 59, 0),
+  );
 
   beforeAll(async () => {
     midnightCompanyId = await findOrCreateCompany("Exec Midnight Co", MIDNIGHT_CO_SLUG);
@@ -1526,9 +1528,9 @@ describe("executive briefing: midnight boundary accuracy", () => {
   });
 
   it("counts an inspection created one second before midnight as part of that day's briefing", async () => {
-    const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDate);
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDateStr);
     expect(result.success).toBe(true);
-    // insp1 (23:59:59 of targetDate) is inside the [00:00:00, 23:59:59.999) window.
+    // insp1 (23:59:59 UTC of targetDate) is inside the [00:00:00, 23:59:59.999 UTC) window.
     // insp2 and insp3 are outside — the count must be exactly 1.
     expect(result.briefing.inspectionsCount).toBe(1);
   });
@@ -1536,7 +1538,7 @@ describe("executive briefing: midnight boundary accuracy", () => {
   it("does not count an inspection created one second after midnight (start of the next day)", async () => {
     // Request the briefing for targetDate — insp2 belongs to targetDate + 1,
     // so it must not appear regardless of how close to midnight it was created.
-    const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDate);
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDateStr);
     expect(result.success).toBe(true);
     // If insp2 leaked in, the count would be 2; it must stay at 1.
     expect(result.briefing.inspectionsCount).toBe(1);
@@ -1544,30 +1546,291 @@ describe("executive briefing: midnight boundary accuracy", () => {
 
   it("does not count an inspection from the day before the target date", async () => {
     // insp3 was created at end-of-day of (targetDate - 1), which is before the
-    // window's lower bound (00:00:00.000 of targetDate).
-    const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDate);
+    // window's lower bound (00:00:00.000 UTC of targetDate).
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDateStr);
     expect(result.success).toBe(true);
     // If insp3 leaked in, the count would be 2; it must stay at 1.
     expect(result.briefing.inspectionsCount).toBe(1);
   });
 
   it("a briefing for 'yesterday' does not include inspections from two days ago", async () => {
-    // targetDate is 5 days ago; none of our fixtures fall in yesterday's window.
+    // targetDateStr is 5 days ago; none of our fixtures fall in yesterday's window.
     // This confirms the date window is anchored to the requested day, not a rolling range.
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const result = await generateDailyExecutiveBriefing(midnightCompanyId, yesterday);
+    const now = new Date();
+    const yesterdayStr = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1))
+      .toISOString().slice(0, 10);
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, yesterdayStr);
     expect(result.success).toBe(true);
     expect(result.briefing.inspectionsCount).toBe(0);
   });
 
   it("a briefing for 'yesterday' does not include inspections from today", async () => {
     // Same fixture company — none of our inspections are dated today.
-    // Requesting today's briefing should also return 0.
-    const today = new Date();
-    const result = await generateDailyExecutiveBriefing(midnightCompanyId, today);
+    // Requesting today's date string should also return 0.
+    const now = new Date();
+    const todayStr = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+      .toISOString().slice(0, 10);
+    const result = await generateDailyExecutiveBriefing(midnightCompanyId, todayStr);
     expect(result.success).toBe(true);
     expect(result.briefing.inspectionsCount).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Daily briefing: timezone-aware midnight boundary (Task #411)
+// ---------------------------------------------------------------------------
+
+describe("executive briefing: timezone-aware midnight boundary", () => {
+  /**
+   * Regression guard for the UTC-vs-owner-timezone drift bug.
+   *
+   * Two inspections are seeded 2 minutes apart, straddling local midnight in
+   * "America/New_York" (EDT = UTC-4 in summer):
+   *
+   *   inspTzA — 23:59:00 Eastern on targetDate
+   *             = targetDate+1 at 03:59:00 UTC
+   *             → INSIDE the Eastern day window for targetDate
+   *
+   *   inspTzB — 00:01:00 Eastern on targetDate+1
+   *             = targetDate+1 at 04:01:00 UTC
+   *             → OUTSIDE the Eastern day window for targetDate
+   *
+   * If the service naively uses setHours(0,0,0,0) (server UTC), it anchors
+   * the window to UTC midnight.  The UTC window for targetDate ends at
+   * targetDate+1 00:00:00 UTC, so inspTzA (03:59 UTC) would fall OUTSIDE it —
+   * the owner would see 0 inspections when they expect 1.
+   *
+   * With the fixed timezone-aware boundary, inspTzA is correctly counted and
+   * inspTzB is correctly excluded.
+   *
+   * A dedicated company is used so these fixtures cannot interfere with any
+   * other describe blocks.  The target date is 7 days ago to stay clear of
+   * "yesterday" and well within the 90-day HTTP guard.
+   */
+
+  const TZ_OWNER_ID  = "exec_tz_midnight_owner_clerk_id";
+  const TZ_CO_SLUG   = "exec-tz-midnight-co";
+  const TEST_TZ      = "America/New_York"; // EDT = UTC-4 in summer
+
+  let tzCompanyId: number;
+  let tzInspIds: number[] = [];
+
+  // Target date: 7 days ago expressed as a YYYY-MM-DD string in UTC.
+  // We use the UTC date directly — no server-local Date construction — so this
+  // test is server-timezone-independent.
+  const _now7 = new Date();
+  const targetDateStr = new Date(
+    Date.UTC(_now7.getUTCFullYear(), _now7.getUTCMonth(), _now7.getUTCDate() - 7),
+  ).toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+  // Derive the day window for targetDate in TEST_TZ using the same
+  // DST-correct helper used by the service itself.  This guarantees the
+  // timestamps we seed into the DB straddle the exact boundary the service
+  // will compute, even on DST transition dates.
+  const tzBounds = dayBoundsInTimezone(targetDateStr, TEST_TZ);
+  // inspTzA: 1 minute before the end of the Eastern day window (inside)
+  const ts_inspTzA = new Date(tzBounds.end.getTime() - 60 * 1000);
+  // inspTzB: 1 minute after the end of the Eastern day window (outside)
+  const ts_inspTzB = new Date(tzBounds.end.getTime() + 60 * 1000);
+
+  beforeAll(async () => {
+    tzCompanyId = await findOrCreateCompany("Exec TZ Midnight Co", TZ_CO_SLUG);
+    await ensureActiveBranding(tzCompanyId, "Exec TZ Midnight Co Brand");
+
+    // Full teardown so re-runs start clean.
+    await db.delete(inspectionScorecardsTable).where(eq(inspectionScorecardsTable.companyId, tzCompanyId));
+    await db.delete(opportunitiesTable).where(eq(opportunitiesTable.companyId, tzCompanyId));
+    await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, tzCompanyId));
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, TZ_OWNER_ID));
+
+    await db.insert(usersTable).values({
+      clerkUserId: TZ_OWNER_ID,
+      role: "owner",
+      companyId: tzCompanyId,
+    });
+
+    // inspTzA: 23:59 Eastern on targetDate — must appear in the briefing.
+    const inspTzA = await createInspectionViaApi(TZ_OWNER_ID, "TZ Midnight A St");
+    await db.update(inspectionsTable)
+      .set({ status: "completed", createdAt: ts_inspTzA })
+      .where(eq(inspectionsTable.id, inspTzA));
+
+    // inspTzB: 00:01 Eastern on targetDate+1 — must NOT appear in targetDate's briefing.
+    const inspTzB = await createInspectionViaApi(TZ_OWNER_ID, "TZ Midnight B St");
+    await db.update(inspectionsTable)
+      .set({ status: "completed", createdAt: ts_inspTzB })
+      .where(eq(inspectionsTable.id, inspTzB));
+
+    tzInspIds = [inspTzA, inspTzB];
+  });
+
+  afterAll(async () => {
+    if (tzInspIds.length) {
+      await db.delete(inspectionScorecardsTable).where(
+        inArray(inspectionScorecardsTable.inspectionId, tzInspIds),
+      );
+      await db.delete(inspectionsTable).where(inArray(inspectionsTable.id, tzInspIds));
+    }
+    await db.delete(opportunitiesTable).where(eq(opportunitiesTable.companyId, tzCompanyId));
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, TZ_OWNER_ID));
+    await db.delete(brandingProfilesTable).where(eq(brandingProfilesTable.companyId, tzCompanyId));
+    await db.delete(companiesTable).where(eq(companiesTable.slug, TZ_CO_SLUG));
+  });
+
+  it("counts inspTzA (59 min before end of Eastern window) inside targetDate's briefing", async () => {
+    const result = await generateDailyExecutiveBriefing(tzCompanyId, targetDateStr, TEST_TZ);
+    expect(result.success).toBe(true);
+    // inspTzA is 1 min before end-of-day Eastern → inside the window.
+    // inspTzB is 1 min after  end-of-day Eastern → outside.
+    expect(result.briefing.inspectionsCount).toBe(1);
+  });
+
+  it("excludes inspTzB (1 min past end of Eastern window) from targetDate's briefing", async () => {
+    const result = await generateDailyExecutiveBriefing(tzCompanyId, targetDateStr, TEST_TZ);
+    expect(result.success).toBe(true);
+    // Count must still be 1 (only inspTzA); if inspTzB leaked in it would be 2.
+    expect(result.briefing.inspectionsCount).toBe(1);
+  });
+
+  it("WITHOUT timezone param (UTC default) misses inspTzA — confirms the bug this task fixes", async () => {
+    // ts_inspTzA is positioned after UTC midnight of the target date
+    // (it is near the end of the Eastern day, which is early UTC next day).
+    // A UTC-bounded briefing for targetDateStr therefore sees 0 inspections —
+    // exactly the pre-fix silent data loss this task corrects.
+    const utcResult = await generateDailyExecutiveBriefing(tzCompanyId, targetDateStr, "UTC");
+    expect(utcResult.success).toBe(true);
+    expect(utcResult.briefing.inspectionsCount).toBe(0);
+  });
+
+  it("the HTTP endpoint accepts ?tz=America/New_York and applies timezone-aware bounds", async () => {
+    asUser(TZ_OWNER_ID);
+    const now = new Date();
+    const dateParam = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 7))
+      .toISOString().slice(0, 10);
+    const res = await request(app).get(
+      `/api/executive/briefing/yesterday?date=${dateParam}&tz=${encodeURIComponent(TEST_TZ)}`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    // The timezone-corrected window counts inspTzA.
+    expect(res.body.briefing.inspectionsCount).toBe(1);
+  });
+
+  it("the HTTP endpoint returns 400 for an unrecognised ?tz value", async () => {
+    asUser(TZ_OWNER_ID);
+    const now = new Date();
+    const dateParam = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 2))
+      .toISOString().slice(0, 10);
+    const res = await request(app).get(
+      `/api/executive/briefing/yesterday?date=${dateParam}&tz=Not/ATimezone`,
+    );
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/IANA timezone/i);
+  });
+
+  it("includes an inspection created at exactly the last millisecond of the local day (end - 1 ms)", async () => {
+    // The TZ briefing describe company has two fixtures (inspTzA, inspTzB).
+    // We seed a third inspection exactly 1 ms before the exclusive end boundary
+    // (tzBounds.end is nextDayStart, so end - 1 ms is the last valid instant).
+    // This confirms the query uses a correct strict-less-than upper bound and
+    // does not accidentally exclude the final millisecond.
+    const lastMs = new Date(tzBounds.end.getTime() - 1);
+    const inspTzC = await createInspectionViaApi(TZ_OWNER_ID, "TZ Midnight C St");
+    await db.update(inspectionsTable)
+      .set({ status: "completed", createdAt: lastMs })
+      .where(eq(inspectionsTable.id, inspTzC));
+    tzInspIds.push(inspTzC);
+
+    const result = await generateDailyExecutiveBriefing(tzCompanyId, targetDateStr, TEST_TZ);
+    expect(result.success).toBe(true);
+    // inspTzA + inspTzC are inside; inspTzB is outside → count = 2.
+    expect(result.briefing.inspectionsCount).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dayBoundsInTimezone: unit tests for DST-safe boundary computation
+// ---------------------------------------------------------------------------
+
+describe("dayBoundsInTimezone: DST boundary computation", () => {
+  /**
+   * These are pure unit tests — no DB access, no HTTP.
+   * We assert the UTC instants returned by dayBoundsInTimezone against known
+   * IANA timezone offsets on specific calendar dates.
+   */
+
+  it("returns correct UTC instants for a regular summer day in America/New_York (EDT = UTC-4)", () => {
+    // 2026-08-14 is a summer day — EDT throughout.
+    const { start, end } = dayBoundsInTimezone("2026-08-14", "America/New_York");
+    // Local midnight EDT = UTC 04:00.
+    expect(start.toISOString()).toBe("2026-08-14T04:00:00.000Z");
+    // Next local midnight EDT (exclusive) = UTC 04:00 next day.
+    expect(end.toISOString()).toBe("2026-08-15T04:00:00.000Z");
+    // Regular day: exactly 24 hours.
+    expect(end.getTime() - start.getTime()).toBe(24 * 3600 * 1000);
+  });
+
+  it("returns correct UTC instants for a regular winter day in America/New_York (EST = UTC-5)", () => {
+    // 2026-01-15 is a winter day — EST throughout.
+    const { start, end } = dayBoundsInTimezone("2026-01-15", "America/New_York");
+    // Local midnight EST = UTC 05:00.
+    expect(start.toISOString()).toBe("2026-01-15T05:00:00.000Z");
+    // Next local midnight EST (exclusive) = UTC 05:00 next day.
+    expect(end.toISOString()).toBe("2026-01-16T05:00:00.000Z");
+    expect(end.getTime() - start.getTime()).toBe(24 * 3600 * 1000);
+  });
+
+  it("returns a 23-hour day for the America/New_York spring-forward date (2025-03-09)", () => {
+    // On 2025-03-09 clocks spring forward at 2 am EST → 3 am EDT.
+    // Midnight is in EST (UTC-5); the next midnight is in EDT (UTC-4).
+    const { start, end } = dayBoundsInTimezone("2025-03-09", "America/New_York");
+    // Local midnight EST (UTC-5) = UTC 05:00.
+    expect(start.toISOString()).toBe("2025-03-09T05:00:00.000Z");
+    // Next local midnight EDT (UTC-4) = UTC 04:00.
+    expect(end.toISOString()).toBe("2025-03-10T04:00:00.000Z");
+    // Spring-forward → 23-hour day (one hour lost).
+    expect(end.getTime() - start.getTime()).toBe(23 * 3600 * 1000);
+  });
+
+  it("returns a 25-hour day for the America/New_York fall-back date (2025-11-02)", () => {
+    // On 2025-11-02 clocks fall back at 2 am EDT → 1 am EST.
+    // Midnight is in EDT (UTC-4); the next midnight is in EST (UTC-5).
+    const { start, end } = dayBoundsInTimezone("2025-11-02", "America/New_York");
+    // Local midnight EDT (UTC-4) = UTC 04:00.
+    expect(start.toISOString()).toBe("2025-11-02T04:00:00.000Z");
+    // Next local midnight EST (UTC-5) = UTC 05:00.
+    expect(end.toISOString()).toBe("2025-11-03T05:00:00.000Z");
+    // Fall-back → 25-hour day (one extra hour).
+    expect(end.getTime() - start.getTime()).toBe(25 * 3600 * 1000);
+  });
+
+  it("end - 1 ms is on the target local date and end is on the next local date", () => {
+    // Confirms 'end' is truly the exclusive next-day boundary, not end-of-day.
+    const { start, end } = dayBoundsInTimezone("2026-08-14", "America/New_York");
+    const lastMs = new Date(end.getTime() - 1);
+
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/New_York",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    });
+    expect(fmt.format(start)).toBe("2026-08-14");
+    expect(fmt.format(lastMs)).toBe("2026-08-14");  // last ms is still Aug 14
+    expect(fmt.format(end)).toBe("2026-08-15");     // end is already Aug 15
+  });
+
+  it("correctly handles UTC (no offset, no DST)", () => {
+    const { start, end } = dayBoundsInTimezone("2026-06-01", "UTC");
+    expect(start.toISOString()).toBe("2026-06-01T00:00:00.000Z");
+    expect(end.toISOString()).toBe("2026-06-02T00:00:00.000Z");
+    expect(end.getTime() - start.getTime()).toBe(24 * 3600 * 1000);
+  });
+
+  it("correctly handles a positive-offset timezone (Asia/Kolkata, UTC+5:30)", () => {
+    // Local midnight IST = UTC 18:30 of the PREVIOUS day.
+    const { start, end } = dayBoundsInTimezone("2026-08-14", "Asia/Kolkata");
+    expect(start.toISOString()).toBe("2026-08-13T18:30:00.000Z");
+    expect(end.toISOString()).toBe("2026-08-14T18:30:00.000Z");
+    expect(end.getTime() - start.getTime()).toBe(24 * 3600 * 1000);
   });
 });
 

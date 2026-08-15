@@ -334,8 +334,12 @@ export async function runDailyBriefingJob(): Promise<BriefingJobResult> {
         continue;
       }
 
-      // Generate the briefing once per company (shared across all its owners)
-      const { briefing } = await generateDailyExecutiveBriefing(company.id, yesterday);
+      // Generate the briefing once per company (shared across all its owners).
+      // The scheduler uses UTC as the reference timezone because no per-company
+      // timezone is stored in the schema.  The day window is therefore UTC
+      // yesterday — clients that need owner-local boundaries should call the
+      // /executive/briefing/yesterday HTTP endpoint with ?tz=<IANA>.
+      const { briefing } = await generateDailyExecutiveBriefing(company.id, dateKey, "UTC");
 
       const { html, text, subject } = buildBriefingEmail({
         companyName: company.name,

@@ -591,8 +591,12 @@ export interface DailyBriefing {
 }
 
 export function fetchDailyBriefing(token: string | null) {
+  // Pass the device's IANA timezone so the server anchors day boundaries to the
+  // owner's local calendar rather than UTC.  Without this, a UTC-5 owner would
+  // miss inspections completed after 7 pm because they fall in the next UTC day.
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   return request<{ success: true; briefing: DailyBriefing }>(
-    "/api/executive/briefing/yesterday",
+    `/api/executive/briefing/yesterday?tz=${encodeURIComponent(tz)}`,
     token,
   );
 }
