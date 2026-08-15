@@ -86,7 +86,7 @@ import {
   inspectionScorecardsTable,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
-import { notifyCriticalInspection } from "../push-notifications";
+import { notifyCriticalInspection, notifyTechnicianRouteUpdated } from "../push-notifications";
 import { runInspectionFinalization } from "../inspection-complete";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1129,5 +1129,345 @@ describe("POST /me/push-token — re-registration clears push_last_failed_at", (
     const res = await request(app).get("/api/auth/me");
     expect(res.status).toBe(200);
     expect(res.body.pushLastFailedAt).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyTechnicianRouteUpdated — route-reassignment notification delivery
+//
+// The schedule PATCH handler calls this function to push a "Route Updated"
+// notification to old and new technicians when a route is reassigned. These
+// tests verify the real Expo delivery path — not via mocked schedule tests —
+// covering:
+//   1. Correct payload sent to a technician with a valid push token
+//   2. Expo API skipped when the technician has no push token on file
+//   3. Expo API skipped when pushNotificationsEnabled = false for the tech
+//   4. Only the requested technician Clerk ID is notified (not other techs)
+//   5. Non-technician users (managers, owners) are silently excluded even
+//      if their Clerk IDs are passed (defense-in-depth role check)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("notifyTechnicianRouteUpdated — sends to technician with a valid token", () => {
+  const TECH_ROUTE_CLERK_A = "pn_route_tech_a";
+  const TECH_ROUTE_CLERK_B = "pn_route_tech_b";
+  const MANAGER_ROUTE_CLERK = "pn_route_manager";
+  const TOKEN_TECH_A = "ExponentPushToken[route_tech_a_token]";
+  const TOKEN_TECH_B = "ExponentPushToken[route_tech_b_token]";
+  const ROUTE_SITE = "99 Route Test Ave";
+
+  let routeInspectionId: number;
+
+  beforeEach(async () => {
+    await db.delete(usersTable).where(eq(usersTable.companyId, companyId));
+    await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyId));
+
+    // Two technicians and one manager for this suite.
+    await db.insert(usersTable).values([
+      {
+        clerkUserId: TECH_ROUTE_CLERK_A,
+        role: "technician",
+        companyId,
+        pushToken: TOKEN_TECH_A,
+        pushNotificationsEnabled: true,
+      },
+      {
+        clerkUserId: TECH_ROUTE_CLERK_B,
+        role: "technician",
+        companyId,
+        pushToken: TOKEN_TECH_B,
+        pushNotificationsEnabled: true,
+      },
+      {
+        clerkUserId: MANAGER_ROUTE_CLERK,
+        role: "manager",
+        companyId,
+        pushToken: "ExponentPushToken[manager_token]",
+        pushNotificationsEnabled: true,
+      },
+    ]);
+
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: ROUTE_SITE,
+        technicianName: "Route Tech A",
+        pestTypes: [],
+        scheduledDate: new Date("2026-08-25T00:00:00.000Z"),
+      })
+      .returning();
+    routeInspectionId = insp.id;
+  });
+
+  it("sends a correctly shaped Route Updated payload to the technician's push token", async () => {
+    await notifyTechnicianRouteUpdated({
+      companyId,
+      inspectionId: routeInspectionId,
+      technicianClerkIds: [TECH_ROUTE_CLERK_A],
+      scheduledDate: new Date("2026-08-25T00:00:00.000Z"),
+      siteAddress: ROUTE_SITE,
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(1);
+
+    const msg = messages[0];
+    expect(msg.to).toBe(TOKEN_TECH_A);
+    expect(typeof msg.title).toBe("string");
+    expect((msg.title as string).toLowerCase()).toContain("route");
+    expect(msg.body).toContain(ROUTE_SITE);
+    expect(msg.sound).toBe("default");
+    expect(msg.channelId).toBe("route-updates");
+
+    const data = msg.data as Record<string, unknown>;
+    expect(data.inspectionId).toBe(routeInspectionId);
+    expect(data.companyId).toBe(companyId);
+    expect(data.screen).toBe("inspection");
+  });
+
+  it("sends to both old and new technicians when two Clerk IDs are provided", async () => {
+    await notifyTechnicianRouteUpdated({
+      companyId,
+      inspectionId: routeInspectionId,
+      technicianClerkIds: [TECH_ROUTE_CLERK_A, TECH_ROUTE_CLERK_B],
+      scheduledDate: new Date("2026-08-25T00:00:00.000Z"),
+      siteAddress: ROUTE_SITE,
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1); // single batched Expo request
+
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(2);
+
+    const tokens = messages.map((m) => m.to);
+    expect(tokens).toContain(TOKEN_TECH_A);
+    expect(tokens).toContain(TOKEN_TECH_B);
+  });
+});
+
+describe("notifyTechnicianRouteUpdated — skips when technician has no push token", () => {
+  const TECH_NO_TOKEN_CLERK = "pn_route_tech_no_token";
+  const TECH_WITH_TOKEN_CLERK = "pn_route_tech_with_token";
+  const TOKEN_WITH = "ExponentPushToken[route_with_token]";
+  const ROUTE_SITE = "88 No Token Lane";
+
+  let routeInspectionId: number;
+
+  beforeEach(async () => {
+    await db.delete(usersTable).where(eq(usersTable.companyId, companyId));
+    await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyId));
+
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: ROUTE_SITE,
+        technicianName: "No Token Tech",
+        pestTypes: [],
+      })
+      .returning();
+    routeInspectionId = insp.id;
+  });
+
+  it("does not call the Expo API when the only targeted technician has no push token", async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: TECH_NO_TOKEN_CLERK,
+      role: "technician",
+      companyId,
+      pushToken: null, // no token registered
+      pushNotificationsEnabled: true,
+    });
+
+    await notifyTechnicianRouteUpdated({
+      companyId,
+      inspectionId: routeInspectionId,
+      technicianClerkIds: [TECH_NO_TOKEN_CLERK],
+      scheduledDate: new Date("2026-08-25T00:00:00.000Z"),
+      siteAddress: ROUTE_SITE,
+    });
+
+    // No token → Expo must not be called.
+    expect(expoCalls()).toHaveLength(0);
+  });
+
+  it("does not call the Expo API when the technician's token is not a valid ExponentPushToken", async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: TECH_NO_TOKEN_CLERK,
+      role: "technician",
+      companyId,
+      pushToken: "fcm:invalid-format", // wrong format
+      pushNotificationsEnabled: true,
+    });
+
+    await notifyTechnicianRouteUpdated({
+      companyId,
+      inspectionId: routeInspectionId,
+      technicianClerkIds: [TECH_NO_TOKEN_CLERK],
+      scheduledDate: null,
+      siteAddress: ROUTE_SITE,
+    });
+
+    expect(expoCalls()).toHaveLength(0);
+  });
+
+  it("notifies only the tech with a token when one has a token and one does not", async () => {
+    await db.insert(usersTable).values([
+      {
+        clerkUserId: TECH_NO_TOKEN_CLERK,
+        role: "technician",
+        companyId,
+        pushToken: null, // no token
+        pushNotificationsEnabled: true,
+      },
+      {
+        clerkUserId: TECH_WITH_TOKEN_CLERK,
+        role: "technician",
+        companyId,
+        pushToken: TOKEN_WITH,
+        pushNotificationsEnabled: true,
+      },
+    ]);
+
+    await notifyTechnicianRouteUpdated({
+      companyId,
+      inspectionId: routeInspectionId,
+      technicianClerkIds: [TECH_NO_TOKEN_CLERK, TECH_WITH_TOKEN_CLERK],
+      scheduledDate: new Date("2026-08-25T00:00:00.000Z"),
+      siteAddress: ROUTE_SITE,
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(1); // only the tech with a token
+    expect(messages[0].to).toBe(TOKEN_WITH);
+  });
+
+  it("does not call the Expo API when technicianClerkIds is empty", async () => {
+    await notifyTechnicianRouteUpdated({
+      companyId,
+      inspectionId: routeInspectionId,
+      technicianClerkIds: [],
+      scheduledDate: null,
+      siteAddress: ROUTE_SITE,
+    });
+
+    expect(expoCalls()).toHaveLength(0);
+  });
+});
+
+describe("notifyTechnicianRouteUpdated — skips opted-out technicians", () => {
+  const TECH_OPTED_OUT_CLERK = "pn_route_tech_opted_out";
+  const ROUTE_SITE = "77 Opted Out Street";
+
+  let routeInspectionId: number;
+
+  beforeEach(async () => {
+    await db.delete(usersTable).where(eq(usersTable.companyId, companyId));
+    await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyId));
+
+    await db.insert(usersTable).values({
+      clerkUserId: TECH_OPTED_OUT_CLERK,
+      role: "technician",
+      companyId,
+      pushToken: "ExponentPushToken[opted_out_token]",
+      pushNotificationsEnabled: false, // opted out
+    });
+
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: ROUTE_SITE,
+        technicianName: "Opted Out Tech",
+        pestTypes: [],
+      })
+      .returning();
+    routeInspectionId = insp.id;
+  });
+
+  it("does not call the Expo API when the technician has pushNotificationsEnabled = false", async () => {
+    await notifyTechnicianRouteUpdated({
+      companyId,
+      inspectionId: routeInspectionId,
+      technicianClerkIds: [TECH_OPTED_OUT_CLERK],
+      scheduledDate: new Date("2026-08-25T00:00:00.000Z"),
+      siteAddress: ROUTE_SITE,
+    });
+
+    // Opted-out technician must not receive any push — Expo must not be called.
+    expect(expoCalls()).toHaveLength(0);
+  });
+});
+
+describe("notifyTechnicianRouteUpdated — manager/owner Clerk IDs are excluded (role guard)", () => {
+  const MANAGER_CLERK = "pn_route_role_guard_manager";
+  const OWNER_CLERK = "pn_route_role_guard_owner";
+  const ROUTE_SITE = "66 Role Guard Boulevard";
+
+  let routeInspectionId: number;
+
+  beforeEach(async () => {
+    await db.delete(usersTable).where(eq(usersTable.companyId, companyId));
+    await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyId));
+
+    // Seed a manager and an owner, both with valid tokens and notifications on.
+    await db.insert(usersTable).values([
+      {
+        clerkUserId: MANAGER_CLERK,
+        role: "manager",
+        companyId,
+        pushToken: "ExponentPushToken[manager_role_guard]",
+        pushNotificationsEnabled: true,
+      },
+      {
+        clerkUserId: OWNER_CLERK,
+        role: "owner",
+        companyId,
+        pushToken: "ExponentPushToken[owner_role_guard]",
+        pushNotificationsEnabled: true,
+      },
+    ]);
+
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: ROUTE_SITE,
+        technicianName: "Some Tech",
+        pestTypes: [],
+      })
+      .returning();
+    routeInspectionId = insp.id;
+  });
+
+  it("does not notify a manager whose Clerk ID is passed — role check restricts to technicians only", async () => {
+    await notifyTechnicianRouteUpdated({
+      companyId,
+      inspectionId: routeInspectionId,
+      technicianClerkIds: [MANAGER_CLERK],
+      scheduledDate: new Date("2026-08-25T00:00:00.000Z"),
+      siteAddress: ROUTE_SITE,
+    });
+
+    // The function filters to role = technician, so the manager is excluded.
+    expect(expoCalls()).toHaveLength(0);
+  });
+
+  it("does not notify an owner whose Clerk ID is passed — role check restricts to technicians only", async () => {
+    await notifyTechnicianRouteUpdated({
+      companyId,
+      inspectionId: routeInspectionId,
+      technicianClerkIds: [OWNER_CLERK],
+      scheduledDate: null,
+      siteAddress: ROUTE_SITE,
+    });
+
+    expect(expoCalls()).toHaveLength(0);
   });
 });
