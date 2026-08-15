@@ -77383,7 +77383,11 @@ router2.patch("/me/push-notifications", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "enabled must be a boolean" });
   }
   try {
-    await db.update(usersTable).set({ pushNotificationsEnabled: enabled }).where(eq(usersTable.id, user.id));
+    if (enabled) {
+      await db.update(usersTable).set({ pushNotificationsEnabled: true, pushLastFailedAt: null }).where(eq(usersTable.id, user.id));
+    } else {
+      await db.update(usersTable).set({ pushNotificationsEnabled: false }).where(eq(usersTable.id, user.id));
+    }
     return res.json({ success: true, pushNotificationsEnabled: enabled });
   } catch {
     return res.status(500).json({ error: "Failed to update push notification preference" });
@@ -90541,9 +90545,17 @@ router4.get("/", async (req, res) => {
 router4.post("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
-    const { siteAddress, clientName, technicianName, technicianId, notes, pestTypes, clientKey } = req.body;
+    const { siteAddress, clientName, technicianName, technicianId, notes, pestTypes, clientKey, scheduledDate } = req.body;
     if (!siteAddress || !technicianName) {
       return res.status(400).json({ error: "siteAddress and technicianName are required" });
+    }
+    let parsedScheduledDate = null;
+    if (scheduledDate) {
+      const d = new Date(scheduledDate);
+      if (isNaN(d.getTime())) {
+        return res.status(400).json({ error: "Invalid scheduledDate \u2014 expected an ISO 8601 string" });
+      }
+      parsedScheduledDate = d;
     }
     const key = typeof clientKey === "string" && clientKey.trim() ? clientKey.trim() : null;
     if (key) {
@@ -90569,7 +90581,8 @@ router4.post("/", async (req, res) => {
       notes: notes ?? null,
       pestTypes: pestTypes ?? [],
       status: "pending",
-      clientKey: key
+      clientKey: key,
+      scheduledDate: parsedScheduledDate
     }).onConflictDoNothing({
       target: [inspectionsTable.companyId, inspectionsTable.clientKey]
     }).returning();
@@ -90593,6 +90606,7 @@ router4.post("/", async (req, res) => {
       pestTypes: row.pestTypes ?? [],
       media: [],
       createdAt: row.createdAt.toISOString(),
+      scheduledDate: row.scheduledDate?.toISOString() ?? null,
       completedAt: null
     });
   } catch (err) {

@@ -55,10 +55,20 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
-    const { siteAddress, clientName, technicianName, technicianId, notes, pestTypes, clientKey } =
+    const { siteAddress, clientName, technicianName, technicianId, notes, pestTypes, clientKey, scheduledDate } =
       req.body;
     if (!siteAddress || !technicianName) {
       return res.status(400).json({ error: "siteAddress and technicianName are required" });
+    }
+
+    // Parse and validate scheduledDate when provided.
+    let parsedScheduledDate: Date | null = null;
+    if (scheduledDate) {
+      const d = new Date(scheduledDate);
+      if (isNaN(d.getTime())) {
+        return res.status(400).json({ error: "Invalid scheduledDate — expected an ISO 8601 string" });
+      }
+      parsedScheduledDate = d;
     }
 
     // Idempotent create for the offline-first mobile client: `clientKey` is a
@@ -96,6 +106,7 @@ router.post("/", async (req, res) => {
         pestTypes: pestTypes ?? [],
         status: "pending",
         clientKey: key,
+        scheduledDate: parsedScheduledDate,
       })
       .onConflictDoNothing({
         target: [inspectionsTable.companyId, inspectionsTable.clientKey],
@@ -127,6 +138,7 @@ router.post("/", async (req, res) => {
       pestTypes: row.pestTypes ?? [],
       media: [],
       createdAt: row.createdAt.toISOString(),
+      scheduledDate: row.scheduledDate?.toISOString() ?? null,
       completedAt: null,
     });
   } catch (err) {

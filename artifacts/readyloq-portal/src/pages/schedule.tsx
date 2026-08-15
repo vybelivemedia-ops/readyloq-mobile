@@ -167,17 +167,21 @@ function NewInspectionSheet({
   open,
   onClose,
   technicians,
+  initialDate,
+  initialTech,
 }: {
   open: boolean;
   onClose: () => void;
   technicians: string[];
+  initialDate?: string;
+  initialTech?: string;
 }) {
   const create = useCreateInspection();
   const [form, setForm] = useState<BookForm>({
     siteAddress: '',
     clientName: '',
-    technicianName: technicians[0] ?? '',
-    scheduledDate: toYMD(new Date()),
+    technicianName: initialTech ?? technicians[0] ?? '',
+    scheduledDate: initialDate ?? toYMD(new Date()),
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -407,6 +411,7 @@ export function Schedule() {
   const [selected, setSelected] = useState<ScheduleEntry | null>(null);
   const [filterTech, setFilterTech] = useState<string>('');
   const [bookOpen, setBookOpen] = useState(false);
+  const [bookPreset, setBookPreset] = useState<{ date: string; tech: string } | null>(null);
 
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
@@ -453,6 +458,11 @@ export function Schedule() {
 
   const techList = filterTech ? [filterTech] : Array.from(grid.keys());
 
+  function handleOpenBook(date?: string, tech?: string) {
+    setBookPreset(date || tech ? { date: date ?? toYMD(new Date()), tech: tech ?? '' } : null);
+    setBookOpen(true);
+  }
+
   function handleSave(technicianName: string, scheduledDate: string) {
     if (!selected) return;
     reassign.mutate(
@@ -490,7 +500,7 @@ export function Schedule() {
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {/* Book inspection button */}
           <button
-            onClick={() => setBookOpen(true)}
+            onClick={() => handleOpenBook()}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -598,7 +608,7 @@ export function Schedule() {
                 <Calendar className="w-8 h-8 opacity-40" />
                 <p className="text-sm">No inspections this week</p>
                 <button
-                  onClick={() => setBookOpen(true)}
+                  onClick={() => handleOpenBook()}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
@@ -630,10 +640,18 @@ export function Schedule() {
                     return (
                       <div
                         key={dayKey}
-                        className={`px-2 py-2 border-r border-border last:border-r-0 min-h-[80px] ${
+                        onClick={() => {
+                          if (cellEntries.length === 0) handleOpenBook(dayKey, tech);
+                        }}
+                        className={`px-2 py-2 border-r border-border last:border-r-0 min-h-[80px] transition-colors ${
                           isToday ? 'bg-primary/5' : ''
-                        }`}
+                        } ${cellEntries.length === 0 ? 'cursor-pointer hover:bg-primary/5 group' : ''}`}
                       >
+                        {cellEntries.length === 0 && (
+                          <div className="hidden group-hover:flex items-center justify-center h-full min-h-[64px] opacity-40">
+                            <Plus className="w-4 h-4 text-primary" />
+                          </div>
+                        )}
                         {cellEntries.map((entry) => (
                           <InspectionCard
                             key={entry.id}
@@ -664,9 +682,12 @@ export function Schedule() {
 
       {/* ── New inspection sheet ── */}
       <NewInspectionSheet
+        key={bookPreset ? `${bookPreset.date}:${bookPreset.tech}` : 'default'}
         open={bookOpen}
-        onClose={() => setBookOpen(false)}
+        onClose={() => { setBookOpen(false); setBookPreset(null); }}
         technicians={technicians}
+        initialDate={bookPreset?.date}
+        initialTech={bookPreset?.tech}
       />
     </div>
   );
