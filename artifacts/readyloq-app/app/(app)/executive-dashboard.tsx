@@ -695,6 +695,41 @@ export default function ExecutiveDashboardScreen() {
     [getToken],
   );
 
+  const handleCopySummary = useCallback(async () => {
+    if (!briefing?.summary) return;
+    try {
+      await Clipboard.setStringAsync(briefing.summary);
+      setCopyLabel("copied");
+      setTimeout(() => setCopyLabel("copy"), 2000);
+    } catch (e) {
+      Alert.alert(
+        "Copy Failed",
+        e instanceof Error ? e.message : "Could not copy summary.",
+      );
+    }
+  }, [briefing]);
+
+  const handleLongPressCopy = useCallback(() => {
+    Alert.alert(
+      "Copy Options",
+      "What would you like to copy?",
+      [
+        {
+          text: "Copy full snapshot",
+          onPress: () => void handleCopy(),
+        },
+        {
+          text: "Copy summary only",
+          onPress: () => void handleCopySummary(),
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ],
+    );
+  }, [handleCopy, handleCopySummary]);
+
   // Load on mount
   React.useEffect(() => { void load(); }, [load]);
 
@@ -768,6 +803,7 @@ export default function ExecutiveDashboardScreen() {
         {/* Copy snapshot button */}
         <TouchableOpacity
           onPress={() => void handleCopy()}
+          onLongPress={handleLongPressCopy}
           disabled={isCopyButtonDisabled(loading, copying)}
           style={{
             height: 36,
