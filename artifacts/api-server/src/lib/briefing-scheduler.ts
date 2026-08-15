@@ -234,6 +234,30 @@ export function buildBriefingEmail(opts: {
   return { html, text, subject };
 }
 
+// ── Idempotency guard ─────────────────────────────────────────────────────────
+
+/**
+ * How long (ms) after a job starts for a given date before a retry is allowed.
+ * 1 hour covers any realistic scheduler double-fire or hot-reload scenario.
+ */
+const IDEMPOTENCY_WINDOW_MS = 60 * 60 * 1_000;
+
+/**
+ * Keyed by UTC date string (YYYY-MM-DD) → Unix timestamp (ms) when the job
+ * was first accepted for that date.  A second invocation within the window is
+ * rejected immediately.  Entries older than 25 h are pruned on each run to
+ * prevent unbounded growth.
+ */
+const acceptedRuns = new Map<string, number>();
+
+/**
+ * Remove the idempotency entry for `dateKey`.  Call in tests to reset state
+ * between cases without reloading the module.
+ */
+export function resetBriefingLockForDate(dateKey: string): void {
+  acceptedRuns.delete(dateKey);
+}
+
 // ── Main job ──────────────────────────────────────────────────────────────────
 
 export interface BriefingJobResult {
@@ -247,14 +271,40 @@ export interface BriefingJobResult {
   noTransport: number;
   /** Companies processed. */
   total: number;
+  /**
+   * True when this invocation was dropped because the job already ran (or is
+   * already running) for the same UTC date within the idempotency window.
+   */
+  duplicate?: true;
 }
 
 export async function runDailyBriefingJob(): Promise<BriefingJobResult> {
   const yesterday = new Date();
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
   yesterday.setUTCHours(0, 0, 0, 0);
+  const dateKey = yesterday.toISOString().split("T")[0]!;
 
-  logger.info({ date: yesterday.toISOString().split("T")[0] }, "briefing-scheduler: job started");
+  // ── Idempotency check ──────────────────────────────────────────────────────
+  // Prune stale entries (older than 25 h) on every invocation.
+  const cutoff = Date.now() - 25 * 60 * 60 * 1_000;
+  for (const [key, ts] of acceptedRuns) {
+    if (ts < cutoff) acceptedRuns.delete(key);
+  }
+
+  const firstAccepted = acceptedRuns.get(dateKey);
+  if (firstAccepted !== undefined && Date.now() - firstAccepted < IDEMPOTENCY_WINDOW_MS) {
+    logger.warn(
+      { dateKey, firstAcceptedAt: new Date(firstAccepted).toISOString() },
+      "briefing-scheduler: duplicate invocation within 1-hour window — skipping",
+    );
+    return { sent: 0, skipped: 0, failed: 0, noTransport: 0, total: 0, duplicate: true };
+  }
+
+  // Record the acceptance timestamp *before* any async work so a concurrent
+  // second call sees the lock immediately.
+  acceptedRuns.set(dateKey, Date.now());
+
+  logger.info({ date: dateKey }, "briefing-scheduler: job started");
 
   const companies = await db
     .select({ id: companiesTable.id, name: companiesTable.name })

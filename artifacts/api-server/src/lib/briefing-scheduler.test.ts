@@ -57,7 +57,15 @@ vi.stubGlobal("fetch", (...args: Parameters<typeof fetch>) => fetchStub(...args)
 import app from "../app";
 import { db, usersTable, companiesTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
-import { runDailyBriefingJob } from "./briefing-scheduler";
+import { runDailyBriefingJob, resetBriefingLockForDate } from "./briefing-scheduler";
+
+/** Returns the UTC date key (YYYY-MM-DD) that the scheduler treats as "yesterday". */
+function yesterdayKey(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().split("T")[0]!;
+}
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -136,6 +144,8 @@ beforeEach(() => {
     throw new Error(`Unexpected fetch: ${String(url)}`);
   };
   authState.userId = null;
+  // Reset the idempotency lock so each test starts clean.
+  resetBriefingLockForDate(yesterdayKey());
 });
 
 // ── Scheduler job tests ───────────────────────────────────────────────────────
@@ -225,6 +235,25 @@ describe("runDailyBriefingJob", () => {
     await runDailyBriefingJob();
 
     expect(calledAddresses).not.toContain("manager@example.com");
+  });
+
+  it("second invocation within 1 hour is a no-op (duplicate:true, sendMail not called again)", async () => {
+    await db.update(usersTable).set({ briefingEmailOptOut: false }).where(eq(usersTable.id, ownerUserId));
+
+    // First run — should proceed normally
+    const first = await runDailyBriefingJob();
+    expect(first.duplicate).toBeUndefined();
+
+    const callsAfterFirst = mockSendMail.mock.calls.length;
+
+    // Second run — same UTC date, well within 1-hour window
+    const second = await runDailyBriefingJob();
+    expect(second.duplicate).toBe(true);
+    expect(second.sent).toBe(0);
+    expect(second.total).toBe(0);
+
+    // sendMail must NOT have been called a second time
+    expect(mockSendMail.mock.calls.length).toBe(callsAfterFirst);
   });
 });
 
