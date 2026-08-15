@@ -443,6 +443,107 @@ describe("bad deep-link filter param — normalizeFilterParam falls back to 'all
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. pull-to-refresh — existing search query narrows refreshed data correctly
+//
+//  React Query replaces the cached list with a new server response after a
+//  pull-to-refresh gesture.  The search query lives in local component state
+//  and does NOT reset.  filterReports must operate on the NEW data while the
+//  OLD query string is still active — it must never serve stale, pre-refresh
+//  results.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("pull-to-refresh — filterReports narrows refreshed data with the existing query", () => {
+  // Stale data the component held before the refresh.
+  const staleReports: SearchableReport[] = [
+    makeReport({ id: 10, title: "Termite Inspection", siteAddress: "10 Old Lane", clientName: "OldCo" }),
+    makeReport({ id: 11, title: "Rodent Survey", siteAddress: "11 Old Lane", clientName: "OldCo" }),
+  ];
+
+  // Fresh data returned by the server after the pull-to-refresh completes.
+  const freshReports: SearchableReport[] = [
+    makeReport({ id: 20, title: "Termite Inspection", siteAddress: "20 New Blvd", clientName: "NewCo" }),
+    makeReport({ id: 21, title: "Rodent Survey", siteAddress: "21 New Blvd", clientName: "NewCo" }),
+    makeReport({ id: 22, title: "Annual Review", siteAddress: "22 New Blvd", clientName: "AcmeCorp" }),
+  ];
+
+  it("returns results from the refreshed list, not the stale list, when the query is unchanged", () => {
+    // Query was active before refresh and has NOT been cleared.
+    const query = "Termite";
+
+    const staleResults = filterReports(staleReports, query);
+    const freshResults = filterReports(freshReports, query);
+
+    // Both return one result, but from different data sets.
+    expect(staleResults).toHaveLength(1);
+    expect(staleResults[0].id).toBe(10);
+
+    expect(freshResults).toHaveLength(1);
+    expect(freshResults[0].id).toBe(20); // fresh item, not the stale one
+  });
+
+  it("narrows fresh data correctly when the new data has more matches than the old", () => {
+    // Query matches only one stale record but multiple fresh records.
+    const moreMatchesFresh: SearchableReport[] = [
+      makeReport({ id: 30, title: "Quarterly Termite Report", siteAddress: "30 Main St", clientName: "Beta LLC" }),
+      makeReport({ id: 31, title: "Termite Baiting Inspection", siteAddress: "31 Main St", clientName: "Beta LLC" }),
+      makeReport({ id: 32, title: "Rodent Exclusion", siteAddress: "32 Main St", clientName: "Beta LLC" }),
+    ];
+
+    const query = "Termite";
+
+    const staleResults = filterReports(staleReports, query);
+    const freshResults = filterReports(moreMatchesFresh, query);
+
+    expect(staleResults).toHaveLength(1);
+    expect(freshResults).toHaveLength(2);
+    expect(freshResults.map((r) => r.id)).toEqual([30, 31]);
+  });
+
+  it("narrows fresh data correctly when the new data has fewer matches than the old", () => {
+    // Fresh data doesn't contain any item matching the active query.
+    const noMatchFresh: SearchableReport[] = [
+      makeReport({ id: 40, title: "Rodent Survey", siteAddress: "40 Park Ave", clientName: "Gamma Inc" }),
+      makeReport({ id: 41, title: "Annual Review", siteAddress: "41 Park Ave", clientName: "Gamma Inc" }),
+    ];
+
+    const query = "Termite";
+
+    const staleResults = filterReports(staleReports, query);
+    const freshResults = filterReports(noMatchFresh, query);
+
+    expect(staleResults).toHaveLength(1); // stale data had a match
+    expect(freshResults).toHaveLength(0); // fresh data has none — correct behaviour
+  });
+
+  it("returns the full fresh list when the query is blank (pull-to-refresh with no active search)", () => {
+    const query = "";
+    const results = filterReports(freshReports, query);
+    expect(results).toHaveLength(freshReports.length);
+    expect(results).toEqual(freshReports);
+  });
+
+  it("does not return items from stale data that are absent from the fresh list", () => {
+    // Verify filterReports(fresh, query) never surfaces stale IDs.
+    const query = "OldCo"; // matches stale items but NOT fresh items
+    const freshResults = filterReports(freshReports, query);
+    expect(freshResults).toHaveLength(0);
+  });
+
+  it("reflects a new item added by another technician that only appears after refresh", () => {
+    // A report created after the last fetch appears in freshReports but not staleReports.
+    const newlyAdded = makeReport({ id: 99, title: "Emergency Pest Call", siteAddress: "99 River Rd", clientName: "NewCo" });
+    const freshWithNew = [...freshReports, newlyAdded];
+
+    const query = "Emergency";
+
+    expect(filterReports(staleReports, query)).toHaveLength(0); // not in stale data
+    const freshResults = filterReports(freshWithNew, query);
+    expect(freshResults).toHaveLength(1);
+    expect(freshResults[0].id).toBe(99); // new item is reachable after refresh
+  });
+});
+
 // ─── applyFilterParamChange equivalents for the bad-link scenarios ───────────
 
 describe("bad deep-link filter param — applyFilterParamChange falls back to 'all'", () => {
