@@ -14,3 +14,10 @@ uri = "file://artifacts/readyloq-app/assets/images/icon.png"
 type = "image"
 title = "Expo / Android Launcher Source — 1024×1024 PNG"
 description = "High-res master used by EAS to generate all Android mipmap densities (mdpi → xxxhdpi). Also accepted by Google Play as a feature graphic source."
+
+[[outputs]]
+id = "bI12K-IMBMZ7Asi6JCAJR"
+uri = "file://attached_assets/readyloq-feature-graphic-1024x500.png"
+type = "image"
+title = "Google Play Feature Graphic — 1024×500 PNG"
+description = "Upload to: Store listing → Feature graphic. Exact spec: 1024×500 px, PNG, ≤1 MB."
