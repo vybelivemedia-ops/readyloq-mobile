@@ -47,6 +47,7 @@ import { NativeCameraHealthBadge } from "@/components/NativeCameraHealthBadge";
 import { useAllDevicesHealthCheck } from "@/hooks/useAllDevicesHealthCheck";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
 import { useMetaGlassesSession, type GlassesEvent } from "@/hooks/useMetaGlassesSession";
+import { useSmartGlassesBleFrames } from "@/hooks/useSmartGlassesBleFrames";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
@@ -808,6 +809,21 @@ export default function NewInspectionScreen() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [],
     ),
+  });
+
+  // ── BLE direct frame injection — bypasses the Meta cloud webhook ─────────────
+  // When the glasses are paired via BLE, hardware-button frames arrive here
+  // (~50 ms latency) and are routed straight into the FAIE photo pipeline,
+  // exactly as if the technician had captured the photo with the phone camera.
+  // The webhook path (useMetaGlassesSession above) continues to handle voice
+  // commands and cloud-relayed events independently.
+  useSmartGlassesBleFrames({
+    active: wsInspectionId != null,
+    onFrame: (cacheUri: string) => {
+      setPhotos((prev) => [...prev, { uri: cacheUri }]);
+      setFaieStatus("🕶 BLE frame captured");
+      setTimeout(() => setFaieStatus(null), 3_000);
+    },
   });
 
   // #106 — Haptic alert the moment glasses first go silent (isInactive flips true).

@@ -38,8 +38,8 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import crypto from "node:crypto";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { toFile } from "openai";
-import { db, inspectionsTable, inspectionMediaTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, inspectionsTable, inspectionMediaTable, metaGlassesSessionsTable } from "@workspace/db";
+import { eq, gt, lt } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 const objectStorageService = new ObjectStorageService();
@@ -91,13 +91,47 @@ const sessions = new Map<string, ActiveSession>();
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 h
 const MAX_EVENTS = 100;
 
-/** Prune expired sessions every 15 minutes. */
+/** Prune expired sessions every 15 minutes (memory + DB). */
 setInterval(() => {
   const cutoff = Date.now() - SESSION_TTL_MS;
   for (const [id, session] of sessions) {
     if (session.createdAt < cutoff) sessions.delete(id);
   }
+  // Purge expired DB rows — fire-and-forget.
+  void db
+    .delete(metaGlassesSessionsTable)
+    .where(lt(metaGlassesSessionsTable.expiresAt, new Date()))
+    .catch(() => { /* best-effort — non-fatal */ });
 }, 15 * 60 * 1000).unref();
+
+// ─── Startup: restore sessions from DB ───────────────────────────────────────
+// Loads active (non-expired) sessions back into the in-memory Map so that
+// polling resumes seamlessly after an API restart mid-inspection.
+void (async () => {
+  try {
+    const rows = await db
+      .select()
+      .from(metaGlassesSessionsTable)
+      .where(gt(metaGlassesSessionsTable.expiresAt, new Date()));
+    for (const row of rows) {
+      sessions.set(row.sessionId, {
+        sessionId: row.sessionId,
+        code: row.code,
+        inspectionId: row.inspectionId,
+        companyId: row.companyId,
+        userId: row.userId,
+        createdAt: row.createdAt.getTime(),
+        events: (row.events as GlassesEvent[]) ?? [],
+      });
+    }
+    if (rows.length > 0) {
+      console.log(`[meta-glasses] Restored ${rows.length} active session(s) from DB`);
+    }
+  } catch (err) {
+    // Non-fatal: table may not exist yet in fresh dev environments.
+    console.warn("[meta-glasses] Could not restore sessions from DB:", String(err));
+  }
+})();
 
 function makeCode(): string {
   return crypto.randomBytes(3).toString("hex").toUpperCase(); // e.g. "A3F9BC"
@@ -110,6 +144,14 @@ function makeSessionId(): string {
 function pushEvent(session: ActiveSession, event: GlassesEvent): void {
   session.events.push(event);
   if (session.events.length > MAX_EVENTS) session.events.shift();
+  // Fire-and-forget DB sync — Map is the primary (fast) store; DB is durability.
+  void db
+    .update(metaGlassesSessionsTable)
+    .set({ events: session.events as unknown[] })
+    .where(eq(metaGlassesSessionsTable.sessionId, session.sessionId))
+    .catch((err) =>
+      logger.warn("[meta-glasses] DB event sync failed: " + String(err)),
+    );
 }
 
 // ─── HMAC verification ────────────────────────────────────────────────────────
@@ -288,6 +330,22 @@ router.post(
       createdAt: Date.now(),
       events: [],
     });
+
+    // Persist to DB so the session survives an API restart mid-inspection.
+    void db
+      .insert(metaGlassesSessionsTable)
+      .values({
+        sessionId,
+        code,
+        inspectionId,
+        companyId,
+        userId: req.user!.id,
+        events: [],
+        expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+      })
+      .catch((err) =>
+        logger.warn("[meta-glasses] DB session insert failed: " + String(err)),
+      );
 
     console.log(`[meta-glasses] session created: ${sessionId} inspection=${inspectionId} company=${companyId}`);
     return res.json({ sessionId, code });

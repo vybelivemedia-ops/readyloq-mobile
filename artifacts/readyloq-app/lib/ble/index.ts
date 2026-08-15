@@ -27,3 +27,5 @@ export type {
 
 export { checkBlePermissions, requestBlePermissions } from "./permissions";
 export type { BlePermissionStatus } from "./permissions";
+
+export { smartGlassesProvider, SmartGlassesProvider } from "./smart-glasses-provider";
