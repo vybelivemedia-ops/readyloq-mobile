@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 /**
- * Integration config tests (Task #244).
+ * Integration config tests.
  *
  * Exercises the full connect → update → disconnect lifecycle for
  * PUT / GET / DELETE /api/integrations/config and verifies:
@@ -12,6 +12,10 @@ import request from "supertest";
  *  3. Saves are rejected when accountId or apiKey is blank
  *  4. Only owners can save or disconnect (role enforcement)
  *  5. Existing inspection data is unaffected by disconnecting
+ *
+ * Also covers the sync cooldown boundary:
+ *  6. Failed syncs are immediately retryable — the 60-second cooldown applies
+ *     only to successful syncs.
  */
 
 const { authState } = vi.hoisted(() => ({
@@ -29,13 +33,11 @@ vi.mock("@clerk/express", async (importOriginal) => {
 
 // field-integration.ts makes outbound HTTP calls to PestPac/FieldRoutes. We
 // stub it out to avoid any real network calls and keep the suite hermetic.
+// Exposed via vi.hoisted so individual tests can override behaviour.
+const { syncMock } = vi.hoisted(() => ({ syncMock: vi.fn() }));
 vi.mock("../services/field-integration", () => ({
-  syncInspectionToExternalSystem: vi.fn(async () => ({
-    success: true,
-    externalSystem: "pestpac",
-    postedNotes: true,
-    attachmentsPosted: 0,
-  })),
+  syncInspectionToExternalSystem: syncMock,
+  probeIntegrationCredentials: vi.fn(async () => ({ ok: true })),
 }));
 
 import app from "../app";
@@ -47,7 +49,7 @@ import {
   inspectionsTable,
   inspectionSyncLogsTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 // ─── Identities ───────────────────────────────────────────────────────────────
 
@@ -89,6 +91,15 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   asUser(null);
+  // Restore the default success implementation so existing lifecycle tests are
+  // not affected by cooldown tests that override this mock.
+  syncMock.mockReset();
+  syncMock.mockResolvedValue({
+    success: true,
+    externalSystem: "pestpac",
+    postedNotes: true,
+    attachmentsPosted: 0,
+  });
   // Reset to a clean slate before each test so tests are order-independent.
   await db.delete(companyFieldIntegrationsTable).where(
     eq(companyFieldIntegrationsTable.companyId, companyId),
@@ -618,5 +629,180 @@ describe("tenant isolation — config is scoped per company", () => {
     await db
       .delete(companyFieldIntegrationsTable)
       .where(eq(companyFieldIntegrationsTable.companyId, otherCompanyId));
+  });
+});
+
+// ─── Sync cooldown boundary ───────────────────────────────────────────────────
+//
+// The 60-second cooldown intentionally applies ONLY to successful syncs so
+// that transient external-system failures can be retried immediately without
+// the owner waiting a full minute.
+//
+// These tests pin that boundary so a future refactor cannot silently apply
+// the cooldown to failed attempts.
+
+describe("POST /api/integrations/sync — cooldown boundary", () => {
+  /** Stub result returned by the mock when the sync succeeds. */
+  const SUCCESS_RESULT = {
+    success: true,
+    externalSystem: "pestpac",
+    postedNotes: true,
+    attachmentsPosted: 0,
+  };
+
+  const COOLDOWN_OWNER_ID = "sync_cooldown_owner_clerk_id";
+  let cooldownCompanyId: number;
+  let cooldownInspectionId: number;
+
+  beforeAll(async () => {
+    cooldownCompanyId = await findOrCreateCompany("Sync Cooldown Co", "sync-cooldown-co");
+
+    // Owner user for this sub-suite.
+    const existing = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, COOLDOWN_OWNER_ID));
+    if (existing.length === 0) {
+      await db.insert(usersTable).values({ clerkUserId: COOLDOWN_OWNER_ID, role: "owner", companyId: cooldownCompanyId });
+    }
+
+    // Integration config.
+    await db.delete(companyFieldIntegrationsTable).where(
+      eq(companyFieldIntegrationsTable.companyId, cooldownCompanyId),
+    );
+    await db.insert(companyFieldIntegrationsTable).values({
+      companyId: cooldownCompanyId,
+      systemType: "pestpac",
+      accountId: "acct-cooldown",
+      apiKey: "test-api-key",
+      enabled: true,
+    });
+
+    // A completed inspection owned by this company.
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({ companyId: cooldownCompanyId, siteAddress: "1 Cooldown Ave", technicianName: "Tech", status: "completed" })
+      .returning();
+    cooldownInspectionId = insp.id;
+  });
+
+  beforeEach(async () => {
+    // Clear sync logs between tests so each test starts clean.
+    await db
+      .delete(inspectionSyncLogsTable)
+      .where(
+        and(
+          eq(inspectionSyncLogsTable.companyId, cooldownCompanyId),
+          eq(inspectionSyncLogsTable.inspectionId, cooldownInspectionId),
+        ),
+      );
+  });
+
+  it("returns cached result on a second successful sync within the cooldown window", async () => {
+    asUser(COOLDOWN_OWNER_ID);
+
+    const first = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: cooldownInspectionId });
+    expect(first.status).toBe(200);
+    expect(syncMock).toHaveBeenCalledTimes(1);
+
+    // Second call within the 60-second window — must not hit the external system.
+    const second = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: cooldownInspectionId });
+    expect(second.status).toBe(200);
+    expect(second.body._idempotent).toBe(true);
+    expect(syncMock).toHaveBeenCalledTimes(1); // still only one call to the external system
+  });
+
+  it("allows an immediate retry after a failed sync — does NOT apply the cooldown", async () => {
+    // First call: external system returns an error.
+    syncMock.mockRejectedValueOnce(new Error("PestPac 503: service unavailable"));
+
+    asUser(COOLDOWN_OWNER_ID);
+    const first = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: cooldownInspectionId });
+
+    // The route should surface the failure to the caller.
+    expect(first.status).toBe(502);
+    expect(syncMock).toHaveBeenCalledTimes(1);
+
+    // Second call: external system recovers.  The failure must NOT have
+    // triggered a cooldown — the external system must be reached again.
+    const second = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: cooldownInspectionId });
+
+    expect(second.status).toBe(200);
+    expect(second.body._idempotent).toBeUndefined(); // real sync, not a cache hit
+    expect(syncMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows multiple consecutive failed retries without hitting the cooldown", async () => {
+    syncMock
+      .mockRejectedValueOnce(new Error("PestPac timeout"))
+      .mockRejectedValueOnce(new Error("PestPac timeout"));
+    // Third call uses the default success implementation restored in the outer beforeEach.
+
+    asUser(COOLDOWN_OWNER_ID);
+
+    // Attempt 1 — fail.
+    const a1 = await request(app).post("/api/integrations/sync").send({ inspectionId: cooldownInspectionId });
+    expect(a1.status).toBe(502);
+
+    // Attempt 2 — fail again, still no cooldown.
+    const a2 = await request(app).post("/api/integrations/sync").send({ inspectionId: cooldownInspectionId });
+    expect(a2.status).toBe(502);
+    expect(syncMock).toHaveBeenCalledTimes(2);
+
+    // Attempt 3 — succeeds; must reach the external system.
+    const a3 = await request(app).post("/api/integrations/sync").send({ inspectionId: cooldownInspectionId });
+    expect(a3.status).toBe(200);
+    expect(a3.body._idempotent).toBeUndefined();
+    expect(syncMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("records a failure log for a failed sync so operators can inspect it", async () => {
+    syncMock.mockRejectedValueOnce(new Error("PestPac 401: bad credentials"));
+
+    asUser(COOLDOWN_OWNER_ID);
+    await request(app).post("/api/integrations/sync").send({ inspectionId: cooldownInspectionId });
+
+    const logs = await db
+      .select()
+      .from(inspectionSyncLogsTable)
+      .where(
+        and(
+          eq(inspectionSyncLogsTable.companyId, cooldownCompanyId),
+          eq(inspectionSyncLogsTable.inspectionId, cooldownInspectionId),
+        ),
+      );
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].success).toBe(false);
+    expect(logs[0].errorMessage).toContain("PestPac 401");
+    expect(logs[0].resultJson).toBeNull();
+  });
+
+  it("records a success log and stores the result JSON after a successful sync", async () => {
+    asUser(COOLDOWN_OWNER_ID);
+    const res = await request(app).post("/api/integrations/sync").send({ inspectionId: cooldownInspectionId });
+    expect(res.status).toBe(200);
+
+    const logs = await db
+      .select()
+      .from(inspectionSyncLogsTable)
+      .where(
+        and(
+          eq(inspectionSyncLogsTable.companyId, cooldownCompanyId),
+          eq(inspectionSyncLogsTable.inspectionId, cooldownInspectionId),
+          eq(inspectionSyncLogsTable.success, true),
+        ),
+      );
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].resultJson).toMatchObject(SUCCESS_RESULT);
   });
 });
