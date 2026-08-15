@@ -57,6 +57,12 @@ import {
   commitPan,
   viewerIdentityTransform,
 } from "@/lib/vision/photo-viewer-logic";
+import {
+  getKeyboardAvoidingBehavior,
+  VIEWER_TOOLBAR_PADDING_TOP,
+  VIEWER_TOOLBAR_PADDING_BOTTOM,
+  VIEWER_TOOLBAR_BUTTON_PADDING_V,
+} from "@/lib/vision/keyboard-toolbar-logic";
 
 type ReviewAction = "accept" | "correct" | "dismiss";
 
@@ -610,15 +616,15 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
             </GestureDetector>
 
             {/* Save / Copy button row — KeyboardAvoidingView keeps buttons above the soft keyboard */}
-            <KeyboardAvoidingView behavior={Platform.OS === "android" ? "padding" : "position"}>
-            <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, paddingVertical: 14, paddingBottom: 32, backgroundColor: "rgba(0,0,0,0.9)" }}>
+            <KeyboardAvoidingView behavior={getKeyboardAvoidingBehavior(Platform.OS)}>
+            <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, paddingVertical: VIEWER_TOOLBAR_PADDING_TOP, paddingBottom: VIEWER_TOOLBAR_PADDING_BOTTOM, backgroundColor: "rgba(0,0,0,0.9)" }}>
               <TouchableOpacity
                 onPress={handleSaveViewerImage}
                 disabled={viewerSaving}
                 activeOpacity={0.7}
                 style={{
                   flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                  backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingVertical: 12,
+                  backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingVertical: VIEWER_TOOLBAR_BUTTON_PADDING_V,
                   opacity: viewerSaving ? 0.5 : 1,
                 }}
               >
@@ -633,7 +639,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                 activeOpacity={0.7}
                 style={{
                   flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                  backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingVertical: 12,
+                  backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingVertical: VIEWER_TOOLBAR_BUTTON_PADDING_V,
                   opacity: viewerCopying ? 0.5 : 1,
                 }}
               >
