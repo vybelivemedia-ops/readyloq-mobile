@@ -924,3 +924,210 @@ describe("DELETE /auth/me/push-token — clear device token", () => {
     expect(expoCalls()).toHaveLength(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Push-failure banner — end-to-end flow
+//
+// Task 300 adds a push-failure banner to the owner dashboard that surfaces
+// Expo push ticket errors.  These tests verify the full lifecycle:
+//   1. A DeviceNotRegistered ticket sets push_last_failed_at in the DB.
+//   2. GET /me returns pushLastFailedAt as a non-null ISO string.
+//   3. DELETE /me/push-failure clears the flag (/me then returns null).
+//   4. POST /me/push-token (re-registration) also clears push_last_failed_at.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("push-failure banner — DeviceNotRegistered sets push_last_failed_at", () => {
+  beforeEach(async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+    });
+    asUser(OWNER_A_CLERK);
+
+    // Expo returns a DeviceNotRegistered error for the owner's token.
+    fetchState.responseBody = {
+      data: [{ status: "error", message: "InvalidCredentials", details: { error: "DeviceNotRegistered" } }],
+    };
+  });
+
+  it("sets push_last_failed_at and clears push_token after a DeviceNotRegistered ticket", async () => {
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    // Give the fire-and-forget DB update a moment to settle.
+    await new Promise((r) => setTimeout(r, 100));
+
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken, pushLastFailedAt: usersTable.pushLastFailedAt })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+
+    // DeviceNotRegistered → token cleared, failure timestamp recorded.
+    expect(user.pushToken).toBeNull();
+    expect(user.pushLastFailedAt).not.toBeNull();
+    expect(user.pushLastFailedAt).toBeInstanceOf(Date);
+  });
+
+  it("GET /me returns pushLastFailedAt as a non-null ISO string after a DeviceNotRegistered failure", async () => {
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    const res = await request(app).get("/api/auth/me");
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.pushLastFailedAt).toBe("string");
+    // Must parse as a valid ISO date string.
+    expect(Number.isNaN(Date.parse(res.body.pushLastFailedAt as string))).toBe(false);
+  });
+});
+
+describe("push-failure banner — non-DeviceNotRegistered error sets push_last_failed_at", () => {
+  beforeEach(async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+    });
+    asUser(OWNER_A_CLERK);
+
+    // Expo returns a generic (non-DeviceNotRegistered) error ticket.
+    fetchState.responseBody = {
+      data: [{ status: "error", message: "MessageRateExceeded", details: { error: "MessageRateExceeded" } }],
+    };
+  });
+
+  it("sets push_last_failed_at but keeps the push_token for non-DeviceNotRegistered errors", async () => {
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken, pushLastFailedAt: usersTable.pushLastFailedAt })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+
+    // Token should remain (it may still be valid); only the failure flag is set.
+    expect(user.pushToken).toBe(VALID_TOKEN_A);
+    expect(user.pushLastFailedAt).not.toBeNull();
+  });
+});
+
+describe("DELETE /me/push-failure — dismiss the push-failure banner", () => {
+  beforeEach(async () => {
+    // Seed an owner whose push_last_failed_at is already set (simulating a prior failure).
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: VALID_TOKEN_A,
+      pushNotificationsEnabled: true,
+      pushLastFailedAt: new Date(),
+    });
+    asUser(OWNER_A_CLERK);
+  });
+
+  it("clears push_last_failed_at in the DB", async () => {
+    const res = await request(app).delete("/api/auth/me/push-failure");
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const [user] = await db
+      .select({ pushLastFailedAt: usersTable.pushLastFailedAt })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+    expect(user.pushLastFailedAt).toBeNull();
+  });
+
+  it("GET /me returns pushLastFailedAt: null after the dismiss route is called", async () => {
+    // Confirm it is set before dismissal.
+    const before = await request(app).get("/api/auth/me");
+    expect(typeof before.body.pushLastFailedAt).toBe("string");
+
+    // Dismiss.
+    await request(app).delete("/api/auth/me/push-failure");
+
+    // Verify /me now reports null.
+    const after = await request(app).get("/api/auth/me");
+    expect(after.status).toBe(200);
+    expect(after.body.pushLastFailedAt).toBeNull();
+  });
+
+  it("returns 401 when the request is unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app).delete("/api/auth/me/push-failure");
+    expect(res.status).toBe(401);
+  });
+
+  it("is idempotent — a second call when the flag is already null still returns 200", async () => {
+    // First call clears the flag.
+    await request(app).delete("/api/auth/me/push-failure");
+    // Second call on an already-null flag must still succeed.
+    const res = await request(app).delete("/api/auth/me/push-failure");
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe("POST /me/push-token — re-registration clears push_last_failed_at", () => {
+  beforeEach(async () => {
+    // Seed an owner whose push_last_failed_at is set (prior delivery failure).
+    await db.insert(usersTable).values({
+      clerkUserId: OWNER_A_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: null,
+      pushNotificationsEnabled: true,
+      pushLastFailedAt: new Date(),
+    });
+    asUser(OWNER_A_CLERK);
+  });
+
+  it("clears push_last_failed_at when a new push token is registered", async () => {
+    const res = await request(app)
+      .post("/api/auth/me/push-token")
+      .send({ token: VALID_TOKEN_A });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken, pushLastFailedAt: usersTable.pushLastFailedAt })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+
+    // New token persisted and failure flag cleared.
+    expect(user.pushToken).toBe(VALID_TOKEN_A);
+    expect(user.pushLastFailedAt).toBeNull();
+  });
+
+  it("GET /me returns pushLastFailedAt: null after re-registration", async () => {
+    await request(app)
+      .post("/api/auth/me/push-token")
+      .send({ token: VALID_TOKEN_A });
+
+    const res = await request(app).get("/api/auth/me");
+    expect(res.status).toBe(200);
+    expect(res.body.pushLastFailedAt).toBeNull();
+  });
+});
