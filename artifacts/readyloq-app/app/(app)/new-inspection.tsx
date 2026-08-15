@@ -820,8 +820,16 @@ export default function NewInspectionScreen() {
   // commands and cloud-relayed events independently.
   const bleGlasses = useSmartGlassesBleFrames({
     active: wsInspectionId != null,
-    onFrame: (cacheUri: string) => {
-      setPhotos((prev) => [...prev, { uri: cacheUri }]);
+    // onFrame MUST be async — the hook awaits it before deleting the cache file.
+    // Routing through ingestEvidence ensures persistPhoto durably copies the
+    // frame to documentDirectory before the cache source is removed.
+    onFrame: async (uri: string) => {
+      await ingestEvidence([{
+        id: `ble_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        uri,
+        source: "smart_glasses" as const,
+        capturedAt: new Date().toISOString(),
+      }]);
       setFaieStatus("🕶 BLE frame captured");
       setTimeout(() => setFaieStatus(null), 3_000);
     },
