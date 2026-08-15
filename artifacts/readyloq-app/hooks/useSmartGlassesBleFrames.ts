@@ -53,8 +53,14 @@ interface SmartGlassesBleFramesState {
   isActive: boolean;
   /** True when the BLE driver reports a connected device (regardless of active). */
   isBleConnected: boolean;
-  /** Running total of JPEG frames received this component lifetime. */
+  /** Running total of JPEG frames successfully written and delivered this session. */
   frameCount: number;
+  /**
+   * Running total of frames that could not be written (filesystem error, corrupt
+   * JPEG, or glasses disconnected mid-transfer). When > 0 the UI should show a
+   * "X frames lost" warning so the technician knows some captures were missed.
+   */
+  droppedFrameCount: number;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -67,6 +73,7 @@ export function useSmartGlassesBleFrames({
     () => smartGlassesBle.getState().connectionState === "connected",
   );
   const [frameCount, setFrameCount] = useState(0);
+  const [droppedFrameCount, setDroppedFrameCount] = useState(0);
 
   // Stable ref so the frame callback always calls the latest onFrame prop
   const onFrameRef = useRef(onFrame);
@@ -111,8 +118,10 @@ export function useSmartGlassesBleFrames({
           setFrameCount((prev) => prev + 1);
           onFrameRef.current(cacheUri);
         } catch {
-          // Silent: BLE frame corruption or filesystem error in the field —
-          // don't crash the inspection; just drop this frame.
+          // BLE frame corruption, filesystem error, or glasses disconnected
+          // mid-transfer — don't crash the inspection, but track the drop so
+          // the UI can warn the technician that some captures were missed.
+          setDroppedFrameCount((prev) => prev + 1);
         }
       })();
     });
@@ -124,6 +133,7 @@ export function useSmartGlassesBleFrames({
     isActive: active && isBleConnected,
     isBleConnected,
     frameCount,
+    droppedFrameCount,
   };
 }
 

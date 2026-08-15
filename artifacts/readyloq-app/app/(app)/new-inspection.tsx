@@ -1758,6 +1758,12 @@ export default function NewInspectionScreen() {
               {bleGlasses.frameCount} BLE frame{bleGlasses.frameCount === 1 ? "" : "s"}
             </Text>
           ) : null}
+          {/* Dropped-frame warning — shown when any BLE frames were lost mid-transfer */}
+          {bleGlasses.droppedFrameCount > 0 ? (
+            <Text style={{ color: "#f87171", fontFamily: "Inter_500Medium", fontSize: 10 }}>
+              ⚠ {bleGlasses.droppedFrameCount} frame{bleGlasses.droppedFrameCount === 1 ? "" : "s"} lost
+            </Text>
+          ) : null}
           {/* Cloud event count — shown alongside when BLE is also active */}
           {bleGlasses.isBleConnected && glassesSession.eventCount > 0 ? (
             <Text style={{ color: "rgba(255,255,255,0.65)", fontFamily: "Inter_400Regular", fontSize: 10 }}>
