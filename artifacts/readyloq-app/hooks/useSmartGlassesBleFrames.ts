@@ -96,7 +96,11 @@ export function useSmartGlassesBleFrames({
           const filename = `glasses_ble_${Date.now()}_${Math.random()
             .toString(36)
             .slice(2, 8)}.jpg`;
-          const cacheUri = `${FileSystem.cacheDirectory ?? ""}${filename}`;
+          // cacheDirectory can be null on some Android configurations; fall back
+          // to documentDirectory (always non-null on Expo) so the URI is valid.
+          const baseDir =
+            FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? "";
+          const cacheUri = `${baseDir}${filename}`;
 
           // Convert Uint8Array → base64 → write to FileSystem cache
           const base64 = uint8ArrayToBase64(jpeg);
