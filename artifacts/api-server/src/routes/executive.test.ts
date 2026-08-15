@@ -1574,6 +1574,49 @@ describe("executive briefing: midnight boundary accuracy", () => {
     expect(result.success).toBe(true);
     expect(result.briefing.inspectionsCount).toBe(0);
   });
+
+  it("excludes in_progress and draft inspections — only completed ones count in the briefing total", async () => {
+    /**
+     * Seed two non-completed inspections timestamped inside the target day's window
+     * (same createdAt as insp1, which is completed and already counted).
+     *
+     * The briefing service filters on status = 'completed', so adding an
+     * in_progress and a draft inspection inside the same window must not raise
+     * the count above 1.  If the status filter were accidentally removed or
+     * widened, this test catches it immediately.
+     */
+    const inProgressInsp = await createInspectionViaApi(MIDNIGHT_OWNER_ID, "Status Filter In Progress St");
+    const draftInsp      = await createInspectionViaApi(MIDNIGHT_OWNER_ID, "Status Filter Draft St");
+
+    // Place both non-completed inspections inside the target day's window.
+    await db
+      .update(inspectionsTable)
+      .set({ status: "in_progress", createdAt: oneSecBeforeMidnight })
+      .where(eq(inspectionsTable.id, inProgressInsp));
+
+    await db
+      .update(inspectionsTable)
+      .set({ status: "draft", createdAt: oneSecBeforeMidnight })
+      .where(eq(inspectionsTable.id, draftInsp));
+
+    try {
+      const result = await generateDailyExecutiveBriefing(midnightCompanyId, targetDateStr);
+      expect(result.success).toBe(true);
+
+      // Only the already-seeded completed insp1 should be counted.
+      // in_progress and draft must both be excluded by the status filter.
+      expect(result.briefing.inspectionsCount).toBe(1);
+
+      // The summary text must reference "1 inspection" — not 2 or 3, which
+      // would indicate non-completed rows leaked into the aggregate.
+      expect(result.briefing.summary).toMatch(/\b1\b.*inspection/i);
+    } finally {
+      // Inline cleanup so these fixtures don't affect sibling tests.
+      await db
+        .delete(inspectionsTable)
+        .where(inArray(inspectionsTable.id, [inProgressInsp, draftInsp]));
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
