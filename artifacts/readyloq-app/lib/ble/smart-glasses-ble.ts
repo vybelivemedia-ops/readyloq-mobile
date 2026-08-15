@@ -408,8 +408,7 @@ class SmartGlassesBleManager {
     }
 
     this._connectedDevice = null;
-    this._fireDroppedFrames("disconnect");
-    this._frameBuffers.clear();
+    this._clearFrameBuffers("disconnect");
 
     this._patch({
       connectionState: "idle",
@@ -498,8 +497,7 @@ class SmartGlassesBleManager {
     this._ble.onDeviceDisconnected(device.id, (_error, _dev) => {
       this._removeSubscriptions();
       this._connectedDevice = null;
-      this._fireDroppedFrames("disconnect");
-      this._frameBuffers.clear();
+      this._clearFrameBuffers("disconnect");
 
       this._patch({
         connectionState: "idle",
@@ -511,12 +509,22 @@ class SmartGlassesBleManager {
   }
 
   /**
-   * Fire dropped-frame callbacks for every buffer currently in `_frameBuffers`.
-   * Call this BEFORE clearing or modifying `_frameBuffers` so the count is accurate.
+   * Cancel all pending reassembly TTL timers, clear the buffer map, and
+   * notify drop listeners with the count of in-progress frames.
+   *
+   * Always use this instead of `_frameBuffers.clear()` directly on disconnect
+   * paths. Cancelling the timers prevents:
+   *   (a) double-counting — stale timers firing after the map is already gone
+   *   (b) sequence collisions — stale timers deleting a new connection's buffer
+   *       that happened to reuse the same frameSeq
    */
-  private _fireDroppedFrames(reason: "disconnect" | "timeout", count = this._frameBuffers.size): void {
-    if (count <= 0) return;
-    this._droppedFrameListeners.forEach((cb) => cb(count, reason));
+  private _clearFrameBuffers(reason: "disconnect"): void {
+    const count = this._frameBuffers.size;
+    this._frameBuffers.forEach((buf) => clearTimeout(buf.timeoutHandle));
+    this._frameBuffers.clear();
+    if (count > 0) {
+      this._droppedFrameListeners.forEach((cb) => cb(count, reason));
+    }
   }
 
   private _removeSubscriptions(): void {
@@ -557,15 +565,25 @@ class SmartGlassesBleManager {
 
     let buf = this._frameBuffers.get(frameSeq);
     if (!buf) {
+      // Use a holder so the timeout callback can identity-check its own buffer
+      // without a "used before assigned" TypeScript error.
+      const captured: { ref: FrameBuffer | null } = { ref: null };
       buf = {
         chunks: new Map(),
         totalChunks,
         timeoutHandle: setTimeout(() => {
-          this._frameBuffers.delete(frameSeq);
-          // One partial frame timed out — not all chunks arrived within the TTL.
-          this._fireDroppedFrames("timeout", 1);
+          // Identity guard: only act if THIS buffer is still the active entry.
+          //   • If _clearFrameBuffers() already ran (disconnect), map is empty
+          //     → get() returns undefined → guard fails → no double-count.
+          //   • If a new connection reused the same frameSeq, a different object
+          //     is in the map → guard fails → new buffer is not corrupted.
+          if (this._frameBuffers.get(frameSeq) === captured.ref) {
+            this._frameBuffers.delete(frameSeq);
+            this._droppedFrameListeners.forEach((cb) => cb(1, "timeout"));
+          }
         }, FRAME_REASSEMBLY_TTL_MS),
       };
+      captured.ref = buf;
       this._frameBuffers.set(frameSeq, buf);
     }
 
