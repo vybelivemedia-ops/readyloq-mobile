@@ -17,7 +17,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRootNavigationState, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -281,6 +281,91 @@ function ReportCard({
   );
 }
 
+// ─── Params hydration skeleton ────────────────────────────────────────────────
+
+/**
+ * Shown for one JS tick while expo-router hydrates the navigation params on
+ * cold start.  Prevents a one-frame flash where the tab would momentarily
+ * render as "All" before snapping to the deep-linked filter value (e.g.
+ * `readyloq://reports-detail?filter=critical`).
+ */
+function AuditSkeleton({ top }: { top: number }) {
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Tab row placeholders */}
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 8,
+          paddingHorizontal: 16,
+          paddingTop: 14,
+          paddingBottom: 12,
+        }}
+      >
+        {([0, 1, 2, 3] as const).map((i) => (
+          <View
+            key={i}
+            style={{
+              flex: 1,
+              height: 52,
+              borderRadius: 10,
+              backgroundColor: C.surface,
+              borderWidth: 1,
+              borderColor: C.border,
+              opacity: 0.6,
+            }}
+          />
+        ))}
+      </View>
+
+      {/* Search bar placeholder */}
+      <View
+        style={{
+          height: 40,
+          marginHorizontal: 16,
+          marginBottom: 10,
+          borderRadius: 10,
+          backgroundColor: C.surface,
+          borderWidth: 1,
+          borderColor: C.border,
+          opacity: 0.6,
+        }}
+      />
+
+      {/* Filter banner placeholder */}
+      <View
+        style={{
+          height: 36,
+          marginHorizontal: 16,
+          marginBottom: 12,
+          borderRadius: 8,
+          backgroundColor: C.surface,
+          borderWidth: 1,
+          borderColor: C.border,
+          opacity: 0.6,
+        }}
+      />
+
+      {/* Report card placeholders */}
+      <View style={{ paddingHorizontal: 16, gap: 10 }}>
+        {([0, 1, 2, 3] as const).map((i) => (
+          <View
+            key={i}
+            style={{
+              height: 72,
+              borderRadius: 10,
+              backgroundColor: C.surface,
+              borderWidth: 1,
+              borderColor: C.border,
+              opacity: 0.6 - i * 0.1,
+            }}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 // Re-export the normalise helper under the local name so usages below are unchanged.
@@ -296,6 +381,39 @@ export default function ReportsDetailScreen() {
   // before we have a chance to validate — normalizeFilterParam handles that.
   const { filter: filterParam, q: qParam } = useLocalSearchParams<{ filter?: string; q?: string }>();
 
+  // ── Cold-start deep-link guard ─────────────────────────────────────────────
+  // When the app is cold-started via a push-notification deep link such as
+  //   readyloq://reports-detail?filter=critical
+  // expo-router may deliver `filterParam` as `undefined` on the very first
+  // render cycle before the navigation stack is fully hydrated.  A naive
+  // `useState(normalizeFilterParam(filterParam))` would therefore initialise
+  // `activeTab` to "all", and the screen would flash to "All" before snapping
+  // to the deep-linked tab — even if we correct it in a `useEffect`.
+  //
+  // Root cause: `useEffect` always runs AFTER the first committed paint, so a
+  // `paramsReady` flag set inside an effect is too late — the wrong tab has
+  // already been displayed by the time the effect fires.
+  //
+  // Correct fix: use `useRootNavigationState()` from expo-router.  Its `.key`
+  // property is populated ONLY once the navigation container has resolved the
+  // initial URL and mounted the navigation stack.  On cold start its value is
+  // undefined until that resolution completes, giving us a synchronous signal
+  // we can read inside the lazy `useState` initialiser.
+  //
+  //   • Normal in-app navigation  → navigationReady is already true on first
+  //     render → paramsReady starts true → no skeleton ever shown.
+  //   • Cold-start deep link      → navigationReady is false on first render
+  //     → paramsReady starts false → skeleton shown → navigation hydrates →
+  //     param effect fires with the real filterParam ("critical") → correct
+  //     tab is set + paramsReady = true → skeleton replaced with the right UI.
+  const navigationState = useRootNavigationState();
+  const navigationReady = !!navigationState?.key;
+
+  // Lazy initialiser captures navigationReady at first render.  If the nav
+  // stack is already hydrated (normal navigation) this is true and no skeleton
+  // will ever be shown.  If not (cold start) this is false and we defer.
+  const [paramsReady, setParamsReady] = useState(() => navigationReady);
+
   const [activeTab, setActiveTab] = useState<AuditFilter>(
     normalizeFilterParam(filterParam),
   );
@@ -307,8 +425,14 @@ export default function ReportsDetailScreen() {
   // Restore the last-used tab from storage on first mount — but only when the
   // caller did NOT supply an explicit `filter=` deep-link param (which always
   // takes precedence over the stored preference).
+  //
+  // We guard on `navigationReady` so that on cold start the storage read does
+  // not race with param hydration: if navigation isn't ready yet we return
+  // early and the effect re-fires (via the `navigationReady` dependency) once
+  // the nav stack is hydrated and filterParam is stable.
   useEffect(() => {
-    if (filterParam) return; // deep-link overrides stored preference
+    if (!navigationReady) return; // wait for the nav stack to resolve the URL
+    if (filterParam) return;      // deep-link overrides stored preference
     AsyncStorage.getItem(AUDIT_TAB_STORAGE_KEY)
       .then((stored) => {
         const tab = normalizeFilterParam(stored ?? undefined);
@@ -319,20 +443,30 @@ export default function ReportsDetailScreen() {
       .catch(() => {
         // Storage errors are non-fatal; silently keep the default tab.
       });
+  // navigationReady intentionally included: the effect must re-run once the
+  // nav stack hydrates so the storage read sees the correct filterParam.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — run once on mount only
+  }, [navigationReady]);
 
   // Keep the active tab (and search query) in sync with the URL params.
   // useState's initializer only runs at first mount; if expo-router reuses
   // the mounted screen instance (e.g. the route is already in the stack and
   // a second push arrives with different params), filterParam/qParam change
   // but the local state would be stale without this effect.
+  //
+  // navigationReady is included in the dep array so this effect re-fires once
+  // the nav stack hydrates.  Until it does we return early, keeping the
+  // skeleton visible so the user never sees the wrong ("all") tab.
   useEffect(() => {
+    if (!navigationReady) return; // params are not yet stable — keep skeleton
     const next = applyFilterParamChange({ activeTab, searchQuery }, filterParam, qParam);
     setActiveTab(next.activeTab);
     setSearchQuery(next.searchQuery);
+    // Mark params as hydrated so the skeleton is replaced with the real UI.
+    // setParamsReady is a no-op when already true (normal navigation).
+    setParamsReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterParam, qParam]);
+  }, [filterParam, qParam, navigationReady]);
 
   // Clear search whenever the user manually switches tabs, and persist the
   // selection so the next visit starts on the same tab.
@@ -394,10 +528,19 @@ export default function ReportsDetailScreen() {
             Management Report Audit
           </Text>
           <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 1 }}>
-            {isLoading ? "Loading…" : `${reports.length} report${reports.length === 1 ? "" : "s"}`}
+            {!paramsReady || isLoading ? "Loading…" : `${reports.length} report${reports.length === 1 ? "" : "s"}`}
           </Text>
         </View>
       </View>
+
+      {/* ── Cold-start skeleton — shown for one JS tick while expo-router ────
+           hydrates the navigation params.  Prevents the "All" → target-tab
+           flash when the app is cold-started via a push-notification deep
+           link (e.g. readyloq://reports-detail?filter=critical).         ── */}
+      {!paramsReady ? (
+        <AuditSkeleton top={insets.top} />
+      ) : (
+        <>
 
       {/* ── Filter tab row ──────────────────────────────────────────────────── */}
       <View
@@ -629,6 +772,8 @@ export default function ReportsDetailScreen() {
             </View>
           }
         />
+      )}
+        </>
       )}
     </View>
   );

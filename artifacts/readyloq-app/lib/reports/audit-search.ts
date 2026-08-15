@@ -110,10 +110,11 @@ export function applyTabChange(
  * Pure state transition for when the `filter` (and optional `q`) URL params
  * change (deep-link or back-navigation).
  *
- * Mirrors the `useEffect([filterParam, qParam])` in ReportsDetailScreen:
- * normalises the raw filter param, updates the active tab, and seeds the
- * search query from `rawQ` when provided (falling back to "" so results from
- * the previous tab don't leak when no search term is supplied).
+ * Mirrors the `useEffect([filterParam, qParam, navigationReady])` in
+ * ReportsDetailScreen: normalises the raw filter param, updates the active
+ * tab, and seeds the search query from `rawQ` when provided (falling back to
+ * "" so results from the previous tab don't leak when no search term is
+ * supplied).
  */
 export function applyFilterParamChange(
   state: AuditScreenState,
@@ -122,4 +123,72 @@ export function applyFilterParamChange(
 ): AuditScreenState {
   const q = Array.isArray(rawQ) ? (rawQ[0] ?? "") : (rawQ ?? "");
   return { activeTab: normalizeFilterParam(rawParam), searchQuery: q };
+}
+
+// ─── simulateColdStartHydration ──────────────────────────────────────────────
+
+/**
+ * Result of the two-phase cold-start hydration sequence.
+ *
+ * Without the `paramsReady` skeleton guard, `preHydration.activeTab` ("all")
+ * would be visible to the user for one render frame before snapping to
+ * `postHydration.activeTab`.  `wasAllTabVisibleDuringHydration` is `true`
+ * whenever that flash would occur — i.e. when the deep-link lands on a tab
+ * other than "all" and the guard is therefore necessary.
+ */
+export interface ColdStartHydrationResult {
+  /** Tab state computed from undefined params (nav stack not yet hydrated). */
+  preHydration: AuditScreenState;
+  /** Tab state computed once the real deep-link params arrive. */
+  postHydration: AuditScreenState;
+  /**
+   * `true` when the "All" tab would momentarily be visible without the guard:
+   * i.e. the pre-hydration tab is "all" but the post-hydration tab is not.
+   * This is the exact condition the `paramsReady` skeleton guard prevents.
+   */
+  wasAllTabVisibleDuringHydration: boolean;
+}
+
+/**
+ * Models the two-phase cold-start param-hydration sequence as a pure
+ * function so it can be unit-tested without a React renderer.
+ *
+ * Phase 1 — Before the navigation stack hydrates, `useLocalSearchParams`
+ * returns `undefined` for every param.  `normalizeFilterParam(undefined)`
+ * therefore returns `"all"`, which is what the screen's `useState` initialiser
+ * would compute — the wrong tab.
+ *
+ * Phase 2 — Once `useRootNavigationState().key` becomes defined (navigation
+ * hydrated), the param effect fires with the real `filterParam` value and
+ * `applyFilterParamChange` resolves it to the correct tab.
+ *
+ * The `paramsReady` skeleton guard keeps the UI hidden during Phase 1 so the
+ * user never sees the "all" → target-tab snap.
+ *
+ * @param hydratedFilterParam  The real filter param delivered after hydration.
+ * @param hydratedQ            The real q (search) param delivered after hydration.
+ */
+export function simulateColdStartHydration(
+  hydratedFilterParam: string | string[] | undefined,
+  hydratedQ?: string | string[] | undefined,
+): ColdStartHydrationResult {
+  // Phase 1: before hydration — filterParam is always undefined.
+  const preHydration: AuditScreenState = {
+    activeTab: normalizeFilterParam(undefined), // always "all" — the wrong tab
+    searchQuery: "",
+  };
+
+  // Phase 2: after hydration — the real params are applied.
+  const postHydration = applyFilterParamChange(
+    preHydration,
+    hydratedFilterParam,
+    hydratedQ,
+  );
+
+  return {
+    preHydration,
+    postHydration,
+    wasAllTabVisibleDuringHydration:
+      preHydration.activeTab === "all" && postHydration.activeTab !== "all",
+  };
 }

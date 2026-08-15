@@ -22,9 +22,11 @@ import {
   normalizeFilterParam,
   applyTabChange,
   applyFilterParamChange,
+  simulateColdStartHydration,
   type SearchableReport,
   type AuditFilter,
   type AuditScreenState,
+  type ColdStartHydrationResult,
 } from "../audit-search";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -574,6 +576,157 @@ describe("pull-to-refresh — filterReports narrows refreshed data with the exis
     const freshResults = filterReports(freshWithNew, query);
     expect(freshResults).toHaveLength(1);
     expect(freshResults[0].id).toBe(99); // new item is reachable after refresh
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. Cold-start deep-link — params arrive late (paramsReady guard)
+//
+//  When the app is cold-started via a push-notification deep link such as
+//    readyloq://reports-detail?filter=critical
+//  expo-router may deliver filterParam as `undefined` on the very first
+//  render cycle before the navigation stack is fully hydrated.  If we used
+//  that `undefined` value directly, the `useState` initializer would set
+//  activeTab to "all", and the screen would show the "All" tab for one frame
+//  before snapping to "critical" — a visible flash.
+//
+//  Fix: reports-detail.tsx uses a `paramsReady` boolean (starts false) that
+//  is set to true only after the filterParam/qParam useEffect has fired.
+//  While paramsReady is false the screen shows a skeleton, so the user never
+//  sees the intermediate "all" state.
+//
+//  These tests document the two-step state machine in pure form so the
+//  contract is regression-protected without a React renderer.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. Cold-start deep-link — simulateColdStartHydration (component model)
+//
+//  simulateColdStartHydration() is a pure model of the two-phase param
+//  resolution performed by ReportsDetailScreen on cold start:
+//
+//    Phase 1 — useRootNavigationState().key is undefined (nav not hydrated).
+//              useLocalSearchParams returns undefined for every param.
+//              normalizeFilterParam(undefined) = "all" — the WRONG tab.
+//              The paramsReady skeleton guard keeps this hidden from the user.
+//
+//    Phase 2 — navigation hydrates; useRootNavigationState().key is set.
+//              The param useEffect re-fires (navigationReady dep changed).
+//              filterParam = "critical" → applyFilterParamChange resolves it.
+//              paramsReady is set to true; skeleton is replaced with the
+//              CORRECT tab, never having been visible.
+//
+//  wasAllTabVisibleDuringHydration = true whenever the guard is necessary.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("cold-start deep-link — simulateColdStartHydration models the two-phase sequence", () => {
+  // ── filter=critical ──────────────────────────────────────────────────────
+
+  it("cold start with filter=critical: pre-hydration is 'all' (wrong), post-hydration is 'critical' (correct)", () => {
+    const result: ColdStartHydrationResult = simulateColdStartHydration("critical");
+    expect(result.preHydration.activeTab).toBe("all");   // what would flash WITHOUT the guard
+    expect(result.postHydration.activeTab).toBe("critical"); // what the user sees WITH the guard
+  });
+
+  it("cold start with filter=critical: wasAllTabVisibleDuringHydration is true — guard is required", () => {
+    const { wasAllTabVisibleDuringHydration } = simulateColdStartHydration("critical");
+    expect(wasAllTabVisibleDuringHydration).toBe(true);
+  });
+
+  it("cold start with filter=critical: post-hydration tab is NOT 'all' (regression guard)", () => {
+    const { postHydration } = simulateColdStartHydration("critical");
+    expect(postHydration.activeTab).not.toBe("all");
+  });
+
+  // ── filter=pipeline ──────────────────────────────────────────────────────
+
+  it("cold start with filter=pipeline: pre-hydration is 'all', post-hydration is 'pipeline'", () => {
+    const { preHydration, postHydration } = simulateColdStartHydration("pipeline");
+    expect(preHydration.activeTab).toBe("all");
+    expect(postHydration.activeTab).toBe("pipeline");
+  });
+
+  it("cold start with filter=pipeline: wasAllTabVisibleDuringHydration is true — guard is required", () => {
+    const { wasAllTabVisibleDuringHydration } = simulateColdStartHydration("pipeline");
+    expect(wasAllTabVisibleDuringHydration).toBe(true);
+  });
+
+  it("cold start with filter=pipeline: post-hydration tab is NOT 'all'", () => {
+    const { postHydration } = simulateColdStartHydration("pipeline");
+    expect(postHydration.activeTab).not.toBe("all");
+  });
+
+  // ── filter=pending ───────────────────────────────────────────────────────
+
+  it("cold start with filter=pending: pre-hydration is 'all', post-hydration is 'pending'", () => {
+    const { preHydration, postHydration } = simulateColdStartHydration("pending");
+    expect(preHydration.activeTab).toBe("all");
+    expect(postHydration.activeTab).toBe("pending");
+  });
+
+  it("cold start with filter=pending: wasAllTabVisibleDuringHydration is true — guard is required", () => {
+    const { wasAllTabVisibleDuringHydration } = simulateColdStartHydration("pending");
+    expect(wasAllTabVisibleDuringHydration).toBe(true);
+  });
+
+  it("cold start with filter=pending: post-hydration tab is NOT 'all'", () => {
+    const { postHydration } = simulateColdStartHydration("pending");
+    expect(postHydration.activeTab).not.toBe("all");
+  });
+
+  // ── No deep-link param (normal cold start without a filter) ──────────────
+
+  it("cold start with no filter param: both phases resolve to 'all' — no flash, no guard needed", () => {
+    const { preHydration, postHydration, wasAllTabVisibleDuringHydration } =
+      simulateColdStartHydration(undefined);
+    expect(preHydration.activeTab).toBe("all");
+    expect(postHydration.activeTab).toBe("all");
+    expect(wasAllTabVisibleDuringHydration).toBe(false); // no flash risk
+  });
+
+  // ── With a ?q= search param ──────────────────────────────────────────────
+
+  it("cold start with filter=critical&q=oak: post-hydration preserves the search query", () => {
+    const { postHydration } = simulateColdStartHydration("critical", "oak");
+    expect(postHydration.activeTab).toBe("critical");
+    expect(postHydration.searchQuery).toBe("oak");
+  });
+
+  it("cold start with filter=critical&q=oak: pre-hydration has empty search query", () => {
+    const { preHydration } = simulateColdStartHydration("critical", "oak");
+    expect(preHydration.searchQuery).toBe("");
+  });
+
+  // ── Array params (expo-router multi-value) ────────────────────────────────
+
+  it("cold start with filter=['critical','pipeline'] (array): post-hydration picks the first element", () => {
+    const { postHydration } = simulateColdStartHydration(["critical", "pipeline"]);
+    expect(postHydration.activeTab).toBe("critical");
+  });
+
+  // ── Bad/unrecognised deep-link param ─────────────────────────────────────
+
+  it("cold start with filter='CRITICAL' (uppercase): post-hydration falls back to 'all' safely", () => {
+    const { postHydration, wasAllTabVisibleDuringHydration } =
+      simulateColdStartHydration("CRITICAL");
+    expect(postHydration.activeTab).toBe("all");
+    // No flash risk — both phases are "all".
+    expect(wasAllTabVisibleDuringHydration).toBe(false);
+  });
+
+  it("cold start with filter='garbage': post-hydration falls back to 'all' safely", () => {
+    const { postHydration, wasAllTabVisibleDuringHydration } =
+      simulateColdStartHydration("garbage");
+    expect(postHydration.activeTab).toBe("all");
+    expect(wasAllTabVisibleDuringHydration).toBe(false);
+  });
+
+  // ── State immutability ───────────────────────────────────────────────────
+
+  it("does not mutate the preHydration object when computing postHydration", () => {
+    const result = simulateColdStartHydration("critical");
+    expect(result.preHydration).not.toBe(result.postHydration);
+    expect(result.preHydration.activeTab).toBe("all"); // unchanged
   });
 });
 
