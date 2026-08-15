@@ -211,20 +211,23 @@ export async function notifyTechnicianRouteUpdated(input: {
   // Fetch push tokens for each technician in a single query.
   // Restricting to role = technician is defense-in-depth: even if a caller
   // mistakenly passes a manager or owner Clerk ID, they will not receive the push.
-  let rows: { pushToken: string | null; clerkUserId: string }[] = [];
+  // We fetch ALL company technicians so we can detect Clerk IDs that have no
+  // matching user record yet (new hire who has never signed in to the mobile app).
+  let allTechRows: { pushToken: string | null; clerkUserId: string; pushNotificationsEnabled: boolean }[] = [];
   try {
-    rows = await db
-      .select({ pushToken: usersTable.pushToken, clerkUserId: usersTable.clerkUserId })
+    allTechRows = await db
+      .select({
+        pushToken: usersTable.pushToken,
+        clerkUserId: usersTable.clerkUserId,
+        pushNotificationsEnabled: usersTable.pushNotificationsEnabled,
+      })
       .from(usersTable)
       .where(
         and(
           eq(usersTable.companyId, companyId),
           eq(usersTable.role, "technician"),
-          eq(usersTable.pushNotificationsEnabled, true),
         ),
       );
-    // Filter to only the targeted technician Clerk IDs.
-    rows = rows.filter((r) => uniqueIds.includes(r.clerkUserId));
   } catch (err) {
     void logErrorEvent("notification", {
       companyId,
@@ -234,6 +237,41 @@ export async function notifyTechnicianRouteUpdated(input: {
     });
     return;
   }
+
+  // Build a map for quick lookup, then classify each targeted Clerk ID.
+  const techRowByClerkId = new Map(allTechRows.map((r) => [r.clerkUserId, r]));
+
+  for (const clerkId of uniqueIds) {
+    const row = techRowByClerkId.get(clerkId);
+    if (!row) {
+      // No usersTable record — technician has never signed in via the mobile app.
+      void logErrorEvent("notification", {
+        companyId,
+        inspectionId,
+        message: `Route-update notification skipped: technician Clerk ID has no user record yet (new hire)`,
+        context: { stage: "push_skip_no_user_record", clerkUserId: clerkId },
+      });
+    } else if (!row.pushNotificationsEnabled) {
+      void logErrorEvent("notification", {
+        companyId,
+        inspectionId,
+        message: `Route-update notification skipped: technician has push notifications disabled`,
+        context: { stage: "push_skip_notifications_disabled", clerkUserId: clerkId },
+      });
+    } else if (!row.pushToken || !row.pushToken.startsWith("ExponentPushToken[")) {
+      void logErrorEvent("notification", {
+        companyId,
+        inspectionId,
+        message: `Route-update notification skipped: technician has no valid push token registered`,
+        context: { stage: "push_skip_no_token", clerkUserId: clerkId },
+      });
+    }
+  }
+
+  // Only send to technicians with notifications enabled and a valid token.
+  const rows = allTechRows.filter(
+    (r) => uniqueIds.includes(r.clerkUserId) && r.pushNotificationsEnabled,
+  );
 
   const tokens = rows
     .map((r) => r.pushToken)

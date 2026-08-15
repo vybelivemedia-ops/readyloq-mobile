@@ -208,6 +208,10 @@ router.patch("/:id", async (req, res) => {
     // When false + name changed, we treat the reassignment as real even if we
     // couldn't resolve the new tech's Clerk ID (old tech should still be notified).
     let resolvedToSamePerson = false;
+    // Set to the new technician's display name when their Clerk ID could not be
+    // resolved (new hire with no prior inspections). Used to populate `warnings`
+    // in the response so the caller knows the notification was skipped.
+    let unresolvedNewTechName: string | null = null;
 
     if (technicianId !== undefined) {
       if (technicianId === null) {
@@ -261,6 +265,8 @@ router.patch("/:id", async (req, res) => {
         // not send a false notification to the former technician.
         newTechClerkId = null;
         update.technicianId = null;
+        // Flag so the response can warn the caller that this tech won't be notified.
+        unresolvedNewTechName = technicianName;
       }
     }
 
@@ -271,7 +277,17 @@ router.patch("/:id", async (req, res) => {
       .returning();
 
     const calDate = updated.scheduledDate ?? updated.createdAt;
-    const responsePayload = {
+
+    // Build warnings for the caller so UI can surface notification gaps.
+    const warnings: string[] = [];
+    if (unresolvedNewTechName !== null) {
+      warnings.push(
+        `Technician "${unresolvedNewTechName}" has no Clerk account record yet — ` +
+          `they will not receive a push notification until they sign in to the mobile app.`,
+      );
+    }
+
+    const responsePayload: Record<string, unknown> = {
       id: updated.id,
       siteAddress: updated.siteAddress,
       clientName: updated.clientName ?? null,
@@ -285,6 +301,10 @@ router.patch("/:id", async (req, res) => {
       createdAt: updated.createdAt.toISOString(),
       completedAt: updated.completedAt?.toISOString() ?? null,
     };
+
+    if (warnings.length > 0) {
+      responsePayload.warnings = warnings;
+    }
 
     // ── Push notification ─────────────────────────────────────────────────────
     //
