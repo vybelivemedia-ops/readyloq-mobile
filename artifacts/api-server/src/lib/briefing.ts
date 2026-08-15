@@ -158,7 +158,7 @@ const OPEN_OPPORTUNITY_STATUSES = ["new", "reviewed", "quoted"] as const;
 async function buildTechnicianSection(companyId: number): Promise<TechnicianBriefing> {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
 
-  const [[counts], recent, siteHistoryRows] = await Promise.all([
+  const [[counts], recent, siteHistoryResult] = await Promise.all([
     db
       .select({
         total: sql<number>`count(*)::int`,
@@ -231,7 +231,7 @@ async function buildTechnicianSection(companyId: number): Promise<TechnicianBrie
       ...r,
       createdAt: r.createdAt.toISOString(),
     })),
-    siteHistory: (siteHistoryRows as unknown as Array<{
+    siteHistory: ((siteHistoryResult as unknown as { rows: unknown[] }).rows as Array<{
       siteAddress: string;
       visitCount: number;
       lastVisitedAt: Date | null;
@@ -241,7 +241,7 @@ async function buildTechnicianSection(companyId: number): Promise<TechnicianBrie
     }>).map((r) => ({
       siteAddress: r.siteAddress,
       visitCount: r.visitCount,
-      lastVisitedAt: r.lastVisitedAt ? r.lastVisitedAt.toISOString() : null,
+      lastVisitedAt: r.lastVisitedAt ? new Date(r.lastVisitedAt).toISOString() : null,
       lastInspectionId: Number(r.lastInspectionId),
       lastFindingsCount: r.lastFindingsCount ?? 0,
       pestTypes: r.pestTypes ?? [],

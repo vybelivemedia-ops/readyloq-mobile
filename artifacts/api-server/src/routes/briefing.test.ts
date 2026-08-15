@@ -78,7 +78,7 @@ async function findOrCreateCompany(name: string, slug: string): Promise<number> 
 async function seedInspection(
   companyId: number,
   siteAddress: string,
-  opts: { completed?: boolean; completedDaysAgo?: number; findingsCount?: number } = {},
+  opts: { completed?: boolean; completedDaysAgo?: number; findingsCount?: number; pestTypes?: string[] } = {},
 ) {
   const completed = opts.completed ?? false;
   const [row] = await db
@@ -90,6 +90,7 @@ async function seedInspection(
       status: completed ? "completed" : "pending",
       completedAt: completed ? daysAgo(opts.completedDaysAgo ?? 1) : null,
       findingsCount: opts.findingsCount ?? 0,
+      pestTypes: opts.pestTypes ?? [],
     })
     .returning();
   return row;
@@ -273,6 +274,111 @@ describe("technician briefing", () => {
     expect(t.openInspections).toBe(1);
     expect(t.completedThisWeek).toBe(1);
     expect(t.recentInspections.length).toBe(3);
+  });
+});
+
+describe("building history pest-type union", () => {
+  it("unions pest types across multiple visits to the same address", async () => {
+    // Visit 1: rodents only
+    await seedInspection(companyAId, "50 Union Ave", {
+      completed: true,
+      completedDaysAgo: 10,
+      pestTypes: ["rodents"],
+    });
+    // Visit 2: cockroaches only (different finding, same address)
+    await seedInspection(companyAId, "50 Union Ave", {
+      completed: true,
+      completedDaysAgo: 3,
+      pestTypes: ["cockroaches"],
+    });
+
+    asUser(TECH_A_ID);
+    const res = await request(app).get("/api/briefing");
+    expect(res.status).toBe(200);
+    const history = res.body.technician.siteHistory as Array<{
+      siteAddress: string;
+      visitCount: number;
+      pestTypes: string[];
+    }>;
+    const entry = history.find((h) => h.siteAddress === "50 Union Ave");
+    expect(entry).toBeDefined();
+    expect(entry!.visitCount).toBe(2);
+    // Both pest types from both visits must appear (union, sorted alphabetically by the query)
+    expect(entry!.pestTypes).toContain("rodents");
+    expect(entry!.pestTypes).toContain("cockroaches");
+    expect(entry!.pestTypes).toHaveLength(2);
+  });
+
+  it("does not break the union when one visit has no pest types", async () => {
+    // Visit 1: ants recorded
+    await seedInspection(companyAId, "51 Empty Lane", {
+      completed: true,
+      completedDaysAgo: 8,
+      pestTypes: ["ants"],
+    });
+    // Visit 2: no pest types recorded (empty array)
+    await seedInspection(companyAId, "51 Empty Lane", {
+      completed: true,
+      completedDaysAgo: 2,
+      pestTypes: [],
+    });
+
+    asUser(TECH_A_ID);
+    const res = await request(app).get("/api/briefing");
+    expect(res.status).toBe(200);
+    const history = res.body.technician.siteHistory as Array<{
+      siteAddress: string;
+      visitCount: number;
+      pestTypes: string[];
+    }>;
+    const entry = history.find((h) => h.siteAddress === "51 Empty Lane");
+    expect(entry).toBeDefined();
+    expect(entry!.visitCount).toBe(2);
+    // "ants" still appears even though the second visit had no pest types
+    expect(entry!.pestTypes).toEqual(["ants"]);
+  });
+
+  it("returns the correct pest types for an address with a single visit", async () => {
+    await seedInspection(companyAId, "52 Solo Street", {
+      completed: true,
+      completedDaysAgo: 5,
+      pestTypes: ["termites", "bedbugs"],
+    });
+
+    asUser(TECH_A_ID);
+    const res = await request(app).get("/api/briefing");
+    expect(res.status).toBe(200);
+    const history = res.body.technician.siteHistory as Array<{
+      siteAddress: string;
+      visitCount: number;
+      pestTypes: string[];
+    }>;
+    const entry = history.find((h) => h.siteAddress === "52 Solo Street");
+    expect(entry).toBeDefined();
+    expect(entry!.visitCount).toBe(1);
+    expect(entry!.pestTypes).toContain("termites");
+    expect(entry!.pestTypes).toContain("bedbugs");
+    expect(entry!.pestTypes).toHaveLength(2);
+  });
+
+  it("returns an empty pestTypes array when all visits at an address have no pest activity", async () => {
+    await seedInspection(companyAId, "53 Clean Court", {
+      completed: true,
+      completedDaysAgo: 4,
+      pestTypes: [],
+    });
+
+    asUser(TECH_A_ID);
+    const res = await request(app).get("/api/briefing");
+    expect(res.status).toBe(200);
+    const history = res.body.technician.siteHistory as Array<{
+      siteAddress: string;
+      visitCount: number;
+      pestTypes: string[];
+    }>;
+    const entry = history.find((h) => h.siteAddress === "53 Clean Court");
+    expect(entry).toBeDefined();
+    expect(entry!.pestTypes).toEqual([]);
   });
 });
 
