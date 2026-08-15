@@ -417,6 +417,124 @@ describe("exclusionOpportunities — non-empty count", () => {
   });
 });
 
+// ─── Opportunities filter ─────────────────────────────────────────────────────
+
+describe("GET /reports?opportunities=true — filter", () => {
+  /**
+   * Seeds one report WITH exclusion opportunities and one WITHOUT, then
+   * confirms that ?opportunities=true returns only the one that has them.
+   * This guards against a regression where the filter is silently ignored
+   * and zero-opportunity reports leak into the "Open opportunities" list.
+   */
+  it("returns only reports that have at least one exclusion opportunity", async () => {
+    const withOpps = ["pest: Active rodent entry at foundation gap", "structural: Unsealed conduit penetration"];
+    const withOppsJson = JSON.stringify(withOpps);
+    const noOppsJson = JSON.stringify([]);
+
+    // Seed a report WITH opportunities
+    const withResult = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'OppFilter — has opportunities',
+              '99 Opp Ave', 'complete', NULL, NULL,
+              ${withOppsJson}::jsonb,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const withId = (withResult.rows[0] as { id: number }).id;
+
+    // Seed a report WITHOUT opportunities
+    await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'OppFilter — no opportunities',
+              '99 Opp Ave', 'complete', NULL, NULL,
+              ${noOppsJson}::jsonb,
+              'Smoky', CURRENT_DATE)
+    `);
+
+    asUser(OWNER_ID);
+    const res = await request(app).get("/api/reports?opportunities=true");
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+
+    const ids: number[] = res.body.map((r: { id: number }) => r.id);
+
+    // The report WITH opportunities must be present
+    expect(ids).toContain(withId);
+
+    // Every returned report must have at least one opportunity
+    for (const report of res.body as Array<{ id: number; exclusionOpportunities: string[] }>) {
+      expect(
+        Array.isArray(report.exclusionOpportunities),
+        `exclusionOpportunities not an array on report ${report.id}`,
+      ).toBe(true);
+      expect(
+        report.exclusionOpportunities.length,
+        `report ${report.id} has zero opportunities but was returned by the opportunities filter`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("count in the response matches the stored exclusionOpportunities array length", async () => {
+    const opps = [
+      "entry_point: Gap under exterior door",
+      "structural: Crack in foundation near utility room",
+      "vegetation: Overgrown shrub providing harborage along wall",
+    ];
+    const oppsJson = JSON.stringify(opps);
+
+    const result = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'OppFilter — count check',
+              '77 Count Rd', 'complete', NULL, NULL,
+              ${oppsJson}::jsonb,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const reportId = (result.rows[0] as { id: number }).id;
+
+    asUser(OWNER_ID);
+    const res = await request(app).get("/api/reports?opportunities=true");
+
+    expect(res.status).toBe(200);
+    const target = (res.body as Array<{ id: number; exclusionOpportunities: string[] }>)
+      .find((r) => r.id === reportId);
+
+    expect(target).toBeDefined();
+    // Count in the response must equal the number of strings seeded
+    expect(target!.exclusionOpportunities).toHaveLength(opps.length);
+    expect(target!.exclusionOpportunities).toEqual(opps);
+  });
+
+  it("NULL exclusion_opportunities rows are excluded (treated as empty array)", async () => {
+    // Insert a legacy row with NULL exclusion_opportunities
+    const nullResult = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'OppFilter — null opps legacy row',
+              '55 Null St', 'complete', NULL, NULL, NULL,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const nullId = (nullResult.rows[0] as { id: number }).id;
+
+    asUser(OWNER_ID);
+    const res = await request(app).get("/api/reports?opportunities=true");
+
+    expect(res.status).toBe(200);
+    const ids: number[] = res.body.map((r: { id: number }) => r.id);
+    // The NULL-opps report must NOT appear in the filtered list
+    expect(ids).not.toContain(nullId);
+  });
+});
+
 // ─── Tenant isolation (reports are company-scoped) ────────────────────────────
 
 describe("tenant isolation", () => {

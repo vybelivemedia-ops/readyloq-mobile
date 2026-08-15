@@ -76,6 +76,7 @@ function filterToParams(filter: ReportFilter, timeframe: ReportTimeframe): Repor
     case "pending_approvals": params.status = ["pending", "draft"];           break;
     case "approved":       params.status    = ["approved", "complete"];       break;
     case "proposal_sent":  params.status    = ["sent", "proposal_sent"];      break;
+    case "opportunities": params.opportunities = true;                        break;
     // Informational — fetch all, show banner only
     default: break;
   }

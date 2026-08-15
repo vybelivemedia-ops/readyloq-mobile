@@ -18,6 +18,8 @@ export interface ReportQueryParams {
   status?: string[];
   /** Restrict to reports created within the last N days. */
   sinceDays?: number;
+  /** When true, only return reports with at least one exclusion opportunity. */
+  opportunities?: boolean;
 }
 
 function buildUrl(params: ReportQueryParams): string {
@@ -25,6 +27,7 @@ function buildUrl(params: ReportQueryParams): string {
   if (params.severity?.length) qs.set("severity", params.severity.join(","));
   if (params.status?.length)   qs.set("status",   params.status.join(","));
   if (params.sinceDays != null) qs.set("since_days", String(params.sinceDays));
+  if (params.opportunities)    qs.set("opportunities", "true");
   const q = qs.toString();
   return q ? `/api/reports?${q}` : "/api/reports";
 }
@@ -43,6 +46,7 @@ export function fetchReportsQueryKey(params: ReportQueryParams = {}) {
     params.severity?.slice().sort().join(",") ?? "",
     params.status?.slice().sort().join(",")   ?? "",
     params.sinceDays ?? "",
+    params.opportunities ?? false,
   ] as const;
 }
 

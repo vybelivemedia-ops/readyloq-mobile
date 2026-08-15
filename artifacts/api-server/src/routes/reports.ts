@@ -9,7 +9,7 @@ import {
   opportunitiesTable,
   type Finding,
 } from "@workspace/db";
-import { eq, and, desc, inArray, gte } from "drizzle-orm";
+import { eq, and, desc, inArray, gte, sql } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import {
   generateReportNarrative,
@@ -61,6 +61,7 @@ function serializeReport(
 //   ?severity=high,critical   — filter by one or more severity values
 //   ?status=pending,draft     — filter by one or more status values
 //   ?since_days=30            — restrict to reports created in the last N days
+//   ?opportunities=true       — only reports with at least one exclusion opportunity
 // Left-joins the linked opportunity so each report carries `pipelineValue`
 // (the auto-populated estimatedAnnualValue from the pricing engine).
 router.get("/", async (req, res) => {
@@ -68,13 +69,15 @@ router.get("/", async (req, res) => {
     const companyId = getCompanyId(req);
 
     // Parse optional filter params
-    const severityParam  = typeof req.query.severity   === "string" ? req.query.severity   : null;
-    const statusParam    = typeof req.query.status     === "string" ? req.query.status     : null;
-    const sinceDaysParam = typeof req.query.since_days === "string" ? req.query.since_days : null;
+    const severityParam      = typeof req.query.severity     === "string" ? req.query.severity     : null;
+    const statusParam        = typeof req.query.status       === "string" ? req.query.status       : null;
+    const sinceDaysParam     = typeof req.query.since_days   === "string" ? req.query.since_days   : null;
+    const opportunitiesParam = typeof req.query.opportunities === "string" ? req.query.opportunities : null;
 
-    const severityValues = severityParam  ? severityParam.split(",").filter(Boolean)  : null;
-    const statusValues   = statusParam    ? statusParam.split(",").filter(Boolean)    : null;
-    const sinceDays      = sinceDaysParam ? parseInt(sinceDaysParam, 10)              : null;
+    const severityValues    = severityParam  ? severityParam.split(",").filter(Boolean)  : null;
+    const statusValues      = statusParam    ? statusParam.split(",").filter(Boolean)    : null;
+    const sinceDays         = sinceDaysParam ? parseInt(sinceDaysParam, 10)              : null;
+    const filterOpportunities = opportunitiesParam === "true";
 
     // Build WHERE conditions
     const VALID_SEVERITIES = ["low", "medium", "high", "critical"] as const;
@@ -92,6 +95,13 @@ router.get("/", async (req, res) => {
     if (sinceDays != null && !isNaN(sinceDays) && sinceDays > 0) {
       const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
       conditions.push(gte(reportsTable.createdAt, since));
+    }
+    if (filterOpportunities) {
+      // Only include reports whose exclusion_opportunities JSONB array is non-empty.
+      // COALESCE handles legacy NULL rows (treat them as an empty array → length 0).
+      conditions.push(
+        sql`jsonb_array_length(COALESCE(${reportsTable.exclusionOpportunities}, '[]'::jsonb)) > 0`,
+      );
     }
 
     const rows = await db
