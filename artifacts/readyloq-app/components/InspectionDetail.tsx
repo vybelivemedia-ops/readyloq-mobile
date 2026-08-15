@@ -13,7 +13,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
@@ -609,7 +609,8 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
               </Reanimated.View>
             </GestureDetector>
 
-            {/* Save / Copy button row */}
+            {/* Save / Copy button row — KeyboardAvoidingView keeps buttons above the soft keyboard */}
+            <KeyboardAvoidingView behavior={Platform.OS === "android" ? "padding" : "position"}>
             <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, paddingVertical: 14, paddingBottom: 32, backgroundColor: "rgba(0,0,0,0.9)" }}>
               <TouchableOpacity
                 onPress={handleSaveViewerImage}
@@ -642,6 +643,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                 </Text>
               </TouchableOpacity>
             </View>
+            </KeyboardAvoidingView>
           </View>
         </Modal>
 
