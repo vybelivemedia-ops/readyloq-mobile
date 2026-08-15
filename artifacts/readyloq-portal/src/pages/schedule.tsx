@@ -1,12 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   format, startOfWeek, endOfWeek, addWeeks, subWeeks,
   eachDayOfInterval, isSameDay, parseISO, isValid,
 } from 'date-fns';
 import {
   ChevronLeft, ChevronRight, CalendarDays, Users, AlertCircle,
-  CheckCircle2, Clock, MapPin, X, RefreshCw, Calendar, Plus,
+  CheckCircle2, Clock, MapPin, X, RefreshCw, Calendar, Plus, GripVertical,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useSchedule, useReassignInspection, useCreateInspection,
   type ScheduleEntry,
@@ -386,15 +387,33 @@ function NewInspectionSheet({
 
 // ─── Inspection card ───────────────────────────────────────────────────────────
 
-function InspectionCard({ entry, onClick }: { entry: ScheduleEntry; onClick: () => void }) {
+function InspectionCard({
+  entry,
+  onClick,
+  onDragStart,
+  onDragEnd,
+  isDragging,
+}: {
+  entry: ScheduleEntry;
+  onClick: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
+  isDragging: boolean;
+}) {
   const m = statusMeta(entry.status, entry.calendarDate);
   const Icon = m.icon;
   return (
-    <button
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       onClick={onClick}
-      className={`w-full text-left p-2 rounded-md border mb-1 last:mb-0 transition-colors hover:opacity-80 cursor-pointer ${m.bg}`}
+      className={`w-full text-left p-2 rounded-md border mb-1 last:mb-0 transition-all cursor-grab active:cursor-grabbing select-none ${m.bg} ${
+        isDragging ? 'opacity-40 scale-95' : 'hover:opacity-80'
+      }`}
     >
       <div className={`flex items-center gap-1.5 mb-0.5 ${m.color}`}>
+        <GripVertical className="w-3 h-3 shrink-0 opacity-40" />
         <Icon className="w-3 h-3 shrink-0" />
         <span className="text-xs font-semibold truncate">{m.label}</span>
       </div>
@@ -404,7 +423,7 @@ function InspectionCard({ entry, onClick }: { entry: ScheduleEntry; onClick: () 
       {entry.clientName && (
         <p className="text-[10px] text-muted-foreground truncate">{entry.clientName}</p>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -419,12 +438,18 @@ export function Schedule() {
   const [bookOpen, setBookOpen] = useState(false);
   const [bookPreset, setBookPreset] = useState<{ date: string; tech: string } | null>(null);
 
+  // Drag-and-drop state
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null);
+  const dragOverRef = useRef<string | null>(null); // sync ref to avoid stale closure in drop handler
+
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   const { data: entries = [], isLoading, error } = useSchedule(toYMD(weekStart), toYMD(weekEnd));
   const { data: members = [] } = useCompanyMembers();
   const reassign = useReassignInspection();
+  const qc = useQueryClient();
 
   // Unique technician names from this week's data
   const technicians = useMemo(() => {
@@ -503,6 +528,70 @@ export function Schedule() {
       },
       { onSuccess: () => setSelected(null) },
     );
+  }
+
+  // ── Drag-and-drop handlers ────────────────────────────────────────────────
+
+  function handleCardDragStart(e: React.DragEvent, entry: ScheduleEntry) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(entry.id));
+    setDraggingId(entry.id);
+  }
+
+  function handleDayDragOver(e: React.DragEvent, dayKey: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverRef.current !== dayKey) {
+      dragOverRef.current = dayKey;
+      setDragOverDay(dayKey);
+    }
+  }
+
+  function handleDayDragLeave(e: React.DragEvent) {
+    // Only clear when leaving the cell entirely (not moving into a child)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      dragOverRef.current = null;
+      setDragOverDay(null);
+    }
+  }
+
+  function handleDayDrop(e: React.DragEvent, dayKey: string) {
+    e.preventDefault();
+    const id = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    setDraggingId(null);
+    setDragOverDay(null);
+    dragOverRef.current = null;
+
+    if (!id || isNaN(id)) return;
+    const entry = entries.find((en) => en.id === id);
+    if (!entry || entry.calendarDate === dayKey) return;
+
+    // Optimistic update: move card to new day in cache
+    const queryKey = ['schedule', toYMD(weekStart), toYMD(weekEnd)];
+    const previous = qc.getQueryData<ScheduleEntry[]>(queryKey);
+    qc.setQueryData<ScheduleEntry[]>(queryKey, (old) =>
+      old?.map((en) =>
+        en.id === id
+          ? { ...en, calendarDate: dayKey, scheduledDate: `${dayKey}T00:00:00.000Z` }
+          : en,
+      ),
+    );
+
+    reassign.mutate(
+      { id, payload: { scheduledDate: `${dayKey}T00:00:00.000Z` } },
+      {
+        onError: () => {
+          // Revert optimistic update on failure
+          if (previous) qc.setQueryData(queryKey, previous);
+        },
+      },
+    );
+  }
+
+  function handleDragEnd() {
+    setDraggingId(null);
+    setDragOverDay(null);
+    dragOverRef.current = null;
   }
 
   const today = toYMD(new Date());
@@ -665,26 +754,43 @@ export function Schedule() {
                     const dayKey = toYMD(day);
                     const cellEntries = grid.get(tech)?.get(dayKey) ?? [];
                     const isToday = dayKey === today;
+                    const isDropTarget = dragOverDay === dayKey && draggingId !== null;
+                    const isEmpty = cellEntries.length === 0;
                     return (
                       <div
                         key={dayKey}
                         onClick={() => {
-                          if (cellEntries.length === 0) handleOpenBook(dayKey, tech);
+                          if (isEmpty && draggingId === null) handleOpenBook(dayKey, tech);
                         }}
+                        onDragOver={(e) => handleDayDragOver(e, dayKey)}
+                        onDragLeave={handleDayDragLeave}
+                        onDrop={(e) => handleDayDrop(e, dayKey)}
                         className={`px-2 py-2 border-r border-border last:border-r-0 min-h-[80px] transition-colors ${
                           isToday ? 'bg-primary/5' : ''
-                        } ${cellEntries.length === 0 ? 'cursor-pointer hover:bg-primary/5 group' : ''}`}
+                        } ${isEmpty && draggingId === null ? 'cursor-pointer hover:bg-primary/5 group' : ''} ${
+                          isDropTarget
+                            ? 'ring-2 ring-inset ring-primary/60 bg-primary/10'
+                            : ''
+                        }`}
                       >
-                        {cellEntries.length === 0 && (
+                        {isEmpty && draggingId === null && (
                           <div className="hidden group-hover:flex items-center justify-center h-full min-h-[64px] opacity-40">
                             <Plus className="w-4 h-4 text-primary" />
+                          </div>
+                        )}
+                        {isEmpty && isDropTarget && (
+                          <div className="flex items-center justify-center h-full min-h-[64px] opacity-60">
+                            <Plus className="w-5 h-5 text-primary" />
                           </div>
                         )}
                         {cellEntries.map((entry) => (
                           <InspectionCard
                             key={entry.id}
                             entry={entry}
-                            onClick={() => setSelected(entry)}
+                            onClick={() => { if (draggingId === null) setSelected(entry); }}
+                            onDragStart={(e) => handleCardDragStart(e, entry)}
+                            onDragEnd={handleDragEnd}
+                            isDragging={draggingId === entry.id}
                           />
                         ))}
                       </div>
