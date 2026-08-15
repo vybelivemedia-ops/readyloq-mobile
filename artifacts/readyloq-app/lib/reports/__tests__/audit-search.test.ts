@@ -364,3 +364,111 @@ describe("KPI deep-link — back navigation and return behaviour", () => {
     expect(next.searchQuery).toBe("");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. Bad deep-link filter param — normalizeFilterParam fallback behaviour
+//
+//  Task spec scenarios:
+//    a) /reports-detail?filter=PENDING  (uppercase)   → All tab (not a crash)
+//    b) /reports-detail?filter=pending  (lowercase)   → Pending tab
+//    c) /reports-detail                (no param)     → All tab
+//    d) /reports-detail?filter=foo      (arbitrary)   → All tab
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("bad deep-link filter param — normalizeFilterParam falls back to 'all'", () => {
+  // ── a) Uppercase value is not a valid AuditFilter ─────────────────────────
+  it("treats 'PENDING' (uppercase) as unrecognised and returns 'all'", () => {
+    expect(normalizeFilterParam("PENDING")).toBe("all");
+  });
+
+  it("treats 'CRITICAL' (uppercase) as unrecognised and returns 'all'", () => {
+    expect(normalizeFilterParam("CRITICAL")).toBe("all");
+  });
+
+  it("treats 'Pipeline' (mixed-case) as unrecognised and returns 'all'", () => {
+    expect(normalizeFilterParam("Pipeline")).toBe("all");
+  });
+
+  // ── b) Lowercase valid value maps to the expected tab ─────────────────────
+  it("maps 'pending' (lowercase) to the pending tab", () => {
+    expect(normalizeFilterParam("pending")).toBe("pending");
+  });
+
+  it("maps 'critical' (lowercase) to the critical tab", () => {
+    expect(normalizeFilterParam("critical")).toBe("critical");
+  });
+
+  it("maps 'pipeline' (lowercase) to the pipeline tab", () => {
+    expect(normalizeFilterParam("pipeline")).toBe("pipeline");
+  });
+
+  it("maps 'all' (lowercase) to the all tab", () => {
+    expect(normalizeFilterParam("all")).toBe("all");
+  });
+
+  // ── c) Missing param defaults to 'all' ───────────────────────────────────
+  it("returns 'all' when the param is undefined (no ?filter= in the URL)", () => {
+    expect(normalizeFilterParam(undefined)).toBe("all");
+  });
+
+  it("returns 'all' when the param is an empty string", () => {
+    expect(normalizeFilterParam("")).toBe("all");
+  });
+
+  // ── d) Arbitrary garbage values default to 'all' ─────────────────────────
+  it("returns 'all' for an arbitrary unknown string 'foo'", () => {
+    expect(normalizeFilterParam("foo")).toBe("all");
+  });
+
+  it("returns 'all' for a numeric-looking string '123'", () => {
+    expect(normalizeFilterParam("123")).toBe("all");
+  });
+
+  it("returns 'all' for a SQL-injection-style string", () => {
+    expect(normalizeFilterParam("' OR 1=1 --")).toBe("all");
+  });
+
+  // ── Array params (expo-router passes string[] for repeated query keys) ────
+  it("picks the first element of an array param when it is a valid filter", () => {
+    expect(normalizeFilterParam(["pending", "critical"])).toBe("pending");
+  });
+
+  it("returns 'all' when the first element of an array param is uppercase", () => {
+    expect(normalizeFilterParam(["PENDING"])).toBe("all");
+  });
+
+  it("returns 'all' when the array is empty", () => {
+    // Array.isArray([]) is true; [0] is undefined → falls back to 'all'.
+    expect(normalizeFilterParam([])).toBe("all");
+  });
+});
+
+// ─── applyFilterParamChange equivalents for the bad-link scenarios ───────────
+
+describe("bad deep-link filter param — applyFilterParamChange falls back to 'all'", () => {
+  const initial: AuditScreenState = { activeTab: "pipeline", searchQuery: "existing query" };
+
+  it("resets to 'all' and clears search when filter=PENDING (uppercase) arrives", () => {
+    const next = applyFilterParamChange(initial, "PENDING");
+    expect(next.activeTab).toBe("all");
+    expect(next.searchQuery).toBe("");
+  });
+
+  it("switches to 'pending' and clears search when filter=pending (lowercase) arrives", () => {
+    const next = applyFilterParamChange(initial, "pending");
+    expect(next.activeTab).toBe("pending");
+    expect(next.searchQuery).toBe("");
+  });
+
+  it("resets to 'all' and clears search when no filter param is present", () => {
+    const next = applyFilterParamChange(initial, undefined);
+    expect(next.activeTab).toBe("all");
+    expect(next.searchQuery).toBe("");
+  });
+
+  it("resets to 'all' for an arbitrary garbage value 'foo'", () => {
+    const next = applyFilterParamChange(initial, "foo");
+    expect(next.activeTab).toBe("all");
+    expect(next.searchQuery).toBe("");
+  });
+});
