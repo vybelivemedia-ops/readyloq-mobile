@@ -2148,6 +2148,9 @@ export default function NewInspectionScreen() {
                     analyzing={wsAnalyzing}
                     photosCount={photos.length}
                     onZoomSuggestion={handleCopilotZoom}
+                    isBleConnected={bleGlasses.isBleConnected}
+                    bleFrameCount={bleGlasses.frameCount}
+                    glassesSessionActive={bleGlasses.isBleConnected || glassesSession.isActive}
                   />
                   <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 8 }}>
                     <Pressable
@@ -2520,6 +2523,9 @@ export default function NewInspectionScreen() {
                 analyzing={wsAnalyzing}
                 photosCount={photos.length}
                 onZoomSuggestion={handleCopilotZoom}
+                isBleConnected={bleGlasses.isBleConnected}
+                bleFrameCount={bleGlasses.frameCount}
+                glassesSessionActive={bleGlasses.isBleConnected || glassesSession.isActive}
               />
               <View style={{ borderTopWidth: 1, borderTopColor: colors.border + "55", paddingVertical: 6 }}>
                 <Pressable

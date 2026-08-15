@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { getBleBadgeStyle } from "@/lib/ble/badge-display";
 
 // ─── Ghost prompt definitions ────────────────────────────────────────────────
 
@@ -232,6 +233,18 @@ export interface CoPilotHUDProps {
   photosCount: number;
   /** Called whenever Co-Pilot wants to change the camera zoom level (0–1). */
   onZoomSuggestion?: (zoom: number) => void;
+  /** True when the smart glasses are BLE-connected to this device directly. */
+  isBleConnected?: boolean;
+  /** Total BLE frames received from the glasses in this session. */
+  bleFrameCount?: number;
+  /**
+   * True when glasses are in use — either BLE-connected directly to this
+   * device OR a cloud-relay session is active. When false the badge is omitted.
+   * Pass `bleGlasses.isBleConnected || glassesSession.isActive` from the
+   * inspection screen so BLE-only devices (cloud registration unavailable)
+   * still show the badge.
+   */
+  glassesSessionActive?: boolean;
 }
 
 export function CoPilotHUD({
@@ -240,6 +253,9 @@ export function CoPilotHUD({
   analyzing,
   photosCount,
   onZoomSuggestion,
+  isBleConnected = false,
+  bleFrameCount = 0,
+  glassesSessionActive = false,
 }: CoPilotHUDProps) {
   const colors = useColors();
 
@@ -581,6 +597,47 @@ export function CoPilotHUD({
         >
           {propertyType}
         </Text>
+
+        {/* BLE / Cloud connection badge — omitted when no glasses session is active */}
+        {glassesSessionActive && (() => {
+          const badge = getBleBadgeStyle(isBleConnected);
+          return (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                paddingHorizontal: 7,
+                paddingVertical: 3,
+                borderRadius: 10,
+                backgroundColor: badge.bgColor,
+                borderWidth: 1,
+                borderColor: badge.borderColor,
+              }}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: badge.dotColor,
+                }}
+              />
+              <Text
+                style={{
+                  color: badge.textColor,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 10,
+                  letterSpacing: 0.3,
+                }}
+              >
+                {badge.label}
+                {isBleConnected && bleFrameCount > 0 ? ` · ${bleFrameCount}` : ""}
+              </Text>
+            </View>
+          );
+        })()}
+
         <Pressable
           onPress={() => {
             if (!muted) Speech.stop();
