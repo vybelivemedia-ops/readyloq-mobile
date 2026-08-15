@@ -381,10 +381,19 @@ router.patch("/me/push-notifications", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "enabled must be a boolean" });
   }
   try {
-    await db
-      .update(usersTable)
-      .set({ pushNotificationsEnabled: enabled })
-      .where(eq(usersTable.id, user.id));
+    // When re-enabling, also clear the delivery-failure flag so the dashboard
+    // banner hides immediately without requiring a separate token re-registration.
+    if (enabled) {
+      await db
+        .update(usersTable)
+        .set({ pushNotificationsEnabled: true, pushLastFailedAt: null })
+        .where(eq(usersTable.id, user.id));
+    } else {
+      await db
+        .update(usersTable)
+        .set({ pushNotificationsEnabled: false })
+        .where(eq(usersTable.id, user.id));
+    }
     return res.json({ success: true, pushNotificationsEnabled: enabled });
   } catch {
     return res.status(500).json({ error: "Failed to update push notification preference" });
