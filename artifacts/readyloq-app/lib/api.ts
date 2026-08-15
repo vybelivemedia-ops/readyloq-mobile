@@ -91,6 +91,11 @@ export interface CurrentUser {
    * re-registers their push token.
    */
   pushLastFailedAt: string | null;
+  /**
+   * True when the owner has opted out of the daily briefing email.
+   * Always true for property_manager (they have no staff row).
+   */
+  briefingEmailOptOut: boolean;
 }
 
 export interface AdminUser {
@@ -658,6 +663,18 @@ export function setPushNotificationsEnabled(token: string | null, enabled: boole
     {
       method: "PATCH",
       body: JSON.stringify({ enabled }),
+    },
+  );
+}
+
+/** Toggle the daily briefing email opt-out preference on the server. */
+export function setBriefingEmailOptOut(token: string | null, optOut: boolean) {
+  return request<{ success: boolean; briefingEmailOptOut: boolean }>(
+    "/api/auth/me/briefing-email",
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ optOut }),
     },
   );
 }

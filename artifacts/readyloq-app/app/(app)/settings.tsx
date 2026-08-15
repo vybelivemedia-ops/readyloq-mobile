@@ -38,6 +38,7 @@ import {
   deleteIntegrationConfig,
   testIntegrationCredentials,
   setPushNotificationsEnabled,
+  setBriefingEmailOptOut,
   type FieldIntegrationSystem,
   type IntegrationConfigResponse,
   type IntegrationProbeResult,
@@ -816,6 +817,29 @@ export default function SettingsScreen() {
     }
   };
 
+  // ── Daily briefing email toggle (owner only) ──────────────────────────────────
+  const [briefingOptOut, setBriefingOptOut] = React.useState<boolean>(
+    user?.briefingEmailOptOut ?? false,
+  );
+  const [briefingToggling, setBriefingToggling] = React.useState(false);
+
+  const handleBriefingEmailToggle = async (receiveEmail: boolean) => {
+    if (briefingToggling) return;
+    const optOut = !receiveEmail;
+    setBriefingOptOut(optOut);
+    setBriefingToggling(true);
+    try {
+      const token = await getToken();
+      await setBriefingEmailOptOut(token, optOut);
+    } catch {
+      // Revert optimistic update on failure
+      setBriefingOptOut(!optOut);
+      Alert.alert("Error", "Failed to update briefing email preference.");
+    } finally {
+      setBriefingToggling(false);
+    }
+  };
+
   return (
     <Screen>
       {/* Header */}
@@ -897,12 +921,26 @@ export default function SettingsScreen() {
                 icon="notifications-outline"
                 label="Critical Risk Alerts"
                 sublabel="Push notification when an inspection scores critical risk"
-                isLast
                 right={
                   <Switch
                     value={pushEnabled}
                     onValueChange={(v) => void handlePushToggle(v)}
                     disabled={pushToggling}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor="#ffffff"
+                  />
+                }
+              />
+              <SettingRow
+                icon="mail-outline"
+                label="Daily Briefing Email"
+                sublabel="Morning summary of yesterday's inspections and risk alerts"
+                isLast
+                right={
+                  <Switch
+                    value={!briefingOptOut}
+                    onValueChange={(v) => void handleBriefingEmailToggle(v)}
+                    disabled={briefingToggling}
                     trackColor={{ false: colors.border, true: colors.primary }}
                     thumbColor="#ffffff"
                   />
