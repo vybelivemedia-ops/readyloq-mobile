@@ -31,6 +31,9 @@ export function IndexRedirect() {
       case 'technician':
         setLocation('/inspections');
         break;
+      case 'property_manager':
+        setLocation('/client');
+        break;
       default:
         setLocation('/dashboard');
     }

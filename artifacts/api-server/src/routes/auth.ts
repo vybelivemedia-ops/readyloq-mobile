@@ -6,12 +6,14 @@ import {
   companiesTable,
   companyInvitesTable,
   brandingProfilesTable,
+  clientPortalAccessTable,
   READYLOQ_DEFAULT_PROFILE,
   type CompanyInvite,
   type UserRole,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
-import { requireAuth, requireRole, requireCompany, requireSuperAdmin } from "../middleware/require-auth";
+import { getAuth } from "@clerk/express";
+import { requireAuth, requireClerkAuth, requireRole, requireCompany, requireSuperAdmin } from "../middleware/require-auth";
 
 const router: IRouter = Router();
 
@@ -59,32 +61,115 @@ function serializeInvite(row: CompanyInvite) {
 }
 
 // ── GET /me ───────────────────────────────────────────────────────────────────
-router.get("/me", requireAuth, async (req, res) => {
-  const user = req.user!;
+// Uses requireClerkAuth (not requireAuth) to avoid auto-provisioning a
+// usersTable row for property managers who are authenticated via Clerk but
+// are external clients, not internal staff.
+//
+// Resolution order:
+//   1. If the Clerk user already has a usersTable row → return staff identity
+//      (this covers the happy-path for owner/manager/sales/technician).
+//   2. If not in usersTable AND found in clientPortalAccessTable → return a
+//      property_manager identity (no usersTable row created).
+//   3. If in neither table → auto-provision as technician (new staff onboarding).
+router.get("/me", requireClerkAuth, async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
   try {
-    let company = null;
-    if (user.companyId != null) {
-      const [row] = await db
-        .select()
-        .from(companiesTable)
-        .where(eq(companiesTable.id, user.companyId));
-      if (row) company = { id: row.id, name: row.name, slug: row.slug };
+    // Case 1: existing internal staff user.
+    if (req.user) {
+      const user = req.user;
+      let company = null;
+      if (user.companyId != null) {
+        const [row] = await db
+          .select()
+          .from(companiesTable)
+          .where(eq(companiesTable.id, user.companyId));
+        if (row) company = { id: row.id, name: row.name, slug: row.slug };
+      }
+      const effectiveRole = (user.roleOverride ?? user.role) as string;
+      // Throttled "last seen" refresh (fire-and-forget).
+      const last = user.lastSeenAt ? user.lastSeenAt.getTime() : 0;
+      if (Date.now() - last > 5 * 60 * 1000) {
+        void db
+          .update(usersTable)
+          .set({ lastSeenAt: new Date() })
+          .where(eq(usersTable.id, user.id))
+          .catch(() => {});
+      }
+      return res.json({
+        id: user.id,
+        clerkUserId: user.clerkUserId,
+        role: user.role,
+        effectiveRole,
+        roleOverride: user.roleOverride ?? null,
+        isSuperAdmin: user.isSuperAdmin,
+        companyId: user.companyId,
+        betaAccess: user.betaAccess,
+        company,
+        pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
+        hasPushToken: user.pushToken != null,
+        pushLastFailedAt: user.pushLastFailedAt?.toISOString() ?? null,
+        briefingEmailOptOut: user.briefingEmailOptOut ?? false,
+      });
     }
-    const effectiveRole = (user.roleOverride ?? user.role) as string;
+
+    // Case 2: not in usersTable — check clientPortalAccessTable before
+    // provisioning, so external property managers never get a phantom staff row.
+    const [clientAccess] = await db
+      .select()
+      .from(clientPortalAccessTable)
+      .where(eq(clientPortalAccessTable.clerkUserId, userId));
+
+    if (clientAccess) {
+      const [clientCompany] = await db
+        .select({ id: companiesTable.id, name: companiesTable.name, slug: companiesTable.slug })
+        .from(companiesTable)
+        .where(eq(companiesTable.id, clientAccess.companyId));
+
+      return res.json({
+        id: null,
+        clerkUserId: userId,
+        role: "property_manager",
+        effectiveRole: "property_manager",
+        roleOverride: null,
+        isSuperAdmin: false,
+        companyId: clientAccess.companyId,
+        betaAccess: false,
+        company: clientCompany ?? null,
+        pushNotificationsEnabled: false,
+        hasPushToken: false,
+        pushLastFailedAt: null,
+        briefingEmailOptOut: true,
+        clientAccess: {
+          id: clientAccess.id,
+          label: clientAccess.label ?? null,
+          siteAddresses: clientAccess.siteAddresses,
+        },
+      });
+    }
+
+    // Case 3: brand-new staff member — provision a technician row (normal
+    // onboarding; they'll be assigned to a company via an invite link).
+    const [newUser] = await db
+      .insert(usersTable)
+      .values({ clerkUserId: userId, role: "technician" })
+      .returning();
+
     return res.json({
-      id: user.id,
-      clerkUserId: user.clerkUserId,
-      role: user.role,
-      effectiveRole,
-      roleOverride: user.roleOverride ?? null,
-      isSuperAdmin: user.isSuperAdmin,
-      companyId: user.companyId,
-      betaAccess: user.betaAccess,
-      company,
-      pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
-      hasPushToken: user.pushToken != null,
-      pushLastFailedAt: user.pushLastFailedAt?.toISOString() ?? null,
-      briefingEmailOptOut: user.briefingEmailOptOut ?? false,
+      id: newUser.id,
+      clerkUserId: newUser.clerkUserId,
+      role: newUser.role,
+      effectiveRole: newUser.role,
+      roleOverride: null,
+      isSuperAdmin: false,
+      companyId: null,
+      betaAccess: newUser.betaAccess,
+      company: null,
+      pushNotificationsEnabled: true,
+      hasPushToken: false,
+      pushLastFailedAt: null,
+      briefingEmailOptOut: false,
     });
   } catch {
     return res.status(500).json({ error: "Failed to load user" });

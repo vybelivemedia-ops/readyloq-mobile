@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express41 = __toESM(require_express2(), 1);
+var import_express42 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express39 = __toESM(require_express2(), 1);
+var import_express40 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -77159,29 +77159,78 @@ function serializeInvite(row) {
     createdAt: row.createdAt.toISOString()
   };
 }
-router2.get("/me", requireAuth, async (req, res) => {
-  const user = req.user;
+router2.get("/me", requireClerkAuth, async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
   try {
-    let company = null;
-    if (user.companyId != null) {
-      const [row] = await db.select().from(companiesTable).where(eq(companiesTable.id, user.companyId));
-      if (row) company = { id: row.id, name: row.name, slug: row.slug };
+    if (req.user) {
+      const user = req.user;
+      let company = null;
+      if (user.companyId != null) {
+        const [row] = await db.select().from(companiesTable).where(eq(companiesTable.id, user.companyId));
+        if (row) company = { id: row.id, name: row.name, slug: row.slug };
+      }
+      const effectiveRole2 = user.roleOverride ?? user.role;
+      const last = user.lastSeenAt ? user.lastSeenAt.getTime() : 0;
+      if (Date.now() - last > 5 * 60 * 1e3) {
+        void db.update(usersTable).set({ lastSeenAt: /* @__PURE__ */ new Date() }).where(eq(usersTable.id, user.id)).catch(() => {
+        });
+      }
+      return res.json({
+        id: user.id,
+        clerkUserId: user.clerkUserId,
+        role: user.role,
+        effectiveRole: effectiveRole2,
+        roleOverride: user.roleOverride ?? null,
+        isSuperAdmin: user.isSuperAdmin,
+        companyId: user.companyId,
+        betaAccess: user.betaAccess,
+        company,
+        pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
+        hasPushToken: user.pushToken != null,
+        pushLastFailedAt: user.pushLastFailedAt?.toISOString() ?? null,
+        briefingEmailOptOut: user.briefingEmailOptOut ?? false
+      });
     }
-    const effectiveRole2 = user.roleOverride ?? user.role;
+    const [clientAccess] = await db.select().from(clientPortalAccessTable).where(eq(clientPortalAccessTable.clerkUserId, userId));
+    if (clientAccess) {
+      const [clientCompany] = await db.select({ id: companiesTable.id, name: companiesTable.name, slug: companiesTable.slug }).from(companiesTable).where(eq(companiesTable.id, clientAccess.companyId));
+      return res.json({
+        id: null,
+        clerkUserId: userId,
+        role: "property_manager",
+        effectiveRole: "property_manager",
+        roleOverride: null,
+        isSuperAdmin: false,
+        companyId: clientAccess.companyId,
+        betaAccess: false,
+        company: clientCompany ?? null,
+        pushNotificationsEnabled: false,
+        hasPushToken: false,
+        pushLastFailedAt: null,
+        briefingEmailOptOut: true,
+        clientAccess: {
+          id: clientAccess.id,
+          label: clientAccess.label ?? null,
+          siteAddresses: clientAccess.siteAddresses
+        }
+      });
+    }
+    const [newUser] = await db.insert(usersTable).values({ clerkUserId: userId, role: "technician" }).returning();
     return res.json({
-      id: user.id,
-      clerkUserId: user.clerkUserId,
-      role: user.role,
-      effectiveRole: effectiveRole2,
-      roleOverride: user.roleOverride ?? null,
-      isSuperAdmin: user.isSuperAdmin,
-      companyId: user.companyId,
-      betaAccess: user.betaAccess,
-      company,
-      pushNotificationsEnabled: user.pushNotificationsEnabled ?? true,
-      hasPushToken: user.pushToken != null,
-      pushLastFailedAt: user.pushLastFailedAt?.toISOString() ?? null,
-      briefingEmailOptOut: user.briefingEmailOptOut ?? false
+      id: newUser.id,
+      clerkUserId: newUser.clerkUserId,
+      role: newUser.role,
+      effectiveRole: newUser.role,
+      roleOverride: null,
+      isSuperAdmin: false,
+      companyId: null,
+      betaAccess: newUser.betaAccess,
+      company: null,
+      pushNotificationsEnabled: true,
+      hasPushToken: false,
+      pushLastFailedAt: null,
+      briefingEmailOptOut: false
     });
   } catch {
     return res.status(500).json({ error: "Failed to load user" });
@@ -77388,7 +77437,7 @@ router2.post("/accept-invite", requireAuth, async (req, res) => {
 var auth_default = router2;
 
 // src/routes/inspections.ts
-var import_express5 = __toESM(require_express2(), 1);
+var import_express6 = __toESM(require_express2(), 1);
 
 // src/lib/tenant.ts
 function getCompanyId(req) {
@@ -88177,7 +88226,7 @@ function computeCoverage(input) {
 }
 
 // src/routes/analysis.ts
-var import_express4 = __toESM(require_express2(), 1);
+var import_express5 = __toESM(require_express2(), 1);
 
 // src/lib/objectStorage.ts
 import { Storage } from "@google-cloud/storage";
@@ -89421,7 +89470,7 @@ function validateFindings(raw, context) {
   return [valid, invalidCount];
 }
 var objectStorageService = new ObjectStorageService();
-var router3 = (0, import_express4.Router)();
+var router3 = (0, import_express5.Router)();
 async function cropPhonePhotos(companyId, candidates) {
   for (const { storagePath, confidence, species } of candidates) {
     try {
@@ -90458,7 +90507,7 @@ async function runInspectionFinalization(input) {
 }
 
 // src/routes/inspections.ts
-var router4 = (0, import_express5.Router)();
+var router4 = (0, import_express6.Router)();
 router4.get("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
@@ -90817,8 +90866,8 @@ router4.post("/:id/media", async (req, res) => {
 var inspections_default = router4;
 
 // src/routes/dataset.ts
-var import_express6 = __toESM(require_express2(), 1);
-var router5 = (0, import_express6.Router)();
+var import_express7 = __toESM(require_express2(), 1);
+var router5 = (0, import_express7.Router)();
 var CATEGORY_LABELS = {
   pest_activity: "Pest Activity",
   exclusion: "Exclusion Issues",
@@ -90882,7 +90931,7 @@ router5.get("/categories", async (req, res) => {
 var dataset_default = router5;
 
 // src/routes/reports.ts
-var import_express7 = __toESM(require_express2(), 1);
+var import_express8 = __toESM(require_express2(), 1);
 
 // src/lib/report-html-server.ts
 var SEVERITY_COLOR = {
@@ -91017,7 +91066,7 @@ function buildServerReportHtml(report, inspection) {
 }
 
 // src/routes/reports.ts
-var router6 = (0, import_express7.Router)();
+var router6 = (0, import_express8.Router)();
 function safeParseFindings(raw) {
   if (!Array.isArray(raw)) return [];
   return raw.filter((item) => {
@@ -91275,8 +91324,8 @@ router6.delete("/:id", async (req, res) => {
 var reports_default = router6;
 
 // src/routes/analytics.ts
-var import_express8 = __toESM(require_express2(), 1);
-var router7 = (0, import_express8.Router)();
+var import_express9 = __toESM(require_express2(), 1);
+var router7 = (0, import_express9.Router)();
 router7.get("/dashboard", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
@@ -91480,8 +91529,8 @@ router7.get("/risk", async (req, res) => {
 var analytics_default = router7;
 
 // src/routes/intelligence.ts
-var import_express9 = __toESM(require_express2(), 1);
-var router8 = (0, import_express9.Router)();
+var import_express10 = __toESM(require_express2(), 1);
+var router8 = (0, import_express10.Router)();
 function conditionsForFinding(f) {
   const text2 = `${f.description ?? ""} ${f.treatment ?? ""}`.toLowerCase();
   const out = [];
@@ -91756,8 +91805,8 @@ router8.get("/property-risk", async (req, res) => {
 var intelligence_default = router8;
 
 // src/routes/intelligence-dataset.ts
-var import_express10 = __toESM(require_express2(), 1);
-var router9 = (0, import_express10.Router)();
+var import_express11 = __toESM(require_express2(), 1);
+var router9 = (0, import_express11.Router)();
 var TAXONOMY_LABEL = Object.fromEntries(
   INTELLIGENCE_TAXONOMY.map((g) => [g.slug, g.label])
 );
@@ -92473,8 +92522,8 @@ router9.post(
 var intelligence_dataset_default = router9;
 
 // src/routes/branding.ts
-var import_express11 = __toESM(require_express2(), 1);
-var router10 = (0, import_express11.Router)();
+var import_express12 = __toESM(require_express2(), 1);
+var router10 = (0, import_express12.Router)();
 function serialize(row) {
   return {
     ...row,
@@ -92707,8 +92756,8 @@ router10.post("/restore-defaults", async (req, res) => {
 var branding_default = router10;
 
 // src/routes/properties.ts
-var import_express12 = __toESM(require_express2(), 1);
-var router11 = (0, import_express12.Router)();
+var import_express13 = __toESM(require_express2(), 1);
+var router11 = (0, import_express13.Router)();
 var hotspotSchema = external_exports.object({
   zone: external_exports.string().min(1),
   description: external_exports.string().min(1),
@@ -93058,7 +93107,7 @@ router11.post("/:addressKey/notes", async (req, res) => {
 var properties_default = router11;
 
 // src/routes/storage.ts
-var import_express13 = __toESM(require_express2(), 1);
+var import_express14 = __toESM(require_express2(), 1);
 import { Readable as Readable4 } from "stream";
 var legacyCompanyIdCache = null;
 async function getLegacyCompanyId() {
@@ -93077,7 +93126,7 @@ var RequestUploadUrlResponse = external_exports.object({
   objectPath: external_exports.string(),
   metadata: external_exports.object({ name: external_exports.string(), size: external_exports.number().optional(), contentType: external_exports.string().optional() }).optional()
 });
-var router12 = (0, import_express13.Router)();
+var router12 = (0, import_express14.Router)();
 var objectStorageService2 = new ObjectStorageService();
 router12.post(
   "/storage/uploads/request-url",
@@ -93183,8 +93232,8 @@ router12.get(
 var storage_default = router12;
 
 // src/routes/leads.ts
-var import_express14 = __toESM(require_express2(), 1);
-var router13 = (0, import_express14.Router)();
+var import_express15 = __toESM(require_express2(), 1);
+var router13 = (0, import_express15.Router)();
 var leadsLimiter = rate_limit_default({
   windowMs: 15 * 60 * 1e3,
   max: 15,
@@ -93210,8 +93259,8 @@ router13.post("/", leadsLimiter, async (req, res) => {
 var leads_default = router13;
 
 // src/routes/beta.ts
-var import_express15 = __toESM(require_express2(), 1);
-var router14 = (0, import_express15.Router)();
+var import_express16 = __toESM(require_express2(), 1);
+var router14 = (0, import_express16.Router)();
 var CHECKLIST = [
   {
     key: "device_smoke_test",
@@ -93516,8 +93565,8 @@ router14.patch("/testers/:userId/access", requireRole("manager"), async (req, re
 var beta_default = router14;
 
 // src/routes/opportunities.ts
-var import_express16 = __toESM(require_express2(), 1);
-var router15 = (0, import_express16.Router)();
+var import_express17 = __toESM(require_express2(), 1);
+var router15 = (0, import_express17.Router)();
 function serializeOpportunity(row) {
   return {
     ...row,
@@ -93828,8 +93877,8 @@ router15.post("/:id/notes", async (req, res) => {
 var opportunities_default = router15;
 
 // src/routes/scorecards.ts
-var import_express17 = __toESM(require_express2(), 1);
-var router16 = (0, import_express17.Router)();
+var import_express18 = __toESM(require_express2(), 1);
+var router16 = (0, import_express18.Router)();
 function serialize3(row) {
   return {
     ...row,
@@ -93955,9 +94004,9 @@ router16.get("/inspection/:inspectionId", async (req, res) => {
 var scorecards_default = router16;
 
 // src/routes/customer-summaries.ts
-var import_express18 = __toESM(require_express2(), 1);
+var import_express19 = __toESM(require_express2(), 1);
 import { randomBytes as randomBytes2 } from "node:crypto";
-var router17 = (0, import_express18.Router)();
+var router17 = (0, import_express19.Router)();
 var SHARE_DEFAULT_DAYS = 30;
 var SHARE_MAX_DAYS = 90;
 function serialize4(row) {
@@ -94120,8 +94169,8 @@ router17.post("/:id/revoke", async (req, res) => {
 var customer_summaries_default = router17;
 
 // src/routes/proposals.ts
-var import_express19 = __toESM(require_express2(), 1);
-var router18 = (0, import_express19.Router)();
+var import_express20 = __toESM(require_express2(), 1);
+var router18 = (0, import_express20.Router)();
 var MAX_OPPORTUNITIES = 50;
 function serialize5(row) {
   return {
@@ -94285,7 +94334,7 @@ router18.delete("/:id", async (req, res) => {
 var proposals_default = router18;
 
 // src/routes/briefing.ts
-var import_express20 = __toESM(require_express2(), 1);
+var import_express21 = __toESM(require_express2(), 1);
 
 // src/lib/briefing.ts
 var DAY_MS = 864e5;
@@ -94295,7 +94344,7 @@ var LOW_QUALITY_SCORE_THRESHOLD = 60;
 var OPEN_OPPORTUNITY_STATUSES = ["new", "reviewed", "quoted"];
 async function buildTechnicianSection(companyId) {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
-  const [[counts], recent, siteHistoryRows] = await Promise.all([
+  const [[counts], recent, siteHistoryResult] = await Promise.all([
     db.select({
       total: sql`count(*)::int`,
       completed: sql`count(*) filter (where ${inspectionsTable.status} = 'completed')::int`,
@@ -94358,10 +94407,10 @@ async function buildTechnicianSection(companyId) {
       ...r,
       createdAt: r.createdAt.toISOString()
     })),
-    siteHistory: siteHistoryRows.map((r) => ({
+    siteHistory: siteHistoryResult.rows.map((r) => ({
       siteAddress: r.siteAddress,
       visitCount: r.visitCount,
-      lastVisitedAt: r.lastVisitedAt ? r.lastVisitedAt.toISOString() : null,
+      lastVisitedAt: r.lastVisitedAt ? new Date(r.lastVisitedAt).toISOString() : null,
       lastInspectionId: Number(r.lastInspectionId),
       lastFindingsCount: r.lastFindingsCount ?? 0,
       pestTypes: r.pestTypes ?? []
@@ -94637,7 +94686,7 @@ async function buildBriefing(role, companyId) {
 }
 
 // src/routes/briefing.ts
-var router19 = (0, import_express20.Router)();
+var router19 = (0, import_express21.Router)();
 router19.get("/", async (req, res) => {
   try {
     const user = req.user;
@@ -94652,8 +94701,8 @@ router19.get("/", async (req, res) => {
 var briefing_default = router19;
 
 // src/routes/share.ts
-var import_express21 = __toESM(require_express2(), 1);
-var router20 = (0, import_express21.Router)();
+var import_express22 = __toESM(require_express2(), 1);
+var router20 = (0, import_express22.Router)();
 var NOT_FOUND = { error: "This link is invalid or has expired" };
 router20.get("/summary/:token", async (req, res) => {
   try {
@@ -94695,8 +94744,8 @@ router20.get("/summary/:token", async (req, res) => {
 var share_default = router20;
 
 // src/routes/gemini.ts
-var import_express22 = __toESM(require_express2(), 1);
-var router21 = (0, import_express22.Router)();
+var import_express23 = __toESM(require_express2(), 1);
+var router21 = (0, import_express23.Router)();
 router21.get("/conversations", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
@@ -94854,8 +94903,8 @@ router21.post("/generate-image", async (req, res) => {
 var gemini_default = router21;
 
 // src/routes/bait-stations.ts
-var import_express23 = __toESM(require_express2(), 1);
-var router22 = (0, import_express23.Router)({ mergeParams: true });
+var import_express24 = __toESM(require_express2(), 1);
+var router22 = (0, import_express24.Router)({ mergeParams: true });
 var upsertSchema = external_exports.object({
   label: external_exports.string().min(1).max(100),
   locationType: external_exports.string().optional(),
@@ -94963,8 +95012,8 @@ router22.delete("/:stationId", async (req, res) => {
 var bait_stations_default = router22;
 
 // src/routes/products.ts
-var import_express24 = __toESM(require_express2(), 1);
-var router23 = (0, import_express24.Router)();
+var import_express25 = __toESM(require_express2(), 1);
+var router23 = (0, import_express25.Router)();
 function serializeProduct(p, lr) {
   return {
     ...p,
@@ -95030,8 +95079,8 @@ router23.get("/:id/label-rules", async (req, res) => {
 var products_default = router23;
 
 // src/routes/treatment-logs.ts
-var import_express25 = __toESM(require_express2(), 1);
-var router24 = (0, import_express25.Router)({ mergeParams: true });
+var import_express26 = __toESM(require_express2(), 1);
+var router24 = (0, import_express26.Router)({ mergeParams: true });
 var checklistItemSchema = external_exports.object({
   label: external_exports.string().min(1),
   checked: external_exports.boolean()
@@ -95203,7 +95252,7 @@ router24.get("/", async (req, res) => {
 var treatment_logs_default = router24;
 
 // src/routes/crm.ts
-var import_express26 = __toESM(require_express2(), 1);
+var import_express27 = __toESM(require_express2(), 1);
 
 // src/services/integration/adapters/fieldRoutesAdapter.ts
 var FieldRoutesAdapter = class {
@@ -95393,7 +95442,7 @@ function getEnvCRMAdapter() {
 }
 
 // src/routes/crm.ts
-var router25 = (0, import_express26.Router)();
+var router25 = (0, import_express27.Router)();
 router25.get("/clients", async (req, res) => {
   const adapter = getEnvCRMAdapter();
   if (!adapter) {
@@ -95472,8 +95521,8 @@ function extractFindings(raw) {
 var crm_default = router25;
 
 // src/routes/daily-rig.ts
-var import_express27 = __toESM(require_express2(), 1);
-var router26 = (0, import_express27.Router)();
+var import_express28 = __toESM(require_express2(), 1);
+var router26 = (0, import_express28.Router)();
 function todayUtc() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 }
@@ -95606,8 +95655,8 @@ router26.get("/recent-mixes", async (req, res) => {
 var daily_rig_default = router26;
 
 // src/routes/review-queue.ts
-var import_express28 = __toESM(require_express2(), 1);
-var router27 = (0, import_express28.Router)();
+var import_express29 = __toESM(require_express2(), 1);
+var router27 = (0, import_express29.Router)();
 var SEVERITY_RISK = {
   critical: "critical",
   high: "high",
@@ -95690,7 +95739,7 @@ router27.post("/:id", async (req, res) => {
 var review_queue_default = router27;
 
 // src/routes/meta-glasses.ts
-var import_express29 = __toESM(require_express2(), 1);
+var import_express30 = __toESM(require_express2(), 1);
 import crypto2 from "node:crypto";
 
 // ../../node_modules/openai/internal/tslib.mjs
@@ -105567,7 +105616,7 @@ function parseVoiceCommand(text2) {
   const description = parts.length > 0 ? `${text2.charAt(0).toUpperCase() + text2.slice(1)}. Detected: ${parts.join(", ")}.` : text2.charAt(0).toUpperCase() + text2.slice(1);
   return { category, species, description, severity, zone, station, confidence };
 }
-var router28 = (0, import_express29.Router)();
+var router28 = (0, import_express30.Router)();
 router28.post(
   "/session",
   requireAuth,
@@ -105777,7 +105826,7 @@ router28.get(
 var meta_glasses_default = router28;
 
 // src/routes/billing.ts
-var import_express30 = __toESM(require_express2(), 1);
+var import_express31 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/stripe@22.4.0_@types+node@25.6.2/node_modules/stripe/esm/Error.js
 var Error_exports = {};
@@ -123676,7 +123725,7 @@ var StripeService = class {
 var stripeService = new StripeService();
 
 // src/routes/billing.ts
-var router29 = (0, import_express30.Router)();
+var router29 = (0, import_express31.Router)();
 var BILLING_RETURN_URL = process.env.BILLING_RETURN_URL ?? "https://readyloq.com";
 var ownerOnly = [requireAuth, requireCompany, requireRole("owner")];
 var memberAuth = [requireAuth, requireCompany];
@@ -123819,9 +123868,9 @@ router29.post("/portal", ...ownerOnly, async (req, res) => {
 var billing_default = router29;
 
 // src/routes/admin.ts
-var import_express31 = __toESM(require_express2(), 1);
+var import_express32 = __toESM(require_express2(), 1);
 import { createHmac as createHmac2, timingSafeEqual as timingSafeEqual2 } from "crypto";
-var router30 = (0, import_express31.Router)();
+var router30 = (0, import_express32.Router)();
 var VALID_ROLES = ["owner", "manager", "sales", "technician"];
 var ADMIN_TOKEN_TTL_MS = 8 * 60 * 60 * 1e3;
 function signAdminToken() {
@@ -123963,8 +124012,8 @@ router30.post("/resynthesize-opportunities", async (req, res) => {
 var admin_default = router30;
 
 // src/routes/transcribe.ts
-var import_express32 = __toESM(require_express2(), 1);
-var router31 = (0, import_express32.Router)();
+var import_express33 = __toESM(require_express2(), 1);
+var router31 = (0, import_express33.Router)();
 router31.post("/transcribe", requireAuth, async (req, res) => {
   const { audio, mimeType } = req.body;
   if (!audio || typeof audio !== "string") {
@@ -123990,7 +124039,7 @@ router31.post("/transcribe", requireAuth, async (req, res) => {
 var transcribe_default = router31;
 
 // src/routes/integrations.ts
-var import_express33 = __toESM(require_express2(), 1);
+var import_express34 = __toESM(require_express2(), 1);
 
 // src/lib/retry.ts
 function sleep5(ms) {
@@ -124196,7 +124245,7 @@ async function syncInspectionToExternalSystem(payload) {
 
 // src/routes/integrations.ts
 var SYNC_COOLDOWN_SECONDS = 60;
-var router32 = (0, import_express33.Router)();
+var router32 = (0, import_express34.Router)();
 var configInputSchema = external_exports.object({
   systemType: external_exports.enum(["pestpac", "fieldroutes"]),
   accountId: external_exports.string().min(1),
@@ -124467,7 +124516,7 @@ router32.get("/sync-history", requireRole("owner"), async (req, res) => {
 var integrations_default = router32;
 
 // src/routes/playbooks.ts
-var import_express34 = __toESM(require_express2(), 1);
+var import_express35 = __toESM(require_express2(), 1);
 
 // src/lib/playbook-compliance.ts
 function evaluatePlaybookCompliance(findings, productNames, playbooks) {
@@ -124530,7 +124579,7 @@ var playbookInputSchema = external_exports.object({
   notes: external_exports.string().max(2e3).nullish(),
   isActive: external_exports.boolean().default(true)
 });
-var router33 = (0, import_express34.Router)();
+var router33 = (0, import_express35.Router)();
 router33.get("/active", async (req, res) => {
   const companyId = req.user.companyId;
   try {
@@ -124648,7 +124697,7 @@ router33.delete("/:id", requireRole("owner"), async (req, res) => {
 var playbooks_default = router33;
 
 // src/routes/executive.ts
-var import_express35 = __toESM(require_express2(), 1);
+var import_express36 = __toESM(require_express2(), 1);
 
 // src/services/briefing.ts
 async function generateDailyExecutiveBriefing(companyId, targetDate) {
@@ -124707,7 +124756,7 @@ async function generateDailyExecutiveBriefing(companyId, targetDate) {
 }
 
 // src/routes/executive.ts
-var router34 = (0, import_express35.Router)();
+var router34 = (0, import_express36.Router)();
 function escapeHtml(raw) {
   return raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -125383,8 +125432,8 @@ router34.get(
 var executive_default = router34;
 
 // src/routes/schedule.ts
-var import_express36 = __toESM(require_express2(), 1);
-var router35 = (0, import_express36.Router)();
+var import_express37 = __toESM(require_express2(), 1);
+var router35 = (0, import_express37.Router)();
 function toISODate(d) {
   return d.toISOString().slice(0, 10);
 }
@@ -125481,8 +125530,8 @@ router35.patch("/:id", async (req, res) => {
 var schedule_default = router35;
 
 // src/routes/client-portal.ts
-var import_express37 = __toESM(require_express2(), 1);
-var router36 = (0, import_express37.Router)();
+var import_express38 = __toESM(require_express2(), 1);
+var router36 = (0, import_express38.Router)();
 async function getClientAccess(req) {
   const { userId } = getAuth(req);
   if (!userId) return null;
@@ -125754,7 +125803,7 @@ router36.delete("/invites/:id", requireCompany, requireRole("manager"), async (r
 var client_portal_default = router36;
 
 // src/routes/index.ts
-var router37 = (0, import_express39.Router)();
+var router37 = (0, import_express40.Router)();
 router37.use(health_default);
 router37.use("/auth", auth_default);
 router37.use(storage_default);
@@ -125881,8 +125930,8 @@ router37.use(requireAuth, transcribe_default);
 var routes_default = router37;
 
 // src/routes/faie.ts
-var import_express40 = __toESM(require_express2(), 1);
-var router38 = (0, import_express40.Router)();
+var import_express41 = __toESM(require_express2(), 1);
+var router38 = (0, import_express41.Router)();
 var storage2 = new ObjectStorageService();
 var DatasetIngestBody = external_exports.object({
   companyId: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
@@ -126116,7 +126165,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // src/app.ts
-var app = (0, import_express41.default)();
+var app = (0, import_express42.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -126169,7 +126218,7 @@ app.use(
 );
 app.post(
   "/api/stripe/webhook",
-  import_express41.default.raw({ type: "application/json" }),
+  import_express42.default.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -126189,9 +126238,9 @@ app.post(
     }
   }
 );
-app.use("/v1/faie", import_express41.default.json({ limit: "20mb" }), faie_default);
-app.use(import_express41.default.json());
-app.use(import_express41.default.urlencoded({ extended: true }));
+app.use("/v1/faie", import_express42.default.json({ limit: "20mb" }), faie_default);
+app.use(import_express42.default.json());
+app.use(import_express42.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(

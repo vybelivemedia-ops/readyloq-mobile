@@ -3,6 +3,7 @@ import { useUser, useClerk } from '@clerk/clerk-react';
 import { apiUrl } from '../config';
 
 export interface AuthMe {
+  id: number | null;
   effectiveRole: string;
   companyId: number | null;
   isSuperAdmin: boolean;

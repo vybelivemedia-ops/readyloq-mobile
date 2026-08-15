@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { Link, useLocation } from 'wouter';
-import { LayoutDashboard, ClipboardCheck, FileText, Users, DollarSign, Building2, BarChart3, CalendarDays, LogOut, Loader2, Menu, KeyRound } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, FileText, Users, DollarSign, Building2, BarChart3, CalendarDays, LogOut, Loader2, Menu, KeyRound, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useClerk } from '@clerk/clerk-react';
@@ -38,6 +38,8 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: '/team', label: 'Team', icon: Users, roles: ['owner', 'manager'] },
     { href: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['owner', 'manager'] },
     { href: '/client-access', label: 'Client Access', icon: KeyRound, roles: ['owner', 'manager'] },
+    // Property managers see a single scoped view only.
+    { href: '/client', label: 'My Reports', icon: Home, roles: ['property_manager'] },
   ].filter(item => item.roles.includes(me.effectiveRole));
 
   const NavLinks = ({ onClick }: { onClick?: () => void }) => (

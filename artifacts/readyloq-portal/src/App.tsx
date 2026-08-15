@@ -20,6 +20,7 @@ import { Properties } from '@/pages/properties';
 import { Analytics } from '@/pages/analytics';
 import { Schedule } from '@/pages/schedule';
 import { ClientAccess } from '@/pages/client-access';
+import { ClientPortal } from '@/pages/client';
 import { Layout } from '@/components/layout';
 
 const queryClient = new QueryClient();
@@ -91,6 +92,9 @@ function Router() {
               </Route>
               <Route path="/client-access">
                 <ProtectedRoute component={ClientAccess} roles={['owner', 'manager']} />
+              </Route>
+              <Route path="/client">
+                <ProtectedRoute component={ClientPortal} roles={['property_manager']} />
               </Route>
               <Route component={NotFound} />
             </Switch>
