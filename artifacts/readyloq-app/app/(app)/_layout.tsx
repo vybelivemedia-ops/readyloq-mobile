@@ -202,24 +202,32 @@ function Gate() {
     });
   }, [ready]);
 
-  // ── Push token registration (owners only) ───────────────────────────────────
+  // ── Push token registration (owners and technicians) ────────────────────────
   // Request permission and register the Expo push token so the server can
-  // deliver critical-risk inspection alerts. Runs once after the workspace
-  // is fully ready and the user is an owner. Silently no-ops on failure —
-  // notifications are a best-effort feature and must never block the UI.
+  // deliver notifications: critical-risk alerts to owners and route-update
+  // alerts to technicians. Runs once after the workspace is fully ready and
+  // the user has a role that receives push notifications. Silently no-ops on
+  // failure — notifications are a best-effort feature and must never block the UI.
   useEffect(() => {
-    if (!ready || user?.role !== "owner") return;
+    const notifiableRoles = ["owner", "technician"];
+    if (!ready || !user?.role || !notifiableRoles.includes(user.role)) return;
     if (!Device.isDevice) return; // push not available on simulators
 
     void (async () => {
       try {
-        // Set up a notification channel for Android (required for Android 8+).
+        // Set up notification channels for Android (required for Android 8+).
         if (Platform.OS === "android") {
           await Notifications.setNotificationChannelAsync("critical-alerts", {
             name: "Critical Risk Alerts",
             importance: Notifications.AndroidImportance.MAX,
             vibrationPattern: [0, 250, 250, 250],
             lightColor: "#ef4444",
+          });
+          await Notifications.setNotificationChannelAsync("route-updates", {
+            name: "Route Updates",
+            importance: Notifications.AndroidImportance.HIGH,
+            vibrationPattern: [0, 150, 100, 150],
+            lightColor: "#3b82f6",
           });
         }
 

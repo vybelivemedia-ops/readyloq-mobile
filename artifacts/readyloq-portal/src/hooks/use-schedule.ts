@@ -26,6 +26,7 @@ export interface CreateInspectionPayload {
   siteAddress: string;
   clientName?: string;
   technicianName: string;
+  technicianId?: string | null;
   scheduledDate?: string | null;
   pestTypes?: string[];
   notes?: string;

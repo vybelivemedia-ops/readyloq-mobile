@@ -167,12 +167,14 @@ function NewInspectionSheet({
   open,
   onClose,
   technicians,
+  technicianIdMap,
   initialDate,
   initialTech,
 }: {
   open: boolean;
   onClose: () => void;
   technicians: string[];
+  technicianIdMap: Map<string, string | null>;
   initialDate?: string;
   initialTech?: string;
 }) {
@@ -208,10 +210,14 @@ function NewInspectionSheet({
     if (!form.scheduledDate) { setError('Scheduled date is required'); return; }
 
     try {
+      const resolvedId = technicianIdMap.get(form.technicianName.trim());
       await create.mutateAsync({
         siteAddress: form.siteAddress.trim(),
         clientName: form.clientName.trim() || undefined,
         technicianName: form.technicianName.trim(),
+        // Include the Clerk ID when we can resolve it from the map, so the
+        // inspection row carries a stable identity from creation.
+        ...(typeof resolvedId === 'string' ? { technicianId: resolvedId } : {}),
         scheduledDate: form.scheduledDate ? `${form.scheduledDate}T00:00:00.000Z` : undefined,
       });
       handleClose();
@@ -426,6 +432,22 @@ export function Schedule() {
     return names;
   }, [entries]);
 
+  // Map technician display-name → Clerk user ID (from the schedule entries that
+  // already carry the ID for mobile-app-created records). Used to send the stable
+  // identity alongside the name on create/reassign so the server can persist and
+  // notify the right person even when no prior inspection history exists.
+  const technicianIdMap = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const e of entries) {
+      // First occurrence wins: keeps the most-recent semantics stable across
+      // re-renders without needing a secondary sort.
+      if (!map.has(e.technicianName)) {
+        map.set(e.technicianName, e.technicianId);
+      }
+    }
+    return map;
+  }, [entries]);
+
   const filtered = useMemo(
     () => (filterTech ? entries.filter((e) => e.technicianName === filterTech) : entries),
     [entries, filterTech],
@@ -465,11 +487,17 @@ export function Schedule() {
 
   function handleSave(technicianName: string, scheduledDate: string) {
     if (!selected) return;
+    // Resolve the Clerk ID from the map so the server can notify the right person
+    // and keep technicianId in sync with the displayed name.
+    const resolvedId = technicianIdMap.get(technicianName);
     reassign.mutate(
       {
         id: selected.id,
         payload: {
           technicianName,
+          // Only include the ID when we have a concrete string — avoid sending
+          // null (which would clear a previously known ID on the server).
+          ...(typeof resolvedId === 'string' ? { technicianId: resolvedId } : {}),
           scheduledDate: scheduledDate ? `${scheduledDate}T00:00:00.000Z` : null,
         },
       },
@@ -686,6 +714,7 @@ export function Schedule() {
         open={bookOpen}
         onClose={() => { setBookOpen(false); setBookPreset(null); }}
         technicians={technicians}
+        technicianIdMap={technicianIdMap}
         initialDate={bookPreset?.date}
         initialTech={bookPreset?.tech}
       />

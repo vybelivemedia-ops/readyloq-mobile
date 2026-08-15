@@ -186,3 +186,85 @@ export async function notifyCriticalInspection(input: {
 
   await sendExpoPush(messages, ctx);
 }
+
+/**
+ * Notify a technician that their scheduled route was updated by a manager.
+ *
+ * Looks up the push token for each `technicianClerkId` in `technicianClerkIds`
+ * (there may be two when an inspection is reassigned: the old and new tech).
+ * Best-effort — never throws.
+ */
+export async function notifyTechnicianRouteUpdated(input: {
+  companyId: number;
+  inspectionId: number;
+  /** Clerk user IDs of the technician(s) to notify. Deduplicated internally. */
+  technicianClerkIds: string[];
+  scheduledDate: Date | null;
+  siteAddress: string;
+}): Promise<void> {
+  const { companyId, inspectionId, technicianClerkIds, scheduledDate, siteAddress } = input;
+  if (technicianClerkIds.length === 0) return;
+
+  const uniqueIds = [...new Set(technicianClerkIds)];
+  const ctx: PushContext = { companyId, inspectionId };
+
+  // Fetch push tokens for each technician in a single query.
+  // Restricting to role = technician is defense-in-depth: even if a caller
+  // mistakenly passes a manager or owner Clerk ID, they will not receive the push.
+  let rows: { pushToken: string | null; clerkUserId: string }[] = [];
+  try {
+    rows = await db
+      .select({ pushToken: usersTable.pushToken, clerkUserId: usersTable.clerkUserId })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.companyId, companyId),
+          eq(usersTable.role, "technician"),
+          eq(usersTable.pushNotificationsEnabled, true),
+        ),
+      );
+    // Filter to only the targeted technician Clerk IDs.
+    rows = rows.filter((r) => uniqueIds.includes(r.clerkUserId));
+  } catch (err) {
+    void logErrorEvent("notification", {
+      companyId,
+      inspectionId,
+      message: `Failed to fetch technician push tokens: ${err instanceof Error ? err.message : String(err)}`,
+      context: { stage: "push_fetch_tokens" },
+    });
+    return;
+  }
+
+  const tokens = rows
+    .map((r) => r.pushToken)
+    .filter((t): t is string => typeof t === "string" && t.startsWith("ExponentPushToken["));
+
+  if (tokens.length === 0) return;
+
+  // Format the date as a human-readable string (e.g. "Mon Aug 17").
+  const dateLabel = scheduledDate
+    ? scheduledDate.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+      })
+    : "upcoming";
+
+  const shortAddress = siteAddress.length > 50 ? siteAddress.slice(0, 47) + "…" : siteAddress;
+
+  const messages: ExpoPushMessage[] = tokens.map((token) => ({
+    to: token,
+    title: "Route Updated",
+    body: `Your ${dateLabel} route at ${shortAddress} has been updated by your manager`,
+    sound: "default",
+    channelId: "route-updates",
+    data: {
+      screen: "inspection",
+      inspectionId,
+      companyId,
+    },
+  }));
+
+  await sendExpoPush(messages, ctx);
+}
