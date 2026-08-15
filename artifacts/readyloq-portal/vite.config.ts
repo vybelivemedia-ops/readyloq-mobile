@@ -73,8 +73,17 @@ export default defineConfig({
       strict: true,
     },
     proxy: {
-      // Forward /api to the shared API server in development.
-      // In production the Replit deployment proxy routes /api to the API service.
+      // In dev the browser fetches /readyloq-portal/api/... (BASE_URL-prefixed) so
+      // the request stays within this artifact's path and hits Vite's proxy rather
+      // than being routed by the Replit dev proxy to the wrong artifact.
+      // The rewrite strips the /readyloq-portal prefix before forwarding to the
+      // API server so the server sees the expected /api/... path.
+      [`${basePath}api`]: {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(new RegExp(`^${basePath}`), '/'),
+      },
+      // Keep the bare /api rule as a fallback (e.g. direct localhost access in CI).
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
