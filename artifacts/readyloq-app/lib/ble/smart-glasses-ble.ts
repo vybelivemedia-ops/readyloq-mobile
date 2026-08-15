@@ -119,6 +119,17 @@ export type FrameCallback = (jpegBytes: Uint8Array) => void;
 export type AudioCallback = (pcmBytes: Uint8Array, timestampMs: number) => void;
 export type StateChangeCallback = (state: SmartGlassesBleState) => void;
 
+/**
+ * Fired when one or more in-progress frame reassemblies are discarded.
+ * @param count  Number of partial frames lost (≥ 1).
+ * @param reason "disconnect" — BLE link dropped mid-transfer;
+ *               "timeout"    — not all chunks arrived within FRAME_REASSEMBLY_TTL_MS.
+ */
+export type DroppedFrameCallback = (
+  count: number,
+  reason: "disconnect" | "timeout",
+) => void;
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -187,6 +198,7 @@ class SmartGlassesBleManager {
   private _stateListeners = new Set<StateChangeCallback>();
   private _frameListeners = new Set<FrameCallback>();
   private _audioListeners = new Set<AudioCallback>();
+  private _droppedFrameListeners = new Set<DroppedFrameCallback>();
 
   private _scanTimer: ReturnType<typeof setTimeout> | null = null;
   private _connectedDevice: Device | null = null;
@@ -233,6 +245,17 @@ class SmartGlassesBleManager {
   onAudio(cb: AudioCallback): () => void {
     this._audioListeners.add(cb);
     return () => this._audioListeners.delete(cb);
+  }
+
+  /**
+   * Subscribe to dropped-frame events.
+   * Called whenever partial reassemblies are discarded — either because the
+   * BLE link dropped mid-transfer or because not all chunks arrived in time.
+   * Returns an unsubscribe function.
+   */
+  onDroppedFrame(cb: DroppedFrameCallback): () => void {
+    this._droppedFrameListeners.add(cb);
+    return () => this._droppedFrameListeners.delete(cb);
   }
 
   // ── Scanning ──────────────────────────────────────────────────────────────
@@ -385,6 +408,7 @@ class SmartGlassesBleManager {
     }
 
     this._connectedDevice = null;
+    this._fireDroppedFrames("disconnect");
     this._frameBuffers.clear();
 
     this._patch({
@@ -474,6 +498,7 @@ class SmartGlassesBleManager {
     this._ble.onDeviceDisconnected(device.id, (_error, _dev) => {
       this._removeSubscriptions();
       this._connectedDevice = null;
+      this._fireDroppedFrames("disconnect");
       this._frameBuffers.clear();
 
       this._patch({
@@ -483,6 +508,15 @@ class SmartGlassesBleManager {
         error: "Glasses disconnected.",
       });
     });
+  }
+
+  /**
+   * Fire dropped-frame callbacks for every buffer currently in `_frameBuffers`.
+   * Call this BEFORE clearing or modifying `_frameBuffers` so the count is accurate.
+   */
+  private _fireDroppedFrames(reason: "disconnect" | "timeout", count = this._frameBuffers.size): void {
+    if (count <= 0) return;
+    this._droppedFrameListeners.forEach((cb) => cb(count, reason));
   }
 
   private _removeSubscriptions(): void {
@@ -528,6 +562,8 @@ class SmartGlassesBleManager {
         totalChunks,
         timeoutHandle: setTimeout(() => {
           this._frameBuffers.delete(frameSeq);
+          // One partial frame timed out — not all chunks arrived within the TTL.
+          this._fireDroppedFrames("timeout", 1);
         }, FRAME_REASSEMBLY_TTL_MS),
       };
       this._frameBuffers.set(frameSeq, buf);

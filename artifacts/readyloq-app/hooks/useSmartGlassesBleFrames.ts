@@ -92,6 +92,18 @@ export function useSmartGlassesBleFrames({
     return unsub;
   }, []);
 
+  // ── Track driver-level frame drops (disconnect + reassembly timeout) ──────
+  //
+  // These drops happen BEFORE the frame reaches the hook's onFrame callback,
+  // so the catch block below can't see them. Subscribe directly to the BLE
+  // driver so they are counted in droppedFrameCount regardless of active state.
+  useEffect(() => {
+    const unsub = smartGlassesBle.onDroppedFrame((count) => {
+      setDroppedFrameCount((prev) => prev + count);
+    });
+    return unsub;
+  }, []);
+
   // ── Subscribe to JPEG frames when active + BLE connected ─────────────────
   useEffect(() => {
     if (!active || !isBleConnected) return;
