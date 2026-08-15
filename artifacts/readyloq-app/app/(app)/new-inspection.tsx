@@ -817,7 +817,7 @@ export default function NewInspectionScreen() {
   // exactly as if the technician had captured the photo with the phone camera.
   // The webhook path (useMetaGlassesSession above) continues to handle voice
   // commands and cloud-relayed events independently.
-  useSmartGlassesBleFrames({
+  const bleGlasses = useSmartGlassesBleFrames({
     active: wsInspectionId != null,
     onFrame: (cacheUri: string) => {
       setPhotos((prev) => [...prev, { uri: cacheUri }]);
@@ -1712,6 +1712,58 @@ export default function NewInspectionScreen() {
               </Text>
             </View>
           )}
+        </View>
+        {/* Connection-mode badge row — BLE direct vs cloud relay */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {/* BLE / Cloud badge */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              backgroundColor: bleGlasses.isBleConnected
+                ? "rgba(34,197,94,0.22)"
+                : "rgba(245,158,11,0.22)",
+              borderRadius: 5,
+              paddingHorizontal: 7,
+              paddingVertical: 3,
+              borderWidth: 1,
+              borderColor: bleGlasses.isBleConnected
+                ? "rgba(34,197,94,0.55)"
+                : "rgba(245,158,11,0.55)",
+            }}
+          >
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: bleGlasses.isBleConnected ? "#22c55e" : "#f59e0b",
+              }}
+            />
+            <Text
+              style={{
+                color: bleGlasses.isBleConnected ? "#86efac" : "#fcd34d",
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 10,
+                letterSpacing: 0.3,
+              }}
+            >
+              {bleGlasses.isBleConnected ? "BLE · direct" : "Cloud · relay"}
+            </Text>
+          </View>
+          {/* BLE frame count — shown only when BLE has received frames */}
+          {bleGlasses.isBleConnected && bleGlasses.frameCount > 0 ? (
+            <Text style={{ color: "rgba(255,255,255,0.65)", fontFamily: "Inter_400Regular", fontSize: 10 }}>
+              {bleGlasses.frameCount} BLE frame{bleGlasses.frameCount === 1 ? "" : "s"}
+            </Text>
+          ) : null}
+          {/* Cloud event count — shown alongside when BLE is also active */}
+          {bleGlasses.isBleConnected && glassesSession.eventCount > 0 ? (
+            <Text style={{ color: "rgba(255,255,255,0.65)", fontFamily: "Inter_400Regular", fontSize: 10 }}>
+              · {glassesSession.eventCount} cloud event{glassesSession.eventCount === 1 ? "" : "s"}
+            </Text>
+          ) : null}
         </View>
         {/* #109 — Expanded reconnect banner: visible for 10 s after a new code is issued */}
         {glassesSession.codeJustChanged && glassesSession.code ? (
