@@ -34,6 +34,7 @@ import {
   type ExecutiveQualityWeek,
   type DailyBriefing,
 } from "@/lib/api";
+import { isCopyButtonDisabled, runCopySnapshot } from "@/lib/dashboard/copy-button";
 
 // ─── Palette (dark command-centre tone) ───────────────────────────────────────
 
@@ -677,23 +678,22 @@ export default function ExecutiveDashboardScreen() {
     }
   }, [getToken]);
 
-  const handleCopy = useCallback(async () => {
-    setCopying(true);
-    try {
-      const token = await getToken();
-      const { text } = await fetchExecutiveTextPreview(token);
-      await Clipboard.setStringAsync(text);
-      setCopyLabel("copied");
-      setTimeout(() => setCopyLabel("copy"), 2000);
-    } catch (e) {
-      Alert.alert(
-        "Copy Failed",
-        e instanceof Error ? e.message : "Could not copy dashboard snapshot.",
-      );
-    } finally {
-      setCopying(false);
-    }
-  }, [getToken]);
+  const handleCopy = useCallback(
+    () =>
+      runCopySnapshot({
+        getToken,
+        fetchText: fetchExecutiveTextPreview,
+        writeClipboard: Clipboard.setStringAsync,
+        setCopying,
+        setCopyLabel,
+        onError: (e) =>
+          Alert.alert(
+            "Copy Failed",
+            e instanceof Error ? e.message : "Could not copy dashboard snapshot.",
+          ),
+      }),
+    [getToken],
+  );
 
   // Load on mount
   React.useEffect(() => { void load(); }, [load]);
@@ -768,7 +768,7 @@ export default function ExecutiveDashboardScreen() {
         {/* Copy snapshot button */}
         <TouchableOpacity
           onPress={() => void handleCopy()}
-          disabled={copying || loading}
+          disabled={isCopyButtonDisabled(loading, copying)}
           style={{
             height: 36,
             borderRadius: 18,
