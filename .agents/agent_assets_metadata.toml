@@ -5,5 +5,12 @@ generated = []
 id = "L_PcY2SttNnETdWLBYfN4"
 uri = "file://attached_assets/readyloq-app-icon-512-final.png"
 type = "image"
-title = "ReadyLoq App Icon — 512×512 PNG (Google Play ready)"
-description = "Upload this to Google Play Console → App icon. 512×512 px · PNG · 205 KB."
+title = "Google Play Icon — 512×512 PNG"
+description = "Upload to: Google Play Console → App icon field. Exact requirement: 512×512 px, PNG, ≤1 MB."
+
+[[outputs]]
+id = "cFdQyq0qWPKFBkxzFugty"
+uri = "file://artifacts/readyloq-app/assets/images/icon.png"
+type = "image"
+title = "Expo / Android Launcher Source — 1024×1024 PNG"
+description = "High-res master used by EAS to generate all Android mipmap densities (mdpi → xxxhdpi). Also accepted by Google Play as a feature graphic source."
