@@ -35,6 +35,7 @@ import {
   type DailyBriefing,
 } from "@/lib/api";
 import { isCopyButtonDisabled, runCopySnapshot } from "@/lib/dashboard/copy-button";
+import { KPI_DEEP_LINK_FILTERS } from "@/lib/dashboard/kpi-deep-links";
 
 // ─── Palette (dark command-centre tone) ───────────────────────────────────────
 
@@ -1053,7 +1054,7 @@ export default function ExecutiveDashboardScreen() {
                     ? `${metrics.openOpportunities} open · ${metrics.wonOpportunities} won`
                     : undefined
                 }
-                onPress={() => router.push("/reports-detail?filter=pipeline" as never)}
+                onPress={() => router.push(`/reports-detail?filter=${KPI_DEEP_LINK_FILTERS.openPipeline}` as never)}
               />
               <KpiCard
                 label="Avg Quality Score"
@@ -1068,8 +1069,8 @@ export default function ExecutiveDashboardScreen() {
                         ? C.warning
                         : C.danger
                 }
-                sublabel={`${metrics?.totalScorecards ?? 0} scored inspections`}
-                onPress={() => router.push("/reports-detail?filter=critical" as never)}
+                sublabel={`${metrics?.totalScorecards ?? 0} scored · opens Critical Risks`}
+                onPress={() => router.push(`/reports-detail?filter=${KPI_DEEP_LINK_FILTERS.avgQualityScore}` as never)}
               />
               <KpiCard
                 label="Critical Risk Sites"
@@ -1081,7 +1082,7 @@ export default function ExecutiveDashboardScreen() {
                     ? `${metrics.riskDistribution.high} high · ${metrics.riskDistribution.medium} medium`
                     : undefined
                 }
-                onPress={() => router.push("/reports-detail?filter=critical" as never)}
+                onPress={() => router.push(`/reports-detail?filter=${KPI_DEEP_LINK_FILTERS.criticalRiskSites}` as never)}
               />
               <KpiCard
                 label="This Month"

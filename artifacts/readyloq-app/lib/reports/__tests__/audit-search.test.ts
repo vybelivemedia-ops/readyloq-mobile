@@ -299,6 +299,39 @@ describe("KPI deep-link — 'Open Pipeline' tile opens the Pipeline tab", () => 
   });
 });
 
+describe("KPI deep-link — 'Avg Quality Score' tile opens the Critical Risks tab", () => {
+  // executive-dashboard.tsx pushes /reports-detail?filter=critical for the
+  // "Avg Quality Score" KPI.  Low quality scores correlate with critical-risk
+  // findings so the destination is intentional, but the label mismatch means
+  // this mapping must be guarded by an explicit test.
+
+  it("normalizes 'critical' param (sent by Avg Quality Score tile) to the critical tab on first mount", () => {
+    const tab = normalizeFilterParam("critical");
+    expect(tab).toBe("critical");
+  });
+
+  it("applyFilterParamChange sets activeTab to 'critical' when Avg Quality Score tile fires filter=critical", () => {
+    const initial: AuditScreenState = { activeTab: "all", searchQuery: "" };
+    const next = applyFilterParamChange(initial, "critical");
+    expect(next.activeTab).toBe("critical");
+  });
+
+  it("does not accidentally open the pipeline tab when Avg Quality Score sends filter=critical", () => {
+    expect(normalizeFilterParam("critical")).not.toBe("pipeline");
+  });
+
+  it("does not accidentally open the all tab when Avg Quality Score sends filter=critical", () => {
+    expect(normalizeFilterParam("critical")).not.toBe("all");
+  });
+
+  it("clears any active search query when navigating from Avg Quality Score tile", () => {
+    const withSearch: AuditScreenState = { activeTab: "all", searchQuery: "oak street" };
+    const next = applyFilterParamChange(withSearch, "critical");
+    expect(next.activeTab).toBe("critical");
+    expect(next.searchQuery).toBe("");
+  });
+});
+
 describe("KPI deep-link — 'Critical Risk Sites' tile opens the Critical Risks tab", () => {
   // Simulate first mount.
   it("normalizes 'critical' param to the critical tab on first mount", () => {
