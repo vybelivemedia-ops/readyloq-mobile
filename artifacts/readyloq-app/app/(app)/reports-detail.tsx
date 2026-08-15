@@ -14,6 +14,7 @@
  * React Query cache). The pasted `fetchReportRecords()` / `apiGet` helpers do
  * not exist in this codebase — all report fetching goes through customFetch.
  */
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -285,6 +286,9 @@ function ReportCard({
 // Re-export the normalise helper under the local name so usages below are unchanged.
 const normalizeFilterParam = _normalizeFilterParam;
 
+/** AsyncStorage key for the last-selected audit tab preference. */
+const AUDIT_TAB_STORAGE_KEY = "@readyloq/audit_last_tab";
+
 export default function ReportsDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -300,6 +304,24 @@ export default function ReportsDetailScreen() {
     Array.isArray(qParam) ? (qParam[0] ?? "") : (qParam ?? ""),
   );
 
+  // Restore the last-used tab from storage on first mount — but only when the
+  // caller did NOT supply an explicit `filter=` deep-link param (which always
+  // takes precedence over the stored preference).
+  useEffect(() => {
+    if (filterParam) return; // deep-link overrides stored preference
+    AsyncStorage.getItem(AUDIT_TAB_STORAGE_KEY)
+      .then((stored) => {
+        const tab = normalizeFilterParam(stored ?? undefined);
+        // normalizeFilterParam returns "all" for null/undefined/invalid values,
+        // so this is always safe to apply unconditionally.
+        setActiveTab(tab);
+      })
+      .catch(() => {
+        // Storage errors are non-fatal; silently keep the default tab.
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — run once on mount only
+
   // Keep the active tab (and search query) in sync with the URL params.
   // useState's initializer only runs at first mount; if expo-router reuses
   // the mounted screen instance (e.g. the route is already in the stack and
@@ -312,11 +334,14 @@ export default function ReportsDetailScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterParam, qParam]);
 
-  // Clear search whenever the user manually switches tabs.
+  // Clear search whenever the user manually switches tabs, and persist the
+  // selection so the next visit starts on the same tab.
   const handleTabChange = (tab: AuditFilter) => {
     const next = applyTabChange({ activeTab, searchQuery }, tab);
     setActiveTab(next.activeTab);
     setSearchQuery(next.searchQuery);
+    // Persist asynchronously; errors are non-fatal.
+    AsyncStorage.setItem(AUDIT_TAB_STORAGE_KEY, tab).catch(() => {});
   };
 
   const queryParams = useMemo(() => tabToParams(activeTab), [activeTab]);
