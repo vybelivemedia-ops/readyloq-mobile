@@ -34,7 +34,7 @@
     },
     "android": {
       "package": "com.hgwashingllc.readyloqmobile",
-      "versionCode": 180,
+      "versionCode": 181,
       "intentFilters": [
         {
           "action": "VIEW",
