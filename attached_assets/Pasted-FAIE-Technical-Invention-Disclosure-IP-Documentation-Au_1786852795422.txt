@@ -1,0 +1,646 @@
+FAIE Technical Invention Disclosure & IP Documentation Audit
+
+You are working inside the ReadyLoq codebase. I want you to perform a deep, code-first technical audit of the actual implementation and produce a formal FAIE Technical Invention Disclosure Package for potential review by a patent attorney or patent agent.
+
+IMPORTANT RULES
+
+This is not a marketing exercise.
+
+Do not claim that anything is "patentable," "novel," or "patent-worthy."
+
+Do not invent functionality.
+
+Do not infer that a feature exists merely because it appears in documentation, comments, architecture plans, TODOs, schemas, or interfaces.
+
+For every technical capability, classify it as:
+
+- IMPLEMENTED — verified in actual executable code
+- PARTIALLY IMPLEMENTED — some functional components exist but the complete workflow is unfinished
+- EXPERIMENTAL — code exists but is not established as production functionality
+- PLANNED — described but not implemented
+- NOT FOUND — no implementation located
+
+When documentation conflicts with the actual code, the code wins.
+
+Preserve exact technical terminology, filenames, classes, functions, database tables, APIs, providers, hooks, and package names wherever possible.
+
+Do not modify application behavior while performing this audit unless explicitly necessary to generate documentation.
+
+---
+
+1. FULL REPOSITORY DISCOVERY
+
+First map the entire repository.
+
+Identify:
+
+- Monorepo structure
+- ReadyLoq mobile application
+- ReadyLoq web application
+- API server
+- Database/schema packages
+- Shared libraries
+- "@platform/*" packages
+- FAIE-related modules
+- Camera systems
+- Audio/voice systems
+- AI/vision systems
+- Offline/sync systems
+- BLE/wearable systems
+- Measurement systems
+- Evidence systems
+- Inspection state management
+- Compliance/chemical-related systems
+- Reporting
+- Storage
+- Background workers
+- Cron/background jobs
+
+Create a dependency map showing which components communicate with each other.
+
+Do not limit the investigation to files whose names contain "FAIE."
+
+Search for the actual implementation of the workflows.
+
+---
+
+2. DEFINE FAIE AS CURRENTLY IMPLEMENTED
+
+Determine exactly what FAIE is in the current codebase.
+
+Identify:
+
+- FAIE entry points
+- FAIE services
+- FAIE hooks
+- FAIE state
+- FAIE providers
+- AI models/providers
+- Camera inputs
+- Audio inputs
+- Wearable inputs
+- Outputs
+- Inspection state changes
+- Evidence creation
+- AI findings
+- Technician confirmations/corrections
+- Manager verification
+- Report integration
+
+Create an architecture diagram showing the actual implementation.
+
+Clearly separate:
+
+FAIE core
+
+from:
+
+supporting ReadyLoq infrastructure.
+
+---
+
+3. TRANSIENT VISUAL / FRAME INTELLIGENCE
+
+Investigate the complete camera pipeline.
+
+Specifically determine whether the implementation actually performs:
+
+camera stream
+→ transient frame processing
+→ quality evaluation
+→ frame selection/extraction
+→ AI/vision analysis
+→ evidence creation
+→ disposal of unnecessary raw frames/video
+
+Search for:
+
+- camera providers
+- frame buffers
+- frame extraction
+- auto capture
+- image quality gates
+- perceptual hashing
+- deduplication
+- temporary files
+- memory buffers
+- cleanup routines
+- raw video persistence
+- inspection completion cleanup
+- storage upload behavior
+
+Document exactly:
+
+1. Where frames originate.
+2. Where they are held.
+3. Whether raw video is persisted.
+4. When frames are extracted.
+5. What gets retained.
+6. What gets discarded.
+7. When temporary assets are deleted.
+8. What happens if the inspection fails.
+9. What happens if the app crashes.
+10. What happens when the device loses connectivity.
+
+If the "zero-disk retention" concept is not completely implemented, explicitly say so.
+
+Do not describe it as zero-disk if temporary files are actually written.
+
+---
+
+4. OFFLINE-FIRST INSPECTION STATE
+
+Audit the actual offline architecture.
+
+Trace:
+
+inspection creation
+→ local state
+→ evidence/media storage
+→ sync queue
+→ connectivity detection
+→ synchronization
+→ retry
+→ reconciliation
+→ server confirmation
+→ cleanup
+
+Identify:
+
+- SQLite
+- AsyncStorage
+- IndexedDB
+- filesystem storage
+- React Query persistence
+- sync workers
+- background fetch
+- background tasks
+- queue locking
+- single-flight mechanisms
+- retry policies
+- idempotency keys
+- conflict resolution
+- state transitions
+- cleanup logic
+
+Determine whether the system actually prevents:
+
+- duplicate uploads
+- duplicate inspections
+- race conditions
+- orphaned files
+- double synchronization
+- partial inspection corruption
+
+Document the exact mechanisms.
+
+If any claim is only partially implemented, say so.
+
+---
+
+5. VOICE / FAIE COMMAND INTELLIGENCE
+
+Trace the entire voice pipeline.
+
+Determine exactly what exists for:
+
+microphone
+→ audio processing
+→ noise suppression
+→ transcription
+→ wake word
+→ intent detection
+→ command parsing
+→ structured action
+→ validation
+→ inspection state mutation
+→ evidence/report output
+
+Search for:
+
+- Whisper
+- Expo speech
+- Deepgram
+- RNNoise
+- WebRTC AEC
+- noise suppression
+- speaker detection
+- wake-word detection
+- fuzzy matching
+- command parsers
+- intent schemas
+- voice vocabulary
+- inspection command types
+
+Pay special attention to the distinction between:
+
+voice-to-text
+
+and:
+
+voice-to-structured-command execution.
+
+Document concrete examples found in the code.
+
+---
+
+6. COMPLIANCE / CHEMICAL WORKFLOW
+
+Audit any implementation involving:
+
+- chemical products
+- treatment records
+- product identification
+- label information
+- treatment quantities
+- treatment locations
+- compliance validation
+- chemical usage documentation
+- voice-driven chemical entry
+
+Determine whether the system actually validates commands against regulatory/product rules.
+
+Do not claim regulatory compliance merely because a chemical field exists.
+
+Document:
+
+- validation rules
+- data sources
+- product schemas
+- decision logic
+- error states
+- user confirmations
+- audit records
+
+Clearly distinguish:
+
+software validation
+
+from:
+
+legal/regulatory compliance.
+
+---
+
+7. WEARABLE / SMART GLASSES PIPELINE
+
+Audit the current wearable implementation.
+
+Specifically inspect:
+
+- "SmartGlassesProvider"
+- "smartGlassesBle"
+- "useSmartGlassesBleFrames"
+- "@platform/meta-wearables"
+- BLE drivers
+- Meta Wearables integration
+- device registration
+- session persistence
+- frame callbacks
+- snapshot requests
+- health checks
+- cloud/webhook paths
+- phone camera fallback
+
+Trace:
+
+physical wearable
+→ connection
+→ frame
+→ provider
+→ ReadyLoq
+→ FAIE
+→ evidence
+
+Determine whether the implementation is:
+
+- generic BLE
+- Meta DAT
+- custom hardware
+- Meta Gen 1
+- Meta Gen 2
+- another wearable
+- or a combination.
+
+Do not assume Meta hardware works simply because a Meta package exists.
+
+Identify exactly what has been physically validated versus what exists only in code.
+
+---
+
+8. MEASUREMENT INTELLIGENCE
+
+Audit the measurement implementation.
+
+Determine whether FAIE can actually:
+
+- detect openings
+- detect cracks
+- detect gaps
+- detect penetrations
+- estimate dimensions
+- establish scale
+- use AR/depth information
+- use reference objects
+- calculate material quantities
+- estimate labor
+- save measurements
+- attach measurements to evidence
+
+Identify:
+
+- "measurement-core"
+- measurement providers
+- camera calibration
+- polygons
+- dimensions
+- confidence scores
+- user confirmation
+
+Clearly distinguish:
+
+visual estimate
+
+from:
+
+physically calibrated measurement.
+
+---
+
+9. EVIDENCE PIPELINE
+
+Map:
+
+capture
+→ quality gate
+→ AI interpretation
+→ technician confirmation
+→ evidence object
+→ storage
+→ inspection
+→ report
+→ intelligence dataset
+
+Identify:
+
+- evidence schemas
+- image metadata
+- perceptual hashing
+- deduplication
+- annotations
+- confidence
+- source provider
+- technician corrections
+- AI predictions
+- verification levels
+
+Determine what information is preserved as training signal.
+
+---
+
+10. INTELLIGENCE DATASET / LEARNING SYSTEM
+
+Audit the Intelligence Dataset implementation.
+
+Verify:
+
+- "intelligence_records"
+- "intelligence_tags"
+- "intelligence_reviews"
+- "intelligence_votes"
+- verification levels
+- AI predictions
+- technician corrections
+- manager verification
+- expert verification
+- training approval
+- anonymization fields
+- sharing controls
+- analytics
+
+Document the actual feedback loop:
+
+AI prediction
+→ technician judgment
+→ correction
+→ manager verification
+→ approved training signal
+
+Explain how this could create proprietary operational data over time, but do not claim that it automatically creates a legal trade secret or patent.
+
+---
+
+11. MULTIMODAL STATE ENGINE
+
+Determine whether the system has a unified state representation combining:
+
+- visual evidence
+- audio commands
+- technician input
+- measurements
+- property history
+- AI findings
+- treatment information
+- connectivity state
+- wearable state
+
+If it exists, document the exact object/schema/state machine.
+
+If it doesn't, clearly state that the architecture is distributed rather than unified.
+
+---
+
+12. IDENTIFY POTENTIALLY DISTINCTIVE TECHNICAL COMBINATIONS
+
+After documenting the actual code, identify technical combinations that may warrant review by an IP professional.
+
+Do NOT call them inventions automatically.
+
+For each candidate, provide:
+
+Candidate
+
+Technical concept
+
+Problem addressed
+
+Existing components involved
+
+Actual implementation
+
+Why the combination may be technically distinctive
+
+Alternative implementations
+
+Evidence in repository
+
+Implementation status
+
+Potential prior-art questions
+
+Do not evaluate legal novelty.
+
+---
+
+13. PRIOR-ART RESEARCH QUESTIONS
+
+Create a list of questions a patent attorney should investigate.
+
+Examples:
+
+- Existing continuous vision systems that extract selected evidence without storing continuous video
+- Existing offline field-service synchronization systems
+- Existing voice-command inspection systems
+- Existing compliance-aware voice workflows
+- Existing smart-glasses inspection systems
+- Existing AI measurement systems
+- Existing multimodal field-worker copilots
+- Existing systems combining these capabilities
+
+Do not pretend this is a complete patent search.
+
+---
+
+14. IMPLEMENTATION TIMELINE
+
+Use Git history to identify when important technical components were created.
+
+For each potentially important component record:
+
+- commit hash
+- commit date
+- author
+- file/module
+- description
+- first implementation
+- major subsequent changes
+
+Create a chronological development timeline.
+
+Do not alter Git history.
+
+---
+
+15. TECHNICAL FIGURES
+
+Generate clear architecture diagrams for:
+
+Figure 1
+
+Overall FAIE architecture
+
+Figure 2
+
+Transient visual evidence pipeline
+
+Figure 3
+
+Offline inspection synchronization
+
+Figure 4
+
+Voice command → structured inspection action
+
+Figure 5
+
+Wearable → FAIE pipeline
+
+Figure 6
+
+AI prediction → technician correction → verification → training signal
+
+Figure 7
+
+Measurement intelligence pipeline
+
+Figure 8
+
+Unified multimodal inspection workflow
+
+Use Mermaid where appropriate and ensure the diagrams reflect the actual code.
+
+---
+
+16. INVENTION DISCLOSURE FORMAT
+
+Produce the final document with these sections:
+
+Title
+
+A technically descriptive title for the overall FAIE system.
+
+Technical Field
+
+Describe the relevant technical field.
+
+Problem
+
+Describe the real-world field inspection problems the implementation addresses.
+
+Existing Approaches
+
+Only describe approaches supported by the repository or clearly label outside knowledge.
+
+Summary of the Technical Architecture
+
+Describe the actual ReadyLoq/FAIE implementation.
+
+Detailed Technical Description
+
+Break down each subsystem.
+
+Data Flow
+
+Describe the actual data movement.
+
+Key Technical Mechanisms
+
+Identify the most important mechanisms.
+
+Potentially Distinctive Combinations
+
+List the candidates identified during the audit.
+
+Alternative Implementations
+
+Explain how the same technical objectives could be achieved through different implementations.
+
+Current Implementation Status
+
+Provide a table:
+
+Capability| Status| Evidence
+
+Git Evidence
+
+Provide implementation dates and commit references.
+
+Prior-Art Research Questions
+
+List questions for professional IP research.
+
+Attorney Review Checklist
+
+Provide a concise list of what should be reviewed by a patent attorney/patent agent.
+
+---
+
+17. CRITICAL ACCURACY REQUIREMENT
+
+At the beginning and end of the document include this statement:
+
+«This document is a technical invention disclosure and engineering record generated from the ReadyLoq codebase. It is not a legal opinion, patentability determination, prior-art search, or patent application. Any assessment of novelty, non-obviousness, patentability, trade-secret status, or infringement requires review by qualified intellectual-property counsel.»
+
+Most importantly:
+
+Do not exaggerate.
+
+If the repository shows that something is incomplete, say it is incomplete.
+
+If a feature is only an interface, say it is an interface.
+
+If a feature is implemented but not physically validated, say so.
+
+If a capability exists in documentation but not code, mark it PLANNED.
+
+I want a technically defensible record of what ReadyLoq and FAIE actually contain today—not a sales pitch.
