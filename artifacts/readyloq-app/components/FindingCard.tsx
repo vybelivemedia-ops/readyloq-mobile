@@ -29,6 +29,25 @@ export function findingAttribution(reviewStatus?: string | null): FindingAttribu
   return "ai";
 }
 
+/**
+ * Shape of the `laserMeasurement` sub-object stored inside captureMetadata.
+ * Burst measurements carry full dimensions in `metadata`; laser-only readings
+ * carry just `value` (width).
+ */
+interface LaserMeasurement {
+  kind?: string;
+  value?: number;
+  unit?: string;
+  signalQuality?: number;
+  metadata?: {
+    method?: string;
+    heightInches?: number;
+    areaSqInches?: number;
+    confidence?: number;
+    warnings?: string[];
+  };
+}
+
 interface FindingCardProps {
   finding: Finding;
   /**
@@ -46,9 +65,15 @@ interface FindingCardProps {
    * recognition credit per commission rules).
    */
   technicianName?: string;
+  /**
+   * Raw captureMetadata from the InspectionMedia record whose URL matches
+   * this finding's imageUrl. When present and contains a laserMeasurement,
+   * the card renders the stamped dimensions below the confidence row.
+   */
+  captureMetadata?: Record<string, unknown> | null;
 }
 
-export function FindingCard({ finding, onReview, savedAction, technicianName }: FindingCardProps) {
+export function FindingCard({ finding, onReview, savedAction, technicianName, captureMetadata }: FindingCardProps) {
   const colors = useColors();
   const [zoomVisible, setZoomVisible] = useState(false);
 
@@ -251,6 +276,99 @@ export function FindingCard({ finding, onReview, savedAction, technicianName }: 
         ) : null}
       </View>
 
+      {/* ── Stamped measurement block ───────────────────────────────────────── */}
+      {(() => {
+        const laser = captureMetadata?.laserMeasurement as LaserMeasurement | undefined;
+        if (!laser) return null;
+
+        const isBurst = laser.metadata?.method === "burst_reference";
+        const widthIn = laser.value;
+        const heightIn = laser.metadata?.heightInches;
+        const areaSqIn = laser.metadata?.areaSqInches;
+        // Prefer the inner confidence (burst pipeline score) over signalQuality
+        const conf = laser.metadata?.confidence ?? laser.signalQuality;
+        const isLowConf = conf != null && conf < 0.5;
+        const warnings = laser.metadata?.warnings ?? [];
+
+        const accentColor = isLowConf ? (colors.warning ?? "#f59e0b") : (colors.info ?? "#0ea5e9");
+
+        return (
+          <View
+            style={{
+              backgroundColor: isLowConf
+                ? (colors.warning ?? "#f59e0b") + "14"
+                : (colors.info ?? "#0ea5e9") + "12",
+              borderRadius: 8,
+              padding: 10,
+              gap: 6,
+              borderWidth: 1,
+              borderColor: isLowConf
+                ? (colors.warning ?? "#f59e0b") + "40"
+                : (colors.info ?? "#0ea5e9") + "30",
+            }}
+          >
+            {/* Header row */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Ionicons
+                name={isLowConf ? "warning-outline" : "resize-outline"}
+                size={13}
+                color={accentColor}
+              />
+              <Text
+                style={{
+                  color: accentColor,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 11,
+                  flex: 1,
+                }}
+              >
+                {isBurst ? "On-screen measurement" : "Laser measurement"}
+                {isLowConf ? " — low confidence" : ""}
+              </Text>
+              {conf != null ? (
+                <Text
+                  style={{ color: accentColor, fontFamily: "Inter_500Medium", fontSize: 11 }}
+                >
+                  {Math.round(conf * 100)}%
+                </Text>
+              ) : null}
+            </View>
+
+            {/* Dimension row */}
+            <View style={{ flexDirection: "row", gap: 14, flexWrap: "wrap" }}>
+              {widthIn != null ? (
+                <DimItem
+                  label={isBurst && heightIn != null ? "W" : "Width"}
+                  value={`${widthIn.toFixed(2)} in`}
+                  colors={colors}
+                />
+              ) : null}
+              {isBurst && heightIn != null ? (
+                <DimItem label="H" value={`${heightIn.toFixed(2)} in`} colors={colors} />
+              ) : null}
+              {isBurst && areaSqIn != null ? (
+                <DimItem label="Area" value={`${areaSqIn.toFixed(2)} in²`} colors={colors} />
+              ) : null}
+            </View>
+
+            {/* Warnings */}
+            {warnings.length > 0 ? (
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 11,
+                  lineHeight: 16,
+                }}
+                numberOfLines={2}
+              >
+                {warnings.join(" · ")}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })()}
+
       {finding.treatment ? (
         <View
           style={{
@@ -311,5 +429,27 @@ export function FindingCard({ finding, onReview, savedAction, technicianName }: 
         </View>
       ) : null}
     </Card>
+  );
+}
+
+// ── Small helper: one labelled dimension value ────────────────────────────────
+function DimItem({
+  label,
+  value,
+  colors,
+}: {
+  label: string;
+  value: string;
+  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+}) {
+  return (
+    <View style={{ gap: 1 }}>
+      <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 10 }}>
+        {label}
+      </Text>
+      <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 13 }}>
+        {value}
+      </Text>
+    </View>
   );
 }

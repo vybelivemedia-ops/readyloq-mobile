@@ -686,15 +686,24 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                 </View>
               </Card>
 
-              {analysis.findings?.map((f) => (
-                <FindingCard
-                  key={f.id}
-                  finding={f}
-                  onReview={(action) => handleFindingAction(f, action)}
-                  savedAction={reviewResults[f.id] ?? null}
-                  technicianName={inspection.technicianName}
-                />
-              ))}
+              {analysis.findings?.map((f) => {
+                // Cross-reference the finding's evidence photo URL with the
+                // media array so we can surface stamped measurements.
+                const mediaMeta = f.imageUrl
+                  ? (photos.find((m) => m.url === f.imageUrl)
+                      ?.captureMetadata as Record<string, unknown> | null | undefined)
+                  : null;
+                return (
+                  <FindingCard
+                    key={f.id}
+                    finding={f}
+                    onReview={(action) => handleFindingAction(f, action)}
+                    savedAction={reviewResults[f.id] ?? null}
+                    technicianName={inspection.technicianName}
+                    captureMetadata={mediaMeta ?? null}
+                  />
+                );
+              })}
 
               {analysis.recommendations?.length ? (
                 <Card style={{ gap: 8 }}>
