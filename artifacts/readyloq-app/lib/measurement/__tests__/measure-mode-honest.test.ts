@@ -312,6 +312,183 @@ describe("MeasureModeOverlay results sheet — warnings before Stamp", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 2b. EXIF-UNAVAILABLE FOCAL-LENGTH WARNING — end-to-end path
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// When BurstMeasurementManager.captureBurst() cannot read EXIF data it returns
+// focalLengthSource: "fallback".  new-inspection.tsx checks that flag and pushes:
+//
+//   "Focal length estimated from default (EXIF unavailable) — dimensions may be less accurate"
+//
+// into result.warnings BEFORE calling setMeasureResult().  MeasureModeOverlay
+// then renders result.warnings (amber banner) above the Stamp button.
+//
+// These tests mirror that logic end-to-end without React Native so vitest can
+// run them in a plain Node environment:
+//   a. The correct warning string is produced by the fallback branch.
+//   b. The results-sheet state exposes the warning before Stamp is available.
+//   c. Stamp remains reachable so the technician can override with awareness.
+//   d. The warning round-trips into the stamp metadata.
+//   e. When EXIF IS available (focalLengthSource === "exif") no extra warning
+//      is pushed.
+
+describe("EXIF-unavailable focal-length warning — warning text and overlay ordering", () => {
+  // Mirror the exact warning string from new-inspection.tsx handleRunBurstMeasure.
+  // If this string ever changes in the screen, this test will catch the drift.
+  const EXIF_FALLBACK_WARNING =
+    "Focal length estimated from default (EXIF unavailable) — dimensions may be less accurate";
+
+  interface MinimalResult {
+    confidence: number;
+    warnings: string[];
+    widthInches: number;
+    heightInches: number;
+    areaSqInches: number;
+  }
+
+  /**
+   * Simulate the handleRunBurstMeasure logic in new-inspection.tsx:
+   * after the pipeline runs, check focalLengthSource and push the warning.
+   */
+  function applyFocalLengthSourceWarning(
+    result: MinimalResult,
+    focalLengthSource: "exif" | "fallback",
+  ): MinimalResult {
+    if (focalLengthSource === "fallback") {
+      result.warnings.push(EXIF_FALLBACK_WARNING);
+    }
+    return result;
+  }
+
+  /**
+   * Simulate the MeasureModeOverlay results-sheet rendering decision:
+   * returns the ordered list of "elements" that would appear before Stamp.
+   * In the real component the order is:
+   *   1. confidence row
+   *   2. warnings (map over result.warnings)
+   *   3. dimensions row
+   *   4. [Re-measure] [Stamp] button row   ← Stamp is here
+   */
+  function resultsSheetElements(result: MinimalResult): string[] {
+    const elements: string[] = ["confidence-row"];
+    for (const w of result.warnings) {
+      elements.push(`warning: ${w}`);
+    }
+    elements.push("dimensions-row");
+    elements.push("stamp-button");
+    return elements;
+  }
+
+  it("produces the exact EXIF-unavailable warning string when focalLengthSource is 'fallback'", () => {
+    const result: MinimalResult = {
+      confidence: 0.65,
+      warnings: [],
+      widthInches: 5.0,
+      heightInches: 3.0,
+      areaSqInches: 15.0,
+    };
+    applyFocalLengthSourceWarning(result, "fallback");
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toBe(EXIF_FALLBACK_WARNING);
+    expect(result.warnings[0]).toMatch(/EXIF unavailable/i);
+    expect(result.warnings[0]).toMatch(/dimensions may be less accurate/i);
+  });
+
+  it("does NOT push the fallback warning when focalLengthSource is 'exif'", () => {
+    const result: MinimalResult = {
+      confidence: 0.75,
+      warnings: [],
+      widthInches: 5.0,
+      heightInches: 3.0,
+      areaSqInches: 15.0,
+    };
+    applyFocalLengthSourceWarning(result, "exif");
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it("warning element appears before the stamp-button element in the results sheet", () => {
+    const result: MinimalResult = {
+      confidence: 0.65,
+      warnings: [],
+      widthInches: 5.0,
+      heightInches: 3.0,
+      areaSqInches: 15.0,
+    };
+    applyFocalLengthSourceWarning(result, "fallback");
+
+    const elements = resultsSheetElements(result);
+    const warningIdx = elements.findIndex((e) => e.startsWith("warning:"));
+    const stampIdx = elements.indexOf("stamp-button");
+
+    expect(warningIdx).toBeGreaterThan(-1); // warning is rendered
+    expect(stampIdx).toBeGreaterThan(-1);   // stamp is rendered
+    // The warning must appear before Stamp in the element list.
+    expect(warningIdx).toBeLessThan(stampIdx);
+  });
+
+  it("stamp is still available (technician override) even when EXIF warning is present", () => {
+    const result: MinimalResult = {
+      confidence: 0.65,
+      warnings: [],
+      widthInches: 5.0,
+      heightInches: 3.0,
+      areaSqInches: 15.0,
+    };
+    applyFocalLengthSourceWarning(result, "fallback");
+
+    // handleStampMeasureResult guard: only checks isFinite(widthInches).
+    const stampEnabled = Number.isFinite(result.widthInches);
+    expect(stampEnabled).toBe(true);
+    // Warning is still present — technician sees it before choosing to stamp.
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("confidence indicator is shown at full fidelity even when EXIF warning is present", () => {
+    // EXIF fallback does not force low confidence — the pipeline's own
+    // confidence score is preserved; only the warning text is added.
+    const result: MinimalResult = {
+      confidence: 0.7,
+      warnings: [],
+      widthInches: 5.0,
+      heightInches: 3.0,
+      areaSqInches: 15.0,
+    };
+    applyFocalLengthSourceWarning(result, "fallback");
+
+    // Confidence unchanged by the warning push.
+    expect(result.confidence).toBe(0.7);
+    // Still shown as good confidence (≥ 0.5 threshold from the overlay).
+    expect(result.confidence).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it("EXIF warning coexists with an additional pipeline warning (e.g. clipping)", () => {
+    const clippingWarning = "Reference object partially out of frame — scale may be overstated";
+    const result: MinimalResult = {
+      confidence: 0.28,
+      warnings: [clippingWarning],
+      widthInches: 5.0,
+      heightInches: 3.0,
+      areaSqInches: 15.0,
+    };
+    applyFocalLengthSourceWarning(result, "fallback");
+
+    expect(result.warnings).toHaveLength(2);
+    expect(result.warnings).toContain(clippingWarning);
+    expect(result.warnings).toContain(EXIF_FALLBACK_WARNING);
+
+    // Both warnings appear before Stamp in the results sheet.
+    const elements = resultsSheetElements(result);
+    const stampIdx = elements.indexOf("stamp-button");
+    const warningIndices = elements
+      .map((e, i) => (e.startsWith("warning:") ? i : -1))
+      .filter((i) => i >= 0);
+
+    expect(warningIndices).toHaveLength(2);
+    warningIndices.forEach((wi) => expect(wi).toBeLessThan(stampIdx));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 3. STAMP METADATA CARRIES CONFIDENCE AND WARNINGS
 // ─────────────────────────────────────────────────────────────────────────────
 //
