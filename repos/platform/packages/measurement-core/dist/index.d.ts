@@ -673,7 +673,22 @@ export interface ScaleAnchorResult {
      * Callers should surface this to the technician and request a re-frame.
      */
     clipped: boolean;
+    /**
+     * Human-readable warnings generated during anchoring.
+     * Non-empty when the result is unreliable — e.g. reference box is too small
+     * to produce a valid scale (pixelWidth below the minimum threshold).
+     * BurstMeasurementPipeline propagates these into its own warnings array.
+     */
+    warnings: string[];
 }
+/**
+ * Minimum reference object pixel width required for a valid scale anchor.
+ * Below this threshold, pixelWidth ≈ 0 → referenceDepthMeters → Infinity,
+ * which produces stampable-looking Infinity/NaN dimensions downstream.
+ * The guard fires early and surfaces a warning instead of letting the
+ * divide-by-zero reach the stamping UI.
+ */
+export declare const MIN_REFERENCE_PIXEL_WIDTH = 5;
 /**
  * Anchors a relative SfMDepthMap to metric (absolute) scale using a reference
  * object with known physical dimensions.

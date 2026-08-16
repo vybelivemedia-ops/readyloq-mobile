@@ -1051,7 +1051,23 @@ export interface ScaleAnchorResult {
    * Callers should surface this to the technician and request a re-frame.
    */
   clipped: boolean;
+  /**
+   * Human-readable warnings generated during anchoring.
+   * Non-empty when the result is unreliable — e.g. reference box is too small
+   * to produce a valid scale (pixelWidth below the minimum threshold).
+   * BurstMeasurementPipeline propagates these into its own warnings array.
+   */
+  warnings: string[];
 }
+
+/**
+ * Minimum reference object pixel width required for a valid scale anchor.
+ * Below this threshold, pixelWidth ≈ 0 → referenceDepthMeters → Infinity,
+ * which produces stampable-looking Infinity/NaN dimensions downstream.
+ * The guard fires early and surfaces a warning instead of letting the
+ * divide-by-zero reach the stamping UI.
+ */
+export const MIN_REFERENCE_PIXEL_WIDTH = 5;
 
 /**
  * Anchors a relative SfMDepthMap to metric (absolute) scale using a reference
@@ -1103,9 +1119,28 @@ export class ReferenceScaleAnchor {
     // observed; the `clipped` flag tells them not to trust the result.
     const pixelWidth = box.width * imageWidthPx;
 
-    // Pinhole depth back-projection (metres)
+    const anchorWarnings: string[] = [];
+
+    // Guard: a near-zero reference box (e.g. a single tap) produces a
+    // pixelWidth ≈ 0, making referenceDepthMeters → Infinity and every
+    // downstream dimension NaN or Infinity.  Catch it here — before the
+    // divide — and surface a warning so the pipeline can relay it to the UI
+    // instead of propagating an unrepresentable value.
+    const tooSmall = pixelWidth < MIN_REFERENCE_PIXEL_WIDTH;
+    if (tooSmall) {
+      anchorWarnings.push(
+        `Reference box is too small to anchor scale (${pixelWidth.toFixed(1)} px width, ` +
+        `minimum is ${MIN_REFERENCE_PIXEL_WIDTH} px) — draw a larger box around the reference object`,
+      );
+    }
+
+    // Pinhole depth back-projection (metres).
+    // When pixelWidth is below the threshold we clamp to the minimum so that
+    // downstream numeric values are finite (confidence will be 0, so the result
+    // is discarded, but we avoid propagating Infinity into the pipeline).
+    const safePixelWidth = tooSmall ? MIN_REFERENCE_PIXEL_WIDTH : pixelWidth;
     const referenceDepthMeters =
-      (this.focalLengthPx * referenceObject.widthMm) / (pixelWidth * 1000);
+      (this.focalLengthPx * referenceObject.widthMm) / (safePixelWidth * 1000);
 
     // Sample relative depth at the bounding box centroid
     const cx = Math.round((box.x + box.width  / 2) * depthMap.width);
@@ -1121,10 +1156,18 @@ export class ReferenceScaleAnchor {
 
     // Confidence: penalise low pixel width (far object = noisy), high variance,
     // and clipping (clipped anchor has systematically wrong scale).
-    const pixelConfidence = Math.min(1, pixelWidth / 80); // 80 px = full conf
-    const varianceConfidence = Math.max(0, 1 - depthMap.scaleVariance);
-    const clippingPenalty = clipped ? 0.4 : 1.0;
-    const confidence = (pixelConfidence * 0.7 + varianceConfidence * 0.3) * clippingPenalty;
+    // A below-threshold box FORCES confidence to exactly 0 — no variance or
+    // other factor can rescue an invalid anchor.  The clamped safePixelWidth
+    // keeps downstream values finite, but the caller must not stamp the result.
+    let confidence: number;
+    if (tooSmall) {
+      confidence = 0;
+    } else {
+      const pixelConfidence = Math.min(1, pixelWidth / 80); // 80 px = full conf
+      const varianceConfidence = Math.max(0, 1 - depthMap.scaleVariance);
+      const clippingPenalty = clipped ? 0.4 : 1.0;
+      confidence = (pixelConfidence * 0.7 + varianceConfidence * 0.3) * clippingPenalty;
+    }
 
     return {
       metersPerRelativeUnit,
@@ -1133,6 +1176,7 @@ export class ReferenceScaleAnchor {
       referenceRealWidthMm: referenceObject.widthMm,
       confidence: Math.min(1, Math.max(0, confidence)),
       clipped,
+      warnings: anchorWarnings,
     };
   }
 
@@ -1388,6 +1432,8 @@ export class BurstMeasurementPipeline {
           "Reference object partially out of frame — re-centre and retry",
         );
       }
+      // Propagate any anchor-level warnings (e.g. near-zero reference box)
+      warnings.push(...anchorResult.warnings);
     }
 
     // ── Stage 3: Unproject vertices → fit plane → measure ────────────────────
@@ -1444,7 +1490,19 @@ export class BurstMeasurementPipeline {
     // ── Confidence assembly ───────────────────────────────────────────────────
     const sfmVariance    = Math.max(0, 1 - depthMap.scaleVariance);
     const anchorQuality  = anchorResult?.confidence ?? 0;
-    const confidence     = sfmVariance * 0.3 + anchorQuality * 0.5 + planeFitScore * 0.2;
+
+    // When the reference box was too small to produce a valid anchor (pixelWidth
+    // below the minimum threshold), the anchor confidence is already 0 — but SfM
+    // variance and plane-fit quality can still contribute up to 0.5 to the
+    // combined score.  That is unsafe: a consumer relying on the combined
+    // confidence could accept a measurement derived from an arbitrary clamp.
+    // Force the entire pipeline confidence to 0 so the result cannot be stamped.
+    const anchorInvalid =
+      anchorResult !== null &&
+      anchorResult.referencePixelWidth < MIN_REFERENCE_PIXEL_WIDTH;
+    const confidence = anchorInvalid
+      ? 0
+      : sfmVariance * 0.3 + anchorQuality * 0.5 + planeFitScore * 0.2;
 
     return {
       widthInches:  Math.round(widthInches  * 10) / 10,

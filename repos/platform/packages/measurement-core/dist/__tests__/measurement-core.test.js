@@ -23,7 +23,7 @@
  *   4. Run: pnpm --filter @platform/measurement-core test
  */
 import { describe, it, expect } from "vitest";
-import { MEASUREMENT_EVENT_KINDS, ReferenceScaleAnchor, FallbackSfMProvider, BurstMeasurementPipeline, REFERENCE_OBJECTS, } from "../index.js";
+import { MEASUREMENT_EVENT_KINDS, ReferenceScaleAnchor, FallbackSfMProvider, BurstMeasurementPipeline, REFERENCE_OBJECTS, MIN_REFERENCE_PIXEL_WIDTH, } from "../index.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK FACTORIES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -415,6 +415,176 @@ describe("ReferenceScaleAnchor — clipping detection", () => {
         const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
         // x=0 and x+width=1 are exactly at the boundary — not outside it.
         expect(result.clipped).toBe(false);
+    });
+});
+// ─────────────────────────────────────────────────────────────────────────────
+// NEAR-ZERO REFERENCE BOX GUARD (Task 618)
+// ReferenceScaleAnchor must catch pixelWidth < MIN_REFERENCE_PIXEL_WIDTH before
+// the divide-by-zero produces Infinity / NaN dimensions.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("ReferenceScaleAnchor — near-zero reference box guard", () => {
+    const anchor = new ReferenceScaleAnchor(800);
+    it("fires the guard and emits a warning when pixelWidth < MIN_REFERENCE_PIXEL_WIDTH", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // A single-tap box: width = 0.001 → pixelWidth = 0.001 × 1080 = 1.08 px (< 5 px)
+        const box = { x: 0.4, y: 0.4, width: 0.001, height: 0.001 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.warnings.length).toBeGreaterThan(0);
+        expect(result.warnings[0]).toMatch(/too small/i);
+    });
+    it("returns zero confidence for a near-zero reference box", async () => {
+        const depthMap = await makeFlatDepthMap();
+        const box = { x: 0.4, y: 0.4, width: 0.001, height: 0.001 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.confidence).toBe(0);
+    });
+    it("returns finite (non-Infinity, non-NaN) dimensions for a near-zero reference box", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // width=0 would be a true single-tap (after normalisation); use the smallest
+        // normalised value that keeps pixelWidth < MIN_REFERENCE_PIXEL_WIDTH.
+        const box = { x: 0.4, y: 0.4, width: 0, height: 0 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(Number.isFinite(result.referenceDepthMeters)).toBe(true);
+        expect(Number.isFinite(result.metersPerRelativeUnit)).toBe(true);
+        expect(Number.isNaN(result.referenceDepthMeters)).toBe(false);
+        expect(Number.isNaN(result.metersPerRelativeUnit)).toBe(false);
+    });
+    it("does NOT fire the guard for a normal-sized reference box", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // Box giving ~200 px width → well above the 5 px threshold
+        const box = { x: 0.2, y: 0.3, width: 0.185, height: 0.07 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.warnings).toEqual([]);
+        expect(result.confidence).toBeGreaterThan(0);
+    });
+    it("emits an empty warnings array when pixelWidth is exactly at the threshold", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // pixelWidth = MIN_REFERENCE_PIXEL_WIDTH exactly → should NOT trigger the guard
+        const box = { x: 0.4, y: 0.4, width: MIN_REFERENCE_PIXEL_WIDTH / 1080, height: 0.05 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.warnings).toEqual([]);
+    });
+    it("forces confidence to 0 even when the depth map has low variance (scaleVariance=0)", async () => {
+        // Construct a synthetic low-variance depth map (all values = 0.5, scaleVariance=0).
+        // Without the tooSmall guard, varianceConfidence=1 would contribute 0.3 to confidence.
+        const lowVarianceMap = {
+            width: 8,
+            height: 8,
+            relativeDepth: new Float32Array(64).fill(0.5),
+            scaleVariance: 0, // perfect internal consistency — worst case for the old bug
+            frameCount: 1,
+        };
+        // Single-tap box: pixelWidth ≈ 1 px (well below 5 px threshold)
+        const box = { x: 0.4, y: 0.4, width: 0.001, height: 0.001 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, lowVarianceMap);
+        // Must be exactly 0 — varianceConfidence must not bleed through
+        expect(result.confidence).toBe(0);
+        expect(result.warnings.length).toBeGreaterThan(0);
+    });
+});
+/** A synthetic low-variance SfMDepthMap (scaleVariance=0, uniform 0.5 depth). */
+function makeLowVarianceDepthMap() {
+    const width = 64, height = 64;
+    return {
+        width,
+        height,
+        relativeDepth: new Float32Array(width * height).fill(0.5),
+        scaleVariance: 0, // perfect internal consistency — worst case for confidence bleed
+        frameCount: 3, // multi-frame — simulates a real SfM run
+    };
+}
+describe("BurstMeasurementPipeline — near-zero reference box warning propagation", () => {
+    it("propagates the anchor too-small warning into pipeline result.warnings", async () => {
+        const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), 800);
+        const frames = [{ uri: "file://a.jpg", capturedAt: 0 }];
+        const vertices = [
+            { x: 50, y: 50 }, { x: 200, y: 50 },
+            { x: 200, y: 200 }, { x: 50, y: 200 },
+        ];
+        // Single-tap-sized reference box → pixelWidth ≈ 1 px
+        const result = await pipeline.measure(frames, vertices, {
+            box: { x: 0.4, y: 0.4, width: 0.001, height: 0.001 },
+            object: CREDIT_CARD,
+            imageWidthPx: 1080,
+            imageHeightPx: 1920,
+        });
+        expect(result.warnings.length).toBeGreaterThan(0);
+        expect(result.warnings.some((w) => /too small/i.test(w))).toBe(true);
+    });
+    it("returns finite dimensions when a near-zero reference box is supplied", async () => {
+        const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), 800);
+        const frames = [{ uri: "file://a.jpg", capturedAt: 0 }];
+        const vertices = [
+            { x: 50, y: 50 }, { x: 200, y: 50 },
+            { x: 200, y: 200 }, { x: 50, y: 200 },
+        ];
+        const result = await pipeline.measure(frames, vertices, {
+            box: { x: 0.4, y: 0.4, width: 0, height: 0 },
+            object: CREDIT_CARD,
+            imageWidthPx: 1080,
+            imageHeightPx: 1920,
+        });
+        expect(Number.isFinite(result.widthInches)).toBe(true);
+        expect(Number.isFinite(result.heightInches)).toBe(true);
+        expect(Number.isFinite(result.areaSqInches)).toBe(true);
+        expect(Number.isNaN(result.widthInches)).toBe(false);
+        expect(Number.isNaN(result.heightInches)).toBe(false);
+    });
+    it("forces pipeline confidence to 0 even with a low-variance depth map and good plane fit", async () => {
+        // This is the critical regression: without a pipeline-level override, a low-variance
+        // SfM map (scaleVariance=0) contributes 0.3 and a good plane fit contributes 0.2,
+        // leaving the result at 0.5 confidence despite the anchor being invalid.
+        // The pipeline must force confidence to exactly 0 for a sub-threshold reference box.
+        // We inject a custom SfMProvider that returns a low-variance map so the
+        // fallback provider's scaleVariance=1 doesn't accidentally mask the bug.
+        const lowVarianceMap = makeLowVarianceDepthMap();
+        const stubbedProvider = {
+            computeDepth: async () => lowVarianceMap,
+        };
+        const pipeline = new BurstMeasurementPipeline(stubbedProvider, 800);
+        const frames = [{ uri: "file://a.jpg", capturedAt: 0 }];
+        // A planar, well-formed target polygon
+        const vertices = [
+            { x: 100, y: 100 }, { x: 500, y: 100 },
+            { x: 500, y: 500 }, { x: 100, y: 500 },
+        ];
+        // Single-tap reference box: pixelWidth = 0.001 × 1080 = 1.08 px (< 5 px)
+        const result = await pipeline.measure(frames, vertices, {
+            box: { x: 0.4, y: 0.4, width: 0.001, height: 0.001 },
+            object: CREDIT_CARD,
+            imageWidthPx: 1080,
+            imageHeightPx: 1920,
+        });
+        // Pipeline confidence must be exactly 0 — the invalid anchor must veto the result
+        expect(result.confidence).toBe(0);
+        // Dimensions must still be finite (no Infinity/NaN)
+        expect(Number.isFinite(result.widthInches)).toBe(true);
+        expect(Number.isFinite(result.heightInches)).toBe(true);
+        // Warning must be present
+        expect(result.warnings.some((w) => /too small/i.test(w))).toBe(true);
+    });
+    it("does NOT force pipeline confidence to 0 for a valid reference box with a low-variance map", async () => {
+        // Confirm the guard is not over-broad: a good reference box on a low-variance
+        // map should still yield positive pipeline confidence.
+        const lowVarianceMap = makeLowVarianceDepthMap();
+        const stubbedProvider = {
+            computeDepth: async () => lowVarianceMap,
+        };
+        const pipeline = new BurstMeasurementPipeline(stubbedProvider, 800);
+        const frames = [{ uri: "file://a.jpg", capturedAt: 0 }];
+        const vertices = [
+            { x: 100, y: 100 }, { x: 500, y: 100 },
+            { x: 500, y: 500 }, { x: 100, y: 500 },
+        ];
+        // Normal reference box: pixelWidth = 0.2 × 1080 = 216 px
+        const result = await pipeline.measure(frames, vertices, {
+            box: { x: 0.2, y: 0.3, width: 0.2, height: 0.08 },
+            object: CREDIT_CARD,
+            imageWidthPx: 1080,
+            imageHeightPx: 1920,
+        });
+        expect(result.confidence).toBeGreaterThan(0);
+        expect(result.warnings).toEqual([]);
     });
 });
 describe("BurstMeasurementPipeline — clipping warnings propagation", () => {
