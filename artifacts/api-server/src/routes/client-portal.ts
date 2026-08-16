@@ -136,6 +136,7 @@ router.get("/buildings/:address/inspections", async (req, res) => {
       mediaCount: inspectionsTable.mediaCount,
       createdAt: inspectionsTable.createdAt,
       completedAt: inspectionsTable.completedAt,
+      signedAt: inspectionsTable.signedAt,
     })
     .from(inspectionsTable)
     .where(
@@ -152,6 +153,7 @@ router.get("/buildings/:address/inspections", async (req, res) => {
       pestTypes: r.pestTypes ?? [],
       createdAt: r.createdAt.toISOString(),
       completedAt: r.completedAt?.toISOString() ?? null,
+      signedAt: r.signedAt?.toISOString() ?? null,
     })),
   );
 });

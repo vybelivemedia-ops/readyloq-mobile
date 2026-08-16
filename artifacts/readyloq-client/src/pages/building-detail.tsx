@@ -14,6 +14,7 @@ import {
   Clock,
   Bug,
   MessageSquare,
+  PenLine,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -261,6 +262,17 @@ export function BuildingDetail() {
                               : format(new Date(insp.createdAt), "MMM d, yyyy 'at' h:mm a")}
                           </span>
                           {severityBadge(insp.severity)}
+                          {insp.signedAt ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200">
+                              <PenLine className="w-3 h-3" />
+                              Signed
+                            </span>
+                          ) : insp.status === 'completed' ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+                              <PenLine className="w-3 h-3" />
+                              Awaiting signature
+                            </span>
+                          ) : null}
                         </div>
                         <div className="flex flex-wrap gap-3 mt-1 pl-6">
                           <span className="text-xs text-muted-foreground">{insp.technicianName}</span>

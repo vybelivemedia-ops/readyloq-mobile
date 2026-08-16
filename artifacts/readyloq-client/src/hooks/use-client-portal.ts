@@ -31,6 +31,7 @@ export interface ClientInspection {
   mediaCount: number;
   createdAt: string;
   completedAt: string | null;
+  signedAt: string | null;
 }
 
 export interface ClientReport {
