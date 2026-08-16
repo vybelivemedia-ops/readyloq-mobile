@@ -26,4 +26,5 @@ export * from "./field-integrations";
 export * from "./playbooks";
 export * from "./client-portal";
 export * from "./meta-glasses";
+export * from "./portal-messages";
 //# sourceMappingURL=index.d.ts.map

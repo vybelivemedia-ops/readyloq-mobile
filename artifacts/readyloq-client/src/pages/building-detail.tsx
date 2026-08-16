@@ -13,10 +13,12 @@ import {
   AlertCircle,
   Clock,
   Bug,
+  MessageSquare,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PropertyMessagingWidget } from '@/components/PropertyMessagingWidget';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
@@ -151,7 +153,7 @@ export function BuildingDetail() {
         </CardContent>
       </Card>
 
-      {/* Tabs: Reports | Inspections */}
+      {/* Tabs: Reports | Inspections | Messages */}
       <Tabs defaultValue="reports">
         <TabsList className="mb-4">
           <TabsTrigger value="reports">
@@ -159,6 +161,10 @@ export function BuildingDetail() {
           </TabsTrigger>
           <TabsTrigger value="inspections">
             Inspection History{inspections ? ` (${inspections.length})` : ''}
+          </TabsTrigger>
+          <TabsTrigger value="messages" className="flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5" />
+            Messages
           </TabsTrigger>
         </TabsList>
 
@@ -216,6 +222,11 @@ export function BuildingDetail() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Messages tab */}
+        <TabsContent value="messages">
+          <PropertyMessagingWidget address={address} />
         </TabsContent>
 
         {/* Inspection history tab */}

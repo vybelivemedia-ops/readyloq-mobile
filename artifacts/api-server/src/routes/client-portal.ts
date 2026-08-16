@@ -17,12 +17,14 @@ import {
   inspectionsTable,
   reportsTable,
   companiesTable,
+  portalMessagesTable,
 } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { requireCompany, requireRole } from "../middleware/require-auth";
 import { buildServerReportHtml } from "../lib/report-html-server";
+import { messageBus } from "../lib/message-bus";
 
 const router = Router();
 
@@ -467,6 +469,94 @@ router.delete("/invites/:id", requireCompany, requireRole("manager"), async (req
 
   if (!deleted) return res.status(404).json({ error: "Access record not found" });
   return res.status(204).send();
+});
+
+// ─── GET /client/buildings/:address/messages ──────────────────────────────────
+
+router.get("/buildings/:address/messages", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+
+  const address = decodeURIComponent(req.params.address);
+  if (!access.siteAddresses.includes(address)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+
+  const rows = await db
+    .select()
+    .from(portalMessagesTable)
+    .where(
+      and(
+        eq(portalMessagesTable.companyId, access.companyId),
+        eq(portalMessagesTable.siteAddress, address),
+      ),
+    )
+    .orderBy(asc(portalMessagesTable.createdAt))
+    .limit(100);
+
+  return res.json(rows.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })));
+});
+
+// ─── POST /client/buildings/:address/messages ─────────────────────────────────
+
+const clientMessageSchema = z.object({ message: z.string().min(1).max(2000) });
+
+router.post("/buildings/:address/messages", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+
+  const address = decodeURIComponent(req.params.address);
+  if (!access.siteAddresses.includes(address)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+
+  const { userId } = getAuth(req);
+  const body = clientMessageSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "Invalid message" });
+
+  const [msg] = await db
+    .insert(portalMessagesTable)
+    .values({
+      companyId: access.companyId,
+      siteAddress: address,
+      senderType: "client",
+      senderClerkId: userId!,
+      senderName: access.label ?? access.email ?? null,
+      message: body.data.message,
+    })
+    .returning();
+
+  messageBus.publish(msg);
+
+  return res.status(201).json({ ...msg, createdAt: msg.createdAt.toISOString() });
+});
+
+// ─── GET /client/buildings/:address/messages/stream (SSE) ────────────────────
+
+router.get("/buildings/:address/messages/stream", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) { res.status(401).end(); return; }
+
+  const address = decodeURIComponent(req.params.address);
+  if (!access.siteAddresses.includes(address)) { res.status(403).end(); return; }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no"); // disable Replit proxy / nginx buffering
+  res.flushHeaders();
+
+  // Heartbeat keeps the TCP connection alive through proxies (25 s < typical 30 s timeout).
+  const heartbeat = setInterval(() => res.write(": ping\n\n"), 25_000);
+
+  const unsubscribe = messageBus.subscribe(access.companyId, address, (msg) => {
+    res.write(`data: ${JSON.stringify({ ...msg, createdAt: msg.createdAt.toISOString() })}\n\n`);
+  });
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
 });
 
 export default router;

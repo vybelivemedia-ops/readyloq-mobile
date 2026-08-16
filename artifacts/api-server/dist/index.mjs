@@ -20613,27 +20613,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router39;
+    module.exports = Router40;
     module.exports.Route = Route;
-    function Router39(options) {
-      if (!(this instanceof Router39)) {
-        return new Router39(options);
+    function Router40(options) {
+      if (!(this instanceof Router40)) {
+        return new Router40(options);
       }
       const opts = options || {};
-      function router39(req, res, next) {
-        router39.handle(req, res, next);
+      function router40(req, res, next) {
+        router40.handle(req, res, next);
       }
-      Object.setPrototypeOf(router39, this);
-      router39.caseSensitive = opts.caseSensitive;
-      router39.mergeParams = opts.mergeParams;
-      router39.params = {};
-      router39.strict = opts.strict;
-      router39.stack = [];
-      return router39;
+      Object.setPrototypeOf(router40, this);
+      router40.caseSensitive = opts.caseSensitive;
+      router40.mergeParams = opts.mergeParams;
+      router40.params = {};
+      router40.strict = opts.strict;
+      router40.stack = [];
+      return router40;
     }
-    Router39.prototype = function() {
+    Router40.prototype = function() {
     };
-    Router39.prototype.param = function param(name, fn) {
+    Router40.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20653,7 +20653,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router39.prototype.handle = function handle(req, res, callback) {
+    Router40.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20780,7 +20780,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router39.prototype.use = function use(handler) {
+    Router40.prototype.use = function use(handler) {
       let offset = 0;
       let path4 = "/";
       if (typeof handler !== "function") {
@@ -20813,7 +20813,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router39.prototype.route = function route(path4) {
+    Router40.prototype.route = function route(path4) {
       const route2 = new Route(path4);
       const layer = new Layer(path4, {
         sensitive: this.caseSensitive,
@@ -20828,7 +20828,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router39.prototype[method] = function(path4) {
+      Router40.prototype[method] = function(path4) {
         const route = this.route(path4);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21011,13 +21011,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router39 = require_router();
+    var Router40 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router39 = null;
+      var router40 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21026,13 +21026,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router39 === null) {
-            router39 = new Router39({
+          if (router40 === null) {
+            router40 = new Router40({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router39;
+          return router40;
         }
       });
     };
@@ -21103,15 +21103,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router39 = this.router;
+      var router40 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router39.use(path4, fn2);
+          return router40.use(path4, fn2);
         }
         debug7(".use app under %s", path4);
         fn2.mountpath = path4;
         fn2.parent = this;
-        router39.use(path4, function mounted_app(req, res, next) {
+        router40.use(path4, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23681,10 +23681,10 @@ var require_express = __commonJS({
   "../../node_modules/.pnpm/express@5.2.1/node_modules/express/lib/express.js"(exports, module) {
     "use strict";
     var bodyParser = require_body_parser();
-    var EventEmitter3 = __require("node:events").EventEmitter;
+    var EventEmitter4 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router39 = require_router();
+    var Router40 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23692,7 +23692,7 @@ var require_express = __commonJS({
       var app2 = function(req2, res2, next) {
         app2.handle(req2, res2, next);
       };
-      mixin(app2, EventEmitter3.prototype, false);
+      mixin(app2, EventEmitter4.prototype, false);
       mixin(app2, proto, false);
       app2.request = Object.create(req, {
         app: { configurable: true, enumerable: true, writable: true, value: app2 }
@@ -23706,8 +23706,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router39.Route;
-    exports.Router = Router39;
+    exports.Route = Router40.Route;
+    exports.Router = Router40;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -27096,7 +27096,7 @@ var require_sonic_boom = __commonJS({
   "../../node_modules/.pnpm/sonic-boom@4.2.1/node_modules/sonic-boom/index.js"(exports, module) {
     "use strict";
     var fs2 = __require("fs");
-    var EventEmitter3 = __require("events");
+    var EventEmitter4 = __require("events");
     var inherits = __require("util").inherits;
     var path4 = __require("path");
     var sleep6 = require_atomic_sleep();
@@ -27333,7 +27333,7 @@ var require_sonic_boom = __commonJS({
       sonic._asyncDrainScheduled = false;
       sonic.emit("drain");
     }
-    inherits(SonicBoom, EventEmitter3);
+    inherits(SonicBoom, EventEmitter4);
     function mergeBuf(bufs, len) {
       if (bufs.length === 0) {
         return kEmptyBuffer;
@@ -27911,7 +27911,7 @@ var require_thread_stream = __commonJS({
   "../../node_modules/.pnpm/thread-stream@3.1.0/node_modules/thread-stream/index.js"(exports, module) {
     "use strict";
     var { version: version3 } = require_package();
-    var { EventEmitter: EventEmitter3 } = __require("events");
+    var { EventEmitter: EventEmitter4 } = __require("events");
     var { Worker } = __require("worker_threads");
     var { join: join2 } = __require("path");
     var { pathToFileURL } = __require("url");
@@ -28067,7 +28067,7 @@ var require_thread_stream = __commonJS({
       stream.worker.off("exit", onWorkerExit);
       destroy(stream, code !== 0 ? new Error("the worker thread exited") : null);
     }
-    var ThreadStream = class extends EventEmitter3 {
+    var ThreadStream = class extends EventEmitter4 {
       constructor(opts = {}) {
         super();
         if (opts.bufferSize < 4) {
@@ -29024,7 +29024,7 @@ var require_meta = __commonJS({
 var require_proto = __commonJS({
   "../../node_modules/.pnpm/pino@9.14.0/node_modules/pino/lib/proto.js"(exports, module) {
     "use strict";
-    var { EventEmitter: EventEmitter3 } = __require("node:events");
+    var { EventEmitter: EventEmitter4 } = __require("node:events");
     var {
       lsCacheSym,
       levelValSym,
@@ -29106,7 +29106,7 @@ var require_proto = __commonJS({
       [getLevelSym]: getLevel,
       [setLevelSym]: setLevel
     };
-    Object.setPrototypeOf(prototype, EventEmitter3.prototype);
+    Object.setPrototypeOf(prototype, EventEmitter4.prototype);
     module.exports = function() {
       return Object.create(prototype);
     };
@@ -35612,10 +35612,10 @@ var require_result = __commonJS({
 var require_query = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/query.js"(exports, module) {
     "use strict";
-    var { EventEmitter: EventEmitter3 } = __require("events");
+    var { EventEmitter: EventEmitter4 } = __require("events");
     var Result2 = require_result();
     var utils = require_utils6();
-    var Query2 = class extends EventEmitter3 {
+    var Query2 = class extends EventEmitter4 {
       constructor(config2, values, callback) {
         super();
         config2 = utils.normalizeQueryConfig(config2, values, callback);
@@ -36737,13 +36737,13 @@ var require_stream = __commonJS({
 var require_connection = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/connection.js"(exports, module) {
     "use strict";
-    var EventEmitter3 = __require("events").EventEmitter;
+    var EventEmitter4 = __require("events").EventEmitter;
     var { parse: parse4, serialize: serialize6 } = require_dist3();
     var { getStream, getSecureStream } = require_stream();
     var flushBuffer = serialize6.flush();
     var syncBuffer = serialize6.sync();
     var endBuffer = serialize6.end();
-    var Connection2 = class extends EventEmitter3 {
+    var Connection2 = class extends EventEmitter4 {
       constructor(config2) {
         super();
         config2 = config2 || {};
@@ -37212,7 +37212,7 @@ var require_lib4 = __commonJS({
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js
 var require_client = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js"(exports, module) {
-    var EventEmitter3 = __require("events").EventEmitter;
+    var EventEmitter4 = __require("events").EventEmitter;
     var utils = require_utils6();
     var nodeUtils = __require("util");
     var sasl = require_sasl();
@@ -37247,7 +37247,7 @@ var require_client = __commonJS({
       },
       "Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead."
     );
-    var Client3 = class extends EventEmitter3 {
+    var Client3 = class extends EventEmitter4 {
       constructor(config2) {
         super();
         this.connectionParameters = new ConnectionParameters(config2);
@@ -37831,7 +37831,7 @@ var require_client = __commonJS({
 var require_pg_pool = __commonJS({
   "../../node_modules/.pnpm/pg-pool@3.13.0_pg@8.20.0/node_modules/pg-pool/index.js"(exports, module) {
     "use strict";
-    var EventEmitter3 = __require("events").EventEmitter;
+    var EventEmitter4 = __require("events").EventEmitter;
     var NOOP = function() {
     };
     var removeWhere = (list, predicate) => {
@@ -37882,7 +37882,7 @@ var require_pg_pool = __commonJS({
         pool2.emit("error", err, client);
       };
     }
-    var Pool4 = class extends EventEmitter3 {
+    var Pool4 = class extends EventEmitter4 {
       constructor(options, Client3) {
         super();
         this.options = Object.assign({}, options);
@@ -38257,11 +38257,11 @@ var require_pg_pool = __commonJS({
 var require_query2 = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/native/query.js"(exports, module) {
     "use strict";
-    var EventEmitter3 = __require("events").EventEmitter;
+    var EventEmitter4 = __require("events").EventEmitter;
     var util2 = __require("util");
     var utils = require_utils6();
     var NativeQuery = module.exports = function(config2, values, callback) {
-      EventEmitter3.call(this);
+      EventEmitter4.call(this);
       config2 = utils.normalizeQueryConfig(config2, values, callback);
       this.text = config2.text;
       this.values = config2.values;
@@ -38278,7 +38278,7 @@ var require_query2 = __commonJS({
         }.bind(this)
       );
     };
-    util2.inherits(NativeQuery, EventEmitter3);
+    util2.inherits(NativeQuery, EventEmitter4);
     var errorFieldMap = {
       sqlState: "code",
       statementPosition: "position",
@@ -38405,7 +38405,7 @@ var require_client2 = __commonJS({
       throw e;
     }
     var TypeOverrides2 = require_type_overrides();
-    var EventEmitter3 = __require("events").EventEmitter;
+    var EventEmitter4 = __require("events").EventEmitter;
     var util2 = __require("util");
     var ConnectionParameters = require_connection_parameters();
     var NativeQuery = require_query2();
@@ -38415,7 +38415,7 @@ var require_client2 = __commonJS({
       "Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead."
     );
     var Client3 = module.exports = function(config2) {
-      EventEmitter3.call(this);
+      EventEmitter4.call(this);
       config2 = config2 || {};
       this._Promise = config2.Promise || global.Promise;
       this._types = new TypeOverrides2(config2.types);
@@ -38442,7 +38442,7 @@ var require_client2 = __commonJS({
       this.namedQueries = {};
     };
     Client3.Query = NativeQuery;
-    util2.inherits(Client3, EventEmitter3);
+    util2.inherits(Client3, EventEmitter4);
     Client3.prototype._errorAllQueries = function(err) {
       const enqueueError = (query) => {
         process.nextTick(() => {
@@ -38722,7 +38722,7 @@ var require_lib5 = __commonJS({
 });
 
 // src/app.ts
-var import_express42 = __toESM(require_express2(), 1);
+var import_express44 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 
 // ../../node_modules/.pnpm/helmet@8.2.0/node_modules/helmet/index.mjs
@@ -40266,7 +40266,7 @@ function isTruthy(value) {
   return false;
 }
 
-// ../../node_modules/.pnpm/@clerk+express@2.1.25_express@5.2.1/node_modules/@clerk/express/dist/chunk-L77JF5KH.mjs
+// ../../node_modules/.pnpm/@clerk+express@2.1.25_express@5.2.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/express/dist/chunk-L77JF5KH.mjs
 import { Readable } from "stream";
 var clerkAuthBrand = /* @__PURE__ */ Symbol.for("@clerk/express.auth");
 var brandRequestAuth = (authHandler) => Object.assign(authHandler, { [clerkAuthBrand]: true });
@@ -40773,11 +40773,11 @@ function buildErrorThrower({ packageName, customMessages }) {
   };
 }
 
-// ../../node_modules/.pnpm/@clerk+backend@3.6.1/node_modules/@clerk/backend/dist/chunk-YBVFDYDR.mjs
+// ../../node_modules/.pnpm/@clerk+backend@3.6.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/backend/dist/chunk-YBVFDYDR.mjs
 var errorThrower = buildErrorThrower({ packageName: "@clerk/backend" });
 var { isDevOrStagingUrl } = createDevOrStagingUrlCache();
 
-// ../../node_modules/.pnpm/@clerk+backend@3.6.1/node_modules/@clerk/backend/dist/chunk-RZ7A7F6X.mjs
+// ../../node_modules/.pnpm/@clerk+backend@3.6.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/backend/dist/chunk-RZ7A7F6X.mjs
 var TokenVerificationErrorCode = {
   InvalidSecretKey: "clerk_key_invalid"
 };
@@ -40850,10 +40850,10 @@ var _MachineTokenVerificationError = class _MachineTokenVerificationError2 exten
 _MachineTokenVerificationError.kind = "MachineTokenVerificationError";
 var MachineTokenVerificationError = _MachineTokenVerificationError;
 
-// ../../node_modules/.pnpm/@clerk+backend@3.6.1/node_modules/@clerk/backend/dist/runtime/node/crypto.mjs
+// ../../node_modules/.pnpm/@clerk+backend@3.6.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/backend/dist/runtime/node/crypto.mjs
 import { webcrypto } from "node:crypto";
 
-// ../../node_modules/.pnpm/@clerk+backend@3.6.1/node_modules/@clerk/backend/dist/chunk-J2CDX2WG.mjs
+// ../../node_modules/.pnpm/@clerk+backend@3.6.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/backend/dist/chunk-J2CDX2WG.mjs
 var globalFetch = fetch.bind(globalThis);
 var runtime = {
   crypto: webcrypto,
@@ -41222,7 +41222,7 @@ async function verifyJwt(token, options) {
   return { data: payload };
 }
 
-// ../../node_modules/.pnpm/@clerk+backend@3.6.1/node_modules/@clerk/backend/dist/chunk-TOROEX6P.mjs
+// ../../node_modules/.pnpm/@clerk+backend@3.6.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/backend/dist/chunk-TOROEX6P.mjs
 var __create2 = Object.create;
 var __defProp2 = Object.defineProperty;
 var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -41794,7 +41794,7 @@ ${e.message}`);
   }
 }
 
-// ../../node_modules/.pnpm/@clerk+backend@3.6.1/node_modules/@clerk/backend/dist/chunk-M54YMIAO.mjs
+// ../../node_modules/.pnpm/@clerk+backend@3.6.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/backend/dist/chunk-M54YMIAO.mjs
 var require_dist2 = __commonJS2({
   "../../node_modules/.pnpm/cookie@1.1.1/node_modules/cookie/dist/index.js"(exports) {
     "use strict";
@@ -48165,7 +48165,7 @@ function createAuthenticateRequest(params) {
   };
 }
 
-// ../../node_modules/.pnpm/@clerk+backend@3.6.1/node_modules/@clerk/backend/dist/chunk-P263NW7Z.mjs
+// ../../node_modules/.pnpm/@clerk+backend@3.6.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/backend/dist/chunk-P263NW7Z.mjs
 function withLegacyReturn(cb) {
   return async (...args) => {
     const { data, errors } = await cb(...args);
@@ -48537,7 +48537,7 @@ var TelemetryCollector = class {
   }
 };
 
-// ../../node_modules/.pnpm/@clerk+backend@3.6.1/node_modules/@clerk/backend/dist/index.mjs
+// ../../node_modules/.pnpm/@clerk+backend@3.6.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/backend/dist/index.mjs
 var verifyToken2 = withLegacyReturn(verifyToken);
 function createClerkClient(options) {
   const opts = { ...options };
@@ -48557,7 +48557,7 @@ function createClerkClient(options) {
   };
 }
 
-// ../../node_modules/.pnpm/@clerk+backend@3.6.1/node_modules/@clerk/backend/dist/proxy.mjs
+// ../../node_modules/.pnpm/@clerk+backend@3.6.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/backend/dist/proxy.mjs
 var HOP_BY_HOP_HEADERS = /* @__PURE__ */ new Set([
   "connection",
   "keep-alive",
@@ -48746,7 +48746,7 @@ function handleValueOrFn(value, url2, defaultValue) {
   if (typeof defaultValue !== "undefined") return defaultValue;
 }
 
-// ../../node_modules/.pnpm/@clerk+express@2.1.25_express@5.2.1/node_modules/@clerk/express/dist/index.mjs
+// ../../node_modules/.pnpm/@clerk+express@2.1.25_express@5.2.1_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/@clerk/express/dist/index.mjs
 import { Readable as Readable2 } from "stream";
 var clerkClientSingleton = {};
 var clerkClient = new Proxy(clerkClientSingleton, {
@@ -49892,11 +49892,11 @@ function parsePathRewriteRules(rewriteConfig) {
 var debug4 = Debug.extend("router");
 async function getTarget(req, res, config2) {
   let newTarget;
-  const router39 = config2.router;
-  if (isPlainObject(router39)) {
-    newTarget = getTargetFromProxyTable(req, router39);
-  } else if (typeof router39 === "function") {
-    newTarget = await router39(req, res, config2);
+  const router40 = config2.router;
+  if (isPlainObject(router40)) {
+    newTarget = getTargetFromProxyTable(req, router40);
+  } else if (typeof router40 === "function") {
+    newTarget = await router40(req, res, config2);
   }
   return newTarget;
 }
@@ -50178,7 +50178,7 @@ function clerkProxyMiddleware() {
 }
 
 // src/routes/index.ts
-var import_express40 = __toESM(require_express2(), 1);
+var import_express42 = __toESM(require_express2(), 1);
 
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/esm/index.mjs
 var import_lib = __toESM(require_lib5(), 1);
@@ -57311,6 +57311,7 @@ __export(schema_exports, {
   insertLeadSchema: () => insertLeadSchema,
   insertMessageSchema: () => insertMessageSchema,
   insertPlaybookSchema: () => insertPlaybookSchema,
+  insertPortalMessageSchema: () => insertPortalMessageSchema,
   insertProductSchema: () => insertProductSchema,
   insertPropertyMemorySchema: () => insertPropertyMemorySchema,
   insertPropertyNoteSchema: () => insertPropertyNoteSchema,
@@ -57336,6 +57337,7 @@ __export(schema_exports, {
   opportunityEventsTable: () => opportunityEventsTable,
   opportunityNotesTable: () => opportunityNotesTable,
   opportunitySettingsTable: () => opportunitySettingsTable,
+  portalMessagesTable: () => portalMessagesTable,
   productLabelRulesTable: () => productLabelRulesTable,
   productWithRulesSchema: () => productWithRulesSchema,
   productsTable: () => productsTable,
@@ -70041,6 +70043,31 @@ var metaGlassesSessionsTable = pgTable(
     index("meta_glasses_sessions_expires_idx").on(t.expiresAt)
   ]
 );
+
+// ../../lib/db/src/schema/portal-messages.ts
+var portalMessagesTable = pgTable(
+  "portal_messages",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id),
+    siteAddress: text("site_address").notNull(),
+    senderType: text("sender_type").notNull(),
+    // 'client' | 'provider'
+    senderClerkId: text("sender_clerk_id").notNull(),
+    senderName: text("sender_name"),
+    message: text("message").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow()
+  },
+  (t) => ({
+    companyAddressIdx: index("portal_messages_company_address_idx").on(
+      t.companyId,
+      t.siteAddress
+    )
+  })
+);
+var insertPortalMessageSchema = createInsertSchema(
+  portalMessagesTable
+).omit({ id: true, createdAt: true, companyId: true });
 
 // ../../lib/db/src/seed/products.ts
 var SEED_PRODUCTS = [
@@ -92072,7 +92099,17 @@ router9.get("/corrections/export", requireRole("manager"), async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const { format } = req.query;
-    const rows = await db.select().from(intelligenceRecordsTable).where(eq(intelligenceRecordsTable.companyId, companyId)).orderBy(desc(intelligenceRecordsTable.createdAt));
+    const rows = await db.select().from(intelligenceRecordsTable).where(
+      and(
+        eq(intelligenceRecordsTable.companyId, companyId),
+        // Only export records the manager has explicitly approved for training.
+        // Rejected records (approvedForTraining=false) must never appear in a
+        // training export — even if their verificationLevel is high — because a
+        // rejection is an explicit quality signal that the record is unsuitable.
+        isNotNull(intelligenceRecordsTable.approvedForTraining),
+        eq(intelligenceRecordsTable.approvedForTraining, true)
+      )
+    ).orderBy(desc(intelligenceRecordsTable.createdAt));
     const records = rows.map((r) => ({
       id: r.id,
       imageUrl: r.imageUrl,
@@ -105629,6 +105666,7 @@ function isUndiciDispatcherVersionMismatchError2(error40) {
 
 // src/routes/meta-glasses.ts
 var objectStorageService3 = new ObjectStorageService();
+var MAX_EVENT_COUNT = 1e4;
 var sessions = /* @__PURE__ */ new Map();
 var SESSION_TTL_MS = 24 * 60 * 60 * 1e3;
 var MAX_EVENTS = 100;
@@ -105783,7 +105821,7 @@ router28.post(
       return res.status(400).json({ error: "inspectionId is required" });
     }
     const companyId = req.user.companyId;
-    const [inspection] = await db.select({ id: inspectionsTable.id }).from(inspectionsTable).where(eq(inspectionsTable.id, inspectionId)).limit(1);
+    const [inspection] = await db.select({ id: inspectionsTable.id }).from(inspectionsTable).where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId))).limit(1);
     if (!inspection) {
       return res.status(404).json({ error: "Inspection not found" });
     }
@@ -105964,6 +106002,49 @@ router28.post(
     return res.json({ text: spokenResponse });
   }
 );
+var CLIENT_PUSH_TYPES = /* @__PURE__ */ new Set(["ble_frame_dropped", "ble_reconnect", "ble_link_lost"]);
+router28.post(
+  "/events/:sessionId",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  (req, res) => {
+    const sessionId = req.params.sessionId;
+    const session = sessions.get(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Session not found or expired" });
+    }
+    if (session.companyId !== req.user.companyId) {
+      return res.status(404).json({ error: "Session not found or expired" });
+    }
+    const { type, ...rest } = req.body ?? {};
+    if (!type || !CLIENT_PUSH_TYPES.has(type)) {
+      return res.status(400).json({
+        error: `Unsupported event type. Allowed types: ${[...CLIENT_PUSH_TYPES].join(", ")}`
+      });
+    }
+    const rawCount = rest.count;
+    const parsedCount = typeof rawCount === "number" ? rawCount : typeof rawCount === "string" ? Number(rawCount) : NaN;
+    const validatedCount = Number.isFinite(parsedCount) && parsedCount >= 1 ? Math.min(Math.floor(parsedCount), MAX_EVENT_COUNT) : 1;
+    const event = {
+      ...rest,
+      // Server-owned fields always win over the client payload:
+      id: crypto2.randomUUID(),
+      type: "status",
+      // client-push events are categorised as status events
+      timestamp: Date.now(),
+      text: rest.text ?? `Client event: ${type}`,
+      // Preserve the VALIDATED original event type so telemetry queries
+      // (e.g. frame-drop stats) can filter on a stable field regardless
+      // of what text the caller supplies.  Overrides any forged value.
+      clientEventType: type,
+      // Validated count — always a finite positive integer in [1..MAX_EVENT_COUNT].
+      count: validatedCount
+    };
+    pushEvent(session, event);
+    return res.status(204).end();
+  }
+);
 router28.get(
   "/events/:sessionId",
   requireAuth,
@@ -105976,7 +106057,7 @@ router28.get(
       return res.status(404).json({ error: "Session not found or expired" });
     }
     if (session.companyId !== req.user.companyId) {
-      return res.status(403).json({ error: "Forbidden" });
+      return res.status(404).json({ error: "Session not found or expired" });
     }
     const since = Number(String(req.query.since ?? "0"));
     const events = since > 0 ? session.events.filter((e) => e.timestamp > since) : session.events;
@@ -105986,6 +106067,53 @@ router28.get(
       code: session.code,
       events,
       serverTime: Date.now()
+    });
+  }
+);
+router28.get(
+  "/frame-drop-stats",
+  requireAuth,
+  requireCompany,
+  requireRole("manager"),
+  (req, res) => {
+    const companyId = req.user.companyId;
+    void db.execute(
+      sql`
+          SELECT
+            e->>'deviceId'  AS device_id,
+            e->>'reason'    AS reason,
+            SUM(
+              CASE
+                -- Accept only digit-only strings where the value is >= 1.
+                -- LEAST caps oversized values at 10 000; negative/non-numeric
+                -- strings fall back to 1 so malformed events can never crash
+                -- the cast or inflate totals beyond the per-event ceiling.
+                WHEN (e->>'count') ~ '^[0-9]+$'
+                 AND (e->>'count')::bigint >= 1
+                THEN LEAST((e->>'count')::bigint, 10000)::int
+                -- No count field, unparseable, or negative → single-frame drop.
+                ELSE 1
+              END
+            )::int          AS drop_count
+          FROM meta_glasses_sessions s,
+               jsonb_array_elements(s.events) AS e
+          WHERE s.company_id = ${companyId}
+            AND e->>'clientEventType' = 'ble_frame_dropped'
+          GROUP BY 1, 2
+          ORDER BY drop_count DESC, device_id ASC NULLS LAST
+        `
+    ).then((result) => {
+      const stats = result.rows.map(
+        (row) => ({
+          deviceId: row.device_id ?? null,
+          reason: row.reason ?? null,
+          dropCount: Number(row.drop_count)
+        })
+      );
+      res.json({ stats, queriedAt: Date.now() });
+    }).catch((err) => {
+      logger2.warn("[meta-glasses] frame-drop-stats query failed: " + String(err));
+      res.status(500).json({ error: "Failed to query frame-drop stats" });
     });
   }
 );
@@ -125872,6 +126000,32 @@ var schedule_default = router35;
 
 // src/routes/client-portal.ts
 var import_express38 = __toESM(require_express2(), 1);
+
+// src/lib/message-bus.ts
+import { EventEmitter as EventEmitter3 } from "events";
+var MessageBus = class extends EventEmitter3 {
+  /** Derive the channel key for a given thread. */
+  channelKey(companyId, siteAddress) {
+    return `msg:${companyId}:${siteAddress}`;
+  }
+  /** Emit a new message to all SSE listeners on this thread. */
+  publish(message) {
+    this.emit(this.channelKey(message.companyId, message.siteAddress), message);
+  }
+  /**
+   * Subscribe to new messages on a thread.
+   * Returns an unsubscribe function — always call it when the SSE connection closes.
+   */
+  subscribe(companyId, siteAddress, listener) {
+    const key = this.channelKey(companyId, siteAddress);
+    this.on(key, listener);
+    return () => this.off(key, listener);
+  }
+};
+var messageBus = new MessageBus();
+messageBus.setMaxListeners(500);
+
+// src/routes/client-portal.ts
 var router36 = (0, import_express38.Router)();
 async function getClientAccess(req) {
   const { userId } = getAuth(req);
@@ -126161,21 +126315,146 @@ router36.delete("/invites/:id", requireCompany, requireRole("manager"), async (r
   if (!deleted) return res.status(404).json({ error: "Access record not found" });
   return res.status(204).send();
 });
+router36.get("/buildings/:address/messages", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+  const address = decodeURIComponent(req.params.address);
+  if (!access.siteAddresses.includes(address)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+  const rows = await db.select().from(portalMessagesTable).where(
+    and(
+      eq(portalMessagesTable.companyId, access.companyId),
+      eq(portalMessagesTable.siteAddress, address)
+    )
+  ).orderBy(asc(portalMessagesTable.createdAt)).limit(100);
+  return res.json(rows.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })));
+});
+var clientMessageSchema = external_exports2.object({ message: external_exports2.string().min(1).max(2e3) });
+router36.post("/buildings/:address/messages", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+  const address = decodeURIComponent(req.params.address);
+  if (!access.siteAddresses.includes(address)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+  const { userId } = getAuth(req);
+  const body = clientMessageSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "Invalid message" });
+  const [msg] = await db.insert(portalMessagesTable).values({
+    companyId: access.companyId,
+    siteAddress: address,
+    senderType: "client",
+    senderClerkId: userId,
+    senderName: access.label ?? access.email ?? null,
+    message: body.data.message
+  }).returning();
+  messageBus.publish(msg);
+  return res.status(201).json({ ...msg, createdAt: msg.createdAt.toISOString() });
+});
+router36.get("/buildings/:address/messages/stream", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) {
+    res.status(401).end();
+    return;
+  }
+  const address = decodeURIComponent(req.params.address);
+  if (!access.siteAddresses.includes(address)) {
+    res.status(403).end();
+    return;
+  }
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+  const heartbeat = setInterval(() => res.write(": ping\n\n"), 25e3);
+  const unsubscribe = messageBus.subscribe(access.companyId, address, (msg) => {
+    res.write(`data: ${JSON.stringify({ ...msg, createdAt: msg.createdAt.toISOString() })}
+
+`);
+  });
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
+});
 var client_portal_default = router36;
 
-// src/routes/index.ts
+// src/routes/portal-messages.ts
+var import_express40 = __toESM(require_express2(), 1);
 var router37 = (0, import_express40.Router)();
-router37.use(health_default);
-router37.use("/auth", auth_default);
-router37.use(storage_default);
-router37.use("/leads", leads_default);
-router37.use("/share", share_default);
-router37.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
-router37.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
-router37.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
-router37.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
-router37.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
-router37.use(
+router37.get("/buildings/:address/messages", async (req, res) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) return res.status(401).json({ error: "Unauthorized" });
+  const address = decodeURIComponent(req.params.address);
+  const rows = await db.select().from(portalMessagesTable).where(
+    and(
+      eq(portalMessagesTable.companyId, companyId),
+      eq(portalMessagesTable.siteAddress, address)
+    )
+  ).orderBy(asc(portalMessagesTable.createdAt)).limit(100);
+  return res.json(rows.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })));
+});
+var providerMessageSchema = external_exports2.object({ message: external_exports2.string().min(1).max(2e3) });
+router37.post("/buildings/:address/messages", async (req, res) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) return res.status(401).json({ error: "Unauthorized" });
+  const address = decodeURIComponent(req.params.address);
+  const body = providerMessageSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "Invalid message" });
+  const { userId } = getAuth(req);
+  const user = req.user;
+  const senderName = user?.name ?? user?.email ?? null;
+  const [msg] = await db.insert(portalMessagesTable).values({
+    companyId,
+    siteAddress: address,
+    senderType: "provider",
+    senderClerkId: userId,
+    senderName,
+    message: body.data.message
+  }).returning();
+  messageBus.publish(msg);
+  return res.status(201).json({ ...msg, createdAt: msg.createdAt.toISOString() });
+});
+router37.get("/buildings/:address/messages/stream", async (req, res) => {
+  const companyId = req.user?.companyId;
+  if (!companyId) {
+    res.status(401).end();
+    return;
+  }
+  const address = decodeURIComponent(req.params.address);
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+  const heartbeat = setInterval(() => res.write(": ping\n\n"), 25e3);
+  const unsubscribe = messageBus.subscribe(companyId, address, (msg) => {
+    res.write(`data: ${JSON.stringify({ ...msg, createdAt: msg.createdAt.toISOString() })}
+
+`);
+  });
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
+});
+var portal_messages_default = router37;
+
+// src/routes/index.ts
+var router38 = (0, import_express42.Router)();
+router38.use(health_default);
+router38.use("/auth", auth_default);
+router38.use(storage_default);
+router38.use("/leads", leads_default);
+router38.use("/share", share_default);
+router38.use("/inspections", requireAuth, requireCompany, requireBetaAccess, inspections_default);
+router38.use("/analysis", requireAuth, requireCompany, requireBetaAccess, analysis_default);
+router38.use("/dataset", requireAuth, requireCompany, requireBetaAccess, dataset_default);
+router38.use("/reports", requireAuth, requireCompany, requireBetaAccess, reports_default);
+router38.use("/analytics", requireAuth, requireCompany, requireBetaAccess, analytics_default);
+router38.use(
   "/intelligence",
   requireAuth,
   requireCompany,
@@ -126183,17 +126462,17 @@ router37.use(
   requireRole("manager"),
   intelligence_default
 );
-router37.use(
+router38.use(
   "/intelligence-dataset",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   intelligence_dataset_default
 );
-router37.use("/branding", branding_default);
-router37.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
-router37.use("/beta", requireAuth, requireCompany, beta_default);
-router37.use(
+router38.use("/branding", branding_default);
+router38.use("/properties", requireAuth, requireCompany, requireBetaAccess, properties_default);
+router38.use("/beta", requireAuth, requireCompany, beta_default);
+router38.use(
   "/opportunities",
   requireAuth,
   requireCompany,
@@ -126201,7 +126480,7 @@ router37.use(
   requireRole("sales"),
   opportunities_default
 );
-router37.use(
+router38.use(
   "/scorecards",
   requireAuth,
   requireCompany,
@@ -126209,7 +126488,7 @@ router37.use(
   requireRole("manager"),
   scorecards_default
 );
-router37.use(
+router38.use(
   "/customer-summaries",
   requireAuth,
   requireCompany,
@@ -126217,8 +126496,8 @@ router37.use(
   requireRole("manager"),
   customer_summaries_default
 );
-router37.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
-router37.use(
+router38.use("/briefing", requireAuth, requireCompany, requireBetaAccess, briefing_default);
+router38.use(
   "/proposals",
   requireAuth,
   requireCompany,
@@ -126226,23 +126505,23 @@ router37.use(
   requireRole("sales"),
   proposals_default
 );
-router37.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
-router37.use(
+router38.use("/gemini", requireAuth, requireCompany, requireBetaAccess, gemini_default);
+router38.use(
   "/inspections/:inspectionId/bait-stations",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   bait_stations_default
 );
-router37.use("/products", requireAuth, requireBetaAccess, products_default);
-router37.use(
+router38.use("/products", requireAuth, requireBetaAccess, products_default);
+router38.use(
   "/inspections/:inspectionId/treatment-logs",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   treatment_logs_default
 );
-router37.use(
+router38.use(
   "/crm",
   requireAuth,
   requireCompany,
@@ -126250,7 +126529,7 @@ router37.use(
   requireRole("manager"),
   crm_default
 );
-router37.use(
+router38.use(
   "/integrations",
   requireAuth,
   requireCompany,
@@ -126258,17 +126537,18 @@ router37.use(
   requireRole("manager"),
   integrations_default
 );
-router37.use(
+router38.use(
   "/playbooks",
   requireAuth,
   requireCompany,
   requireBetaAccess,
   playbooks_default
 );
-router37.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
-router37.use(executive_default);
-router37.use("/client", requireClerkAuth, client_portal_default);
-router37.use(
+router38.use("/technician/daily-rig", requireAuth, requireCompany, requireBetaAccess, daily_rig_default);
+router38.use(executive_default);
+router38.use("/client", requireClerkAuth, client_portal_default);
+router38.use("/portal-messages", requireAuth, requireCompany, requireBetaAccess, portal_messages_default);
+router38.use(
   "/schedule",
   requireAuth,
   requireCompany,
@@ -126276,7 +126556,7 @@ router37.use(
   requireRole("manager"),
   schedule_default
 );
-router37.use(
+router38.use(
   "/review-queue",
   requireAuth,
   requireCompany,
@@ -126284,15 +126564,15 @@ router37.use(
   requireRole("manager"),
   review_queue_default
 );
-router37.use("/meta-glasses", meta_glasses_default);
-router37.use("/billing", billing_default);
-router37.use("/admin", admin_default);
-router37.use(requireAuth, transcribe_default);
-var routes_default = router37;
+router38.use("/meta-glasses", meta_glasses_default);
+router38.use("/billing", billing_default);
+router38.use("/admin", admin_default);
+router38.use(requireAuth, transcribe_default);
+var routes_default = router38;
 
 // src/routes/faie.ts
-var import_express41 = __toESM(require_express2(), 1);
-var router38 = (0, import_express41.Router)();
+var import_express43 = __toESM(require_express2(), 1);
+var router39 = (0, import_express43.Router)();
 var storage2 = new ObjectStorageService();
 var DatasetIngestBody = external_exports.object({
   companyId: external_exports.union([external_exports.string(), external_exports.number()]).optional(),
@@ -126326,7 +126606,7 @@ function toCompanyId(raw) {
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
-router38.post("/dataset/ingest", async (req, res) => {
+router39.post("/dataset/ingest", async (req, res) => {
   const parsed = DatasetIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -126352,7 +126632,7 @@ router38.post("/dataset/ingest", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-router38.post("/training/ingest-global", async (req, res) => {
+router39.post("/training/ingest-global", async (req, res) => {
   const parsed = GlobalIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -126381,7 +126661,7 @@ router38.post("/training/ingest-global", async (req, res) => {
   }
 });
 var PLATFORM_COMPANY_ID = 0;
-router38.post("/training/ingest-anonymized", async (req, res) => {
+router39.post("/training/ingest-anonymized", async (req, res) => {
   const parsed = AnonymizedIngestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
@@ -126405,7 +126685,7 @@ router38.post("/training/ingest-anonymized", async (req, res) => {
     res.status(500).json({ error: "Ingest failed" });
   }
 });
-var faie_default = router38;
+var faie_default = router39;
 
 // src/lib/webhookHandlers.ts
 var WebhookHandlers = class _WebhookHandlers {
@@ -126526,7 +126806,7 @@ var WebhookHandlers = class _WebhookHandlers {
 };
 
 // src/app.ts
-var app = (0, import_express42.default)();
+var app = (0, import_express44.default)();
 app.set("trust proxy", 1);
 app.use(
   (0, import_pino_http.default)({
@@ -126579,7 +126859,7 @@ app.use(
 );
 app.post(
   "/api/stripe/webhook",
-  import_express42.default.raw({ type: "application/json" }),
+  import_express44.default.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
@@ -126599,9 +126879,9 @@ app.post(
     }
   }
 );
-app.use("/v1/faie", import_express42.default.json({ limit: "20mb" }), faie_default);
-app.use(import_express42.default.json());
-app.use(import_express42.default.urlencoded({ extended: true }));
+app.use("/v1/faie", import_express44.default.json({ limit: "20mb" }), faie_default);
+app.use(import_express44.default.json());
+app.use(import_express44.default.urlencoded({ extended: true }));
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(

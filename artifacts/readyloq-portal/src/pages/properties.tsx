@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { useListProperties, useGetInfestationRisk } from '@workspace/api-client-react';
-import { Loader2, Building, AlertTriangle } from 'lucide-react';
+import { Loader2, Building, AlertTriangle, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
+import { BuildingMessagingPanel } from '@/components/BuildingMessagingPanel';
 
 export function Properties() {
   const { data: properties, isLoading: isLoadingProps } = useListProperties();
   const { data: risk, isLoading: isLoadingRisk } = useGetInfestationRisk();
+  const [messagingAddress, setMessagingAddress] = useState<string | null>(null);
+  const [messagingClientName, setMessagingClientName] = useState<string | null>(null);
 
   const isLoading = isLoadingProps || isLoadingRisk;
 
@@ -17,6 +21,14 @@ export function Properties() {
   }
 
   return (
+    <>
+    {messagingAddress && (
+      <BuildingMessagingPanel
+        address={messagingAddress}
+        clientName={messagingClientName}
+        onClose={() => { setMessagingAddress(null); setMessagingClientName(null); }}
+      />
+    )}
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Portfolio</h1>
@@ -71,6 +83,7 @@ export function Properties() {
                 <th className="px-6 py-4">Last Inspected</th>
                 <th className="px-6 py-4 text-center">Visits</th>
                 <th className="px-6 py-4 text-center">Open Issues</th>
+                <th className="px-6 py-4 text-center">Message</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -105,11 +118,24 @@ export function Properties() {
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => {
+                        setMessagingAddress(prop.siteAddress);
+                        setMessagingClientName(prop.clientName ?? null);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                      title="Open message thread"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Message
+                    </button>
+                  </td>
                 </tr>
               ))}
               {!properties?.length && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">No properties tracked yet.</td>
+                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">No properties tracked yet.</td>
                 </tr>
               )}
             </tbody>
@@ -117,5 +143,6 @@ export function Properties() {
         </div>
       </div>
     </div>
+    </>
   );
 }

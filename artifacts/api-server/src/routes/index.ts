@@ -42,6 +42,7 @@ import playbooksRouter from "./playbooks";
 import executiveRouter from "./executive";
 import scheduleRouter from "./schedule";
 import clientPortalRouter from "./client-portal";
+import portalMessagesRouter from "./portal-messages";
 
 const router: IRouter = Router();
 
@@ -190,6 +191,10 @@ router.use(executiveRouter);
 // endpoints still get req.user attached (read-only lookup) so the inline
 // requireCompany + requireRole("manager") guards inside the router work.
 router.use("/client", requireClerkAuth, clientPortalRouter);
+
+// In-portal messaging — provider/dispatcher side.
+// requireAuth + requireCompany enforce company scoping.
+router.use("/portal-messages", requireAuth, requireCompany, requireBetaAccess, portalMessagesRouter);
 
 // Scheduling calendar — read and mutate scheduled dates / technician assignments.
 // Manager+ only: dispatchers/managers need to see and change routes; technicians
