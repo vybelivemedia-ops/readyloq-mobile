@@ -552,6 +552,58 @@ router.post(
   },
 );
 
+// ── POST /events/:sessionId — push a client-side telemetry event (auth-gated) ──
+//
+// Used by the mobile app to record BLE telemetry (e.g. frame drops) directly
+// into the session event ring without going through the Meta webhook.
+//
+// Allowed event types are restricted to CLIENT_PUSH_TYPES; any other type
+// returns 400 to prevent misuse.  Cross-company injection is prevented the same
+// way as the GET route: the session is looked up by ID and then its companyId
+// is compared to req.user.companyId — a mismatch yields 404 so that session
+// existence is not leaked.
+const CLIENT_PUSH_TYPES = new Set(["ble_frame_dropped", "ble_reconnect", "ble_link_lost"]);
+
+router.post(
+  "/events/:sessionId",
+  requireAuth,
+  requireCompany,
+  requireBetaAccess,
+  (req: Request, res: Response) => {
+    const sessionId = req.params.sessionId as string;
+    const session = sessions.get(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found or expired" });
+    }
+
+    // Prevent cross-company injection: return 404 (not 403) so session
+    // existence is not leaked to a caller from a different company.
+    if (session.companyId !== req.user!.companyId) {
+      return res.status(404).json({ error: "Session not found or expired" });
+    }
+
+    const { type, ...rest } = req.body ?? {};
+
+    if (!type || !CLIENT_PUSH_TYPES.has(type as string)) {
+      return res.status(400).json({
+        error: `Unsupported event type. Allowed types: ${[...CLIENT_PUSH_TYPES].join(", ")}`,
+      });
+    }
+
+    const event: GlassesEvent = {
+      id: crypto.randomUUID(),
+      type: "status", // client-push events are categorised as status events
+      timestamp: Date.now(),
+      text: (rest.text as string | undefined) ?? `Client event: ${type}`,
+      ...(rest as Partial<GlassesEvent>),
+    };
+
+    pushEvent(session, event);
+    return res.status(204).end();
+  },
+);
+
 // ── GET /events/:sessionId — poll for buffered events (auth-gated) ────────────
 router.get(
   "/events/:sessionId",

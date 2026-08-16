@@ -265,3 +265,65 @@ describe("GET /api/meta-glasses/events/:sessionId — cross-company isolation", 
     expect(res.status).toBe(401);
   });
 });
+
+// ─── POST /events/:sessionId — BLE frame-drop telemetry injection ─────────────
+
+describe("POST /api/meta-glasses/events/:sessionId — cross-company injection guard", () => {
+  let sessionIdForA: string;
+
+  // Create a fresh session owned by Company A for this describe block.
+  beforeAll(async () => {
+    asUser(TECH_A_CLERK);
+    const res = await request(app)
+      .post("/api/meta-glasses/session")
+      .send({ inspectionId: inspectionAId });
+    sessionIdForA = res.body.sessionId as string;
+  });
+
+  it("returns 204 when Tech A posts a ble_frame_dropped event to their own session", async () => {
+    asUser(TECH_A_CLERK);
+    const res = await request(app)
+      .post(`/api/meta-glasses/events/${sessionIdForA}`)
+      .send({ type: "ble_frame_dropped", text: "Frame 42 dropped — link flap" });
+
+    expect(res.status).toBe(204);
+  });
+
+  it("returns 404 when Tech A posts a ble_frame_dropped event to Tech B's session (existence not leaked)", async () => {
+    // First create a session for Company B so there is a real session to target.
+    asUser(TECH_B_CLERK);
+    const createRes = await request(app)
+      .post("/api/meta-glasses/session")
+      .send({ inspectionId: inspectionBId });
+    const sessionIdForB = createRes.body.sessionId as string;
+
+    // Now Tech A tries to inject a telemetry event into Company B's session.
+    asUser(TECH_A_CLERK);
+    const res = await request(app)
+      .post(`/api/meta-glasses/events/${sessionIdForB}`)
+      .send({ type: "ble_frame_dropped", text: "injected" });
+
+    // Must be 404 — not 403 — so session existence is not revealed.
+    expect(res.status).toBe(404);
+    expect(res.body).toHaveProperty("error");
+  });
+
+  it("returns 401 for an unauthenticated POST", async () => {
+    asUser(null);
+    const res = await request(app)
+      .post(`/api/meta-glasses/events/${sessionIdForA}`)
+      .send({ type: "ble_frame_dropped" });
+
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 when an unsupported event type is posted", async () => {
+    asUser(TECH_A_CLERK);
+    const res = await request(app)
+      .post(`/api/meta-glasses/events/${sessionIdForA}`)
+      .send({ type: "evil_inject_type" });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("error");
+  });
+});
