@@ -44,6 +44,7 @@ import { useDailyRoute } from "@/hooks/useDailyRoute";
 import { verifyEquipmentUsage } from "@/lib/audio/intelligence/EquipmentVerifier";
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
+import { MeasureModeOverlay } from "@/components/MeasureModeOverlay";
 import { useMeasurementScaling } from "@/hooks/useMeasurementScaling";
 import { NativeCameraHealthBadge } from "@/components/NativeCameraHealthBadge";
 import { useAllDevicesHealthCheck } from "@/hooks/useAllDevicesHealthCheck";
@@ -66,7 +67,19 @@ import {
   type PropertyMemoryData,
 } from "@/lib/api";
 import { ingestAllUploadedPhotos } from "@/lib/faie-ingest";
-import { consumeLastMeasurementReading } from "@/lib/measurement";
+import {
+  burstMeasurementManager,
+  consumeLastMeasurementReading,
+  setLastMeasurementReading,
+} from "@/lib/measurement";
+import {
+  BurstMeasurementPipeline,
+  FallbackSfMProvider,
+  type BoundingRegion,
+  type BurstFrame,
+  type BurstMeasurementResult,
+  type ReferenceObject,
+} from "@platform/measurement-core";
 import {
   deleteLocalInspection,
   getLocalInspection,
@@ -193,6 +206,100 @@ export default function NewInspectionScreen() {
   // the warning and the confidence penalty always agree on the same boundary.
   const [_referenceClipped, _setReferenceClipped] = useState(false);
   const [_refWarnings, _setRefWarnings] = useState<string[]>([]);
+
+  // ── Measure mode — hardware-free burst measurement ─────────────────────────
+  // A full-screen overlay lets the technician frame a subject with a draggable
+  // quad (or two endpoints for a gap/crack), fit a reference-object box, then
+  // trigger a 3–5 frame burst that runs BurstMeasurementPipeline on the JS
+  // thread (FallbackSfMProvider + ReferenceScaleAnchor).  Results are stamped
+  // through the same measurement bridge used by MeasurementDevicePanel.onStamp.
+  const [measureMode, setMeasureMode] = useState(false);
+  const [measuring, setMeasuring] = useState(false);
+  const [measureResult, setMeasureResult] = useState<BurstMeasurementResult | null>(null);
+  const burstPipeline = useMemo(
+    () => new BurstMeasurementPipeline(new FallbackSfMProvider(), 800),
+    [],
+  );
+
+  const handleRunBurstMeasure = useCallback(
+    async (
+      targetVertices: Array<{ x: number; y: number }>,
+      reference: { box: BoundingRegion; object: ReferenceObject },
+    ) => {
+      const cam = cameraRef.current;
+      if (!cam) {
+        Alert.alert("Camera not ready", "Wait for the camera preview to start, then try again.");
+        return;
+      }
+      setMeasuring(true);
+      setMeasureResult(null);
+      let frames: BurstFrame[] = [];
+      try {
+        // 3–5 frame burst (4 by default) via expo-camera takePictureAsync.
+        frames = await burstMeasurementManager.captureBurst(
+          cam as unknown as { takePictureAsync: (opts: object) => Promise<{ uri: string }> },
+          4,
+        );
+        if (frames.length === 0) {
+          throw new Error("Burst capture failed — no frames were captured");
+        }
+        const result = await burstPipeline.measure(frames, targetVertices, {
+          box: reference.box,
+          object: reference.object,
+          imageWidthPx: _cameraW,
+          imageHeightPx: _cameraH,
+        });
+        // Final guard: degenerate reference geometry can drive the scale
+        // anchor to divide by ~0 — never display or stamp Infinity/NaN.
+        if (
+          !Number.isFinite(result.widthInches) ||
+          !Number.isFinite(result.heightInches) ||
+          !Number.isFinite(result.areaSqInches)
+        ) {
+          throw new Error(
+            "Measurement produced invalid dimensions — refit the reference box and try again",
+          );
+        }
+        setMeasureResult(result);
+      } catch (e) {
+        Alert.alert(
+          "Measurement failed",
+          e instanceof Error ? e.message : "Could not compute dimensions.",
+        );
+      } finally {
+        // Burst frames are temp files — always delete them after the pipeline runs.
+        await burstMeasurementManager.cleanupBurst(frames);
+        setMeasuring(false);
+      }
+    },
+    [burstPipeline, _cameraW, _cameraH],
+  );
+
+  const handleStampMeasureResult = useCallback(() => {
+    if (!measureResult || !Number.isFinite(measureResult.widthInches)) return;
+    // Same stamp path as MeasurementDevicePanel.onStamp: the measurement bridge
+    // caches the reading and consumeLastMeasurementReading() attaches it to the
+    // next captured photo's finding record (captureMetadata).
+    setLastMeasurementReading({
+      deviceId: "burst-measure-pipeline",
+      kind: "width",
+      value: measureResult.widthInches,
+      unit: "in",
+      signalQuality: measureResult.confidence,
+      capturedAt: measureResult.measuredAt,
+      metadata: {
+        method: "burst_reference",
+        heightInches: measureResult.heightInches,
+        areaSqInches: measureResult.areaSqInches,
+        centroidDepthMeters: measureResult.centroidDepthMeters,
+        confidence: measureResult.confidence,
+        warnings: measureResult.warnings,
+      },
+    });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setMeasureMode(false);
+    setMeasureResult(null);
+  }, [measureResult]);
 
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -1267,6 +1374,12 @@ export default function NewInspectionScreen() {
                     value: laser.value,
                     unit: laser.unit,
                     capturedAt: laser.capturedAt,
+                    // Preserve the full stamped payload so burst-measurement
+                    // results (height/area/confidence/method) survive into the
+                    // finding record instead of collapsing to width-only.
+                    ...(laser.deviceId ? { deviceId: laser.deviceId } : {}),
+                    ...(laser.signalQuality != null ? { signalQuality: laser.signalQuality } : {}),
+                    ...(laser.metadata ? { metadata: laser.metadata } : {}),
                   },
                 } : {}),
               };
@@ -1952,6 +2065,51 @@ export default function NewInspectionScreen() {
       </Pressable>
     );
 
+    // Inline chip to enter Measure mode (hardware-free burst measurement).
+    const measureChip = (
+      <Pressable
+        hitSlop={8}
+        onPress={() => {
+          setMeasureResult(null);
+          setMeasureMode(true);
+        }}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 5,
+          backgroundColor: measureMode ? "rgba(23,196,211,0.25)" : "rgba(0,0,0,0.55)",
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: "rgba(23,196,211,0.6)",
+        }}
+      >
+        <Ionicons name="resize-outline" size={13} color="#17c4d3" />
+        <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+          Measure
+        </Text>
+      </Pressable>
+    );
+
+    // Full-screen Measure-mode overlay — rendered inside the camera pane so all
+    // gesture coordinates are relative to the actual preview dimensions.
+    const measureOverlay = measureMode ? (
+      <MeasureModeOverlay
+        viewportWidth={_cameraW}
+        viewportHeight={_cameraH}
+        measuring={measuring}
+        result={measureResult}
+        onMeasure={(target, reference) => void handleRunBurstMeasure(target, reference)}
+        onStamp={handleStampMeasureResult}
+        onClearResult={() => setMeasureResult(null)}
+        onClose={() => {
+          setMeasureMode(false);
+          setMeasureResult(null);
+        }}
+      />
+    ) : null;
+
     // Meta glasses activity strip — shown when a Live AI session is active.
     const glassesCaptures = glassesFindings.filter((e) => e.finding || e.mediaId);
     // #106 — amber strip when glasses have gone silent for 2+ minutes
@@ -2465,6 +2623,7 @@ export default function NewInspectionScreen() {
                   {flashButton}
                   {importButton}
                   {refSelectChip}
+                  {measureChip}
                   <Pressable onPress={() => setShowWifiCamera(true)} style={{ alignItems: "center", gap: 4 }}>
                     <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: wifiCameraConnected ? "rgba(23,196,211,0.2)" : "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center", borderWidth: wifiCameraConnected ? 1 : 0, borderColor: "#17c4d3" }}>
                       <Ionicons name="wifi" size={20} color={wifiCameraConnected ? "#17c4d3" : "#fff"} />
@@ -2482,6 +2641,9 @@ export default function NewInspectionScreen() {
                 onClose={() => setShowWifiCamera(false)}
                 onConnected={() => setWifiCameraConnected(true)}
               />
+              {/* Measure-mode overlay — must be the LAST camera-pane child so it
+                  paints above (and captures touches before) the control bars. */}
+              {measureOverlay}
             </View>
 
             {/* Right: AI Insights / Co-Pilot pane — strict 50% of screen */}
@@ -2526,6 +2688,7 @@ export default function NewInspectionScreen() {
                     }}
                   >
                     <MeasurementDevicePanel
+                      onStamp={setLastMeasurementReading}
                       onActiveCountChange={setActiveSensorCount}
                       roiVertices={_roiVertices}
                       viewportWidth={_cameraW}
@@ -2671,6 +2834,7 @@ export default function NewInspectionScreen() {
               {doneButton}
               {faieButton}
               {refSelectChip}
+              {measureChip}
               <Pressable
                 onPress={() => {
                   if (!wsInspectionId) {
@@ -2787,6 +2951,7 @@ export default function NewInspectionScreen() {
                 {flashButton}
                 {importButton}
                 {refSelectChip}
+                {measureChip}
                 <Pressable onPress={() => setShowWifiCamera(true)} style={{ alignItems: "center" }}>
                   <Ionicons name="wifi" size={22} color={wifiCameraConnected ? "#17c4d3" : "#fff"} />
                 </Pressable>
@@ -2922,6 +3087,7 @@ export default function NewInspectionScreen() {
                 }}
               >
                 <MeasurementDevicePanel
+                  onStamp={setLastMeasurementReading}
                   onActiveCountChange={setActiveSensorCount}
                   roiVertices={_roiVertices}
                   viewportWidth={_cameraW}
@@ -3014,6 +3180,10 @@ export default function NewInspectionScreen() {
             </View>
           )
         ) : null}
+        {/* Measure-mode overlay — must be the LAST child so it paints above
+            (and captures touches before) the top bar, control bars, and rails
+            in both portrait and landscape. */}
+        {measureOverlay}
       </View>
     );
   }
