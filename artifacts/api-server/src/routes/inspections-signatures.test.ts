@@ -195,10 +195,39 @@ describe("PATCH /inspections/:id — signature preservation", () => {
     expect(row.ownerSignature).toBe(updatedSig);
   });
 
-  it("an explicit null in the body clears the signature (intentional wipe)", async () => {
-    // Confirm that `!== undefined` does NOT protect against an explicit null —
-    // an intentional clear (e.g. redo-signature flow) must still work.
-    const inspectionId = await createInspection("explicit-null");
+  it("rejects an explicit null ownerSignature when the DB already has a non-null value (409)", async () => {
+    // Task #626: guard against the re-sign race window where the app sends
+    // ownerSignature: null between the user tapping "Re-sign" and the new SVG
+    // being painted.  Without resignatureConsent: true the server must reject it.
+    const inspectionId = await createInspection("explicit-null-guard");
+    const svgSignature = "<svg><path d='M 0 50 L 100 50'/></svg>";
+
+    asUser(TECH_ID);
+    // First sync: store a valid signature.
+    const patch1 = await request(app)
+      .patch(`/api/inspections/${inspectionId}`)
+      .send({ ownerSignature: svgSignature });
+    expect(patch1.status).toBe(200);
+    expect(patch1.body.ownerSignature).toBe(svgSignature);
+
+    // Accidental null (no consent flag) — must be rejected with 409.
+    const wipe = await request(app)
+      .patch(`/api/inspections/${inspectionId}`)
+      .send({ ownerSignature: null });
+    expect(wipe.status).toBe(409);
+
+    // DB value must be unchanged.
+    const [row] = await db
+      .select()
+      .from(inspectionsTable)
+      .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
+    expect(row.ownerSignature).toBe(svgSignature);
+  });
+
+  it("allows an explicit null ownerSignature when resignatureConsent: true is set", async () => {
+    // The intentional re-sign flow: the UI clears the pad and explicitly
+    // signals consent before the user draws the new signature.
+    const inspectionId = await createInspection("explicit-null-consent");
     const svgSignature = "<svg><path d='M 0 50 L 100 50'/></svg>";
 
     asUser(TECH_ID);
@@ -206,9 +235,10 @@ describe("PATCH /inspections/:id — signature preservation", () => {
       .patch(`/api/inspections/${inspectionId}`)
       .send({ ownerSignature: svgSignature });
 
+    // Explicit clear with consent — must succeed.
     const wipe = await request(app)
       .patch(`/api/inspections/${inspectionId}`)
-      .send({ ownerSignature: null });
+      .send({ ownerSignature: null, resignatureConsent: true });
     expect(wipe.status).toBe(200);
     expect(wipe.body.ownerSignature).toBeNull();
 
@@ -217,5 +247,17 @@ describe("PATCH /inspections/:id — signature preservation", () => {
       .from(inspectionsTable)
       .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
     expect(row.ownerSignature).toBeNull();
+  });
+
+  it("allows an explicit null ownerSignature when the DB value is already null (no existing sig to protect)", async () => {
+    // No prior signature — null is safe to write through without consent.
+    const inspectionId = await createInspection("null-on-unsigned");
+
+    asUser(TECH_ID);
+    const patch = await request(app)
+      .patch(`/api/inspections/${inspectionId}`)
+      .send({ ownerSignature: null });
+    expect(patch.status).toBe(200);
+    expect(patch.body.ownerSignature).toBeNull();
   });
 });

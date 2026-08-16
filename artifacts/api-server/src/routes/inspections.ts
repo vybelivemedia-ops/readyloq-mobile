@@ -182,7 +182,40 @@ router.patch("/:id", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
-    const { status, notes, severity, pestTypes, completedAt, technicianSignature, ownerSignature, ownerNotAvailable, signedAt } = req.body;
+    const {
+      status,
+      notes,
+      severity,
+      pestTypes,
+      completedAt,
+      technicianSignature,
+      ownerSignature,
+      ownerNotAvailable,
+      signedAt,
+      // resignatureConsent: true lets a caller explicitly clear a signature that
+      // is already stored.  Without it, an explicit null is rejected with 409 so
+      // a momentarily-null re-sign flow cannot accidentally wipe the DB value.
+      resignatureConsent,
+    } = req.body;
+
+    // Guard: an explicit null ownerSignature must not silently overwrite a
+    // non-null DB value — the app's local state may be momentarily null between
+    // the user tapping "Re-sign" and the new SVG being painted.  Require the
+    // caller to set resignatureConsent: true to confirm it is intentional.
+    if (ownerSignature === null && resignatureConsent !== true) {
+      const [current] = await db
+        .select()
+        .from(inspectionsTable)
+        .where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+      if (!current) return res.status(404).json({ error: "Not found" });
+      if (current.ownerSignature !== null) {
+        return res.status(409).json({
+          error:
+            "Cannot clear an existing owner signature without explicit resignatureConsent: true",
+        });
+      }
+    }
+
     const updateData: Record<string, unknown> = {};
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;

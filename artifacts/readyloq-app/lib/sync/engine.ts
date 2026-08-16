@@ -363,11 +363,20 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     ]
       .filter(Boolean)
       .join("\n\n");
+    // Signatures are only sent when they are a non-null string.  Omitting the
+    // key entirely (rather than sending null) ensures the server's
+    // resignatureConsent guard can distinguish "not yet captured on this device"
+    // from an intentional clear, preventing a momentarily-null local state from
+    // accidentally wiping a valid signature that is already on the server.
     await updateInspection(serverId, {
       notes: composedNotes || undefined,
       pestTypes: rec.pestTypes.length ? rec.pestTypes : undefined,
-      technicianSignature: rec.technicianSignature ?? undefined,
-      ownerSignature: rec.ownerSignature ?? undefined,
+      ...(typeof rec.technicianSignature === "string"
+        ? { technicianSignature: rec.technicianSignature }
+        : {}),
+      ...(typeof rec.ownerSignature === "string"
+        ? { ownerSignature: rec.ownerSignature }
+        : {}),
       ownerNotAvailable: rec.ownerNotAvailable,
       signedAt: rec.signedAt ?? undefined,
     });
