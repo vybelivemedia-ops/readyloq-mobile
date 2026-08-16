@@ -634,3 +634,256 @@ describe("useSmartGlassesBleFrames — rolling-window storage cap", () => {
     unmount();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite 4 — writeAsStringAsync failure mid-session
+//
+// Verifies the hook's behaviour when the filesystem write itself fails
+// (e.g. ENOSPC, permission error) for a subset of frames:
+//
+//   ✓ droppedFrameCount increments for each write failure
+//   ✓ the consumer onFrame callback is NOT called for frames whose write failed
+//   ✓ deleteAsync IS called for a failed-write URI (uri is assigned before the
+//     write attempt; idempotent:true makes the call safe on a non-existent file)
+//   ✓ subsequent frames — after a run of failures — are written and delivered
+//     normally (the session recovers)
+//   ✓ frame-count telemetry (onDroppedFrame) fires with reason "processing_error"
+//     for each write failure
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("useSmartGlassesBleFrames — writeAsStringAsync failure mid-session", () => {
+  async function flushMicrotasks(ticks = 300) {
+    for (let i = 0; i < ticks; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  it("increments droppedFrameCount once for each frame whose write fails", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    // Fail every write — all frames dropped
+    vi.mocked(fs.writeAsStringAsync).mockRejectedValue(
+      new Error("ENOSPC: no space left on device"),
+    );
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      for (let i = 0; i < 5; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    expect(result.current.droppedFrameCount).toBe(5);
+    unmount();
+  });
+
+  it("increments droppedFrameCount only for the frames that actually fail (subset)", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    // Fail writes 2 and 4 (0-indexed), succeed for the rest
+    let callCount = 0;
+    vi.mocked(fs.writeAsStringAsync).mockImplementation(() => {
+      const idx = callCount++;
+      if (idx === 1 || idx === 3) {
+        return Promise.reject(new Error("ENOSPC")) as unknown as Promise<void>;
+      }
+      return Promise.resolve() as unknown as Promise<void>;
+    });
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      for (let i = 0; i < 5; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    // 2 write failures → 2 drops
+    expect(result.current.droppedFrameCount).toBe(2);
+    unmount();
+  });
+
+  it("does NOT call the consumer onFrame callback when writeAsStringAsync fails", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    vi.mocked(fs.writeAsStringAsync).mockRejectedValue(
+      new Error("ENOSPC: no space left on device"),
+    );
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      for (let i = 0; i < 5; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    // Write failed before consumer could be invoked
+    expect(onFrame).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("calls deleteAsync for the URI even when writeAsStringAsync fails (idempotent cleanup)", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    // The uri is assigned before the write attempt, so the finally block will
+    // attempt an idempotent delete (safe because the file never existed).
+    vi.mocked(fs.writeAsStringAsync).mockRejectedValue(
+      new Error("ENOSPC: no space left on device"),
+    );
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      for (let i = 0; i < 3; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    // Every attempted URI must have had a deleteAsync call with idempotent:true.
+    // writeAsStringAsync was called 3 times (each got a URI before failing).
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(3);
+
+    const attemptedUris = vi
+      .mocked(fs.writeAsStringAsync)
+      .mock.calls.map((c) => c[0]);
+
+    const deletedUris = vi
+      .mocked(fs.deleteAsync)
+      .mock.calls.filter(([uri]) => uri.endsWith(".jpg"))
+      .map(([uri]) => uri);
+
+    for (const uri of attemptedUris) {
+      expect(deletedUris).toContain(uri);
+    }
+
+    // Confirm they were all called with idempotent:true
+    const perFrameDeleteCalls = vi
+      .mocked(fs.deleteAsync)
+      .mock.calls.filter(([uri]) => uri.endsWith(".jpg"));
+    for (const [, opts] of perFrameDeleteCalls) {
+      expect(opts).toEqual({ idempotent: true });
+    }
+
+    unmount();
+  });
+
+  it("processes subsequent frames normally after a run of write failures (session recovers)", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    // First 3 writes fail, then all succeed
+    let callCount = 0;
+    vi.mocked(fs.writeAsStringAsync).mockImplementation(() => {
+      const idx = callCount++;
+      if (idx < 3) {
+        return Promise.reject(new Error("ENOSPC")) as unknown as Promise<void>;
+      }
+      return Promise.resolve() as unknown as Promise<void>;
+    });
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      // 3 failing frames followed by 5 succeeding frames
+      for (let i = 0; i < 8; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(300);
+    });
+
+    // 3 write failures → 3 drops
+    expect(result.current.droppedFrameCount).toBe(3);
+    // 5 successful frames → consumer called 5 times
+    expect(onFrame).toHaveBeenCalledTimes(5);
+    // Total write attempts: 8 (3 failed + 5 succeeded)
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(8);
+    // Successful frame count: 5
+    expect(result.current.frameCount).toBe(5);
+
+    unmount();
+  });
+
+  it("fires the onDroppedFrame telemetry callback with reason 'processing_error' for each write failure", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    vi.mocked(fs.writeAsStringAsync).mockRejectedValue(
+      new Error("ENOSPC: no space left on device"),
+    );
+
+    const onDroppedFrame = vi.fn();
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    // Re-render with the telemetry callback wired in (we can't pass it through
+    // mountHook directly since it doesn't accept onDroppedFrame; instead,
+    // use a fresh hook render for this test).
+    const { unmount: unmount2 } = renderHook(() =>
+      useSmartGlassesBleFrames({
+        active: true,
+        onFrame,
+        onDroppedFrame,
+      }),
+    );
+
+    // Flush startup effect
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      for (let i = 0; i < 4; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    // onDroppedFrame must be called once per failed write with "processing_error"
+    const processingErrorCalls = onDroppedFrame.mock.calls.filter(
+      ([, reason]) => reason === "processing_error",
+    );
+    expect(processingErrorCalls.length).toBe(4);
+    // Each call reports exactly 1 dropped frame
+    for (const [count] of processingErrorCalls) {
+      expect(count).toBe(1);
+    }
+
+    unmount();
+    unmount2();
+  });
+});
