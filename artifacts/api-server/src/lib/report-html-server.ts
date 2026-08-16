@@ -257,6 +257,60 @@ export function buildServerReportHtml(
 
   const pestTypes = ((inspection.pestTypes ?? []) as string[]).join(", ");
 
+  // ── Signature section ──────────────────────────────────────────────────────
+  // SVG signature strings are encoded as base64 data URIs and rendered via
+  // <img> tags. Embedding SVG inside <img src="data:image/svg+xml;base64,...">
+  // is the standard XSS-safe technique: browsers place SVG-in-img in a
+  // restricted context where scripts, event handlers, foreignObject, and
+  // external resource loads cannot execute — regardless of SVG content.
+  // This means no server-side allowlist sanitizer is needed; the browser's own
+  // security model is the defence-in-depth boundary.
+  //
+  // ownerNotAvailable renders a plain-text notice (run through esc()) instead
+  // of a signature image; no raw user content ever reaches the DOM as markup.
+
+  function svgToDataUri(svg: string): string {
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+  }
+
+  const signedAtLabel = inspection.signedAt
+    ? new Date(inspection.signedAt).toLocaleString("en-US", {
+        year: "numeric", month: "short", day: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      })
+    : null;
+
+  function sigBox(label: string, svgOrNotice: string, isSvg: boolean): string {
+    return `
+      <div style="flex:1;min-width:200px">
+        <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af">${esc(label)}</p>
+        <div style="border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;padding:8px;min-height:80px;display:flex;align-items:center;justify-content:center">
+          ${isSvg
+            ? `<img src="${svgToDataUri(svgOrNotice)}" alt="${esc(label)}" style="width:100%;max-width:300px;height:80px;object-fit:contain" />`
+            : `<p style="margin:0;font-size:12px;color:#6b7280;font-style:italic">${esc(svgOrNotice)}</p>`}
+        </div>
+        ${signedAtLabel ? `<p style="margin:4px 0 0 0;font-size:10px;color:#9ca3af">Signed: ${esc(signedAtLabel)}</p>` : ""}
+      </div>`;
+  }
+
+  const hasTechSig = typeof inspection.technicianSignature === "string" && inspection.technicianSignature.length > 0;
+  const hasOwnerSig = typeof inspection.ownerSignature === "string" && inspection.ownerSignature.length > 0;
+  const hasAnySig = hasTechSig || hasOwnerSig || inspection.ownerNotAvailable;
+
+  const sigHtml = hasAnySig
+    ? section(
+        "Signatures",
+        `<div style="display:flex;flex-wrap:wrap;gap:16px">
+          ${hasTechSig ? sigBox("Technician Signature", inspection.technicianSignature as string, true) : ""}
+          ${hasOwnerSig
+            ? sigBox("Owner / Client Signature", inspection.ownerSignature as string, true)
+            : inspection.ownerNotAvailable
+              ? sigBox("Owner / Client Signature", "Owner not available — technician acknowledged on behalf", false)
+              : ""}
+        </div>`,
+      )
+    : "";
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -317,6 +371,7 @@ export function buildServerReportHtml(
     ${exclHtml}
     ${narrativeHtml}
     ${treatmentHtml}
+    ${sigHtml}
 
     <!-- Footer -->
     <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:11px">

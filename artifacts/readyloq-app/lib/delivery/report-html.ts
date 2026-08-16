@@ -189,12 +189,24 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
       : "";
 
   // ── Signatures section ───────────────────────────────────────────────────
-  // Render whichever slots have content. ownerNotAvailable replaces the owner
-  // signature box with an explanatory notice. Slots with no data are omitted.
+  // SVG strings from the on-device signature pad are encoded as base64 data
+  // URIs and rendered via <img> elements. This is the standard XSS-safe
+  // technique: SVG loaded inside <img src="data:image/svg+xml;base64,...">
+  // runs in a restricted browser/WebView context where scripts, event
+  // handlers, and foreignObject cannot execute, regardless of SVG content.
+  // ownerNotAvailable renders a plain-text notice (run through esc()) so no
+  // raw user content ever reaches the DOM as executable markup.
+  function svgToDataUri(svg: string): string {
+    // btoa() is available globally in React Native (JavaScriptCore) and in
+    // Node.js 16+. Signature SVGs from the on-device pad are ASCII so no
+    // multi-byte encoding step is needed.
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+  }
+
   const techSigSlot = record.technicianSignature
     ? `<div class="sig-slot">
         <div class="sig-label">Technician</div>
-        <div class="sig-box">${record.technicianSignature}</div>
+        <div class="sig-box"><img src="${svgToDataUri(record.technicianSignature)}" alt="Technician signature" style="max-width:100%;max-height:120px;display:block" /></div>
       </div>`
     : "";
 
@@ -206,7 +218,7 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
     : record.ownerSignature
       ? `<div class="sig-slot">
           <div class="sig-label">Owner / Tenant</div>
-          <div class="sig-box">${record.ownerSignature}</div>
+          <div class="sig-box"><img src="${svgToDataUri(record.ownerSignature)}" alt="Owner signature" style="max-width:100%;max-height:120px;display:block" /></div>
         </div>`
       : "";
 
