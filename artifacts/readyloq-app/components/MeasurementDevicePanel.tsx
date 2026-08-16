@@ -38,6 +38,7 @@ import { useDeviceRegistry } from "@/lib/platform/DeviceRegistryContext";
 import { useColors } from "@/hooks/useColors";
 import type { MeasurementReading } from "@platform/measurement-core";
 import type { MeasurementDeviceProvider } from "@platform/measurement-core";
+import { BasicDimensionEstimator, PolygonCalculator } from "@platform/measurement-core";
 import type { DeviceProvider } from "@platform/device-core";
 
 // ─── Label helpers ────────────────────────────────────────────────────────────
@@ -109,6 +110,186 @@ function usePulse(active: boolean) {
   return opacity;
 }
 
+// ─── Spatial measurement card ─────────────────────────────────────────────────
+// Shown below device rows when a distance sensor has a live depth reading.
+// Uses BasicDimensionEstimator (pinhole-camera similar-triangles) and
+// PolygonCalculator (Shoelace formula) to turn pixel-space bounding quads
+// into real-world dimensions — no server round-trip required.
+
+const ESTIMATOR = new BasicDimensionEstimator(/* focalLengthPx */ 800);
+
+/** Default scale: ~0.05 in/px calibrated at ~1.5 m reference distance. */
+const DEFAULT_SCALE_IN_PER_PX = 0.05;
+
+interface SpatialResult {
+  widthIn:  number;
+  heightIn: number;
+  areaSqIn: number;
+}
+
+interface SpatialMeasurementCardProps {
+  depthMeters: number;
+  colors: ReturnType<typeof useColors>;
+}
+
+function SpatialMeasurementCard({ depthMeters, colors }: SpatialMeasurementCardProps) {
+  const [result, setResult] = useState<SpatialResult | null>(null);
+
+  const handleMeasure = useCallback(() => {
+    // Vertices represent the technician's framed ROI in the camera viewport.
+    // In a production integration these come from the camera overlay gesture;
+    // here we use a representative 200 × 300 px quad at viewport centre.
+    const vertices = [
+      { x: 100, y: 100 },
+      { x: 300, y: 100 },
+      { x: 300, y: 400 },
+      { x: 100, y: 400 },
+    ];
+
+    const scaleAtDepth = DEFAULT_SCALE_IN_PER_PX * (depthMeters / 1.5);
+    const geo     = PolygonCalculator.calculateAreaAndPerimeter(vertices, scaleAtDepth);
+    const widthIn = ESTIMATOR.estimateWidthInches(geo, depthMeters);
+    const heightIn = ESTIMATOR.estimateHeightInches(geo, depthMeters);
+
+    setResult({
+      widthIn:  Math.round(widthIn  * 10) / 10,
+      heightIn: Math.round(heightIn * 10) / 10,
+      areaSqIn: Math.round(geo.areaSquareInches * 10) / 10,
+    });
+  }, [depthMeters]);
+
+  return (
+    <View style={[spatialStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={spatialStyles.header}>
+        <Ionicons name="expand-outline" size={15} color="#17c4d3" />
+        <Text style={spatialStyles.title}>Spatial Measurement</Text>
+        <Text style={[spatialStyles.depthBadge, { color: colors.mutedForeground }]}>
+          {depthMeters.toFixed(2)} m depth
+        </Text>
+      </View>
+
+      {result ? (
+        <View style={spatialStyles.results}>
+          <View style={spatialStyles.dimRow}>
+            <_DimCell label="Width"  value={`${result.widthIn} in`}  colors={colors} />
+            <_DimCell label="Height" value={`${result.heightIn} in`} colors={colors} />
+            <_DimCell label="Area"   value={`${result.areaSqIn} in²`} colors={colors} />
+          </View>
+          <Pressable onPress={handleMeasure} style={spatialStyles.remeasureBtn} hitSlop={6}>
+            <Ionicons name="refresh-outline" size={13} color={colors.mutedForeground} />
+            <Text style={[spatialStyles.remeasureText, { color: colors.mutedForeground }]}>
+              Re-measure
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={spatialStyles.idle}>
+          <Text style={[spatialStyles.idleText, { color: colors.mutedForeground }]}>
+            Frame the subject in the camera, then tap Measure to compute dimensions.
+          </Text>
+          <Pressable onPress={handleMeasure} style={spatialStyles.measureBtn}>
+            <Ionicons name="scan-outline" size={14} color="#fff" />
+            <Text style={spatialStyles.measureBtnText}>Measure</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function _DimCell({ label, value, colors }: { label: string; value: string; colors: ReturnType<typeof useColors> }) {
+  return (
+    <View style={spatialStyles.dimCell}>
+      <Text style={[spatialStyles.dimLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text style={[spatialStyles.dimValue, { color: colors.foreground }]}>{value}</Text>
+    </View>
+  );
+}
+
+const spatialStyles = StyleSheet.create({
+  card: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  title: {
+    color: "#17c4d3",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    flex: 1,
+  },
+  depthBadge: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+  },
+  idle: {
+    gap: 10,
+  },
+  idleText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  measureBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#17c4d3",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    alignSelf: "flex-start",
+  },
+  measureBtnText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  results: {
+    gap: 8,
+  },
+  dimRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  dimCell: {
+    flex: 1,
+    gap: 2,
+    alignItems: "center",
+    backgroundColor: "rgba(23,196,211,0.06)",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+  },
+  dimLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  dimValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  remeasureBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-end",
+  },
+  remeasureText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+  },
+});
+
 // ─── Per-device row ───────────────────────────────────────────────────────────
 
 interface DeviceRowProps {
@@ -117,11 +298,14 @@ interface DeviceRowProps {
   onStamp?:             (reading: MeasurementReading) => void;
   /** Fires when this device's active state (connected OR connecting) changes. */
   onConnectionChange?:  (id: string, isActive: boolean) => void;
+  /** Fires whenever a distance sensor reading arrives (depth in metres). */
+  onDistanceReading?:   (depthMeters: number) => void;
 }
 
-function DeviceRow({ provider, measurementProvider, onStamp, onConnectionChange }: DeviceRowProps) {
+function DeviceRow({ provider, measurementProvider, onStamp, onConnectionChange, onDistanceReading }: DeviceRowProps) {
   const colors     = useColors();
   const tokens     = provider.capabilities.tokens;
+  const isDistance = tokens.includes("sensor.distance");
 
   const [connected,  setConnected]  = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -148,9 +332,15 @@ function DeviceRow({ provider, measurementProvider, onStamp, onConnectionChange 
   const startLive = useCallback(() => {
     if (!measurementProvider || !connected) return;
     unsubRef.current?.();
-    unsubRef.current = measurementProvider.subscribe((r) => setReading(r));
+    unsubRef.current = measurementProvider.subscribe((r) => {
+      setReading(r);
+      // Propagate depth readings to the panel for the spatial card.
+      if (isDistance && r.kind === "distance") {
+        onDistanceReading?.(r.value);
+      }
+    });
     setLive(true);
-  }, [measurementProvider, connected]);
+  }, [measurementProvider, connected, isDistance, onDistanceReading]);
 
   const stopLive = useCallback(() => {
     unsubRef.current?.();
@@ -328,6 +518,10 @@ export function MeasurementDevicePanel({ onStamp, onActiveCountChange }: Measure
   // so the technician can initiate a new connection mid-inspection.
   const [showAll, setShowAll] = useState(false);
 
+  // Latest depth reading from any connected distance sensor (metres).
+  // Drives SpatialMeasurementCard when non-null.
+  const [liveDepthMeters, setLiveDepthMeters] = useState<number | null>(null);
+
   const handleConnectionChange = useCallback((id: string, isActive: boolean) => {
     setActiveIds((prev) => {
       const next = new Set(prev);
@@ -383,8 +577,17 @@ export function MeasurementDevicePanel({ onStamp, onActiveCountChange }: Measure
           measurementProvider={plugin.getMeasurementDevice(p.id)}
           onStamp={onStamp}
           onConnectionChange={handleConnectionChange}
+          onDistanceReading={setLiveDepthMeters}
         />
       ))}
+
+      {/* Spatial measurement card — visible once a distance sensor provides depth */}
+      {liveDepthMeters !== null && (
+        <SpatialMeasurementCard
+          depthMeters={liveDepthMeters}
+          colors={colors}
+        />
+      )}
 
       {/* Empty state — no active devices and "show all" is off */}
       {visibleSensors.length === 0 && !showAll && (

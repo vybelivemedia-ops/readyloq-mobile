@@ -456,4 +456,127 @@ export declare const MEASUREMENT_EVENT_KINDS: {
     readonly CACHE_MISS: "measurement.cache.miss";
 };
 export type MeasurementEventKind = (typeof MEASUREMENT_EVENT_KINDS)[keyof typeof MEASUREMENT_EVENT_KINDS];
+/** Pixel-space 2-D point (absolute or normalised coords). */
+export interface Point2D {
+    x: number;
+    y: number;
+}
+/** World-space 3-D point (metres). */
+export interface Point3D {
+    x: number;
+    y: number;
+    z: number;
+}
+/**
+ * The output of PolygonCalculator.calculateAreaAndPerimeter.
+ * Carries the original vertices alongside the real-world area and perimeter
+ * derived from a pixel-to-inch scale factor.
+ */
+export interface PolygonGeometry {
+    vertices: Point2D[];
+    /** Real-world area in square inches. */
+    areaSquareInches: number;
+    /** Real-world perimeter in inches. */
+    perimeterInches: number;
+}
+/**
+ * Simplified calibration snapshot used by BasicDimensionEstimator.
+ * For the full calibration contract (EXIF-derived, AR-anchored, etc.) see
+ * CalibrationProfile above.
+ */
+export interface BasicCalibrationProfile {
+    /** Opaque device or session identifier. */
+    deviceId: string;
+    /** Effective focal length in pixels (derived from focalLengthMm × imageWidthPx / sensorWidthMm). */
+    focalLengthPx: number;
+    /** Inches per pixel at the reference/calibration depth. */
+    pixelToInchRatio: number;
+    /** Unix timestamp (ms) when the profile was captured. */
+    calibratedAt: number;
+}
+/**
+ * Raw depth-map buffer as produced by a monocular depth model or hardware
+ * depth sensor. Use DepthMap (above) for the full contract including
+ * relative-depth semantics; DepthMapData is the concrete transfer object.
+ */
+export interface DepthMapData {
+    width: number;
+    height: number;
+    /** Row-major absolute depth values in metres. Length = width × height. */
+    buffer: Float32Array;
+    minDepthMeters: number;
+    maxDepthMeters: number;
+}
+interface _BasicDimensionEstimatorContract {
+    estimateWidthInches(polygon: PolygonGeometry, depthMeters: number): number;
+    estimateHeightInches(polygon: PolygonGeometry, depthMeters: number): number;
+}
+/**
+ * Pinhole-camera dimension estimator.
+ *
+ * Uses the similar-triangles relationship:
+ *   realSize (m) = pixelSize × depthMeters / focalLengthPx
+ *
+ * Width  is derived from the vector between vertices[0] → vertices[1].
+ * Height is derived from the vector between vertices[0] → vertices[3]
+ * (i.e. assumes an axis-aligned or near-axis-aligned bounding quad).
+ *
+ * All outputs are in inches (1 m ≈ 39.3701 in).
+ *
+ * @example
+ * const est = new BasicDimensionEstimator(800);
+ * const geo = PolygonCalculator.calculateAreaAndPerimeter(vertices, 0.05);
+ * const widthIn = est.estimateWidthInches(geo, 1.5);
+ */
+export declare class BasicDimensionEstimator implements _BasicDimensionEstimatorContract {
+    private readonly focalLengthPx;
+    /** @param focalLengthPx Effective focal length in pixels. Defaults to 800 (typical wide-angle phone camera). */
+    constructor(focalLengthPx?: number);
+    /**
+     * Estimate real-world width from the edge between vertices[0] and vertices[1].
+     * Returns 0 when the polygon has fewer than 2 vertices.
+     */
+    estimateWidthInches(polygon: PolygonGeometry, depthMeters: number): number;
+    /**
+     * Estimate real-world height from the edge between vertices[0] and vertices[3].
+     * Returns 0 when the polygon has fewer than 4 vertices.
+     */
+    estimateHeightInches(polygon: PolygonGeometry, depthMeters: number): number;
+}
+/**
+ * Stateless polygon geometry calculator.
+ *
+ * calculateAreaAndPerimeter uses the Shoelace formula for area and
+ * Euclidean distance for perimeter, then applies a uniform scale factor
+ * (inches per pixel) to produce real-world measurements.
+ *
+ * The scale factor should be calibrated against a known reference object
+ * or derived from BasicCalibrationProfile.pixelToInchRatio.
+ *
+ * @example
+ * const geo = PolygonCalculator.calculateAreaAndPerimeter(
+ *   [{ x:100,y:100 },{ x:300,y:100 },{ x:300,y:400 },{ x:100,y:400 }],
+ *   0.05, // inches per pixel at reference depth
+ * );
+ * // geo.areaSquareInches ≈ 100 sq in  (200×300 px × 0.05²)
+ */
+export declare class PolygonCalculator {
+    /**
+     * Compute area (sq in) and perimeter (in) of a pixel-space polygon.
+     *
+     * @param vertices         Pixel-space vertices in winding order (CW or CCW).
+     * @param scaleInchesPerPixel  Calibrated inches-per-pixel at the subject depth.
+     */
+    static calculateAreaAndPerimeter(vertices: Point2D[], scaleInchesPerPixel: number): PolygonGeometry;
+    /**
+     * Sample the average depth under a polygon from a DepthMapData buffer.
+     * Uses a simple point-in-polygon bounding-box scan; good enough for
+     * convex quads at inspection distances.
+     *
+     * Returns the mean depth in metres, or `null` if no samples were inside.
+     */
+    static sampleMeanDepth(vertices: Point2D[], depthMap: DepthMapData): number | null;
+    /** Ray-casting point-in-polygon test. */
+    private static _pointInPolygon;
+}
 //# sourceMappingURL=index.d.ts.map
