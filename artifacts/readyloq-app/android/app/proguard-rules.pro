@@ -79,6 +79,63 @@
     java.lang.Object readResolve();
 }
 
+# ── react-native-screens ──────────────────────────────────────────────────────
+# Uses reflection to register native screen components via the React Native
+# module registry.  Also contains Kotlin-implemented ViewManagers.
+-keep class com.swmansion.rnscreens.** { *; }
+
+# ── react-native-safe-area-context ───────────────────────────────────────────
+-keep class com.th3rdwave.safeareacontext.** { *; }
+
+# ── @react-native-community/netinfo ──────────────────────────────────────────
+-keep class com.reactnativecommunity.netinfo.** { *; }
+
+# ── react-native-svg ─────────────────────────────────────────────────────────
+# SVG rendering uses reflection to resolve element classes by tag name.
+-keep class com.horcrux.svg.** { *; }
+
+# ── react-native-keyboard-controller ─────────────────────────────────────────
+-keep class com.swmansion.keyboardcontroller.** { *; }
+
+# ── react-native-worklets (Reanimated worklets runtime) ──────────────────────
+# Worklets are executed on a separate C++/JNI thread; the Java bridge class
+# must not be renamed or removed.
+-keep class com.swmansion.worklets.** { *; }
+-keep class com.swmansion.reanimated.worklets.** { *; }
+
+# ── whisper.rn (on-device speech recognition — JNI) ──────────────────────────
+# whisper.rn bundles a native .so; its Java shim is loaded by name at runtime.
+-keep class com.rnwhisper.** { *; }
+# Keep all JNI-registered native methods regardless of package.
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# ── Fresco (animated GIF / WebP images) ──────────────────────────────────────
+# Fresco uses reflection for its image pipeline factories and animated backends.
+-keep class com.facebook.fresco.** { *; }
+-keep class com.facebook.imagepipeline.** { *; }
+-dontwarn com.facebook.fresco.**
+
+# ── Firebase / FCM (expo-notifications push channel) ─────────────────────────
+# expo-notifications on Android routes through FCM.  The service and receiver
+# classes are referenced by name in the manifest; R8 must not rename them.
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.firebase.**
+
+# ── Kotlin metadata & reflection ──────────────────────────────────────────────
+# R8 full mode can drop @Metadata annotations that kotlinx.serialization and
+# Reanimated's Kotlin reflection paths depend on.
+-keepattributes *Annotation*
+-keepattributes Signature
+-keepattributes InnerClasses
+-keepattributes EnclosingMethod
+-keep class kotlin.** { *; }
+-keep class kotlin.Metadata { *; }
+-keepclassmembers class **$WhenMappings { <fields>; }
+-keepclassmembers class kotlin.Lazy { *; }
+
 # ── Suppress noisy warnings from unused optional dependencies ─────────────────
 -dontwarn com.google.android.gms.**
 -dontwarn javax.annotation.**
