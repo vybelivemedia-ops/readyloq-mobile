@@ -182,13 +182,17 @@ router.patch("/:id", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
-    const { status, notes, severity, pestTypes, completedAt } = req.body;
+    const { status, notes, severity, pestTypes, completedAt, technicianSignature, ownerSignature, ownerNotAvailable, signedAt } = req.body;
     const updateData: Record<string, unknown> = {};
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
     if (severity !== undefined) updateData.severity = severity;
     if (pestTypes !== undefined) updateData.pestTypes = pestTypes;
     if (completedAt !== undefined) updateData.completedAt = new Date(completedAt);
+    if (technicianSignature !== undefined) updateData.technicianSignature = technicianSignature;
+    if (ownerSignature !== undefined) updateData.ownerSignature = ownerSignature;
+    if (ownerNotAvailable !== undefined) updateData.ownerNotAvailable = ownerNotAvailable;
+    if (signedAt !== undefined) updateData.signedAt = new Date(signedAt);
     if (Object.keys(updateData).length === 0) {
       const [current] = await db
         .select()

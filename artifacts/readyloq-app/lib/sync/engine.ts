@@ -366,6 +366,10 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     await updateInspection(serverId, {
       notes: composedNotes || undefined,
       pestTypes: rec.pestTypes.length ? rec.pestTypes : undefined,
+      technicianSignature: rec.technicianSignature ?? undefined,
+      ownerSignature: rec.ownerSignature ?? undefined,
+      ownerNotAvailable: rec.ownerNotAvailable,
+      signedAt: rec.signedAt ?? undefined,
     });
 
     // 5.5. Bait station sync — each station is created once on the server

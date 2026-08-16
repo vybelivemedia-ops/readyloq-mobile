@@ -257,8 +257,8 @@ export function BuildingDetail() {
                           )}
                           <span className="text-sm font-medium text-foreground">
                             {insp.completedAt
-                              ? format(new Date(insp.completedAt), 'MMM d, yyyy')
-                              : format(new Date(insp.createdAt), 'MMM d, yyyy')}
+                              ? format(new Date(insp.completedAt), "MMM d, yyyy 'at' h:mm a")
+                              : format(new Date(insp.createdAt), "MMM d, yyyy 'at' h:mm a")}
                           </span>
                           {severityBadge(insp.severity)}
                         </div>

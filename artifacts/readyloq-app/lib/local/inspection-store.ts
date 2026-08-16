@@ -150,6 +150,16 @@ export type LocalInspection = {
     technicianSpecies?: string;
   }>;
   /**
+   * On-site signature data (SVG strings captured by InspectionSignaturePanel).
+   * ownerNotAvailable is set when the owner/tenant was absent and the
+   * technician signed on their behalf. signedAt records the first signature.
+   */
+  technicianSignature: string | null;
+  ownerSignature: string | null;
+  ownerNotAvailable: boolean;
+  signedAt: string | null;
+
+  /**
    * ISO timestamp of the last time this inspection's report was successfully
    * delivered via any channel (print, share, email). Null until first delivery.
    * Updated by the delivery section on every successful hand-off.
@@ -238,6 +248,10 @@ export function newLocalInspection(
     pendingCorrections: [],
     lastDeliveredAt: null,
     pendingDeliveries: [],
+    technicianSignature: null,
+    ownerSignature: null,
+    ownerNotAvailable: false,
+    signedAt: null,
   };
 }
 
@@ -424,6 +438,10 @@ export function parseRecord(raw: string): LocalInspection | null {
     rec.baitStations ??= [];
     rec.lastDeliveredAt ??= null;
     rec.pendingDeliveries ??= [];
+    rec.technicianSignature ??= null;
+    rec.ownerSignature ??= null;
+    rec.ownerNotAvailable ??= false;
+    rec.signedAt ??= null;
     // Reset any `uploading: true` flags that survived a crash.
     // The sync engine sets `uploading: true` + `pendingStoragePath` in the same
     // atomic merge BEFORE the PUT bytes are sent, then promotes `pendingStoragePath`

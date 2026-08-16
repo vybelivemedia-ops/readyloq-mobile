@@ -18,7 +18,7 @@ import { useColors } from "@/hooks/useColors";
 import { useLocalInspections } from "@/hooks/useLocalInspections";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
 import {
-  formatDate,
+  formatDateTime,
   formatStatus,
   severityTone,
   statusTone,
@@ -145,7 +145,7 @@ export default function InspectionsScreen() {
       <View style={{ flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <Meta icon="camera-outline" text={`${item.mediaCount ?? 0}`} />
         <Meta icon="search-outline" text={`${item.findingsCount ?? 0} findings`} />
-        <Meta icon="calendar-outline" text={formatDate(item.createdAt)} />
+        <Meta icon="calendar-outline" text={formatDateTime(item.createdAt)} />
         {item.severity ? (
           <Badge label={formatStatus(item.severity)} tone={severityTone(item.severity)} />
         ) : null}
@@ -411,7 +411,7 @@ function LocalInspectionCard({
       )}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <Meta icon="camera-outline" text={`${record.photos.length}`} />
-        <Meta icon="calendar-outline" text={formatDate(record.createdAt)} />
+        <Meta icon="calendar-outline" text={formatDateTime(record.createdAt)} />
         {record.completed && phase === "failed" ? (
           <Pressable
             onPress={() => void syncNow(record.localId).catch(() => {})}

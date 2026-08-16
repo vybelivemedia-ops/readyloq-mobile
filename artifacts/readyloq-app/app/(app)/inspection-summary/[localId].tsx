@@ -54,6 +54,7 @@ import {
 } from "@/lib/delivery/registry";
 import type { LocalInspection, LocalSyncPhase } from "@/lib/local/inspection-store";
 import { enqueueDelivery, updateLocalInspection, updatePhotoDescription } from "@/lib/local/inspection-store";
+import { InspectionSignaturePanel } from "@/components/InspectionSignaturePanel";
 import { syncNow } from "@/lib/sync/engine";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
 
@@ -601,6 +602,20 @@ export default function InspectionSummaryScreen() {
             </View>
           </View>
         )}
+
+        {/* ── Signature panel ─────────────────────────────────────────────
+             Shown for all inspections (in-progress and completed).
+             The panel saves directly to the local store; because
+             useLocalInspection subscribes to the store, the parent
+             re-renders automatically and the updated record is passed
+             back through props — no extra state needed here. */}
+        <InspectionSignaturePanel
+          localId={record.localId}
+          technicianName={record.technicianName}
+          technicianSignature={record.technicianSignature ?? null}
+          ownerSignature={record.ownerSignature ?? null}
+          ownerNotAvailable={record.ownerNotAvailable ?? false}
+        />
 
         <View style={{ gap: 10 }}>
           {serverId != null && finalized ? (

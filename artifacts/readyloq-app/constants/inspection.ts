@@ -85,6 +85,20 @@ export function formatDate(iso?: string | null): string {
   });
 }
 
+/** Date + time, e.g. "Aug 16, 2026, 2:34 PM" */
+export function formatDateTime(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function formatRelative(iso?: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);

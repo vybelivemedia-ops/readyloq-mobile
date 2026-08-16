@@ -7,16 +7,69 @@ import {
   getGetCustomerSummaryForInspectionQueryKey,
 } from '@workspace/api-client-react';
 import { useParams, Link } from 'wouter';
-import { Loader2, ArrowLeft, Bug, MapPin, Calendar, User, ShieldAlert } from 'lucide-react';
+import { Loader2, ArrowLeft, Bug, MapPin, Calendar, User, ShieldAlert, PenLine } from 'lucide-react';
 import { format } from 'date-fns';
+
+// Concrete inspection shape — includes all fields the API returns plus the
+// new signature columns that are not yet in the generated client types.
+interface InspectionWithSignatures {
+  id: number;
+  siteAddress: string;
+  clientName?: string | null;
+  technicianName: string;
+  status: string;
+  pestTypes?: string[] | null;
+  findingsCount?: number | null;
+  mediaCount?: number | null;
+  severity?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+  technicianSignature?: string | null;
+  ownerSignature?: string | null;
+  ownerNotAvailable?: boolean;
+  signedAt?: string | null;
+}
+
+function SignatureBlock({
+  label,
+  svg,
+  notAvailable,
+}: {
+  label: string;
+  svg?: string | null;
+  notAvailable?: boolean;
+}) {
+  return (
+    <div className="p-5 flex flex-col gap-3">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+      {svg ? (
+        <img
+          src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
+          alt={`${label} signature`}
+          className="h-20 w-full object-contain border border-border rounded-lg bg-white"
+        />
+      ) : notAvailable ? (
+        <div className="h-20 flex items-center justify-center rounded-lg bg-muted">
+          <span className="text-xs text-muted-foreground">Not available — technician signed on behalf</span>
+        </div>
+      ) : (
+        <div className="h-20 flex items-center justify-center rounded-lg border border-dashed border-border">
+          <span className="text-xs text-muted-foreground">No signature captured</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function InspectionDetail() {
   const params = useParams();
   const id = Number(params.id);
 
-  const { data: inspection, isLoading: isLoadingInsp } = useGetInspection(id, {
+  const { data: _inspection, isLoading: isLoadingInsp } = useGetInspection(id, {
     query: { queryKey: getGetInspectionQueryKey(id), enabled: !!id },
   });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inspection = _inspection as unknown as InspectionWithSignatures | undefined;
   const { data: scorecard, isLoading: isLoadingScore } = useGetInspectionScorecard(id, {
     query: { queryKey: getGetInspectionScorecardQueryKey(id), enabled: !!id },
   });
@@ -71,7 +124,7 @@ export function InspectionDetail() {
           <div className="p-2 bg-primary/10 text-primary rounded-lg"><Calendar className="w-5 h-5" /></div>
           <div>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Date</p>
-            <p className="font-semibold mt-0.5 text-sm">{format(new Date(inspection.createdAt), 'MMM d, yyyy')}</p>
+            <p className="font-semibold mt-0.5 text-sm">{format(new Date(inspection.createdAt), "MMM d, yyyy 'at' h:mm a")}</p>
           </div>
         </div>
         <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3 shadow-sm">
@@ -89,6 +142,32 @@ export function InspectionDetail() {
           </div>
         </div>
       </div>
+
+      {/* Signatures */}
+      {(inspection.technicianSignature || inspection.ownerSignature || inspection.ownerNotAvailable) && (
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-border flex items-center gap-2">
+            <PenLine className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-base font-semibold">Signatures</h2>
+            {inspection.signedAt && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                Signed {format(new Date(inspection.signedAt), "MMM d, yyyy 'at' h:mm a")}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
+            <SignatureBlock
+              label="Owner / Tenant"
+              svg={inspection.ownerSignature}
+              notAvailable={inspection.ownerNotAvailable}
+            />
+            <SignatureBlock
+              label="Technician"
+              svg={inspection.technicianSignature}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">

@@ -84,7 +84,7 @@ export function InspectionsList() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-muted-foreground">
-                      {format(new Date(insp.createdAt), 'MMM d, yyyy')}
+                      {format(new Date(insp.createdAt), "MMM d, yyyy 'at' h:mm a")}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <Link href={`/inspections/${insp.id}`} className="text-primary font-medium hover:underline">

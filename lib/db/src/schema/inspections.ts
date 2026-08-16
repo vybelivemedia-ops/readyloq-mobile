@@ -38,6 +38,13 @@ export const inspectionsTable = pgTable(
     scheduledDate: timestamp("scheduled_date"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     completedAt: timestamp("completed_at"),
+    // On-site signature capture: SVG strings produced by the mobile signature
+    // pad. ownerNotAvailable is set when the owner/tenant is absent and the
+    // technician signs on their behalf. signedAt records the first signature.
+    technicianSignature: text("technician_signature"),
+    ownerSignature: text("owner_signature"),
+    ownerNotAvailable: boolean("owner_not_available").notNull().default(false),
+    signedAt: timestamp("signed_at"),
   },
   (t) => [
     uniqueIndex("inspections_company_client_key_uq").on(t.companyId, t.clientKey),

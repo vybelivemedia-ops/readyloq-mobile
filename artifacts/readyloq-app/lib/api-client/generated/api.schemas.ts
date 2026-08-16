@@ -369,6 +369,10 @@ export interface InspectionUpdate {
   severity?: string;
   pestTypes?: string[];
   completedAt?: string;
+  technicianSignature?: string;
+  ownerSignature?: string;
+  ownerNotAvailable?: boolean;
+  signedAt?: string;
 }
 
 export type MediaInputCaptureMetadata = { [key: string]: unknown };
