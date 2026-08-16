@@ -17,6 +17,7 @@ export default defineConfig({
     include: [
       "lib/measurement/__tests__/**/*.test.ts",
       "lib/finding-card/__tests__/**/*.test.ts",
+      "lib/delivery/__tests__/**/*.test.ts",
     ],
   },
   resolve: {
