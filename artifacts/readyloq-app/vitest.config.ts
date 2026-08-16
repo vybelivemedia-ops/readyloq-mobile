@@ -20,7 +20,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    include: ["lib/**/__tests__/**/*.test.ts"],
+    include: ["lib/**/__tests__/**/*.test.ts", "hooks/__tests__/**/*.test.ts"],
     // The audio stress test uses console-based assertions (not vitest suites)
     // and is run via npx tsx directly — exclude it from the vitest runner.
     exclude: ["lib/audio/__tests__/**"],
