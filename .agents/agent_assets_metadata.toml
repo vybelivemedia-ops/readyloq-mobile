@@ -21,3 +21,10 @@ uri = "file://attached_assets/readyloq-feature-graphic-1024x500.png"
 type = "image"
 title = "Google Play Feature Graphic — 1024×500 PNG"
 description = "Upload to: Store listing → Feature graphic. Exact spec: 1024×500 px, PNG, ≤1 MB."
+
+[[outputs]]
+id = "hiYwRORQt7cCyREcnOZ3r"
+uri = "file://FAIE-Technical-Invention-Disclosure.md"
+type = "text"
+title = "FAIE Technical Invention Disclosure"
+description = "Code-first IP documentation audit of the ReadyLoq/FAIE system — 17 sections, 8 architecture figures, 45-row implementation status table, 5 candidate technical combinations, prior-art questions, and attorney review checklist."
