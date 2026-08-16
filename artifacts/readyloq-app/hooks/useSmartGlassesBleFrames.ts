@@ -63,6 +63,38 @@ import { smartGlassesBle } from "@/lib/ble";
  */
 const MIN_ORPHAN_AGE_MS = 5 * 60 * 1000;
 
+/**
+ * Maximum number of BLE frame cache files that may exist on disk at the same
+ * time during a live inspection session.
+ *
+ * Frames are normally deleted immediately after their consumer callback
+ * (ingestEvidence) resolves.  However, when many frames are in-flight
+ * simultaneously — e.g. a slow upload connection during a long session —
+ * in-flight writes accumulate on disk.  This cap bounds that accumulation.
+ *
+ * At ~200–500 KB per JPEG frame this limits mid-session storage to roughly
+ * 20–50 MB (the practical range of the 50 MB budget below).
+ *
+ * When either this cap or MAX_CACHED_STORAGE_BYTES is reached the incoming
+ * frame is dropped without writing (counted as a drop).  Enforcement is
+ * synchronous and uses pre-registration so concurrent in-flight writes all
+ * count against the budget before any async I/O starts.
+ */
+const MAX_CACHED_FRAMES = 100;
+
+/**
+ * Hard byte budget for in-flight BLE frame cache files.
+ *
+ * Enforced alongside MAX_CACHED_FRAMES: whichever limit is hit first causes
+ * the incoming frame to be dropped without writing.  At the default
+ * 100-frame cap and 500 KB/frame average the two limits are consistent
+ * (100 × 500 KB = 50 MB).  Oversized JPEGs (e.g. 700 KB) will trigger the
+ * byte cap before the frame-count cap — keeping disk use within this budget
+ * even when individual frames are large.
+ */
+const MAX_CACHED_STORAGE_MB = 50;
+const MAX_CACHED_STORAGE_BYTES = MAX_CACHED_STORAGE_MB * 1024 * 1024;
+
 // ─── Module-level frame-count persistence ─────────────────────────────────────
 //
 // On Android, switching apps or receiving a phone call can unmount and remount
@@ -173,6 +205,28 @@ export function useSmartGlassesBleFrames({
   const droppedFrameCountRef = useRef(_persistedDroppedFrameCount);
   /** Timer id for the auto-clear of reconnectNotice. */
   const reconnectNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Ordered list of URIs that are reserved or written to disk but whose
+   * consumer callback has not yet resolved (i.e. still in-flight).
+   *
+   * A URI is pushed BEFORE `writeAsStringAsync` is called so that concurrent
+   * frames that arrive while the write is in progress see the reservation and
+   * cannot all slip through the cap check simultaneously.  Each URI is removed
+   * in the frame's own `finally` block once the cache file has been deleted.
+   *
+   * When `writtenUrisRef.current.length >= MAX_CACHED_FRAMES` or
+   * `writtenBytesRef.current + jpeg.byteLength > MAX_CACHED_STORAGE_BYTES`
+   * the incoming frame is dropped without writing (counted as a drop).
+   */
+  const writtenUrisRef = useRef<string[]>([]);
+  /**
+   * Running total of bytes reserved / on disk for in-flight frames.
+   * Incremented before `writeAsStringAsync` (using `jpeg.byteLength`);
+   * decremented in the `finally` block using the same value.
+   * Together with `writtenUrisRef` this enforces both the frame-count and
+   * byte-budget caps simultaneously.
+   */
+  const writtenBytesRef = useRef(0);
 
   // Unique session ID — embeds a base-36 creation timestamp so startup
   // cleanup can age-gate orphan deletion without extra filesystem I/O.
@@ -308,12 +362,49 @@ export function useSmartGlassesBleFrames({
       const frameGeneration = reconnectGenerationRef.current;
 
       void (async () => {
+        // `frameBytes` tracks the byte size reserved for this frame so the
+        // finally block can release the exact amount regardless of errors.
+        const frameBytes = jpeg.byteLength;
         let uri: string | null = null;
+        let reserved = false; // true once the URI slot has been pre-registered
         try {
+          // ── Rolling-window storage cap ─────────────────────────────────────
+          // Check BOTH caps synchronously before touching the filesystem.
+          // The URI is pre-registered into writtenUrisRef (and bytes into
+          // writtenBytesRef) BEFORE the async write begins so that concurrent
+          // frames that arrive during the write see the reservation and cannot
+          // all slip through simultaneously.
+          //
+          // When either cap is exceeded the frame is dropped without writing —
+          // this is counted as a drop and the function returns early.
+          const frameCount = writtenUrisRef.current.length;
+          const bytesBefore = writtenBytesRef.current;
+          if (
+            frameCount >= MAX_CACHED_FRAMES ||
+            bytesBefore + frameBytes > MAX_CACHED_STORAGE_BYTES
+          ) {
+            // Cap exceeded — drop this frame without writing any file.
+            droppedFrameCountRef.current += 1;
+            _persistedDroppedFrameCount = droppedFrameCountRef.current;
+            if (reconnectNoticeTimerRef.current != null) {
+              clearTimeout(reconnectNoticeTimerRef.current);
+              reconnectNoticeTimerRef.current = null;
+              setReconnectNotice(null);
+            }
+            setDroppedFrameCount(droppedFrameCountRef.current);
+            return; // uri stays null → finally is a no-op
+          }
+
           const filename = `frame_${Date.now()}_${Math.random()
             .toString(36)
             .slice(2, 8)}.jpg`;
           uri = `${sessionDir}${filename}`;
+
+          // Pre-register before the async write so concurrent frames see the
+          // reservation and cannot slip through the cap check simultaneously.
+          writtenUrisRef.current.push(uri);
+          writtenBytesRef.current += frameBytes;
+          reserved = true;
 
           await FileSystem.writeAsStringAsync(uri, uint8ArrayToBase64(jpeg), {
             encoding: FileSystem.EncodingType.Base64,
@@ -375,13 +466,40 @@ export function useSmartGlassesBleFrames({
           }
           setDroppedFrameCount(droppedFrameCountRef.current);
         } finally {
-          // Delete the cache file regardless of success or failure: on success
-          // persistPhoto has already copied it to documentDirectory; on failure
-          // it's useless.  idempotent: true silences "file not found" errors.
           if (uri) {
-            void FileSystem.deleteAsync(uri, { idempotent: true }).catch(
-              () => {},
-            );
+            if (reserved) {
+              // The reservation (URI slot + byte count) must remain live while
+              // deleteAsync is in-flight so concurrent frames cannot reuse the
+              // budget while the old file still occupies disk.  Only release
+              // AFTER the delete resolves successfully.
+              //
+              // On failure: keep the reservation.  The file still exists on
+              // disk, so its bytes remain accounted for in writtenBytesRef and
+              // writtenUrisRef.  This prevents the cap from being bypassed by
+              // a stream of deletion failures under storage pressure.  The
+              // startup orphan scan on the next session will remove the file.
+              try {
+                await FileSystem.deleteAsync(uri, { idempotent: true });
+                // Delete confirmed — release the slot and byte budget.
+                const idx = writtenUrisRef.current.indexOf(uri);
+                if (idx !== -1) writtenUrisRef.current.splice(idx, 1);
+                writtenBytesRef.current = Math.max(
+                  0,
+                  writtenBytesRef.current - frameBytes,
+                );
+              } catch {
+                // Deletion failed — leave the reservation in place.
+                // Budget is not freed; subsequent cap checks will reflect the
+                // retained disk usage, preventing further accumulation.
+              }
+            } else {
+              // URI was set but never reserved (should not occur in current
+              // code paths — reserved is true whenever uri is set).  Guard
+              // for safety: best-effort delete with no budget to release.
+              void FileSystem.deleteAsync(uri, { idempotent: true }).catch(
+                () => {},
+              );
+            }
           }
         }
       })();

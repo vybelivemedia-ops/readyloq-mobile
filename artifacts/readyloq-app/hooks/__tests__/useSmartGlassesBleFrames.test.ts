@@ -88,6 +88,16 @@ function buildMockBle(initial: GlassesConnectionState = "idle"): {
       frameCallbacks.forEach((cb) => cb(fakeJpeg));
     },
 
+    /**
+     * Emit a synthetic JPEG of a specific byte size so tests can drive
+     * the byte-budget cap (MAX_CACHED_STORAGE_BYTES) independently of
+     * the frame-count cap (MAX_CACHED_FRAMES).
+     */
+    emitCustomFrame(byteSize: number) {
+      const fakeJpeg = new Uint8Array(byteSize).fill(0xff);
+      frameCallbacks.forEach((cb) => cb(fakeJpeg));
+    },
+
     frameSubscriberCount: () => frameCallbacks.size,
     stateSubscriberCount: () => stateSubscribers.size,
   };
@@ -158,6 +168,12 @@ async function mountHook(
 let useSmartGlassesBleFrames: Awaited<ReturnType<typeof importHook>>;
 
 beforeEach(async () => {
+  // Reset the module registry so each test starts with a fresh module instance.
+  // This is required because useSmartGlassesBleFrames uses module-level
+  // variables (_persistedDroppedFrameCount, _persistedFrameCount) that survive
+  // vi.clearAllMocks() and would otherwise accumulate across tests.
+  vi.resetModules();
+
   mockBle = buildMockBle("idle");
   vi.clearAllMocks();
 
@@ -471,6 +487,150 @@ describe("useSmartGlassesBleFrames — storage cleanup: orphan scan on re-mount"
     });
 
     expect(fs.readDirectoryAsync).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite 3 — rolling-window storage cap (MAX_CACHED_FRAMES / byte budget)
+//
+// These tests verify that the cap is enforced correctly even when:
+//   (a) deleteAsync is deferred (pending) — reservation not yet released
+//   (b) deleteAsync fails — reservation intentionally retained
+//   (c) individual frames are large enough to trigger the byte budget cap
+//       before the frame-count cap
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("useSmartGlassesBleFrames — rolling-window storage cap", () => {
+  /**
+   * Flush enough microtask ticks for N frames each needing K await points
+   * plus extra headroom.
+   */
+  async function flushMicrotasks(ticks = 300) {
+    for (let i = 0; i < ticks; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  // ── frame-count cap, deferred delete ──────────────────────────────────────
+
+  it("does not write more than MAX_CACHED_FRAMES (100) files when deleteAsync is permanently deferred", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    // deleteAsync never resolves → reservations are never released
+    vi.mocked(fs.deleteAsync).mockReturnValue(
+      new Promise<void>(() => {}), // intentionally never resolves
+    );
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      // Emit 110 frames: first 100 should be written, last 10 dropped
+      for (let i = 0; i < 110; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(400);
+    });
+
+    // Only MAX_CACHED_FRAMES writes permitted — surplus frames are dropped
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(100);
+    unmount();
+  });
+
+  it("increments droppedFrameCount for every frame rejected by the deferred-delete cap", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    vi.mocked(fs.deleteAsync).mockReturnValue(new Promise<void>(() => {}));
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      for (let i = 0; i < 105; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(400);
+    });
+
+    // 5 surplus frames were dropped (105 − 100)
+    expect(result.current.droppedFrameCount).toBe(5);
+    unmount();
+  });
+
+  // ── frame-count cap, failed delete ────────────────────────────────────────
+
+  it("retains the slot reservation when deleteAsync fails so the cap is still enforced", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    // deleteAsync always rejects → reservations are kept intentionally
+    vi.mocked(fs.deleteAsync).mockRejectedValue(new Error("disk full"));
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      // Fill the cap: 100 frames written, all with failed deletes
+      for (let i = 0; i < 100; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(400);
+    });
+
+    await act(async () => {
+      // 101st frame: reservations from failed deletes keep the list full → drop
+      mockBle.emitFrame();
+      await flushMicrotasks(50);
+    });
+
+    // 100 writes succeeded; 101st was dropped due to retained reservations
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(100);
+    expect(result.current.droppedFrameCount).toBe(1);
+    unmount();
+  });
+
+  // ── byte-budget cap ───────────────────────────────────────────────────────
+
+  it("enforces the 50 MB byte budget before reaching the 100-frame count cap with large frames", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    // deleteAsync never resolves → reservations never released (same as deferred test)
+    vi.mocked(fs.deleteAsync).mockReturnValue(new Promise<void>(() => {}));
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    // MAX_CACHED_STORAGE_BYTES = 50 MB = 52_428_800 bytes
+    // Frame size = 1 MB each → byte cap fires after 50 frames (50 MB)
+    // 51st frame: 50 MB + 1 MB = 51 MB > 50 MB → dropped
+    // This verifies byte cap fires BEFORE the 100-frame count cap.
+    const ONE_MB = 1024 * 1024;
+
+    await act(async () => {
+      for (let i = 0; i < 55; i++) {
+        mockBle.emitCustomFrame(ONE_MB);
+      }
+      await flushMicrotasks(400);
+    });
+
+    // Exactly 50 frames written (50 MB reserved), 5 dropped by the byte cap
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(50);
     unmount();
   });
 });
