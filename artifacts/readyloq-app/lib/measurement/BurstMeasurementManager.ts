@@ -31,6 +31,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 
 import type { BurstFrame } from "@platform/measurement-core";
+import { sfmDepthEngine } from "./SfMDepthEngine";
 
 // Re-export so callers don't need to import the platform package directly.
 export type { BurstFrame };
@@ -174,6 +175,66 @@ class BurstMeasurementManager {
     const surfaceNormal = { x: 0, y: 0, z: 1 };
 
     return { widthMm, heightMm, confidence, surfaceNormal, pxToMmScale };
+  }
+
+  /**
+   * Convenience wrapper: derives metric depth from the burst frames via the
+   * SfM engine and then computes reference-anchored dimensions in one call.
+   *
+   * ─── When to use this vs computeScaledDimensions ──────────────────────────
+   *   • Use this method when you have burst frames but no external depth source
+   *     (no BLE laser, no ARKit depth).
+   *   • Use computeScaledDimensions directly when you already have a reliable
+   *     depth estimate (e.g. from a BLE distance meter).
+   *
+   * @param frames               Output of captureBurst().
+   * @param widthP1              Near endpoint of the target dimension.
+   * @param widthP2              Far endpoint of the target dimension.
+   * @param referenceKnownMm     Physical width of the reference object (mm).
+   * @param referencePixelLength Pixel distance across the reference object.
+   * @param focalLengthPx        Camera focal length in pixels (default 1000).
+   * @param fallbackDepthMeters  Used when SfM triangulation yields no points
+   *                             (e.g. identical frames, pure zoom motion).
+   *                             Defaults to 1.0 m — a reasonable arm's-length
+   *                             prior for indoor inspections.
+   * @param heightP1             Optional: near endpoint of a height dimension.
+   * @param heightP2             Optional: far endpoint of a height dimension.
+   */
+  public async computeScaledDimensionsFromBurst(
+    frames: BurstFrame[],
+    widthP1: { x: number; y: number },
+    widthP2: { x: number; y: number },
+    referenceKnownMm: number,
+    referencePixelLength: number,
+    focalLengthPx: number = 1000,
+    fallbackDepthMeters: number = 1.0,
+    heightP1?: { x: number; y: number },
+    heightP2?: { x: number; y: number },
+  ): Promise<BlendedMeasurementResult & { depthSource: "sfm" | "fallback"; depthMeters: number }> {
+    const frameUris = frames.map((f) => f.uri);
+
+    // Ask the SfM engine for a median depth estimate from disparity.
+    const sfmDepth = await sfmDepthEngine.estimateMedianDepth(
+      frameUris,
+      0.08,          // 8 cm hand-motion baseline
+      focalLengthPx,
+    );
+
+    const depthMeters = sfmDepth ?? fallbackDepthMeters;
+    const depthSource: "sfm" | "fallback" = sfmDepth !== null ? "sfm" : "fallback";
+
+    const result = this.computeScaledDimensions(
+      widthP1,
+      widthP2,
+      referenceKnownMm,
+      referencePixelLength,
+      depthMeters,
+      focalLengthPx,
+      heightP1,
+      heightP2,
+    );
+
+    return { ...result, depthSource, depthMeters };
   }
 
   /**

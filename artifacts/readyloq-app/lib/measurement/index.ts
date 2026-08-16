@@ -57,6 +57,13 @@ export {
   type BlendedMeasurementResult,
 } from "./BurstMeasurementManager";
 
+// ── SfM depth engine ──────────────────────────────────────────────────────────
+export {
+  sfmDepthEngine,
+  type Point2D,
+  type TriangulatedPoint,
+} from "./SfMDepthEngine";
+
 // ── Measurement Bridge ────────────────────────────────────────────────────────
 export {
   setLastMeasurementReading,
