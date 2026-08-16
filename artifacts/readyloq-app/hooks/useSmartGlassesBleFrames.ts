@@ -110,6 +110,9 @@ let _persistedFrameCount = 0;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** Drop reason codes reported via onDroppedFrame. */
+export type BleFrameDropReason = "driver_drop" | "cap_exceeded" | "processing_error";
+
 interface UseSmartGlassesBleFramesOptions {
   /**
    * Set to true when an inspection is open and frame capture should be active.
@@ -130,6 +133,20 @@ interface UseSmartGlassesBleFramesOptions {
    *   }
    */
   onFrame: (uri: string) => Promise<void> | void;
+  /**
+   * Optional telemetry callback — fired synchronously at each drop site with
+   * the number of newly-dropped frames, the reason, and the currently-connected
+   * BLE device ID (null when not available).
+   *
+   * The consumer (e.g. new-inspection.tsx) should POST this to
+   * POST /api/meta-glasses/events/:sessionId as a `ble_frame_dropped` event
+   * so engineering can aggregate per-device drop counts in the portal.
+   *
+   *   onDroppedFrame: (count, reason, deviceId) => {
+   *     glassesSession.postTelemetryEvent(count, reason, deviceId);
+   *   }
+   */
+  onDroppedFrame?: (count: number, reason: BleFrameDropReason, deviceId: string | null) => void;
 }
 
 interface SmartGlassesBleFramesState {
@@ -162,7 +179,13 @@ interface SmartGlassesBleFramesState {
 export function useSmartGlassesBleFrames({
   active,
   onFrame,
+  onDroppedFrame,
 }: UseSmartGlassesBleFramesOptions): SmartGlassesBleFramesState {
+  // Stable ref so the drop callback always uses the latest prop without needing
+  // to be listed in effect dependencies.
+  const onDroppedFrameRef = useRef(onDroppedFrame);
+  onDroppedFrameRef.current = onDroppedFrame;
+
   const [isBleConnected, setIsBleConnected] = useState(
     () => smartGlassesBle.getState().connectionState === "connected",
   );
@@ -338,6 +361,12 @@ export function useSmartGlassesBleFrames({
         setReconnectNotice(null);
       }
       setDroppedFrameCount(droppedFrameCountRef.current);
+      // Notify the consumer so it can POST telemetry to the API.
+      onDroppedFrameRef.current?.(
+        count,
+        "driver_drop",
+        smartGlassesBle.getState().connectedDeviceId ?? null,
+      );
     });
     return unsub;
   }, []);
@@ -392,6 +421,12 @@ export function useSmartGlassesBleFrames({
               setReconnectNotice(null);
             }
             setDroppedFrameCount(droppedFrameCountRef.current);
+            // Notify consumer for telemetry.
+            onDroppedFrameRef.current?.(
+              1,
+              "cap_exceeded",
+              smartGlassesBle.getState().connectedDeviceId ?? null,
+            );
             return; // uri stays null → finally is a no-op
           }
 
@@ -465,6 +500,12 @@ export function useSmartGlassesBleFrames({
             setReconnectNotice(null);
           }
           setDroppedFrameCount(droppedFrameCountRef.current);
+          // Notify consumer for telemetry.
+          onDroppedFrameRef.current?.(
+            1,
+            "processing_error",
+            smartGlassesBle.getState().connectedDeviceId ?? null,
+          );
         } finally {
           if (uri) {
             if (reserved) {

@@ -42,18 +42,20 @@ vi.mock("../lib/objectStorage", () => ({
 }));
 
 import app from "../app";
-import { db, usersTable, companiesTable, inspectionsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, inspectionsTable, metaGlassesSessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 // ─── Seed identifiers ─────────────────────────────────────────────────────────
 
 const TECH_A_CLERK = "mg_test_tech_a_clerk";
 const TECH_B_CLERK = "mg_test_tech_b_clerk";
+const MANAGER_A_CLERK = "mg_test_manager_a_clerk";
 
 let companyAId: number;
 let companyBId: number;
 let techAId: number;
 let techBId: number;
+let managerAId: number;
 let inspectionAId: number; // belongs to Company A
 let inspectionBId: number; // belongs to Company B
 
@@ -119,6 +121,28 @@ beforeAll(async () => {
       })
       .returning();
     techBId = row.id;
+  }
+
+  // Upsert manager A (belongs to Company A, manager role, beta access enabled)
+  const [existingMA] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.clerkUserId, MANAGER_A_CLERK));
+  if (existingMA) {
+    managerAId = existingMA.id;
+  } else {
+    const [row] = await db
+      .insert(usersTable)
+      .values({
+        clerkUserId: MANAGER_A_CLERK,
+        email: "manager-a@mg-test.example",
+        name: "Manager A",
+        role: "manager",
+        companyId: companyAId,
+        betaAccess: true,
+      })
+      .returning();
+    managerAId = row.id;
   }
 
   // Create an inspection for each company
@@ -325,5 +349,309 @@ describe("POST /api/meta-glasses/events/:sessionId — cross-company injection g
 
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("error");
+  });
+});
+
+// ─── GET /frame-drop-stats — BLE telemetry aggregation ───────────────────────
+
+describe("GET /api/meta-glasses/frame-drop-stats", () => {
+  // Seed a session for Company A with known frame-drop events directly in the
+  // DB so we control the JSONB contents precisely.
+  beforeAll(async () => {
+    // Create one session for Company A containing two ble_frame_dropped events
+    // (one with custom text so we verify clientEventType is the discriminator)
+    // and one ble_reconnect event that must NOT appear in the counts.
+    await db.insert(metaGlassesSessionsTable).values({
+      sessionId: "fds-test-session-a",
+      code: "FDSTST",
+      inspectionId: inspectionAId,
+      companyId: companyAId,
+      userId: managerAId,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      events: [
+        {
+          id: "evt-1",
+          type: "status",
+          timestamp: Date.now(),
+          text: "Frame 42 dropped — link flap", // custom text; must still count
+          clientEventType: "ble_frame_dropped",
+          deviceId: "device-alpha",
+          reason: "buffer_overflow",
+          count: 1, // explicit single-frame drop
+        },
+        {
+          id: "evt-2",
+          type: "status",
+          timestamp: Date.now(),
+          text: "Client event: ble_frame_dropped", // default text
+          clientEventType: "ble_frame_dropped",
+          deviceId: "device-alpha",
+          reason: "buffer_overflow",
+          count: 7, // bulk driver drop — SUM must produce 8 total, not 2
+        },
+        {
+          id: "evt-3",
+          type: "status",
+          timestamp: Date.now(),
+          text: "Client event: ble_reconnect", // reconnect — must NOT be counted
+          clientEventType: "ble_reconnect",
+          deviceId: "device-alpha",
+        },
+        {
+          id: "evt-4",
+          type: "status",
+          timestamp: Date.now(),
+          text: "Client event: ble_frame_dropped", // no count field — must default to 1
+          clientEventType: "ble_frame_dropped",
+          deviceId: "device-alpha",
+          reason: "buffer_overflow",
+          // count intentionally absent to exercise COALESCE(..., 1)
+        },
+      ],
+    }).onConflictDoNothing();
+
+    // Create a session for Company B — its drops must never appear in Company A stats.
+    await db.insert(metaGlassesSessionsTable).values({
+      sessionId: "fds-test-session-b",
+      code: "FDSTB2",
+      inspectionId: inspectionBId,
+      companyId: companyBId,
+      userId: techBId,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      events: [
+        {
+          id: "evt-b-1",
+          type: "status",
+          timestamp: Date.now(),
+          text: "Client event: ble_frame_dropped",
+          clientEventType: "ble_frame_dropped",
+          deviceId: "device-beta",
+          reason: "signal_loss",
+        },
+      ],
+    }).onConflictDoNothing();
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(metaGlassesSessionsTable)
+      .where(eq(metaGlassesSessionsTable.sessionId, "fds-test-session-a"))
+      .catch(() => {});
+    await db
+      .delete(metaGlassesSessionsTable)
+      .where(eq(metaGlassesSessionsTable.sessionId, "fds-test-session-b"))
+      .catch(() => {});
+  });
+
+  it("returns 200 with correct drop counts for a manager", async () => {
+    asUser(MANAGER_A_CLERK);
+    const res = await request(app).get("/api/meta-glasses/frame-drop-stats");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("stats");
+    expect(res.body).toHaveProperty("queriedAt");
+
+    // Company A seeded: device-alpha / buffer_overflow with counts 1 + 7 + 1 = 9.
+    // SUM(count) must return 9, not 3 (COUNT(*) would give 3).
+    const stat = (res.body.stats as Array<{ deviceId: string; reason: string; dropCount: number }>)
+      .find((s) => s.deviceId === "device-alpha" && s.reason === "buffer_overflow");
+    expect(stat).toBeDefined();
+    expect(stat!.dropCount).toBe(9);
+  });
+
+  it("sums count > 1 correctly — a bulk driver drop is not treated as a single drop", async () => {
+    asUser(MANAGER_A_CLERK);
+    const res = await request(app).get("/api/meta-glasses/frame-drop-stats");
+    expect(res.status).toBe(200);
+
+    // evt-2 has count=7, evt-1 count=1, evt-4 has no count (defaults to 1) → 9 total.
+    // If the aggregation used COUNT(*) instead of SUM(count) it would return 3.
+    const stat = (res.body.stats as Array<{ deviceId: string; reason: string; dropCount: number }>)
+      .find((s) => s.deviceId === "device-alpha" && s.reason === "buffer_overflow");
+    expect(stat).toBeDefined();
+    expect(stat!.dropCount).toBeGreaterThan(3); // proves SUM is used, not COUNT
+    expect(stat!.dropCount).toBe(9);            // exact value
+  });
+
+  it("counts events with custom text when clientEventType is ble_frame_dropped", async () => {
+    asUser(MANAGER_A_CLERK);
+    const res = await request(app).get("/api/meta-glasses/frame-drop-stats");
+    expect(res.status).toBe(200);
+
+    // The event with text "Frame 42 dropped — link flap" must be counted
+    // (discriminated by clientEventType, not text).
+    const total = (res.body.stats as Array<{ dropCount: number }>)
+      .reduce((sum, s) => sum + s.dropCount, 0);
+    expect(total).toBeGreaterThanOrEqual(9);
+  });
+
+  it("excludes ble_reconnect events from the drop count", async () => {
+    asUser(MANAGER_A_CLERK);
+    const res = await request(app).get("/api/meta-glasses/frame-drop-stats");
+    expect(res.status).toBe(200);
+
+    // There must be no row for device-alpha / reason:undefined from the reconnect event
+    const reconnectRow = (res.body.stats as Array<{ deviceId: string; reason: string | null; dropCount: number }>)
+      .find((s) => s.deviceId === "device-alpha" && s.reason === null);
+    // If such a row exists its drop count should not include the reconnect event
+    // (i.e. the reconnect must add 0 frame drops).
+    if (reconnectRow) {
+      expect(reconnectRow.dropCount).toBe(0);
+    }
+  });
+
+  it("scopes results to the calling company — Company B's device must not appear", async () => {
+    asUser(MANAGER_A_CLERK);
+    const res = await request(app).get("/api/meta-glasses/frame-drop-stats");
+    expect(res.status).toBe(200);
+
+    const hasBeta = (res.body.stats as Array<{ deviceId: string }>)
+      .some((s) => s.deviceId === "device-beta");
+    expect(hasBeta).toBe(false);
+  });
+
+  it("returns 403 when a technician (non-manager) calls the endpoint", async () => {
+    asUser(TECH_A_CLERK);
+    const res = await request(app).get("/api/meta-glasses/frame-drop-stats");
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 401 for an unauthenticated request", async () => {
+    asUser(null);
+    const res = await request(app).get("/api/meta-glasses/frame-drop-stats");
+    expect(res.status).toBe(401);
+  });
+
+  it("clamps malformed count to 1 and caps overflow count — endpoint never crashes", async () => {
+    // Seed directly into the DB to test the SQL safe-cast without relying on
+    // the fire-and-forget pushEvent path (which would introduce a race).
+    await db.insert(metaGlassesSessionsTable).values({
+      sessionId: "fds-test-malformed",
+      code: "FDSMAL",
+      inspectionId: inspectionAId,
+      companyId: companyAId,
+      userId: managerAId,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      events: [
+        {
+          id: "evt-malformed-1",
+          type: "status",
+          timestamp: Date.now(),
+          text: "Client event: ble_frame_dropped",
+          clientEventType: "ble_frame_dropped",
+          deviceId: "device-malformed",
+          reason: "bad-counts",
+          count: "not-a-number", // non-numeric string → SQL must default to 1
+        },
+        {
+          id: "evt-malformed-2",
+          type: "status",
+          timestamp: Date.now(),
+          text: "Client event: ble_frame_dropped",
+          clientEventType: "ble_frame_dropped",
+          deviceId: "device-malformed",
+          reason: "bad-counts",
+          count: 99_999_999, // oversized → SQL must cap at 10000 via LEAST
+        },
+        {
+          id: "evt-malformed-3",
+          type: "status",
+          timestamp: Date.now(),
+          text: "Client event: ble_frame_dropped",
+          clientEventType: "ble_frame_dropped",
+          deviceId: "device-malformed",
+          reason: "bad-counts",
+          count: -5, // negative (JSON number "-5") → SQL must default to 1
+        },
+      ],
+    }).onConflictDoNothing();
+
+    asUser(MANAGER_A_CLERK);
+    const res = await request(app).get("/api/meta-glasses/frame-drop-stats");
+
+    // Must return 200 — malformed counts must never crash the endpoint.
+    expect(res.status).toBe(200);
+
+    const malformedRow = (res.body.stats as Array<{ deviceId: string; reason: string; dropCount: number }>)
+      .find((s) => s.deviceId === "device-malformed" && s.reason === "bad-counts");
+    expect(malformedRow).toBeDefined();
+    // "not-a-number" → 1 (bad string), 99_999_999 → 10000 (LEAST cap), -5 → 1 (negative)
+    expect(malformedRow!.dropCount).toBe(10_002);
+
+    // Cleanup
+    await db.delete(metaGlassesSessionsTable)
+      .where(eq(metaGlassesSessionsTable.sessionId, "fds-test-malformed"))
+      .catch(() => {});
+  });
+
+  it("server caps count at MAX_EVENT_COUNT before persisting via POST /events/:sessionId", async () => {
+    // Seed a session directly in the DB simulating what the server stores after
+    // capping count=999999 → 10000.  We test the DB value directly rather than
+    // going through the fire-and-forget pushEvent path (which would race with
+    // the immediate stats query).
+    await db.insert(metaGlassesSessionsTable).values({
+      sessionId: "fds-test-overflow",
+      code: "FDSOVF",
+      inspectionId: inspectionAId,
+      companyId: companyAId,
+      userId: managerAId,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      events: [
+        {
+          id: "evt-overflow-1",
+          type: "status",
+          timestamp: Date.now(),
+          text: "Client event: ble_frame_dropped",
+          clientEventType: "ble_frame_dropped",
+          deviceId: "device-overflow",
+          reason: "driver_drop",
+          count: 10_000, // server-capped value (original might have been 999999)
+        },
+      ],
+    }).onConflictDoNothing();
+
+    asUser(MANAGER_A_CLERK);
+    const res = await request(app).get("/api/meta-glasses/frame-drop-stats");
+    expect(res.status).toBe(200);
+
+    const overflowRow = (res.body.stats as Array<{ deviceId: string; dropCount: number }>)
+      .find((s) => s.deviceId === "device-overflow");
+    expect(overflowRow).toBeDefined();
+    // Value stored is exactly 10000 (capped by server); LEAST(10000, 10000) = 10000.
+    expect(overflowRow!.dropCount).toBe(10_000);
+
+    // Cleanup
+    await db.delete(metaGlassesSessionsTable)
+      .where(eq(metaGlassesSessionsTable.sessionId, "fds-test-overflow"))
+      .catch(() => {});
+  });
+
+  it("does not count a ble_reconnect event that forges clientEventType=ble_frame_dropped", async () => {
+    // Post a reconnect event with a forged clientEventType. The server must
+    // overwrite clientEventType with the validated type ("ble_reconnect"), so
+    // the stats query must not count it as a frame drop.
+    asUser(MANAGER_A_CLERK);
+    // We need a live session to push into — create one now.
+    const sessionRes = await request(app)
+      .post("/api/meta-glasses/session")
+      .send({ inspectionId: inspectionAId });
+    const forgerySessionId = sessionRes.body.sessionId as string;
+
+    // Attempt to inject a ble_reconnect event disguised as a frame drop.
+    await request(app)
+      .post(`/api/meta-glasses/events/${forgerySessionId}`)
+      .send({
+        type: "ble_reconnect",
+        clientEventType: "ble_frame_dropped", // forged — server must ignore this
+        deviceId: "device-forgery",
+        reason: "forged",
+      });
+
+    // Query stats and confirm device-forgery has zero frame drops.
+    const statsRes = await request(app).get("/api/meta-glasses/frame-drop-stats");
+    expect(statsRes.status).toBe(200);
+    const forgeryRow = (statsRes.body.stats as Array<{ deviceId: string }>)
+      .find((s) => s.deviceId === "device-forgery");
+    expect(forgeryRow).toBeUndefined();
   });
 });

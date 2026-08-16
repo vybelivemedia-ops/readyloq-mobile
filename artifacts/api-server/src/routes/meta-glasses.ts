@@ -39,11 +39,11 @@ import crypto from "node:crypto";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { toFile } from "openai";
 import { db, inspectionsTable, inspectionMediaTable, metaGlassesSessionsTable } from "@workspace/db";
-import { and, eq, gt, lt } from "drizzle-orm";
+import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 const objectStorageService = new ObjectStorageService();
-import { requireAuth, requireCompany, requireBetaAccess } from "../middleware/require-auth";
+import { requireAuth, requireCompany, requireBetaAccess, requireRole } from "../middleware/require-auth";
 import { analyzePhotoFromBase64 } from "../lib/intelligence-ai";
 import { zoomGlassesFrame } from "../lib/glasses-zoom";
 import { logErrorEvent } from "../lib/error-events";
@@ -75,7 +75,26 @@ export interface GlassesEvent {
    * was cropped to this subject.
    */
   zoomSubject?: string;
+  /**
+   * Original client-push event type (e.g. "ble_frame_dropped", "ble_reconnect",
+   * "ble_link_lost").  Always set by POST /events/:sessionId so telemetry queries
+   * can filter on a stable field regardless of the caller-supplied text.
+   */
+  clientEventType?: string;
+  /** BLE device identifier supplied by the mobile app for telemetry events. */
+  deviceId?: string;
+  /** Human-readable drop reason supplied by the mobile app. */
+  reason?: string;
+  /**
+   * Number of frames dropped in this event (for bulk driver drops).
+   * Server-validated: always a finite positive integer in [1..MAX_EVENT_COUNT].
+   * Defaults to 1 when not present.
+   */
+  count?: number;
 }
+
+/** Maximum frame count per telemetry event — guards against forged/inflated totals. */
+const MAX_EVENT_COUNT = 10_000;
 
 interface ActiveSession {
   sessionId: string;
@@ -591,12 +610,35 @@ router.post(
       });
     }
 
+    // Validate and normalize the optional frame-drop count.
+    // We accept only finite positive integers in [1..MAX_EVENT_COUNT].
+    // Invalid / missing / out-of-range values are clamped to 1 so a single
+    // bad payload cannot inflate or corrupt aggregate totals.
+    const rawCount = (rest as Record<string, unknown>).count;
+    const parsedCount = typeof rawCount === "number" ? rawCount
+      : typeof rawCount === "string" ? Number(rawCount)
+      : NaN;
+    const validatedCount =
+      Number.isFinite(parsedCount) && parsedCount >= 1
+        ? Math.min(Math.floor(parsedCount), MAX_EVENT_COUNT)
+        : 1;
+
+    // Spread permitted client metadata first (deviceId, reason, custom text …)
+    // then override with authoritative server-owned fields so callers cannot
+    // forge id, timestamp, type, clientEventType, or count.
     const event: GlassesEvent = {
+      ...(rest as Partial<GlassesEvent>),
+      // Server-owned fields always win over the client payload:
       id: crypto.randomUUID(),
       type: "status", // client-push events are categorised as status events
       timestamp: Date.now(),
       text: (rest.text as string | undefined) ?? `Client event: ${type}`,
-      ...(rest as Partial<GlassesEvent>),
+      // Preserve the VALIDATED original event type so telemetry queries
+      // (e.g. frame-drop stats) can filter on a stable field regardless
+      // of what text the caller supplies.  Overrides any forged value.
+      clientEventType: type as string,
+      // Validated count — always a finite positive integer in [1..MAX_EVENT_COUNT].
+      count: validatedCount,
     };
 
     pushEvent(session, event);
@@ -637,6 +679,73 @@ router.get(
       events,
       serverTime: Date.now(),
     });
+  },
+);
+
+// ── GET /frame-drop-stats — aggregate ble_frame_dropped telemetry (auth-gated, manager+) ─────────
+//
+// Queries the meta_glasses_sessions table JSONB events column for every session
+// belonging to the calling company, unnests the event array, and returns drop
+// counts grouped by deviceId and reason.  Only events with
+// clientEventType = "ble_frame_dropped" are counted — reconnect / link-lost
+// events are excluded.  Filters on the dedicated `clientEventType` field
+// (not `text`) so counts are accurate regardless of the caller-supplied text.
+//
+// Response shape:
+//   { stats: Array<{ deviceId: string|null, reason: string|null, dropCount: number }>, queriedAt: number }
+router.get(
+  "/frame-drop-stats",
+  requireAuth,
+  requireCompany,
+  requireRole("manager"),
+  (req: Request, res: Response) => {
+    const companyId = req.user!.companyId!;
+
+    // Use a raw SQL lateral join to unnest the JSONB events array and filter
+    // for ble_frame_dropped entries.  The original client event type is baked
+    // into the text field as "Client event: ble_frame_dropped" by the push
+    // handler (the `type` key is stripped before spreading into GlassesEvent).
+    void db
+      .execute(
+        sql`
+          SELECT
+            e->>'deviceId'  AS device_id,
+            e->>'reason'    AS reason,
+            SUM(
+              CASE
+                -- Accept only digit-only strings where the value is >= 1.
+                -- LEAST caps oversized values at 10 000; negative/non-numeric
+                -- strings fall back to 1 so malformed events can never crash
+                -- the cast or inflate totals beyond the per-event ceiling.
+                WHEN (e->>'count') ~ '^[0-9]+$'
+                 AND (e->>'count')::bigint >= 1
+                THEN LEAST((e->>'count')::bigint, 10000)::int
+                -- No count field, unparseable, or negative → single-frame drop.
+                ELSE 1
+              END
+            )::int          AS drop_count
+          FROM meta_glasses_sessions s,
+               jsonb_array_elements(s.events) AS e
+          WHERE s.company_id = ${companyId}
+            AND e->>'clientEventType' = 'ble_frame_dropped'
+          GROUP BY 1, 2
+          ORDER BY drop_count DESC, device_id ASC NULLS LAST
+        `,
+      )
+      .then((result) => {
+        const stats = (result.rows as Array<{ device_id: string | null; reason: string | null; drop_count: number }>).map(
+          (row) => ({
+            deviceId: row.device_id ?? null,
+            reason: row.reason ?? null,
+            dropCount: Number(row.drop_count),
+          }),
+        );
+        res.json({ stats, queriedAt: Date.now() });
+      })
+      .catch((err) => {
+        logger.warn("[meta-glasses] frame-drop-stats query failed: " + String(err));
+        res.status(500).json({ error: "Failed to query frame-drop stats" });
+      });
   },
 );
 

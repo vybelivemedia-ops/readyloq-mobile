@@ -79,6 +79,20 @@ interface MetaGlassesSessionState {
    * issued — lets the UI highlight the code so the tech notices it changed.
    */
   codeJustChanged: boolean;
+  /**
+   * Fire-and-forget POST of a BLE telemetry event to the active session.
+   * Safe to call even when no session is registered — it silently no-ops.
+   * On network failure the event is discarded (best-effort telemetry).
+   *
+   * Callers should not await this — it is intentionally non-blocking so
+   * the frame-drop hot-path is never stalled by a network call.
+   */
+  postTelemetryEvent(payload: {
+    type: string;
+    deviceId?: string | null;
+    reason?: string;
+    count?: number;
+  }): void;
 }
 
 const POLL_INTERVAL_MS = 3_000;        // poll every 3 s
@@ -263,5 +277,40 @@ export function useMetaGlassesSession({
     }
   }, [inspectionId]);
 
-  return { sessionId, code, eventCount, status, isActive, isInactive, codeJustChanged };
+  // ── postTelemetryEvent — fire-and-forget BLE telemetry POST ───────────────
+  // Stable across renders (useCallback with stable deps) so callers can safely
+  // list it in effect dependency arrays without triggering re-subscriptions.
+  // Always-current session ID is read inside the async function via closure —
+  // the callback captures the outer `sessionId` state, which is a React state
+  // value. We use a ref so the latest session ID is always readable without
+  // the function identity changing on every render.
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
+
+  const postTelemetryEvent = useCallback(
+    (payload: { type: string; deviceId?: string | null; reason?: string; count?: number }) => {
+      const sid = sessionIdRef.current;
+      if (!sid) return; // no active session — silently discard
+
+      // Fire-and-forget: network failures are acceptable for telemetry.
+      void (async () => {
+        try {
+          const token = await getToken();
+          await fetch(`${API_BASE}/api/meta-glasses/events/${sid}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          });
+        } catch {
+          // Best-effort telemetry — silently discard network failures.
+        }
+      })();
+    },
+    [getToken], // getToken is stable from Clerk; sessionId is read via ref
+  );
+
+  return { sessionId, code, eventCount, status, isActive, isInactive, codeJustChanged, postTelemetryEvent };
 }

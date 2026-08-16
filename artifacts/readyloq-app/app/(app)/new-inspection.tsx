@@ -833,6 +833,18 @@ export default function NewInspectionScreen() {
       setFaieStatus("🕶 BLE frame captured");
       setTimeout(() => setFaieStatus(null), 3_000);
     },
+    // Post BLE frame-drop telemetry to the active meta-glasses session so the
+    // engineering team can identify faulty hardware in the portal BLE Health page.
+    // This is fire-and-forget: postTelemetryEvent silently discards failures and
+    // no-ops when no session is registered (e.g. before inspection is persisted).
+    onDroppedFrame: (count, reason, deviceId) => {
+      glassesSession.postTelemetryEvent({
+        type: "ble_frame_dropped",
+        deviceId: deviceId ?? undefined,
+        reason,
+        count,
+      });
+    },
   });
 
   // #106 — Haptic alert the moment glasses first go silent (isInactive flips true).
