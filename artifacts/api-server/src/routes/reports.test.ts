@@ -78,7 +78,7 @@ import {
   inspectionMediaTable,
   reportsTable,
 } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as reportNarrativeAi from "../lib/report-narrative-ai";
 
 // ─── Stable Clerk IDs (prefixed to avoid cross-suite collisions) ──────────────
@@ -721,5 +721,165 @@ describe("tenant isolation", () => {
     asUser(OWNER_B_ID);
     const res = await request(app).get(`/api/reports/${reportId}`);
     expect(res.status).toBe(404);
+  });
+});
+
+// ─── Sync round-trip: captureMetadata survives POST → DB → HTML ───────────────
+//
+// The PDF report reads laserMeasurement from inspectionMediaTable.captureMetadata.
+// If the sync engine (or the media POST route) drops or corrupts the blob,
+// measurements silently disappear from the PDF with no error.  These tests pin
+// the full path:
+//   1. POST /inspections/:id/media with a rich captureMetadata payload
+//      (burst variant, warnings present) → 201, captureMetadata stored verbatim.
+//   2. DB read-back: the stored jsonb value deep-equals the posted payload.
+//   3. GET /reports/:id/html: the measurement strip appears in the HTML with
+//      the correct width, height, area, and warning text.
+
+describe("sync round-trip: captureMetadata persists through media POST and HTML render", () => {
+  /** Full burst-reference payload including nested warnings — matches what the
+   *  sync engine sends when a BLE laser measurement is stamped on a photo. */
+  const BURST_METADATA = {
+    laserMeasurement: {
+      kind: "distance",
+      value: 4.75,
+      unit: "inches",
+      signalQuality: 0.72,
+      metadata: {
+        method: "burst_reference",
+        heightInches: 6.25,
+        areaSqInches: 29.69,
+        confidence: 0.68,
+        warnings: ["partial_occlusion", "edge_proximity"],
+      },
+    },
+    deviceModel: "ReadyLoq BLE-1",
+    capturedAt: "2026-08-16T10:00:00.000Z",
+  };
+
+  const SYNC_PHOTO_URL = "https://storage.example.com/sync-roundtrip-laser.jpg";
+
+  it("POST /inspections/:id/media stores captureMetadata verbatim (deep equal)", async () => {
+    asUser(TECH_ID);
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({
+        mediaType: "photo",
+        url: SYNC_PHOTO_URL,
+        filename: "laser-burst.jpg",
+        captureSource: "ble_laser",
+        qualityScore: 87,
+        captureMetadata: BURST_METADATA,
+      });
+
+    expect(res.status).toBe(201);
+
+    // The API response must include the full captureMetadata — confirms the
+    // route did not strip or truncate the nested object before returning.
+    expect(res.body.captureMetadata).toBeDefined();
+    expect(res.body.captureMetadata.laserMeasurement).toBeDefined();
+    const laser = res.body.captureMetadata.laserMeasurement;
+    expect(laser.value).toBe(BURST_METADATA.laserMeasurement.value);
+    expect(laser.metadata.method).toBe("burst_reference");
+    expect(laser.metadata.heightInches).toBe(BURST_METADATA.laserMeasurement.metadata.heightInches);
+    expect(laser.metadata.areaSqInches).toBe(BURST_METADATA.laserMeasurement.metadata.areaSqInches);
+    expect(laser.metadata.confidence).toBe(BURST_METADATA.laserMeasurement.metadata.confidence);
+    // Warnings array must survive intact — both entries, in order.
+    expect(Array.isArray(laser.metadata.warnings)).toBe(true);
+    expect(laser.metadata.warnings).toEqual(BURST_METADATA.laserMeasurement.metadata.warnings);
+
+    // Read the row directly from the DB to confirm the jsonb column was not
+    // silently truncated after the API returned.  This guards against a
+    // scenario where the route responded with the input echo but the DB write
+    // stored a shorter blob (e.g. due to a missing jsonb cast or column
+    // width constraint).
+    const mediaRowId: number = res.body.id;
+    const [dbRow] = await db
+      .select({ captureMetadata: inspectionMediaTable.captureMetadata })
+      .from(inspectionMediaTable)
+      .where(eq(inspectionMediaTable.id, mediaRowId));
+
+    expect(dbRow).toBeDefined();
+    // toEqual performs a deep structural comparison — any missing key, wrong
+    // type, or truncated array element will fail here.
+    expect(dbRow.captureMetadata).toEqual(BURST_METADATA);
+  });
+
+  it("GET /reports/:id/html renders measurement strip with warnings after media round-trip", async () => {
+    // Ensure the media row exists with the expected URL (the previous test
+    // created it; this test is intentionally dependent so we test the full
+    // POST → DB → HTML pipeline as one coherent flow rather than isolating
+    // the HTML step behind a direct DB seed).
+    const [existingMedia] = await db
+      .select({ id: inspectionMediaTable.id, captureMetadata: inspectionMediaTable.captureMetadata })
+      .from(inspectionMediaTable)
+      .where(
+        and(
+          eq(inspectionMediaTable.companyId, companyId),
+          eq(inspectionMediaTable.inspectionId, inspectionId),
+          eq(inspectionMediaTable.url, SYNC_PHOTO_URL),
+        ),
+      )
+      .limit(1);
+
+    expect(existingMedia).toBeDefined();
+    // Guard: the captureMetadata must have survived the round-trip before
+    // we test the HTML renderer — prevents a false-positive where the HTML
+    // route silently falls back to "no measurement" without an error.
+    expect(existingMedia.captureMetadata).toBeDefined();
+    const storedLaser = (existingMedia.captureMetadata as typeof BURST_METADATA).laserMeasurement;
+    expect(storedLaser.metadata.warnings).toEqual(BURST_METADATA.laserMeasurement.metadata.warnings);
+
+    // Seed a report whose finding links to the stamped photo URL.
+    const findingsJson = JSON.stringify([
+      {
+        id: 99,
+        category: "Gap",
+        description: "Stamped measurement gap",
+        confidence: 0.9,
+        severity: "high",
+        location: "Service entry",
+        imageUrl: SYNC_PHOTO_URL,
+        exclusionOpportunity: false,
+      },
+    ]);
+    const result = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'Sync Round-Trip HTML Test',
+              '42 Empty St', 'complete',
+              ${findingsJson}::jsonb, '[]'::jsonb, '[]'::jsonb,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const reportId = (result.rows[0] as { id: number }).id;
+
+    asUser(OWNER_ID);
+    const htmlRes = await request(app).get(`/api/reports/${reportId}/html`);
+    expect(htmlRes.status).toBe(200);
+
+    // Measurement strip must appear.
+    expect(htmlRes.text).toContain("Laser Measurement");
+
+    // Width, height, and area values must all be rendered.
+    // value=4.75 → "4.75 in", heightInches=6.25 → "6.25 in",
+    // areaSqInches=29.69 → "29.69 sq in" (< 144).
+    expect(htmlRes.text).toContain("W:");
+    expect(htmlRes.text).toContain("H:");
+    expect(htmlRes.text).toContain("Area:");
+    expect(htmlRes.text).toContain("4.75");
+    expect(htmlRes.text).toContain("6.25");
+    // fmtArea uses toFixed(1) for values < 144 sq in → "29.7 sq in"
+    expect(htmlRes.text).toContain("29.7");
+
+    // Both warning strings must appear in the rendered HTML — confirms the
+    // warnings array survived the full round-trip (POST → jsonb → SELECT →
+    // HTML render) without being dropped or truncated.
+    expect(htmlRes.text).toContain("partial_occlusion");
+    expect(htmlRes.text).toContain("edge_proximity");
+
+    // confidence=0.68 is above the 0.5 amber threshold — must NOT be flagged.
+    expect(htmlRes.text).not.toContain("low confidence");
   });
 });

@@ -464,7 +464,7 @@ router.post("/:id/media", async (req, res) => {
     const { mediaType, url, filename, caption, durationSec, captureSource, qualityScore, captureMetadata } = req.body;
     if (!mediaType || !url)
       return res.status(400).json({ error: "mediaType and url are required" });
-    const VALID_MEDIA_TYPES = ["image", "video", "document", "audio"] as const;
+    const VALID_MEDIA_TYPES = ["photo", "image", "video", "document", "audio", "voice"] as const;
     if (!VALID_MEDIA_TYPES.includes(mediaType)) {
       return res.status(400).json({
         error: `Invalid mediaType. Must be one of: ${VALID_MEDIA_TYPES.join(", ")}`,
