@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { useReviewQueueCount } from '@/hooks/use-review-queue-count';
 import { Link, useLocation } from 'wouter';
 import { LayoutDashboard, ClipboardCheck, FileText, Users, DollarSign, Building2, BarChart3, CalendarDays, LogOut, Loader2, Menu, KeyRound, Home, Wifi, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const { me, isLoaded, isSignedIn } = useAuth();
   const [location] = useLocation();
   const { signOut } = useClerk();
-  
+  const reviewQueueCount = useReviewQueueCount();
+
   // Theme sync
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -38,7 +40,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: '/team', label: 'Team', icon: Users, roles: ['owner', 'manager'] },
     { href: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['owner', 'manager'] },
     { href: '/client-access', label: 'Client Access', icon: KeyRound, roles: ['owner', 'manager'] },
-    { href: '/ai-review', label: 'AI Review', icon: Brain, roles: ['owner', 'manager'] },
+    { href: '/ai-review', label: 'AI Review', icon: Brain, roles: ['owner', 'manager'], badge: reviewQueueCount },
     { href: '/ble-health', label: 'BLE Health', icon: Wifi, roles: ['owner', 'manager'] },
     // Property managers see a single scoped view only.
     { href: '/client', label: 'My Reports', icon: Home, roles: ['property_manager'] },
@@ -48,6 +50,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <nav className="space-y-1">
       {navItems.map((item) => {
         const isActive = location === item.href || location.startsWith(`${item.href}/`);
+        const badge = ('badge' in item ? item.badge : 0) ?? 0;
         return (
           <Link key={item.href} href={item.href} onClick={onClick}>
             <div
@@ -57,8 +60,17 @@ export function Layout({ children }: { children: ReactNode }) {
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
-              <item.icon className="w-4 h-4" />
-              {item.label}
+              <item.icon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 truncate">{item.label}</span>
+              {badge > 0 && (
+                <span className={`ml-auto shrink-0 min-w-[1.25rem] h-5 px-1 rounded-full text-[11px] font-semibold leading-5 text-center tabular-nums ${
+                  isActive
+                    ? 'bg-primary-foreground/20 text-primary-foreground'
+                    : 'bg-primary text-primary-foreground'
+                }`}>
+                  {badge > 99 ? '99+' : badge}
+                </span>
+              )}
             </div>
           </Link>
         );
