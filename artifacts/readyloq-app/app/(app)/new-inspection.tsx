@@ -1768,8 +1768,14 @@ export default function NewInspectionScreen() {
               {bleGlasses.frameCount} BLE frame{bleGlasses.frameCount === 1 ? "" : "s"}
             </Text>
           ) : null}
-          {/* Dropped-frame warning — shown when any BLE frames were lost mid-transfer */}
-          {bleGlasses.droppedFrameCount > 0 ? (
+          {/* Dropped-frame warning — permanent while frames are being lost;
+               replaced by a 5-second transient notice once the glasses reconnect
+               and the first frame is successfully written. */}
+          {bleGlasses.reconnectNotice ? (
+            <Text style={{ color: "#86efac", fontFamily: "Inter_500Medium", fontSize: 10 }}>
+              ✓ {bleGlasses.reconnectNotice}
+            </Text>
+          ) : bleGlasses.droppedFrameCount > 0 ? (
             <Text style={{ color: "#f87171", fontFamily: "Inter_500Medium", fontSize: 10 }}>
               ⚠ {bleGlasses.droppedFrameCount} frame{bleGlasses.droppedFrameCount === 1 ? "" : "s"} lost
             </Text>

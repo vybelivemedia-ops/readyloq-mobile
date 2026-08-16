@@ -95,12 +95,21 @@ interface SmartGlassesBleFramesState {
   /** Running total of JPEG frames successfully ingested this session. */
   frameCount: number;
   /**
-   * Running total of frames lost this session:
+   * Running total of frames lost since the last reconnect (or since mount).
    *   - BLE reassembly layer: disconnect mid-transfer or 5 s TTL timeout
    *   - Write layer: filesystem error after reassembly
    *   - Ingest layer: ingestEvidence threw or consumer callback failed
+   *
+   * Resets to 0 when the glasses reconnect and the first frame is successfully
+   * written — so the warning disappears automatically after a clean recovery.
    */
   droppedFrameCount: number;
+  /**
+   * Transient message shown for ~5 s after a successful reconnect.
+   * Format: "Reconnected — N frame(s) lost last disconnect"
+   * Null when there was no recent reconnect or no frames were lost.
+   */
+  reconnectNotice: string | null;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -114,10 +123,35 @@ export function useSmartGlassesBleFrames({
   );
   const [frameCount, setFrameCount] = useState(0);
   const [droppedFrameCount, setDroppedFrameCount] = useState(0);
+  const [reconnectNotice, setReconnectNotice] = useState<string | null>(null);
 
   // Stable ref so the frame callback always uses the latest onFrame prop.
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
+
+  /**
+   * Set to true when BLE transitions disconnected → connected.
+   * Cleared by the next successful frame write, which also resets
+   * droppedFrameCount and sets the transient reconnect notice.
+   */
+  const pendingReconnectRef = useRef(false);
+  /**
+   * Monotonically-incrementing generation counter.  Bumped on every
+   * disconnected → connected transition.  Each frame captures its generation
+   * at launch time; the recovery block only fires when the frame's generation
+   * matches the current one.  This prevents a slow-ingesting pre-reconnect
+   * frame from falsely triggering the green "reconnected" notice.
+   */
+  const reconnectGenerationRef = useRef(0);
+  /**
+   * Holds the droppedFrameCount at the moment the reconnect was detected so
+   * the frame callback can read it synchronously (avoids stale-closure issues).
+   */
+  const droppedAtReconnectRef = useRef(0);
+  /** Ref mirror of droppedFrameCount — readable inside callbacks without closures. */
+  const droppedFrameCountRef = useRef(0);
+  /** Timer id for the auto-clear of reconnectNotice. */
+  const reconnectNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Unique session ID — embeds a base-36 creation timestamp so startup
   // cleanup can age-gate orphan deletion without extra filesystem I/O.
@@ -190,13 +224,24 @@ export function useSmartGlassesBleFrames({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Track BLE connection state ───────────────────────────────────────────
+  // ── Track BLE connection state + detect reconnect transitions ────────────
   useEffect(() => {
-    setIsBleConnected(
-      smartGlassesBle.getState().connectionState === "connected",
-    );
+    let wasConnected =
+      smartGlassesBle.getState().connectionState === "connected";
+    setIsBleConnected(wasConnected);
+
     const unsub = smartGlassesBle.subscribe((state) => {
-      setIsBleConnected(state.connectionState === "connected");
+      const nowConnected = state.connectionState === "connected";
+      if (!wasConnected && nowConnected) {
+        // disconnected → connected transition: arm the pending-reconnect flag
+        // and bump the generation so any still-in-flight pre-reconnect frames
+        // cannot falsely trigger the recovery (they'll see a stale generation).
+        droppedAtReconnectRef.current = droppedFrameCountRef.current;
+        pendingReconnectRef.current = true;
+        reconnectGenerationRef.current += 1;
+      }
+      wasConnected = nowConnected;
+      setIsBleConnected(nowConnected);
     });
     return unsub;
   }, []);
@@ -204,7 +249,17 @@ export function useSmartGlassesBleFrames({
   // ── Track driver-level frame drops (disconnect + reassembly timeout) ──────
   useEffect(() => {
     const unsub = smartGlassesBle.onDroppedFrame((count) => {
-      setDroppedFrameCount((prev) => prev + count);
+      // Update the ref synchronously so the reconnect-transition subscriber
+      // (which may fire in the same call stack) always sees the current count.
+      droppedFrameCountRef.current += count;
+      // Any new drop immediately cancels the reconnect notice so the red
+      // warning becomes visible again — the recovery was not clean.
+      if (reconnectNoticeTimerRef.current != null) {
+        clearTimeout(reconnectNoticeTimerRef.current);
+        reconnectNoticeTimerRef.current = null;
+        setReconnectNotice(null);
+      }
+      setDroppedFrameCount(droppedFrameCountRef.current);
     });
     return unsub;
   }, []);
@@ -221,6 +276,13 @@ export function useSmartGlassesBleFrames({
     const sessionDir = `${baseDir}glasses_sessions/${sessionIdRef.current}/`;
 
     const unsub = smartGlassesBle.onFrame((jpeg: Uint8Array) => {
+      // Capture the reconnect generation synchronously at launch time.
+      // If a disconnect+reconnect occurs while this frame is being written or
+      // ingested, reconnectGenerationRef will have been bumped, so the recovery
+      // block below will see a mismatch and skip — preventing a slow
+      // pre-reconnect frame from falsely clearing the warning.
+      const frameGeneration = reconnectGenerationRef.current;
+
       void (async () => {
         let uri: string | null = null;
         try {
@@ -236,10 +298,51 @@ export function useSmartGlassesBleFrames({
           // Await the consumer callback so the durable copy (ingestEvidence →
           // persistPhoto) completes before we delete the cache source file.
           await onFrameRef.current(uri);
+
+          // ── Reconnect recovery ─────────────────────────────────────────────
+          // On the first successful frame after a disconnected → connected
+          // transition, reset the dropped-frame counter and show a brief notice
+          // so the technician knows the warning referred to the last disconnect
+          // (not to an ongoing problem).
+          //
+          // The generation guard ensures only a frame that was *received after*
+          // the reconnect can trigger recovery.  A slow-ingesting pre-reconnect
+          // frame will see frameGeneration < reconnectGenerationRef.current and
+          // skip this block entirely.
+          if (pendingReconnectRef.current && frameGeneration === reconnectGenerationRef.current) {
+            pendingReconnectRef.current = false;
+            const lostCount = droppedAtReconnectRef.current;
+            // Preserve any drops that occurred between the reconnect event
+            // and this first successful frame — they belong to the new session.
+            const postReconnectDrops =
+              droppedFrameCountRef.current - droppedAtReconnectRef.current;
+            droppedFrameCountRef.current = postReconnectDrops;
+            setDroppedFrameCount(postReconnectDrops);
+            if (lostCount > 0) {
+              const msg = `Reconnected — ${lostCount} frame${lostCount === 1 ? "" : "s"} lost last disconnect`;
+              setReconnectNotice(msg);
+              if (reconnectNoticeTimerRef.current != null) {
+                clearTimeout(reconnectNoticeTimerRef.current);
+              }
+              reconnectNoticeTimerRef.current = setTimeout(() => {
+                setReconnectNotice(null);
+                reconnectNoticeTimerRef.current = null;
+              }, 5_000);
+            }
+          }
+
           setFrameCount((prev) => prev + 1);
         } catch {
           // Write failure, ingest failure, or consumer threw — count the drop.
-          setDroppedFrameCount((prev) => prev + 1);
+          // Update ref synchronously, then cancel any active reconnect notice so
+          // the red warning becomes visible immediately (recovery was not clean).
+          droppedFrameCountRef.current += 1;
+          if (reconnectNoticeTimerRef.current != null) {
+            clearTimeout(reconnectNoticeTimerRef.current);
+            reconnectNoticeTimerRef.current = null;
+            setReconnectNotice(null);
+          }
+          setDroppedFrameCount(droppedFrameCountRef.current);
         } finally {
           // Delete the cache file regardless of success or failure: on success
           // persistPhoto has already copied it to documentDirectory; on failure
@@ -256,11 +359,22 @@ export function useSmartGlassesBleFrames({
     return unsub;
   }, [active, isBleConnected, setupComplete]);
 
+  // ── Clean up the notice timer on unmount ─────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (reconnectNoticeTimerRef.current != null) {
+        clearTimeout(reconnectNoticeTimerRef.current);
+        reconnectNoticeTimerRef.current = null;
+      }
+    };
+  }, []);
+
   return {
     isActive: active && isBleConnected && setupComplete,
     isBleConnected,
     frameCount,
     droppedFrameCount,
+    reconnectNotice,
   };
 }
 
