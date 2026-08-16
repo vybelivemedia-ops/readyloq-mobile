@@ -7,6 +7,12 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { useColors } from "@/hooks/useColors";
 import { confidencePct, formatStatus, severityTone } from "@/constants/inspection";
+import {
+  resolveLaserMeasurement,
+  isBurstMeasurement,
+  measurementConfidence,
+  isLowConfidence,
+} from "@/lib/finding-card/measurement-strip-logic";
 
 type ReviewAction = "accept" | "correct" | "dismiss";
 
@@ -27,25 +33,6 @@ export type FindingAttribution = "ai" | "tech" | "verified";
 export function findingAttribution(reviewStatus?: string | null): FindingAttribution {
   if (reviewStatus === "accepted" || reviewStatus === "corrected") return "verified";
   return "ai";
-}
-
-/**
- * Shape of the `laserMeasurement` sub-object stored inside captureMetadata.
- * Burst measurements carry full dimensions in `metadata`; laser-only readings
- * carry just `value` (width).
- */
-interface LaserMeasurement {
-  kind?: string;
-  value?: number;
-  unit?: string;
-  signalQuality?: number;
-  metadata?: {
-    method?: string;
-    heightInches?: number;
-    areaSqInches?: number;
-    confidence?: number;
-    warnings?: string[];
-  };
 }
 
 interface FindingCardProps {
@@ -278,16 +265,16 @@ export function FindingCard({ finding, onReview, savedAction, technicianName, ca
 
       {/* ── Stamped measurement block ───────────────────────────────────────── */}
       {(() => {
-        const laser = captureMetadata?.laserMeasurement as LaserMeasurement | undefined;
+        const laser = resolveLaserMeasurement(captureMetadata);
         if (!laser) return null;
 
-        const isBurst = laser.metadata?.method === "burst_reference";
+        const isBurst = isBurstMeasurement(laser);
         const widthIn = laser.value;
         const heightIn = laser.metadata?.heightInches;
         const areaSqIn = laser.metadata?.areaSqInches;
         // Prefer the inner confidence (burst pipeline score) over signalQuality
-        const conf = laser.metadata?.confidence ?? laser.signalQuality;
-        const isLowConf = conf != null && conf < 0.5;
+        const conf = measurementConfidence(laser);
+        const isLowConf = isLowConfidence(conf);
         const warnings = laser.metadata?.warnings ?? [];
 
         const accentColor = isLowConf ? (colors.warning ?? "#f59e0b") : (colors.info ?? "#0ea5e9");

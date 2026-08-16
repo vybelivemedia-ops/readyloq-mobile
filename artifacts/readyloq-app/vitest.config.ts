@@ -11,10 +11,13 @@ import path from "path";
 export default defineConfig({
   test: {
     environment: "node",
-    // Only run tests in the measurement module; other test files in the app
-    // (e.g. lib/audio/__tests__/faie.stress.test.ts) require the full React
+    // Only run tests whose modules are pure TypeScript; other test files in the
+    // app (e.g. lib/audio/__tests__/faie.stress.test.ts) require the full React
     // Native / Jest environment and will fail under vitest's node runner.
-    include: ["lib/measurement/__tests__/**/*.test.ts"],
+    include: [
+      "lib/measurement/__tests__/**/*.test.ts",
+      "lib/finding-card/__tests__/**/*.test.ts",
+    ],
   },
   resolve: {
     alias: {

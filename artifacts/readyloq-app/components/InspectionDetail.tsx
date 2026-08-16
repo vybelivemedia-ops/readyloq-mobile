@@ -50,6 +50,7 @@ import {
 } from "@/lib/api";
 import { ingestAnonymizedFaieData, sendPhotoToFaieDataset } from "@/lib/faie-ingest";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
+import { lookupCaptureMetadata } from "@/lib/finding-card/capture-metadata-lookup";
 import {
   clampZoom,
   clampViewerTranslation,
@@ -689,10 +690,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
               {analysis.findings?.map((f) => {
                 // Cross-reference the finding's evidence photo URL with the
                 // media array so we can surface stamped measurements.
-                const mediaMeta = f.imageUrl
-                  ? (photos.find((m) => m.url === f.imageUrl)
-                      ?.captureMetadata as Record<string, unknown> | null | undefined)
-                  : null;
+                const mediaMeta = lookupCaptureMetadata(photos, f.imageUrl);
                 return (
                   <FindingCard
                     key={f.id}
