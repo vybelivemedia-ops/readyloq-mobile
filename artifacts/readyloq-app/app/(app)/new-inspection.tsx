@@ -52,6 +52,11 @@ import { useSmartGuidance } from "@/hooks/useSmartGuidance";
 import { useMetaGlassesSession, type GlassesEvent } from "@/hooks/useMetaGlassesSession";
 import { useSmartGlassesBleFrames } from "@/hooks/useSmartGlassesBleFrames";
 import { getBleBadgeStyle } from "@/lib/ble/badge-display";
+import { smartGlassesBle } from "@/lib/ble";
+import {
+  loadCalibrationProfile,
+  DEFAULT_FOCAL_LENGTH_PX,
+} from "@/lib/meta-glasses/calibration";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
 import { TextField } from "@/components/ui/TextField";
@@ -207,6 +212,55 @@ export default function NewInspectionScreen() {
   const [_referenceClipped, _setReferenceClipped] = useState(false);
   const [_refWarnings, _setRefWarnings] = useState<string[]>([]);
 
+  // ── Glasses calibration profile ────────────────────────────────────────────
+  // Loaded reactively via a smartGlassesBle.subscribe() subscription so that a
+  // device swap or reconnect immediately re-reads the correct stored profile.
+  //
+  // Race-guard: each async read captures the device ID it started for; the
+  // state update is ignored when the device has already changed by the time
+  // the read completes, preventing a stale read from overwriting the current
+  // device's focal length.
+  //
+  // Current application: the focal length is NOT applied to any measurement
+  // path that uses phone CameraView frames (BurstMeasurementPipeline,
+  // SpatialMeasurementCard ROI overlay), because those paths capture from the
+  // phone camera — mixing focal lengths from different cameras produces
+  // incorrect dimensions.  The profile is persisted in SecureStore and made
+  // available here for the future glasses-frame measurement pipeline (a
+  // glasses-source ROI path will use glassesFocalLengthPx directly when it
+  // exists; until then the stored value is the authoritative per-device record).
+  const [glassesFocalLengthPx, setGlassesFocalLengthPx] = useState(DEFAULT_FOCAL_LENGTH_PX);
+  useEffect(() => {
+    // Holds the device ID of the most-recently-started load.
+    // loadForDevice captures this at call time; the completion callback
+    // only applies the result when capturedId still matches.
+    let latestDeviceId: string | null = null;
+
+    const loadForDevice = (deviceId: string | null) => {
+      latestDeviceId = deviceId;
+      if (!deviceId) {
+        setGlassesFocalLengthPx(DEFAULT_FOCAL_LENGTH_PX);
+        return;
+      }
+      const capturedId = deviceId;
+      void loadCalibrationProfile(capturedId).then((profile) => {
+        // Guard: only apply when this device is still the connected one
+        if (latestDeviceId === capturedId) {
+          setGlassesFocalLengthPx(profile?.focalLengthPx ?? DEFAULT_FOCAL_LENGTH_PX);
+        }
+      });
+    };
+
+    // Load immediately for whatever device is connected right now
+    loadForDevice(smartGlassesBle.getState().connectedDeviceId);
+
+    // Re-load whenever the connected device changes (reconnect, swap, forget)
+    const unsub = smartGlassesBle.subscribe((state) => {
+      loadForDevice(state.connectedDeviceId);
+    });
+    return unsub;
+  }, []);
+
   // ── Measure mode — hardware-free burst measurement ─────────────────────────
   // A full-screen overlay lets the technician frame a subject with a draggable
   // quad (or two endpoints for a gap/crack), fit a reference-object box, then
@@ -216,8 +270,11 @@ export default function NewInspectionScreen() {
   const [measureMode, setMeasureMode] = useState(false);
   const [measuring, setMeasuring] = useState(false);
   const [measureResult, setMeasureResult] = useState<BurstMeasurementResult | null>(null);
+  // Phone-camera pipeline: always uses the phone default focal length (800 px).
+  // These bursts capture from cameraRef (expo-camera CameraView); the glasses
+  // focal length must NOT be substituted here.
   const burstPipeline = useMemo(
-    () => new BurstMeasurementPipeline(new FallbackSfMProvider(), 800),
+    () => new BurstMeasurementPipeline(new FallbackSfMProvider(), DEFAULT_FOCAL_LENGTH_PX),
     [],
   );
 

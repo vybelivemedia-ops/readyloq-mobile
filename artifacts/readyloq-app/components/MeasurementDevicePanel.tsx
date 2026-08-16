@@ -117,10 +117,11 @@ function usePulse(active: boolean) {
 // PolygonCalculator (Shoelace formula) to turn pixel-space bounding quads
 // into real-world dimensions — no server round-trip required.
 
-const ESTIMATOR = new BasicDimensionEstimator(/* focalLengthPx */ 800);
-
 /** Default scale: ~0.05 in/px calibrated at ~1.5 m reference distance. */
 const DEFAULT_SCALE_IN_PER_PX = 0.05;
+
+/** Default focal length used when no glasses calibration profile is available. */
+const DEFAULT_FOCAL_LENGTH_PX = 800;
 
 interface SpatialResult {
   widthIn:    number;
@@ -133,6 +134,13 @@ interface SpatialResult {
 interface SpatialMeasurementCardProps {
   depthMeters: number;
   colors: ReturnType<typeof useColors>;
+  /**
+   * Effective focal length in pixels for the active camera source.
+   * When the measurement source is Meta Ray-Ban glasses, pass the
+   * back-solved focal length from the stored BasicCalibrationProfile.
+   * Defaults to 800 px (typical phone camera wide-angle).
+   */
+  focalLengthPx?: number;
   /**
    * Pixel-space vertices of the technician's framed ROI in the camera preview.
    * When provided (from a camera overlay gesture), clipping detection runs
@@ -167,11 +175,19 @@ interface SpatialMeasurementCardProps {
 function SpatialMeasurementCard({
   depthMeters,
   colors,
+  focalLengthPx = DEFAULT_FOCAL_LENGTH_PX,
   roiVertices,
   viewportWidth,
   viewportHeight,
   referenceClipped = false,
 }: SpatialMeasurementCardProps) {
+  // Build the estimator lazily when the focal length changes.
+  // useMemo keeps it stable across re-renders when the prop is constant.
+  const estimator = React.useMemo(
+    () => new BasicDimensionEstimator(focalLengthPx),
+    [focalLengthPx],
+  );
+
   const window = useWindowDimensions();
   const [result, setResult] = useState<SpatialResult | null>(null);
 
@@ -226,8 +242,8 @@ function SpatialMeasurementCard({
 
     const scaleAtDepth = DEFAULT_SCALE_IN_PER_PX * (depthMeters / 1.5);
     const geo      = PolygonCalculator.calculateAreaAndPerimeter(vertices, scaleAtDepth);
-    const widthIn  = ESTIMATOR.estimateWidthInches(geo, depthMeters);
-    const heightIn = ESTIMATOR.estimateHeightInches(geo, depthMeters);
+    const widthIn  = estimator.estimateWidthInches(geo, depthMeters);
+    const heightIn = estimator.estimateHeightInches(geo, depthMeters);
 
     setResult({
       widthIn:    Math.round(widthIn  * 10) / 10,
@@ -236,7 +252,7 @@ function SpatialMeasurementCard({
       confidence,
       warnings,
     });
-  }, [depthMeters, roiVertices, viewportWidth, viewportHeight, window, referenceClipped]);
+  }, [depthMeters, roiVertices, viewportWidth, viewportHeight, window, referenceClipped, estimator]);
 
   return (
     <View style={[spatialStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -694,6 +710,13 @@ interface MeasurementDevicePanelProps {
    * technician's two-tap reference selection lands on or past the frame edge.
    */
   referenceClipped?: boolean;
+  /**
+   * Effective focal length (px) for the current camera source.
+   * When the active source is Meta Ray-Ban glasses, pass the focal length
+   * derived from the stored BasicCalibrationProfile.
+   * Defaults to 800 px (typical phone wide-angle) when omitted.
+   */
+  glassesFocalLengthPx?: number;
 }
 
 export function MeasurementDevicePanel({
@@ -703,6 +726,7 @@ export function MeasurementDevicePanel({
   viewportWidth,
   viewportHeight,
   referenceClipped = false,
+  glassesFocalLengthPx,
 }: MeasurementDevicePanelProps = {}) {
   const { registry, plugin } = useDeviceRegistry();
   const colors  = useColors();
@@ -780,11 +804,14 @@ export function MeasurementDevicePanel({
 
       {/* Spatial measurement card — visible once a distance sensor provides depth.
           referenceClipped blocks the Measure button until the technician
-          re-centres their reference object selection. */}
+          re-centres their reference object selection.
+          glassesFocalLengthPx overrides the 800 px default when the active
+          camera source is Meta Ray-Ban glasses. */}
       {liveDepthMeters !== null && (
         <SpatialMeasurementCard
           depthMeters={liveDepthMeters}
           colors={colors}
+          focalLengthPx={glassesFocalLengthPx}
           roiVertices={roiVertices}
           viewportWidth={viewportWidth}
           viewportHeight={viewportHeight}

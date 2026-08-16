@@ -30,6 +30,12 @@ import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
 import { DeviceScannerModal } from "@/components/DeviceScannerModal";
 import { WifiCameraModal } from "@/components/WifiCameraModal";
+import { GlassesCalibrationModal } from "@/components/GlassesCalibrationModal";
+import {
+  loadCalibrationProfile,
+  clearCalibrationProfile,
+} from "@/lib/meta-glasses/calibration";
+import type { BasicCalibrationProfile } from "@platform/measurement-core";
 import { useColors } from "@/hooks/useColors";
 import {
   APP_VERSION,
@@ -1002,6 +1008,7 @@ function Section({
 // ─── Connected glasses card ───────────────────────────────────────────────────
 
 function ConnectedGlassesCard({
+  deviceId,
   deviceName,
   colors,
   onDisconnect,
@@ -1011,6 +1018,40 @@ function ConnectedGlassesCard({
   colors: ReturnType<typeof useColors>;
   onDisconnect: () => void;
 }) {
+  const [calibModalVisible, setCalibModalVisible] = useState(false);
+  const [calibProfile, setCalibProfile] = useState<BasicCalibrationProfile | null>(null);
+  const [calibLoading, setCalibLoading] = useState(true);
+
+  // Load existing calibration profile on mount and after save.
+  const refreshCalib = useCallback(async () => {
+    setCalibLoading(true);
+    try {
+      const profile = await loadCalibrationProfile(deviceId);
+      setCalibProfile(profile);
+    } finally {
+      setCalibLoading(false);
+    }
+  }, [deviceId]);
+
+  useEffect(() => { void refreshCalib(); }, [refreshCalib]);
+
+  const handleClearCalib = useCallback(() => {
+    Alert.alert(
+      "Clear calibration?",
+      "The glasses camera will revert to the 800 px phone default until you re-calibrate.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => {
+            void clearCalibrationProfile(deviceId).then(refreshCalib);
+          },
+        },
+      ],
+    );
+  }, [deviceId, refreshCalib]);
+
   return (
     <Card style={{ gap: 12 }}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
@@ -1071,6 +1112,73 @@ function ConnectedGlassesCard({
       {/* Pipeline bindings */}
       <PipelineBindings colors={colors} />
 
+      {/* Camera calibration row */}
+      <View
+        style={{
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.border,
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingVertical: 10,
+            paddingHorizontal: 12,
+            gap: 10,
+          }}
+        >
+          <Ionicons
+            name="aperture-outline"
+            size={18}
+            color={calibProfile ? "#22c55e" : colors.mutedForeground}
+          />
+          <View style={{ flex: 1, gap: 1 }}>
+            <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+              Camera calibration
+            </Text>
+            {calibLoading ? (
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                Loading…
+              </Text>
+            ) : calibProfile ? (
+              <Text style={{ color: "#22c55e", fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                {`Calibrated · ${Math.round(calibProfile.focalLengthPx)} px focal length`}
+              </Text>
+            ) : (
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                Not calibrated — using 800 px default
+              </Text>
+            )}
+          </View>
+          {calibProfile && (
+            <Pressable onPress={handleClearCalib} hitSlop={8}>
+              <Ionicons name="trash-outline" size={16} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+        </View>
+        <Pressable
+          onPress={() => setCalibModalVisible(true)}
+          style={({ pressed }) => ({
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            paddingVertical: 9,
+            backgroundColor: pressed ? "#17c4d318" : "#17c4d310",
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          })}
+        >
+          <Ionicons name="camera-outline" size={15} color="#17c4d3" />
+          <Text style={{ color: "#17c4d3", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+            {calibProfile ? "Re-calibrate glasses camera" : "Calibrate glasses camera"}
+          </Text>
+        </Pressable>
+      </View>
+
       {/* Disconnect button */}
       <Pressable
         onPress={onDisconnect}
@@ -1100,6 +1208,17 @@ function ConnectedGlassesCard({
           Disconnect
         </Text>
       </Pressable>
+
+      {/* Calibration modal */}
+      <GlassesCalibrationModal
+        visible={calibModalVisible}
+        deviceId={deviceId}
+        onClose={() => setCalibModalVisible(false)}
+        onSaved={(profile) => {
+          setCalibProfile(profile);
+          setCalibModalVisible(false);
+        }}
+      />
     </Card>
   );
 }
