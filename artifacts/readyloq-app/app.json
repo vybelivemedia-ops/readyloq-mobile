@@ -25,11 +25,15 @@
         "NSBluetoothAlwaysUsageDescription": "ReadyLoq connects to BLE sensors and Meta Ray-Ban smart glasses for hands-free inspection capture and environmental measurement.",
         "NSBluetoothPeripheralUsageDescription": "ReadyLoq uses Bluetooth to pair with smart glasses and measurement sensors.",
         "UIBackgroundModes": [
-          "bluetooth-central"
+          "bluetooth-central",
+          "fetch",
+          "processing"
         ]
       },
       "backgroundModes": [
-        "bluetooth-central"
+        "bluetooth-central",
+        "fetch",
+        "processing"
       ]
     },
     "android": {
@@ -63,7 +67,8 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
       ]
     },
     "web": {
@@ -118,6 +123,7 @@
           "sounds": []
         }
       ],
+      "expo-background-fetch",
       "expo-mail-composer",
       [
         "react-native-ble-plx",

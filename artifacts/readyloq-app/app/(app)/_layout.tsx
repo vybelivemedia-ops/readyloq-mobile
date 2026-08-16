@@ -35,6 +35,15 @@ import {
 } from "@/lib/local/inspection-store";
 import { useSignOut } from "@/hooks/useSignOut";
 import { configureSyncEngine } from "@/lib/sync/engine";
+import {
+  cacheTokenForBackground,
+  clearCachedBackgroundToken,
+  registerBackgroundSync,
+  unregisterBackgroundSync,
+} from "@/lib/sync/background-task";
+// Side-effect import — ensures TaskManager.defineTask runs at module init so
+// the OS can replay the task after relaunching the app in the background.
+import "@/lib/sync/background-task";
 import { speechService } from "@/lib/vision";
 import { createCompany } from "@/lib/api";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
@@ -58,12 +67,34 @@ export default function AppLayout() {
   // server queries fresh after each successful sync.
   useEffect(() => {
     if (!isSignedIn) return;
+
+    // Wrap getToken so every fresh token is also cached in SecureStore for the
+    // OS background-fetch task (which runs in a separate JS context with no
+    // access to the live Clerk session).
+    const getTokenWithCache = async () => {
+      const token = await getToken();
+      if (token) void cacheTokenForBackground(token);
+      return token;
+    };
+
     configureSyncEngine({
-      getToken: () => getToken(),
+      getToken: getTokenWithCache,
       onSynced: () => {
         void queryClient.invalidateQueries();
       },
     });
+
+    // Register the OS background-fetch task. Safe to call on every mount —
+    // expo-background-fetch is idempotent and simply updates the interval if
+    // the task is already registered.
+    void registerBackgroundSync();
+
+    return () => {
+      // On sign-out, remove the task and wipe the cached token so a future
+      // user on the same device can't trigger a sync with stale credentials.
+      void unregisterBackgroundSync();
+      void clearCachedBackgroundToken();
+    };
   }, [isSignedIn, getToken, queryClient]);
 
   if (!isLoaded) return <FullScreenLoader />;

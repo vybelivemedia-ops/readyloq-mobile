@@ -428,6 +428,40 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
   }
 }
 
+/**
+ * One-shot sync for the OS background-fetch task.
+ *
+ * Unlike `configureSyncEngine`, this does NOT attach AppState / NetInfo
+ * listeners — those make no sense in a background-task context. It simply
+ * acquires the single-flight lock, runs a full sync pass with the supplied
+ * token getter, and returns whether any work was done.
+ *
+ * Safe to call from `expo-background-fetch` TaskManager tasks where the JS
+ * module state may be a fresh context (state.configured === false).
+ */
+export async function runBackgroundSync(
+  getToken: () => Promise<string | null>,
+): Promise<boolean> {
+  if (state.running) return false;
+  // Inject the token getter so syncOne can authenticate.
+  state.getToken = getToken;
+  state.running = true;
+  let didWork = false;
+  try {
+    const records = (await listLocalInspections()).filter(hasPendingWork);
+    if (records.length === 0) return false;
+    records.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    for (const record of records) {
+      await syncOne(record).catch(() => null);
+    }
+    didWork = true;
+  } finally {
+    state.running = false;
+    state.getToken = null;
+  }
+  return didWork;
+}
+
 /** Exponential backoff retry while anything is pending: 10s → 20s → … → 5min. */
 async function scheduleRetryIfNeeded() {
   if (state.retryTimer) {
