@@ -8,6 +8,10 @@
  *
  *   1. captureBurst()          — 3–5 frames with ~80 ms spacing; natural hand
  *                               motion provides the spatial baseline for SfM.
+ *                               Each burst request captures EXIF from the first
+ *                               frame and derives focalLengthPx via the
+ *                               FocalLenIn35mmFilm field (cached after first
+ *                               derivation so subsequent bursts skip the parse).
  *   2. computeScaledDimensions() — reference-anchored pixel→mm scale, depth-
  *                               corrected via (Z / f), with optional planar
  *                               surface-normal projection.
@@ -25,6 +29,18 @@
  *   Pass heightP1/heightP2 for a second dimension; omit them and heightMm is
  *   null. The old "* 0.75 aspect-ratio fallback" is explicitly removed — a
  *   fabricated height is worse than an honest null.
+ *
+ * ─── Focal length derivation ──────────────────────────────────────────────────
+ *   Phone camera focal lengths vary widely (≈500–1600 px equivalent).
+ *   captureBurst() captures EXIF on the first frame and derives focalLengthPx
+ *   using the FocalLenIn35mmFilm EXIF field (most portable across Android/iOS):
+ *
+ *     focalLengthPx = (FocalLenIn35mmFilm / 36 mm) × PixelXDimension
+ *
+ *   The derived value is cached in module scope for the app session (phone
+ *   hardware doesn't change). When EXIF is absent or incomplete, 800 px
+ *   (the historical default) is used as a last-resort fallback and the caller
+ *   receives `focalLengthSource: "fallback"` so it can surface a warning.
  */
 
 // expo-file-system v19 moved cacheDirectory/deleteAsync/copyAsync to /legacy
@@ -35,7 +51,60 @@ import type { BurstFrame } from "@platform/measurement-core";
 // Re-export so callers don't need to import the platform package directly.
 export type { BurstFrame };
 
-// ─── Result type ──────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/**
+ * Last-resort focal length (pixels) used when EXIF data is unavailable.
+ * Corresponds to a typical wide-angle smartphone camera at 1080 px width.
+ * Actual device values vary roughly 500–1600 px; relying on this constant
+ * introduces a proportional error in all depth-corrected dimensions.
+ */
+export const DEFAULT_FOCAL_LENGTH_PX = 800;
+
+// ─── Module-level EXIF focal-length cache ─────────────────────────────────────
+// Phone camera hardware (and thus focal length) doesn't change during an app
+// session; cache the derived value after the first successful EXIF parse.
+
+let _cachedFocalLengthPx: number | null = null;
+let _cachedFocalLengthSource: "exif" | "fallback" = "fallback";
+
+/**
+ * Derive the effective focal length in pixels from photo EXIF data.
+ *
+ * Strategy — in priority order:
+ *   1. FocalLenIn35mmFilm  (most portable — already normalised to 35mm equiv)
+ *        focalPx = (fl35mm / 36 mm) × PixelXDimension
+ *   2. Returns null when derivation is not possible from the supplied EXIF.
+ *
+ * @param exif  Raw EXIF object from expo-camera (takePictureAsync exif:true).
+ * @returns Derived focal length in pixels, or null if EXIF is insufficient.
+ */
+function _deriveFocalLengthPxFromExif(
+  exif: Record<string, unknown>,
+): number | null {
+  // Image pixel width is required to convert mm focal length → pixels.
+  const imagePx =
+    typeof exif["PixelXDimension"] === "number" ? exif["PixelXDimension"] : null;
+  if (!imagePx || imagePx <= 0) return null;
+
+  // Path 1: FocalLenIn35mmFilm — 35 mm equivalent, normalised across sensor sizes.
+  // A full-frame 35 mm sensor is 36 mm wide.
+  const fl35 =
+    typeof exif["FocalLenIn35mmFilm"] === "number"
+      ? exif["FocalLenIn35mmFilm"]
+      : null;
+  if (fl35 && fl35 > 0) {
+    const derived = (fl35 / 36) * imagePx;
+    // Sanity-check: plausible range for smartphone cameras is 250–2500 px.
+    if (derived >= 250 && derived <= 2500) {
+      return derived;
+    }
+  }
+
+  return null;
+}
+
+// ─── Result types ─────────────────────────────────────────────────────────────
 
 export interface BlendedMeasurementResult {
   /** Computed width (p1 → p2 distance), in millimetres. */
@@ -77,12 +146,41 @@ export interface BlendedMeasurementResult {
   warnings: string[];
 }
 
+/**
+ * Result returned by `captureBurst`.
+ *
+ * Carries the captured frames alongside the EXIF-derived focal length so
+ * callers can construct an accurate `BurstMeasurementPipeline` for this device.
+ */
+export interface BurstCaptureResult {
+  /** Frames captured during the burst, written to the cache directory. */
+  frames: BurstFrame[];
+  /**
+   * Effective camera focal length in pixels.
+   * Derived from EXIF `FocalLenIn35mmFilm` when available; otherwise the
+   * 800 px last-resort fallback (see `DEFAULT_FOCAL_LENGTH_PX`).
+   *
+   * Pass this directly to `new BurstMeasurementPipeline(sfm, focalLengthPx)`.
+   */
+  focalLengthPx: number;
+  /**
+   * Origin of `focalLengthPx`.
+   * "exif"     — derived from EXIF; accurate for this device.
+   * "fallback" — EXIF was absent or incomplete; 800 px default was used.
+   *              Callers should surface a warning so the technician knows
+   *              dimensions may be less accurate.
+   */
+  focalLengthSource: "exif" | "fallback";
+}
+
 // ─── Manager ──────────────────────────────────────────────────────────────────
 
 class BurstMeasurementManager {
   /**
    * Captures a rapid 3–5 frame burst for motion triangulation.
    *
+   * Requests EXIF data on the first frame and derives the device focal length
+   * in pixels via `FocalLenIn35mmFilm` (cached for the app session).
    * Frames are written to `FileSystem.cacheDirectory` with unique names.
    * Always call cleanupBurst() after you are done to avoid accumulating
    * temporary JPEGs across inspections.
@@ -91,9 +189,14 @@ class BurstMeasurementManager {
    * @param frameCount  Number of frames (default 4; clamped to 2–6).
    */
   public async captureBurst(
-    cameraRef: { takePictureAsync: (opts: object) => Promise<{ uri: string }> },
+    cameraRef: {
+      takePictureAsync: (opts: object) => Promise<{
+        uri: string;
+        exif?: Record<string, unknown>;
+      }>;
+    },
     frameCount: number = 4,
-  ): Promise<BurstFrame[]> {
+  ): Promise<BurstCaptureResult> {
     const count = Math.max(2, Math.min(6, frameCount));
     const frames: BurstFrame[] = [];
 
@@ -102,7 +205,26 @@ class BurstMeasurementManager {
         const photo = await cameraRef.takePictureAsync({
           skipProcessing: true, // eliminates 3–8 s JPEG compression delay
           quality: 0.8,
+          exif: true, // request EXIF so we can derive the real focal length
         });
+
+        // ── EXIF focal-length derivation (first frame only, cached) ───────────
+        // We only need one EXIF read per camera session; subsequent bursts reuse
+        // the cached value without re-parsing.
+        if (i === 0 && _cachedFocalLengthPx === null && photo.exif) {
+          const derived = _deriveFocalLengthPxFromExif(photo.exif);
+          if (derived !== null) {
+            _cachedFocalLengthPx = derived;
+            _cachedFocalLengthSource = "exif";
+            console.log(
+              `[BurstMeasurement] EXIF focal length derived: ${derived.toFixed(1)} px`,
+            );
+          } else {
+            console.log(
+              "[BurstMeasurement] EXIF present but insufficient for focal length derivation; using fallback",
+            );
+          }
+        }
 
         const localUri = `${FileSystem.cacheDirectory}burst_${Date.now()}_${i}.jpg`;
         await FileSystem.copyAsync({ from: photo.uri, to: localUri });
@@ -118,7 +240,11 @@ class BurstMeasurementManager {
       }
     }
 
-    return frames;
+    return {
+      frames,
+      focalLengthPx: _cachedFocalLengthPx ?? DEFAULT_FOCAL_LENGTH_PX,
+      focalLengthSource: _cachedFocalLengthPx !== null ? _cachedFocalLengthSource : "fallback",
+    };
   }
 
   /**
@@ -146,7 +272,7 @@ class BurstMeasurementManager {
     referenceKnownMm: number,
     referencePixelLength: number,
     estimatedDepthMeters: number,
-    focalLengthPx: number = 800,
+    focalLengthPx: number = DEFAULT_FOCAL_LENGTH_PX,
     heightP1?: { x: number; y: number },
     heightP2?: { x: number; y: number },
     options?: {

@@ -53,8 +53,10 @@ export {
 // ── Burst measurement ─────────────────────────────────────────────────────────
 export {
   burstMeasurementManager,
+  DEFAULT_FOCAL_LENGTH_PX,
   type BurstFrame,
   type BlendedMeasurementResult,
+  type BurstCaptureResult,
 } from "./BurstMeasurementManager";
 
 // SfMDepthEngine is intentionally NOT exported here.

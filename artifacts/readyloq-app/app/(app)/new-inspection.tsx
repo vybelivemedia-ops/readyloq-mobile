@@ -270,12 +270,14 @@ export default function NewInspectionScreen() {
   const [measureMode, setMeasureMode] = useState(false);
   const [measuring, setMeasuring] = useState(false);
   const [measureResult, setMeasureResult] = useState<BurstMeasurementResult | null>(null);
-  // Phone-camera pipeline: always uses the phone default focal length (800 px).
-  // These bursts capture from cameraRef (expo-camera CameraView); the glasses
-  // focal length must NOT be substituted here.
-  const burstPipeline = useMemo(
-    () => new BurstMeasurementPipeline(new FallbackSfMProvider(), DEFAULT_FOCAL_LENGTH_PX),
-    [],
+  // Phone-camera pipeline: focal length is derived from EXIF on the very first
+  // burst and cached for the session (see BurstMeasurementManager.captureBurst).
+  // The pipeline ref is rebuilt only when the EXIF-derived focal length changes.
+  // IMPORTANT: the glasses focal length must NOT be substituted here — these
+  // bursts capture from cameraRef (expo-camera CameraView), not the glasses.
+  const _burstFocalLengthRef = useRef<number>(DEFAULT_FOCAL_LENGTH_PX);
+  const _burstPipelineRef = useRef<BurstMeasurementPipeline>(
+    new BurstMeasurementPipeline(new FallbackSfMProvider(), DEFAULT_FOCAL_LENGTH_PX),
   );
 
   const handleRunBurstMeasure = useCallback(
@@ -293,19 +295,49 @@ export default function NewInspectionScreen() {
       let frames: BurstFrame[] = [];
       try {
         // 3–5 frame burst (4 by default) via expo-camera takePictureAsync.
-        frames = await burstMeasurementManager.captureBurst(
-          cam as unknown as { takePictureAsync: (opts: object) => Promise<{ uri: string }> },
+        // captureBurst captures EXIF on the first frame and returns the derived
+        // focal length (or the 800 px fallback when EXIF is unavailable).
+        const capture = await burstMeasurementManager.captureBurst(
+          cam as unknown as {
+            takePictureAsync: (opts: object) => Promise<{
+              uri: string;
+              exif?: Record<string, unknown>;
+            }>;
+          },
           4,
         );
+        frames = capture.frames;
+
+        // Rebuild the pipeline when the EXIF-derived focal length changes.
+        // This typically happens once per session on the very first burst;
+        // subsequent bursts reuse the cached pipeline.
+        if (capture.focalLengthPx !== _burstFocalLengthRef.current) {
+          _burstFocalLengthRef.current = capture.focalLengthPx;
+          _burstPipelineRef.current = new BurstMeasurementPipeline(
+            new FallbackSfMProvider(),
+            capture.focalLengthPx,
+          );
+        }
+
         if (frames.length === 0) {
           throw new Error("Burst capture failed — no frames were captured");
         }
-        const result = await burstPipeline.measure(frames, targetVertices, {
+        const result = await _burstPipelineRef.current.measure(frames, targetVertices, {
           box: reference.box,
           object: reference.object,
           imageWidthPx: _cameraW,
           imageHeightPx: _cameraH,
         });
+
+        // When EXIF was unavailable the pipeline used the 800 px default focal
+        // length.  Surface a warning so the technician knows the depth correction
+        // is an approximation and results may be less accurate.
+        if (capture.focalLengthSource === "fallback") {
+          result.warnings.push(
+            "Focal length estimated from default (EXIF unavailable) — dimensions may be less accurate",
+          );
+        }
+
         // Final guard: degenerate reference geometry can drive the scale
         // anchor to divide by ~0 — never display or stamp Infinity/NaN.
         if (
@@ -329,7 +361,7 @@ export default function NewInspectionScreen() {
         setMeasuring(false);
       }
     },
-    [burstPipeline, _cameraW, _cameraH],
+    [_cameraW, _cameraH],
   );
 
   const handleStampMeasureResult = useCallback(() => {
