@@ -50,15 +50,31 @@ function labelize(slug?: string | null): string {
   return slug.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function FieldRow({ label, ai, tech }: { label: string; ai: string; tech: string }) {
-  const differs = ai !== '—' && tech !== '—' && ai !== tech;
+function FieldRow({
+  label,
+  ai,
+  tech,
+  managerEdit,
+}: {
+  label: string;
+  ai: string;
+  tech: string;
+  managerEdit?: string;
+}) {
+  const techDiffers = ai !== '—' && tech !== '—' && ai !== tech;
+  const managerChanged = Boolean(managerEdit) && managerEdit !== tech;
   return (
     <tr className="border-b border-border last:border-0">
       <td className="py-2 pr-4 text-xs font-medium text-muted-foreground whitespace-nowrap align-top">{label}</td>
       <td className="py-2 pr-4 text-sm align-top">{ai}</td>
-      <td className={`py-2 text-sm align-top ${differs ? 'text-amber-500 font-medium' : ''}`}>
+      <td className={`py-2 text-sm align-top ${techDiffers ? 'text-amber-500 font-medium' : ''}`}>
         {tech}
-        {differs && <span className="ml-2 text-[10px] uppercase tracking-wide text-amber-500">corrected</span>}
+        {techDiffers && <span className="ml-2 text-[10px] uppercase tracking-wide text-amber-500">corrected</span>}
+        {managerChanged && (
+          <span className="ml-2 text-[10px] uppercase tracking-wide text-blue-500">
+            → {managerEdit}
+          </span>
+        )}
       </td>
     </tr>
   );
@@ -77,10 +93,13 @@ function VerificationBadge({ level }: { level: number }) {
 // Managers can only set values, not clear them — this avoids ambiguity between
 // "I want to clear this field" and "I haven't changed this field yet."
 interface LabelEdits {
-  category: string;      // '' = keep record.category
-  subcategory: string;   // '' = keep record.subcategory
-  possiblePest: string;  // '' = keep record.possiblePest
-  severity: string;      // '' = keep record.severity
+  category: string;                    // '' = keep record.category
+  subcategory: string;                 // '' = keep record.subcategory
+  possiblePest: string;                // '' = keep record.possiblePest
+  severity: string;                    // '' = keep record.severity
+  possibleConduciveCondition: string;  // '' = keep record.possibleConduciveCondition
+  possibleEntryPoint: string;          // '' = keep record.possibleEntryPoint
+  correctiveAction: string;            // '' = keep record.correctiveAction
 }
 
 function initEdits(record: IntelligenceRecord | null): LabelEdits {
@@ -89,6 +108,9 @@ function initEdits(record: IntelligenceRecord | null): LabelEdits {
     subcategory: record?.subcategory ?? '',
     possiblePest: record?.possiblePest ?? '',
     severity: record?.severity ?? '',
+    possibleConduciveCondition: record?.possibleConduciveCondition ?? '',
+    possibleEntryPoint: record?.possibleEntryPoint ?? '',
+    correctiveAction: record?.correctiveAction ?? '',
   };
 }
 
@@ -132,6 +154,27 @@ function buildLabelPayload(
     payload.severity = edits.severity;
   }
 
+  if (
+    edits.possibleConduciveCondition &&
+    edits.possibleConduciveCondition !== (record.possibleConduciveCondition ?? '')
+  ) {
+    payload.possibleConduciveCondition = edits.possibleConduciveCondition;
+  }
+
+  if (
+    edits.possibleEntryPoint &&
+    edits.possibleEntryPoint !== (record.possibleEntryPoint ?? '')
+  ) {
+    payload.possibleEntryPoint = edits.possibleEntryPoint;
+  }
+
+  if (
+    edits.correctiveAction &&
+    edits.correctiveAction !== (record.correctiveAction ?? '')
+  ) {
+    payload.correctiveAction = edits.correctiveAction;
+  }
+
   return payload;
 }
 
@@ -147,6 +190,9 @@ export function IntelligenceReview() {
     subcategory: '',
     possiblePest: '',
     severity: '',
+    possibleConduciveCondition: '',
+    possibleEntryPoint: '',
+    correctiveAction: '',
   });
 
   const listParams = { status: 'confirmed', page, limit: PAGE_SIZE } as const;
@@ -184,7 +230,10 @@ export function IntelligenceReview() {
           vars.data.category ||
           vars.data.subcategory ||
           vars.data.possiblePest ||
-          vars.data.severity
+          vars.data.severity ||
+          vars.data.possibleConduciveCondition ||
+          vars.data.possibleEntryPoint ||
+          vars.data.correctiveAction
         );
         toast({
           title:
@@ -352,19 +401,26 @@ export function IntelligenceReview() {
                       </tr>
                     </thead>
                     <tbody>
-                      <FieldRow label="Category" ai={labelize(ai?.category)} tech={labelize(selected.category)} />
-                      <FieldRow label="Subcategory" ai={labelize(ai?.subcategory)} tech={labelize(selected.subcategory)} />
-                      <FieldRow label="Pest" ai={labelize(ai?.possiblePest)} tech={labelize(selected.possiblePest)} />
+                      <FieldRow label="Category" ai={labelize(ai?.category)} tech={labelize(selected.category)} managerEdit={labelPayload.category ? labelize(labelPayload.category) : undefined} />
+                      <FieldRow label="Subcategory" ai={labelize(ai?.subcategory)} tech={labelize(selected.subcategory)} managerEdit={labelPayload.subcategory ? labelize(labelPayload.subcategory) : undefined} />
+                      <FieldRow label="Pest" ai={labelize(ai?.possiblePest)} tech={labelize(selected.possiblePest)} managerEdit={labelPayload.possiblePest ? labelize(labelPayload.possiblePest) : undefined} />
                       <FieldRow
                         label="Conducive condition"
                         ai={labelize(ai?.possibleConduciveCondition)}
                         tech={labelize(selected.possibleConduciveCondition)}
+                        managerEdit={labelPayload.possibleConduciveCondition ? labelize(labelPayload.possibleConduciveCondition) : undefined}
                       />
-                      <FieldRow label="Entry point" ai={labelize(ai?.possibleEntryPoint)} tech={labelize(selected.possibleEntryPoint)} />
+                      <FieldRow
+                        label="Entry point"
+                        ai={labelize(ai?.possibleEntryPoint)}
+                        tech={labelize(selected.possibleEntryPoint)}
+                        managerEdit={labelPayload.possibleEntryPoint ? labelize(labelPayload.possibleEntryPoint) : undefined}
+                      />
                       <FieldRow
                         label="Corrective action"
                         ai={ai?.suggestedCorrectiveAction ?? '—'}
                         tech={selected.correctiveAction ?? '—'}
+                        managerEdit={labelPayload.correctiveAction ? labelize(labelPayload.correctiveAction) : undefined}
                       />
                     </tbody>
                   </table>
@@ -506,6 +562,48 @@ export function IntelligenceReview() {
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+
+                      {/* Conducive condition */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="edit-conducive-condition" className="text-xs font-medium">Conducive condition</Label>
+                        <Input
+                          id="edit-conducive-condition"
+                          data-testid="edit-conducive-condition"
+                          placeholder="e.g. moisture_intrusion"
+                          value={edits.possibleConduciveCondition}
+                          onChange={(e) =>
+                            setEdits((prev) => ({ ...prev, possibleConduciveCondition: e.target.value }))
+                          }
+                        />
+                      </div>
+
+                      {/* Entry point */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="edit-entry-point" className="text-xs font-medium">Entry point</Label>
+                        <Input
+                          id="edit-entry-point"
+                          data-testid="edit-entry-point"
+                          placeholder="e.g. gap_around_pipe"
+                          value={edits.possibleEntryPoint}
+                          onChange={(e) =>
+                            setEdits((prev) => ({ ...prev, possibleEntryPoint: e.target.value }))
+                          }
+                        />
+                      </div>
+
+                      {/* Corrective action — full width */}
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label htmlFor="edit-corrective-action" className="text-xs font-medium">Corrective action</Label>
+                        <Input
+                          id="edit-corrective-action"
+                          data-testid="edit-corrective-action"
+                          placeholder="e.g. seal_entry_point_and_remove_harborage"
+                          value={edits.correctiveAction}
+                          onChange={(e) =>
+                            setEdits((prev) => ({ ...prev, correctiveAction: e.target.value }))
+                          }
+                        />
                       </div>
                     </div>
                   </div>
