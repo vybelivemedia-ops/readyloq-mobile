@@ -244,7 +244,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
 
   const inspection = inspectionQ.data;
   const analysis = analysisQ.data?.[0];
-  const photos = (inspection?.media ?? []).filter((m) => m.mediaType === "photo");
+  const photos = (inspection?.media ?? []).filter((m) => m.mediaType === "photo" || m.mediaType === "image");
 
   const runAnalysis = async () => {
     setError(null);

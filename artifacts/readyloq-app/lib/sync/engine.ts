@@ -316,7 +316,7 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
       }
       if (photo?.storagePath && photo.mediaRowId == null) {
         const media = await addInspectionMedia(serverId, {
-          mediaType: "photo",
+          mediaType: "image",
           url: photo.storagePath,
           // Vision Platform provenance — where the evidence came from and how
           // the on-device quality gate scored it.

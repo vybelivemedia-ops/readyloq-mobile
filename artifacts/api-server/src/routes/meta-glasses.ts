@@ -508,7 +508,7 @@ router.post(
           .values({
             companyId: session.companyId,
             inspectionId: session.inspectionId,
-            mediaType: "photo",
+            mediaType: "image",
             url: storagePath,
             captureSource: "smart_glasses",
             caption,

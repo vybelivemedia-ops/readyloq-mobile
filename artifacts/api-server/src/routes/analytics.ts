@@ -34,7 +34,7 @@ router.get("/dashboard", async (req, res) => {
       .where(eq(inspectionMediaTable.companyId, companyId));
 
     const total = inspections.length;
-    const photosCaptured = media.filter((m) => m.mediaType === "photo").length;
+    const photosCaptured = media.filter((m) => m.mediaType === "photo" || m.mediaType === "image").length;
     const videosCaptured = media.filter((m) => m.mediaType === "video").length;
     const completed = inspections.filter((i) => i.status === "completed").length;
     const open = inspections.filter((i) => i.status !== "completed").length;

@@ -90579,7 +90579,7 @@ async function runInspectionFinalization(input) {
           )
         );
         const voiceTranscripts = media.filter((m) => m.mediaType === "voice").map((m) => m.caption ?? m.filename ?? "").filter((s2) => s2.length > 0);
-        const photoMedia = media.filter((m) => m.mediaType === "photo");
+        const photoMedia = media.filter((m) => m.mediaType === "photo" || m.mediaType === "image");
         const photoLabels = photoMedia.map((m) => [m.filename, m.caption].filter(Boolean).join(" \u2014 ")).filter((s2) => s2.length > 0);
         const narrative = await generateReportNarrative({
           title: report.title,
@@ -91523,7 +91523,7 @@ router6.post("/:id/generate-narrative", async (req, res) => {
       )
     );
     const voiceTranscripts = media.filter((m) => m.mediaType === "voice").map((m) => m.caption ?? m.filename ?? "").filter((s2) => s2.length > 0);
-    const photoMedia = media.filter((m) => m.mediaType === "photo");
+    const photoMedia = media.filter((m) => m.mediaType === "photo" || m.mediaType === "image");
     const photoLabels = photoMedia.map((m) => [m.filename, m.caption].filter(Boolean).join(" \u2014 ")).filter((s2) => s2.length > 0);
     const analyses = await db.select().from(analysisResultsTable).where(
       and(
@@ -91623,7 +91623,7 @@ router6.get("/:id/html", async (req, res) => {
       and(
         eq(inspectionMediaTable.inspectionId, report.inspectionId),
         eq(inspectionMediaTable.companyId, companyId),
-        eq(inspectionMediaTable.mediaType, "photo")
+        inArray(inspectionMediaTable.mediaType, ["photo", "image"])
       )
     );
     const html = buildServerReportHtml(report, inspection, mediaRows);
@@ -91657,7 +91657,7 @@ router7.get("/dashboard", async (req, res) => {
     const reports = await db.select().from(reportsTable).where(eq(reportsTable.companyId, companyId));
     const media = await db.select().from(inspectionMediaTable).where(eq(inspectionMediaTable.companyId, companyId));
     const total = inspections.length;
-    const photosCaptured = media.filter((m) => m.mediaType === "photo").length;
+    const photosCaptured = media.filter((m) => m.mediaType === "photo" || m.mediaType === "image").length;
     const videosCaptured = media.filter((m) => m.mediaType === "video").length;
     const completed = inspections.filter((i) => i.status === "completed").length;
     const open = inspections.filter((i) => i.status !== "completed").length;
@@ -93218,7 +93218,7 @@ async function buildFeed(addressKey, companyId) {
       date: inspById.get(a.inspectionId)?.createdAt ?? a.createdAt
     }))
   );
-  const historicalPhotos = media.filter((m) => m.mediaType === "photo").sort(byNewest).map((m) => ({
+  const historicalPhotos = media.filter((m) => m.mediaType === "photo" || m.mediaType === "image").sort(byNewest).map((m) => ({
     url: m.url,
     caption: m.caption ?? null,
     inspectionId: m.inspectionId,
@@ -106119,7 +106119,7 @@ router28.post(
         const [mediaRow] = await db.insert(inspectionMediaTable).values({
           companyId: session.companyId,
           inspectionId: session.inspectionId,
-          mediaType: "photo",
+          mediaType: "image",
           url: storagePath,
           captureSource: "smart_glasses",
           caption,
@@ -124880,7 +124880,7 @@ router32.post("/sync", async (req, res) => {
     const analysis = analyses[0];
     const findings = analysis?.findings ?? [];
     const reportSummary = findings.length > 0 ? findings.slice(0, 5).map((f) => `${f.category}: ${f.description}`).join(". ") : "No significant findings detected.";
-    const photos = media.filter((m) => m.mediaType === "photo" && m.url).map((m) => ({
+    const photos = media.filter((m) => (m.mediaType === "photo" || m.mediaType === "image") && m.url).map((m) => ({
       url: m.url,
       caption: m.caption ?? null,
       severity: findings.find((f) => f.imageUrl === m.url)?.severity ?? "low"
@@ -126402,7 +126402,7 @@ router36.get("/reports/:id/html", async (req, res) => {
     and(
       eq(inspectionMediaTable.inspectionId, report.inspectionId),
       eq(inspectionMediaTable.companyId, access.companyId),
-      eq(inspectionMediaTable.mediaType, "photo")
+      inArray(inspectionMediaTable.mediaType, ["photo", "image"])
     )
   );
   const html = buildServerReportHtml(report, inspection, mediaRows);
@@ -127144,7 +127144,7 @@ var EnterpriseAdapterRouter = class {
         });
         success2 = true;
       } else if (config2.systemType === "fieldroutes") {
-        const photos = mediaRows.filter((m) => m.mediaType === "photo" && m.url).map((m) => ({
+        const photos = mediaRows.filter((m) => (m.mediaType === "photo" || m.mediaType === "image") && m.url).map((m) => ({
           url: m.url,
           caption: m.caption ?? null,
           severity: rawFindings.find((f) => f.imageUrl === m.url)?.severity ?? "low"

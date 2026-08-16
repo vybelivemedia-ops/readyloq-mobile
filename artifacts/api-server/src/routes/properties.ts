@@ -199,7 +199,7 @@ async function buildFeed(addressKey: string, companyId: number) {
   );
 
   const historicalPhotos = media
-    .filter((m) => m.mediaType === "photo")
+    .filter((m) => m.mediaType === "photo" || m.mediaType === "image")
     .sort(byNewest)
     .map((m) => ({
       url: m.url,

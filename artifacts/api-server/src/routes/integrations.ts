@@ -298,7 +298,7 @@ router.post("/sync", async (req, res) => {
         : "No significant findings detected.";
 
     const photos = media
-      .filter((m) => m.mediaType === "photo" && m.url)
+      .filter((m) => (m.mediaType === "photo" || m.mediaType === "image") && m.url)
       .map((m) => ({
         url: m.url,
         caption: m.caption ?? null,

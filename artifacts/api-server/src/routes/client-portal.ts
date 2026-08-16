@@ -20,7 +20,7 @@ import {
   companiesTable,
   portalMessagesTable,
 } from "@workspace/db";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { requireCompany, requireRole } from "../middleware/require-auth";
@@ -304,7 +304,7 @@ router.get("/reports/:id/html", async (req, res) => {
       and(
         eq(inspectionMediaTable.inspectionId, report.inspectionId),
         eq(inspectionMediaTable.companyId, access.companyId),
-        eq(inspectionMediaTable.mediaType, "photo"),
+        inArray(inspectionMediaTable.mediaType, ["photo", "image"]),
       ),
     );
 

@@ -264,7 +264,7 @@ router.post("/:id/generate-narrative", async (req, res) => {
       .filter((m) => m.mediaType === "voice")
       .map((m) => m.caption ?? m.filename ?? "")
       .filter((s) => s.length > 0);
-    const photoMedia = media.filter((m) => m.mediaType === "photo");
+    const photoMedia = media.filter((m) => m.mediaType === "photo" || m.mediaType === "image");
     const photoLabels = photoMedia
       .map((m) => [m.filename, m.caption].filter(Boolean).join(" — "))
       .filter((s) => s.length > 0);
@@ -427,7 +427,7 @@ router.get("/:id/html", async (req, res) => {
         and(
           eq(inspectionMediaTable.inspectionId, report.inspectionId),
           eq(inspectionMediaTable.companyId, companyId),
-          eq(inspectionMediaTable.mediaType, "photo"),
+          inArray(inspectionMediaTable.mediaType, ["photo", "image"]),
         ),
       );
 

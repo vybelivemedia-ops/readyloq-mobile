@@ -159,7 +159,7 @@ export class EnterpriseAdapterRouter {
         // FieldRoutes uses the existing text-note adapter which is already
         // tested and handles the dual-token auth correctly via apiToken.
         const photos = mediaRows
-          .filter((m) => m.mediaType === "photo" && m.url)
+          .filter((m) => (m.mediaType === "photo" || m.mediaType === "image") && m.url)
           .map((m) => ({
             url: m.url!,
             caption: m.caption ?? null,
