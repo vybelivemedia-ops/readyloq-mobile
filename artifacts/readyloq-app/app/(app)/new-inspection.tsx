@@ -44,6 +44,7 @@ import { useDailyRoute } from "@/hooks/useDailyRoute";
 import { verifyEquipmentUsage } from "@/lib/audio/intelligence/EquipmentVerifier";
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
+import { useMeasurementScaling } from "@/hooks/useMeasurementScaling";
 import { NativeCameraHealthBadge } from "@/components/NativeCameraHealthBadge";
 import { useAllDevicesHealthCheck } from "@/hooks/useAllDevicesHealthCheck";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
@@ -150,6 +151,48 @@ export default function NewInspectionScreen() {
   // When sensors are connected the panel gets equal space with the camera;
   // when none are docked the camera expands to fill more of the screen.
   const [activeSensorCount, setActiveSensorCount] = useState(0);
+
+  // ── Reference-object measurement scaling (clipping detection) ──────────────
+  // The technician taps two points on the camera view to mark the reference
+  // object (e.g. a credit card).  Clipping is evaluated immediately when the
+  // second tap lands — before any target selection — so the amber warning
+  // banner appears as soon as the reference is confirmed clipped and blocks the
+  // technician from proceeding with a drifted scale factor.
+  //
+  // Camera pane dimensions — tracked via onLayout so wide-screen mode (where
+  // the camera is the left half) uses the actual half-screen width rather than
+  // the full window width.  Portrait and landscape both fill the screen so the
+  // initial window dimensions are correct there too.
+  const { width: _winW, height: _winH } = useWindowDimensions();
+  const [_cameraW, _setCameraW] = useState(_winW);
+  const [_cameraH, _setCameraH] = useState(_winH);
+  const _onCameraPaneLayout = useCallback(
+    (e: import("react-native").LayoutChangeEvent) => {
+      const { width, height } = e.nativeEvent.layout;
+      if (width > 0 && height > 0) {
+        _setCameraW(width);
+        _setCameraH(height);
+      }
+    },
+    [],
+  );
+  const {
+    handleReferenceSelected: _handleRefSelected,
+    refPoints: _refPoints,
+    clearMeasurement: _clearRefMeasurement,
+  } = useMeasurementScaling({
+    imageDimensions: { w: _cameraW, h: _cameraH },
+  });
+
+  // Two-tap reference selection state machine: idle → p1 → p2 → idle
+  const [_refSelectMode, _setRefSelectMode] = useState<"idle" | "p1" | "p2">("idle");
+  const [_refP1, _setRefP1] = useState<{ x: number; y: number } | null>(null);
+
+  // Clipping is computed immediately on P2 tap — NOT waiting for a target.
+  // The same 2-px edge margin used by computeScaledDimensions applies here so
+  // the warning and the confidence penalty always agree on the same boundary.
+  const [_referenceClipped, _setReferenceClipped] = useState(false);
+  const [_refWarnings, _setRefWarnings] = useState<string[]>([]);
 
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -1750,6 +1793,165 @@ export default function NewInspectionScreen() {
       </View>
     ) : null;
 
+    // Reference-object clipping warning banner.
+    // Shown when the technician has selected a reference object whose endpoints
+    // extend to a frame edge, making the measured pixel span unreliable.  The
+    // banner persists until the technician re-selects the reference in-frame.
+    const refClipBanner = _referenceClipped ? (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          backgroundColor: "rgba(217,119,6,0.92)",
+          paddingHorizontal: 10,
+          paddingVertical: 7,
+          borderRadius: 10,
+          maxWidth: 440,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.25)",
+        }}
+      >
+        <Ionicons name="warning" size={14} color="#fff" />
+        <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 12, flex: 1, flexShrink: 1 }}>
+          {_refWarnings[0] ?? "Reference partially out of frame — re-centre and retry"}
+        </Text>
+        <Pressable
+          hitSlop={8}
+          onPress={() => {
+            _clearRefMeasurement();
+            _setReferenceClipped(false);
+            _setRefWarnings([]);
+            _setRefSelectMode("idle");
+            _setRefP1(null);
+          }}
+          style={{
+            backgroundColor: "rgba(255,255,255,0.2)",
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 6,
+          }}
+        >
+          <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>Re-select</Text>
+        </Pressable>
+      </View>
+    ) : null;
+
+    // Build a 4-corner ROI quad from the reference selection endpoints so
+    // SpatialMeasurementCard can run the same clipping check against the same
+    // region the technician marked.  When no reference has been selected yet
+    // we pass undefined and the card defaults to its centred placeholder quad.
+    const _roiVertices: Array<{ x: number; y: number }> | undefined =
+      _refPoints.length === 2
+        ? (() => {
+            const [rp1, rp2] = _refPoints as [{ x: number; y: number }, { x: number; y: number }];
+            const minX = Math.min(rp1.x, rp2.x);
+            const maxX = Math.max(rp1.x, rp2.x);
+            const minY = Math.min(rp1.y, rp2.y);
+            const maxY = Math.max(rp1.y, rp2.y);
+            return [
+              { x: minX, y: minY },
+              { x: maxX, y: minY },
+              { x: maxX, y: maxY },
+              { x: minX, y: maxY },
+            ];
+          })()
+        : undefined;
+
+    // Transparent Pressable overlay — active only during reference selection.
+    // Intercepts the first two taps in sequence to set P1 then P2.
+    const refSelectionOverlay =
+      _refSelectMode !== "idle" ? (
+        <Pressable
+          style={{
+            position: "absolute",
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 50,
+          }}
+          onPress={(e) => {
+            const { locationX: x, locationY: y } = e.nativeEvent;
+            if (_refSelectMode === "p1") {
+              _setRefP1({ x, y });
+              _setRefSelectMode("p2");
+            } else if (_refSelectMode === "p2" && _refP1) {
+              const p2 = { x, y };
+              // Compute clipping IMMEDIATELY — before _handleRefSelected — so
+              // the amber banner renders right away rather than waiting for the
+              // hook's result (which only fires after a target is also set).
+              const EDGE = 2;
+              const pts = [_refP1, p2];
+              const clipped = pts.some(
+                (p) =>
+                  p.x <= EDGE ||
+                  p.y <= EDGE ||
+                  p.x >= _cameraW - EDGE ||
+                  p.y >= _cameraH - EDGE,
+              );
+              _setReferenceClipped(clipped);
+              _setRefWarnings(
+                clipped
+                  ? ["Reference object partially out of frame — re-centre and retry"]
+                  : [],
+              );
+              _handleRefSelected(_refP1, p2);
+              _setRefSelectMode("idle");
+              _setRefP1(null);
+            }
+          }}
+        >
+          {/* Selection hint */}
+          <View
+            style={{
+              position: "absolute",
+              top: "50%",
+              alignSelf: "center",
+              backgroundColor: "rgba(0,0,0,0.65)",
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: "#17c4d3",
+            }}
+          >
+            <Text style={{ color: "#17c4d3", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+              {_refSelectMode === "p1" ? "Tap near edge of reference object" : "Tap far edge of reference object"}
+            </Text>
+          </View>
+        </Pressable>
+      ) : null;
+
+    // Inline chip to start reference selection (shown in the banner strip).
+    const refSelectChip = (
+      <Pressable
+        hitSlop={8}
+        onPress={() => {
+          _clearRefMeasurement();
+          _setReferenceClipped(false);
+          _setRefWarnings([]);
+          _setRefP1(null);
+          _setRefSelectMode("p1");
+        }}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 5,
+          backgroundColor: _referenceClipped
+            ? "rgba(217,119,6,0.85)"
+            : "rgba(0,0,0,0.55)",
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: _referenceClipped ? "#f59e0b" : "rgba(23,196,211,0.6)",
+        }}
+      >
+        <Ionicons name="expand-outline" size={13} color={_referenceClipped ? "#f59e0b" : "#17c4d3"} />
+        <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+          {_refPoints.length === 2 ? (_referenceClipped ? "Re-select Ref" : "Ref ✓") : "Select Ref"}
+        </Text>
+      </Pressable>
+    );
+
     // Meta glasses activity strip — shown when a Live AI session is active.
     const glassesCaptures = glassesFindings.filter((e) => e.finding || e.mediaId);
     // #106 — amber strip when glasses have gone silent for 2+ minutes
@@ -2147,7 +2349,7 @@ export default function NewInspectionScreen() {
         <Screen edges={["top", "bottom"]}>
           <View style={{ flex: 1, flexDirection: "row", backgroundColor: "#0D1117" }}>
             {/* Left: camera pane — cover-fills the entire half, no letterboxing */}
-            <View style={{ flex: 1, backgroundColor: "#000" }}>
+            <View style={{ flex: 1, backgroundColor: "#000" }} onLayout={_onCameraPaneLayout}>
               {/* CameraView fills the pane completely — acts as CSS object-fit:cover */}
               <CameraView
                 ref={cameraRef}
@@ -2156,6 +2358,10 @@ export default function NewInspectionScreen() {
                 zoom={zoom}
                 flash={flash}
               />
+              {/* Reference overlay inside the camera pane — touch coords relative
+                   to this View (left half), so clipping checks the actual half-screen
+                   camera width, not the full window width. */}
+              {refSelectionOverlay}
 
               {/* Frame-capture flash overlay */}
               <Animated.View
@@ -2221,6 +2427,7 @@ export default function NewInspectionScreen() {
                     </Text>
                   </View>
                 )}
+                {refClipBanner}
                 {qualityBanner}
                 {faieBanner}
                 {glassesViewerModal}
@@ -2257,6 +2464,7 @@ export default function NewInspectionScreen() {
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 28 }}>
                   {flashButton}
                   {importButton}
+                  {refSelectChip}
                   <Pressable onPress={() => setShowWifiCamera(true)} style={{ alignItems: "center", gap: 4 }}>
                     <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: wifiCameraConnected ? "rgba(23,196,211,0.2)" : "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center", borderWidth: wifiCameraConnected ? 1 : 0, borderColor: "#17c4d3" }}>
                       <Ionicons name="wifi" size={20} color={wifiCameraConnected ? "#17c4d3" : "#fff"} />
@@ -2317,7 +2525,13 @@ export default function NewInspectionScreen() {
                       padding: 12,
                     }}
                   >
-                    <MeasurementDevicePanel onActiveCountChange={setActiveSensorCount} />
+                    <MeasurementDevicePanel
+                      onActiveCountChange={setActiveSensorCount}
+                      roiVertices={_roiVertices}
+                      viewportWidth={_cameraW}
+                      viewportHeight={_cameraH}
+                      referenceClipped={_referenceClipped}
+                    />
                   </View>
                 </View>
               ) : (
@@ -2344,8 +2558,12 @@ export default function NewInspectionScreen() {
     }
 
     return (
-      <View style={{ flex: 1, backgroundColor: "#000" }}>
+      <View style={{ flex: 1, backgroundColor: "#000" }} onLayout={_onCameraPaneLayout}>
         <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back" zoom={zoom} flash={flash} />
+        {/* Reference-object selection overlay — intercepts two taps to define the
+            reference endpoint pair; touch coords are relative to this View so
+            clipping evaluates against the full-screen camera in portrait/landscape. */}
+        {refSelectionOverlay}
         {/* Frame-capture flash: briefly pulses white when a voice note grabs a room snapshot */}
         <Animated.View
           pointerEvents="none"
@@ -2452,6 +2670,7 @@ export default function NewInspectionScreen() {
               {captureButton}
               {doneButton}
               {faieButton}
+              {refSelectChip}
               <Pressable
                 onPress={() => {
                   if (!wsInspectionId) {
@@ -2476,6 +2695,7 @@ export default function NewInspectionScreen() {
                 gap: 10,
               }}
             >
+              {refClipBanner}
               {qualityBanner}
               {faieBanner}
               {glassesStrip}
@@ -2484,6 +2704,7 @@ export default function NewInspectionScreen() {
               {zoomChips}
             </View>
             {thumbs}
+            {refSelectionOverlay}
           </>
         ) : (
           <View
@@ -2499,6 +2720,9 @@ export default function NewInspectionScreen() {
             }}
           >
             {thumbs}
+            {refClipBanner ? (
+              <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{refClipBanner}</View>
+            ) : null}
             {qualityBanner ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{qualityBanner}</View>
             ) : null}
@@ -2562,6 +2786,7 @@ export default function NewInspectionScreen() {
               <View style={{ width: 64, alignItems: "center", gap: 12 }}>
                 {flashButton}
                 {importButton}
+                {refSelectChip}
                 <Pressable onPress={() => setShowWifiCamera(true)} style={{ alignItems: "center" }}>
                   <Ionicons name="wifi" size={22} color={wifiCameraConnected ? "#17c4d3" : "#fff"} />
                 </Pressable>
@@ -2696,7 +2921,13 @@ export default function NewInspectionScreen() {
                   padding: 12,
                 }}
               >
-                <MeasurementDevicePanel onActiveCountChange={setActiveSensorCount} />
+                <MeasurementDevicePanel
+                  onActiveCountChange={setActiveSensorCount}
+                  roiVertices={_roiVertices}
+                  viewportWidth={_cameraW}
+                  viewportHeight={_cameraH}
+                  referenceClipped={_referenceClipped}
+                />
               </View>
             </View>
           ) : (

@@ -665,6 +665,14 @@ export interface ScaleAnchorResult {
     referenceRealWidthMm: number;
     /** Calibration confidence (0–1). */
     confidence: number;
+    /**
+     * True when the supplied bounding box extends past one or more edges of the
+     * image (i.e. normalised coords fall outside the [0, 1] range on any axis).
+     * A clipped box underestimates pixel width, which causes the depth
+     * back-projection to overestimate distance and produce a silent scale error.
+     * Callers should surface this to the technician and request a re-frame.
+     */
+    clipped: boolean;
 }
 /**
  * Anchors a relative SfMDepthMap to metric (absolute) scale using a reference
@@ -766,6 +774,13 @@ export interface BurstMeasurementResult {
         anchorQuality: number;
         planeFit: number;
     };
+    /**
+     * Human-readable warnings produced during this pipeline run.
+     * Non-empty when the estimate may be unreliable (e.g. reference object
+     * partially out of frame). Display each warning to the technician before
+     * allowing them to stamp the result.
+     */
+    warnings: string[];
     /** ISO-8601 timestamp. */
     measuredAt: string;
 }

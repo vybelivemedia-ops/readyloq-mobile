@@ -31,6 +31,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -122,41 +123,120 @@ const ESTIMATOR = new BasicDimensionEstimator(/* focalLengthPx */ 800);
 const DEFAULT_SCALE_IN_PER_PX = 0.05;
 
 interface SpatialResult {
-  widthIn:  number;
-  heightIn: number;
-  areaSqIn: number;
+  widthIn:    number;
+  heightIn:   number;
+  areaSqIn:   number;
+  confidence: number;
+  warnings:   string[];
 }
 
 interface SpatialMeasurementCardProps {
   depthMeters: number;
   colors: ReturnType<typeof useColors>;
+  /**
+   * Pixel-space vertices of the technician's framed ROI in the camera preview.
+   * When provided (from a camera overlay gesture), clipping detection runs
+   * against the actual viewport bounds and warnings are shown when any vertex
+   * is within 1 px of an edge.
+   *
+   * When omitted, a representative centred quad is used so the card remains
+   * functional before the camera overlay gesture is wired; clipping will not
+   * be triggered by the default quad.
+   */
+  roiVertices?: Array<{ x: number; y: number }>;
+  /**
+   * Actual camera preview width in logical pixels (from the parent layout or
+   * useWindowDimensions).  Used as the right-edge boundary for clipping
+   * detection.  Defaults to the device's window width when omitted.
+   */
+  viewportWidth?: number;
+  /**
+   * Actual camera preview height in logical pixels.  Defaults to the device's
+   * window height when omitted.
+   */
+  viewportHeight?: number;
+  /**
+   * When true the Measure button is disabled and a message is shown asking the
+   * technician to re-centre the reference object.  This prevents a clipped
+   * reference (where the pixel span is understated) from producing a drifted
+   * scale factor that looks plausible but is wrong.
+   */
+  referenceClipped?: boolean;
 }
 
-function SpatialMeasurementCard({ depthMeters, colors }: SpatialMeasurementCardProps) {
+function SpatialMeasurementCard({
+  depthMeters,
+  colors,
+  roiVertices,
+  viewportWidth,
+  viewportHeight,
+  referenceClipped = false,
+}: SpatialMeasurementCardProps) {
+  const window = useWindowDimensions();
   const [result, setResult] = useState<SpatialResult | null>(null);
 
+  // Auto-clear any stale measurement result the moment the reference becomes
+  // clipped.  This prevents a result produced with an in-frame reference from
+  // remaining visible (with its Re-measure button) after the technician selects
+  // a clipped reference, closing the bypass path the reviewer identified.
+  React.useEffect(() => {
+    if (referenceClipped) {
+      setResult(null);
+    }
+  }, [referenceClipped]);
+
   const handleMeasure = useCallback(() => {
-    // Vertices represent the technician's framed ROI in the camera viewport.
-    // In a production integration these come from the camera overlay gesture;
-    // here we use a representative 200 × 300 px quad at viewport centre.
-    const vertices = [
-      { x: 100, y: 100 },
-      { x: 300, y: 100 },
-      { x: 300, y: 400 },
-      { x: 100, y: 400 },
+    // Hard guard — also checked at call sites, but this ensures the computation
+    // never runs even if a future code path calls handleMeasure directly.
+    if (referenceClipped) return;
+    // Use caller-supplied vertices (from camera overlay gesture) when available;
+    // otherwise fall back to a representative 200 × 300 px centred quad.
+    // The centred default never clips — it is a stand-in until the camera
+    // overlay gesture is fully wired (see task #602).
+    const vpW = viewportWidth  ?? window.width;
+    const vpH = viewportHeight ?? window.height;
+
+    const vertices = roiVertices ?? [
+      { x: vpW * 0.25, y: vpH * 0.1 },
+      { x: vpW * 0.75, y: vpH * 0.1 },
+      { x: vpW * 0.75, y: vpH * 0.5 },
+      { x: vpW * 0.25, y: vpH * 0.5 },
     ];
 
+    // Clipping: any vertex within 1 logical pixel of an edge means the framed
+    // ROI (or the reference object behind it) extends past the camera preview.
+    const EDGE = 1;
+    const clipped = vertices.some(
+      (v) => v.x <= EDGE || v.y <= EDGE || v.x >= vpW - EDGE || v.y >= vpH - EDGE,
+    );
+
+    const warnings: string[] = [];
+    if (clipped) {
+      warnings.push(
+        "Reference object partially out of frame — re-centre and retry",
+      );
+    }
+
+    // Confidence: width of the framed ROI vs 80 px threshold.
+    // Clipping applies a 0.4× penalty because the measured pixel span
+    // understates the true object width (mirrors ReferenceScaleAnchor logic).
+    const refPixelWidth = Math.abs(vertices[1].x - vertices[0].x);
+    const pixelConf = Math.min(1, refPixelWidth / 80);
+    const confidence = Math.min(1, Math.max(0, pixelConf * (clipped ? 0.4 : 0.9)));
+
     const scaleAtDepth = DEFAULT_SCALE_IN_PER_PX * (depthMeters / 1.5);
-    const geo     = PolygonCalculator.calculateAreaAndPerimeter(vertices, scaleAtDepth);
-    const widthIn = ESTIMATOR.estimateWidthInches(geo, depthMeters);
+    const geo      = PolygonCalculator.calculateAreaAndPerimeter(vertices, scaleAtDepth);
+    const widthIn  = ESTIMATOR.estimateWidthInches(geo, depthMeters);
     const heightIn = ESTIMATOR.estimateHeightInches(geo, depthMeters);
 
     setResult({
-      widthIn:  Math.round(widthIn  * 10) / 10,
-      heightIn: Math.round(heightIn * 10) / 10,
-      areaSqIn: Math.round(geo.areaSquareInches * 10) / 10,
+      widthIn:    Math.round(widthIn  * 10) / 10,
+      heightIn:   Math.round(heightIn * 10) / 10,
+      areaSqIn:   Math.round(geo.areaSquareInches * 10) / 10,
+      confidence,
+      warnings,
     });
-  }, [depthMeters]);
+  }, [depthMeters, roiVertices, viewportWidth, viewportHeight, window, referenceClipped]);
 
   return (
     <View style={[spatialStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -170,6 +250,29 @@ function SpatialMeasurementCard({ depthMeters, colors }: SpatialMeasurementCardP
 
       {result ? (
         <View style={spatialStyles.results}>
+          {/* Confidence indicator */}
+          <View style={spatialStyles.confRow}>
+            <View
+              style={[
+                spatialStyles.confDot,
+                { backgroundColor: result.confidence >= 0.5 ? "#22c55e" : "#f59e0b" },
+              ]}
+            />
+            <Text style={[spatialStyles.confLabel, { color: colors.mutedForeground }]}>
+              {result.confidence >= 0.5
+                ? `Confidence ${Math.round(result.confidence * 100)}%`
+                : `Low confidence (${Math.round(result.confidence * 100)}%) — result may be inaccurate`}
+            </Text>
+          </View>
+
+          {/* Inline warnings */}
+          {result.warnings.map((w, i) => (
+            <View key={i} style={spatialStyles.warningRow}>
+              <Ionicons name="warning-outline" size={13} color="#f59e0b" />
+              <Text style={spatialStyles.warningText}>{w}</Text>
+            </View>
+          ))}
+
           <View style={spatialStyles.dimRow}>
             <_DimCell label="Width"  value={`${result.widthIn} in`}  colors={colors} />
             <_DimCell label="Height" value={`${result.heightIn} in`} colors={colors} />
@@ -184,13 +287,25 @@ function SpatialMeasurementCard({ depthMeters, colors }: SpatialMeasurementCardP
         </View>
       ) : (
         <View style={spatialStyles.idle}>
-          <Text style={[spatialStyles.idleText, { color: colors.mutedForeground }]}>
-            Frame the subject in the camera, then tap Measure to compute dimensions.
-          </Text>
-          <Pressable onPress={handleMeasure} style={spatialStyles.measureBtn}>
-            <Ionicons name="scan-outline" size={14} color="#fff" />
-            <Text style={spatialStyles.measureBtnText}>Measure</Text>
-          </Pressable>
+          {referenceClipped ? (
+            /* Clipped-reference gate — Measure is blocked until technician re-centres */
+            <View style={spatialStyles.clippedGate}>
+              <Ionicons name="warning" size={15} color="#f59e0b" />
+              <Text style={[spatialStyles.clippedGateText, { color: "#f59e0b" }]}>
+                Reference partially out of frame — re-centre and retry before measuring
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text style={[spatialStyles.idleText, { color: colors.mutedForeground }]}>
+                Frame the subject in the camera, then tap Measure to compute dimensions.
+              </Text>
+              <Pressable onPress={handleMeasure} style={spatialStyles.measureBtn}>
+                <Ionicons name="scan-outline" size={14} color="#fff" />
+                <Text style={spatialStyles.measureBtnText}>Measure</Text>
+              </Pressable>
+            </>
+          )}
         </View>
       )}
     </View>
@@ -287,6 +402,55 @@ const spatialStyles = StyleSheet.create({
   remeasureText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
+  },
+  confRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  confDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  confLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    flex: 1,
+  },
+  warningRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: "rgba(245,158,11,0.10)",
+    borderRadius: 7,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  warningText: {
+    color: "#f59e0b",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    flex: 1,
+    lineHeight: 16,
+  },
+  /** Shown in place of the Measure button when a clipped reference is active. */
+  clippedGate: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+    backgroundColor: "rgba(245,158,11,0.12)",
+    borderRadius: 9,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.35)",
+  },
+  clippedGateText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 17,
+    flex: 1,
   },
 });
 
@@ -504,9 +668,42 @@ interface MeasurementDevicePanelProps {
    * no sensor drawer is open.
    */
   onActiveCountChange?: (count: number) => void;
+  /**
+   * Pixel-space vertices of the technician's camera-overlay ROI gesture.
+   * When provided they are forwarded to SpatialMeasurementCard so that
+   * clipping detection runs against the actual framed region rather than
+   * the default placeholder quad.
+   * Typically produced by the camera overlay drag handler in new-inspection.tsx.
+   */
+  roiVertices?: Array<{ x: number; y: number }>;
+  /**
+   * Width of the camera preview in logical pixels.
+   * Forwarded to SpatialMeasurementCard for edge-clipping detection.
+   * Falls back to useWindowDimensions when omitted.
+   */
+  viewportWidth?: number;
+  /**
+   * Height of the camera preview in logical pixels.
+   * Forwarded to SpatialMeasurementCard for edge-clipping detection.
+   * Falls back to useWindowDimensions when omitted.
+   */
+  viewportHeight?: number;
+  /**
+   * When true the Measure button inside SpatialMeasurementCard is blocked and
+   * a warning is shown in its place.  Set by new-inspection.tsx as soon as the
+   * technician's two-tap reference selection lands on or past the frame edge.
+   */
+  referenceClipped?: boolean;
 }
 
-export function MeasurementDevicePanel({ onStamp, onActiveCountChange }: MeasurementDevicePanelProps = {}) {
+export function MeasurementDevicePanel({
+  onStamp,
+  onActiveCountChange,
+  roiVertices,
+  viewportWidth,
+  viewportHeight,
+  referenceClipped = false,
+}: MeasurementDevicePanelProps = {}) {
   const { registry, plugin } = useDeviceRegistry();
   const colors  = useColors();
   const sensors = registry.findByCategory("sensor");
@@ -581,11 +778,17 @@ export function MeasurementDevicePanel({ onStamp, onActiveCountChange }: Measure
         />
       ))}
 
-      {/* Spatial measurement card — visible once a distance sensor provides depth */}
+      {/* Spatial measurement card — visible once a distance sensor provides depth.
+          referenceClipped blocks the Measure button until the technician
+          re-centres their reference object selection. */}
       {liveDepthMeters !== null && (
         <SpatialMeasurementCard
           depthMeters={liveDepthMeters}
           colors={colors}
+          roiVertices={roiVertices}
+          viewportWidth={viewportWidth}
+          viewportHeight={viewportHeight}
+          referenceClipped={referenceClipped}
         />
       )}
 

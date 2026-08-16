@@ -57,12 +57,10 @@ export {
   type BlendedMeasurementResult,
 } from "./BurstMeasurementManager";
 
-// ── SfM depth engine ──────────────────────────────────────────────────────────
-export {
-  sfmDepthEngine,
-  type Point2D,
-  type TriangulatedPoint,
-} from "./SfMDepthEngine";
+// SfMDepthEngine is intentionally NOT exported here.
+// It uses a hardcoded mock feature-pair implementation as a development stand-in
+// and must not be shipped as a production measurement path until a real native
+// feature-tracking bridge is implemented and validated (see task #601).
 
 // ── Measurement Bridge ────────────────────────────────────────────────────────
 export {

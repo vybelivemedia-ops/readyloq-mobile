@@ -22,8 +22,8 @@
  *   3. Replace test.todo blocks with real assertions
  *   4. Run: pnpm --filter @platform/measurement-core test
  */
-import { describe, it, expect, test } from "vitest";
-import { MEASUREMENT_EVENT_KINDS } from "../index.js";
+import { describe, it, expect } from "vitest";
+import { MEASUREMENT_EVENT_KINDS, ReferenceScaleAnchor, FallbackSfMProvider, BurstMeasurementPipeline, REFERENCE_OBJECTS, } from "../index.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK FACTORIES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -317,71 +317,170 @@ describe("MEASUREMENT_EVENT_KINDS", () => {
 // BEHAVIORAL CONTRACT TESTS (test.todo — implement with real adapters)
 // ─────────────────────────────────────────────────────────────────────────────
 describe("MeasurementEngine — single image flow", () => {
-    it("returns a MeasurementResult with at least one estimate", () => {
-        test.todo("engine.measure(request) resolves with estimates.length >= 1");
-    });
-    it("returns cached result on second identical call", () => {
-        test.todo("second call with same input returns result.cached === true and latencyMs < 5");
-    });
-    it("falls back to uncalibrated estimate when no EXIF and no reference object", () => {
-        test.todo("result.calibrationProfile.status === 'uncalibrated' and confidence.score < 0.5");
-    });
-    it("improves confidence when reference object is provided", () => {
-        test.todo("confidence with credit_card reference > confidence without any reference");
-    });
+    it.todo("returns a MeasurementResult with at least one estimate: engine.measure(request) resolves with estimates.length >= 1");
+    it.todo("returns cached result on second identical call: result.cached === true and latencyMs < 5");
+    it.todo("falls back to uncalibrated estimate when no EXIF and no reference object: calibrationProfile.status === 'uncalibrated'");
+    it.todo("improves confidence when reference object is provided: confidence with credit_card reference > without reference");
 });
 describe("MeasurementEngine — annotation versioning", () => {
-    it("first annotation has version=1 and isActive=true", () => {
-        test.todo("annotateEvidence returns annotation with version===1 and isActive===true");
-    });
-    it("revising annotation creates version=2, deactivates version=1", () => {
-        test.todo("after reviseAnnotation: new version===2 isActive=true, old version===1 isActive=false");
-    });
-    it("getActive returns the highest active version", () => {
-        test.todo("history.getActive(evidenceItemId) returns the annotation with highest version and isActive=true");
-    });
+    it.todo("first annotation has version=1 and isActive=true: annotateEvidence returns version===1 and isActive===true");
+    it.todo("revising annotation creates version=2, deactivates version=1: new version===2 isActive=true, old version===1 isActive=false");
+    it.todo("getActive returns the highest active version: history.getActive returns annotation with highest version and isActive=true");
 });
 describe("CalibrationService — auto-calibrate", () => {
-    it("returns focal_length_auto status when EXIF is present", () => {
-        test.todo("CalibrationProfile.status === 'focal_length_auto' when exifJson includes FocalLength");
-    });
-    it("returns reference_object status when reference object is detected", () => {
-        test.todo("CalibrationProfile.status === 'reference_object' after successful ReferenceObjectService.detectInImage");
-    });
-    it("calibrationConfidence increases with better calibration source", () => {
-        test.todo("ar_anchored confidence > reference_object confidence > focal_length_auto confidence > uncalibrated");
-    });
+    it.todo("returns focal_length_auto status when EXIF is present: CalibrationProfile.status === 'focal_length_auto'");
+    it.todo("returns reference_object status when reference object is detected: status === 'reference_object' after detectInImage");
+    it.todo("calibrationConfidence increases with better calibration source: ar_anchored > reference_object > focal_length_auto > uncalibrated");
 });
 // ─────────────────────────────────────────────────────────────────────────────
 // REGRESSION TESTS (test.todo — implement with concrete implementations)
 // ─────────────────────────────────────────────────────────────────────────────
 describe("REGRESSION — geometry invariants", () => {
-    it("pixel-to-mm-to-pixel round-trip is identity", () => {
-        test.todo("mmToPixels(pixelsToMm(100, scale), scale) === 100 for any scale");
-    });
-    it("unit conversion is reversible", () => {
-        test.todo("convert(convert(x, 'mm', 'in'), 'in', 'mm') ≈ x");
-    });
-    it("polygon area with known rectangle matches analytical formula", () => {
-        test.todo("0.5×0.5 normalised square on 1000×1000 image has area = 250_000 px²");
-    });
-    it("volume = area × depth", () => {
-        test.todo("estimateVolume(100 mm², 10 mm) = 1000 mm³");
-    });
+    it.todo("pixel-to-mm-to-pixel round-trip is identity: mmToPixels(pixelsToMm(100, scale), scale) === 100");
+    it.todo("unit conversion is reversible: convert(convert(x, 'mm', 'in'), 'in', 'mm') ≈ x");
+    it.todo("polygon area with known rectangle matches analytical formula: 0.5×0.5 square on 1000×1000 image = 250_000 px²");
+    it.todo("volume = area × depth: estimateVolume(100 mm², 10 mm) = 1000 mm³");
 });
 describe("REGRESSION — calibration consistency", () => {
-    it("pixelsPerMm = (focalLengthMm / sensorWidthMm) * imageWidthPx / focalLengthMm", () => {
-        test.todo("derived pixelsPerMm matches expected value for known camera spec");
-    });
-    it("reference object calibration produces correct scale for credit card", () => {
-        test.todo("credit card (85.6mm) spanning 300px → pixelsPerMm ≈ 3.5 px/mm");
-    });
+    it.todo("pixelsPerMm derives from focal + sensor + imageWidth: matches expected value for known camera spec");
+    it.todo("reference object calibration produces correct scale for credit card: 85.6mm spanning 300px → pixelsPerMm ≈ 3.5");
 });
 describe("REGRESSION — MeasurementCache perceptual hash stability", () => {
-    it("same image produces same cache key on repeated calls", () => {
-        test.todo("two calls with identical imageBase64 return the same key string");
+    it.todo("same image produces same cache key on repeated calls: two calls with identical imageBase64 return the same key");
+    it.todo("different images produce different cache keys: distinct imageBase64 strings have different pHash keys");
+});
+// ─────────────────────────────────────────────────────────────────────────────
+// CONCRETE CLIPPING-DETECTION TESTS
+// ReferenceScaleAnchor and BurstMeasurementPipeline — added to guard the
+// "reference object partially out of frame" fix.
+// ─────────────────────────────────────────────────────────────────────────────
+/** Build a minimal flat SfMDepthMap for tests (FallbackSfMProvider output). */
+async function makeFlatDepthMap() {
+    return new FallbackSfMProvider().computeDepth([
+        { uri: "file://test.jpg", capturedAt: 0 },
+    ]);
+}
+const CREDIT_CARD = REFERENCE_OBJECTS["credit_card"];
+describe("ReferenceScaleAnchor — clipping detection", () => {
+    const anchor = new ReferenceScaleAnchor(800);
+    it("returns clipped:false for a bounding box fully within the image", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // Box centred in frame — nowhere near an edge.
+        const box = { x: 0.2, y: 0.3, width: 0.3, height: 0.1 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.clipped).toBe(false);
     });
-    it("different images produce different cache keys", () => {
-        test.todo("distinct imageBase64 strings have different pHash keys");
+    it("returns clipped:true when the box clips the left edge (x < 0)", async () => {
+        const depthMap = await makeFlatDepthMap();
+        const box = { x: -0.05, y: 0.3, width: 0.3, height: 0.1 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.clipped).toBe(true);
+    });
+    it("returns clipped:true when the box clips the right edge (x + width > 1)", async () => {
+        const depthMap = await makeFlatDepthMap();
+        const box = { x: 0.8, y: 0.3, width: 0.3, height: 0.1 }; // 0.8 + 0.3 = 1.1 > 1
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.clipped).toBe(true);
+    });
+    it("returns clipped:true when the box clips the top edge (y < 0)", async () => {
+        const depthMap = await makeFlatDepthMap();
+        const box = { x: 0.2, y: -0.02, width: 0.3, height: 0.1 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.clipped).toBe(true);
+    });
+    it("returns clipped:true when the box clips the bottom edge (y + height > 1)", async () => {
+        const depthMap = await makeFlatDepthMap();
+        const box = { x: 0.2, y: 0.95, width: 0.3, height: 0.1 }; // 0.95 + 0.1 = 1.05 > 1
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.clipped).toBe(true);
+    });
+    it("penalises confidence by 0.4× when clipped vs an equivalent non-clipped box", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // In-frame box (200 px wide in a 1080-wide image → normalised width ≈ 0.185)
+        const inFrame = { x: 0.2, y: 0.3, width: 0.185, height: 0.07 };
+        // Clipped version: same width but positioned so right edge overflows
+        const clipped = { x: 0.85, y: 0.3, width: 0.185, height: 0.07 };
+        const rIn = anchor.anchor(inFrame, 1080, 1920, CREDIT_CARD, depthMap);
+        const rClp = anchor.anchor(clipped, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(rIn.clipped).toBe(false);
+        expect(rClp.clipped).toBe(true);
+        // Clipped confidence should be meaningfully lower (the 0.4× penalty)
+        expect(rClp.confidence).toBeLessThan(rIn.confidence);
+    });
+    it("returns clipped:false for a box whose edges exactly touch 0 and 1", async () => {
+        // A box that spans the full image normalised width (x=0, width=1) is NOT
+        // clipped — the object fills the frame but is not cut off.
+        const depthMap = await makeFlatDepthMap();
+        const box = { x: 0, y: 0, width: 1, height: 1 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        // x=0 and x+width=1 are exactly at the boundary — not outside it.
+        expect(result.clipped).toBe(false);
+    });
+});
+describe("BurstMeasurementPipeline — clipping warnings propagation", () => {
+    it("includes warning string when reference box is clipped", async () => {
+        const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), 800);
+        const frames = [{ uri: "file://a.jpg", capturedAt: 0 }];
+        const vertices = [
+            { x: 50, y: 50 }, { x: 200, y: 50 },
+            { x: 200, y: 200 }, { x: 50, y: 200 },
+        ];
+        // Box clips right edge: x + width > 1 (0.85 + 0.2 = 1.05)
+        const result = await pipeline.measure(frames, vertices, {
+            box: { x: 0.85, y: 0.3, width: 0.2, height: 0.08 },
+            object: CREDIT_CARD,
+            imageWidthPx: 1080,
+            imageHeightPx: 1920,
+        });
+        expect(result.warnings.length).toBeGreaterThan(0);
+        expect(result.warnings[0]).toMatch(/out of frame/i);
+    });
+    it("returns an empty warnings array when the reference box is fully in-frame", async () => {
+        const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), 800);
+        const frames = [{ uri: "file://a.jpg", capturedAt: 0 }];
+        const vertices = [
+            { x: 50, y: 50 }, { x: 200, y: 50 },
+            { x: 200, y: 200 }, { x: 50, y: 200 },
+        ];
+        const result = await pipeline.measure(frames, vertices, {
+            box: { x: 0.2, y: 0.3, width: 0.3, height: 0.08 },
+            object: CREDIT_CARD,
+            imageWidthPx: 1080,
+            imageHeightPx: 1920,
+        });
+        expect(result.warnings).toEqual([]);
+    });
+    it("produces lower confidence when reference box is clipped", async () => {
+        const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), 800);
+        const frames = [{ uri: "file://a.jpg", capturedAt: 0 }];
+        const vertices = [
+            { x: 50, y: 50 }, { x: 200, y: 50 },
+            { x: 200, y: 200 }, { x: 50, y: 200 },
+        ];
+        const [clipped, inFrame] = await Promise.all([
+            pipeline.measure(frames, vertices, {
+                box: { x: 0.85, y: 0.3, width: 0.2, height: 0.08 },
+                object: CREDIT_CARD,
+                imageWidthPx: 1080, imageHeightPx: 1920,
+            }),
+            pipeline.measure(frames, vertices, {
+                box: { x: 0.2, y: 0.3, width: 0.2, height: 0.08 },
+                object: CREDIT_CARD,
+                imageWidthPx: 1080, imageHeightPx: 1920,
+            }),
+        ]);
+        expect(clipped.confidence).toBeLessThan(inFrame.confidence);
+    });
+    it("returns a warnings array (possibly empty) when no reference is supplied", async () => {
+        const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), 800);
+        const frames = [{ uri: "file://a.jpg", capturedAt: 0 }];
+        const vertices = [
+            { x: 50, y: 50 }, { x: 200, y: 50 },
+            { x: 200, y: 200 }, { x: 50, y: 200 },
+        ];
+        // No reference object — no clipping check possible
+        const result = await pipeline.measure(frames, vertices);
+        expect(Array.isArray(result.warnings)).toBe(true);
+        expect(result.warnings).toEqual([]);
     });
 });

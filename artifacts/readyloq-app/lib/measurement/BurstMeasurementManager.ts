@@ -31,7 +31,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 
 import type { BurstFrame } from "@platform/measurement-core";
-import { sfmDepthEngine } from "./SfMDepthEngine";
 
 // Re-export so callers don't need to import the platform package directly.
 export type { BurstFrame };
@@ -50,6 +49,7 @@ export interface BlendedMeasurementResult {
    * Composite confidence score (0–1).
    * Derived from reference pixel length (longer = sharper scale resolution)
    * and estimated depth (closer = higher confidence from the pinhole model).
+   * Penalised by 0.4× when the reference object is clipped (see `clipped`).
    */
   confidence: number;
   /**
@@ -60,6 +60,21 @@ export interface BlendedMeasurementResult {
   surfaceNormal: { x: number; y: number; z: number };
   /** Pixel-to-mm scale factor, useful for overlaying dimension lines in the UI. */
   pxToMmScale: number;
+  /**
+   * True when either reference endpoint lies at or beyond an image edge,
+   * meaning the reference object was partially out of frame. When true,
+   * `referencePixelLength` understates the true object width, so the computed
+   * pxToMmScale and all derived dimensions are unreliable.
+   * Only populated when `options.referenceP1/P2` and image dimensions are
+   * supplied to `computeScaledDimensions`; false otherwise.
+   */
+  clipped: boolean;
+  /**
+   * Human-readable warnings produced during computation.
+   * Surface every entry to the technician before allowing them to stamp the
+   * result into an inspection record.
+   */
+  warnings: string[];
 }
 
 // ─── Manager ──────────────────────────────────────────────────────────────────
@@ -134,9 +149,51 @@ class BurstMeasurementManager {
     focalLengthPx: number = 800,
     heightP1?: { x: number; y: number },
     heightP2?: { x: number; y: number },
+    options?: {
+      /**
+       * Pixel-space endpoints of the reference object drag gesture.
+       * Required together with `imageWidthPx`/`imageHeightPx` for clipping
+       * detection.  When supplied, any endpoint within 2 px of an image
+       * edge is treated as clipped — meaning the reference object extends
+       * past the frame and the pixel length is understated.
+       */
+      referenceP1?: { x: number; y: number };
+      referenceP2?: { x: number; y: number };
+      /** Width of the captured image in pixels. */
+      imageWidthPx?: number;
+      /** Height of the captured image in pixels. */
+      imageHeightPx?: number;
+    },
   ): BlendedMeasurementResult {
     if (referencePixelLength <= 0) {
       throw new Error("BurstMeasurementManager: referencePixelLength must be > 0");
+    }
+
+    // ── Clipping detection ────────────────────────────────────────────────
+    // If either reference endpoint is at or past an image edge the drag was
+    // clamped to the visible boundary; the true pixel width is larger than
+    // what was measured.  We require both endpoints AND image dimensions to
+    // make a definitive determination; without them we cannot know.
+    const EDGE_MARGIN_PX = 2;
+    let clipped = false;
+    const warnings: string[] = [];
+
+    const { referenceP1, referenceP2, imageWidthPx, imageHeightPx } = options ?? {};
+    if (referenceP1 && referenceP2 && imageWidthPx && imageHeightPx) {
+      const pts = [referenceP1, referenceP2];
+      clipped = pts.some(
+        (p) =>
+          p.x <= EDGE_MARGIN_PX ||
+          p.y <= EDGE_MARGIN_PX ||
+          p.x >= imageWidthPx  - EDGE_MARGIN_PX ||
+          p.y >= imageHeightPx - EDGE_MARGIN_PX,
+      );
+    }
+
+    if (clipped) {
+      warnings.push(
+        "Reference object partially out of frame — re-centre and retry",
+      );
     }
 
     // ── Scale factor ───────────────────────────────────────────────────────
@@ -163,78 +220,25 @@ class BurstMeasurementManager {
     //   • Reference resolution: longer reference object in frame → sharper px/mm
     //     Full confidence at ≥ 120 px (credit card width at ~0.5 m).
     //   • Depth plausibility: 0.2 m–4 m is the reliable range for this model.
-    const refResolutionScore  = Math.min(1, referencePixelLength / 120);
-    const depthScore          = estimatedDepthMeters >= 0.2 && estimatedDepthMeters <= 4
-      ? 1 - Math.abs(estimatedDepthMeters - 1.5) / 3  // peak at 1.5 m
-      : 0.3;
-    const confidence = Math.min(1, refResolutionScore * 0.6 + depthScore * 0.4);
+    // Clipping imposes an additional 0.4× penalty because the scale factor is
+    // derived from an understated pixel length.
+    const refResolutionScore = Math.min(1, referencePixelLength / 120);
+    const depthScore =
+      estimatedDepthMeters >= 0.2 && estimatedDepthMeters <= 4
+        ? 1 - Math.abs(estimatedDepthMeters - 1.5) / 3 // peak at 1.5 m
+        : 0.3;
+    const clippingPenalty = clipped ? 0.4 : 1.0;
+    const confidence = Math.min(
+      1,
+      (refResolutionScore * 0.6 + depthScore * 0.4) * clippingPenalty,
+    );
 
     // ── Surface normal ────────────────────────────────────────────────────
     // Default: perpendicular to vertical wall facing camera (z-forward).
     // Upgrade path: pass PlaneEstimator.fitPlane() result from BurstMeasurementPipeline.
     const surfaceNormal = { x: 0, y: 0, z: 1 };
 
-    return { widthMm, heightMm, confidence, surfaceNormal, pxToMmScale };
-  }
-
-  /**
-   * Convenience wrapper: derives metric depth from the burst frames via the
-   * SfM engine and then computes reference-anchored dimensions in one call.
-   *
-   * ─── When to use this vs computeScaledDimensions ──────────────────────────
-   *   • Use this method when you have burst frames but no external depth source
-   *     (no BLE laser, no ARKit depth).
-   *   • Use computeScaledDimensions directly when you already have a reliable
-   *     depth estimate (e.g. from a BLE distance meter).
-   *
-   * @param frames               Output of captureBurst().
-   * @param widthP1              Near endpoint of the target dimension.
-   * @param widthP2              Far endpoint of the target dimension.
-   * @param referenceKnownMm     Physical width of the reference object (mm).
-   * @param referencePixelLength Pixel distance across the reference object.
-   * @param focalLengthPx        Camera focal length in pixels (default 1000).
-   * @param fallbackDepthMeters  Used when SfM triangulation yields no points
-   *                             (e.g. identical frames, pure zoom motion).
-   *                             Defaults to 1.0 m — a reasonable arm's-length
-   *                             prior for indoor inspections.
-   * @param heightP1             Optional: near endpoint of a height dimension.
-   * @param heightP2             Optional: far endpoint of a height dimension.
-   */
-  public async computeScaledDimensionsFromBurst(
-    frames: BurstFrame[],
-    widthP1: { x: number; y: number },
-    widthP2: { x: number; y: number },
-    referenceKnownMm: number,
-    referencePixelLength: number,
-    focalLengthPx: number = 1000,
-    fallbackDepthMeters: number = 1.0,
-    heightP1?: { x: number; y: number },
-    heightP2?: { x: number; y: number },
-  ): Promise<BlendedMeasurementResult & { depthSource: "sfm" | "fallback"; depthMeters: number }> {
-    const frameUris = frames.map((f) => f.uri);
-
-    // Ask the SfM engine for a median depth estimate from disparity.
-    const sfmDepth = await sfmDepthEngine.estimateMedianDepth(
-      frameUris,
-      0.08,          // 8 cm hand-motion baseline
-      focalLengthPx,
-    );
-
-    const depthMeters = sfmDepth ?? fallbackDepthMeters;
-    const depthSource: "sfm" | "fallback" = sfmDepth !== null ? "sfm" : "fallback";
-
-    const result = this.computeScaledDimensions(
-      widthP1,
-      widthP2,
-      referenceKnownMm,
-      referencePixelLength,
-      depthMeters,
-      focalLengthPx,
-      heightP1,
-      heightP2,
-    );
-
-    return { ...result, depthSource, depthMeters };
+    return { widthMm, heightMm, confidence, surfaceNormal, pxToMmScale, clipped, warnings };
   }
 
   /**

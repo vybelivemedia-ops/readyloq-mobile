@@ -59,8 +59,16 @@ export function useMeasurementScaling(options?: {
   initialReference?: ReferenceObjectSpec;
   /** Camera focal length in pixels. Defaults to 800. */
   focalLengthPx?: number;
+  /**
+   * Native image dimensions used for reference-clipping detection.
+   * When provided, `computeScaledDimensions` checks whether either reference
+   * endpoint lies at an image edge (within 2 px) and emits a warning if so.
+   * Typically the full-resolution JPEG size from expo-camera (e.g. 4032×3024).
+   */
+  imageDimensions?: { w: number; h: number };
 }) {
   const focalLengthPx = options?.focalLengthPx ?? 800;
+  const imageDimensions = options?.imageDimensions;
 
   // ── Reference object ───────────────────────────────────────────────────────
   const [referenceObject, setReferenceObject] = useState<ReferenceObjectSpec>(
@@ -106,10 +114,20 @@ export function useMeasurementScaling(options?: {
         focalLengthPx,
         hp1,
         hp2,
+        // Pass reference endpoints + image dimensions so the manager can
+        // detect whether the reference object was partially out of frame.
+        imageDimensions
+          ? {
+              referenceP1:  refP1,
+              referenceP2:  refP2,
+              imageWidthPx: imageDimensions.w,
+              imageHeightPx: imageDimensions.h,
+            }
+          : undefined,
       );
       setResult(computed);
     },
-    [referenceObject.widthMm, focalLengthPx],
+    [referenceObject.widthMm, focalLengthPx, imageDimensions],
   );
 
   // ── Public handlers ───────────────────────────────────────────────────────
@@ -211,5 +229,9 @@ export function useMeasurementScaling(options?: {
     // ── Derived ──────────────────────────────────────────────────────────
     isReady:        refPoints.length === 2,
     hasMeasurement: result !== null,
+    /** Warnings from the last computation (empty array when none). */
+    warnings:       result?.warnings ?? [],
+    /** True when the last computation detected a clipped reference object. */
+    referenceClipped: result?.clipped ?? false,
   };
 }

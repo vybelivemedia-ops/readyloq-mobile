@@ -1043,6 +1043,14 @@ export interface ScaleAnchorResult {
   referenceRealWidthMm: number;
   /** Calibration confidence (0–1). */
   confidence: number;
+  /**
+   * True when the supplied bounding box extends past one or more edges of the
+   * image (i.e. normalised coords fall outside the [0, 1] range on any axis).
+   * A clipped box underestimates pixel width, which causes the depth
+   * back-projection to overestimate distance and produce a silent scale error.
+   * Callers should surface this to the technician and request a re-frame.
+   */
+  clipped: boolean;
 }
 
 /**
@@ -1080,7 +1088,19 @@ export class ReferenceScaleAnchor {
     referenceObject: ReferenceObject,
     depthMap: SfMDepthMap,
   ): ScaleAnchorResult {
-    // Pixel width of the reference object in the image
+    // Detect whether the supplied bounding box clips any image edge.
+    // Normalised coords must stay within [0, 1] on both axes; anything outside
+    // means the reference object is partially out of frame, which understates
+    // its pixel width and causes a silent depth-estimation error.
+    const clipped =
+      box.x < 0 ||
+      box.y < 0 ||
+      box.x + box.width  > 1 ||
+      box.y + box.height > 1;
+
+    // Pixel width of the reference object in the image.
+    // Use the raw (possibly clipped) value so callers see how much width was
+    // observed; the `clipped` flag tells them not to trust the result.
     const pixelWidth = box.width * imageWidthPx;
 
     // Pinhole depth back-projection (metres)
@@ -1099,10 +1119,12 @@ export class ReferenceScaleAnchor {
     const safeRelative = relativeAtCentroid > 0.001 ? relativeAtCentroid : 0.5;
     const metersPerRelativeUnit = referenceDepthMeters / safeRelative;
 
-    // Confidence: penalise low pixel width (far object = noisy) and high variance
+    // Confidence: penalise low pixel width (far object = noisy), high variance,
+    // and clipping (clipped anchor has systematically wrong scale).
     const pixelConfidence = Math.min(1, pixelWidth / 80); // 80 px = full conf
     const varianceConfidence = Math.max(0, 1 - depthMap.scaleVariance);
-    const confidence = pixelConfidence * 0.7 + varianceConfidence * 0.3;
+    const clippingPenalty = clipped ? 0.4 : 1.0;
+    const confidence = (pixelConfidence * 0.7 + varianceConfidence * 0.3) * clippingPenalty;
 
     return {
       metersPerRelativeUnit,
@@ -1110,6 +1132,7 @@ export class ReferenceScaleAnchor {
       referencePixelWidth: pixelWidth,
       referenceRealWidthMm: referenceObject.widthMm,
       confidence: Math.min(1, Math.max(0, confidence)),
+      clipped,
     };
   }
 
@@ -1281,6 +1304,13 @@ export interface BurstMeasurementResult {
     anchorQuality: number; // 0–1: 1 = wide reference object in frame
     planeFit: number;      // 0–1: 1 = tight planar residual
   };
+  /**
+   * Human-readable warnings produced during this pipeline run.
+   * Non-empty when the estimate may be unreliable (e.g. reference object
+   * partially out of frame). Display each warning to the technician before
+   * allowing them to stamp the result.
+   */
+  warnings: string[];
   /** ISO-8601 timestamp. */
   measuredAt: string;
 }
@@ -1343,6 +1373,8 @@ export class BurstMeasurementPipeline {
     let imageW = reference?.imageWidthPx ?? 1080;
     let imageH = reference?.imageHeightPx ?? 1920;
 
+    const warnings: string[] = [];
+
     if (reference) {
       anchorResult = this.scaleAnchor.anchor(
         reference.box,
@@ -1351,6 +1383,11 @@ export class BurstMeasurementPipeline {
         reference.object,
         depthMap,
       );
+      if (anchorResult.clipped) {
+        warnings.push(
+          "Reference object partially out of frame — re-centre and retry",
+        );
+      }
     }
 
     // ── Stage 3: Unproject vertices → fit plane → measure ────────────────────
@@ -1417,6 +1454,7 @@ export class BurstMeasurementPipeline {
       plane,
       confidence:   Math.min(1, Math.max(0, confidence)),
       confidenceBreakdown: { sfmVariance, anchorQuality, planeFit: planeFitScore },
+      warnings,
       measuredAt: new Date().toISOString(),
     };
   }
