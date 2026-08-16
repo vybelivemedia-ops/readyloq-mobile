@@ -54,7 +54,7 @@ import { logErrorEvent } from "../lib/error-events";
 
 export interface GlassesEvent {
   id: string;
-  type: "finding" | "status" | "transcription";
+  type: "finding" | "status" | "transcription" | "ble_frame_dropped";
   timestamp: number; // ms since epoch
   text: string; // spoken summary / status message
   finding?: {
@@ -75,6 +75,17 @@ export interface GlassesEvent {
    * was cropped to this subject.
    */
   zoomSubject?: string;
+  /**
+   * BLE device ID that dropped the frame. Present on ble_frame_dropped events.
+   */
+  deviceId?: string;
+  /**
+   * Drop reason for ble_frame_dropped telemetry events.
+   *   - "filesystem_error": frame bytes arrived but the cache write failed (e.g. ENOENT, EPERM)
+   *   - "corrupt_jpeg": bytes could not be decoded as a valid JPEG
+   *   - "unknown": ingest/consumer callback threw or the error was unclassified
+   */
+  reason?: "filesystem_error" | "corrupt_jpeg" | "unknown";
 }
 
 interface ActiveSession {
@@ -549,6 +560,52 @@ router.post(
     }
 
     return res.json({ text: spokenResponse });
+  },
+);
+
+// ── POST /events/:sessionId — push a client-generated event (auth-gated) ─────
+// Used by the mobile app to report BLE frame-drop telemetry without a separate
+// DB table or schema change: events land in the same JSONB column used by the
+// webhook handler.  Only a restricted set of client-push event types is allowed.
+const CLIENT_PUSH_TYPES = new Set<GlassesEvent["type"]>(["ble_frame_dropped"]);
+
+router.post(
+  "/events/:sessionId",
+  requireAuth,
+  requireCompany,
+  (req: Request, res: Response) => {
+    const sessionId = req.params.sessionId as string;
+    const session = sessions.get(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found or expired" });
+    }
+
+    // Guard: session must belong to the caller's company.
+    if (session.companyId !== req.user!.companyId) {
+      return res.status(404).json({ error: "Session not found or expired" });
+    }
+
+    const { type, deviceId, reason } = req.body ?? {};
+
+    if (!type || !CLIENT_PUSH_TYPES.has(type as GlassesEvent["type"])) {
+      return res.status(400).json({ error: "Unsupported event type" });
+    }
+
+    const event: GlassesEvent = {
+      id: crypto.randomUUID(),
+      type: type as GlassesEvent["type"],
+      timestamp: Date.now(),
+      text: `BLE frame dropped — device: ${String(deviceId ?? "unknown")}, reason: ${String(reason ?? "unknown")}`,
+      deviceId: typeof deviceId === "string" ? deviceId : undefined,
+      reason: (["filesystem_error", "corrupt_jpeg", "unknown"] as const).includes(reason)
+        ? (reason as GlassesEvent["reason"])
+        : "unknown",
+    };
+
+    pushEvent(session, event);
+
+    return res.status(204).end();
   },
 );
 

@@ -50,6 +50,7 @@ import { useEffect, useRef, useState } from "react";
 // expo-file-system v19 moved cacheDirectory/EncodingType/writeAsStringAsync to /legacy
 import * as FileSystem from "expo-file-system/legacy";
 import { smartGlassesBle } from "@/lib/ble";
+import { customFetch } from "@/lib/api-client/custom-fetch";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,14 @@ interface UseSmartGlassesBleFramesOptions {
    *   }
    */
   onFrame: (uri: string) => Promise<void> | void;
+  /**
+   * Meta-glasses session ID returned by POST /api/meta-glasses/session.
+   * When provided, each dropped frame fires a lightweight telemetry event to
+   * POST /api/meta-glasses/events/:sessionId so the engineering team can track
+   * which BLE devices produce frequent frame drops in the field.
+   * Optional — no telemetry is sent when omitted or null.
+   */
+  sessionId?: string | null;
 }
 
 interface SmartGlassesBleFramesState {
@@ -130,6 +139,7 @@ interface SmartGlassesBleFramesState {
 export function useSmartGlassesBleFrames({
   active,
   onFrame,
+  sessionId,
 }: UseSmartGlassesBleFramesOptions): SmartGlassesBleFramesState {
   const [isBleConnected, setIsBleConnected] = useState(
     () => smartGlassesBle.getState().connectionState === "connected",
@@ -145,6 +155,11 @@ export function useSmartGlassesBleFrames({
   // Stable ref so the frame callback always uses the latest onFrame prop.
   const onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
+
+  // Stable ref so the async frame callback can always read the latest telemetry
+  // sessionId without it appearing in the effect's dependency array.
+  const telemetrySessionIdRef = useRef(sessionId);
+  telemetrySessionIdRef.current = sessionId;
 
   /**
    * Set to true when BLE transitions disconnected → connected.
@@ -362,7 +377,7 @@ export function useSmartGlassesBleFrames({
             _persistedFrameCount = prev + 1;
             return prev + 1;
           });
-        } catch {
+        } catch (err: unknown) {
           // Write failure, ingest failure, or consumer threw — count the drop.
           // Update ref synchronously, then cancel any active reconnect notice so
           // the red warning becomes visible immediately (recovery was not clean).
@@ -374,6 +389,37 @@ export function useSmartGlassesBleFrames({
             setReconnectNotice(null);
           }
           setDroppedFrameCount(droppedFrameCountRef.current);
+
+          // ── Telemetry: report the drop to the server ────────────────────────
+          // Classify the error so the engineering team can distinguish hardware-
+          // level filesystem failures from ingest/consumer errors in the fleet.
+          //   filesystem_error — ENOENT / EPERM / filesystem-level failure while
+          //                      writing the JPEG to the session cache directory.
+          //   unknown          — ingest callback threw, or the error was not a
+          //                      filesystem error (covers corrupt frames, network
+          //                      failures inside ingestEvidence, etc.).
+          const sid = telemetrySessionIdRef.current;
+          if (sid) {
+            const errMsg =
+              err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+            const reason: "filesystem_error" | "unknown" =
+              errMsg.includes("enoent") ||
+              errMsg.includes("no such file") ||
+              errMsg.includes("eperm") ||
+              errMsg.includes("permission denied") ||
+              errMsg.includes("could not write")
+                ? "filesystem_error"
+                : "unknown";
+            const deviceId =
+              smartGlassesBle.getState().connectedDeviceId ?? "unknown";
+            void customFetch(`/api/meta-glasses/events/${sid}`, {
+              method: "POST",
+              body: JSON.stringify({ type: "ble_frame_dropped", deviceId, reason }),
+            }).catch(() => {
+              // Best-effort telemetry — never let a reporting failure cascade
+              // into additional UI noise for the technician.
+            });
+          }
         } finally {
           // Delete the cache file regardless of success or failure: on success
           // persistPhoto has already copied it to documentDirectory; on failure

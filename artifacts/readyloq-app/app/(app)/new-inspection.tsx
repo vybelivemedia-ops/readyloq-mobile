@@ -833,6 +833,9 @@ export default function NewInspectionScreen() {
       setFaieStatus("🕶 BLE frame captured");
       setTimeout(() => setFaieStatus(null), 3_000);
     },
+    // Wire the meta-glasses session so frame-drop events are reported as
+    // server-side telemetry (stored in meta_glasses_sessions.events JSONB).
+    sessionId: glassesSession.sessionId,
   });
 
   // #106 — Haptic alert the moment glasses first go silent (isInactive flips true).
