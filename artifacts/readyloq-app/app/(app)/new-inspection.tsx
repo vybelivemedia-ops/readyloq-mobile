@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -230,6 +231,13 @@ export default function NewInspectionScreen() {
   // contention, cameraRef not yet ready).
   const lastFrameUriRef = useRef<string | null>(null);
   const frameBufferIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /**
+   * Set to true while the rolling frame-buffer session is active.
+   * In-flight takePictureAsync calls check this after they resolve: if it was
+   * cleared by stopFrameBuffer/unmount before the capture completed, the new
+   * file is deleted immediately rather than stored as an orphan.
+   */
+  const frameBufferActiveRef = useRef<boolean>(false);
   // Controls the co-pilot always-on voice watchdog loop.
   // Set to true when FAIE starts in copilot mode; cleared when the user stops.
   const faieAutoRestartRef = useRef(false);
@@ -318,10 +326,19 @@ export default function NewInspectionScreen() {
   // Clean up any live recording if the screen is dismissed mid-dictation.
   useEffect(() => {
     return () => {
-      // Stop the rolling frame buffer first so no further snapshots fire.
+      // Mark the frame buffer inactive before clearing the interval so that any
+      // in-flight takePictureAsync calls that resolve after the interval is cleared
+      // will self-delete their files rather than writing an orphan to lastFrameUriRef.
+      frameBufferActiveRef.current = false;
       if (frameBufferIntervalRef.current != null) {
         clearInterval(frameBufferIntervalRef.current);
         frameBufferIntervalRef.current = null;
+      }
+      // Delete any lingering voice-context temp frame so it doesn't persist
+      // on disk after the inspection screen unmounts.
+      if (lastFrameUriRef.current) {
+        void FileSystem.deleteAsync(lastFrameUriRef.current, { idempotent: true }).catch(() => {});
+        lastFrameUriRef.current = null;
       }
       stopDictationRef.current?.();
       stopDictationRef.current = null;
@@ -363,12 +380,24 @@ export default function NewInspectionScreen() {
   // ── FAIE frame-buffer helpers ──────────────────────────────────────────────
 
   /**
+   * Best-effort deletion of a voice-context temp frame.
+   * Errors are intentionally swallowed — a failed delete should never interrupt
+   * the inspection flow or leave the buffer in an inconsistent state.
+   */
+  const deleteTempFrameSilently = (uri: string): void => {
+    void FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {
+      // Swallow — temp-file cleanup is best-effort only.
+    });
+  };
+
+  /**
    * Starts a rolling 1 500 ms background snapshot loop that silently stores the
    * latest low-quality camera frame while the FAIE session is active.
    * Idempotent — a second call while the interval is already running is a no-op.
    */
   const startFrameBuffer = () => {
     if (frameBufferIntervalRef.current != null) return;
+    frameBufferActiveRef.current = true;
     frameBufferIntervalRef.current = setInterval(() => {
       void (async () => {
         try {
@@ -376,7 +405,21 @@ export default function NewInspectionScreen() {
             quality: 0.1,
             skipProcessing: true,
           });
-          if (pic?.uri) lastFrameUriRef.current = pic.uri;
+          if (pic?.uri) {
+            if (!frameBufferActiveRef.current) {
+              // stopFrameBuffer/unmount fired while this capture was in flight.
+              // The ref has already been cleared — delete this file immediately
+              // so it never becomes an orphan.
+              deleteTempFrameSilently(pic.uri);
+              return;
+            }
+            // Delete the previous temp frame before storing the new one so only
+            // one voice-context frame file exists on disk at any time.
+            if (lastFrameUriRef.current) {
+              deleteTempFrameSilently(lastFrameUriRef.current);
+            }
+            lastFrameUriRef.current = pic.uri;
+          }
         } catch {
           // Silently skip — keep the last successful frame URI in the buffer.
         }
@@ -386,11 +429,17 @@ export default function NewInspectionScreen() {
 
   /** Stops the rolling frame-buffer interval and releases buffered frame memory. */
   const stopFrameBuffer = () => {
+    // Mark inactive first so any in-flight interval captures delete themselves
+    // when they resolve rather than overwriting the now-null ref.
+    frameBufferActiveRef.current = false;
     if (frameBufferIntervalRef.current != null) {
       clearInterval(frameBufferIntervalRef.current);
       frameBufferIntervalRef.current = null;
     }
-    // Discard the stored frame URI so the JPEG is eligible for GC immediately.
+    // Delete the last buffered temp frame so it doesn't accumulate on disk.
+    if (lastFrameUriRef.current) {
+      deleteTempFrameSilently(lastFrameUriRef.current);
+    }
     lastFrameUriRef.current = null;
   };
 
@@ -404,6 +453,10 @@ export default function NewInspectionScreen() {
    *    last rolling-buffer frame (up to ~1.5 s old but still useful for spatial context).
    * 3. If the buffer is empty (session just started) return null; the event is
    *    dispatched without an imageUri and the banner shows no camera icon.
+   *
+   * Ownership: when the deadline wins, the live capture continues in the
+   * background.  Its .then() deletes the file it produces so it never becomes
+   * an orphan, regardless of whether the frame-buffer session is still active.
    */
   const getFrameWithBuffer = async (): Promise<string | null> => {
     try {
@@ -417,9 +470,20 @@ export default function NewInspectionScreen() {
       })();
       const fresh = await Promise.race([capture, deadline]);
       if (fresh) {
+        // Capture won the race — delete the previous buffered frame and store the new one.
+        if (lastFrameUriRef.current && lastFrameUriRef.current !== fresh) {
+          deleteTempFrameSilently(lastFrameUriRef.current);
+        }
         lastFrameUriRef.current = fresh;
         return fresh;
       }
+      // Deadline won — attach cleanup to the still-running capture so its file
+      // is deleted once it eventually resolves instead of becoming an orphan.
+      void capture
+        .then((uri) => {
+          if (uri) deleteTempFrameSilently(uri);
+        })
+        .catch(() => {});
     } catch {
       // fall through to buffer
     }
