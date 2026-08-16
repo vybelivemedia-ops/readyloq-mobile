@@ -56,3 +56,23 @@ export function getBleBadgeStyle(isBleConnected: boolean): BleBadgeStyle {
   return isBleConnected ? BLE_DIRECT_STYLE : CLOUD_RELAY_STYLE;
 }
 
+/**
+ * Returns whether the BLE/Cloud badge should be rendered at all.
+ *
+ * The badge is shown whenever a glasses session is in use — meaning the glasses
+ * are either BLE-connected right now, or they have delivered at least one frame
+ * during this inspection (cloud-relay fallback is active / was recently active).
+ *
+ * When both flags are false the glasses are completely absent and the badge
+ * should be omitted so the HUD header stays clean.
+ *
+ * @param isBleConnected - `true` when BLE link is currently up
+ * @param bleFrameCount  - total frames received in this inspection session
+ */
+export function shouldShowBleBadge(
+  isBleConnected: boolean,
+  bleFrameCount: number,
+): boolean {
+  return isBleConnected || bleFrameCount > 0;
+}
+

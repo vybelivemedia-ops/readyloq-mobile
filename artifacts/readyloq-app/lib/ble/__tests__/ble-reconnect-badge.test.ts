@@ -15,7 +15,7 @@
  *        • the frame counter increments while connected
  *        • the frame counter is NOT reset on disconnect or reconnect
  *
- * Task #534 requirements:
+ * Task #544 requirements:
  *   ✓ Badge text flips BLE·direct → Cloud·relay → BLE·direct mid-inspection
  *   ✓ Badge colors (bg, border, dot, text) update on every transition
  *   ✓ BLE frame count preserved across reconnect (no reset to 0)
@@ -27,6 +27,7 @@ import {
   BLE_DIRECT_STYLE,
   CLOUD_RELAY_STYLE,
   getBleBadgeStyle,
+  shouldShowBleBadge,
   type BleBadgeStyle,
 } from "../badge-display";
 import type {
@@ -474,5 +475,236 @@ describe("BLE simulation — frame subscription lifecycle", () => {
 
     expect(ble.frameSubscriberCount()).toBe(0);
     hook.dispose();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// C. Badge state when glasses disconnect with frames already received
+//
+// These tests cover the case where the glasses have been actively used during
+// the inspection (bleFrameCount > 0) and then lose their BLE link mid-session.
+// The badge should switch to Cloud·relay (amber) — not disappear — because the
+// session is still live via cloud relay.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("badge transitions to Cloud·relay when glasses disconnect with bleFrameCount > 0", () => {
+  it("badge shows 'BLE · direct' while connected and frames have been received", () => {
+    const ble = buildMockBle("connected");
+    const hook = simulateHook(ble, true);
+
+    // Receive some frames while connected
+    ble.emitFrame();
+    ble.emitFrame();
+
+    expect(hook.getBadge().label).toBe("BLE · direct");
+    expect(hook.getBadge().dotColor).toBe("#22c55e"); // green
+    hook.dispose();
+  });
+
+  it("badge label switches to 'Cloud · relay' on disconnect when bleFrameCount > 0", () => {
+    const ble = buildMockBle("connected");
+    const hook = simulateHook(ble, true);
+
+    // Frames received before disconnect
+    ble.emitFrame();
+    ble.emitFrame();
+    ble.emitFrame();
+    expect(hook.getFrameCount()).toBe(3); // frames were accumulated
+
+    // Glasses drop their BLE link mid-inspection
+    ble.setConnectionState("idle");
+
+    expect(hook.getBadge().label).toBe("Cloud · relay");
+    hook.dispose();
+  });
+
+  it("badge dot switches to amber on disconnect when bleFrameCount > 0", () => {
+    const ble = buildMockBle("connected");
+    const hook = simulateHook(ble, true);
+
+    ble.emitFrame();
+    ble.setConnectionState("idle");
+
+    expect(hook.getBadge().dotColor).toBe("#f59e0b"); // amber
+    expect(hook.getBadge().bgColor).toBe("rgba(245,158,11,0.22)");
+    hook.dispose();
+  });
+
+  it("badge style equals CLOUD_RELAY_STYLE exactly on disconnect with frames", () => {
+    const ble = buildMockBle("connected");
+    const hook = simulateHook(ble, true);
+
+    ble.emitFrame();
+    ble.setConnectionState("idle");
+
+    expect(hook.getBadge()).toEqual(CLOUD_RELAY_STYLE);
+    hook.dispose();
+  });
+
+  it("badge restores to 'BLE · direct' (green) when glasses reconnect after a mid-inspection drop", () => {
+    const ble = buildMockBle("connected");
+    const hook = simulateHook(ble, true);
+
+    ble.emitFrame();
+    ble.emitFrame();
+
+    ble.setConnectionState("idle");      // drop — badge goes amber
+    ble.setConnectionState("connected"); // reconnect — badge should go green
+
+    expect(hook.getBadge().label).toBe("BLE · direct");
+    expect(hook.getBadge().dotColor).toBe("#22c55e");
+    hook.dispose();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// D. shouldShowBleBadge — badge visibility helper
+//
+// The badge is omitted from the HUD header when glasses have never been part
+// of the session (isBleConnected=false AND bleFrameCount=0).  This prevents a
+// spurious "Cloud · relay" badge from appearing for technicians who are not
+// using smart glasses at all.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E. CoPilotHUD badge rendering simulation
+//
+// Mirrors the exact rendering decision made in CoPilotHUD.tsx:
+//
+//   const visible = glassesSessionActive || shouldShowBleBadge(isBleConnected, bleFrameCount)
+//   const badge   = getBleBadgeStyle(isBleConnected)
+//
+// Drives the BLE state-machine through connect → receive frames → disconnect →
+// reconnect and asserts that:
+//   • the badge is visible whenever it should be (no premature disappearance)
+//   • the badge label/colors match the current connection mode
+//
+// This confirms that the component props (isBleConnected, bleFrameCount) that
+// flow into the real CoPilotHUD produce the correct rendered output at every
+// step of a mid-inspection reconnect.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Mirrors the CoPilotHUD badge rendering logic exactly. */
+function hudBadgeState(
+  isBleConnected: boolean,
+  bleFrameCount: number,
+  glassesSessionActive: boolean,
+) {
+  const visible = glassesSessionActive || shouldShowBleBadge(isBleConnected, bleFrameCount);
+  const badge = getBleBadgeStyle(isBleConnected);
+  return { visible, badge };
+}
+
+describe("CoPilotHUD badge rendering simulation — full reconnect lifecycle", () => {
+  it("badge is hidden before glasses connect (no session, no frames)", () => {
+    const { visible } = hudBadgeState(false, 0, false);
+    expect(visible).toBe(false);
+  });
+
+  it("badge appears as 'BLE · direct' (green) when glasses first connect", () => {
+    const { visible, badge } = hudBadgeState(true, 0, false);
+    expect(visible).toBe(true);
+    expect(badge.label).toBe("BLE · direct");
+    expect(badge.dotColor).toBe("#22c55e");
+  });
+
+  it("badge is still 'BLE · direct' (green) while connected and frames are flowing", () => {
+    // bleFrameCount > 0, isBleConnected true
+    const { visible, badge } = hudBadgeState(true, 12, false);
+    expect(visible).toBe(true);
+    expect(badge.label).toBe("BLE · direct");
+  });
+
+  it("badge stays visible as 'Cloud · relay' (amber) immediately after glasses disconnect with frames > 0", () => {
+    // This is the critical regression check:
+    // isBleConnected goes false but bleFrameCount is still > 0 → badge must NOT disappear
+    const { visible, badge } = hudBadgeState(false, 12, false);
+    expect(visible).toBe(true);
+    expect(badge.label).toBe("Cloud · relay");
+    expect(badge.dotColor).toBe("#f59e0b"); // amber
+  });
+
+  it("badge uses CLOUD_RELAY_STYLE exactly when disconnected mid-inspection", () => {
+    const { badge } = hudBadgeState(false, 5, false);
+    expect(badge).toEqual(CLOUD_RELAY_STYLE);
+  });
+
+  it("badge restores to 'BLE · direct' (green) when glasses reconnect mid-inspection", () => {
+    // After reconnect: isBleConnected true, frameCount still > 0 from before
+    const { visible, badge } = hudBadgeState(true, 12, false);
+    expect(visible).toBe(true);
+    expect(badge.label).toBe("BLE · direct");
+    expect(badge.dotColor).toBe("#22c55e"); // green restored
+  });
+
+  it("badge hidden → BLE direct → Cloud relay → BLE direct: full mid-inspection reconnect sequence", () => {
+    // Step 1: no glasses yet
+    expect(hudBadgeState(false, 0, false).visible).toBe(false);
+
+    // Step 2: glasses connect (no frames yet)
+    expect(hudBadgeState(true, 0, false).badge.label).toBe("BLE · direct");
+
+    // Step 3: frames flowing
+    expect(hudBadgeState(true, 5, false).badge.label).toBe("BLE · direct");
+
+    // Step 4: glasses drop mid-inspection
+    const afterDrop = hudBadgeState(false, 5, false);
+    expect(afterDrop.visible).toBe(true);         // badge stays visible
+    expect(afterDrop.badge.label).toBe("Cloud · relay"); // amber fallback
+
+    // Step 5: glasses reconnect
+    const afterReconnect = hudBadgeState(true, 5, false);
+    expect(afterReconnect.visible).toBe(true);
+    expect(afterReconnect.badge.label).toBe("BLE · direct"); // green restored
+  });
+
+  it("badge is visible via glassesSessionActive even when shouldShowBleBadge would return false", () => {
+    // Cloud-relay session active, but no BLE frames (e.g. Meta glasses cloud-only path)
+    const { visible, badge } = hudBadgeState(false, 0, true /* glassesSessionActive */);
+    expect(visible).toBe(true);
+    expect(badge.label).toBe("Cloud · relay");
+  });
+
+  it("badge style equals BLE_DIRECT_STYLE by reference when connected", () => {
+    const { badge } = hudBadgeState(true, 3, false);
+    expect(badge).toBe(BLE_DIRECT_STYLE);
+  });
+
+  it("badge style equals CLOUD_RELAY_STYLE by reference when disconnected with frames", () => {
+    const { badge } = hudBadgeState(false, 3, false);
+    expect(badge).toBe(CLOUD_RELAY_STYLE);
+  });
+});
+
+describe("shouldShowBleBadge — badge hidden when no glasses session is active", () => {
+  it("returns false when not BLE-connected and no frames received (no glasses)", () => {
+    expect(shouldShowBleBadge(false, 0)).toBe(false);
+  });
+
+  it("returns true when BLE-connected even with 0 frames (just paired)", () => {
+    expect(shouldShowBleBadge(true, 0)).toBe(true);
+  });
+
+  it("returns true when not BLE-connected but frames were received (cloud relay)", () => {
+    expect(shouldShowBleBadge(false, 1)).toBe(true);
+  });
+
+  it("returns true when BLE-connected and frames have been received", () => {
+    expect(shouldShowBleBadge(true, 5)).toBe(true);
+  });
+
+  it("returns false only at the exact (false, 0) boundary — false for zero frames disconnected", () => {
+    expect(shouldShowBleBadge(false, 0)).toBe(false);
+    expect(shouldShowBleBadge(false, 1)).toBe(true); // one frame tips it over
+  });
+
+  it("badge stays visible (cloud-relay style) after disconnect when frames > 0", () => {
+    // Simulate: was BLE-connected, received frames, now disconnected
+    const visible = shouldShowBleBadge(false, 10);
+    const badge = getBleBadgeStyle(false); // badge style for disconnected state
+
+    expect(visible).toBe(true);
+    expect(badge.label).toBe("Cloud · relay");
+    expect(badge.dotColor).toBe("#f59e0b");
   });
 });
