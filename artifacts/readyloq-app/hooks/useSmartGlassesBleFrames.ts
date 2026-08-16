@@ -63,6 +63,19 @@ import { smartGlassesBle } from "@/lib/ble";
  */
 const MIN_ORPHAN_AGE_MS = 5 * 60 * 1000;
 
+// ─── Module-level frame-count persistence ─────────────────────────────────────
+//
+// On Android, switching apps or receiving a phone call can unmount and remount
+// the inspection screen, resetting all React state to zero.  Module-level
+// variables survive this lifecycle: the JS bundle stays loaded across
+// background/foreground transitions, so these counters accumulate correctly
+// across the entire inspection session regardless of component remounts.
+//
+// They are reset to 0 only by an explicit reconnect recovery (which clears
+// pre-disconnect drops) — never on component unmount.
+let _persistedDroppedFrameCount = 0;
+let _persistedFrameCount = 0;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface UseSmartGlassesBleFramesOptions {
@@ -121,8 +134,12 @@ export function useSmartGlassesBleFrames({
   const [isBleConnected, setIsBleConnected] = useState(
     () => smartGlassesBle.getState().connectionState === "connected",
   );
-  const [frameCount, setFrameCount] = useState(0);
-  const [droppedFrameCount, setDroppedFrameCount] = useState(0);
+  // Initialise from module-level persisted values so counts survive the
+  // Android background/foreground unmount+remount cycle.
+  const [frameCount, setFrameCount] = useState(() => _persistedFrameCount);
+  const [droppedFrameCount, setDroppedFrameCount] = useState(
+    () => _persistedDroppedFrameCount,
+  );
   const [reconnectNotice, setReconnectNotice] = useState<string | null>(null);
 
   // Stable ref so the frame callback always uses the latest onFrame prop.
@@ -148,8 +165,12 @@ export function useSmartGlassesBleFrames({
    * the frame callback can read it synchronously (avoids stale-closure issues).
    */
   const droppedAtReconnectRef = useRef(0);
-  /** Ref mirror of droppedFrameCount — readable inside callbacks without closures. */
-  const droppedFrameCountRef = useRef(0);
+  /**
+   * Ref mirror of droppedFrameCount — readable inside callbacks without closures.
+   * Initialised from the module-level persisted value so it is already at the
+   * correct count when the component remounts after an Android background event.
+   */
+  const droppedFrameCountRef = useRef(_persistedDroppedFrameCount);
   /** Timer id for the auto-clear of reconnectNotice. */
   const reconnectNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -252,6 +273,9 @@ export function useSmartGlassesBleFrames({
       // Update the ref synchronously so the reconnect-transition subscriber
       // (which may fire in the same call stack) always sees the current count.
       droppedFrameCountRef.current += count;
+      // Mirror to the module-level persisted value so the count survives an
+      // Android background/foreground unmount+remount cycle.
+      _persistedDroppedFrameCount = droppedFrameCountRef.current;
       // Any new drop immediately cancels the reconnect notice so the red
       // warning becomes visible again — the recovery was not clean.
       if (reconnectNoticeTimerRef.current != null) {
@@ -317,6 +341,9 @@ export function useSmartGlassesBleFrames({
             const postReconnectDrops =
               droppedFrameCountRef.current - droppedAtReconnectRef.current;
             droppedFrameCountRef.current = postReconnectDrops;
+            // Sync the module-level counter — the reconnect recovery is the
+            // only place that intentionally resets drops to a lower value.
+            _persistedDroppedFrameCount = postReconnectDrops;
             setDroppedFrameCount(postReconnectDrops);
             if (lostCount > 0) {
               const msg = `Reconnected — ${lostCount} frame${lostCount === 1 ? "" : "s"} lost last disconnect`;
@@ -331,12 +358,16 @@ export function useSmartGlassesBleFrames({
             }
           }
 
-          setFrameCount((prev) => prev + 1);
+          setFrameCount((prev) => {
+            _persistedFrameCount = prev + 1;
+            return prev + 1;
+          });
         } catch {
           // Write failure, ingest failure, or consumer threw — count the drop.
           // Update ref synchronously, then cancel any active reconnect notice so
           // the red warning becomes visible immediately (recovery was not clean).
           droppedFrameCountRef.current += 1;
+          _persistedDroppedFrameCount = droppedFrameCountRef.current;
           if (reconnectNoticeTimerRef.current != null) {
             clearTimeout(reconnectNoticeTimerRef.current);
             reconnectNoticeTimerRef.current = null;
