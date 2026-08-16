@@ -74,15 +74,23 @@ function isLowConfidence(conf: number | null): boolean {
   return conf != null && conf < 0.5;
 }
 
-/** Format a decimal inch value as a tidy string, e.g. 1.5 → "1.50 in". */
-function fmtIn(value: number | undefined | null): string | null {
+/** Format a decimal inch value as a tidy string, e.g. 1.5 → "1.50 in".
+ *  Returns null for null/undefined, Infinity, -Infinity, or NaN so that
+ *  a near-zero reference box (which can produce Infinity via division) is
+ *  silently omitted from the report rather than printed as garbage.
+ * @internal exported for unit tests only */
+export function fmtIn(value: number | undefined | null): string | null {
   if (value == null) return null;
+  if (!Number.isFinite(value)) return null;
   return `${value.toFixed(2)} in`;
 }
 
-/** Format square inches as sq ft when ≥ 144, otherwise in². */
-function fmtArea(areaSqIn: number | undefined | null): string | null {
+/** Format square inches as sq ft when ≥ 144, otherwise in².
+ *  Returns null for null/undefined, Infinity, -Infinity, or NaN.
+ * @internal exported for unit tests only */
+export function fmtArea(areaSqIn: number | undefined | null): string | null {
   if (areaSqIn == null) return null;
+  if (!Number.isFinite(areaSqIn)) return null;
   if (areaSqIn >= 144) {
     return `${(areaSqIn / 144).toFixed(2)} sq ft`;
   }
