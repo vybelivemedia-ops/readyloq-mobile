@@ -321,11 +321,78 @@ router.post("/sync", async (req, res) => {
       ),
     ];
 
+    // ── Structured Enterprise Bridge fields ────────────────────────────────
+    // Stamped laser measurements live in inspection_media.captureMetadata
+    // (laserMeasurement blob); AI vision estimates live on the finding itself
+    // (measurementEstimate). Prefer the stamped sensor value when both exist.
+    const mediaByUrl = new Map(media.filter((m) => m.url).map((m) => [m.url, m]));
+    const structuredFindings = findings.map((f) => {
+      let measurements:
+        | { widthMm?: number; heightMm?: number; confidence?: number; surfaceType?: string }
+        | undefined;
+
+      const meta = f.imageUrl ? mediaByUrl.get(f.imageUrl)?.captureMetadata : undefined;
+      const laser = meta && typeof meta === "object"
+        ? (meta as Record<string, unknown>).laserMeasurement as
+            | { value?: number; unit?: string; metadata?: { heightInches?: number; confidence?: number } }
+            | undefined
+        : undefined;
+
+      if (laser && typeof laser === "object") {
+        const toMm = (v: number, unit?: string): number =>
+          unit === "mm" ? v : unit === "cm" ? v * 10 : unit === "m" ? v * 1000 : v * 25.4; // default inches
+        const widthMm = typeof laser.value === "number" ? Math.round(toMm(laser.value, laser.unit)) : undefined;
+        const heightMm =
+          typeof laser.metadata?.heightInches === "number"
+            ? Math.round(laser.metadata.heightInches * 25.4)
+            : undefined;
+        if (widthMm !== undefined || heightMm !== undefined) {
+          measurements = {
+            ...(widthMm !== undefined && { widthMm }),
+            ...(heightMm !== undefined && { heightMm }),
+            ...(typeof laser.metadata?.confidence === "number" && { confidence: laser.metadata.confidence }),
+          };
+        }
+      }
+      if (!measurements && f.measurementEstimate) {
+        const est = f.measurementEstimate;
+        const widthMm = est.gapWidthIn != null ? Math.round(est.gapWidthIn * 25.4) : undefined;
+        const heightMm = est.heightFt != null ? Math.round(est.heightFt * 304.8) : undefined;
+        if (widthMm !== undefined || heightMm !== undefined) {
+          measurements = {
+            ...(widthMm !== undefined && { widthMm }),
+            ...(heightMm !== undefined && { heightMm }),
+            confidence: est.confidence,
+          };
+        }
+      }
+      if (measurements && f.structuralIssue) {
+        measurements.surfaceType = f.structuralIssue;
+      }
+
+      return {
+        category: f.category,
+        severity: f.severity,
+        evidencePhotoUrl: f.imageUrl ?? null,
+        ...(measurements && { measurements }),
+      };
+    });
+
+    const signatureAudit = {
+      technicianSigned: !!inspection.technicianSignature,
+      ownerSigned: !!inspection.ownerSignature,
+      ownerNotAvailable: inspection.ownerNotAvailable ?? false,
+      signedAt: inspection.signedAt?.toISOString() ?? null,
+    };
+
     const syncResult = await syncInspectionToExternalSystem({
       externalSystem: config.systemType,
       accountId: config.accountId,
       apiKey: config.apiKey,
+      apiToken: config.apiToken,
       apiBaseUrl: config.apiBaseUrl,
+      findings: structuredFindings,
+      signatureAudit,
       inspectionDate:
         (inspection.completedAt ?? inspection.createdAt).toISOString().split("T")[0],
       reportSummary,

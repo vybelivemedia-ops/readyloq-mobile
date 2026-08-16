@@ -90851,7 +90851,30 @@ router4.patch("/:id", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
-    const { status, notes, severity, pestTypes, completedAt, technicianSignature, ownerSignature, ownerNotAvailable, signedAt } = req.body;
+    const {
+      status,
+      notes,
+      severity,
+      pestTypes,
+      completedAt,
+      technicianSignature,
+      ownerSignature,
+      ownerNotAvailable,
+      signedAt,
+      // resignatureConsent: true lets a caller explicitly clear a signature that
+      // is already stored.  Without it, an explicit null is rejected with 409 so
+      // a momentarily-null re-sign flow cannot accidentally wipe the DB value.
+      resignatureConsent
+    } = req.body;
+    if (ownerSignature === null && resignatureConsent !== true) {
+      const [current] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
+      if (!current) return res.status(404).json({ error: "Not found" });
+      if (current.ownerSignature !== null) {
+        return res.status(409).json({
+          error: "Cannot clear an existing owner signature without explicit resignatureConsent: true"
+        });
+      }
+    }
     const updateData = {};
     if (status !== void 0) updateData.status = status;
     if (notes !== void 0) updateData.notes = notes;
@@ -91044,7 +91067,7 @@ router4.post("/:id/media", async (req, res) => {
     const { mediaType, url: url2, filename, caption, durationSec, captureSource, qualityScore, captureMetadata } = req.body;
     if (!mediaType || !url2)
       return res.status(400).json({ error: "mediaType and url are required" });
-    const VALID_MEDIA_TYPES = ["image", "video", "document", "audio"];
+    const VALID_MEDIA_TYPES = ["photo", "image", "video", "document", "audio", "voice"];
     if (!VALID_MEDIA_TYPES.includes(mediaType)) {
       return res.status(400).json({
         error: `Invalid mediaType. Must be one of: ${VALID_MEDIA_TYPES.join(", ")}`
@@ -91190,10 +91213,12 @@ function isLowConfidence(conf) {
 }
 function fmtIn(value) {
   if (value == null) return null;
+  if (!Number.isFinite(value)) return null;
   return `${value.toFixed(2)} in`;
 }
 function fmtArea(areaSqIn) {
   if (areaSqIn == null) return null;
+  if (!Number.isFinite(areaSqIn)) return null;
   if (areaSqIn >= 144) {
     return `${(areaSqIn / 144).toFixed(2)} sq ft`;
   }
@@ -91303,6 +91328,36 @@ function buildServerReportHtml(report, inspection, media = []) {
     `<div style="color:#374151;font-size:13px;line-height:1.6;white-space:pre-wrap">${esc2(report.treatmentNotes)}</div>`
   ) : "";
   const pestTypes = (inspection.pestTypes ?? []).join(", ");
+  function svgToDataUri(svg) {
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+  }
+  const signedAtLabel = inspection.signedAt ? new Date(inspection.signedAt).toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }) : null;
+  function sigBox(label, svgOrNotice, isSvg) {
+    return `
+      <div style="flex:1;min-width:200px">
+        <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af">${esc2(label)}</p>
+        <div style="border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;padding:8px;min-height:80px;display:flex;align-items:center;justify-content:center">
+          ${isSvg ? `<img src="${svgToDataUri(svgOrNotice)}" alt="${esc2(label)}" style="width:100%;max-width:300px;height:80px;object-fit:contain" />` : `<p style="margin:0;font-size:12px;color:#6b7280;font-style:italic">${esc2(svgOrNotice)}</p>`}
+        </div>
+        ${signedAtLabel ? `<p style="margin:4px 0 0 0;font-size:10px;color:#9ca3af">Signed: ${esc2(signedAtLabel)}</p>` : ""}
+      </div>`;
+  }
+  const hasTechSig = typeof inspection.technicianSignature === "string" && inspection.technicianSignature.length > 0;
+  const hasOwnerSig = typeof inspection.ownerSignature === "string" && inspection.ownerSignature.length > 0;
+  const hasAnySig = hasTechSig || hasOwnerSig || inspection.ownerNotAvailable;
+  const sigHtml = hasAnySig ? section(
+    "Signatures",
+    `<div style="display:flex;flex-wrap:wrap;gap:16px">
+          ${hasTechSig ? sigBox("Technician Signature", inspection.technicianSignature, true) : ""}
+          ${hasOwnerSig ? sigBox("Owner / Client Signature", inspection.ownerSignature, true) : inspection.ownerNotAvailable ? sigBox("Owner / Client Signature", "Owner not available \u2014 technician acknowledged on behalf", false) : ""}
+        </div>`
+  ) : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -91360,6 +91415,7 @@ function buildServerReportHtml(report, inspection, media = []) {
     ${exclHtml}
     ${narrativeHtml}
     ${treatmentHtml}
+    ${sigHtml}
 
     <!-- Footer -->
     <div style="margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:11px">
@@ -124551,7 +124607,18 @@ async function syncToPestPac(payload) {
       headers,
       body: JSON.stringify({
         note: `[ReadyLoq AI Report] ${payload.reportSummary}`,
-        date: payload.inspectionDate
+        date: payload.inspectionDate,
+        // Structured Enterprise Bridge fields — each finding carries its
+        // measurements as custom fields; signature status rides alongside.
+        ...payload.findings && {
+          findings: payload.findings.map((f) => ({
+            category: f.category,
+            severity: f.severity,
+            evidencePhotoUrl: f.evidencePhotoUrl,
+            ...f.measurements && { customFields: f.measurements }
+          }))
+        },
+        ...payload.signatureAudit && { signatureAudit: payload.signatureAudit }
       })
     }),
     isRetryableResponse
@@ -124600,7 +124667,9 @@ async function syncToFieldRoutes(payload) {
   const base = payload.apiBaseUrl?.replace(/\/$/, "") ?? FIELDROUTES_DEFAULT_BASE;
   const headers = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${payload.apiKey}`
+    Authorization: `Bearer ${payload.apiKey}`,
+    authenticationKey: payload.apiKey,
+    ...payload.apiToken ? { authenticationToken: payload.apiToken } : {}
   };
   const customerId = payload.accountId;
   const { result: histRes, retries: noteRetries } = await withRetryTracked(
@@ -124616,7 +124685,17 @@ async function syncToFieldRoutes(payload) {
           notes: payload.treatmentConditions.notes ?? null
         },
         mediaUrls: payload.photos.map((p) => p.url),
-        date: payload.inspectionDate
+        date: payload.inspectionDate,
+        // Structured Enterprise Bridge fields.
+        ...payload.findings && {
+          findings: payload.findings.map((f) => ({
+            category: f.category,
+            severity: f.severity,
+            evidencePhotoUrl: f.evidencePhotoUrl,
+            ...f.measurements && { customFields: f.measurements }
+          }))
+        },
+        ...payload.signatureAudit && { signatureAudit: payload.signatureAudit }
       })
     }),
     isRetryableResponse
@@ -124896,11 +124975,59 @@ router32.post("/sync", async (req, res) => {
         logs.map((l) => l.productId != null ? productNameById.get(l.productId) : null).filter((n) => n != null)
       )
     ];
+    const mediaByUrl = new Map(media.filter((m) => m.url).map((m) => [m.url, m]));
+    const structuredFindings = findings.map((f) => {
+      let measurements;
+      const meta = f.imageUrl ? mediaByUrl.get(f.imageUrl)?.captureMetadata : void 0;
+      const laser = meta && typeof meta === "object" ? meta.laserMeasurement : void 0;
+      if (laser && typeof laser === "object") {
+        const toMm = (v, unit) => unit === "mm" ? v : unit === "cm" ? v * 10 : unit === "m" ? v * 1e3 : v * 25.4;
+        const widthMm = typeof laser.value === "number" ? Math.round(toMm(laser.value, laser.unit)) : void 0;
+        const heightMm = typeof laser.metadata?.heightInches === "number" ? Math.round(laser.metadata.heightInches * 25.4) : void 0;
+        if (widthMm !== void 0 || heightMm !== void 0) {
+          measurements = {
+            ...widthMm !== void 0 && { widthMm },
+            ...heightMm !== void 0 && { heightMm },
+            ...typeof laser.metadata?.confidence === "number" && { confidence: laser.metadata.confidence }
+          };
+        }
+      }
+      if (!measurements && f.measurementEstimate) {
+        const est = f.measurementEstimate;
+        const widthMm = est.gapWidthIn != null ? Math.round(est.gapWidthIn * 25.4) : void 0;
+        const heightMm = est.heightFt != null ? Math.round(est.heightFt * 304.8) : void 0;
+        if (widthMm !== void 0 || heightMm !== void 0) {
+          measurements = {
+            ...widthMm !== void 0 && { widthMm },
+            ...heightMm !== void 0 && { heightMm },
+            confidence: est.confidence
+          };
+        }
+      }
+      if (measurements && f.structuralIssue) {
+        measurements.surfaceType = f.structuralIssue;
+      }
+      return {
+        category: f.category,
+        severity: f.severity,
+        evidencePhotoUrl: f.imageUrl ?? null,
+        ...measurements && { measurements }
+      };
+    });
+    const signatureAudit = {
+      technicianSigned: !!inspection.technicianSignature,
+      ownerSigned: !!inspection.ownerSignature,
+      ownerNotAvailable: inspection.ownerNotAvailable ?? false,
+      signedAt: inspection.signedAt?.toISOString() ?? null
+    };
     const syncResult = await syncInspectionToExternalSystem({
       externalSystem: config2.systemType,
       accountId: config2.accountId,
       apiKey: config2.apiKey,
+      apiToken: config2.apiToken,
       apiBaseUrl: config2.apiBaseUrl,
+      findings: structuredFindings,
+      signatureAudit,
       inspectionDate: (inspection.completedAt ?? inspection.createdAt).toISOString().split("T")[0],
       reportSummary,
       photos,
@@ -127159,7 +127286,26 @@ var EnterpriseAdapterRouter = class {
           externalSystem: "fieldroutes",
           accountId: config2.accountId,
           apiKey: config2.apiKey,
+          apiToken: config2.apiToken,
           apiBaseUrl: config2.apiBaseUrl,
+          findings: inspectionFindings.map((f, i) => ({
+            category: rawFindings[i]?.category ?? f.Code,
+            severity: f.Severity,
+            evidencePhotoUrl: f.AttachmentUrl ?? null,
+            ...Object.keys(f.CustomFields).length > 0 && {
+              measurements: {
+                ...f.CustomFields.WidthMm !== void 0 && { widthMm: f.CustomFields.WidthMm },
+                ...f.CustomFields.HeightMm !== void 0 && { heightMm: f.CustomFields.HeightMm },
+                ...f.CustomFields.VerifiedConfidence !== void 0 && {
+                  confidence: f.CustomFields.VerifiedConfidence
+                },
+                ...f.CustomFields.SurfaceType !== void 0 && {
+                  surfaceType: f.CustomFields.SurfaceType
+                }
+              }
+            }
+          })),
+          signatureAudit: payload.SignatureAudit,
           inspectionDate: (inspection.completedAt ?? inspection.createdAt).toISOString().split("T")[0],
           reportSummary: summary,
           photos,

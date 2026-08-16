@@ -187,7 +187,26 @@ export class EnterpriseAdapterRouter {
           externalSystem: "fieldroutes",
           accountId: config.accountId,
           apiKey: config.apiKey,
+          apiToken: config.apiToken,
           apiBaseUrl: config.apiBaseUrl,
+          findings: inspectionFindings.map((f, i) => ({
+            category: rawFindings[i]?.category ?? f.Code,
+            severity: f.Severity,
+            evidencePhotoUrl: f.AttachmentUrl ?? null,
+            ...(Object.keys(f.CustomFields).length > 0 && {
+              measurements: {
+                ...(f.CustomFields.WidthMm !== undefined && { widthMm: f.CustomFields.WidthMm }),
+                ...(f.CustomFields.HeightMm !== undefined && { heightMm: f.CustomFields.HeightMm }),
+                ...(f.CustomFields.VerifiedConfidence !== undefined && {
+                  confidence: f.CustomFields.VerifiedConfidence,
+                }),
+                ...(f.CustomFields.SurfaceType !== undefined && {
+                  surfaceType: f.CustomFields.SurfaceType,
+                }),
+              },
+            }),
+          })),
+          signatureAudit: payload.SignatureAudit,
           inspectionDate: (inspection.completedAt ?? inspection.createdAt)
             .toISOString()
             .split("T")[0],

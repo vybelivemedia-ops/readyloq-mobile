@@ -30,6 +30,11 @@ description: Event-driven integration layer dispatching finalized ReadyLoq inspe
 - `company_field_integrations.api_token` column added (nullable) — required for FieldRoutes dual-token auth
 - Migration run manually via raw pg client (no drizzle-kit)
 
+## Legacy SyncPayload (manual sync route)
+- `SyncPayload` in `field-integration.ts` now carries optional `findings[]` (category, severity, evidencePhotoUrl, measurements{widthMm,heightMm,confidence,surfaceType}), `signatureAudit`, and `apiToken` — both the manual `POST /api/integrations/sync` route and the router's fieldroutes path populate them.
+- Stamped measurements come from `inspection_media.captureMetadata.laserMeasurement` (value+unit, metadata.heightInches); vision fallback is `finding.measurementEstimate` (imperial → mm).
+- FieldRoutes requests send `authenticationKey` + `authenticationToken` headers (dual token) in addition to the legacy Bearer.
+
 ## Key constraints
 - `syncInspectionToExternalSystem()` in `field-integration.ts` throws on `"servsuite"` — SerVsuite must go through `EnterpriseAdapterRouter`, not the legacy CRM path.
 - The legacy `CRMAdapter` interface (pestPacAdapter.ts / fieldRoutesAdapter.ts) still exists for backward compat with manual `POST /api/integrations/sync` route.

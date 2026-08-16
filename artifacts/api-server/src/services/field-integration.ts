@@ -43,18 +43,54 @@ export interface TreatmentConditions {
   notes?: string | null;
 }
 
+/** Stamped / estimated physical dimensions attached to a finding. */
+export interface SyncFindingMeasurements {
+  widthMm?: number;
+  heightMm?: number;
+  /** 0–1 model or sensor confidence. */
+  confidence?: number;
+  surfaceType?: string;
+}
+
+/** Structured AI finding included in the Enterprise Bridge sync payload. */
+export interface SyncFindingItem {
+  category: string;
+  severity: string;
+  evidencePhotoUrl: string | null;
+  /** Present only when a stamped/estimated measurement exists for the finding. */
+  measurements?: SyncFindingMeasurements;
+}
+
+/** Compliance sign-off record included in the sync payload. */
+export interface SignatureAudit {
+  technicianSigned: boolean;
+  ownerSigned: boolean;
+  ownerNotAvailable: boolean;
+  /** ISO-8601 timestamp of the first signature — null if unsigned. */
+  signedAt: string | null;
+}
+
 export interface SyncPayload {
   externalSystem: FieldIntegrationSystem;
   /** Account / customer ID within the external platform. */
   accountId: string;
   /** Caller-supplied API credential — never log this value. */
   apiKey: string;
+  /**
+   * Second credential for systems requiring dual-token auth (FieldRoutes
+   * authenticationToken). Never log this value.
+   */
+  apiToken?: string | null;
   /** Optional base URL override (defaults to production endpoint). */
   apiBaseUrl?: string | null;
   inspectionDate: string;
   reportSummary: string;
   photos: PhotoSyncItem[];
   treatmentConditions: TreatmentConditions;
+  /** Structured AI findings (category, severity, photo, measurements). */
+  findings?: SyncFindingItem[];
+  /** Signature status for the inspection. */
+  signatureAudit?: SignatureAudit;
 }
 
 export interface SyncResult {
@@ -90,6 +126,17 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
         body: JSON.stringify({
           note: `[ReadyLoq AI Report] ${payload.reportSummary}`,
           date: payload.inspectionDate,
+          // Structured Enterprise Bridge fields — each finding carries its
+          // measurements as custom fields; signature status rides alongside.
+          ...(payload.findings && {
+            findings: payload.findings.map((f) => ({
+              category: f.category,
+              severity: f.severity,
+              evidencePhotoUrl: f.evidencePhotoUrl,
+              ...(f.measurements && { customFields: f.measurements }),
+            })),
+          }),
+          ...(payload.signatureAudit && { signatureAudit: payload.signatureAudit }),
         }),
       }),
     isRetryableResponse,
@@ -147,9 +194,14 @@ const FIELDROUTES_DEFAULT_BASE = "https://api.fieldroutes.com/api/v1";
 
 async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
   const base = payload.apiBaseUrl?.replace(/\/$/, "") ?? FIELDROUTES_DEFAULT_BASE;
-  const headers = {
+  // FieldRoutes requires BOTH credentials: authenticationKey (apiKey) and
+  // authenticationToken (apiToken). The Bearer header is kept for older
+  // gateway deployments that proxy on it.
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${payload.apiKey}`,
+    authenticationKey: payload.apiKey,
+    ...(payload.apiToken ? { authenticationToken: payload.apiToken } : {}),
   };
   const customerId = payload.accountId;
 
@@ -169,6 +221,16 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
           },
           mediaUrls: payload.photos.map((p) => p.url),
           date: payload.inspectionDate,
+          // Structured Enterprise Bridge fields.
+          ...(payload.findings && {
+            findings: payload.findings.map((f) => ({
+              category: f.category,
+              severity: f.severity,
+              evidencePhotoUrl: f.evidencePhotoUrl,
+              ...(f.measurements && { customFields: f.measurements }),
+            })),
+          }),
+          ...(payload.signatureAudit && { signatureAudit: payload.signatureAudit }),
         }),
       }),
     isRetryableResponse,
