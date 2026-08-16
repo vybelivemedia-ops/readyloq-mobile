@@ -1806,6 +1806,61 @@ export default function NewInspectionScreen() {
       </View>
     ) : null;
 
+    // Compact BLE-only badge — shown when glasses are BLE-connected but no
+    // cloud session is active yet.  Gives the technician confirmation that the
+    // hardware link is working before they start the Meta Live AI session.
+    const bleBadgeOnly = !glassesSession.isActive && bleGlasses.isBleConnected ? (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        {(() => {
+          const badgeStyle = getBleBadgeStyle(true /* isBleConnected */);
+          return (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                backgroundColor: badgeStyle.bgColor,
+                borderRadius: 5,
+                paddingHorizontal: 7,
+                paddingVertical: 3,
+                borderWidth: 1,
+                borderColor: badgeStyle.borderColor,
+              }}
+            >
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: badgeStyle.dotColor,
+                }}
+              />
+              <Text
+                style={{
+                  color: badgeStyle.textColor,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 10,
+                  letterSpacing: 0.3,
+                }}
+              >
+                {badgeStyle.label}
+              </Text>
+            </View>
+          );
+        })()}
+        {bleGlasses.frameCount > 0 ? (
+          <Text style={{ color: "rgba(255,255,255,0.65)", fontFamily: "Inter_400Regular", fontSize: 10 }}>
+            {bleGlasses.frameCount} BLE frame{bleGlasses.frameCount === 1 ? "" : "s"}
+          </Text>
+        ) : null}
+        {bleGlasses.droppedFrameCount > 0 ? (
+          <Text style={{ color: "#f87171", fontFamily: "Inter_500Medium", fontSize: 10 }}>
+            ⚠ {bleGlasses.droppedFrameCount} frame{bleGlasses.droppedFrameCount === 1 ? "" : "s"} lost
+          </Text>
+        ) : null}
+      </View>
+    ) : null;
+
     // Compact list of the most recent glasses detections — shown below the strip.
     // #110 — entries with a stored frame are tappable to open full-screen.
     // #115 — entries show the zoomed subject label when available.
@@ -2088,6 +2143,7 @@ export default function NewInspectionScreen() {
                 {faieBanner}
                 {glassesViewerModal}
                 {glassesStrip}
+                {bleBadgeOnly}
                 {glassesFindingsPanel}
                 {zoomChips}
                 <NativeCameraHealthBadge />
@@ -2341,6 +2397,7 @@ export default function NewInspectionScreen() {
               {qualityBanner}
               {faieBanner}
               {glassesStrip}
+              {bleBadgeOnly}
               {glassesFindingsPanel}
               {zoomChips}
             </View>
@@ -2368,6 +2425,9 @@ export default function NewInspectionScreen() {
             ) : null}
             {glassesStrip ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{glassesStrip}</View>
+            ) : null}
+            {bleBadgeOnly ? (
+              <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{bleBadgeOnly}</View>
             ) : null}
             {glassesFindingsPanel ? (
               <View style={{ paddingHorizontal: 16 }}>{glassesFindingsPanel}</View>
