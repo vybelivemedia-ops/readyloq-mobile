@@ -79,7 +79,7 @@ let _cachedFocalLengthSource: "exif" | "fallback" = "fallback";
  * @param exif  Raw EXIF object from expo-camera (takePictureAsync exif:true).
  * @returns Derived focal length in pixels, or null if EXIF is insufficient.
  */
-function _deriveFocalLengthPxFromExif(
+export function _deriveFocalLengthPxFromExif(
   exif: Record<string, unknown>,
 ): number | null {
   // Image pixel width is required to convert mm focal length → pixels.

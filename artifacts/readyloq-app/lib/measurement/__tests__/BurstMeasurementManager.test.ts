@@ -12,7 +12,10 @@ import { describe, it, expect } from "vitest";
 
 // BurstMeasurementManager is exported only as a singleton — import the class
 // behaviour through the singleton for simplicity (the class is not exported).
-import { burstMeasurementManager } from "../BurstMeasurementManager";
+import {
+  burstMeasurementManager,
+  _deriveFocalLengthPxFromExif,
+} from "../BurstMeasurementManager";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -185,5 +188,172 @@ describe("BurstMeasurementManager.computeScaledDimensions — clipping detection
     });
     // Without image dimensions we cannot detect clipping.
     expect(result.clipped).toBe(false);
+  });
+});
+
+// ─── EXIF focal-length derivation ────────────────────────────────────────────
+//
+// All test EXIF payloads use PixelXDimension=1080 (a common 1080p capture
+// width) so the derived focal lengths land in the plausible 250–2500 px range.
+//   formula:  focalLengthPx = (FocalLenIn35mmFilm / 36) × PixelXDimension
+//
+// Typical 35mm-equivalent focal lengths for common phone cameras:
+//   iOS (iPhone 13 main, 26 mm): (26/36)×1080 ≈ 780 px
+//   Android Pixel 6 (27 mm):     (27/36)×1080 ≈ 810 px
+//   Samsung S22 (23 mm):         (23/36)×1080 ≈ 690 px
+
+describe("_deriveFocalLengthPxFromExif", () => {
+  // ── Valid EXIF — iOS ────────────────────────────────────────────────────────
+  it("returns a value in the plausible range for a typical iOS EXIF payload", () => {
+    // iPhone 13 main camera: 26 mm 35mm-equiv, 1080 px wide capture
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 26,
+      PixelXDimension: 1080,
+    });
+    expect(result).not.toBeNull();
+    expect(result!).toBeGreaterThanOrEqual(250);
+    expect(result!).toBeLessThanOrEqual(2500);
+    // (26/36)×1080 ≈ 780
+    expect(result!).toBeCloseTo((26 / 36) * 1080, 1);
+  });
+
+  // ── Valid EXIF — Android Pixel ──────────────────────────────────────────────
+  it("returns a value in the plausible range for a Pixel-style Android EXIF payload", () => {
+    // Google Pixel 6: 27 mm 35mm-equiv
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 27,
+      PixelXDimension: 1080,
+    });
+    expect(result).not.toBeNull();
+    expect(result!).toBeGreaterThanOrEqual(250);
+    expect(result!).toBeLessThanOrEqual(2500);
+    expect(result!).toBeCloseTo((27 / 36) * 1080, 1);
+  });
+
+  // ── Valid EXIF — Samsung ────────────────────────────────────────────────────
+  it("returns a value in the plausible range for a Samsung-style Android EXIF payload", () => {
+    // Samsung Galaxy S22 main: 23 mm 35mm-equiv
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 23,
+      PixelXDimension: 1080,
+    });
+    expect(result).not.toBeNull();
+    expect(result!).toBeGreaterThanOrEqual(250);
+    expect(result!).toBeLessThanOrEqual(2500);
+    expect(result!).toBeCloseTo((23 / 36) * 1080, 1);
+  });
+
+  // ── Missing FocalLenIn35mmFilm ──────────────────────────────────────────────
+  it("returns null when FocalLenIn35mmFilm is absent from EXIF", () => {
+    const result = _deriveFocalLengthPxFromExif({
+      PixelXDimension: 1080,
+      // FocalLenIn35mmFilm deliberately omitted
+    });
+    expect(result).toBeNull();
+  });
+
+  // ── FocalLenIn35mmFilm = 0 ──────────────────────────────────────────────────
+  it("returns null when FocalLenIn35mmFilm is 0", () => {
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 0,
+      PixelXDimension: 1080,
+    });
+    expect(result).toBeNull();
+  });
+
+  // ── FocalLenIn35mmFilm negative ─────────────────────────────────────────────
+  it("returns null when FocalLenIn35mmFilm is negative", () => {
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: -26,
+      PixelXDimension: 1080,
+    });
+    expect(result).toBeNull();
+  });
+
+  // ── Derived value below sanity floor (< 250 px) ────────────────────────────
+  it("returns null when the derived px value falls below the 250 px sanity floor", () => {
+    // fl35=8, imagePx=1080 → (8/36)×1080 = 240 < 250
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 8,
+      PixelXDimension: 1080,
+    });
+    expect(result).toBeNull();
+  });
+
+  // ── Derived value above sanity ceiling (> 2500 px) ─────────────────────────
+  it("returns null when the derived px value exceeds the 2500 px sanity ceiling", () => {
+    // fl35=300, imagePx=1080 → (300/36)×1080 = 9000 > 2500
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 300,
+      PixelXDimension: 1080,
+    });
+    expect(result).toBeNull();
+  });
+
+  // ── Missing PixelXDimension ─────────────────────────────────────────────────
+  it("returns null when PixelXDimension is absent from EXIF", () => {
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 26,
+      // PixelXDimension deliberately omitted
+    });
+    expect(result).toBeNull();
+  });
+
+  // ── PixelXDimension = 0 ─────────────────────────────────────────────────────
+  it("returns null when PixelXDimension is 0", () => {
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 26,
+      PixelXDimension: 0,
+    });
+    expect(result).toBeNull();
+  });
+
+  // ── Non-numeric EXIF fields ─────────────────────────────────────────────────
+  it("returns null when EXIF fields are present but non-numeric strings", () => {
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: "26mm", // OEM formatting oddity
+      PixelXDimension: "1080",
+    });
+    expect(result).toBeNull();
+  });
+
+  // ── Completely empty EXIF object ────────────────────────────────────────────
+  it("returns null for an empty EXIF object", () => {
+    const result = _deriveFocalLengthPxFromExif({});
+    expect(result).toBeNull();
+  });
+
+  // ── Formula accuracy ────────────────────────────────────────────────────────
+  it("produces an accurate focalLengthPx for a known input (26 mm / 1080 px)", () => {
+    const expected = (26 / 36) * 1080; // ≈ 780 px
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 26,
+      PixelXDimension: 1080,
+    });
+    expect(result).not.toBeNull();
+    expect(result!).toBeCloseTo(expected, 5);
+  });
+
+  // ── Sanity-range boundary: just inside the floor ────────────────────────────
+  it("accepts a derived value exactly at the 250 px floor", () => {
+    // fl35 and imagePx chosen so that (fl35/36)×imagePx == 250 exactly
+    // fl35=9, imagePx=1000 → (9/36)×1000 = 250
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 9,
+      PixelXDimension: 1000,
+    });
+    expect(result).not.toBeNull();
+    expect(result!).toBeCloseTo(250, 5);
+  });
+
+  // ── Sanity-range boundary: just inside the ceiling ─────────────────────────
+  it("accepts a derived value exactly at the 2500 px ceiling", () => {
+    // fl35=90, imagePx=1000 → (90/36)×1000 = 2500
+    const result = _deriveFocalLengthPxFromExif({
+      FocalLenIn35mmFilm: 90,
+      PixelXDimension: 1000,
+    });
+    expect(result).not.toBeNull();
+    expect(result!).toBeCloseTo(2500, 5);
   });
 });
