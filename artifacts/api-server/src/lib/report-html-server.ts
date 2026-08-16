@@ -9,6 +9,139 @@ interface Finding {
   severity?: string;
   location?: string;
   exclusionOpportunity?: boolean;
+  /** URL of the evidence photo — used to look up captureMetadata in media records. */
+  imageUrl?: string | null;
+}
+
+/** Minimal shape of an InspectionMedia row needed for measurement lookup. */
+interface MediaRecord {
+  url: string;
+  captureMetadata?: Record<string, unknown> | null;
+}
+
+/** Sub-object stored inside captureMetadata.laserMeasurement */
+interface LaserMeasurement {
+  kind?: string;
+  value?: number;
+  unit?: string;
+  signalQuality?: number;
+  metadata?: {
+    method?: string;
+    heightInches?: number;
+    areaSqInches?: number;
+    confidence?: number;
+    warnings?: string[];
+  };
+}
+
+/** Resolve a LaserMeasurement from a raw captureMetadata blob. */
+function resolveLaserMeasurement(
+  captureMetadata: Record<string, unknown> | null | undefined,
+): LaserMeasurement | null {
+  if (!captureMetadata) return null;
+  const laser = captureMetadata.laserMeasurement;
+  if (!laser || typeof laser !== "object") return null;
+  return laser as LaserMeasurement;
+}
+
+/** Look up captureMetadata for a finding's imageUrl by scanning media records. */
+function lookupCaptureMetadata(
+  media: MediaRecord[],
+  imageUrl: string | null | undefined,
+): Record<string, unknown> | null {
+  if (!imageUrl) return null;
+  const match = media.find((m) => m.url === imageUrl);
+  if (!match) return null;
+  return match.captureMetadata ?? null;
+}
+
+/** True when the laser measurement was produced by the burst-reference pipeline. */
+function isBurstMeasurement(laser: LaserMeasurement): boolean {
+  return laser.metadata?.method === "burst_reference";
+}
+
+/** Best available confidence for a laser measurement. */
+function measurementConfidence(laser: LaserMeasurement): number | null {
+  const inner = laser.metadata?.confidence;
+  if (inner != null) return inner;
+  const outer = laser.signalQuality;
+  if (outer != null) return outer;
+  return null;
+}
+
+/** True when the resolved confidence score is below the 50% amber threshold. */
+function isLowConfidence(conf: number | null): boolean {
+  return conf != null && conf < 0.5;
+}
+
+/** Format a decimal inch value as a tidy string, e.g. 1.5 → "1.50 in". */
+function fmtIn(value: number | undefined | null): string | null {
+  if (value == null) return null;
+  return `${value.toFixed(2)} in`;
+}
+
+/** Format square inches as sq ft when ≥ 144, otherwise in². */
+function fmtArea(areaSqIn: number | undefined | null): string | null {
+  if (areaSqIn == null) return null;
+  if (areaSqIn >= 144) {
+    return `${(areaSqIn / 144).toFixed(2)} sq ft`;
+  }
+  return `${areaSqIn.toFixed(1)} sq in`;
+}
+
+/**
+ * Build the HTML for a laser-measurement strip to embed inside a finding card.
+ * Returns an empty string when no measurement is present.
+ */
+function buildMeasurementStripHtml(laser: LaserMeasurement): string {
+  const conf = measurementConfidence(laser);
+  const lowConf = isLowConfidence(conf);
+  const isBurst = isBurstMeasurement(laser);
+
+  // Colour tokens
+  const accentColor = lowConf ? "#d97706" : "#0ea5e9";
+  const bgColor = lowConf ? "#fef9c3" : "#e0f2fe";
+  const borderColor = lowConf ? "#fcd34d" : "#bae6fd";
+
+  const widthLine = fmtIn(laser.value);
+  const heightLine = isBurst ? fmtIn(laser.metadata?.heightInches) : null;
+  const areaLine = isBurst ? fmtArea(laser.metadata?.areaSqInches) : null;
+  const warnings = laser.metadata?.warnings ?? [];
+
+  const rows: string[] = [];
+  if (widthLine) {
+    rows.push(
+      `<span><strong>W:</strong> ${esc(widthLine)}</span>`,
+    );
+  }
+  if (heightLine) {
+    rows.push(`<span><strong>H:</strong> ${esc(heightLine)}</span>`);
+  }
+  if (areaLine) {
+    rows.push(`<span><strong>Area:</strong> ${esc(areaLine)}</span>`);
+  }
+
+  if (rows.length === 0) return "";
+
+  const lowConfLabel = lowConf
+    ? `<span style="margin-left:8px;font-size:10px;color:${accentColor};font-style:italic">(low confidence)</span>`
+    : "";
+
+  const warningsHtml =
+    warnings.length > 0
+      ? `<div style="margin-top:4px;font-size:10px;color:#92400e">${warnings.map((w) => esc(w)).join(" · ")}</div>`
+      : "";
+
+  return `
+    <div style="margin-top:8px;padding:8px 10px;border-radius:6px;background:${bgColor};border:1px solid ${borderColor}">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${accentColor};margin-bottom:4px">
+        📏 Laser Measurement${lowConfLabel}
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#1e3a5f;font-weight:500">
+        ${rows.join("")}
+      </div>
+      ${warningsHtml}
+    </div>`;
 }
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -45,7 +178,11 @@ function section(title: string, content: string) {
     </div>`;
 }
 
-export function buildServerReportHtml(report: Report, inspection: Inspection): string {
+export function buildServerReportHtml(
+  report: Report,
+  inspection: Inspection,
+  media: MediaRecord[] = [],
+): string {
   const findings = ((report.findings ?? []) as Finding[]).filter(
     (f) => f.category || f.description,
   );
@@ -63,6 +200,12 @@ export function buildServerReportHtml(report: Report, inspection: Inspection): s
             const fsev = (f.severity ?? "").toLowerCase();
             const fc = SEVERITY_COLOR[fsev] ?? "#6b7280";
             const fb = SEVERITY_BG[fsev] ?? "#f9fafb";
+
+            // Look up laser measurement from the evidence photo's captureMetadata
+            const captureMetadata = lookupCaptureMetadata(media, f.imageUrl);
+            const laser = resolveLaserMeasurement(captureMetadata);
+            const measurementHtml = laser ? buildMeasurementStripHtml(laser) : "";
+
             return `
           <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:${fb}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
@@ -72,6 +215,7 @@ export function buildServerReportHtml(report: Report, inspection: Inspection): s
             ${f.description ? `<p style="margin:4px 0 0 0;color:#374151;font-size:13px">${esc(f.description)}</p>` : ""}
             ${f.location ? `<p style="margin:4px 0 0 0;color:#6b7280;font-size:12px">📍 ${esc(f.location)}</p>` : ""}
             ${f.exclusionOpportunity ? `<p style="margin:6px 0 0 0;font-size:11px;color:#0369a1">🔒 Exclusion opportunity identified</p>` : ""}
+            ${measurementHtml}
           </div>`;
           })
           .join("");

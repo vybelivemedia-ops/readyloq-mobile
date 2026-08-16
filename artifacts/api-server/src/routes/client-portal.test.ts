@@ -61,6 +61,7 @@ import {
   usersTable,
   companiesTable,
   inspectionsTable,
+  inspectionMediaTable,
   reportsTable,
   clientPortalAccessTable,
 } from "@workspace/db";
@@ -450,5 +451,163 @@ describe("/api/client/invites — manager-only access control", () => {
     // PM_USER_B (under Company B) must not appear in Company A's invite list.
     const clerkIds: string[] = res.body.map((r: any) => r.clerkUserId);
     expect(clerkIds).not.toContain(PM_USER_B);
+  });
+});
+
+// ─── GET /api/client/reports/:id/html — measurement strip ────────────────────
+
+describe("GET /api/client/reports/:id/html — laser measurement strip", () => {
+  const LASER_PHOTO_URL = "https://storage.example.com/cp-laser-photo.jpg";
+  let measurementReportId: number;
+
+  beforeAll(async () => {
+    // Seed a photo media record with a burst-reference laser measurement
+    await db.insert(inspectionMediaTable).values({
+      companyId: companyAId,
+      inspectionId: inspectionAId,
+      mediaType: "photo",
+      url: LASER_PHOTO_URL,
+      filename: "cp-laser.jpg",
+      captureMetadata: {
+        laserMeasurement: {
+          kind: "distance",
+          value: 3.25,
+          unit: "inches",
+          signalQuality: 0.9,
+          metadata: {
+            method: "burst_reference",
+            heightInches: 4.0,
+            areaSqInches: 13.0,
+            confidence: 0.78,
+            warnings: ["edge_detected"],
+          },
+        },
+      },
+    });
+
+    // Seed an approved report with a finding whose imageUrl references the photo
+    const findingsJson = JSON.stringify([
+      {
+        id: 99,
+        category: "Gap",
+        description: "Gap at threshold",
+        confidence: 0.85,
+        severity: "high",
+        location: "Front entrance",
+        imageUrl: LASER_PHOTO_URL,
+        exclusionOpportunity: true,
+      },
+    ]);
+    const [repM] = await db
+      .insert(reportsTable)
+      .values({
+        companyId: companyAId,
+        inspectionId: inspectionAId,
+        title: "Measurement Report A",
+        status: "approved",
+        siteAddress: SHARED_ADDRESS,
+        technicianName: "Tech A",
+        inspectionDate: new Date(),
+        findings: JSON.parse(findingsJson),
+      })
+      .returning();
+    measurementReportId = repM.id;
+  });
+
+  it("renders W/H/area measurement strip when the finding image has captureMetadata.laserMeasurement", async () => {
+    asUser(PM_USER_A);
+    const res = await request(app).get(`/api/client/reports/${measurementReportId}/html`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Laser Measurement");
+    expect(res.text).toContain("W:");
+    expect(res.text).toContain("H:");
+    expect(res.text).toContain("Area:");
+    // confidence 0.78 is above threshold — should NOT be labelled low confidence
+    expect(res.text).not.toContain("low confidence");
+    // Warning text should appear
+    expect(res.text).toContain("edge_detected");
+  });
+
+  it("renders low-confidence label when measurement confidence < 0.5", async () => {
+    const LOW_URL = "https://storage.example.com/cp-low-conf.jpg";
+    await db.insert(inspectionMediaTable).values({
+      companyId: companyAId,
+      inspectionId: inspectionAId,
+      mediaType: "photo",
+      url: LOW_URL,
+      filename: "cp-low.jpg",
+      captureMetadata: {
+        laserMeasurement: {
+          kind: "distance",
+          value: 0.5,
+          unit: "inches",
+          metadata: {
+            method: "burst_reference",
+            heightInches: 0.6,
+            areaSqInches: 0.3,
+            confidence: 0.4,
+            warnings: ["low_signal"],
+          },
+        },
+      },
+    });
+
+    const [repLow] = await db
+      .insert(reportsTable)
+      .values({
+        companyId: companyAId,
+        inspectionId: inspectionAId,
+        title: "Low Conf Report",
+        status: "approved",
+        siteAddress: SHARED_ADDRESS,
+        technicianName: "Tech A",
+        inspectionDate: new Date(),
+        findings: [
+          {
+            id: 100,
+            category: "Crack",
+            description: "Hairline crack",
+            confidence: 0.7,
+            severity: "medium",
+            location: null,
+            imageUrl: LOW_URL,
+            exclusionOpportunity: false,
+          },
+        ],
+      })
+      .returning();
+
+    asUser(PM_USER_A);
+    const res = await request(app).get(`/api/client/reports/${repLow.id}/html`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Laser Measurement");
+    expect(res.text).toContain("low confidence");
+    expect(res.text).toContain("low_signal");
+  });
+
+  it("returns 403 for a PM who does not have access to this building", async () => {
+    asUser(PM_USER_B);
+    const res = await request(app).get(`/api/client/reports/${measurementReportId}/html`);
+    // PM_USER_B is under Company B — cannot see Company A's report
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 404 for a non-approved report", async () => {
+    const [draft] = await db
+      .insert(reportsTable)
+      .values({
+        companyId: companyAId,
+        inspectionId: inspectionAId,
+        title: "Draft Report",
+        status: "draft",
+        siteAddress: SHARED_ADDRESS,
+        technicianName: "Tech A",
+        inspectionDate: new Date(),
+      })
+      .returning();
+
+    asUser(PM_USER_A);
+    const res = await request(app).get(`/api/client/reports/${draft.id}/html`);
+    expect(res.status).toBe(404);
   });
 });

@@ -15,6 +15,7 @@ import { db } from "@workspace/db";
 import {
   clientPortalAccessTable,
   inspectionsTable,
+  inspectionMediaTable,
   reportsTable,
   companiesTable,
   portalMessagesTable,
@@ -291,7 +292,21 @@ router.get("/reports/:id/html", async (req, res) => {
 
   if (!inspection) return res.status(404).send("Inspection not found");
 
-  const html = buildServerReportHtml(report, inspection);
+  const mediaRows = await db
+    .select({
+      url: inspectionMediaTable.url,
+      captureMetadata: inspectionMediaTable.captureMetadata,
+    })
+    .from(inspectionMediaTable)
+    .where(
+      and(
+        eq(inspectionMediaTable.inspectionId, report.inspectionId),
+        eq(inspectionMediaTable.companyId, access.companyId),
+        eq(inspectionMediaTable.mediaType, "photo"),
+      ),
+    );
+
+  const html = buildServerReportHtml(report, inspection, mediaRows);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "private, max-age=300");
   return res.send(html);

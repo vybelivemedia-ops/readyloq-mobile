@@ -75,6 +75,7 @@ import {
   usersTable,
   companiesTable,
   inspectionsTable,
+  inspectionMediaTable,
   reportsTable,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
@@ -532,6 +533,161 @@ describe("GET /reports?opportunities=true — filter", () => {
     const ids: number[] = res.body.map((r: { id: number }) => r.id);
     // The NULL-opps report must NOT appear in the filtered list
     expect(ids).not.toContain(nullId);
+  });
+});
+
+// ─── HTML report — measurement strip rendering ────────────────────────────────
+
+describe("GET /reports/:id/html — laser measurement strip", () => {
+  const PHOTO_URL = "https://storage.example.com/photo-with-laser.jpg";
+
+  it("renders measurement strip for a finding whose imageUrl matches a photo with captureMetadata.laserMeasurement", async () => {
+    // Seed a media record with a burst-reference laser measurement
+    await db.insert(inspectionMediaTable).values({
+      companyId,
+      inspectionId,
+      mediaType: "photo",
+      url: PHOTO_URL,
+      filename: "laser-shot.jpg",
+      captureMetadata: {
+        laserMeasurement: {
+          kind: "distance",
+          value: 2.5,
+          unit: "inches",
+          signalQuality: 0.85,
+          metadata: {
+            method: "burst_reference",
+            heightInches: 3.0,
+            areaSqInches: 7.5,
+            confidence: 0.82,
+            warnings: [],
+          },
+        },
+      },
+    });
+
+    // Create an approved report with a finding referencing the photo URL
+    const findingsJson = JSON.stringify([
+      {
+        id: 1,
+        category: "Gap",
+        description: "Gap under door",
+        confidence: 0.9,
+        severity: "high",
+        location: "Front door",
+        imageUrl: PHOTO_URL,
+        exclusionOpportunity: false,
+      },
+    ]);
+    const result = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'HTML Measurement Test',
+              '42 Empty St', 'complete',
+              ${findingsJson}::jsonb, '[]'::jsonb, '[]'::jsonb,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const reportId = (result.rows[0] as { id: number }).id;
+
+    asUser(OWNER_ID);
+    const res = await request(app).get(`/api/reports/${reportId}/html`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Laser Measurement");
+    expect(res.text).toContain("W:");
+    expect(res.text).toContain("H:");
+    expect(res.text).toContain("Area:");
+    // Should NOT show low-confidence label for confidence 0.82
+    expect(res.text).not.toContain("low confidence");
+  });
+
+  it("labels measurement as low confidence when confidence < 0.5", async () => {
+    const LOW_CONF_URL = "https://storage.example.com/photo-low-conf.jpg";
+    await db.insert(inspectionMediaTable).values({
+      companyId,
+      inspectionId,
+      mediaType: "photo",
+      url: LOW_CONF_URL,
+      filename: "low-conf.jpg",
+      captureMetadata: {
+        laserMeasurement: {
+          kind: "distance",
+          value: 1.0,
+          unit: "inches",
+          metadata: {
+            method: "burst_reference",
+            heightInches: 1.2,
+            areaSqInches: 1.2,
+            confidence: 0.35,
+            warnings: ["low_signal"],
+          },
+        },
+      },
+    });
+
+    const findingsJson = JSON.stringify([
+      {
+        id: 2,
+        category: "Crack",
+        description: "Hairline crack",
+        confidence: 0.7,
+        severity: "medium",
+        location: null,
+        imageUrl: LOW_CONF_URL,
+        exclusionOpportunity: false,
+      },
+    ]);
+    const result = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'HTML Low Conf Test',
+              '42 Empty St', 'complete',
+              ${findingsJson}::jsonb, '[]'::jsonb, '[]'::jsonb,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const reportId = (result.rows[0] as { id: number }).id;
+
+    asUser(OWNER_ID);
+    const res = await request(app).get(`/api/reports/${reportId}/html`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Laser Measurement");
+    expect(res.text).toContain("low confidence");
+    // Warning text should appear
+    expect(res.text).toContain("low_signal");
+  });
+
+  it("renders no measurement strip when the finding has no imageUrl", async () => {
+    const findingsJson = JSON.stringify([
+      {
+        id: 3,
+        category: "Pest",
+        description: "Roach sighting",
+        confidence: 0.9,
+        severity: "high",
+        location: null,
+        imageUrl: null,
+        exclusionOpportunity: false,
+      },
+    ]);
+    const result = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'HTML No Image Test',
+              '42 Empty St', 'complete',
+              ${findingsJson}::jsonb, '[]'::jsonb, '[]'::jsonb,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const reportId = (result.rows[0] as { id: number }).id;
+
+    asUser(OWNER_ID);
+    const res = await request(app).get(`/api/reports/${reportId}/html`);
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain("Laser Measurement");
   });
 });
 

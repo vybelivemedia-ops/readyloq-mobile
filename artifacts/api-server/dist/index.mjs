@@ -68834,7 +68834,14 @@ var inspectionsTable = pgTable(
     // on the calendar by falling back to createdAt for historical rows).
     scheduledDate: timestamp("scheduled_date"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
-    completedAt: timestamp("completed_at")
+    completedAt: timestamp("completed_at"),
+    // On-site signature capture: SVG strings produced by the mobile signature
+    // pad. ownerNotAvailable is set when the owner/tenant is absent and the
+    // technician signs on their behalf. signedAt records the first signature.
+    technicianSignature: text("technician_signature"),
+    ownerSignature: text("owner_signature"),
+    ownerNotAvailable: boolean("owner_not_available").notNull().default(false),
+    signedAt: timestamp("signed_at")
   },
   (t) => [
     uniqueIndex("inspections_company_client_key_uq").on(t.companyId, t.clientKey),
@@ -90775,13 +90782,17 @@ router4.patch("/:id", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
-    const { status, notes, severity, pestTypes, completedAt } = req.body;
+    const { status, notes, severity, pestTypes, completedAt, technicianSignature, ownerSignature, ownerNotAvailable, signedAt } = req.body;
     const updateData = {};
     if (status !== void 0) updateData.status = status;
     if (notes !== void 0) updateData.notes = notes;
     if (severity !== void 0) updateData.severity = severity;
     if (pestTypes !== void 0) updateData.pestTypes = pestTypes;
     if (completedAt !== void 0) updateData.completedAt = new Date(completedAt);
+    if (technicianSignature !== void 0) updateData.technicianSignature = technicianSignature;
+    if (ownerSignature !== void 0) updateData.ownerSignature = ownerSignature;
+    if (ownerNotAvailable !== void 0) updateData.ownerNotAvailable = ownerNotAvailable;
+    if (signedAt !== void 0) updateData.signedAt = new Date(signedAt);
     if (Object.keys(updateData).length === 0) {
       const [current] = await db.select().from(inspectionsTable).where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)));
       if (!current) return res.status(404).json({ error: "Not found" });
@@ -91083,6 +91094,79 @@ var dataset_default = router5;
 var import_express8 = __toESM(require_express2(), 1);
 
 // src/lib/report-html-server.ts
+function resolveLaserMeasurement(captureMetadata) {
+  if (!captureMetadata) return null;
+  const laser = captureMetadata.laserMeasurement;
+  if (!laser || typeof laser !== "object") return null;
+  return laser;
+}
+function lookupCaptureMetadata(media, imageUrl) {
+  if (!imageUrl) return null;
+  const match2 = media.find((m) => m.url === imageUrl);
+  if (!match2) return null;
+  return match2.captureMetadata ?? null;
+}
+function isBurstMeasurement(laser) {
+  return laser.metadata?.method === "burst_reference";
+}
+function measurementConfidence(laser) {
+  const inner = laser.metadata?.confidence;
+  if (inner != null) return inner;
+  const outer = laser.signalQuality;
+  if (outer != null) return outer;
+  return null;
+}
+function isLowConfidence(conf) {
+  return conf != null && conf < 0.5;
+}
+function fmtIn(value) {
+  if (value == null) return null;
+  return `${value.toFixed(2)} in`;
+}
+function fmtArea(areaSqIn) {
+  if (areaSqIn == null) return null;
+  if (areaSqIn >= 144) {
+    return `${(areaSqIn / 144).toFixed(2)} sq ft`;
+  }
+  return `${areaSqIn.toFixed(1)} sq in`;
+}
+function buildMeasurementStripHtml(laser) {
+  const conf = measurementConfidence(laser);
+  const lowConf = isLowConfidence(conf);
+  const isBurst = isBurstMeasurement(laser);
+  const accentColor = lowConf ? "#d97706" : "#0ea5e9";
+  const bgColor = lowConf ? "#fef9c3" : "#e0f2fe";
+  const borderColor = lowConf ? "#fcd34d" : "#bae6fd";
+  const widthLine = fmtIn(laser.value);
+  const heightLine = isBurst ? fmtIn(laser.metadata?.heightInches) : null;
+  const areaLine = isBurst ? fmtArea(laser.metadata?.areaSqInches) : null;
+  const warnings = laser.metadata?.warnings ?? [];
+  const rows = [];
+  if (widthLine) {
+    rows.push(
+      `<span><strong>W:</strong> ${esc2(widthLine)}</span>`
+    );
+  }
+  if (heightLine) {
+    rows.push(`<span><strong>H:</strong> ${esc2(heightLine)}</span>`);
+  }
+  if (areaLine) {
+    rows.push(`<span><strong>Area:</strong> ${esc2(areaLine)}</span>`);
+  }
+  if (rows.length === 0) return "";
+  const lowConfLabel = lowConf ? `<span style="margin-left:8px;font-size:10px;color:${accentColor};font-style:italic">(low confidence)</span>` : "";
+  const warningsHtml = warnings.length > 0 ? `<div style="margin-top:4px;font-size:10px;color:#92400e">${warnings.map((w) => esc2(w)).join(" \xB7 ")}</div>` : "";
+  return `
+    <div style="margin-top:8px;padding:8px 10px;border-radius:6px;background:${bgColor};border:1px solid ${borderColor}">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${accentColor};margin-bottom:4px">
+        \u{1F4CF} Laser Measurement${lowConfLabel}
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#1e3a5f;font-weight:500">
+        ${rows.join("")}
+      </div>
+      ${warningsHtml}
+    </div>`;
+}
 var SEVERITY_COLOR = {
   critical: "#dc2626",
   high: "#ea580c",
@@ -91108,7 +91192,7 @@ function section(title, content) {
       ${content}
     </div>`;
 }
-function buildServerReportHtml(report, inspection) {
+function buildServerReportHtml(report, inspection, media = []) {
   const findings = (report.findings ?? []).filter(
     (f) => f.category || f.description
   );
@@ -91121,6 +91205,9 @@ function buildServerReportHtml(report, inspection) {
     const fsev = (f.severity ?? "").toLowerCase();
     const fc = SEVERITY_COLOR[fsev] ?? "#6b7280";
     const fb = SEVERITY_BG[fsev] ?? "#f9fafb";
+    const captureMetadata = lookupCaptureMetadata(media, f.imageUrl);
+    const laser = resolveLaserMeasurement(captureMetadata);
+    const measurementHtml = laser ? buildMeasurementStripHtml(laser) : "";
     return `
           <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:${fb}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
@@ -91130,6 +91217,7 @@ function buildServerReportHtml(report, inspection) {
             ${f.description ? `<p style="margin:4px 0 0 0;color:#374151;font-size:13px">${esc2(f.description)}</p>` : ""}
             ${f.location ? `<p style="margin:4px 0 0 0;color:#6b7280;font-size:12px">\u{1F4CD} ${esc2(f.location)}</p>` : ""}
             ${f.exclusionOpportunity ? `<p style="margin:6px 0 0 0;font-size:11px;color:#0369a1">\u{1F512} Exclusion opportunity identified</p>` : ""}
+            ${measurementHtml}
           </div>`;
   }).join("");
   const recsHtml = recommendations.length === 0 ? `<p style="color:#6b7280;font-style:italic">No recommendations recorded.</p>` : `<ul style="margin:0;padding-left:18px">${recommendations.map((r) => `<li style="margin-bottom:6px;color:#374151;font-size:13px">${esc2(r)}</li>`).join("")}</ul>`;
@@ -91459,7 +91547,17 @@ router6.get("/:id/html", async (req, res) => {
       )
     );
     if (!inspection) return res.status(404).send("Inspection not found");
-    const html = buildServerReportHtml(report, inspection);
+    const mediaRows = await db.select({
+      url: inspectionMediaTable.url,
+      captureMetadata: inspectionMediaTable.captureMetadata
+    }).from(inspectionMediaTable).where(
+      and(
+        eq(inspectionMediaTable.inspectionId, report.inspectionId),
+        eq(inspectionMediaTable.companyId, companyId),
+        eq(inspectionMediaTable.mediaType, "photo")
+      )
+    );
+    const html = buildServerReportHtml(report, inspection, mediaRows);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "private, max-age=300");
     return res.send(html);
@@ -126211,7 +126309,17 @@ router36.get("/reports/:id/html", async (req, res) => {
     )
   );
   if (!inspection) return res.status(404).send("Inspection not found");
-  const html = buildServerReportHtml(report, inspection);
+  const mediaRows = await db.select({
+    url: inspectionMediaTable.url,
+    captureMetadata: inspectionMediaTable.captureMetadata
+  }).from(inspectionMediaTable).where(
+    and(
+      eq(inspectionMediaTable.inspectionId, report.inspectionId),
+      eq(inspectionMediaTable.companyId, access.companyId),
+      eq(inspectionMediaTable.mediaType, "photo")
+    )
+  );
+  const html = buildServerReportHtml(report, inspection, mediaRows);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "private, max-age=300");
   return res.send(html);
