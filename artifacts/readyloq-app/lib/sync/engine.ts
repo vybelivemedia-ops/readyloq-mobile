@@ -21,7 +21,7 @@ import {
   updateLocalInspection,
   type LocalInspection,
 } from "@/lib/local/inspection-store";
-import { uploadPhoto } from "@/lib/upload";
+import { doUpload, probeStoragePath, reserveUploadPath } from "@/lib/upload";
 
 /**
  * Offline-first sync engine.
@@ -218,6 +218,20 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     // 2 + 3. Photos first: upload bytes, then register the media row.
     // Progress is merged after each photo (keyed by localUri) so a drop
     // mid-batch never re-uploads and a mid-sync capture is never lost.
+    //
+    // Crash-safety: the upload is split into three persisted checkpoints so
+    // the worst-case crash window never causes a silent data loss or an
+    // undetected double-upload:
+    //
+    //   Checkpoint A — `pendingStoragePath` written BEFORE any bytes are sent.
+    //   Checkpoint B — bytes PUT to object storage.
+    //   Checkpoint C — `storagePath` promoted from `pendingStoragePath`.
+    //
+    // On the next launch `parseRecord` resets `uploading: false` (was `true`),
+    // but intentionally leaves `pendingStoragePath` intact.  The engine then
+    // probes whether the object was already written and either reuses the path
+    // (no re-upload) or uploads fresh (rare orphaned object, but safe because
+    // the server's `POST /media` endpoint deduplicates by URL).
     const snapshot = [...rec.photos];
     for (let i = 0; i < snapshot.length; i++) {
       const localUri = snapshot[i].localUri;
@@ -225,35 +239,80 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
       if (!photo) continue; // removed while syncing
       if (!photo.storagePath && !photo.uploading) {
         // Mark as in-flight BEFORE the network request so removePhoto sees it
-        // and refuses to delete a photo that is mid-upload. The flag is cleared
-        // whether the upload succeeds or throws.
+        // and refuses to delete a photo that is mid-upload.
         await merge((r) => {
           const p = r.photos.find((x) => x.localUri === localUri);
           if (p) p.uploading = true;
         });
-        let storagePath: string;
+        photo = rec.photos.find((p) => p.localUri === localUri);
+
         try {
           const token = state.getToken ? await state.getToken() : null;
-          storagePath = await uploadPhoto(
-            token,
-            localUri,
-            `inspection-${serverId}-${Date.now()}-${i}.jpg`,
-          );
+          let resolvedPath: string;
+
+          if (photo?.pendingStoragePath) {
+            // ── Crash-recovery path ──────────────────────────────────────────
+            // A path was reserved in a previous run (Checkpoint A reached) but
+            // the process died before Checkpoint C was written.  Probe whether
+            // the bytes actually landed so we can skip a redundant PUT.
+            const alreadyUploaded = await probeStoragePath(photo.pendingStoragePath, token);
+            if (alreadyUploaded) {
+              // Object exists — reuse the pre-reserved path, no PUT needed.
+              resolvedPath = photo.pendingStoragePath;
+            } else {
+              // Object wasn't written (died before or during the PUT).
+              // Reserve a fresh path and upload.
+              const { uploadURL, storagePath: freshPath } = await reserveUploadPath(
+                token,
+                `inspection-${serverId}-${Date.now()}-${i}.jpg`,
+                localUri,
+              );
+              // Update the stored candidate to the new reservation.
+              await merge((r) => {
+                const p = r.photos.find((x) => x.localUri === localUri);
+                if (p) p.pendingStoragePath = freshPath;
+              });
+              await doUpload(uploadURL, localUri); // Checkpoint B
+              resolvedPath = freshPath;
+            }
+          } else {
+            // ── Normal (first-attempt) path ──────────────────────────────────
+            // Reserve the upload path and persist it BEFORE sending any bytes
+            // (Checkpoint A).  If the process dies after this write but before
+            // Checkpoint C the next launch takes the crash-recovery path above.
+            const { uploadURL, storagePath: candidatePath } = await reserveUploadPath(
+              token,
+              `inspection-${serverId}-${Date.now()}-${i}.jpg`,
+              localUri,
+            );
+            // Checkpoint A: durable marker written before the PUT.
+            await merge((r) => {
+              const p = r.photos.find((x) => x.localUri === localUri);
+              if (p) p.pendingStoragePath = candidatePath;
+            });
+            await doUpload(uploadURL, localUri); // Checkpoint B
+            resolvedPath = candidatePath;
+          }
+
+          // Checkpoint C: promote pendingStoragePath → storagePath.
+          await merge((r) => {
+            const p = r.photos.find((x) => x.localUri === localUri);
+            if (p) {
+              if (!p.storagePath) p.storagePath = resolvedPath;
+              p.pendingStoragePath = undefined;
+              p.uploading = false;
+            }
+          });
+          photo = rec.photos.find((p) => p.localUri === localUri);
         } catch (uploadErr) {
           await merge((r) => {
             const p = r.photos.find((x) => x.localUri === localUri);
             if (p) p.uploading = false;
+            // pendingStoragePath is intentionally left intact so the next
+            // attempt takes the crash-recovery path and probes before retrying.
           });
           throw uploadErr;
         }
-        await merge((r) => {
-          const p = r.photos.find((x) => x.localUri === localUri);
-          if (p) {
-            if (!p.storagePath) p.storagePath = storagePath;
-            p.uploading = false;
-          }
-        });
-        photo = rec.photos.find((p) => p.localUri === localUri);
       }
       if (photo?.storagePath && photo.mediaRowId == null) {
         const media = await addInspectionMedia(serverId, {

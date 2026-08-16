@@ -73,6 +73,21 @@ export type LocalPhoto = {
    * which would orphan the uploaded file without a local or server record.
    */
   uploading?: boolean;
+  /**
+   * Durable pre-upload marker: the `/api/storage/...` path reserved via
+   * `requestUploadUrl` BEFORE the PUT bytes are sent. Written to AsyncStorage
+   * in the same merge step as setting `uploading: true`, so a crash between the
+   * URL-reservation call and the actual PUT (or between the PUT and the
+   * `storagePath` promotion) can be detected and handled on the next launch:
+   *
+   *   - pendingStoragePath set + storagePath null → upload was started; probe
+   *     the object URL to decide whether to skip re-upload or upload to a new path.
+   *   - Promoted to storagePath on success, then cleared.
+   *
+   * Never cleared on app restart (unlike `uploading`) — it is the crash-recovery
+   * anchor that prevents double-uploading the same bytes.
+   */
+  pendingStoragePath?: string;
 };
 
 export type LocalSyncPhase =
@@ -409,6 +424,20 @@ export function parseRecord(raw: string): LocalInspection | null {
     rec.baitStations ??= [];
     rec.lastDeliveredAt ??= null;
     rec.pendingDeliveries ??= [];
+    // Reset any `uploading: true` flags that survived a crash.
+    // The sync engine sets `uploading: true` + `pendingStoragePath` in the same
+    // atomic merge BEFORE the PUT bytes are sent, then promotes `pendingStoragePath`
+    // → `storagePath` after a successful upload.  If the process died while the
+    // flag was set, the photo would be permanently stuck (never re-attempted because
+    // the upload guard checks `!uploading`).  Clearing the flag on every hydration
+    // lets the engine retry the photo; `pendingStoragePath` (intentionally NOT reset
+    // here) tells the engine whether a storage path was already reserved so it can
+    // probe for the object before deciding to re-upload or reuse.
+    if (rec.photos) {
+      for (const p of rec.photos) {
+        if (p.uploading) p.uploading = false;
+      }
+    }
     return rec;
   } catch {
     return null;
