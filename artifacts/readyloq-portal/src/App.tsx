@@ -22,6 +22,7 @@ import { Schedule } from '@/pages/schedule';
 import { ClientAccess } from '@/pages/client-access';
 import { ClientPortal } from '@/pages/client';
 import { BleHealth } from '@/pages/ble-health';
+import { IntelligenceReview } from '@/pages/intelligence-review';
 import { Layout } from '@/components/layout';
 
 const queryClient = new QueryClient();
@@ -93,6 +94,9 @@ function Router() {
               </Route>
               <Route path="/client-access">
                 <ProtectedRoute component={ClientAccess} roles={['owner', 'manager']} />
+              </Route>
+              <Route path="/ai-review">
+                <ProtectedRoute component={IntelligenceReview} roles={['owner', 'manager']} />
               </Route>
               <Route path="/ble-health">
                 <ProtectedRoute component={BleHealth} roles={['owner', 'manager']} />

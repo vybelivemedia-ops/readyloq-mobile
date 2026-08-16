@@ -596,6 +596,53 @@ describe("intelligence verification pipeline", () => {
     expect(approved.body.approvedForTraining).toBe(true);
   });
 
+  it("a record beyond the default page size is still reachable and approvable", async () => {
+    // Build a queue larger than the API's default page size (20).
+    const recs = [];
+    for (let i = 0; i < 22; i++) {
+      recs.push(await createIntelRecord(OWNER_A_ID, companyAId));
+    }
+    asUser(OWNER_A_ID);
+    for (const r of recs) {
+      const confirmed = await request(app)
+        .patch(`/api/intelligence-dataset/records/${r.id}`)
+        .send({ category: "pest", subcategory: "cockroach" });
+      expect(confirmed.status).toBe(200);
+    }
+
+    // Page 1 of the pending queue holds only the default 20 records.
+    const page1 = await request(app).get(
+      "/api/intelligence-dataset/records?status=confirmed&page=1&limit=20",
+    );
+    expect(page1.status).toBe(200);
+    expect(page1.body.total).toBeGreaterThanOrEqual(22);
+    expect(page1.body.items.length).toBe(20);
+
+    // Page 2 exposes the remainder; approve a record found there.
+    const page2 = await request(app).get(
+      "/api/intelligence-dataset/records?status=confirmed&page=2&limit=20",
+    );
+    expect(page2.status).toBe(200);
+    expect(page2.body.items.length).toBeGreaterThanOrEqual(2);
+    const target = page2.body.items[0];
+
+    const approved = await request(app)
+      .post(`/api/intelligence-dataset/records/${target.id}/review`)
+      .send({ action: "approve" });
+    expect(approved.status).toBe(200);
+    expect(approved.body.status).toBe("approved");
+    expect(approved.body.verificationLevel).toBe(4);
+    expect(approved.body.approvedForTraining).toBe(true);
+
+    // It leaves the pending queue.
+    const after = await request(app).get(
+      "/api/intelligence-dataset/records?status=confirmed&page=1&limit=100",
+    );
+    expect(
+      after.body.items.map((r: { id: number }) => r.id),
+    ).not.toContain(target.id);
+  });
+
   it("expert-verify promotes an approved record to L5", async () => {
     const rec = await createIntelRecord(OWNER_A_ID, companyAId);
     asUser(OWNER_A_ID);
