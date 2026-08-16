@@ -276,6 +276,10 @@ export async function probeIntegrationCredentials(
       return probePestPac(apiKey, accountId, apiBaseUrl);
     case "fieldroutes":
       return probeFieldRoutes(apiKey, accountId, apiBaseUrl);
+    case "servsuite": {
+      const { probeServSuite } = await import("./integration/adapters/servsuiteAdapter");
+      return probeServSuite(apiKey, apiBaseUrl);
+    }
     default: {
       const exhaustive: never = systemType;
       throw new Error(`Unknown external system: ${String(exhaustive)}`);
@@ -293,6 +297,12 @@ export async function syncInspectionToExternalSystem(
       return syncToPestPac(payload);
     case "fieldroutes":
       return syncToFieldRoutes(payload);
+    case "servsuite":
+      // ServSuite uses EnterpriseAdapterRouter which builds the full structured
+      // payload from the DB. The legacy text-note SyncPayload doesn't apply.
+      throw new Error(
+        "ServSuite must be dispatched via EnterpriseAdapterRouter, not syncInspectionToExternalSystem",
+      );
     default: {
       const exhaustive: never = payload.externalSystem;
       throw new Error(`Unknown external system: ${String(exhaustive)}`);

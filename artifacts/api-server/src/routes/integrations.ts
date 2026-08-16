@@ -26,9 +26,12 @@ const router = Router();
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const configInputSchema = z.object({
-  systemType: z.enum(["pestpac", "fieldroutes"]),
+  systemType: z.enum(["pestpac", "fieldroutes", "servsuite"]),
   accountId: z.string().min(1),
   apiKey: z.string().min(1),
+  // FieldRoutes requires both apiKey (authenticationKey) and apiToken
+  // (authenticationToken). Ignored for PestPac and ServSuite.
+  apiToken: z.string().optional(),
   apiBaseUrl: z.string().url().optional(),
   enabled: z.boolean().optional(),
 });
@@ -69,7 +72,7 @@ router.put("/config", requireRole("owner"), async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid config", issues: parsed.error.issues });
     }
-    const { systemType, accountId, apiKey, apiBaseUrl, enabled } = parsed.data;
+    const { systemType, accountId, apiKey, apiToken, apiBaseUrl, enabled } = parsed.data;
     const now = new Date();
 
     const [existing] = await db
@@ -85,6 +88,7 @@ router.put("/config", requireRole("owner"), async (req, res) => {
           systemType,
           accountId,
           apiKey,
+          apiToken: apiToken ?? null,
           apiBaseUrl: apiBaseUrl ?? null,
           enabled: enabled ?? true,
           updatedAt: now,
@@ -96,6 +100,7 @@ router.put("/config", requireRole("owner"), async (req, res) => {
         systemType,
         accountId,
         apiKey,
+        apiToken: apiToken ?? null,
         apiBaseUrl: apiBaseUrl ?? null,
         enabled: enabled ?? true,
       });

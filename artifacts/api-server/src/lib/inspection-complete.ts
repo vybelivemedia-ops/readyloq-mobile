@@ -18,6 +18,7 @@ import { logErrorEvent } from "./error-events";
 import { validateFindings } from "../routes/analysis";
 import { writePropertyMemory } from "./property-memory-writer";
 import { notifyCriticalInspection } from "./push-notifications";
+import { enterpriseEventBus } from "./enterprise-event-bus";
 
 /**
  * Explicit "Complete Inspection" finalization pipeline.
@@ -421,4 +422,10 @@ export async function runInspectionFinalization(input: {
       context: { stage: "complete_property_memory" },
     });
   }
+
+  // 7. Enterprise Bridge — dispatch to the company's configured external system
+  // (PestPac, ServSuite, FieldRoutes) after the full pipeline completes.
+  // Fire-and-forget: errors are caught inside the router and written to the
+  // sync log so owners can retry via the portal. Never blocks completion.
+  enterpriseEventBus.emitInspectionFinalized({ companyId, inspectionId });
 }

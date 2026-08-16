@@ -9,7 +9,7 @@ import { inspectionsTable } from "./inspections";
 // Mobile consumers may read system_type and account_id (non-sensitive) via
 // GET /api/integrations/config to decide whether to show the "Push to dispatch"
 // button, but the credential itself stays on the server.
-export type FieldIntegrationSystem = "pestpac" | "fieldroutes";
+export type FieldIntegrationSystem = "pestpac" | "fieldroutes" | "servsuite";
 
 export const companyFieldIntegrationsTable = pgTable(
   "company_field_integrations",
@@ -25,6 +25,9 @@ export const companyFieldIntegrationsTable = pgTable(
     // API key or bearer token for the external system.
     // Never serialised into any API response.
     apiKey: text("api_key").notNull(),
+    // Secondary token required by FieldRoutes (authenticationToken).
+    // Null for PestPac and ServSuite which use a single key.
+    apiToken: text("api_token"),
     // Optional base URL override — useful for on-prem / sandbox environments.
     apiBaseUrl: text("api_base_url"),
     enabled: boolean("enabled").notNull().default(true),

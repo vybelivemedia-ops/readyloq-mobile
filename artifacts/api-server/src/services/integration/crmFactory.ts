@@ -5,6 +5,11 @@ import { PestPacAdapter } from './adapters/pestPacAdapter';
 const FIELDROUTES_DEFAULT_URL = 'https://api.fieldroutes.com';
 const PESTPAC_DEFAULT_URL = 'https://api.workwave.com/pestpac/v1';
 
+// ServSuite is handled by EnterpriseAdapterRouter (sendServSuiteREST) rather
+// than the legacy CRMAdapter interface. getCRMAdapter intentionally excludes it
+// so callers fall through to the router path.
+
+
 /**
  * Programmatic factory — useful for per-request or multi-tenant scenarios
  * where credentials come from the database rather than env vars.
@@ -13,7 +18,7 @@ const PESTPAC_DEFAULT_URL = 'https://api.workwave.com/pestpac/v1';
  * (authenticationToken). Pass apiToken when provider is 'fieldroutes'.
  */
 export function getCRMAdapter(
-  provider: 'fieldroutes' | 'pestpac',
+  provider: 'fieldroutes' | 'pestpac' | 'servsuite',
   apiKey: string,
   baseUrl: string,
   apiToken?: string,
@@ -26,6 +31,10 @@ export function getCRMAdapter(
     }
     case 'pestpac':
       return new PestPacAdapter(apiKey, baseUrl);
+    case 'servsuite':
+      // ServSuite uses EnterpriseAdapterRouter.dispatch() directly; this path
+      // exists only so the type system accepts 'servsuite' without narrowing.
+      throw new Error('ServSuite must be dispatched via EnterpriseAdapterRouter, not getCRMAdapter');
     default:
       throw new Error(`Unsupported CRM provider: ${provider}`);
   }

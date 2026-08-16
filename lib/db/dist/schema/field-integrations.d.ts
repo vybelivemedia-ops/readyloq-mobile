@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-export type FieldIntegrationSystem = "pestpac" | "fieldroutes";
+export type FieldIntegrationSystem = "pestpac" | "fieldroutes" | "servsuite";
 export declare const companyFieldIntegrationsTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "company_field_integrations";
     schema: undefined;
@@ -91,6 +91,23 @@ export declare const companyFieldIntegrationsTable: import("drizzle-orm/pg-core"
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        apiToken: import("drizzle-orm/pg-core").PgColumn<{
+            name: "api_token";
+            tableName: "company_field_integrations";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         apiBaseUrl: import("drizzle-orm/pg-core").PgColumn<{
             name: "api_base_url";
             tableName: "company_field_integrations";
@@ -163,11 +180,12 @@ export declare const companyFieldIntegrationsTable: import("drizzle-orm/pg-core"
     dialect: "pg";
 }>;
 export declare const insertFieldIntegrationSchema: z.ZodObject<{
-    enabled: z.ZodOptional<z.ZodBoolean>;
     systemType: z.ZodString;
     accountId: z.ZodString;
     apiKey: z.ZodString;
+    apiToken: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     apiBaseUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    enabled: z.ZodOptional<z.ZodBoolean>;
 }, {
     out: {};
     in: {};

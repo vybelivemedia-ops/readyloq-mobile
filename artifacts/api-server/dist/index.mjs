@@ -18,6 +18,9 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __commonJS = (cb, mod) => function __require2() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
@@ -23681,7 +23684,7 @@ var require_express = __commonJS({
   "../../node_modules/.pnpm/express@5.2.1/node_modules/express/lib/express.js"(exports, module) {
     "use strict";
     var bodyParser = require_body_parser();
-    var EventEmitter4 = __require("node:events").EventEmitter;
+    var EventEmitter5 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
     var Router40 = require_router();
@@ -23692,7 +23695,7 @@ var require_express = __commonJS({
       var app2 = function(req2, res2, next) {
         app2.handle(req2, res2, next);
       };
-      mixin(app2, EventEmitter4.prototype, false);
+      mixin(app2, EventEmitter5.prototype, false);
       mixin(app2, proto, false);
       app2.request = Object.create(req, {
         app: { configurable: true, enumerable: true, writable: true, value: app2 }
@@ -27096,7 +27099,7 @@ var require_sonic_boom = __commonJS({
   "../../node_modules/.pnpm/sonic-boom@4.2.1/node_modules/sonic-boom/index.js"(exports, module) {
     "use strict";
     var fs2 = __require("fs");
-    var EventEmitter4 = __require("events");
+    var EventEmitter5 = __require("events");
     var inherits = __require("util").inherits;
     var path4 = __require("path");
     var sleep6 = require_atomic_sleep();
@@ -27333,7 +27336,7 @@ var require_sonic_boom = __commonJS({
       sonic._asyncDrainScheduled = false;
       sonic.emit("drain");
     }
-    inherits(SonicBoom, EventEmitter4);
+    inherits(SonicBoom, EventEmitter5);
     function mergeBuf(bufs, len) {
       if (bufs.length === 0) {
         return kEmptyBuffer;
@@ -27911,7 +27914,7 @@ var require_thread_stream = __commonJS({
   "../../node_modules/.pnpm/thread-stream@3.1.0/node_modules/thread-stream/index.js"(exports, module) {
     "use strict";
     var { version: version3 } = require_package();
-    var { EventEmitter: EventEmitter4 } = __require("events");
+    var { EventEmitter: EventEmitter5 } = __require("events");
     var { Worker } = __require("worker_threads");
     var { join: join2 } = __require("path");
     var { pathToFileURL } = __require("url");
@@ -28067,7 +28070,7 @@ var require_thread_stream = __commonJS({
       stream.worker.off("exit", onWorkerExit);
       destroy(stream, code !== 0 ? new Error("the worker thread exited") : null);
     }
-    var ThreadStream = class extends EventEmitter4 {
+    var ThreadStream = class extends EventEmitter5 {
       constructor(opts = {}) {
         super();
         if (opts.bufferSize < 4) {
@@ -29024,7 +29027,7 @@ var require_meta = __commonJS({
 var require_proto = __commonJS({
   "../../node_modules/.pnpm/pino@9.14.0/node_modules/pino/lib/proto.js"(exports, module) {
     "use strict";
-    var { EventEmitter: EventEmitter4 } = __require("node:events");
+    var { EventEmitter: EventEmitter5 } = __require("node:events");
     var {
       lsCacheSym,
       levelValSym,
@@ -29106,7 +29109,7 @@ var require_proto = __commonJS({
       [getLevelSym]: getLevel,
       [setLevelSym]: setLevel
     };
-    Object.setPrototypeOf(prototype, EventEmitter4.prototype);
+    Object.setPrototypeOf(prototype, EventEmitter5.prototype);
     module.exports = function() {
       return Object.create(prototype);
     };
@@ -32724,14 +32727,14 @@ var require_parse3 = __commonJS({
       };
       if (opts.fastpaths !== false && !/(^[*!]|[/()[\]{}"])/.test(input)) {
         let backslashes = false;
-        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc3, chars, first, rest, index2) => {
+        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc4, chars, first, rest, index2) => {
           if (first === "\\") {
             backslashes = true;
             return m;
           }
           if (first === "?") {
-            if (esc3) {
-              return esc3 + first + (rest ? QMARK.repeat(rest.length) : "");
+            if (esc4) {
+              return esc4 + first + (rest ? QMARK.repeat(rest.length) : "");
             }
             if (index2 === 0) {
               return qmarkNoDot + (rest ? QMARK.repeat(rest.length) : "");
@@ -32742,12 +32745,12 @@ var require_parse3 = __commonJS({
             return DOT_LITERAL.repeat(chars.length);
           }
           if (first === "*") {
-            if (esc3) {
-              return esc3 + first + (rest ? star : "");
+            if (esc4) {
+              return esc4 + first + (rest ? star : "");
             }
             return star;
           }
-          return esc3 ? m : `\\${m}`;
+          return esc4 ? m : `\\${m}`;
         });
         if (backslashes === true) {
           if (opts.unescape === true) {
@@ -35612,10 +35615,10 @@ var require_result = __commonJS({
 var require_query = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/query.js"(exports, module) {
     "use strict";
-    var { EventEmitter: EventEmitter4 } = __require("events");
+    var { EventEmitter: EventEmitter5 } = __require("events");
     var Result2 = require_result();
     var utils = require_utils6();
-    var Query2 = class extends EventEmitter4 {
+    var Query2 = class extends EventEmitter5 {
       constructor(config2, values, callback) {
         super();
         config2 = utils.normalizeQueryConfig(config2, values, callback);
@@ -36737,13 +36740,13 @@ var require_stream = __commonJS({
 var require_connection = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/connection.js"(exports, module) {
     "use strict";
-    var EventEmitter4 = __require("events").EventEmitter;
+    var EventEmitter5 = __require("events").EventEmitter;
     var { parse: parse4, serialize: serialize6 } = require_dist3();
     var { getStream, getSecureStream } = require_stream();
     var flushBuffer = serialize6.flush();
     var syncBuffer = serialize6.sync();
     var endBuffer = serialize6.end();
-    var Connection2 = class extends EventEmitter4 {
+    var Connection2 = class extends EventEmitter5 {
       constructor(config2) {
         super();
         config2 = config2 || {};
@@ -37212,7 +37215,7 @@ var require_lib4 = __commonJS({
 // ../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js
 var require_client = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js"(exports, module) {
-    var EventEmitter4 = __require("events").EventEmitter;
+    var EventEmitter5 = __require("events").EventEmitter;
     var utils = require_utils6();
     var nodeUtils = __require("util");
     var sasl = require_sasl();
@@ -37247,7 +37250,7 @@ var require_client = __commonJS({
       },
       "Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead."
     );
-    var Client3 = class extends EventEmitter4 {
+    var Client3 = class extends EventEmitter5 {
       constructor(config2) {
         super();
         this.connectionParameters = new ConnectionParameters(config2);
@@ -37831,7 +37834,7 @@ var require_client = __commonJS({
 var require_pg_pool = __commonJS({
   "../../node_modules/.pnpm/pg-pool@3.13.0_pg@8.20.0/node_modules/pg-pool/index.js"(exports, module) {
     "use strict";
-    var EventEmitter4 = __require("events").EventEmitter;
+    var EventEmitter5 = __require("events").EventEmitter;
     var NOOP = function() {
     };
     var removeWhere = (list, predicate) => {
@@ -37882,7 +37885,7 @@ var require_pg_pool = __commonJS({
         pool2.emit("error", err, client);
       };
     }
-    var Pool4 = class extends EventEmitter4 {
+    var Pool4 = class extends EventEmitter5 {
       constructor(options, Client3) {
         super();
         this.options = Object.assign({}, options);
@@ -38257,11 +38260,11 @@ var require_pg_pool = __commonJS({
 var require_query2 = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/native/query.js"(exports, module) {
     "use strict";
-    var EventEmitter4 = __require("events").EventEmitter;
+    var EventEmitter5 = __require("events").EventEmitter;
     var util2 = __require("util");
     var utils = require_utils6();
     var NativeQuery = module.exports = function(config2, values, callback) {
-      EventEmitter4.call(this);
+      EventEmitter5.call(this);
       config2 = utils.normalizeQueryConfig(config2, values, callback);
       this.text = config2.text;
       this.values = config2.values;
@@ -38278,7 +38281,7 @@ var require_query2 = __commonJS({
         }.bind(this)
       );
     };
-    util2.inherits(NativeQuery, EventEmitter4);
+    util2.inherits(NativeQuery, EventEmitter5);
     var errorFieldMap = {
       sqlState: "code",
       statementPosition: "position",
@@ -38405,7 +38408,7 @@ var require_client2 = __commonJS({
       throw e;
     }
     var TypeOverrides2 = require_type_overrides();
-    var EventEmitter4 = __require("events").EventEmitter;
+    var EventEmitter5 = __require("events").EventEmitter;
     var util2 = __require("util");
     var ConnectionParameters = require_connection_parameters();
     var NativeQuery = require_query2();
@@ -38415,7 +38418,7 @@ var require_client2 = __commonJS({
       "Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead."
     );
     var Client3 = module.exports = function(config2) {
-      EventEmitter4.call(this);
+      EventEmitter5.call(this);
       config2 = config2 || {};
       this._Promise = config2.Promise || global.Promise;
       this._types = new TypeOverrides2(config2.types);
@@ -38442,7 +38445,7 @@ var require_client2 = __commonJS({
       this.namedQueries = {};
     };
     Client3.Query = NativeQuery;
-    util2.inherits(Client3, EventEmitter4);
+    util2.inherits(Client3, EventEmitter5);
     Client3.prototype._errorAllQueries = function(err) {
       const enqueueError = (query) => {
         process.nextTick(() => {
@@ -38718,6 +38721,54 @@ var require_lib5 = __commonJS({
         return native;
       }
     });
+  }
+});
+
+// src/services/integration/adapters/servsuiteAdapter.ts
+var servsuiteAdapter_exports = {};
+__export(servsuiteAdapter_exports, {
+  probeServSuite: () => probeServSuite,
+  sendServSuiteREST: () => sendServSuiteREST
+});
+async function sendServSuiteREST(payload, config2) {
+  const base = (config2.apiBaseUrl ?? SERVSUITE_DEFAULT_BASE).replace(/\/$/, "");
+  const res = await fetch(`${base}/workorders`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config2.apiKey}`
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(no body)");
+    throw new Error(`ServSuite REST failed (${res.status}): ${body}`);
+  }
+}
+async function probeServSuite(apiKey, apiBaseUrl) {
+  const base = (apiBaseUrl ?? SERVSUITE_DEFAULT_BASE).replace(/\/$/, "");
+  try {
+    const res = await fetch(`${base}/ping`, {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    });
+    if (res.ok) return { ok: true };
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, reason: "auth_failed", message: "ServSuite rejected the API key." };
+    }
+    return { ok: false, reason: "network_error", message: `Unexpected status ${res.status}` };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "network_error",
+      message: err instanceof Error ? err.message : "Network error reaching ServSuite."
+    };
+  }
+}
+var SERVSUITE_DEFAULT_BASE;
+var init_servsuiteAdapter = __esm({
+  "src/services/integration/adapters/servsuiteAdapter.ts"() {
+    "use strict";
+    SERVSUITE_DEFAULT_BASE = "https://api.servsuite.com/v1";
   }
 });
 
@@ -69941,6 +69992,9 @@ var companyFieldIntegrationsTable = pgTable(
     // API key or bearer token for the external system.
     // Never serialised into any API response.
     apiKey: text("api_key").notNull(),
+    // Secondary token required by FieldRoutes (authenticationToken).
+    // Null for PestPac and ServSuite which use a single key.
+    apiToken: text("api_token"),
     // Optional base URL override — useful for on-prem / sandbox environments.
     apiBaseUrl: text("api_base_url"),
     enabled: boolean("enabled").notNull().default(true),
@@ -90383,6 +90437,20 @@ async function notifyTechnicianRouteUpdated(input) {
   await sendExpoPush(messages2, ctx);
 }
 
+// src/lib/enterprise-event-bus.ts
+import { EventEmitter as EventEmitter2 } from "events";
+var EnterpriseEventBus = class extends EventEmitter2 {
+  emitInspectionFinalized(event) {
+    this.emit("inspection:finalized", event);
+  }
+  onInspectionFinalized(listener) {
+    this.on("inspection:finalized", listener);
+    return () => this.off("inspection:finalized", listener);
+  }
+};
+var enterpriseEventBus = new EnterpriseEventBus();
+enterpriseEventBus.setMaxListeners(50);
+
 // src/lib/inspection-complete.ts
 async function ensureReportForInspection(input) {
   const { companyId, inspectionId } = input;
@@ -90650,6 +90718,7 @@ async function runInspectionFinalization(input) {
       context: { stage: "complete_property_memory" }
     });
   }
+  enterpriseEventBus.emitInspectionFinalized({ companyId, inspectionId });
 }
 
 // src/routes/inspections.ts
@@ -95682,6 +95751,8 @@ function getCRMAdapter(provider, apiKey, baseUrl, apiToken) {
     }
     case "pestpac":
       return new PestPacAdapter(apiKey, baseUrl);
+    case "servsuite":
+      throw new Error("ServSuite must be dispatched via EnterpriseAdapterRouter, not getCRMAdapter");
     default:
       throw new Error(`Unsupported CRM provider: ${provider}`);
   }
@@ -108323,7 +108394,7 @@ import * as crypto4 from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path3 from "path";
-import { EventEmitter as EventEmitter2 } from "events";
+import { EventEmitter as EventEmitter3 } from "events";
 
 // ../../node_modules/.pnpm/stripe@22.4.0_@types+node@25.6.2/node_modules/stripe/esm/crypto/NodeCryptoProvider.js
 import * as crypto3 from "crypto";
@@ -108832,11 +108903,11 @@ var NodePlatformFunctions = class extends PlatformFunctions {
     return super.secureCompare(a, b);
   }
   createEmitter() {
-    return new EventEmitter2();
+    return new EventEmitter3();
   }
   /** @override */
   tryBufferData(data) {
-    if (!(data.file.data instanceof EventEmitter2)) {
+    if (!(data.file.data instanceof EventEmitter3)) {
       return Promise.resolve(data);
     }
     const bufferArray = [];
@@ -124616,6 +124687,10 @@ async function probeIntegrationCredentials(systemType, apiKey, accountId, apiBas
       return probePestPac(apiKey, accountId, apiBaseUrl);
     case "fieldroutes":
       return probeFieldRoutes(apiKey, accountId, apiBaseUrl);
+    case "servsuite": {
+      const { probeServSuite: probeServSuite2 } = await Promise.resolve().then(() => (init_servsuiteAdapter(), servsuiteAdapter_exports));
+      return probeServSuite2(apiKey, apiBaseUrl);
+    }
     default: {
       const exhaustive = systemType;
       throw new Error(`Unknown external system: ${String(exhaustive)}`);
@@ -124628,6 +124703,10 @@ async function syncInspectionToExternalSystem(payload) {
       return syncToPestPac(payload);
     case "fieldroutes":
       return syncToFieldRoutes(payload);
+    case "servsuite":
+      throw new Error(
+        "ServSuite must be dispatched via EnterpriseAdapterRouter, not syncInspectionToExternalSystem"
+      );
     default: {
       const exhaustive = payload.externalSystem;
       throw new Error(`Unknown external system: ${String(exhaustive)}`);
@@ -124639,9 +124718,12 @@ async function syncInspectionToExternalSystem(payload) {
 var SYNC_COOLDOWN_SECONDS = 60;
 var router32 = (0, import_express34.Router)();
 var configInputSchema = external_exports.object({
-  systemType: external_exports.enum(["pestpac", "fieldroutes"]),
+  systemType: external_exports.enum(["pestpac", "fieldroutes", "servsuite"]),
   accountId: external_exports.string().min(1),
   apiKey: external_exports.string().min(1),
+  // FieldRoutes requires both apiKey (authenticationKey) and apiToken
+  // (authenticationToken). Ignored for PestPac and ServSuite.
+  apiToken: external_exports.string().optional(),
   apiBaseUrl: external_exports.string().url().optional(),
   enabled: external_exports.boolean().optional()
 });
@@ -124669,7 +124751,7 @@ router32.put("/config", requireRole("owner"), async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid config", issues: parsed.error.issues });
     }
-    const { systemType, accountId, apiKey, apiBaseUrl, enabled } = parsed.data;
+    const { systemType, accountId, apiKey, apiToken, apiBaseUrl, enabled } = parsed.data;
     const now = /* @__PURE__ */ new Date();
     const [existing] = await db.select({ id: companyFieldIntegrationsTable.id }).from(companyFieldIntegrationsTable).where(eq(companyFieldIntegrationsTable.companyId, companyId)).limit(1);
     if (existing) {
@@ -124677,6 +124759,7 @@ router32.put("/config", requireRole("owner"), async (req, res) => {
         systemType,
         accountId,
         apiKey,
+        apiToken: apiToken ?? null,
         apiBaseUrl: apiBaseUrl ?? null,
         enabled: enabled ?? true,
         updatedAt: now
@@ -124687,6 +124770,7 @@ router32.put("/config", requireRole("owner"), async (req, res) => {
         systemType,
         accountId,
         apiKey,
+        apiToken: apiToken ?? null,
         apiBaseUrl: apiBaseUrl ?? null,
         enabled: enabled ?? true
       });
@@ -126100,8 +126184,8 @@ var schedule_default = router35;
 var import_express38 = __toESM(require_express2(), 1);
 
 // src/lib/message-bus.ts
-import { EventEmitter as EventEmitter3 } from "events";
-var MessageBus = class extends EventEmitter3 {
+import { EventEmitter as EventEmitter4 } from "events";
+var MessageBus = class extends EventEmitter4 {
   /** Derive the channel key for a given thread. */
   channelKey(companyId, siteAddress) {
     return `msg:${companyId}:${siteAddress}`;
@@ -126195,7 +126279,8 @@ router36.get("/buildings/:address/inspections", async (req, res) => {
     findingsCount: inspectionsTable.findingsCount,
     mediaCount: inspectionsTable.mediaCount,
     createdAt: inspectionsTable.createdAt,
-    completedAt: inspectionsTable.completedAt
+    completedAt: inspectionsTable.completedAt,
+    signedAt: inspectionsTable.signedAt
   }).from(inspectionsTable).where(
     and(
       eq(inspectionsTable.companyId, access.companyId),
@@ -126207,7 +126292,8 @@ router36.get("/buildings/:address/inspections", async (req, res) => {
       ...r,
       pestTypes: r.pestTypes ?? [],
       createdAt: r.createdAt.toISOString(),
-      completedAt: r.completedAt?.toISOString() ?? null
+      completedAt: r.completedAt?.toISOString() ?? null,
+      signedAt: r.signedAt?.toISOString() ?? null
     }))
   );
 });
@@ -126913,6 +126999,227 @@ var WebhookHandlers = class _WebhookHandlers {
   }
 };
 
+// src/services/integration/adapters/pestPacSoapAdapter.ts
+var PESTPAC_SOAP_DEFAULT_BASE = "https://api.workwave.com/pestpac/v1/soap";
+async function sendPestPacSOAP(payload, config2) {
+  const base = (config2.apiBaseUrl ?? PESTPAC_SOAP_DEFAULT_BASE).replace(/\/$/, "");
+  const findingsXml = payload.InspectionFindings.map(
+    (f) => `
+      <pp:Finding>
+        <pp:Code>${esc3(f.Code)}</pp:Code>
+        <pp:Description>${esc3(f.Description)}</pp:Description>
+        <pp:Severity>${esc3(f.Severity)}</pp:Severity>
+        ${f.CustomFields.WidthMm !== void 0 ? `<pp:WidthMm>${f.CustomFields.WidthMm}</pp:WidthMm>` : ""}
+        ${f.CustomFields.HeightMm !== void 0 ? `<pp:HeightMm>${f.CustomFields.HeightMm}</pp:HeightMm>` : ""}
+        ${f.CustomFields.VerifiedConfidence !== void 0 ? `<pp:VerifiedConfidence>${f.CustomFields.VerifiedConfidence}</pp:VerifiedConfidence>` : ""}
+        ${f.CustomFields.SurfaceType ? `<pp:SurfaceType>${esc3(f.CustomFields.SurfaceType)}</pp:SurfaceType>` : ""}
+        ${f.AttachmentUrl ? `<pp:AttachmentUrl>${esc3(f.AttachmentUrl)}</pp:AttachmentUrl>` : ""}
+      </pp:Finding>`
+  ).join("");
+  const envelope = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope
+  xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:pp="http://tempuri.org/PestPacService">
+  <soap:Body>
+    <pp:SaveInspectionRecord>
+      <pp:WorkOrderId>${esc3(payload.ExternalWorkOrderId)}</pp:WorkOrderId>
+      <pp:PropertyCode>${esc3(payload.LocationReference.PropertyCode)}</pp:PropertyCode>
+      <pp:EmployeeId>${esc3(payload.ServiceDetails.CompletedByEmployeeId)}</pp:EmployeeId>
+      <pp:TechnicianName>${esc3(payload.ServiceDetails.TechnicianName)}</pp:TechnicianName>
+      <pp:ServiceDate>${esc3(payload.ServiceDetails.ServiceDate)}</pp:ServiceDate>
+      <pp:TechnicianSigned>${payload.SignatureAudit.technicianSigned}</pp:TechnicianSigned>
+      <pp:OwnerSigned>${payload.SignatureAudit.ownerSigned}</pp:OwnerSigned>
+      <pp:OwnerNotAvailable>${payload.SignatureAudit.ownerNotAvailable}</pp:OwnerNotAvailable>
+      ${payload.SignatureAudit.signedAt ? `<pp:SignedTimestamp>${esc3(payload.SignatureAudit.signedAt)}</pp:SignedTimestamp>` : ""}
+      <pp:Findings>${findingsXml}
+      </pp:Findings>
+    </pp:SaveInspectionRecord>
+  </soap:Body>
+</soap:Envelope>`;
+  const res = await fetch(`${base}/SaveInspectionRecord`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/xml; charset=utf-8",
+      SOAPAction: "http://tempuri.org/PestPacService/SaveInspectionRecord",
+      "X-WorkWave-Key": config2.apiKey
+    },
+    body: envelope
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(no body)");
+    throw new Error(`PestPac SOAP failed (${res.status}): ${body}`);
+  }
+}
+function esc3(str4) {
+  return str4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+// src/services/integration/enterprise-router.ts
+init_servsuiteAdapter();
+var EnterpriseAdapterRouter = class {
+  /**
+   * Main entry point — called by the enterprise event bus listener.
+   * Loads inspection + config, builds the structured payload, dispatches.
+   */
+  static async dispatch(event) {
+    const { companyId, inspectionId } = event;
+    const [config2] = await db.select().from(companyFieldIntegrationsTable).where(eq(companyFieldIntegrationsTable.companyId, companyId)).limit(1);
+    if (!config2 || !config2.enabled) return;
+    const [inspectionRows, analysisRows, mediaRows] = await Promise.all([
+      db.select().from(inspectionsTable).where(
+        and(
+          eq(inspectionsTable.id, inspectionId),
+          eq(inspectionsTable.companyId, companyId)
+        )
+      ).limit(1),
+      db.select().from(analysisResultsTable).where(
+        and(
+          eq(analysisResultsTable.inspectionId, inspectionId),
+          eq(analysisResultsTable.companyId, companyId)
+        )
+      ).orderBy(desc(analysisResultsTable.createdAt)).limit(1),
+      db.select().from(inspectionMediaTable).where(
+        and(
+          eq(inspectionMediaTable.inspectionId, inspectionId),
+          eq(inspectionMediaTable.companyId, companyId)
+        )
+      )
+    ]);
+    const inspection = inspectionRows[0];
+    if (!inspection) return;
+    const analysis = analysisRows[0];
+    const rawFindings = analysis?.findings ?? [];
+    const inspectionFindings = rawFindings.map((f) => {
+      const meas = f.measurementEstimate;
+      const widthMm = meas?.gapWidthIn != null ? Math.round(meas.gapWidthIn * 25.4) : void 0;
+      const heightMm = meas?.heightFt != null ? Math.round(meas.heightFt * 304.8) : void 0;
+      const evidenceMedia = mediaRows.find((m) => m.url === f.imageUrl);
+      const code = [
+        (f.category ?? "UNKNOWN").toUpperCase().replace(/\s+/g, "_"),
+        (f.severity ?? "LOW").toUpperCase()
+      ].join("_");
+      return {
+        Code: code,
+        Description: f.description ?? f.category ?? "Finding detected",
+        Severity: f.severity ?? "low",
+        CustomFields: {
+          ...widthMm !== void 0 && { WidthMm: widthMm },
+          ...heightMm !== void 0 && { HeightMm: heightMm },
+          ...meas?.confidence !== void 0 && { VerifiedConfidence: meas.confidence }
+        },
+        ...evidenceMedia?.url && { AttachmentUrl: evidenceMedia.url }
+      };
+    });
+    const payload = {
+      ExternalWorkOrderId: String(inspection.id),
+      LocationReference: {
+        PropertyCode: inspection.siteAddress ?? ""
+      },
+      ServiceDetails: {
+        CompletedByEmployeeId: inspection.technicianId ?? config2.accountId,
+        ServiceDate: (inspection.completedAt ?? inspection.createdAt).toISOString(),
+        TechnicianName: inspection.technicianName ?? ""
+      },
+      InspectionFindings: inspectionFindings,
+      SignatureAudit: {
+        technicianSigned: !!inspection["technicianSignature"],
+        ownerSigned: !!inspection["ownerSignature"],
+        ownerNotAvailable: !!(inspection["ownerNotAvailable"] ?? false),
+        signedAt: inspection["signedAt"]?.toISOString() ?? null
+      }
+    };
+    let success2 = false;
+    let errorMessage = null;
+    try {
+      if (config2.systemType === "pestpac") {
+        await sendPestPacSOAP(payload, {
+          apiKey: config2.apiKey,
+          apiBaseUrl: config2.apiBaseUrl
+        });
+        success2 = true;
+      } else if (config2.systemType === "servsuite") {
+        await sendServSuiteREST(payload, {
+          apiKey: config2.apiKey,
+          apiBaseUrl: config2.apiBaseUrl
+        });
+        success2 = true;
+      } else if (config2.systemType === "fieldroutes") {
+        const photos = mediaRows.filter((m) => m.mediaType === "photo" && m.url).map((m) => ({
+          url: m.url,
+          caption: m.caption ?? null,
+          severity: rawFindings.find((f) => f.imageUrl === m.url)?.severity ?? "low"
+        }));
+        const pestsFound = [
+          ...new Set(
+            rawFindings.filter((f) => f.category === "Pest Activity" || f.possiblePest).map((f) => f.possiblePest ?? f.category).filter((v) => !!v)
+          )
+        ];
+        const summary = rawFindings.length > 0 ? rawFindings.slice(0, 5).map((f) => `${f.category}: ${f.description}`).join(". ") : "No significant findings detected.";
+        await syncInspectionToExternalSystem({
+          externalSystem: "fieldroutes",
+          accountId: config2.accountId,
+          apiKey: config2.apiKey,
+          apiBaseUrl: config2.apiBaseUrl,
+          inspectionDate: (inspection.completedAt ?? inspection.createdAt).toISOString().split("T")[0],
+          reportSummary: summary,
+          photos,
+          treatmentConditions: {
+            pestsFound,
+            chemicalsUsed: [],
+            notes: inspection.notes ?? null
+          }
+        });
+        success2 = true;
+      }
+    } catch (err) {
+      errorMessage = err instanceof Error ? err.message : "Enterprise sync failed";
+      logger2.error(
+        { companyId, inspectionId, system: config2.systemType, error: errorMessage },
+        "[EnterpriseAdapterRouter] dispatch failed"
+      );
+    }
+    await db.insert(inspectionSyncLogsTable).values({
+      companyId,
+      inspectionId,
+      systemType: config2.systemType,
+      success: success2,
+      errorMessage,
+      resultJson: success2 ? {
+        dispatched: true,
+        system: config2.systemType,
+        findingCount: inspectionFindings.length,
+        at: (/* @__PURE__ */ new Date()).toISOString(),
+        trigger: "auto"
+      } : null
+    }).catch((logErr) => {
+      logger2.error({ logErr }, "[EnterpriseAdapterRouter] failed to write sync log");
+    });
+  }
+};
+
+// src/lib/inspection-triggers.ts
+function setupInspectionTriggers() {
+  enterpriseEventBus.onInspectionFinalized(async (event) => {
+    logger2.info(
+      { companyId: event.companyId, inspectionId: event.inspectionId },
+      "[EnterpriseBridge] Inspection finalized \u2014 routing to enterprise adapters"
+    );
+    try {
+      await EnterpriseAdapterRouter.dispatch(event);
+      logger2.info(
+        { companyId: event.companyId, inspectionId: event.inspectionId },
+        "[EnterpriseBridge] Dispatch complete"
+      );
+    } catch (err) {
+      logger2.error(
+        { err, companyId: event.companyId, inspectionId: event.inspectionId },
+        "[EnterpriseBridge] Unhandled error in dispatch \u2014 this is a bug"
+      );
+    }
+  });
+  logger2.info("[EnterpriseBridge] Inspection triggers registered");
+}
+
 // src/app.ts
 var app = (0, import_express44.default)();
 app.set("trust proxy", 1);
@@ -127006,6 +127313,7 @@ var apiLimiter = rate_limit_default({
   message: { error: "Too many requests, please try again later." }
 });
 app.use("/api", apiLimiter, routes_default);
+setupInspectionTriggers();
 var app_default = app;
 
 // src/lib/clerk-redirect-urls.ts

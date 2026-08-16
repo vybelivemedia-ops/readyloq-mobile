@@ -14,6 +14,7 @@ import router from "./routes";
 import faieRouter from "./routes/faie";
 import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./lib/webhookHandlers";
+import { setupInspectionTriggers } from "./lib/inspection-triggers";
 
 const app: Express = express();
 
@@ -149,5 +150,10 @@ const apiLimiter = rateLimit({
 });
 
 app.use("/api", apiLimiter, router);
+
+// ── Enterprise Bridge — register inspection lifecycle triggers ────────────────
+// Must run after all middleware and routes are registered so the event bus
+// listener is alive before any finalization can fire.
+setupInspectionTriggers();
 
 export default app;
