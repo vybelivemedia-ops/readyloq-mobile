@@ -6,7 +6,12 @@ buildscript {
     mavenCentral()
   }
   dependencies {
-    classpath('com.android.tools.build:gradle')
+    // Pin the exact AGP version that @react-native/gradle-plugin@0.81.5 declares
+    // in its own libs.versions.toml (agp = "8.11.0").  Leaving this unversioned
+    // lets Gradle pick whatever it resolves first, which can differ between EAS
+    // cloud and local builds.  9.0 is NOT used: it removed APIs the RN plugin
+    // still calls, which would break codegen and autolinking.
+    classpath('com.android.tools.build:gradle:8.11.0')
     classpath('com.facebook.react:react-native-gradle-plugin')
     classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
   }
