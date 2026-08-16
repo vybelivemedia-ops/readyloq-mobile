@@ -1,19 +1,49 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   useListIntelligenceRecords,
+  useListIntelligenceCategories,
   useReviewIntelligenceRecord,
   getListIntelligenceRecordsQueryKey,
   type IntelligenceRecord,
+  type IntelligenceReviewInputSeverity,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, CheckCircle2, XCircle, Brain, UserCheck, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Brain,
+  UserCheck,
+  ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 const PAGE_SIZE = 20;
+
+const SEVERITY_OPTIONS: { value: IntelligenceReviewInputSeverity; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'moderate', label: 'Moderate' },
+  { value: 'high', label: 'High' },
+  { value: 'critical', label: 'Critical' },
+];
 
 function labelize(slug?: string | null): string {
   if (!slug) return '—';
@@ -43,12 +73,81 @@ function VerificationBadge({ level }: { level: number }) {
   return <Badge variant="secondary" className="capitalize">{label} · L{level}</Badge>;
 }
 
+// State tracks the manager's edits. Empty string means "unchanged from the record".
+// Managers can only set values, not clear them — this avoids ambiguity between
+// "I want to clear this field" and "I haven't changed this field yet."
+interface LabelEdits {
+  category: string;      // '' = keep record.category
+  subcategory: string;   // '' = keep record.subcategory
+  possiblePest: string;  // '' = keep record.possiblePest
+  severity: string;      // '' = keep record.severity
+}
+
+function initEdits(record: IntelligenceRecord | null): LabelEdits {
+  return {
+    category: record?.category ?? '',
+    subcategory: record?.subcategory ?? '',
+    possiblePest: record?.possiblePest ?? '',
+    severity: record?.severity ?? '',
+  };
+}
+
+/**
+ * Returns only the fields that should be sent to the API as corrections.
+ *
+ * Rules:
+ * - category: sent only when non-empty and different from the record.
+ * - subcategory: when the category is being changed, subcategory is ALWAYS
+ *   included (even as '' to clear the old value) so we never persist a
+ *   category/subcategory pair from two different taxonomy groups.
+ *   When only subcategory changes, sent only when non-empty and different.
+ * - possiblePest / severity: sent only when non-empty and different.
+ *   An empty value is treated as "no change" so managers cannot accidentally
+ *   clear a label by blanking a text field.
+ */
+function buildLabelPayload(
+  edits: LabelEdits,
+  record: IntelligenceRecord,
+): Record<string, string> {
+  const payload: Record<string, string> = {};
+
+  const categoryChanged =
+    Boolean(edits.category) && edits.category !== (record.category ?? '');
+
+  if (categoryChanged) {
+    payload.category = edits.category;
+    // Always include subcategory when category changes so the old subcategory
+    // is not silently retained under a different category.
+    payload.subcategory = edits.subcategory; // may be '' — that's intentional
+  } else if (edits.subcategory && edits.subcategory !== (record.subcategory ?? '')) {
+    payload.subcategory = edits.subcategory;
+  }
+
+  // Pest: empty input is treated as "no change".
+  if (edits.possiblePest && edits.possiblePest !== (record.possiblePest ?? '')) {
+    payload.possiblePest = edits.possiblePest;
+  }
+
+  if (edits.severity && edits.severity !== (record.severity ?? '')) {
+    payload.severity = edits.severity;
+  }
+
+  return payload;
+}
+
 export function IntelligenceReview() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [comment, setComment] = useState('');
   const [page, setPage] = useState(1);
+  const [editOpen, setEditOpen] = useState(false);
+  const [edits, setEdits] = useState<LabelEdits>({
+    category: '',
+    subcategory: '',
+    possiblePest: '',
+    severity: '',
+  });
 
   const listParams = { status: 'confirmed', page, limit: PAGE_SIZE } as const;
   const { data, isLoading, isFetching } = useListIntelligenceRecords(listParams);
@@ -56,27 +155,54 @@ export function IntelligenceReview() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const { data: categories = [] } = useListIntelligenceCategories();
+
   const selected: IntelligenceRecord | null = useMemo(
     () => records.find((r) => r.id === selectedId) ?? records[0] ?? null,
     [records, selectedId],
   );
 
+  // Reset edits whenever the selected record changes.
+  useEffect(() => {
+    setEdits(initEdits(selected));
+    setEditOpen(false);
+  }, [selected?.id]);
+
+  const selectedCategory = categories.find((c) => c.slug === edits.category);
+  const subcategoryOptions = selectedCategory?.subcategories ?? [];
+
+  // Derived: which fields will actually be sent in the review payload.
+  const labelPayload = selected ? buildLabelPayload(edits, selected) : {};
+  const edited = Object.keys(labelPayload).length > 0;
+
   const review = useReviewIntelligenceRecord({
     mutation: {
       onSuccess: (_res, vars) => {
+        const action = vars.data.action;
+        // Detect corrections from the payload that was actually submitted.
+        const wasEdited = !!(
+          vars.data.category ||
+          vars.data.subcategory ||
+          vars.data.possiblePest ||
+          vars.data.severity
+        );
         toast({
-          title: vars.data.action === 'approve' ? 'Approved for training' : 'Rejected',
+          title:
+            action === 'approve'
+              ? wasEdited ? 'Approved with corrections' : 'Approved for training'
+              : 'Rejected',
           description:
-            vars.data.action === 'approve'
-              ? 'Record promoted to manager-verified and marked approved for training.'
+            action === 'approve'
+              ? wasEdited
+                ? 'Labels corrected and record promoted to manager-verified.'
+                : 'Record promoted to manager-verified and marked approved for training.'
               : 'Record rejected and excluded from the training dataset.',
         });
         setComment('');
         setSelectedId(null);
-        // If this was the last record on the last page, step back a page so the
-        // queue never strands the manager on an empty page.
+        setEditOpen(false);
+        // If this was the last record on the last page, step back a page.
         if (records.length <= 1 && page > 1) setPage(page - 1);
-        // Invalidate every cached page of the pending queue.
         queryClient.invalidateQueries({ queryKey: [getListIntelligenceRecordsQueryKey()[0]] });
       },
       onError: (err: any) => {
@@ -93,7 +219,12 @@ export function IntelligenceReview() {
     if (!selected) return;
     review.mutate({
       id: selected.id,
-      data: { action, ...(comment.trim() ? { comment: comment.trim() } : {}) },
+      data: {
+        action,
+        ...(comment.trim() ? { comment: comment.trim() } : {}),
+        // Only include label corrections on approve (not on reject).
+        ...(action === 'approve' ? labelPayload : {}),
+      },
     });
   };
 
@@ -263,6 +394,125 @@ export function IntelligenceReview() {
                 )}
               </div>
 
+              {/* ── Edit labels ───────────────────────────────────────────────── */}
+              <div className="bg-card border border-border rounded-xl overflow-hidden" data-testid="edit-labels-panel">
+                <button
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-muted/40 transition-colors"
+                  onClick={() => setEditOpen((v) => !v)}
+                  data-testid="edit-labels-toggle"
+                >
+                  <span className="flex items-center gap-2">
+                    <Pencil className="w-4 h-4 text-muted-foreground" />
+                    Edit labels before approving
+                    {edited && (
+                      <Badge variant="secondary" className="text-xs">
+                        {Object.keys(labelPayload).length} change{Object.keys(labelPayload).length !== 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </span>
+                  {editOpen
+                    ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                </button>
+
+                {editOpen && (
+                  <div className="px-4 pb-4 pt-1 border-t border-border space-y-4">
+                    <p className="text-xs text-muted-foreground">
+                      Corrections here are saved alongside the approval (verification level&nbsp;4). Only changed fields are sent.
+                    </p>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {/* Category */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="edit-category" className="text-xs font-medium">Category</Label>
+                        <Select
+                          value={edits.category || undefined}
+                          onValueChange={(v) =>
+                            setEdits((prev) => ({ ...prev, category: v, subcategory: '' }))
+                          }
+                        >
+                          <SelectTrigger id="edit-category" data-testid="edit-category">
+                            <SelectValue placeholder="Select category…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((c) => (
+                              <SelectItem key={c.slug} value={c.slug}>
+                                {c.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {edits.category && edits.category !== (selected?.category ?? '') && (
+                          <p className="text-[11px] text-amber-600">
+                            Category changed — subcategory will be cleared unless you pick a new one below.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Subcategory — cascades from category */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="edit-subcategory" className="text-xs font-medium">Subcategory</Label>
+                        <Select
+                          value={edits.subcategory || undefined}
+                          onValueChange={(v) => setEdits((prev) => ({ ...prev, subcategory: v }))}
+                          disabled={subcategoryOptions.length === 0}
+                        >
+                          <SelectTrigger id="edit-subcategory" data-testid="edit-subcategory">
+                            <SelectValue placeholder={
+                              subcategoryOptions.length === 0
+                                ? 'Pick a category first'
+                                : 'Select subcategory…'
+                            } />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {subcategoryOptions.map((s) => (
+                              <SelectItem key={s.slug} value={s.slug}>
+                                {s.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Pest / species */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="edit-pest" className="text-xs font-medium">Pest / species</Label>
+                        <Input
+                          id="edit-pest"
+                          data-testid="edit-pest"
+                          placeholder="e.g. german_cockroach"
+                          value={edits.possiblePest}
+                          onChange={(e) =>
+                            setEdits((prev) => ({ ...prev, possiblePest: e.target.value }))
+                          }
+                        />
+                      </div>
+
+                      {/* Severity */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="edit-severity" className="text-xs font-medium">Severity</Label>
+                        <Select
+                          value={edits.severity || undefined}
+                          onValueChange={(v) => setEdits((prev) => ({ ...prev, severity: v }))}
+                        >
+                          <SelectTrigger id="edit-severity" data-testid="edit-severity">
+                            <SelectValue placeholder="Select severity…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SEVERITY_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Actions ───────────────────────────────────────────────────── */}
               <div className="bg-card border border-border rounded-xl p-4 space-y-3">
                 <Textarea
                   placeholder="Optional review comment…"
@@ -278,8 +528,10 @@ export function IntelligenceReview() {
                     onClick={() => act('approve')}
                     data-testid="review-approve"
                   >
-                    {review.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                    Approve for training
+                    {review.isPending
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <CheckCircle2 className="w-4 h-4" />}
+                    {edited ? 'Correct & approve' : 'Approve for training'}
                   </Button>
                   <Button
                     variant="destructive"
