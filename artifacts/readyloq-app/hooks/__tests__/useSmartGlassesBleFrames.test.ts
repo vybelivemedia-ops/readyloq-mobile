@@ -887,3 +887,237 @@ describe("useSmartGlassesBleFrames — writeAsStringAsync failure mid-session", 
     unmount2();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite 5 — Android background/foreground cycle
+//
+// Verifies that the module-level counters (_persistedFrameCount,
+// _persistedDroppedFrameCount) correctly survive a component unmount+remount
+// cycle (which Android triggers when the user backgrounds the app mid-inspection
+// and then brings it back to the foreground):
+//
+//   ✓ frameCount on remount continues from where it left off (not reset to 0)
+//   ✓ droppedFrameCount on remount continues from where it left off
+//   ✓ the startup scan on remount does NOT delete the still-active pre-unmount
+//     session directory (age guard — it is younger than MIN_ORPHAN_AGE_MS)
+//   ✓ no extra deleteAsync calls are issued for .jpg files that were already
+//     cleaned up during the pre-unmount session
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("useSmartGlassesBleFrames — Android background/foreground cycle", () => {
+  async function flushMicrotasks(ticks = 300) {
+    for (let i = 0; i < ticks; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  it("frameCount resumes from the persisted value after unmount and remount (not reset to 0)", async () => {
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const fs = await import("expo-file-system/legacy");
+
+    // ── First mount (inspection in progress) ────────────────────────────────
+    const { result: result1, unmount: unmount1 } = await mountHook(
+      useSmartGlassesBleFrames,
+      { active: true, onFrame },
+    );
+
+    // Emit 7 frames successfully
+    await act(async () => {
+      for (let i = 0; i < 7; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    expect(result1.current.frameCount).toBe(7);
+
+    // ── Simulate Android background (unmount) ────────────────────────────────
+    unmount1();
+
+    // ── Simulate Android foreground (remount) ────────────────────────────────
+    // Re-import returns the same cached module instance, so _persistedFrameCount
+    // still holds 7 from the previous mount.
+    const hookAfterRemount = await importHook();
+    const { result: result2, unmount: unmount2 } = await mountHook(
+      hookAfterRemount,
+      { active: true, onFrame },
+    );
+
+    // The useState initializer reads _persistedFrameCount (7), so the count
+    // must not restart from 0.
+    expect(result2.current.frameCount).toBe(7);
+
+    // Emit 3 more frames on the remounted hook
+    await act(async () => {
+      for (let i = 0; i < 3; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    // Total must be 10 (7 from before background + 3 new)
+    expect(result2.current.frameCount).toBe(10);
+
+    unmount2();
+  });
+
+  it("droppedFrameCount resumes from the persisted value after unmount and remount", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    // Make every write fail so all frames are dropped
+    vi.mocked(fs.writeAsStringAsync).mockRejectedValue(
+      new Error("ENOSPC: no space left on device"),
+    );
+
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    // ── First mount ──────────────────────────────────────────────────────────
+    const { result: result1, unmount: unmount1 } = await mountHook(
+      useSmartGlassesBleFrames,
+      { active: true, onFrame },
+    );
+
+    await act(async () => {
+      for (let i = 0; i < 4; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    expect(result1.current.droppedFrameCount).toBe(4);
+
+    // ── Android background ───────────────────────────────────────────────────
+    unmount1();
+
+    // ── Android foreground (remount) ─────────────────────────────────────────
+    const hookAfterRemount = await importHook();
+    const { result: result2, unmount: unmount2 } = await mountHook(
+      hookAfterRemount,
+      { active: true, onFrame },
+    );
+
+    // droppedFrameCount must continue from 4, not restart from 0
+    expect(result2.current.droppedFrameCount).toBe(4);
+
+    unmount2();
+  });
+
+  it("startup scan on remount does NOT delete the pre-unmount session directory (age guard)", async () => {
+    const fs = await import("expo-file-system/legacy");
+
+    // ── First mount ──────────────────────────────────────────────────────────
+    // Sessions base dir does not exist yet → startup creates session dir only
+    vi.mocked(fs.getInfoAsync).mockResolvedValue({ exists: false } as never);
+    vi.mocked(fs.readDirectoryAsync).mockResolvedValue([]);
+
+    mockBle = buildMockBle("connected");
+    const { unmount: unmount1 } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+    });
+
+    // Capture the session directory the first mount created.
+    const firstMountMkdirCalls = vi
+      .mocked(fs.makeDirectoryAsync)
+      .mock.calls.map((c) => c[0]);
+    // There should be exactly one makeDirectoryAsync call for the session dir.
+    expect(firstMountMkdirCalls.length).toBeGreaterThanOrEqual(1);
+    const firstSessionDir = firstMountMkdirCalls[0]; // e.g. /tmp/test-cache/glasses_sessions/<id>/
+    const firstSessionId = firstSessionDir
+      .replace(/.*glasses_sessions\//, "")
+      .replace(/\/$/, "");
+
+    // ── Android background ───────────────────────────────────────────────────
+    unmount1();
+
+    // Reset mock tracking counters (keep behaviour the same)
+    vi.clearAllMocks();
+    // Re-apply defaults after clearAllMocks
+    vi.mocked(fs.makeDirectoryAsync).mockResolvedValue(undefined as never);
+    vi.mocked(fs.deleteAsync).mockResolvedValue(undefined as never);
+    vi.mocked(fs.writeAsStringAsync).mockResolvedValue(undefined as never);
+
+    // Now the sessions base dir exists, containing the first session's dir.
+    // The dir is milliseconds old — well below MIN_ORPHAN_AGE_MS (5 min).
+    vi.mocked(fs.getInfoAsync).mockResolvedValue({ exists: true } as never);
+    vi.mocked(fs.readDirectoryAsync).mockResolvedValue([firstSessionId]);
+
+    // ── Android foreground (remount) ─────────────────────────────────────────
+    const { unmount: unmount2 } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+    });
+
+    // The first session dir is too young to be an orphan — must NOT be deleted.
+    const deletedPaths = vi
+      .mocked(fs.deleteAsync)
+      .mock.calls.map(([p]) => p);
+
+    const firstSessionDirNormalised = firstSessionDir.replace(/\/$/, "");
+    expect(deletedPaths).not.toContain(firstSessionDirNormalised);
+
+    unmount2();
+  });
+
+  it("no extra deleteAsync calls for .jpg files from the pre-unmount session after remount", async () => {
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const fs = await import("expo-file-system/legacy");
+
+    // ── First mount: emit 5 frames, each written and deleted normally ────────
+    const { unmount: unmount1 } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      for (let i = 0; i < 5; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(5);
+
+    // Record every .jpg URI that was deleted during the first session.
+    const firstSessionJpgDeletes = new Set(
+      vi
+        .mocked(fs.deleteAsync)
+        .mock.calls.filter(([uri]) => uri.endsWith(".jpg"))
+        .map(([uri]) => uri),
+    );
+    expect(firstSessionJpgDeletes.size).toBe(5);
+
+    // ── Android background ───────────────────────────────────────────────────
+    unmount1();
+
+    // Clear only the call records for deleteAsync so we can inspect what the
+    // second mount does in isolation.
+    vi.mocked(fs.deleteAsync).mockClear();
+
+    // ── Android foreground (remount) ─────────────────────────────────────────
+    const { unmount: unmount2 } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    // No frames emitted yet on the second mount — just startup + idle.
+    await act(async () => {
+      await flushMicrotasks(50);
+    });
+
+    // None of the .jpg URIs from the first session should appear in a new
+    // deleteAsync call (they were already cleaned up; the remount has no reason
+    // to touch them again).
+    const secondMountJpgDeletes = vi
+      .mocked(fs.deleteAsync)
+      .mock.calls.filter(([uri]) => uri.endsWith(".jpg"))
+      .map(([uri]) => uri);
+
+    for (const uri of secondMountJpgDeletes) {
+      expect(firstSessionJpgDeletes.has(uri)).toBe(false);
+    }
+
+    unmount2();
+  });
+});
