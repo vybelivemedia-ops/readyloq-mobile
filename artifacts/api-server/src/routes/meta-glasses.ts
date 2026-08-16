@@ -566,9 +566,11 @@ router.get(
       return res.status(404).json({ error: "Session not found or expired" });
     }
 
-    // Ensure this session belongs to the authenticated user's company
+    // Ensure this session belongs to the authenticated user's company.
+    // Return 404 (not 403) so that session existence is not leaked to
+    // a caller from a different company.
     if (session.companyId !== req.user!.companyId) {
-      return res.status(403).json({ error: "Forbidden" });
+      return res.status(404).json({ error: "Session not found or expired" });
     }
 
     const since = Number(String(req.query.since ?? "0"));

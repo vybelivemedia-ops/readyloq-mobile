@@ -209,3 +209,59 @@ describe("POST /api/meta-glasses/session — cross-company isolation", () => {
     expect(res.status).toBe(400);
   });
 });
+
+// ─── GET /events/:sessionId — cross-company isolation ────────────────────────
+
+describe("GET /api/meta-glasses/events/:sessionId — cross-company isolation", () => {
+  let sessionIdForA: string;
+
+  // Create a session owned by Company A before these tests run.
+  beforeAll(async () => {
+    asUser(TECH_A_CLERK);
+    const res = await request(app)
+      .post("/api/meta-glasses/session")
+      .send({ inspectionId: inspectionAId });
+    sessionIdForA = res.body.sessionId as string;
+  });
+
+  it("returns 200 and events when Tech A polls their own session", async () => {
+    asUser(TECH_A_CLERK);
+    const res = await request(app).get(
+      `/api/meta-glasses/events/${sessionIdForA}`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("sessionId", sessionIdForA);
+    expect(res.body).toHaveProperty("events");
+  });
+
+  it("returns 404 when Tech B polls a session belonging to Company A", async () => {
+    asUser(TECH_B_CLERK);
+    const res = await request(app).get(
+      `/api/meta-glasses/events/${sessionIdForA}`,
+    );
+
+    // Must be 404 — same response as "not found" so the session's existence
+    // is not leaked to a caller from a different company.
+    expect(res.status).toBe(404);
+    expect(res.body).toHaveProperty("error");
+  });
+
+  it("returns 404 for a completely unknown sessionId", async () => {
+    asUser(TECH_A_CLERK);
+    const res = await request(app).get(
+      "/api/meta-glasses/events/00000000-0000-0000-0000-000000000000",
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 401 for an unauthenticated poll attempt", async () => {
+    asUser(null);
+    const res = await request(app).get(
+      `/api/meta-glasses/events/${sessionIdForA}`,
+    );
+
+    expect(res.status).toBe(401);
+  });
+});
