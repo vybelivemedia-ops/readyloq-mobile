@@ -13,7 +13,7 @@ import {
   type IntelligenceSeverity,
   type TreatmentOutcome,
 } from "@workspace/db";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import {
   UpdateIntelligenceSettingsBody,
   ListIntelligenceRecordsQueryParams,
@@ -251,7 +251,17 @@ router.get("/corrections/export", requireRole("manager"), async (req, res) => {
     const rows = await db
       .select()
       .from(intelligenceRecordsTable)
-      .where(eq(intelligenceRecordsTable.companyId, companyId))
+      .where(
+        and(
+          eq(intelligenceRecordsTable.companyId, companyId),
+          // Only export records the manager has explicitly approved for training.
+          // Rejected records (approvedForTraining=false) must never appear in a
+          // training export — even if their verificationLevel is high — because a
+          // rejection is an explicit quality signal that the record is unsuitable.
+          isNotNull(intelligenceRecordsTable.approvedForTraining),
+          eq(intelligenceRecordsTable.approvedForTraining, true),
+        ),
+      )
       .orderBy(desc(intelligenceRecordsTable.createdAt));
 
     const records = rows.map((r) => ({
