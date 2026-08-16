@@ -50,6 +50,13 @@ export {
   type BleAcousticSensorProvider,
 } from "./ble-acoustic-sensor-provider";
 
+// ── Burst measurement ─────────────────────────────────────────────────────────
+export {
+  burstMeasurementManager,
+  type BurstFrame,
+  type BlendedMeasurementResult,
+} from "./BurstMeasurementManager";
+
 // ── Measurement Bridge ────────────────────────────────────────────────────────
 export {
   setLastMeasurementReading,

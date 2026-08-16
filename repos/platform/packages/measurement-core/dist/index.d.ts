@@ -579,4 +579,240 @@ export declare class PolygonCalculator {
     /** Ray-casting point-in-polygon test. */
     private static _pointInPolygon;
 }
+/**
+ * One frame captured during a burst measurement trigger.
+ * The caller supplies the local URI; optional IMU data improves SfM accuracy.
+ */
+export interface BurstFrame {
+    /** Local file URI (expo-camera output or expo-image-picker). */
+    uri: string;
+    /** Unix timestamp in milliseconds at shutter release. */
+    capturedAt: number;
+    /** Device orientation at capture time, if available from expo-sensors. */
+    imuHint?: {
+        pitchDeg: number;
+        rollDeg: number;
+        yawDeg: number;
+    };
+}
+/**
+ * Relative depth map produced by a Structure-from-Motion or monocular depth
+ * engine. Values are normalised 0 (near) → 1 (far); not yet metric.
+ */
+export interface SfMDepthMap {
+    width: number;
+    height: number;
+    /** Row-major relative depth values. Length = width × height. */
+    relativeDepth: Float32Array;
+    /**
+     * Estimated scale variance (lower = more internally consistent).
+     * Computed as normalised variance across per-pixel depth values.
+     */
+    scaleVariance: number;
+    /** Number of frames that contributed to this map. */
+    frameCount: number;
+}
+/**
+ * Contract for any SfM / depth estimation back-end.
+ *
+ * @see FallbackSfMProvider — ships with measurement-core; no native modules.
+ *
+ * Production implementations:
+ *   - ARKit depth (LiDAR iPhone)    — inject via DeviceProvider
+ *   - ARCore depth (Android)        — inject via DeviceProvider
+ *   - Neural monocular depth model  — inject via MeasurementInferenceProvider
+ */
+export interface SfMProvider {
+    /**
+     * Compute a relative depth map from one or more burst frames.
+     * Single-frame input must still be accepted and should return the provider's
+     * best single-frame estimate.
+     */
+    computeDepth(frames: BurstFrame[]): Promise<SfMDepthMap>;
+}
+/**
+ * Built-in fallback SfM provider.
+ *
+ * Produces a flat (uniform 0.5) relative depth map — meaning "no structural
+ * depth information is available." The pipeline then relies entirely on the
+ * reference-object anchor to derive metric depth. Accuracy is equivalent to
+ * the single-frame pinhole estimator (`BasicDimensionEstimator`), but the
+ * pipeline still applies planar locking for perspective correction.
+ *
+ * Replace with a native ARKit/ARCore or neural-depth provider for higher
+ * accuracy without a reference object.
+ */
+export declare class FallbackSfMProvider implements SfMProvider {
+    computeDepth(frames: BurstFrame[]): Promise<SfMDepthMap>;
+}
+/**
+ * Result of a scale anchoring operation.
+ * `metersPerRelativeUnit` converts any relative depth value to an absolute
+ * depth in metres by simple multiplication.
+ */
+export interface ScaleAnchorResult {
+    /** Multiply by a relative depth value to get metres. */
+    metersPerRelativeUnit: number;
+    /**
+     * The estimated absolute depth (metres) at the reference object's centroid.
+     * Used as the single reference depth when the depth map is uniform (fallback
+     * SfM provider).
+     */
+    referenceDepthMeters: number;
+    /** Pixel width of the reference object as measured in the image. */
+    referencePixelWidth: number;
+    /** Real-world width of the reference object in mm. */
+    referenceRealWidthMm: number;
+    /** Calibration confidence (0–1). */
+    confidence: number;
+}
+/**
+ * Anchors a relative SfMDepthMap to metric (absolute) scale using a reference
+ * object with known physical dimensions.
+ *
+ * The technician (or auto-detector) supplies the bounding box of a reference
+ * object in image space; this class back-solves the depth at that location
+ * from the pinhole model and uses it to globally scale the depth map.
+ *
+ * Formula:
+ *   depth_m = focalLengthPx × realWidthMm / (pixelWidth × 1000)
+ *   metersPerRelativeUnit = depth_m / relativeDepth_at_centroid
+ */
+export declare class ReferenceScaleAnchor {
+    private readonly focalLengthPx;
+    constructor(focalLengthPx?: number);
+    /**
+     * Compute scale anchoring from a bounding box dragged by the technician.
+     *
+     * @param box              Normalised bounding box (0–1 coords) of reference object.
+     * @param imageWidthPx     Width of the source image in pixels.
+     * @param imageHeightPx    Height of the source image in pixels.
+     * @param referenceObject  Known-dimension reference (credit card, outlet plate, etc.).
+     * @param depthMap         The relative SfM depth map to be scaled.
+     */
+    anchor(box: BoundingRegion, imageWidthPx: number, imageHeightPx: number, referenceObject: ReferenceObject, depthMap: SfMDepthMap): ScaleAnchorResult;
+    /**
+     * Convert a normalised image point to a world-space Point3D using the
+     * scaled depth map.
+     *
+     * @param pt     Normalised image point (0–1).
+     * @param depthMap  The relative SfM depth map.
+     * @param anchor    The scale anchor result from `anchor()`.
+     * @param imageWidthPx   Source image width.
+     * @param imageHeightPx  Source image height.
+     */
+    unprojectPoint(pt: Point2D, depthMap: SfMDepthMap, anchor: ScaleAnchorResult, imageWidthPx: number, imageHeightPx: number): Point3D;
+}
+/** Plane equation: Ax + By + Cz = D.  Normal vector is (A, B, C). */
+export interface PlaneEquation {
+    /** X component of the unit normal vector. */
+    A: number;
+    /** Y component of the unit normal vector. */
+    B: number;
+    /** Z component of the unit normal vector. */
+    C: number;
+    /** Scalar offset: D = dot(normal, centroid). */
+    D: number;
+    /** RMS distance of input points from the fitted plane (metres). */
+    fitResidualMeters: number;
+}
+/**
+ * Fits a plane to a 3-D point cloud and projects measurements onto it.
+ *
+ * Algorithm: centred least-squares via 3×3 covariance matrix →
+ * power-iteration to find the smallest eigenvector (plane normal).
+ * Runs in O(N) time; suitable for real-time use on the JS thread.
+ *
+ * Pest control measurements almost always land on planar architectural
+ * surfaces (walls, baseboards, concrete slabs). Projecting the unprojected
+ * point cloud onto the dominant plane before measuring eliminates the
+ * perspective foreshortening error that would otherwise scale results by
+ * cos(angle_to_camera).
+ */
+export declare class PlaneEstimator {
+    /**
+     * Fit a plane to N world-space points (minimum 3).
+     * Returns null when the points are collinear or numerically degenerate.
+     */
+    static fitPlane(points: Point3D[]): PlaneEquation | null;
+    /**
+     * Project a world-space point onto the fitted plane.
+     */
+    static projectOntoPlane(point: Point3D, plane: PlaneEquation): Point3D;
+    /**
+     * Measure the Euclidean distance between two points after projecting both
+     * onto the plane. This is the "flat across the surface" distance that
+     * eliminates perspective foreshortening.
+     */
+    static measureOnPlane(p1: Point3D, p2: Point3D, plane: PlaneEquation): number;
+}
+/** Final output from BurstMeasurementPipeline.measure(). */
+export interface BurstMeasurementResult {
+    /** Estimated width in inches (plane-locked). */
+    widthInches: number;
+    /** Estimated height in inches (plane-locked). */
+    heightInches: number;
+    /** Estimated area in square inches (plane-locked Shoelace). */
+    areaSqInches: number;
+    /** Depth at the polygon centroid in metres. */
+    centroidDepthMeters: number;
+    /** The fitted surface plane (useful for debug overlays). */
+    plane: PlaneEquation | null;
+    /** Composite confidence score (0–1). */
+    confidence: number;
+    /** Breakdown of where confidence was gained or lost. */
+    confidenceBreakdown: {
+        sfmVariance: number;
+        anchorQuality: number;
+        planeFit: number;
+    };
+    /** ISO-8601 timestamp. */
+    measuredAt: string;
+}
+/**
+ * Orchestrates the three-stage blended measurement pipeline:
+ *
+ *   1. SfM depth  — call `sfmProvider.computeDepth(frames)`
+ *   2. Reference anchor — scale the depth map from a known object
+ *   3. Planar lock — unproject polygon vertices → fit plane → measure
+ *
+ * Usage:
+ * ```ts
+ * const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), 800);
+ * const result = await pipeline.measure(frames, targetVertices, {
+ *   box: referenceBox,
+ *   object: REFERENCE_OBJECTS.CREDIT_CARD,
+ *   imageWidthPx: 1080,
+ *   imageHeightPx: 1920,
+ * });
+ * ```
+ */
+export declare class BurstMeasurementPipeline {
+    private readonly sfmProvider;
+    private readonly scaleAnchor;
+    private readonly dimEstimator;
+    constructor(sfmProvider: SfMProvider, focalLengthPx?: number);
+    /**
+     * Run the full blended pipeline.
+     *
+     * @param frames          Burst frames (1–5). More frames → better SfM quality.
+     * @param targetVertices  Pixel-space polygon the technician framed (absolute px).
+     * @param reference       Reference object bounding box + descriptor + image dims.
+     *                        If omitted, falls back to BasicDimensionEstimator at
+     *                        the centroid depth of the fallback SfM map.
+     */
+    measure(frames: BurstFrame[], targetVertices: Point2D[], reference?: {
+        box: BoundingRegion;
+        object: ReferenceObject;
+        imageWidthPx: number;
+        imageHeightPx: number;
+    }): Promise<BurstMeasurementResult>;
+    private _fallbackEstimate;
+}
+/**
+ * Ready-to-use catalogue of common reference objects.
+ * Keys match ReferenceObjectKind; values are widthMm / heightMm.
+ */
+export declare const REFERENCE_OBJECTS: Record<string, ReferenceObject>;
+export declare const DEFAULT_SCALE_IN_PER_PX = 0.05;
 //# sourceMappingURL=index.d.ts.map
