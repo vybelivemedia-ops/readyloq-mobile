@@ -568,6 +568,125 @@ describe("tenant isolation — sync-history cannot expose another company's logs
   });
 });
 
+describe("tenant isolation — unfiltered sync-history is scoped to the requesting company", () => {
+  const UNFILTERED_OWNER_A_ID = "unfiltered_hist_owner_a_clerk_id";
+  const UNFILTERED_OWNER_B_ID = "unfiltered_hist_owner_b_clerk_id";
+
+  let unfilteredCompanyAId: number;
+  let unfilteredCompanyBId: number;
+  let logAId: number;
+  let logBId: number;
+
+  beforeAll(async () => {
+    unfilteredCompanyAId = await findOrCreateCompany(
+      "Unfiltered Hist Co A",
+      "unfiltered-hist-co-a",
+    );
+    unfilteredCompanyBId = await findOrCreateCompany(
+      "Unfiltered Hist Co B",
+      "unfiltered-hist-co-b",
+    );
+
+    // Ensure owner users exist for both companies.
+    for (const [clerkId, cid] of [
+      [UNFILTERED_OWNER_A_ID, unfilteredCompanyAId],
+      [UNFILTERED_OWNER_B_ID, unfilteredCompanyBId],
+    ] as [string, number][]) {
+      const existing = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.clerkUserId, clerkId));
+      if (existing.length === 0) {
+        await db
+          .insert(usersTable)
+          .values({ clerkUserId: clerkId, role: "owner", companyId: cid });
+      }
+    }
+
+    // Seed completed inspections for both companies so the sync log rows have
+    // valid foreign-key references.
+    const [inspA] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId: unfilteredCompanyAId,
+        siteAddress: "1 Alpha St",
+        technicianName: "Tech A",
+        status: "completed",
+      })
+      .returning();
+
+    const [inspB] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId: unfilteredCompanyBId,
+        siteAddress: "2 Beta Blvd",
+        technicianName: "Tech B",
+        status: "completed",
+      })
+      .returning();
+
+    // Seed one sync log entry for company A and one for company B.
+    const [rowA] = await db
+      .insert(inspectionSyncLogsTable)
+      .values({
+        companyId: unfilteredCompanyAId,
+        inspectionId: inspA.id,
+        systemType: "pestpac",
+        success: true,
+        errorMessage: null,
+        resultJson: { externalId: "ext-a-unfiltered" },
+      })
+      .returning({ id: inspectionSyncLogsTable.id });
+
+    const [rowB] = await db
+      .insert(inspectionSyncLogsTable)
+      .values({
+        companyId: unfilteredCompanyBId,
+        inspectionId: inspB.id,
+        systemType: "fieldroutes",
+        success: true,
+        errorMessage: null,
+        resultJson: { externalId: "ext-b-unfiltered" },
+      })
+      .returning({ id: inspectionSyncLogsTable.id });
+
+    logAId = rowA.id;
+    logBId = rowB.id;
+  });
+
+  it("company A's unfiltered sync-history response contains only its own log entries", async () => {
+    authState.userId = UNFILTERED_OWNER_A_ID;
+
+    const res = await request(app).get("/api/integrations/sync-history");
+
+    expect(res.status).toBe(200);
+
+    const ids: number[] = res.body.logs.map((l: { id: number }) => l.id);
+
+    // Company A's own entry must appear.
+    expect(ids).toContain(logAId);
+
+    // Company B's entry must never appear — even without an inspectionId filter.
+    expect(ids).not.toContain(logBId);
+  });
+
+  it("company B's unfiltered sync-history response contains only its own log entries", async () => {
+    authState.userId = UNFILTERED_OWNER_B_ID;
+
+    const res = await request(app).get("/api/integrations/sync-history");
+
+    expect(res.status).toBe(200);
+
+    const ids: number[] = res.body.logs.map((l: { id: number }) => l.id);
+
+    // Company B's own entry must appear.
+    expect(ids).toContain(logBId);
+
+    // Company A's entry must not appear.
+    expect(ids).not.toContain(logAId);
+  });
+});
+
 describe("tenant isolation — config is scoped per company", () => {
   it("two companies each hold their own independent config", async () => {
     const otherCompanyId = await findOrCreateCompany("Other Intg Co", "other-intg-co");
