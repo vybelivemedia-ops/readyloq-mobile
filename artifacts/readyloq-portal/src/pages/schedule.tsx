@@ -14,6 +14,7 @@ import {
   type ScheduleEntry,
 } from '@/hooks/use-schedule';
 import { useCompanyMembers } from '@/hooks/use-team';
+import { useAuth } from '@/hooks/use-auth';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from '@/components/ui/sheet';
@@ -431,6 +432,9 @@ function InspectionCard({
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
 export function Schedule() {
+  const { me } = useAuth();
+  const isManager = me?.effectiveRole === 'manager' || me?.effectiveRole === 'owner';
+
   const [weekStart, setWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 }),
   );
@@ -621,14 +625,16 @@ export function Schedule() {
 
         {/* Controls */}
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          {/* Book inspection button */}
-          <button
-            onClick={() => handleOpenBook()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Book Inspection
-          </button>
+          {/* Book inspection button — managers/owners only */}
+          {isManager && (
+            <button
+              onClick={() => handleOpenBook()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Book Inspection
+            </button>
+          )}
 
           {/* Technician filter */}
           <div className="flex items-center gap-1.5">
@@ -730,13 +736,15 @@ export function Schedule() {
               <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-3">
                 <Calendar className="w-8 h-8 opacity-40" />
                 <p className="text-sm">No inspections this week</p>
-                <button
-                  onClick={() => handleOpenBook()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Book First Inspection
-                </button>
+                {isManager && (
+                  <button
+                    onClick={() => handleOpenBook()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Book First Inspection
+                  </button>
+                )}
               </div>
             ) : (
               techList.map((tech, rowIdx) => (
@@ -766,20 +774,20 @@ export function Schedule() {
                       <div
                         key={dayKey}
                         onClick={() => {
-                          if (isEmpty && draggingId === null) handleOpenBook(dayKey, tech);
+                          if (isManager && isEmpty && draggingId === null) handleOpenBook(dayKey, tech);
                         }}
                         onDragOver={(e) => handleDayDragOver(e, dayKey)}
                         onDragLeave={handleDayDragLeave}
                         onDrop={(e) => handleDayDrop(e, dayKey)}
                         className={`px-2 py-2 border-r border-border last:border-r-0 min-h-[80px] transition-colors ${
                           isToday ? 'bg-primary/5' : ''
-                        } ${isEmpty && draggingId === null ? 'cursor-pointer hover:bg-primary/5 group' : ''} ${
+                        } ${isManager && isEmpty && draggingId === null ? 'cursor-pointer hover:bg-primary/5 group' : ''} ${
                           isDropTarget
                             ? 'ring-2 ring-inset ring-primary/60 bg-primary/10'
                             : ''
                         }`}
                       >
-                        {isEmpty && draggingId === null && (
+                        {isManager && isEmpty && draggingId === null && (
                           <div className="hidden group-hover:flex items-center justify-center h-full min-h-[64px] opacity-40">
                             <Plus className="w-4 h-4 text-primary" />
                           </div>
