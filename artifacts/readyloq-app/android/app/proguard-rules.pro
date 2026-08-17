@@ -136,6 +136,14 @@
 -keepclassmembers class **$WhenMappings { <fields>; }
 -keepclassmembers class kotlin.Lazy { *; }
 
+# ── expo-task-manager / expo-background-fetch internal references ─────────────
+# expo-modules-core@3.x moved or removed these internal Kotlin classes.
+# expo-task-manager and expo-background-fetch still reference them at compile
+# time but they are not present in the published AAR.  R8 full mode treats any
+# missing class reference as a hard error, so we suppress them explicitly.
+-dontwarn expo.modules.kotlin.services.**
+-dontwarn expo.modules.kotlin.types.**
+
 # ── Suppress noisy warnings from unused optional dependencies ─────────────────
 -dontwarn com.google.android.gms.**
 -dontwarn javax.annotation.**
