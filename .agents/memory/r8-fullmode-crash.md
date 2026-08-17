@@ -14,7 +14,11 @@ R8 full mode is more aggressive than standard R8 at dead-code elimination. It de
 - Builds 194–198 failed at compile time; build 200 passed but crashed at startup.
 
 ## How to apply
-- Keep `android.enableR8.fullMode=false` in `android/gradle.properties`.
-- The `-dontwarn expo.modules.kotlin.services.**` and `-dontwarn expo.modules.kotlin.types.**` rules in `android/app/proguard-rules.pro` are retained as a defensive measure but are not needed without full mode.
-- If a task agent re-enables full mode (commit a31f9e7 did this), revert it immediately.
-- APK size is marginally larger without full mode — acceptable trade-off.
+- All three flags in `android/gradle.properties` must stay false/off:
+  - `android.enableR8.fullMode=false`
+  - `android.enableMinifyInReleaseBuilds=false`
+  - `android.enableShrinkResourcesInReleaseBuilds=false`
+- The `-dontwarn` rules in `proguard-rules.pro` are harmless but not sufficient to prevent crashes on their own.
+- If a task agent re-enables any of these three flags (commit a31f9e7 did all three), revert all three immediately.
+- APK size is marginally larger without minification — acceptable trade-off for beta stability.
+- Build 188 = stable (no minification). Builds 200 and 201 = crash at startup (minification on).
