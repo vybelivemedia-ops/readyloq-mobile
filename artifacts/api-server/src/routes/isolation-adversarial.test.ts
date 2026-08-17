@@ -760,3 +760,73 @@ describe("POST /reports/:id/share — cross-tenant isolation and share-token gua
     expect(res.status).toBe(404);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 7. GET /share/summary/:token — expired share links must not return content
+//
+//    A summary whose shareExpiresAt is in the past must be served as a 404
+//    regardless of its approved status or the token's validity. The endpoint
+//    must never return the summary body for an expired link.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("GET /share/summary/:token — expired share links return 404", () => {
+  let expiredToken: string;
+  let validToken: string;
+
+  beforeAll(async () => {
+    // Use a unique suffix per run to avoid clashing on the unique shareToken index.
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    expiredToken = `adv-expired-tok-${suffix}`;
+    validToken = `adv-valid-tok-${suffix}`;
+
+    // Each inspection has a unique constraint on customer_summaries so we need
+    // two separate inspections — one for the expired summary and one for the
+    // still-valid positive-control summary.
+    const inspExpired = await createInspection(ADV_OWNER_A, "80 Expired Link Lane");
+    const inspValid = await createInspection(ADV_OWNER_A, "81 Valid Link Lane");
+
+    // Seed an APPROVED summary whose share link expired one hour ago.
+    await db.insert(customerSummariesTable).values({
+      companyId: companyAId,
+      inspectionId: inspExpired.id,
+      status: "approved",
+      body: "Expired summary body — must never be served",
+      shareToken: expiredToken,
+      approvedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), // 8 days ago
+      shareExpiresAt: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
+    });
+
+    // Seed an APPROVED summary whose share link is still valid (positive control).
+    await db.insert(customerSummariesTable).values({
+      companyId: companyAId,
+      inspectionId: inspValid.id,
+      status: "approved",
+      body: "Valid summary body — must be served",
+      shareToken: validToken,
+      approvedAt: new Date(),
+      shareExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+    });
+  });
+
+  it("returns 404 for an approved summary whose shareExpiresAt is in the past", async () => {
+    // The public share endpoint requires no auth — call without asUser().
+    const res = await request(app).get(`/api/share/summary/${expiredToken}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it("does not include the summary body in the response for an expired link", async () => {
+    const res = await request(app).get(`/api/share/summary/${expiredToken}`);
+
+    const body = JSON.stringify(res.body);
+    expect(body).not.toContain("Expired summary body");
+  });
+
+  it("returns 200 with the summary body for a link that has not yet expired", async () => {
+    const res = await request(app).get(`/api/share/summary/${validToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toBe("Valid summary body — must be served");
+  });
+});
