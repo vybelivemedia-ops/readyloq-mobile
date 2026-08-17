@@ -11,7 +11,7 @@
 
 import type { FieldIntegrationSystem } from "@workspace/db";
 import { logger } from "../lib/logger";
-import { withRetry, withRetryTracked } from "../lib/retry";
+import { withRetryTracked } from "../lib/retry";
 
 /**
  * Returns true only for errors that are worth retrying.
@@ -30,15 +30,6 @@ function isRetryableResponse(res: Response): boolean {
   return true;
 }
 
-/**
- * Returns true for auth failures that can never succeed on a retry regardless
- * of back-off.  Passing this as the `isFatal` predicate to `withRetryTracked`
- * causes the helper to throw immediately instead of burning through the
- * retry budget on a dead credential.
- */
-function isFatalResponse(res: Response): boolean {
-  return res.status === 401 || res.status === 403;
-}
 
 export interface PhotoSyncItem {
   url: string;
@@ -127,7 +118,10 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
   };
   const customerId = payload.accountId;
 
-  // 1 — Post AI narrative as a service note (up to 3 attempts with exponential back-off)
+  // 1 — Post AI narrative as a service note (up to 3 attempts with exponential back-off).
+  // isRetryableResponse already returns false for 401/403 (permanent auth failures),
+  // so no separate isFatal predicate is needed — the response is returned after 1 attempt
+  // and the !noteRes.ok check below surfaces the proper error message.
   const { result: noteRes, retries: noteRetries } = await withRetryTracked(
     () =>
       fetch(`${base}/customers/${customerId}/notes`, {
@@ -152,7 +146,6 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
     isRetryableResponse,
     3,
     500,
-    isFatalResponse,
   );
   if (!noteRes.ok) {
     const body = await noteRes.text();
@@ -177,7 +170,6 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
         isRetryableResponse,
         3,
         500,
-        isFatalResponse,
       );
       attachmentRetries += retries;
       if (attachRes.ok) {
@@ -222,6 +214,8 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
   const customerId = payload.accountId;
 
   // Retry the service-history POST up to 3 times before surfacing a hard error.
+  // isRetryableResponse already returns false for 401/403, so no separate isFatal
+  // predicate is needed — the !histRes.ok check below surfaces the proper message.
   const { result: histRes, retries: noteRetries } = await withRetryTracked(
     () =>
       fetch(`${base}/customer/${customerId}/service-history`, {
@@ -252,7 +246,6 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
     isRetryableResponse,
     3,
     500,
-    isFatalResponse,
   );
 
   if (!histRes.ok) {
