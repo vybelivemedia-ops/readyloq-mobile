@@ -52,9 +52,19 @@ const blockedPaths = [
   path.join(workspaceRoot, "artifacts/readyloq-app/.expo"),
 ];
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const blockListRegexes = blockedPaths.map(
-  (p) => new RegExp(`^${escapeRegex(p)}`)
-);
+const blockListRegexes = [
+  ...blockedPaths.map((p) => new RegExp(`^${escapeRegex(p)}`)),
+  // vite and vitest are dev/build tools that must never appear in the mobile
+  // bundle.  vitest.config.ts (project root) imports "vitest/config" which
+  // chains into vite; if Metro ever follows that path the build fails with
+  // "Invalid call: import(filepath)" in vite's module-runner.  Block both
+  // packages at the resolver level — the mobile app has no runtime need
+  // for either and their presence in the bundle is always a bug.
+  /[/\\]node_modules[/\\]\.pnpm[/\\]vite[@+]/,
+  /[/\\]node_modules[/\\]\.pnpm[/\\]vitest[@+]/,
+  /[/\\]node_modules[/\\]vite[/\\]/,
+  /[/\\]node_modules[/\\]vitest[/\\]/,
+];
 
 config.resolver = {
   ...config.resolver,
