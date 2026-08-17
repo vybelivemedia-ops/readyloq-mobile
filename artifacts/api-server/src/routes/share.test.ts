@@ -2,14 +2,15 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 /**
- * Public share-link isolation tests (Task #436).
+ * Public share-link isolation tests (Task #436) + revocation timing (Task #437).
  *
  * GET /api/share/summary/:token is the ONLY unauthenticated window into
- * tenant data. These tests lock in the three invariants that must always hold:
+ * tenant data. These tests lock in the invariants that must always hold:
  *
  *  1. A valid, unexpired token returns exactly the right company's summary.
  *  2. An expired token is uniformly 404 — never serves stale data.
  *  3. An unknown or random token is uniformly 404.
+ *  4. A revoked token is 404 IMMEDIATELY — not after any cache window.
  *
  * Cross-tenant re-play is structurally impossible (the token IS the credential
  * and the lookup is solely by token — no company IDs in the URL), so test 1
@@ -21,6 +22,8 @@ import request from "supertest";
 // ─── Clerk mock (same pattern as isolation-adversarial.test.ts) ──────────────
 // The share router itself never calls getAuth, but the app-level middleware
 // import requires the mock to exist so the module graph resolves cleanly.
+// Tests in section 5 (revocation timing) DO call authenticated endpoints, so
+// the authState is also used there.
 
 const { authState } = vi.hoisted(() => ({
   authState: { userId: null as string | null },
@@ -95,10 +98,18 @@ async function findOrCreateCompany(name: string, slug: string): Promise<number> 
   return row.id;
 }
 
+/** Switches which Clerk user id the mock returns for the next request(s). */
+function asUser(id: string | null) {
+  authState.userId = id;
+}
+
 // ─── Test fixtures ────────────────────────────────────────────────────────────
 
 let companyAId: number;
 let companyBId: number;
+
+// A manager from company A used only in the revocation-timing test (section 5).
+const SHARE_MGR_A = "share_mgr_a_clerk";
 
 // Tokens are unique per run to avoid clashing on the globally-unique
 // share_token index when the test DB is reused across runs.
@@ -127,6 +138,8 @@ beforeAll(async () => {
     .values([
       { clerkUserId: "share_owner_a_clerk", role: "owner", companyId: companyAId },
       { clerkUserId: "share_owner_b_clerk", role: "owner", companyId: companyBId },
+      // Manager used for revocation-timing tests (section 5).
+      { clerkUserId: SHARE_MGR_A, role: "manager", companyId: companyAId },
     ])
     .onConflictDoNothing();
 
@@ -365,5 +378,104 @@ describe("GET /api/share/summary/:token — cross-tenant token replay is impossi
 
     expect(resB.body.propertyAddress).toBe("2 Beta Boulevard");
     expect(resB.body.propertyAddress).not.toContain("Alpha Street");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 5. Revocation timing — share link is dead immediately after revoke (Task #437)
+//
+//    A manager revokes an approved summary's share link via the authenticated
+//    POST /api/customer-summaries/:id/revoke endpoint. The very next request to
+//    GET /api/share/summary/:token must return 404 — there must be no window
+//    where the public endpoint continues to serve content for a revoked token
+//    (e.g. due to caching or a missed WHERE clause).
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("GET /api/share/summary/:token — revoked token is 404 immediately", () => {
+  // Each test in this section seeds its own summary so revocation state is
+  // independent. The run-scoped suffix prevents global token collisions.
+  let summaryId: number;
+  let revokeToken: string;
+
+  beforeAll(async () => {
+    // Seed a fresh inspection for company A.
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId: companyAId,
+        siteAddress: "5 Revoke Court",
+        technicianName: "Tech Revoke",
+        clientName: "Client Revoke",
+        pestTypes: ["termites"],
+      })
+      .returning();
+
+    // Seed an approved summary with an active (non-expired) share token.
+    revokeToken = `share-revoke-${run}`;
+    const [summary] = await db
+      .insert(customerSummariesTable)
+      .values({
+        companyId: companyAId,
+        inspectionId: insp.id,
+        status: "approved",
+        body: "Approved body that will be revoked.",
+        shareToken: revokeToken,
+        approvedAt: new Date(),
+        shareExpiresAt: FUTURE,
+      })
+      .returning();
+
+    summaryId = summary.id;
+  });
+
+  it("the share link works before revocation", async () => {
+    // Sanity-check: the token must be live before we revoke it.
+    asUser(null);
+    const res = await request(app).get(`/api/share/summary/${revokeToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toBe("Approved body that will be revoked.");
+  });
+
+  it("revoke returns 200 and clears the share token", async () => {
+    asUser(SHARE_MGR_A);
+    const res = await request(app).post(
+      `/api/customer-summaries/${summaryId}/revoke`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.shareToken).toBeNull();
+    asUser(null);
+  });
+
+  it("the public share endpoint returns 404 immediately after revocation — no cache window", async () => {
+    // No delay. The very next request after revoke must be refused.
+    asUser(null);
+    const res = await request(app).get(`/api/share/summary/${revokeToken}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("the 404 body uses the same uniform error message as an unknown token", async () => {
+    // Callers must not be able to distinguish "revoked" from "never existed".
+    asUser(null);
+    const revokedRes = await request(app).get(
+      `/api/share/summary/${revokeToken}`,
+    );
+    const unknownRes = await request(app).get(
+      `/api/share/summary/${"z".repeat(64)}`,
+    );
+
+    expect(revokedRes.status).toBe(404);
+    expect(unknownRes.status).toBe(404);
+    expect(revokedRes.body.error).toBe(unknownRes.body.error);
+  });
+
+  it("a second revoke call on the same summary returns 409 (no active link)", async () => {
+    // Idempotency guard: revoking an already-revoked summary must fail clearly
+    // rather than silently succeed with a misleading 200.
+    asUser(SHARE_MGR_A);
+    const res = await request(app).post(
+      `/api/customer-summaries/${summaryId}/revoke`,
+    );
+    expect(res.status).toBe(409);
+    asUser(null);
   });
 });
