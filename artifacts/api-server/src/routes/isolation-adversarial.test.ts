@@ -592,7 +592,76 @@ describe("customer-summaries write routes — cross-tenant manager is always 404
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 5. POST /reports/:id/share — cross-tenant isolation and share-token guard
+// 5. POST /customer-summaries/inspection/:inspectionId/generate — cross-tenant
+//    guard on the generate endpoint.
+//
+//    The handler looks up the inspection with both `id = inspectionId` AND
+//    `companyId = <caller's company>`. A manager from company B who guesses a
+//    valid inspectionId belonging to company A must always receive 404 — the
+//    inspection row simply doesn't resolve for company B, so no summary is
+//    created or regenerated.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("POST /customer-summaries/inspection/:inspectionId/generate — cross-tenant manager is 404", () => {
+  let inspAId: number;
+
+  beforeAll(async () => {
+    // Create a company A inspection that company B will attempt to target.
+    const insp = await createInspection(ADV_OWNER_A, "90 Generate Isolation Road");
+    inspAId = insp.id;
+  });
+
+  it("returns 404 when company B's manager calls generate with company A's inspectionId", async () => {
+    asUser(ADV_MANAGER_B);
+    const res = await request(app).post(
+      `/api/customer-summaries/inspection/${inspAId}/generate`,
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it("does not create a customer summary for company A's inspection after the cross-tenant attempt", async () => {
+    // The generate endpoint must not have persisted any summary row for
+    // company A's inspection as a result of the cross-tenant request.
+    const rows = await db
+      .select()
+      .from(customerSummariesTable)
+      .where(eq(customerSummariesTable.inspectionId, inspAId));
+
+    // Either no row exists, or any row that does exist is owned by company A
+    // (seeded by another test), never by company B.
+    const companyBRows = rows.filter((r) => r.companyId === companyBId);
+    expect(companyBRows).toHaveLength(0);
+  });
+
+  it("company A's own manager can still generate a summary for their inspection", async () => {
+    // Positive-path sanity check: a legitimate company A manager must not be
+    // blocked by the tenant guard. The AI call is already stubbed to a fast
+    // no-op via the vi.mock("../lib/customer-summary-ai") at the top of this
+    // file, so no real network call is made.
+    const ADV_MGR_A_GEN = "adv_mgr_a_generate_clerk";
+    await db
+      .insert(usersTable)
+      .values({ clerkUserId: ADV_MGR_A_GEN, role: "manager", companyId: companyAId })
+      .onConflictDoNothing();
+
+    asUser(ADV_MGR_A_GEN);
+    const res = await request(app).post(
+      `/api/customer-summaries/inspection/${inspAId}/generate`,
+    );
+
+    // 200 (new draft created) or 409 (already approved and frozen) — both are
+    // valid, non-404 responses that confirm the guard passed for the owner's
+    // company. We explicitly exclude 404 and 403.
+    expect(res.status).not.toBe(404);
+    expect(res.status).not.toBe(403);
+
+    asUser(null);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 6. POST /reports/:id/share — cross-tenant isolation and share-token guard
 //
 //    Two properties are locked in here:
 //      a) Company B cannot generate a share URL for company A's report even
