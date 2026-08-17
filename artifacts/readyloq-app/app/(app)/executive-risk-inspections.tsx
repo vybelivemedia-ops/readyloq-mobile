@@ -33,6 +33,12 @@ import {
   type ExecutiveRiskInspection,
   type ExecutiveRiskLevel,
 } from "@/lib/api";
+import {
+  mergeAppendPage,
+  offsetAfterFilterChange,
+  replaceOnFilterChange,
+  summaryStripMode,
+} from "@/lib/risk-drill-down/filter-pagination";
 
 // ─── Persisted filter helpers ─────────────────────────────────────────────────
 
@@ -421,13 +427,14 @@ export default function ExecutiveRiskInspectionsScreen() {
 
         if (append) {
           setItems((prev) => {
-            const merged = [...prev, ...res.inspections];
-            loadedCountRef.current = merged.length;
+            const { items: merged, newLoadedCount } = mergeAppendPage(prev, res.inspections);
+            loadedCountRef.current = newLoadedCount;
             return merged;
           });
         } else {
-          setItems(res.inspections);
-          loadedCountRef.current = res.inspections.length;
+          const { items: replaced, newLoadedCount } = replaceOnFilterChange(res.inspections);
+          setItems(replaced);
+          loadedCountRef.current = newLoadedCount;
         }
         setHasMore(res.hasMore);
         setTotal(res.total ?? null);
@@ -530,7 +537,7 @@ export default function ExecutiveRiskInspectionsScreen() {
       setFilterTech(tech);
       // Reset the loaded-count offset immediately so that any loadMore() call
       // that fires before the fetch completes cannot use the old page offset.
-      loadedCountRef.current = 0;
+      loadedCountRef.current = offsetAfterFilterChange();
       // Read filterDays from a ref-like closure: we use a functional form to
       // access the latest value without creating a new callback on each render.
       setFilterDays((currentDays) => {
@@ -547,7 +554,7 @@ export default function ExecutiveRiskInspectionsScreen() {
       setFilterDays(days);
       // Reset the loaded-count offset immediately so that any loadMore() call
       // that fires before the fetch completes cannot use the old page offset.
-      loadedCountRef.current = 0;
+      loadedCountRef.current = offsetAfterFilterChange();
       setFilterTech((currentTech) => {
         if (userId) void savePersistedFilter(userId, riskLevel, { tech: currentTech, days });
         void fetchData(currentTech, days);
@@ -561,7 +568,7 @@ export default function ExecutiveRiskInspectionsScreen() {
     setFilterTech(null);
     setFilterDays(null);
     // Reset offset so loadMore cannot carry over the old page count.
-    loadedCountRef.current = 0;
+    loadedCountRef.current = offsetAfterFilterChange();
     if (userId) void clearPersistedFilter(userId, riskLevel);
     void fetchData(null, null);
   }, [fetchData, riskLevel, userId]);
@@ -880,7 +887,7 @@ export default function ExecutiveRiskInspectionsScreen() {
                 <Text
                   style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}
                 >
-                  {total !== null && total > items.length ? (
+                  {summaryStripMode(items.length, total) === "partial" ? (
                     <>
                       <Text style={{ color: accentColor, fontFamily: "Inter_700Bold" }}>
                         {items.length}
