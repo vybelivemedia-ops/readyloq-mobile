@@ -179,6 +179,14 @@ export interface MissionControlDashboardProps {
    * banner is shown prompting the owner to re-enable alerts.
    */
   pushLastFailedAt?: string | null;
+  /**
+   * Whether the owner's device currently has a registered Expo push token.
+   * When false and pushNotificationsEnabled is true, a high-visibility banner
+   * warns the owner that critical alerts are not reaching them.
+   */
+  hasPushToken?: boolean;
+  /** Whether the owner has enabled push notifications in their settings. */
+  pushNotificationsEnabled?: boolean;
   /** Called when the owner taps "Dismiss" on the push-failure banner. */
   onDismissPushFailure?: () => void;
   onRefresh:        () => void;
@@ -255,6 +263,8 @@ export function MissionControlDashboard({
   agents,
   agentsSyncFailed,
   pushLastFailedAt,
+  hasPushToken,
+  pushNotificationsEnabled,
   onDismissPushFailure,
   onRefresh,
   onSignOut,
@@ -343,6 +353,37 @@ export function MissionControlDashboard({
             <Text style={styles.statusText}>Solo operator</Text>
           )}
         </View>
+
+        {/* ── No-push-token banner ─────────────────────────────────────────── */}
+        {hasPushToken === false && pushNotificationsEnabled === true ? (
+          <Pressable
+            onPress={() => router.push("/settings" as Href)}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: 10,
+              padding: 12,
+              backgroundColor: "rgba(239,68,68,0.06)",
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: "rgba(239,68,68,0.28)",
+              borderLeftWidth: 3,
+              borderLeftColor: "#ef4444",
+              opacity: pressed ? 0.85 : 1,
+            })}
+          >
+            <Ionicons name="warning-outline" size={18} color="#ef4444" style={{ marginTop: 1 }} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[styles.pushFailTitle, { color: MC.text }]}>
+                Critical alerts not reaching you
+              </Text>
+              <Text style={styles.pushFailSub}>
+                Push notifications are enabled but your device isn't registered. Tap to fix in Settings.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#ef4444" style={{ marginTop: 2 }} />
+          </Pressable>
+        ) : null}
 
         {/* ── Push-failure banner ──────────────────────────────────────────── */}
         {pushLastFailedAt ? (

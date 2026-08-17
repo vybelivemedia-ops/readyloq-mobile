@@ -629,6 +629,8 @@ export default function DashboardScreen() {
         agents={vybeAgents.agents}
         agentsSyncFailed={vybeAgents.syncFailed}
         pushLastFailedAt={user?.pushLastFailedAt ?? null}
+        hasPushToken={user?.hasPushToken ?? true}
+        pushNotificationsEnabled={user?.pushNotificationsEnabled ?? false}
         onDismissPushFailure={() => { void handleDismissPushFailure(); }}
         onRefresh={() => { onRefresh(); vybeAgents.refresh(); }}
         onSignOut={() => { void signOut(); }}
@@ -702,6 +704,37 @@ export default function DashboardScreen() {
               </Pressable>
             </View>
           </View>
+
+          {/* ── No-push-token banner ─────────────────────────────────────── */}
+          {user?.hasPushToken === false && user?.pushNotificationsEnabled === true ? (
+            <Pressable
+              onPress={() => router.push("/settings" as Href)}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 10,
+                padding: 12,
+                backgroundColor: "rgba(239,68,68,0.06)",
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: "rgba(239,68,68,0.28)",
+                borderLeftWidth: 3,
+                borderLeftColor: "#ef4444",
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Ionicons name="warning-outline" size={18} color="#ef4444" style={{ marginTop: 1 }} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: MC_TEXT, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
+                  Critical alerts not reaching you
+                </Text>
+                <Text style={{ color: MC_MUTED, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 }}>
+                  Push notifications are enabled but your device isn't registered. Tap to fix in Settings.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#ef4444" style={{ marginTop: 2 }} />
+            </Pressable>
+          ) : null}
 
           {/* ── Push-failure banner ──────────────────────────────────────── */}
           {user?.pushLastFailedAt ? (
@@ -982,6 +1015,35 @@ export default function DashboardScreen() {
             <Ionicons name="log-out-outline" size={20} color={colors.mutedForeground} />
           </Pressable>
         </View>
+
+        {/* ── No-push-token banner (owner only) ──────────────────────────── */}
+        {isOwner && user?.hasPushToken === false && user?.pushNotificationsEnabled === true ? (
+          <Pressable
+            onPress={() => router.push("/settings" as Href)}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              padding: 14,
+              borderRadius: 12,
+              backgroundColor: "#ef444414",
+              borderWidth: 1,
+              borderColor: "#ef444440",
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Ionicons name="warning-outline" size={20} color="#ef4444" />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                Critical alerts not reaching you
+              </Text>
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                Push is enabled but your device isn't registered — tap to fix in Settings
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#ef4444" />
+          </Pressable>
+        ) : null}
 
         {/* ── Role-specific hero CTA ──────────────────────────────────────── */}
         {isTech ? (
