@@ -124737,12 +124737,16 @@ async function probePestPac(apiKey, accountId, apiBaseUrl) {
     };
   }
 }
-async function probeFieldRoutes(apiKey, accountId, apiBaseUrl) {
+async function probeFieldRoutes(apiKey, accountId, apiBaseUrl, apiToken) {
   const base = apiBaseUrl?.replace(/\/$/, "") ?? FIELDROUTES_DEFAULT_BASE;
   try {
     const res = await fetch(`${base}/customer/${encodeURIComponent(accountId)}`, {
       method: "GET",
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        authenticationKey: apiKey,
+        ...apiToken ? { authenticationToken: apiToken } : {}
+      },
       signal: AbortSignal.timeout(8e3)
     });
     if (res.ok) return { ok: true };
@@ -124760,12 +124764,12 @@ async function probeFieldRoutes(apiKey, accountId, apiBaseUrl) {
     };
   }
 }
-async function probeIntegrationCredentials(systemType, apiKey, accountId, apiBaseUrl) {
+async function probeIntegrationCredentials(systemType, apiKey, accountId, apiBaseUrl, apiToken) {
   switch (systemType) {
     case "pestpac":
       return probePestPac(apiKey, accountId, apiBaseUrl);
     case "fieldroutes":
-      return probeFieldRoutes(apiKey, accountId, apiBaseUrl);
+      return probeFieldRoutes(apiKey, accountId, apiBaseUrl, apiToken);
     case "servsuite": {
       const { probeServSuite: probeServSuite2 } = await Promise.resolve().then(() => (init_servsuiteAdapter(), servsuiteAdapter_exports));
       return probeServSuite2(apiKey, apiBaseUrl);
@@ -124794,6 +124798,7 @@ async function syncInspectionToExternalSystem(payload) {
 }
 
 // src/routes/integrations.ts
+init_servsuiteAdapter();
 var SYNC_COOLDOWN_SECONDS = 60;
 var router32 = (0, import_express34.Router)();
 var configInputSchema = external_exports.object({
@@ -125020,7 +125025,51 @@ router32.post("/sync", async (req, res) => {
       ownerNotAvailable: inspection.ownerNotAvailable ?? false,
       signedAt: inspection.signedAt?.toISOString() ?? null
     };
-    const syncResult = await syncInspectionToExternalSystem({
+    const syncServSuiteManual = async () => {
+      const enterpriseFindings = structuredFindings.map((sf, i) => {
+        const f = findings[i];
+        const code = [
+          (f?.category ?? "UNKNOWN").toUpperCase().replace(/\s+/g, "_"),
+          (f?.severity ?? "LOW").toUpperCase()
+        ].join("_");
+        return {
+          Code: code,
+          Description: f?.description ?? f?.category ?? "Finding detected",
+          Severity: sf.severity ?? "low",
+          CustomFields: {
+            ...sf.measurements?.widthMm !== void 0 && { WidthMm: sf.measurements.widthMm },
+            ...sf.measurements?.heightMm !== void 0 && { HeightMm: sf.measurements.heightMm },
+            ...sf.measurements?.confidence !== void 0 && { VerifiedConfidence: sf.measurements.confidence },
+            ...sf.measurements?.surfaceType !== void 0 && { SurfaceType: sf.measurements.surfaceType }
+          },
+          ...sf.evidencePhotoUrl && { AttachmentUrl: sf.evidencePhotoUrl }
+        };
+      });
+      const payload = {
+        ExternalWorkOrderId: String(inspection.id),
+        LocationReference: { PropertyCode: inspection.siteAddress ?? "" },
+        ServiceDetails: {
+          CompletedByEmployeeId: inspection.technicianId ?? config2.accountId,
+          ServiceDate: (inspection.completedAt ?? inspection.createdAt).toISOString(),
+          TechnicianName: inspection.technicianName ?? ""
+        },
+        InspectionFindings: enterpriseFindings,
+        SignatureAudit: signatureAudit
+      };
+      await sendServSuiteREST(payload, {
+        apiKey: config2.apiKey,
+        apiBaseUrl: config2.apiBaseUrl
+      });
+      return {
+        success: true,
+        externalSystem: "servsuite",
+        dispatched: true,
+        findingCount: enterpriseFindings.length,
+        at: (/* @__PURE__ */ new Date()).toISOString(),
+        trigger: "manual"
+      };
+    };
+    const syncResult = config2.systemType === "servsuite" ? await syncServSuiteManual() : await syncInspectionToExternalSystem({
       externalSystem: config2.systemType,
       accountId: config2.accountId,
       apiKey: config2.apiKey,
@@ -125073,7 +125122,8 @@ router32.post("/test", requireRole("owner"), async (req, res) => {
       config2.systemType,
       config2.apiKey,
       config2.accountId,
-      config2.apiBaseUrl
+      config2.apiBaseUrl,
+      config2.apiToken
     );
     return res.json(result);
   } catch (err) {

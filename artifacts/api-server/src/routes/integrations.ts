@@ -17,6 +17,8 @@ import { z } from "zod/v4";
 import { getCompanyId } from "../lib/tenant";
 import { requireRole } from "../middleware/require-auth";
 import { syncInspectionToExternalSystem, probeIntegrationCredentials } from "../services/field-integration";
+import { sendServSuiteREST } from "../services/integration/adapters/servsuiteAdapter";
+import type { EnterpriseSyncFinding, EnterpriseSyncPayload } from "../types/enterprise-payload";
 
 /** Duplicate taps within this window (seconds) return the cached result. */
 const SYNC_COOLDOWN_SECONDS = 60;
@@ -385,7 +387,59 @@ router.post("/sync", async (req, res) => {
       signedAt: inspection.signedAt?.toISOString() ?? null,
     };
 
-    const syncResult = await syncInspectionToExternalSystem({
+    // ServSuite doesn't use the legacy text-note SyncPayload — dispatch through
+    // its structured Enterprise Bridge adapter instead.
+    const syncServSuiteManual = async (): Promise<Record<string, unknown>> => {
+      const enterpriseFindings: EnterpriseSyncFinding[] = structuredFindings.map((sf, i) => {
+        const f = findings[i];
+        const code = [
+          (f?.category ?? "UNKNOWN").toUpperCase().replace(/\s+/g, "_"),
+          (f?.severity ?? "LOW").toUpperCase(),
+        ].join("_");
+        return {
+          Code: code,
+          Description: f?.description ?? f?.category ?? "Finding detected",
+          Severity: sf.severity ?? "low",
+          CustomFields: {
+            ...(sf.measurements?.widthMm !== undefined && { WidthMm: sf.measurements.widthMm }),
+            ...(sf.measurements?.heightMm !== undefined && { HeightMm: sf.measurements.heightMm }),
+            ...(sf.measurements?.confidence !== undefined && { VerifiedConfidence: sf.measurements.confidence }),
+            ...(sf.measurements?.surfaceType !== undefined && { SurfaceType: sf.measurements.surfaceType }),
+          },
+          ...(sf.evidencePhotoUrl && { AttachmentUrl: sf.evidencePhotoUrl }),
+        };
+      });
+
+      const payload: EnterpriseSyncPayload = {
+        ExternalWorkOrderId: String(inspection.id),
+        LocationReference: { PropertyCode: inspection.siteAddress ?? "" },
+        ServiceDetails: {
+          CompletedByEmployeeId: inspection.technicianId ?? config.accountId,
+          ServiceDate: (inspection.completedAt ?? inspection.createdAt).toISOString(),
+          TechnicianName: inspection.technicianName ?? "",
+        },
+        InspectionFindings: enterpriseFindings,
+        SignatureAudit: signatureAudit,
+      };
+
+      await sendServSuiteREST(payload, {
+        apiKey: config.apiKey,
+        apiBaseUrl: config.apiBaseUrl,
+      });
+
+      return {
+        success: true,
+        externalSystem: "servsuite",
+        dispatched: true,
+        findingCount: enterpriseFindings.length,
+        at: new Date().toISOString(),
+        trigger: "manual",
+      };
+    };
+
+    const syncResult = config.systemType === "servsuite"
+      ? await syncServSuiteManual()
+      : await syncInspectionToExternalSystem({
       externalSystem: config.systemType,
       accountId: config.accountId,
       apiKey: config.apiKey,
@@ -465,6 +519,7 @@ router.post("/test", requireRole("owner"), async (req, res) => {
       config.apiKey,
       config.accountId,
       config.apiBaseUrl,
+      config.apiToken,
     );
 
     return res.json(result);

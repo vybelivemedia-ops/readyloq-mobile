@@ -7,8 +7,17 @@ import {
   getGetCustomerSummaryForInspectionQueryKey,
 } from '@workspace/api-client-react';
 import { useParams, Link } from 'wouter';
-import { Loader2, ArrowLeft, Bug, MapPin, Calendar, User, ShieldAlert, PenLine } from 'lucide-react';
+import { Loader2, ArrowLeft, Bug, MapPin, Calendar, User, ShieldAlert, PenLine, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import {
+  useIntegrationConfig,
+  useSyncHistory,
+  useSyncInspection,
+  SYSTEM_LABELS,
+} from '@/hooks/use-integrations';
+import { Button } from '@/components/ui/button';
 
 // Concrete inspection shape — includes all fields the API returns plus the
 // new signature columns that are not yet in the generated client types.
@@ -61,7 +70,83 @@ function SignatureBlock({
   );
 }
 
+/**
+ * Owner-only "Sync Now" card — pushes the finalized inspection to the
+ * configured field-service system and shows last-synced status.
+ */
+function IntegrationSyncCard({ inspectionId, inspectionStatus }: { inspectionId: number; inspectionStatus: string }) {
+  const { toast } = useToast();
+  const { data: configRes } = useIntegrationConfig();
+  const { data: historyRes } = useSyncHistory(inspectionId);
+  const syncInspection = useSyncInspection();
+
+  const integration = configRes?.integration;
+  if (!integration || !integration.enabled) return null;
+
+  const systemName = SYSTEM_LABELS[integration.systemType] ?? integration.systemType;
+  const lastSync = historyRes?.logs?.[0];
+  const isFinalized = inspectionStatus === 'complete' || inspectionStatus === 'completed';
+
+  const handleSync = async () => {
+    try {
+      await syncInspection.mutateAsync(inspectionId);
+      toast({ title: 'Sync complete', description: `Inspection synced to ${systemName}.` });
+    } catch (err) {
+      toast({
+        title: 'Sync failed',
+        description: err instanceof Error ? err.message : undefined,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {systemName} Integration
+        </p>
+        {lastSync ? (
+          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+            {lastSync.success ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-500">
+                <CheckCircle2 className="w-3 h-3" /> Synced
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+                <XCircle className="w-3 h-3" /> Last sync failed
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {format(new Date(lastSync.syncedAt), "MMM d, yyyy 'at' h:mm a")}
+            </span>
+            {!lastSync.success && lastSync.errorMessage && (
+              <p className="w-full text-xs text-muted-foreground truncate">{lastSync.errorMessage}</p>
+            )}
+          </div>
+        ) : (
+          <p className="mt-1.5 text-xs text-muted-foreground">Not synced yet.</p>
+        )}
+      </div>
+      <Button
+        onClick={handleSync}
+        disabled={syncInspection.isPending || !isFinalized}
+        title={!isFinalized ? 'Inspection must be finalized before syncing' : undefined}
+        className="shrink-0"
+      >
+        {syncInspection.isPending ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <RefreshCw className="w-4 h-4 mr-2" />
+        )}
+        Sync to {systemName}
+      </Button>
+    </div>
+  );
+}
+
 export function InspectionDetail() {
+  const { me } = useAuth();
   const params = useParams();
   const id = Number(params.id);
 
@@ -111,6 +196,10 @@ export function InspectionDetail() {
           </span>
         </div>
       </div>
+
+      {me?.effectiveRole === 'owner' && (
+        <IntegrationSyncCard inspectionId={inspection.id} inspectionStatus={inspection.status} />
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3 shadow-sm">

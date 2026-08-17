@@ -301,12 +301,24 @@ async function probePestPac(apiKey: string, accountId: string, apiBaseUrl?: stri
   }
 }
 
-async function probeFieldRoutes(apiKey: string, accountId: string, apiBaseUrl?: string | null): Promise<ProbeResult> {
+async function probeFieldRoutes(
+  apiKey: string,
+  accountId: string,
+  apiBaseUrl?: string | null,
+  apiToken?: string | null,
+): Promise<ProbeResult> {
   const base = apiBaseUrl?.replace(/\/$/, "") ?? FIELDROUTES_DEFAULT_BASE;
   try {
+    // FieldRoutes requires BOTH credentials: authenticationKey (apiKey) and
+    // authenticationToken (apiToken) — same header contract as syncToFieldRoutes.
+    // The Bearer header is kept for older gateway deployments that proxy on it.
     const res = await fetch(`${base}/customer/${encodeURIComponent(accountId)}`, {
       method: "GET",
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        authenticationKey: apiKey,
+        ...(apiToken ? { authenticationToken: apiToken } : {}),
+      },
       signal: AbortSignal.timeout(8_000),
     });
     if (res.ok) return { ok: true };
@@ -332,12 +344,13 @@ export async function probeIntegrationCredentials(
   apiKey: string,
   accountId: string,
   apiBaseUrl?: string | null,
+  apiToken?: string | null,
 ): Promise<ProbeResult> {
   switch (systemType) {
     case "pestpac":
       return probePestPac(apiKey, accountId, apiBaseUrl);
     case "fieldroutes":
-      return probeFieldRoutes(apiKey, accountId, apiBaseUrl);
+      return probeFieldRoutes(apiKey, accountId, apiBaseUrl, apiToken);
     case "servsuite": {
       const { probeServSuite } = await import("./integration/adapters/servsuiteAdapter");
       return probeServSuite(apiKey, apiBaseUrl);

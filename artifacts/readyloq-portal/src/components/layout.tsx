@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useReviewQueueCount } from '@/hooks/use-review-queue-count';
 import { Link, useLocation } from 'wouter';
-import { LayoutDashboard, ClipboardCheck, FileText, Users, DollarSign, Building2, BarChart3, CalendarDays, LogOut, Loader2, Menu, KeyRound, Home, Wifi, Brain } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, FileText, Users, DollarSign, Building2, BarChart3, CalendarDays, LogOut, Loader2, Menu, KeyRound, Home, Wifi, Brain, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useClerk } from '@clerk/clerk-react';
@@ -42,6 +42,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: '/client-access', label: 'Client Access', icon: KeyRound, roles: ['owner', 'manager'] },
     { href: '/ai-review', label: 'AI Review', icon: Brain, roles: ['owner', 'manager'], badge: reviewQueueCount },
     { href: '/ble-health', label: 'BLE Health', icon: Wifi, roles: ['owner', 'manager'] },
+    { href: '/integrations', label: 'Integrations', icon: Plug, roles: ['owner'] },
     // Property managers see a single scoped view only.
     { href: '/client', label: 'My Reports', icon: Home, roles: ['property_manager'] },
   ].filter(item => item.roles.includes(me.effectiveRole));
