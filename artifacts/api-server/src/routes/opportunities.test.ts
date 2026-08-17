@@ -28,16 +28,26 @@ vi.mock("@clerk/express", async (importOriginal) => {
 // Deterministic model output for synthesis tests. Each test sets `aiResponse`
 // to the raw JSON string the "model" returns.
 const { aiState } = vi.hoisted(() => ({
-  aiState: { response: null as string | null },
+  aiState: {
+    response: null as string | null,
+    /** 0-based call indices that should throw instead of returning a response. */
+    errorCalls: [] as number[],
+    /** Incremented on every `create` call; reset in beforeEach. */
+    callCount: 0,
+  },
 }));
 
 vi.mock("@workspace/integrations-openai-ai-server", () => ({
   openai: {
     chat: {
       completions: {
-        create: vi.fn(async () => ({
-          choices: [{ message: { content: aiState.response } }],
-        })),
+        create: vi.fn(async () => {
+          const idx = aiState.callCount++;
+          if (aiState.errorCalls.includes(idx)) {
+            throw new Error("AI timeout (simulated)");
+          }
+          return { choices: [{ message: { content: aiState.response } }] };
+        }),
       },
     },
   },
@@ -154,6 +164,8 @@ beforeAll(async () => {
 beforeEach(async () => {
   asUser(null);
   aiState.response = null;
+  aiState.errorCalls = [];
+  aiState.callCount = 0;
   await db.delete(opportunityEventsTable);
   await db.delete(opportunitiesTable);
   await db.delete(opportunitySettingsTable);
@@ -287,6 +299,99 @@ describe("pipeline permissions", () => {
     expect(patch.status).toBe(200);
     expect(patch.body.minConfidence).toBe(0.7);
     expect(patch.body.enabledCategories).toEqual(["structural", "preventative"]);
+  });
+});
+
+describe("synthesis failure counter reset — GET /opportunities/settings reflects 0 after a retry succeeds", () => {
+  const findings: Finding[] = [
+    {
+      id: 1,
+      category: "structural",
+      description: "Crack at north foundation",
+      confidence: 0.85,
+      severity: "medium",
+      location: "North wall",
+      imageUrl: null,
+      treatment: "Seal crack",
+      exclusionOpportunity: true,
+      structuralIssue: "Foundation crack",
+    },
+  ];
+
+  it("clears synthesisFailuresSinceLastSuccess to 0 on the settings endpoint after a successful synthesis run", async () => {
+    // Seed a non-zero failure counter so the owner banner would be visible.
+    await db.insert(opportunitySettingsTable).values({
+      companyId: companyAId,
+      synthesisFailuresSinceLastSuccess: 3,
+      enabled: true,
+    });
+
+    // Confirm the non-zero counter is visible to the owner before the retry.
+    asUser(OWNER_A_ID);
+    const before = await request(app).get("/api/opportunities/settings");
+    expect(before.status).toBe(200);
+    expect(before.body.synthesisFailuresSinceLastSuccess).toBe(3);
+
+    // Set up the AI to return a valid, grounded candidate.
+    const inspA = await createInspection(OWNER_A_ID, "500 Reset Street");
+    aiState.response = JSON.stringify({
+      opportunities: [
+        {
+          category: "structural",
+          title: "Foundation crack sealing",
+          rationale: "Documented crack is a confirmed entry point.",
+          evidenceFindingIds: [1],
+          estimatedValueTier: "medium",
+          confidence: 0.85,
+        },
+      ],
+    });
+
+    // Run synthesis and fully await it — resetSynthesisFailures is now awaited
+    // inside runOpportunitySynthesis so the DB state is settled on return.
+    await runOpportunitySynthesis({
+      companyId: companyAId,
+      inspectionId: inspA.id,
+      findings,
+      retryDelayMs: 0,
+    });
+
+    // The owner banner must clear immediately: no timer needed because the
+    // reset is awaited inside the wrapper before it returns.
+    asUser(OWNER_A_ID);
+    const after = await request(app).get("/api/opportunities/settings");
+    expect(after.status).toBe(200);
+    expect(after.body).toHaveProperty("synthesisFailuresSinceLastSuccess", 0);
+  });
+
+  it("does NOT reset the counter when synthesis fails", async () => {
+    await db.insert(opportunitySettingsTable).values({
+      companyId: companyAId,
+      synthesisFailuresSinceLastSuccess: 2,
+      enabled: true,
+    });
+
+    const inspA = await createInspection(OWNER_A_ID, "501 Fail Street");
+    // Force both AI attempts to throw so runOpportunitySynthesis catches and
+    // calls incrementSynthesisFailures instead of resetSynthesisFailures.
+    aiState.response = '{"opportunities":[]}'; // fallback never reached
+    aiState.errorCalls = [0, 1]; // both attempt indices throw
+    aiState.callCount = 0;
+
+    await runOpportunitySynthesis({
+      companyId: companyAId,
+      inspectionId: inspA.id,
+      findings,
+      retryDelayMs: 0,
+    });
+    // incrementSynthesisFailures is now awaited inside the wrapper, so DB
+    // state is settled before the GET below.
+
+    asUser(OWNER_A_ID);
+    const res = await request(app).get("/api/opportunities/settings");
+    expect(res.status).toBe(200);
+    // Counter must NOT have dropped to 0; it should have incremented.
+    expect(res.body.synthesisFailuresSinceLastSuccess).toBeGreaterThan(0);
   });
 });
 

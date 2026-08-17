@@ -670,7 +670,9 @@ export async function runOpportunitySynthesis(input: {
     await runOpportunitySynthesisCore(input);
     // Reset the failure counter on every successful completion so the owner
     // briefing warning clears automatically once synthesis is healthy again.
-    void resetSynthesisFailures(companyId);
+    // Awaited (not void) so the state is settled before the function returns —
+    // both helpers catch their own DB errors and never propagate.
+    await resetSynthesisFailures(companyId);
   } catch (err) {
     // Never let opportunity mining disturb the inspection flow.
     // Log with enough detail to distinguish an AI call error from a DB/parse
@@ -687,6 +689,8 @@ export async function runOpportunitySynthesis(input: {
       context: { stage: "opportunity_synthesis", inspectionId, error: errMessage },
     });
     // Increment the per-company counter so owners can see a catch-up is needed.
-    void incrementSynthesisFailures(companyId);
+    // Awaited so the write is settled before this function resolves — the helper
+    // catches its own DB errors.
+    await incrementSynthesisFailures(companyId);
   }
 }
