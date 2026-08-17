@@ -828,6 +828,55 @@ describe("PATCH /auth/me/push-notifications — toggle preference", () => {
     expect(expoCalls()).toHaveLength(0);
   });
 
+  it("resumes critical-alert delivery immediately after the flag is re-enabled", async () => {
+    // ── Phase 1: seed owner as opted out from the start ──────────────────────
+    // The beforeEach inserts the user with pushNotificationsEnabled = true;
+    // flip it to false so Phase 1 starts from the opted-out state.
+    await db
+      .update(usersTable)
+      .set({ pushNotificationsEnabled: false })
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+
+    // With pushNotificationsEnabled = false, the Expo API must not be called.
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    expect(expoCalls()).toHaveLength(0);
+
+    // ── Phase 2: re-enable via the PATCH route ────────────────────────────────
+    const toggleRes = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: true });
+
+    expect(toggleRes.status).toBe(200);
+    expect(toggleRes.body.pushNotificationsEnabled).toBe(true);
+
+    // Verify the flag is persisted in the DB.
+    const [user] = await db
+      .select({ pushNotificationsEnabled: usersTable.pushNotificationsEnabled })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, OWNER_A_CLERK));
+    expect(user.pushNotificationsEnabled).toBe(true);
+
+    // ── Phase 3: next critical inspection must reach the owner's token ────────
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(1);
+    expect(messages[0].to).toBe(VALID_TOKEN_A);
+  });
+
   it("rejects a string value for enabled with 400", async () => {
     const res = await request(app)
       .patch("/api/auth/me/push-notifications")
