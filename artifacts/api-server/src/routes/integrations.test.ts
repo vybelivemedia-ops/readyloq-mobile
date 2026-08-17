@@ -926,6 +926,117 @@ describe("POST /api/integrations/sync — cooldown boundary", () => {
   });
 });
 
+// ─── Sync cooldown isolation — per inspectionId, not per company ─────────────
+//
+// The cooldown query filters by BOTH companyId AND inspectionId.  A bug that
+// drops the inspectionId filter would cause a successful sync of inspection A
+// to block immediate retries of inspection B at the same company — silently
+// breaking multi-inspection workflows.  This suite pins that isolation.
+
+describe("POST /api/integrations/sync — cooldown is per inspectionId, not per company", () => {
+  const ISO_OWNER_ID = "sync_iso_owner_clerk_id";
+  let isoCompanyId: number;
+  let isoInspectionAId: number;
+  let isoInspectionBId: number;
+
+  beforeAll(async () => {
+    isoCompanyId = await findOrCreateCompany("Sync Iso Co", "sync-iso-co");
+
+    // Owner user.
+    const existing = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, ISO_OWNER_ID));
+    if (existing.length === 0) {
+      await db.insert(usersTable).values({
+        clerkUserId: ISO_OWNER_ID,
+        role: "owner",
+        companyId: isoCompanyId,
+      });
+    }
+
+    // Integration config for the company.
+    await db
+      .delete(companyFieldIntegrationsTable)
+      .where(eq(companyFieldIntegrationsTable.companyId, isoCompanyId));
+    await db.insert(companyFieldIntegrationsTable).values({
+      companyId: isoCompanyId,
+      systemType: "pestpac",
+      accountId: "iso-acct",
+      apiKey: "iso-key",
+      enabled: true,
+    });
+
+    // Two completed inspections belonging to the same company.
+    const [inspA, inspB] = await db
+      .insert(inspectionsTable)
+      .values([
+        {
+          companyId: isoCompanyId,
+          siteAddress: "1 Alpha Rd",
+          technicianName: "Tech",
+          status: "completed",
+        },
+        {
+          companyId: isoCompanyId,
+          siteAddress: "2 Beta Rd",
+          technicianName: "Tech",
+          status: "completed",
+        },
+      ])
+      .returning();
+    isoInspectionAId = inspA.id;
+    isoInspectionBId = inspB.id;
+  });
+
+  beforeEach(async () => {
+    // Clear sync logs for both inspections so tests are independent.
+    await db
+      .delete(inspectionSyncLogsTable)
+      .where(eq(inspectionSyncLogsTable.companyId, isoCompanyId));
+  });
+
+  it("a successful sync of inspection A does not block an immediate sync of inspection B", async () => {
+    asUser(ISO_OWNER_ID);
+
+    // Sync inspection A — this records a success log and starts its cooldown.
+    const resA = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: isoInspectionAId });
+    expect(resA.status).toBe(200);
+    expect(resA.body._idempotent).toBeUndefined(); // real sync, not cache
+    expect(syncMock).toHaveBeenCalledTimes(1);
+
+    // Sync inspection B — must reach the external system (callCount goes to 2),
+    // not be served from inspection A's cached result.
+    const resB = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: isoInspectionBId });
+    expect(resB.status).toBe(200);
+    expect(resB.body._idempotent).toBeUndefined(); // real sync, not cache
+    expect(syncMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("inspection A's own cooldown still applies to a second sync of inspection A", async () => {
+    asUser(ISO_OWNER_ID);
+
+    // First sync of A.
+    const first = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: isoInspectionAId });
+    expect(first.status).toBe(200);
+    expect(syncMock).toHaveBeenCalledTimes(1);
+
+    // Second sync of A within the window — must be served from cache.
+    const second = await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: isoInspectionAId });
+    expect(second.status).toBe(200);
+    expect(second.body._idempotent).toBe(true);
+    expect(syncMock).toHaveBeenCalledTimes(1); // external system NOT called again
+  });
+});
+
 // ─── sync-history — retry ordering and errorMessage ──────────────────────────
 //
 // This suite exercises the full retry sequence via actual HTTP POST
