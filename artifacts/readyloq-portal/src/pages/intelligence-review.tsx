@@ -319,37 +319,39 @@ export function IntelligenceReview() {
             </div>
             <ul className="divide-y divide-border">
               {records.map((r) => (
-                <li key={r.id}>
+                <li
+                  key={r.id}
+                  className={`flex items-center transition-colors hover:bg-muted/40 ${
+                    selected?.id === r.id ? 'bg-muted/60' : ''
+                  }`}
+                >
+                  {/* Thumbnail — opens lightbox */}
                   <button
-                    className={`w-full flex items-center gap-3 p-3 text-left hover:bg-muted/40 transition-colors ${
-                      selected?.id === r.id ? 'bg-muted/60' : ''
-                    }`}
+                    className="group/thumb relative shrink-0 m-3 rounded-md overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => setLightboxUrl(r.imageUrl)}
+                    aria-label="View full-size image"
+                  >
+                    <img
+                      src={r.thumbnailUrl ?? r.imageUrl}
+                      alt=""
+                      className="w-14 h-14 object-cover bg-muted block"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/thumb:bg-black/40 transition-colors rounded-md">
+                      <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
+                    </div>
+                  </button>
+                  {/* Text row — selects the record */}
+                  <button
+                    className="flex-1 min-w-0 py-3 pr-3 text-left focus:outline-none"
                     onClick={() => { setSelectedId(r.id); setComment(''); }}
                     data-testid={`review-queue-item-${r.id}`}
                   >
-                    <div className="relative group/thumb shrink-0">
-                      <img
-                        src={r.thumbnailUrl ?? r.imageUrl}
-                        alt=""
-                        className="w-14 h-14 rounded-md object-cover bg-muted"
-                      />
-                      <button
-                        className="absolute inset-0 flex items-center justify-center rounded-md bg-black/0 group-hover/thumb:bg-black/40 transition-colors"
-                        onClick={(e) => { e.stopPropagation(); setLightboxUrl(r.imageUrl); }}
-                        aria-label="View full image"
-                        tabIndex={-1}
-                      >
-                        <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
-                      </button>
+                    <div className="text-sm font-medium truncate">
+                      {labelize(r.category)}{r.subcategory ? ` · ${labelize(r.subcategory)}` : ''}
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {labelize(r.category)}{r.subcategory ? ` · ${labelize(r.subcategory)}` : ''}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                        <span>{format(new Date(r.createdAt), 'MMM d, yyyy')}</span>
-                        {r.aiCorrected && <span className="text-amber-500">corrected</span>}
-                      </div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                      <span>{format(new Date(r.createdAt), 'MMM d, yyyy')}</span>
+                      {r.aiCorrected && <span className="text-amber-500">corrected</span>}
                     </div>
                   </button>
                 </li>
