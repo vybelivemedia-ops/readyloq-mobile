@@ -988,6 +988,31 @@ export default function SettingsScreen() {
                   />
                 }
               />
+              {!!user?.pushLastFailedAt && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                    backgroundColor: "#f97316" + "0f",
+                  }}
+                >
+                  <Ionicons name="warning-outline" size={15} color="#f97316" style={{ marginTop: 1 }} />
+                  <Text style={{ flex: 1, color: "#f97316", fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 }}>
+                    {"Last delivery failed on " +
+                      new Date(user.pushLastFailedAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      }) +
+                      ". Re-enable or re-register your token to resume alerts."}
+                  </Text>
+                </View>
+              )}
               <SettingRow
                 icon="mail-outline"
                 label="Daily Briefing Email"
