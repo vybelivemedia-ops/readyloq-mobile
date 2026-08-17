@@ -537,6 +537,91 @@ router.post("/test", requireRole("owner"), async (req, res) => {
   }
 });
 
+// ─── GET /api/integrations/sync-history/export ───────────────────────────────
+// Returns the complete sync log as a downloadable CSV (no row cap).
+// Scoped to the owner's company. Optional ?inspectionId=N to filter.
+router.get("/sync-history/export", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+
+    const inspectionIdRaw = req.query["inspectionId"];
+    const inspectionId =
+      inspectionIdRaw !== undefined ? Number(inspectionIdRaw) : undefined;
+
+    if (inspectionId !== undefined && (!Number.isInteger(inspectionId) || inspectionId <= 0)) {
+      return res.status(400).json({ error: "Invalid inspectionId" });
+    }
+
+    const conditions = [eq(inspectionSyncLogsTable.companyId, companyId)];
+    if (inspectionId !== undefined) {
+      conditions.push(eq(inspectionSyncLogsTable.inspectionId, inspectionId));
+    }
+
+    // No .limit() — return the complete history for support escalations.
+    const logs = await db
+      .select({
+        id: inspectionSyncLogsTable.id,
+        inspectionId: inspectionSyncLogsTable.inspectionId,
+        systemType: inspectionSyncLogsTable.systemType,
+        success: inspectionSyncLogsTable.success,
+        errorMessage: inspectionSyncLogsTable.errorMessage,
+        syncedAt: inspectionSyncLogsTable.syncedAt,
+        resultJson: inspectionSyncLogsTable.resultJson,
+        siteAddress: inspectionsTable.siteAddress,
+      })
+      .from(inspectionSyncLogsTable)
+      .leftJoin(
+        inspectionsTable,
+        and(
+          eq(inspectionSyncLogsTable.inspectionId, inspectionsTable.id),
+          eq(inspectionsTable.companyId, companyId),
+        ),
+      )
+      .where(and(...conditions))
+      .orderBy(desc(inspectionSyncLogsTable.syncedAt));
+
+    // Build CSV — neutralize formula-injection prefixes to prevent spreadsheet
+    // apps from evaluating cells that start with =, +, -, or @.
+    const csvEscape = (value: string | null | undefined): string => {
+      let s = value ?? "";
+      // Prefix potentially dangerous leading characters with a tab so
+      // spreadsheet apps treat the cell as text.
+      if (s.length > 0 && /^[=+\-@]/.test(s)) {
+        s = "\t" + s;
+      }
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+
+    const SYSTEM_LABELS: Record<string, string> = {
+      pestpac: "PestPac",
+      fieldroutes: "FieldRoutes",
+      servsuite: "ServSuite",
+    };
+    const systemLabel = (type: string) => SYSTEM_LABELS[type] ?? type;
+
+    const header = "Timestamp,System,Result,Error Message";
+    const rows = logs.map((e) =>
+      [
+        csvEscape(e.syncedAt instanceof Date ? e.syncedAt.toISOString() : String(e.syncedAt ?? "")),
+        csvEscape(systemLabel(e.systemType)),
+        csvEscape(e.success ? "Success" : "Failed"),
+        csvEscape(e.errorMessage),
+      ].join(","),
+    );
+
+    const csv = [header, ...rows].join("\n");
+    const filename = inspectionId
+      ? `sync-log-inspection-${inspectionId}.csv`
+      : `sync-log-company-${companyId}.csv`;
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(csv);
+  } catch {
+    return res.status(500).json({ error: "Failed to export sync history" });
+  }
+});
+
 // ─── GET /api/integrations/sync-history ──────────────────────────────────────
 // Returns the sync log for the owner's company, newest first.
 // Optional query param ?inspectionId=N to filter to a single inspection.

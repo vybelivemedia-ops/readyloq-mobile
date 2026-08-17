@@ -1241,3 +1241,165 @@ describe("GET /api/integrations/sync-history — invalid inspectionId format", (
     expect(res.body.error).toBe("Invalid inspectionId");
   });
 });
+
+// ─── GET /api/integrations/sync-history/export ────────────────────────────────
+//
+// Verifies:
+//  1. Returns 401 for unauthenticated requests.
+//  2. Returns 403 for non-owner roles (technician).
+//  3. Returns CSV with correct headers and one row per log entry.
+//  4. Correctly labels all three supported system types (pestpac, fieldroutes, servsuite).
+//  5. Tenant-scoped: only the owner's own company logs are exported.
+//  6. Formula-injection characters (=, +, -, @) in errorMessage are neutralised with a tab prefix.
+//  7. Returns all rows with no 100-entry cap (at least 101 entries are exported).
+//  8. Returns 400 for an invalid inspectionId.
+
+const EXPORT_OWNER_ID = "csv_export_owner_clerk";
+const EXPORT_TECH_ID = "csv_export_tech_clerk";
+const EXPORT_OUTSIDER_ID = "csv_export_outsider_clerk";
+
+let exportCompanyId: number;
+let exportOtherCompanyId: number;
+let exportInspectionId: number;
+let exportOtherInspectionId: number;
+
+describe("GET /api/integrations/sync-history/export", () => {
+  beforeAll(async () => {
+    exportCompanyId = await findOrCreateCompany("CSV Export Co", "csv-export-co");
+    exportOtherCompanyId = await findOrCreateCompany("CSV Export Other Co", "csv-export-other-co");
+
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, EXPORT_OWNER_ID));
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, EXPORT_TECH_ID));
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, EXPORT_OUTSIDER_ID));
+    await db.insert(usersTable).values([
+      { clerkUserId: EXPORT_OWNER_ID, role: "owner", companyId: exportCompanyId },
+      { clerkUserId: EXPORT_TECH_ID, role: "technician", companyId: exportCompanyId },
+      { clerkUserId: EXPORT_OUTSIDER_ID, role: "owner", companyId: exportOtherCompanyId },
+    ]);
+
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({ companyId: exportCompanyId, siteAddress: "1 Export Ave", technicianName: "Exporter", status: "completed" })
+      .returning();
+    exportInspectionId = insp.id;
+
+    // Seed logs for the owner's inspection (three different system types + formula values).
+    await db.insert(inspectionSyncLogsTable).values([
+      { companyId: exportCompanyId, inspectionId: exportInspectionId, systemType: "pestpac", success: true, errorMessage: null },
+      { companyId: exportCompanyId, inspectionId: exportInspectionId, systemType: "fieldroutes", success: false, errorMessage: "=DANGEROUS()" },
+      { companyId: exportCompanyId, inspectionId: exportInspectionId, systemType: "servsuite", success: false, errorMessage: "+1 exploit" },
+    ]);
+
+    // Seed a log for the outsider's company — must never appear in owner's export.
+    const [otherInsp] = await db
+      .insert(inspectionsTable)
+      .values({ companyId: exportOtherCompanyId, siteAddress: "99 Other St", technicianName: "Other", status: "completed" })
+      .returning();
+    exportOtherInspectionId = otherInsp.id;
+    await db.insert(inspectionSyncLogsTable).values([
+      { companyId: exportOtherCompanyId, inspectionId: otherInsp.id, systemType: "pestpac", success: true, errorMessage: null },
+    ]);
+  });
+
+  it("returns 401 when unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app).get(`/api/integrations/sync-history/export?inspectionId=${exportInspectionId}`);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 for technician role", async () => {
+    asUser(EXPORT_TECH_ID);
+    const res = await request(app).get(`/api/integrations/sync-history/export?inspectionId=${exportInspectionId}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 400 for an invalid inspectionId", async () => {
+    asUser(EXPORT_OWNER_ID);
+    const res = await request(app).get("/api/integrations/sync-history/export?inspectionId=abc");
+    expect(res.status).toBe(400);
+  });
+
+  it("returns text/csv with a header row", async () => {
+    asUser(EXPORT_OWNER_ID);
+    const res = await request(app).get(`/api/integrations/sync-history/export?inspectionId=${exportInspectionId}`);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/text\/csv/);
+    const lines = (res.text as string).split("\n");
+    expect(lines[0]).toBe("Timestamp,System,Result,Error Message");
+  });
+
+  it("labels pestpac as PestPac", async () => {
+    asUser(EXPORT_OWNER_ID);
+    const res = await request(app).get(`/api/integrations/sync-history/export?inspectionId=${exportInspectionId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"PestPac"');
+  });
+
+  it("labels fieldroutes as FieldRoutes", async () => {
+    asUser(EXPORT_OWNER_ID);
+    const res = await request(app).get(`/api/integrations/sync-history/export?inspectionId=${exportInspectionId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"FieldRoutes"');
+  });
+
+  it("labels servsuite as ServSuite", async () => {
+    asUser(EXPORT_OWNER_ID);
+    const res = await request(app).get(`/api/integrations/sync-history/export?inspectionId=${exportInspectionId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('"ServSuite"');
+  });
+
+  it("neutralises formula-injection characters with a tab prefix", async () => {
+    asUser(EXPORT_OWNER_ID);
+    const res = await request(app).get(`/api/integrations/sync-history/export?inspectionId=${exportInspectionId}`);
+    expect(res.status).toBe(200);
+    // =DANGEROUS() must be stored as \t=DANGEROUS() inside the CSV quotes.
+    expect(res.text).toContain('"\t=DANGEROUS()"');
+    // +1 exploit must be stored as \t+1 exploit.
+    expect(res.text).toContain('"\t+1 exploit"');
+  });
+
+  it("is tenant-scoped: owner's logs are absent from the outsider's export", async () => {
+    asUser(EXPORT_OUTSIDER_ID);
+    // Filter to the outsider's own inspection — guaranteed to be exactly 1 log.
+    const res = await request(app).get(
+      `/api/integrations/sync-history/export?inspectionId=${exportOtherInspectionId}`,
+    );
+    expect(res.status).toBe(200);
+    const lines = (res.text as string).split("\n").filter(Boolean);
+    // Header + exactly one log entry for the outsider's inspection.
+    expect(lines.length).toBe(2);
+    // The owner's inspection ID must not appear anywhere in the CSV.
+    expect(res.text).not.toContain(String(exportInspectionId));
+    // The owner-only error messages must not appear.
+    expect(res.text).not.toContain("=DANGEROUS()");
+  });
+
+  it("returns more than 100 entries when there are more than 100 sync attempts", async () => {
+    asUser(EXPORT_OWNER_ID);
+
+    // Create a fresh inspection with 101 sync logs.
+    const [bigInsp] = await db
+      .insert(inspectionsTable)
+      .values({ companyId: exportCompanyId, siteAddress: "101 Rows Blvd", technicianName: "Bulk", status: "completed" })
+      .returning();
+
+    const rows = Array.from({ length: 101 }, (_, i) => ({
+      companyId: exportCompanyId,
+      inspectionId: bigInsp.id,
+      systemType: "pestpac" as const,
+      success: i % 2 === 0,
+      errorMessage: i % 2 === 0 ? null : `Error ${i}`,
+    }));
+    await db.insert(inspectionSyncLogsTable).values(rows);
+
+    const res = await request(app).get(`/api/integrations/sync-history/export?inspectionId=${bigInsp.id}`);
+    expect(res.status).toBe(200);
+    const dataLines = (res.text as string).split("\n").filter(Boolean).slice(1); // skip header
+    expect(dataLines.length).toBe(101);
+
+    // Cleanup.
+    await db.delete(inspectionSyncLogsTable).where(eq(inspectionSyncLogsTable.inspectionId, bigInsp.id));
+    await db.delete(inspectionsTable).where(eq(inspectionsTable.id, bigInsp.id));
+  });
+});

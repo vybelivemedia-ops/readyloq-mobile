@@ -300,6 +300,40 @@ export function fetchSyncHistory(
   return request<SyncHistoryResponse>(`/api/integrations/sync-history${qs}`, token);
 }
 
+/**
+ * Downloads the complete sync log as a CSV string from the server.
+ * The server applies no row cap, so this includes every attempt.
+ * Formula-injection neutralization is also handled server-side.
+ */
+export async function fetchSyncHistoryCsv(
+  token: string | null,
+  inspectionId?: number,
+): Promise<string> {
+  const qs = inspectionId !== undefined ? `?inspectionId=${inspectionId}` : "";
+  const headers = new Headers();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/integrations/sync-history/export${qs}`, { headers });
+  } catch {
+    throw new ApiError("Network request failed. Check your connection.", 0);
+  }
+
+  if (!res.ok) {
+    let message = `Request failed (${res.status})`;
+    try {
+      const body = await res.json();
+      message = body?.error || body?.message || message;
+    } catch {
+      // non-JSON error body
+    }
+    throw new ApiError(message, res.status);
+  }
+
+  return res.text();
+}
+
 // ─── Property memory ─────────────────────────────────────────────────────────
 
 export interface HistoricalFinding {

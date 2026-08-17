@@ -88115,7 +88115,7 @@ async function runOpportunitySynthesis(input) {
   const { companyId, inspectionId } = input;
   try {
     await runOpportunitySynthesisCore(input);
-    void resetSynthesisFailures(companyId);
+    await resetSynthesisFailures(companyId);
   } catch (err) {
     const errMessage = err instanceof Error ? err.message : String(err);
     logger2.error(
@@ -88127,7 +88127,7 @@ async function runOpportunitySynthesis(input) {
       message: "Opportunity synthesis failed",
       context: { stage: "opportunity_synthesis", inspectionId, error: errMessage }
     });
-    void incrementSynthesisFailures(companyId);
+    await incrementSynthesisFailures(companyId);
   }
 }
 
@@ -125026,6 +125026,9 @@ var syncInputSchema = external_exports.object({
 });
 router32.post("/sync", async (req, res) => {
   let validatedSyncCtx = null;
+  let poolClient = null;
+  let sessionLockHeld = false;
+  let sessionLockKey = null;
   try {
     const companyId = getCompanyId(req);
     const parsed = syncInputSchema.safeParse(req.body);
@@ -125033,6 +125036,7 @@ router32.post("/sync", async (req, res) => {
       return res.status(400).json({ error: "Invalid request", issues: parsed.error.issues });
     }
     const { inspectionId } = parsed.data;
+    sessionLockKey = inspectionId;
     const [config2] = await db.select().from(companyFieldIntegrationsTable).where(eq(companyFieldIntegrationsTable.companyId, companyId)).limit(1);
     if (!config2 || !config2.enabled) {
       return res.status(422).json({ error: "No active field-service integration configured" });
@@ -125048,44 +125052,26 @@ router32.post("/sync", async (req, res) => {
       return res.status(422).json({ error: "Inspection is not yet finalized" });
     }
     validatedSyncCtx = { companyId, inspectionId, systemType: config2.systemType };
-    const result = await pool.connect().then(async (client) => {
-      try {
-        await client.query("BEGIN");
-        const { rows: lockRows } = await client.query(
-          "SELECT pg_try_advisory_xact_lock($1) AS locked",
-          [inspectionId]
-        );
-        if (!lockRows[0]?.locked) {
-          await client.query("ROLLBACK");
-          return { _conflict: true };
-        }
-        const cooldownCutoff = new Date(Date.now() - SYNC_COOLDOWN_SECONDS * 1e3);
-        const [recentSuccess] = await db.select().from(inspectionSyncLogsTable).where(
-          and(
-            eq(inspectionSyncLogsTable.inspectionId, inspectionId),
-            eq(inspectionSyncLogsTable.companyId, companyId),
-            eq(inspectionSyncLogsTable.success, true),
-            isNotNull(inspectionSyncLogsTable.resultJson)
-          )
-        ).orderBy(desc(inspectionSyncLogsTable.syncedAt)).limit(1);
-        if (recentSuccess && recentSuccess.syncedAt >= cooldownCutoff) {
-          await client.query("ROLLBACK");
-          return { _cached: true, result: recentSuccess.resultJson };
-        }
-        await client.query("COMMIT");
-        return { _cached: false };
-      } catch (err) {
-        await client.query("ROLLBACK");
-        throw err;
-      } finally {
-        client.release();
-      }
-    });
-    if (result._conflict) {
+    poolClient = await pool.connect();
+    const { rows: lockRows } = await poolClient.query(
+      "SELECT pg_try_advisory_lock($1) AS locked",
+      [inspectionId]
+    );
+    if (!lockRows[0]?.locked) {
       return res.status(409).json({ error: "Sync already in progress for this inspection" });
     }
-    if (result._cached) {
-      return res.json({ ...result.result, _idempotent: true });
+    sessionLockHeld = true;
+    const cooldownCutoff = new Date(Date.now() - SYNC_COOLDOWN_SECONDS * 1e3);
+    const [recentSuccess] = await db.select().from(inspectionSyncLogsTable).where(
+      and(
+        eq(inspectionSyncLogsTable.inspectionId, inspectionId),
+        eq(inspectionSyncLogsTable.companyId, companyId),
+        eq(inspectionSyncLogsTable.success, true),
+        isNotNull(inspectionSyncLogsTable.resultJson)
+      )
+    ).orderBy(desc(inspectionSyncLogsTable.syncedAt)).limit(1);
+    if (recentSuccess && recentSuccess.syncedAt >= cooldownCutoff) {
+      return res.json({ ...recentSuccess.resultJson, _idempotent: true });
     }
     const [analyses, media, logs] = await Promise.all([
       db.select().from(analysisResultsTable).where(
@@ -125257,6 +125243,14 @@ router32.post("/sync", async (req, res) => {
       });
     }
     return res.status(502).json({ error: message });
+  } finally {
+    if (poolClient) {
+      if (sessionLockHeld && sessionLockKey !== null) {
+        await poolClient.query("SELECT pg_advisory_unlock($1)", [sessionLockKey]).catch(() => {
+        });
+      }
+      poolClient.release();
+    }
   }
 });
 router32.post("/test", requireRole("owner"), async (req, res) => {
@@ -125277,6 +125271,65 @@ router32.post("/test", requireRole("owner"), async (req, res) => {
   } catch (err) {
     logger2.error({ err }, "[integrations/test] probe error");
     return res.json({ ok: false, reason: "network_error", message: "Probe failed \u2014 could not reach the external system." });
+  }
+});
+router32.get("/sync-history/export", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionIdRaw = req.query["inspectionId"];
+    const inspectionId = inspectionIdRaw !== void 0 ? Number(inspectionIdRaw) : void 0;
+    if (inspectionId !== void 0 && (!Number.isInteger(inspectionId) || inspectionId <= 0)) {
+      return res.status(400).json({ error: "Invalid inspectionId" });
+    }
+    const conditions = [eq(inspectionSyncLogsTable.companyId, companyId)];
+    if (inspectionId !== void 0) {
+      conditions.push(eq(inspectionSyncLogsTable.inspectionId, inspectionId));
+    }
+    const logs = await db.select({
+      id: inspectionSyncLogsTable.id,
+      inspectionId: inspectionSyncLogsTable.inspectionId,
+      systemType: inspectionSyncLogsTable.systemType,
+      success: inspectionSyncLogsTable.success,
+      errorMessage: inspectionSyncLogsTable.errorMessage,
+      syncedAt: inspectionSyncLogsTable.syncedAt,
+      resultJson: inspectionSyncLogsTable.resultJson,
+      siteAddress: inspectionsTable.siteAddress
+    }).from(inspectionSyncLogsTable).leftJoin(
+      inspectionsTable,
+      and(
+        eq(inspectionSyncLogsTable.inspectionId, inspectionsTable.id),
+        eq(inspectionsTable.companyId, companyId)
+      )
+    ).where(and(...conditions)).orderBy(desc(inspectionSyncLogsTable.syncedAt));
+    const csvEscape = (value) => {
+      let s2 = value ?? "";
+      if (s2.length > 0 && /^[=+\-@]/.test(s2)) {
+        s2 = "	" + s2;
+      }
+      return `"${s2.replace(/"/g, '""')}"`;
+    };
+    const SYSTEM_LABELS = {
+      pestpac: "PestPac",
+      fieldroutes: "FieldRoutes",
+      servsuite: "ServSuite"
+    };
+    const systemLabel = (type) => SYSTEM_LABELS[type] ?? type;
+    const header = "Timestamp,System,Result,Error Message";
+    const rows = logs.map(
+      (e) => [
+        csvEscape(e.syncedAt instanceof Date ? e.syncedAt.toISOString() : String(e.syncedAt ?? "")),
+        csvEscape(systemLabel(e.systemType)),
+        csvEscape(e.success ? "Success" : "Failed"),
+        csvEscape(e.errorMessage)
+      ].join(",")
+    );
+    const csv = [header, ...rows].join("\n");
+    const filename = inspectionId ? `sync-log-inspection-${inspectionId}.csv` : `sync-log-company-${companyId}.csv`;
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(csv);
+  } catch {
+    return res.status(500).json({ error: "Failed to export sync history" });
   }
 });
 router32.get("/sync-history", requireRole("owner"), async (req, res) => {

@@ -8,6 +8,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { useAuth } from "@clerk/expo";
 
 import { FindingCard } from "@/components/FindingCard";
@@ -24,6 +26,7 @@ import {
   ApiError,
   fetchIntegrationConfig,
   fetchSyncHistory,
+  fetchSyncHistoryCsv,
   triggerIntegrationSync,
   type FieldIntegrationSystem,
   type IntegrationConfigResponse,
@@ -58,6 +61,7 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
   // ── Field-service integration sync ─────────────────────────────────────────
   const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfigResponse | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
 
   const report = reportQ.data;
@@ -88,6 +92,46 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
     }).catch(() => { /* non-blocking */ });
     return () => { cancelled = true; };
   }, [isOwner, isFinalized, report?.inspectionId, getToken, loadSyncHistory]);
+
+  const handleExportCsv = async () => {
+    if (!report?.inspectionId || isExporting) return;
+    setIsExporting(true);
+    try {
+      const token = await getToken();
+      // Server returns the complete, unbounded history as CSV with
+      // formula-injection protection applied server-side.
+      const csv = await fetchSyncHistoryCsv(token, report.inspectionId);
+
+      if (!csv || csv.trim().split("\n").length <= 1) {
+        Alert.alert("No sync history", "There are no sync attempts to export yet.");
+        return;
+      }
+
+      const filename = `sync-log-inspection-${report.inspectionId}.csv`;
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+
+      await FileSystem.writeAsStringAsync(fileUri, csv, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert("Sharing unavailable", "Your device does not support file sharing.");
+        return;
+      }
+
+      await Sharing.shareAsync(fileUri, {
+        mimeType: "text/csv",
+        dialogTitle: "Export sync log",
+        UTI: "public.comma-separated-values-text",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      Alert.alert("Export failed", `Could not export sync log. ${msg}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleSync = async () => {
     if (!report?.inspectionId || isSyncing) return;
@@ -255,6 +299,15 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
               loading={isSyncing}
               onPress={handleSync}
             />
+            {syncHistory.length > 0 && (
+              <Button
+                title="Export sync log as CSV"
+                variant="ghost"
+                icon="download-outline"
+                loading={isExporting}
+                onPress={handleExportCsv}
+              />
+            )}
           </Card>
         ) : null}
       </ScrollView>
