@@ -1595,6 +1595,49 @@ describe("stale-token lifecycle — end-to-end round-trip", () => {
     expect(messages[0].to).not.toBe(STALE_TOKEN);
   });
 
+  it("GET /me reflects pushNotificationsEnabled = false immediately after toggling off", async () => {
+    // Seed the owner with pushNotificationsEnabled = true (re-used STALE_OWNER_CLERK is fine).
+    // The stale-token lifecycle beforeEach already inserted the user; update to ensure it's true.
+    await db
+      .update(usersTable)
+      .set({ pushNotificationsEnabled: true })
+      .where(eq(usersTable.clerkUserId, STALE_OWNER_CLERK));
+
+    // Toggle off.
+    const patchRes = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: false });
+
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.pushNotificationsEnabled).toBe(false);
+
+    // Immediately reload /me — must reflect the change without a restart.
+    const meRes = await request(app).get("/api/auth/me");
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.pushNotificationsEnabled).toBe(false);
+  });
+
+  it("GET /me reflects pushNotificationsEnabled = true immediately after re-enabling", async () => {
+    // Start opted-out.
+    await db
+      .update(usersTable)
+      .set({ pushNotificationsEnabled: false })
+      .where(eq(usersTable.clerkUserId, STALE_OWNER_CLERK));
+
+    // Toggle on.
+    const patchRes = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: true });
+
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.pushNotificationsEnabled).toBe(true);
+
+    // Immediately reload /me — must reflect the restored value.
+    const meRes = await request(app).get("/api/auth/me");
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.pushNotificationsEnabled).toBe(true);
+  });
+
   it("full round-trip — DeviceNotRegistered → re-register → next push uses new token", async () => {
     // ── Phase 1: fire a critical inspection → Expo returns DeviceNotRegistered ──
     await notifyCriticalInspection({
@@ -1663,5 +1706,130 @@ describe("stale-token lifecycle — end-to-end round-trip", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0].to).toBe(NEW_TOKEN);
     expect(messages[0].to).not.toBe(STALE_TOKEN);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings UI round-trip — toggle and token-delete reflect in GET /me immediately
+//
+// These tests verify the specific round-trips required by Task 385:
+//
+//   1. PATCH /me/push-notifications off  → GET /me returns pushNotificationsEnabled = false
+//   2. PATCH /me/push-notifications on   → GET /me returns pushNotificationsEnabled = true
+//   3. DELETE /me/push-token             → GET /me returns hasPushToken = false
+//
+// The mobile settings UI calls GET /me after each mutation to refresh its state.
+// If any of these fail the UI would show a stale toggle value until the app
+// is restarted.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("settings UI round-trip — push-notifications toggle reflects in GET /me immediately", () => {
+  const SETTINGS_OWNER_CLERK = "pn_settings_roundtrip_owner";
+  const SETTINGS_TOKEN = "ExponentPushToken[settings_roundtrip_token]";
+
+  beforeEach(async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: SETTINGS_OWNER_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: SETTINGS_TOKEN,
+      pushNotificationsEnabled: true,
+    });
+    asUser(SETTINGS_OWNER_CLERK);
+  });
+
+  it("toggle off: PATCH pushNotificationsEnabled=false → GET /me returns pushNotificationsEnabled=false", async () => {
+    const patchRes = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: false });
+
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.pushNotificationsEnabled).toBe(false);
+
+    // The mobile UI reloads /me — must see the updated value without an app restart.
+    const meRes = await request(app).get("/api/auth/me");
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.pushNotificationsEnabled).toBe(false);
+  });
+
+  it("toggle on: PATCH pushNotificationsEnabled=true → GET /me returns pushNotificationsEnabled=true", async () => {
+    // Start from opted-out state.
+    await db
+      .update(usersTable)
+      .set({ pushNotificationsEnabled: false })
+      .where(eq(usersTable.clerkUserId, SETTINGS_OWNER_CLERK));
+
+    const patchRes = await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: true });
+
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.pushNotificationsEnabled).toBe(true);
+
+    const meRes = await request(app).get("/api/auth/me");
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.pushNotificationsEnabled).toBe(true);
+  });
+
+  it("full off→on round-trip: GET /me reflects both transitions in sequence", async () => {
+    // ── Step 1: toggle off ────────────────────────────────────────────────────
+    await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: false });
+
+    const meAfterOff = await request(app).get("/api/auth/me");
+    expect(meAfterOff.status).toBe(200);
+    expect(meAfterOff.body.pushNotificationsEnabled).toBe(false);
+
+    // ── Step 2: toggle on ─────────────────────────────────────────────────────
+    await request(app)
+      .patch("/api/auth/me/push-notifications")
+      .send({ enabled: true });
+
+    const meAfterOn = await request(app).get("/api/auth/me");
+    expect(meAfterOn.status).toBe(200);
+    expect(meAfterOn.body.pushNotificationsEnabled).toBe(true);
+  });
+});
+
+describe("settings UI round-trip — DELETE /me/push-token reflects hasPushToken=false in GET /me immediately", () => {
+  const SETTINGS_TOKEN_OWNER_CLERK = "pn_settings_token_roundtrip_owner";
+  const SETTINGS_TOKEN_VALUE = "ExponentPushToken[settings_token_roundtrip]";
+
+  beforeEach(async () => {
+    await db.insert(usersTable).values({
+      clerkUserId: SETTINGS_TOKEN_OWNER_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: SETTINGS_TOKEN_VALUE,
+      pushNotificationsEnabled: true,
+    });
+    asUser(SETTINGS_TOKEN_OWNER_CLERK);
+  });
+
+  it("DELETE /me/push-token → GET /me returns hasPushToken=false immediately", async () => {
+    // Confirm the token is present before deletion.
+    const meBefore = await request(app).get("/api/auth/me");
+    expect(meBefore.status).toBe(200);
+    expect(meBefore.body.hasPushToken).toBe(true);
+
+    const deleteRes = await request(app).delete("/api/auth/me/push-token");
+    expect(deleteRes.status).toBe(200);
+    expect(deleteRes.body.success).toBe(true);
+
+    // The mobile UI reloads /me — hasPushToken must now be false.
+    const meAfter = await request(app).get("/api/auth/me");
+    expect(meAfter.status).toBe(200);
+    expect(meAfter.body.hasPushToken).toBe(false);
+  });
+
+  it("DELETE /me/push-token leaves pushNotificationsEnabled unchanged in GET /me", async () => {
+    await request(app).delete("/api/auth/me/push-token");
+
+    const meRes = await request(app).get("/api/auth/me");
+    expect(meRes.status).toBe(200);
+    // Removing the device token must not flip the notification preference.
+    expect(meRes.body.pushNotificationsEnabled).toBe(true);
+    expect(meRes.body.hasPushToken).toBe(false);
   });
 });
