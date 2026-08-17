@@ -149,7 +149,7 @@ Required env: `DATABASE_URL` (Postgres), `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_
 - Preserve the product vision above; keep ReadyLoq an AI assistant, not a form.
 - Deprioritize dashboards/settings/analytics/admin behind the 8 field pillars.
 - For hardware: build the abstraction, do **not** integrate real devices unless explicitly asked.
-- **EAS builds** — never trigger automatically after a fix. Wait for an explicit command, or flag when enough changes have accumulated to justify one.
+- **EAS builds** — never trigger a build for any reason unless explicitly told to. Not after fixes, not after task merges, not proactively. Ask if a build seems needed; never start one unilaterally.
 - **`Button` size prop** — only accepts `"md" | "lg"`, no `"sm"`.
 
 ---
