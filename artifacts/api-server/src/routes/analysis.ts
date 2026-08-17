@@ -893,11 +893,20 @@ router.patch("/:id/findings/correct", async (req, res) => {
           ? (technicianSpecies?.trim() ?? null)
           : (findings[idx].technicianSpecies ?? null),
     };
-    const updatedFindings = [
+    const rawUpdatedFindings = [
       ...findings.slice(0, idx),
       updatedFinding,
       ...findings.slice(idx + 1),
     ];
+
+    // Apply the same write-boundary guard used by POST /analysis so that
+    // pre-existing invalid findings (stored before validation was added) are
+    // stripped and a structurally invalid correction payload can never reach
+    // the database.
+    const [updatedFindings] = validateFindings(
+      rawUpdatedFindings,
+      "PATCH /analysis/:id/findings/correct",
+    );
 
     const [updated] = await db
       .update(analysisResultsTable)

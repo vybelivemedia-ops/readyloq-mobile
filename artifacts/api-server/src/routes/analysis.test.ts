@@ -52,6 +52,7 @@ import {
   inspectionMediaTable,
   analysisResultsTable,
   usersTable,
+  type Finding,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { objectPathCompanyScope } from "../lib/objectStorage";
@@ -477,5 +478,185 @@ describe("POST /analysis/analyze — write-boundary finding validation", () => {
     // Only the valid AI finding survives; the malformed technician finding is stripped.
     expect(res.body.findings).toHaveLength(1);
     expect((res.body.findings[0] as Record<string, unknown>).category).toBe("Conducive Condition");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /analysis/:id/findings/correct — correction write-boundary validation
+//
+// validateFindings() must run on the full updated findings array before the
+// DB write so that:
+//   (a) pre-existing invalid findings (stored before the guard was added) are
+//       stripped on every correction re-write, and
+//   (b) any structurally invalid data that somehow reaches the handler cannot
+//       enter the database through the correction path.
+// ---------------------------------------------------------------------------
+
+describe("PATCH /analysis/:id/findings/correct — write-boundary finding validation", () => {
+  it("returns 400 when findingId is missing", async () => {
+    asUser(OWNER_ID);
+
+    // Seed a valid row so the route has something to look up.
+    const res = await request(app)
+      .post("/api/analysis")
+      .send({ inspectionId, findings: [validFinding({ id: 1 })] });
+    expect(res.status).toBe(201);
+    const analysisId: number = res.body.id;
+
+    const patch = await request(app)
+      .patch(`/api/analysis/${analysisId}/findings/correct`)
+      .send({ action: "accept" }); // findingId intentionally omitted
+    expect(patch.status).toBe(400);
+  });
+
+  it("returns 400 when action is missing", async () => {
+    asUser(OWNER_ID);
+
+    const res = await request(app)
+      .post("/api/analysis")
+      .send({ inspectionId, findings: [validFinding({ id: 1 })] });
+    expect(res.status).toBe(201);
+    const analysisId: number = res.body.id;
+
+    const patch = await request(app)
+      .patch(`/api/analysis/${analysisId}/findings/correct`)
+      .send({ findingId: 1 }); // action intentionally omitted
+    expect(patch.status).toBe(400);
+  });
+
+  it("returns 400 when action is invalid", async () => {
+    asUser(OWNER_ID);
+
+    const res = await request(app)
+      .post("/api/analysis")
+      .send({ inspectionId, findings: [validFinding({ id: 1 })] });
+    expect(res.status).toBe(201);
+    const analysisId: number = res.body.id;
+
+    const patch = await request(app)
+      .patch(`/api/analysis/${analysisId}/findings/correct`)
+      .send({ findingId: 1, action: "hack" });
+    expect(patch.status).toBe(400);
+  });
+
+  it("accepts a valid finding and persists the reviewStatus update", async () => {
+    asUser(OWNER_ID);
+
+    const res = await request(app)
+      .post("/api/analysis")
+      .send({ inspectionId, findings: [validFinding({ id: 1 })] });
+    expect(res.status).toBe(201);
+    const analysisId: number = res.body.id;
+
+    const patch = await request(app)
+      .patch(`/api/analysis/${analysisId}/findings/correct`)
+      .send({ findingId: 1, action: "accept" });
+    expect(patch.status).toBe(200);
+
+    const findings = patch.body.findings as Array<Record<string, unknown>>;
+    expect(findings).toHaveLength(1);
+    expect(findings[0].reviewStatus).toBe("accepted");
+  });
+
+  it("strips a pre-existing invalid finding when the valid finding is corrected", async () => {
+    asUser(OWNER_ID);
+
+    // POST a valid finding through the normal route so a row is created.
+    const res = await request(app)
+      .post("/api/analysis")
+      .send({ inspectionId, findings: [validFinding({ id: 1 })] });
+    expect(res.status).toBe(201);
+    const analysisId: number = res.body.id;
+
+    // Directly inject an invalid finding into the DB row, simulating legacy
+    // data stored before validateFindings() was added to the POST route.
+    const rowsBefore = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.id, analysisId));
+    expect(rowsBefore).toHaveLength(1);
+
+    // Cast through unknown to bypass the Finding type — intentional: this test
+    // simulates legacy DB rows that were stored before validateFindings() was
+    // added, so the injection must slip past the type system deliberately.
+    const poisoned = [
+      ...(rowsBefore[0].findings as unknown[]),
+      invalidFinding({ id: 99 }), // injected directly — bypasses the POST guard
+    ] as unknown as Finding[];
+    await db
+      .update(analysisResultsTable)
+      .set({ findings: poisoned })
+      .where(eq(analysisResultsTable.id, analysisId));
+
+    // Confirm the poisoned row has two findings before the PATCH.
+    const rowsMid = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.id, analysisId));
+    expect((rowsMid[0].findings as unknown[]).length).toBe(2);
+
+    // Now correct the valid finding. validateFindings() must strip the invalid
+    // one from the array before the DB re-write.
+    const patch = await request(app)
+      .patch(`/api/analysis/${analysisId}/findings/correct`)
+      .send({ findingId: 1, action: "accept" });
+    expect(patch.status).toBe(200);
+
+    // Response must contain only the valid corrected finding.
+    const findings = patch.body.findings as Array<Record<string, unknown>>;
+    expect(findings).toHaveLength(1);
+    expect(findings[0].id).toBe(1);
+    expect(findings[0].reviewStatus).toBe("accepted");
+
+    // DB must also contain only the valid finding.
+    const rowsAfter = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.id, analysisId));
+    const stored = (rowsAfter[0].findings as unknown) as Array<Record<string, unknown>>;
+    expect(stored).toHaveLength(1);
+    expect(stored[0].id).toBe(1);
+    const hasInvalid = stored.some((f) => !("category" in f) || f.category === undefined);
+    expect(hasInvalid).toBe(false);
+  });
+
+  it("does not persist a structurally invalid finding injected alongside a valid correction", async () => {
+    asUser(OWNER_ID);
+
+    // Seed two findings: one valid (id 1) and one already-invalid (id 99, no category).
+    // We bypass POST validation by writing directly to the DB — intentional:
+    // this test simulates legacy rows stored before validateFindings() was added.
+    // Cast through unknown to satisfy the typed findings column while keeping
+    // the structurally invalid entry intact.
+    const [seedRow] = await db
+      .insert(analysisResultsTable)
+      .values({
+        companyId,
+        inspectionId,
+        findings: [validFinding({ id: 1 }), invalidFinding({ id: 99 })] as unknown as Finding[],
+      })
+      .returning();
+    const analysisId = seedRow.id;
+
+    // Correct the valid finding — the invalid one must be stripped on re-write.
+    const patch = await request(app)
+      .patch(`/api/analysis/${analysisId}/findings/correct`)
+      .send({ findingId: 1, action: "dismiss" });
+    expect(patch.status).toBe(200);
+
+    const findings = patch.body.findings as Array<Record<string, unknown>>;
+    // Only the valid finding remains, with its updated reviewStatus.
+    expect(findings).toHaveLength(1);
+    expect(findings[0].id).toBe(1);
+    expect(findings[0].reviewStatus).toBe("dismissed");
+
+    // Verify the DB row is clean.
+    const [dbRow] = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.id, analysisId));
+    const stored = (dbRow.findings as unknown) as Array<Record<string, unknown>>;
+    expect(stored).toHaveLength(1);
+    expect(stored.some((f) => !("category" in f))).toBe(false);
   });
 });
