@@ -399,6 +399,10 @@ function SyncHistoryBadge({
 
   const summaryColor = latest.success ? colors.mutedForeground : colors.destructive;
 
+  const latestNoteRetries = (latest.resultJson?.noteRetries ?? 0) as number;
+  const latestAttachRetries = (latest.resultJson?.attachmentRetries ?? 0) as number;
+  const latestTotalRetries = latestNoteRetries + latestAttachRetries;
+
   // Only expandable when there are multiple entries to show.
   const isExpandable = entries.length > 1;
 
@@ -421,6 +425,20 @@ function SyncHistoryBadge({
         <Text style={{ color: summaryColor, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
           {summaryText}
         </Text>
+        {latestTotalRetries > 0 && (
+          <View
+            style={{
+              backgroundColor: "#fef3c7",
+              borderRadius: 10,
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+            }}
+          >
+            <Text style={{ color: "#92400e", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+              {latestTotalRetries === 1 ? "1 retry" : `${latestTotalRetries} retries`}
+            </Text>
+          </View>
+        )}
         {isExpandable && (
           <Ionicons
             name={expanded ? "chevron-up" : "chevron-down"}
@@ -468,58 +486,79 @@ function SyncHistoryBadge({
             Sync history ({entries.length} {entries.length === 1 ? "attempt" : "attempts"})
           </Text>
 
-          {entries.map((entry) => (
-            <View
-              key={entry.id}
-              style={{
-                flexDirection: "row",
-                alignItems: "flex-start",
-                gap: 8,
-                paddingVertical: 4,
-                borderBottomWidth: 1,
-                borderBottomColor: colors.border,
-              }}
-            >
-              <Ionicons
-                name={entry.success ? "checkmark-circle" : "close-circle"}
-                size={14}
-                color={entry.success ? "#22c55e" : colors.destructive}
-                style={{ marginTop: 1 }}
-              />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text
-                  style={{
-                    color: colors.mutedForeground,
-                    fontFamily: "Inter_400Regular",
-                    fontSize: 12,
-                  }}
-                >
-                  {formatDate(entry.syncedAt)}
-                  {" · "}
-                  <Text
-                    style={{
-                      color: entry.success ? "#22c55e" : colors.destructive,
-                      fontFamily: "Inter_600SemiBold",
-                    }}
-                  >
-                    {entry.success ? "Success" : "Failed"}
-                  </Text>
-                </Text>
-                {!entry.success && entry.errorMessage ? (
-                  <Text
-                    style={{
-                      color: colors.destructive,
-                      fontFamily: "Inter_400Regular",
-                      fontSize: 11,
-                      lineHeight: 15,
-                    }}
-                  >
-                    {entry.errorMessage}
-                  </Text>
-                ) : null}
+          {entries.map((entry) => {
+            const entryNoteRetries = (entry.resultJson?.noteRetries ?? 0) as number;
+            const entryAttachRetries = (entry.resultJson?.attachmentRetries ?? 0) as number;
+            const entryTotalRetries = entryNoteRetries + entryAttachRetries;
+            return (
+              <View
+                key={entry.id}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 8,
+                  paddingVertical: 4,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.border,
+                }}
+              >
+                <Ionicons
+                  name={entry.success ? "checkmark-circle" : "close-circle"}
+                  size={14}
+                  color={entry.success ? "#22c55e" : colors.destructive}
+                  style={{ marginTop: 1 }}
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <Text
+                      style={{
+                        color: colors.mutedForeground,
+                        fontFamily: "Inter_400Regular",
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatDate(entry.syncedAt)}
+                      {" · "}
+                      <Text
+                        style={{
+                          color: entry.success ? "#22c55e" : colors.destructive,
+                          fontFamily: "Inter_600SemiBold",
+                        }}
+                      >
+                        {entry.success ? "Success" : "Failed"}
+                      </Text>
+                    </Text>
+                    {entryTotalRetries > 0 && (
+                      <View
+                        style={{
+                          backgroundColor: "#fef3c7",
+                          borderRadius: 8,
+                          paddingHorizontal: 5,
+                          paddingVertical: 1,
+                        }}
+                      >
+                        <Text style={{ color: "#92400e", fontFamily: "Inter_600SemiBold", fontSize: 10 }}>
+                          {entryTotalRetries === 1 ? "1 retry" : `${entryTotalRetries} retries`}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  {!entry.success && entry.errorMessage ? (
+                    <Text
+                      style={{
+                        color: colors.destructive,
+                        fontFamily: "Inter_400Regular",
+                        fontSize: 11,
+                        lineHeight: 15,
+                      }}
+                    >
+                      {entry.errorMessage}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </View>

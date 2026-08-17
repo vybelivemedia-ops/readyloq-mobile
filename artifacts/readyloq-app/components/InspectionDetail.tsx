@@ -770,11 +770,34 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
             </View>
 
             {lastSync ? (
-              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-                {lastSync.success
-                  ? `Last pushed ${formatDate(lastSync.syncedAt)}`
-                  : `Failed ${formatDate(lastSync.syncedAt)}${lastSync.errorMessage ? `: ${lastSync.errorMessage}` : ""}`}
-              </Text>
+              <View style={{ gap: 4 }}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                  {lastSync.success
+                    ? `Last pushed ${formatDate(lastSync.syncedAt)}`
+                    : `Failed ${formatDate(lastSync.syncedAt)}${lastSync.errorMessage ? `: ${lastSync.errorMessage}` : ""}`}
+                </Text>
+                {(() => {
+                  const noteRetries = (lastSync.resultJson?.noteRetries ?? 0) as number;
+                  const attachRetries = (lastSync.resultJson?.attachmentRetries ?? 0) as number;
+                  const totalRetries = noteRetries + attachRetries;
+                  if (totalRetries === 0) return null;
+                  return (
+                    <View
+                      style={{
+                        alignSelf: "flex-start",
+                        backgroundColor: "#fef3c7",
+                        borderRadius: 8,
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                      }}
+                    >
+                      <Text style={{ color: "#92400e", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+                        {totalRetries === 1 ? "1 retry" : `${totalRetries} retries`}
+                      </Text>
+                    </View>
+                  );
+                })()}
+              </View>
             ) : null}
 
             {/* Push / retry button */}

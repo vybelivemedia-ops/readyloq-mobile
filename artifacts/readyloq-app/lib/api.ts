@@ -271,6 +271,12 @@ export function testIntegrationCredentials(token: string | null) {
   });
 }
 
+export interface SyncResultJson {
+  noteRetries?: number;
+  attachmentRetries?: number;
+  [key: string]: unknown;
+}
+
 export interface SyncHistoryEntry {
   id: number;
   inspectionId: number;
@@ -279,6 +285,7 @@ export interface SyncHistoryEntry {
   errorMessage: string | null;
   syncedAt: string;
   siteAddress: string | null;
+  resultJson: SyncResultJson | null;
 }
 
 export interface SyncHistoryResponse {
