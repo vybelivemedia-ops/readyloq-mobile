@@ -23,6 +23,7 @@ import {
   fetchWeeklyQualityInspections,
   type WeeklyQualityInspection,
 } from "@/lib/api";
+import { WEEK_EMPTY_HEADING, weekEmptySubtitle } from "@/lib/dashboard/week-bar-guard";
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -334,7 +335,7 @@ export default function ExecutiveWeekInspectionsScreen() {
               textAlign: "center",
             }}
           >
-            No scored inspections
+            {WEEK_EMPTY_HEADING}
           </Text>
           <Text
             style={{
@@ -344,7 +345,7 @@ export default function ExecutiveWeekInspectionsScreen() {
               textAlign: "center",
             }}
           >
-            No inspections were scored during the week of {weekLabel}.
+            {weekEmptySubtitle(weekLabel)}
           </Text>
         </View>
       ) : (

@@ -20,6 +20,7 @@ export default defineConfig({
       "lib/delivery/__tests__/**/*.test.ts",
       "lib/local/__tests__/**/*.test.ts",
       "lib/vision/__tests__/**/*.test.ts",
+      "lib/dashboard/__tests__/**/*.test.ts",
       "hooks/__tests__/useAllDevicesHealthCheck.test.ts",
     ],
   },

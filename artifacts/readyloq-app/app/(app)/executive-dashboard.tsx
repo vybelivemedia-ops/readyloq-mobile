@@ -36,6 +36,7 @@ import {
 } from "@/lib/api";
 import { isCopyButtonDisabled, runCopySnapshot } from "@/lib/dashboard/copy-button";
 import { KPI_DEEP_LINK_FILTERS } from "@/lib/dashboard/kpi-deep-links";
+import { isWeekBarTappable, weekBarNavigates, ZERO_WEEK_ALERT_TITLE, zeroWeekAlertBody } from "@/lib/dashboard/week-bar-guard";
 
 // ─── Palette (dark command-centre tone) ───────────────────────────────────────
 
@@ -541,7 +542,9 @@ function QualityTrendChart({
                   : w.avgQuality >= 60
                     ? C.warning
                     : C.danger;
-            const isTappable = w.avgQuality > 0 && !!onPressWeek;
+            const isTappable = isWeekBarTappable(w, !!onPressWeek);
+            // Visual hint: only non-zero bars show the chevron tap-indicator,
+            // but zero bars are still tappable and show an Alert instead.
 
             return (
               <G
@@ -579,7 +582,7 @@ function QualityTrendChart({
                     {w.avgQuality}
                   </SvgText>
                 )}
-                {/* Tap hint chevron for non-zero bars */}
+                {/* Tap hint: shown for all tappable bars (zero=Alert, non-zero=navigate) */}
                 {isTappable && (
                   <SvgText
                     x={x + barW / 2}
@@ -1137,12 +1140,23 @@ export default function ExecutiveDashboardScreen() {
             {qualityWeeks ? (
               <QualityTrendChart
                 weeks={qualityWeeks}
-                onPressWeek={(week) =>
-                  router.push({
-                    pathname: "/executive-week-inspections",
-                    params: { weekStart: week.weekStart, weekLabel: week.label },
-                  } as never)
-                }
+                onPressWeek={(week) => {
+                  if (weekBarNavigates(week)) {
+                    router.push({
+                      pathname: "/executive-week-inspections",
+                      params: { weekStart: week.weekStart, weekLabel: week.label },
+                    } as never);
+                  } else {
+                    // Zero-score bar: show a clear message instead of silently
+                    // doing nothing.  The owner learns why there's no data and
+                    // what they can do about it.
+                    Alert.alert(
+                      ZERO_WEEK_ALERT_TITLE,
+                      zeroWeekAlertBody(week.label),
+                      [{ text: "OK" }],
+                    );
+                  }
+                }}
               />
             ) : (
               <View
