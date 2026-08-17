@@ -352,6 +352,285 @@ describe("POST /api/meta-glasses/events/:sessionId — cross-company injection g
   });
 });
 
+// ─── POST /events/:sessionId — ble_frame_dropped persistence and retrieval ────
+//
+// These tests confirm that a ble_frame_dropped event POSTed by the mobile app
+// (via useMetaGlassesSession.postTelemetryEvent, wired in new-inspection.tsx)
+// is durably stored and readable back through GET /events/:sessionId so that
+// the portal's BLE Health / telemetry view can aggregate per-device drop counts.
+
+describe("POST /events/:sessionId — ble_frame_dropped persistence and retrieval", () => {
+  let sessionId: string;
+
+  // Create a fresh session owned by Company A for every test in this block.
+  beforeAll(async () => {
+    asUser(TECH_A_CLERK);
+    const res = await request(app)
+      .post("/api/meta-glasses/session")
+      .send({ inspectionId: inspectionAId });
+    sessionId = res.body.sessionId as string;
+  });
+
+  it("persists the event so it is visible via GET /events/:sessionId immediately after POST", async () => {
+    asUser(TECH_A_CLERK);
+
+    // POST the telemetry event (mirrors the call made by new-inspection.tsx
+    // via glassesSession.postTelemetryEvent when onDroppedFrame fires).
+    const postRes = await request(app)
+      .post(`/api/meta-glasses/events/${sessionId}`)
+      .send({
+        type: "ble_frame_dropped",
+        deviceId: "device-test-persist",
+        reason: "driver_drop",
+        count: 3,
+      });
+    expect(postRes.status).toBe(204);
+
+    // Poll the session and confirm the event is now visible.
+    const getRes = await request(app).get(
+      `/api/meta-glasses/events/${sessionId}`,
+    );
+    expect(getRes.status).toBe(200);
+
+    const events: GlassesEvent[] = getRes.body.events;
+    const dropped = events.find(
+      (e) => e.clientEventType === "ble_frame_dropped" && e.deviceId === "device-test-persist",
+    );
+
+    expect(dropped).toBeDefined();
+    expect(dropped!.clientEventType).toBe("ble_frame_dropped");
+    expect(dropped!.deviceId).toBe("device-test-persist");
+    expect(dropped!.reason).toBe("driver_drop");
+    expect(dropped!.count).toBe(3);
+  });
+
+  it("server assigns a fresh UUID id — a client-supplied id is overwritten", async () => {
+    asUser(TECH_A_CLERK);
+
+    const postRes = await request(app)
+      .post(`/api/meta-glasses/events/${sessionId}`)
+      .send({
+        type: "ble_frame_dropped",
+        id: "forged-id-00000000",
+        deviceId: "device-test-id-overwrite",
+        reason: "cap_exceeded",
+      });
+    expect(postRes.status).toBe(204);
+
+    const getRes = await request(app).get(
+      `/api/meta-glasses/events/${sessionId}`,
+    );
+    expect(getRes.status).toBe(200);
+
+    const events: GlassesEvent[] = getRes.body.events;
+    const found = events.find(
+      (e) =>
+        e.clientEventType === "ble_frame_dropped" &&
+        e.deviceId === "device-test-id-overwrite",
+    );
+
+    expect(found).toBeDefined();
+    // The server must have generated a new UUID — the forged id is silently ignored.
+    expect(found!.id).not.toBe("forged-id-00000000");
+    expect(found!.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it("event type is stored as 'status' (not 'ble_frame_dropped') with clientEventType as the discriminator", async () => {
+    asUser(TECH_A_CLERK);
+
+    const postRes = await request(app)
+      .post(`/api/meta-glasses/events/${sessionId}`)
+      .send({
+        type: "ble_frame_dropped",
+        deviceId: "device-test-type-field",
+        reason: "processing_error",
+        count: 1,
+      });
+    expect(postRes.status).toBe(204);
+
+    const getRes = await request(app).get(
+      `/api/meta-glasses/events/${sessionId}`,
+    );
+    expect(getRes.status).toBe(200);
+
+    const events: GlassesEvent[] = getRes.body.events;
+    const found = events.find(
+      (e) =>
+        e.clientEventType === "ble_frame_dropped" &&
+        e.deviceId === "device-test-type-field",
+    );
+
+    expect(found).toBeDefined();
+    // The `type` field categorises all client-push events as "status".
+    // The original event type lives in `clientEventType` for telemetry queries.
+    expect(found!.type).toBe("status");
+    expect(found!.clientEventType).toBe("ble_frame_dropped");
+  });
+
+  it("missing count field defaults to 1 in the persisted event", async () => {
+    asUser(TECH_A_CLERK);
+
+    const postRes = await request(app)
+      .post(`/api/meta-glasses/events/${sessionId}`)
+      .send({
+        type: "ble_frame_dropped",
+        deviceId: "device-test-no-count",
+        reason: "driver_drop",
+        // count deliberately omitted
+      });
+    expect(postRes.status).toBe(204);
+
+    const getRes = await request(app).get(
+      `/api/meta-glasses/events/${sessionId}`,
+    );
+    expect(getRes.status).toBe(200);
+
+    const events: GlassesEvent[] = getRes.body.events;
+    const found = events.find(
+      (e) =>
+        e.clientEventType === "ble_frame_dropped" &&
+        e.deviceId === "device-test-no-count",
+    );
+
+    expect(found).toBeDefined();
+    // The server must normalise the absent count to 1.
+    expect(found!.count).toBe(1);
+  });
+
+  it("count=7 survives the POST → GET round-trip unchanged", async () => {
+    asUser(TECH_A_CLERK);
+
+    const postRes = await request(app)
+      .post(`/api/meta-glasses/events/${sessionId}`)
+      .send({
+        type: "ble_frame_dropped",
+        deviceId: "device-test-count-7",
+        reason: "driver_drop",
+        count: 7,
+      });
+    expect(postRes.status).toBe(204);
+
+    const getRes = await request(app).get(
+      `/api/meta-glasses/events/${sessionId}`,
+    );
+    expect(getRes.status).toBe(200);
+
+    const events: GlassesEvent[] = getRes.body.events;
+    const found = events.find(
+      (e) =>
+        e.clientEventType === "ble_frame_dropped" &&
+        e.deviceId === "device-test-count-7",
+    );
+
+    expect(found).toBeDefined();
+    expect(found!.count).toBe(7);
+  });
+
+  it("negative count is clamped to 1 before persistence", async () => {
+    asUser(TECH_A_CLERK);
+
+    const postRes = await request(app)
+      .post(`/api/meta-glasses/events/${sessionId}`)
+      .send({
+        type: "ble_frame_dropped",
+        deviceId: "device-test-negative-count",
+        reason: "cap_exceeded",
+        count: -10,
+      });
+    expect(postRes.status).toBe(204);
+
+    const getRes = await request(app).get(
+      `/api/meta-glasses/events/${sessionId}`,
+    );
+    expect(getRes.status).toBe(200);
+
+    const events: GlassesEvent[] = getRes.body.events;
+    const found = events.find(
+      (e) =>
+        e.clientEventType === "ble_frame_dropped" &&
+        e.deviceId === "device-test-negative-count",
+    );
+
+    expect(found).toBeDefined();
+    expect(found!.count).toBe(1);
+  });
+
+  it("overflow count (> MAX_EVENT_COUNT=10000) is clamped to 10000 before persistence", async () => {
+    asUser(TECH_A_CLERK);
+
+    const postRes = await request(app)
+      .post(`/api/meta-glasses/events/${sessionId}`)
+      .send({
+        type: "ble_frame_dropped",
+        deviceId: "device-test-overflow-count",
+        reason: "driver_drop",
+        count: 999_999,
+      });
+    expect(postRes.status).toBe(204);
+
+    const getRes = await request(app).get(
+      `/api/meta-glasses/events/${sessionId}`,
+    );
+    expect(getRes.status).toBe(200);
+
+    const events: GlassesEvent[] = getRes.body.events;
+    const found = events.find(
+      (e) =>
+        e.clientEventType === "ble_frame_dropped" &&
+        e.deviceId === "device-test-overflow-count",
+    );
+
+    expect(found).toBeDefined();
+    expect(found!.count).toBe(10_000);
+  });
+
+  it("since= filter excludes events older than the cursor — only fresh drops are returned", async () => {
+    asUser(TECH_A_CLERK);
+
+    // Use the server's own clock (serverTime from a GET response) as the cursor
+    // so we're not racing against wall-clock equality between client Date.now()
+    // and the server-assigned event timestamp.
+    const anchorRes = await request(app).get(
+      `/api/meta-glasses/events/${sessionId}`,
+    );
+    expect(anchorRes.status).toBe(200);
+    // serverTime is the server's Date.now() at the moment of the GET response —
+    // guaranteed to be <= any event timestamp set by a subsequent POST.
+    // Subtract 1 ms to make the filter strictly "events after this GET" (the
+    // route uses `timestamp > since`, so equal timestamps are excluded).
+    const cursor: number = (anchorRes.body.serverTime as number) - 1;
+
+    const postRes = await request(app)
+      .post(`/api/meta-glasses/events/${sessionId}`)
+      .send({
+        type: "ble_frame_dropped",
+        deviceId: "device-test-since-filter",
+        reason: "driver_drop",
+        count: 2,
+      });
+    expect(postRes.status).toBe(204);
+
+    // Poll with since=cursor: only events whose server timestamp is > cursor
+    // (i.e. only events created after the anchor GET) should appear.
+    const getRes = await request(app).get(
+      `/api/meta-glasses/events/${sessionId}?since=${cursor}`,
+    );
+    expect(getRes.status).toBe(200);
+
+    const events: GlassesEvent[] = getRes.body.events;
+    const found = events.find(
+      (e) =>
+        e.clientEventType === "ble_frame_dropped" &&
+        e.deviceId === "device-test-since-filter",
+    );
+
+    // The newly-posted drop must appear because its timestamp > cursor.
+    expect(found).toBeDefined();
+  });
+});
+
 // ─── GET /frame-drop-stats — BLE telemetry aggregation ───────────────────────
 
 describe("GET /api/meta-glasses/frame-drop-stats", () => {

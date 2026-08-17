@@ -1123,6 +1123,165 @@ describe("useSmartGlassesBleFrames — Android background/foreground cycle", () 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Test suite 5b — driver_drop: BLE layer fires onDroppedFrame correctly
+//
+// The hook subscribes to smartGlassesBle.onDroppedFrame (driver-level drops
+// caused by disconnect or reassembly timeout).  When that fires, the hook must:
+//   ✓ call the consumer onDroppedFrame with (count, "driver_drop", deviceId)
+//   ✓ pass the connected device ID from getState().connectedDeviceId
+//   ✓ pass null as deviceId when not connected
+//   ✓ increment droppedFrameCount by the driver-reported count
+//
+// This matches the wiring in new-inspection.tsx where onDroppedFrame routes to
+// glassesSession.postTelemetryEvent({ type: "ble_frame_dropped", deviceId, reason, count }).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("useSmartGlassesBleFrames — driver_drop: onDroppedFrame callback contract", () => {
+  async function flushMicrotasks(ticks = 100) {
+    for (let i = 0; i < ticks; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  it("fires onDroppedFrame(count, 'driver_drop', deviceId) when the BLE driver reports a drop", async () => {
+    mockBle = buildMockBle("connected");
+    const onDroppedFrame = vi.fn();
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    const { unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame, onDroppedFrame }),
+    );
+
+    // Flush the async startup effect so the driver-drop subscription is armed.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The hook registers with smartGlassesBle.onDroppedFrame during its useEffect.
+    // Capture the registered callback from the mock's call record and invoke it
+    // as the BLE driver would when a disconnect or reassembly timeout occurs.
+    const registeredDropCb = vi.mocked(mockBle.onDroppedFrame).mock.calls[0]?.[0] as
+      | ((count: number) => void)
+      | undefined;
+    expect(registeredDropCb).toBeDefined();
+
+    await act(async () => {
+      registeredDropCb!(5);
+      await flushMicrotasks(50);
+    });
+
+    // The consumer must receive (count=5, reason="driver_drop", deviceId="device-1")
+    // — "device-1" is the connectedDeviceId the mock returns when connected.
+    expect(onDroppedFrame).toHaveBeenCalledWith(5, "driver_drop", "device-1");
+
+    unmount();
+  });
+
+  it("passes null deviceId when the BLE driver drops a frame while disconnected", async () => {
+    mockBle = buildMockBle("idle"); // not connected → connectedDeviceId is null
+    const onDroppedFrame = vi.fn();
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    const { unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame, onDroppedFrame }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const registeredDropCb = vi.mocked(mockBle.onDroppedFrame).mock.calls[0]?.[0] as
+      | ((count: number) => void)
+      | undefined;
+    expect(registeredDropCb).toBeDefined();
+
+    await act(async () => {
+      registeredDropCb!(2);
+      await flushMicrotasks(50);
+    });
+
+    // deviceId must be null — no connected device in "idle" state.
+    expect(onDroppedFrame).toHaveBeenCalledWith(2, "driver_drop", null);
+
+    unmount();
+  });
+
+  it("increments droppedFrameCount by the exact driver-reported count", async () => {
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const onDroppedFrame = vi.fn();
+
+    const { result, unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame, onDroppedFrame }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const registeredDropCb = vi.mocked(mockBle.onDroppedFrame).mock.calls[0]?.[0] as
+      | ((count: number) => void)
+      | undefined;
+    expect(registeredDropCb).toBeDefined();
+
+    await act(async () => {
+      // Driver reports 8 frames were lost in a burst.
+      registeredDropCb!(8);
+      await flushMicrotasks(50);
+    });
+
+    expect(result.current.droppedFrameCount).toBe(8);
+
+    unmount();
+  });
+
+  it("accumulates driver drops from multiple bursts correctly", async () => {
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+    const onDroppedFrame = vi.fn();
+
+    const { result, unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame, onDroppedFrame }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const registeredDropCb = vi.mocked(mockBle.onDroppedFrame).mock.calls[0]?.[0] as
+      | ((count: number) => void)
+      | undefined;
+    expect(registeredDropCb).toBeDefined();
+
+    await act(async () => {
+      registeredDropCb!(3); // first burst
+      registeredDropCb!(5); // second burst
+      await flushMicrotasks(100);
+    });
+
+    // Total dropped: 3 + 5 = 8
+    expect(result.current.droppedFrameCount).toBe(8);
+    // onDroppedFrame must have been called twice — once per burst
+    const driverDropCalls = vi.mocked(onDroppedFrame).mock.calls.filter(
+      ([, reason]) => reason === "driver_drop",
+    );
+    expect(driverDropCalls.length).toBe(2);
+    expect(driverDropCalls[0][0]).toBe(3);
+    expect(driverDropCalls[1][0]).toBe(5);
+
+    unmount();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Test suite 6 — eviction via stalled onFrame consumer callback
 //
 // Task #566: confirm evicted frames are visible in the drop counter so

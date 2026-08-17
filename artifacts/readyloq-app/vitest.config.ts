@@ -23,6 +23,7 @@ export default defineConfig({
       "lib/dashboard/__tests__/**/*.test.ts",
       "hooks/__tests__/useAllDevicesHealthCheck.test.ts",
       "hooks/__tests__/useSmartGlassesBleFrames.test.ts",
+      "hooks/__tests__/useMetaGlassesSession.test.ts",
       "lib/risk-drill-down/__tests__/**/*.test.ts",
       "app/\\(app\\)/inspection-summary/__tests__/**/*.test.ts",
       "lib/sync-history/__tests__/**/*.test.ts",
