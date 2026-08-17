@@ -382,6 +382,61 @@ describe("building history pest-type union", () => {
   });
 });
 
+describe("site history ordering and limit", () => {
+  it("returns exactly the 8 most-recently-visited addresses and omits the oldest when 9+ distinct addresses exist", async () => {
+    // Seed 9 distinct addresses.  Address 9 is the oldest and must be dropped.
+    const addresses = [
+      { addr: "1 Recent Rd",    daysAgo: 1  },
+      { addr: "2 Second Ave",   daysAgo: 2  },
+      { addr: "3 Third St",     daysAgo: 4  },
+      { addr: "4 Fourth Blvd",  daysAgo: 6  },
+      { addr: "5 Fifth Ln",     daysAgo: 8  },
+      { addr: "6 Sixth Dr",     daysAgo: 12 },
+      { addr: "7 Seventh Way",  daysAgo: 16 },
+      { addr: "8 Eighth Ct",    daysAgo: 20 },
+      { addr: "9 Oldest Pl",    daysAgo: 35 }, // must be absent — pushed off by the LIMIT 8
+    ];
+
+    for (const { addr, daysAgo: d } of addresses) {
+      await seedInspection(companyAId, addr, {
+        completed: true,
+        completedDaysAgo: d,
+        findingsCount: 1,
+      });
+    }
+
+    asUser(TECH_A_ID);
+    const res = await request(app).get("/api/briefing");
+    expect(res.status).toBe(200);
+
+    const history = res.body.technician.siteHistory as Array<{
+      siteAddress: string;
+      lastVisitedAt: string;
+    }>;
+
+    // Exactly 8 entries must be returned.
+    expect(history).toHaveLength(8);
+
+    // The oldest address must not appear.
+    const siteAddresses = history.map((h) => h.siteAddress);
+    expect(siteAddresses).not.toContain("9 Oldest Pl");
+
+    // All 8 retained addresses must be present.
+    for (const { addr } of addresses.slice(0, 8)) {
+      expect(siteAddresses).toContain(addr);
+    }
+
+    // Results must be ordered most-recent first (descending lastVisitedAt).
+    const visitDates = history.map((h) => new Date(h.lastVisitedAt).getTime());
+    for (let i = 1; i < visitDates.length; i++) {
+      expect(visitDates[i]).toBeLessThanOrEqual(visitDates[i - 1]);
+    }
+
+    // The very first entry should be the address visited 1 day ago.
+    expect(history[0].siteAddress).toBe("1 Recent Rd");
+  });
+});
+
 describe("sales briefing", () => {
   it("aggregates pipeline, value, staleness, top opportunities, proposals", async () => {
     const insp = await seedInspection(companyAId, "10 Pipeline Pl", { completed: true });
