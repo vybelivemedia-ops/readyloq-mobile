@@ -2277,3 +2277,195 @@ describe("quality-trend/inspections endpoint: cross-company isolation", () => {
     expect(overlap).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Quality-trend week-boundary accuracy (Task #359)
+//
+// Verifies that date_trunc('week', createdAt) correctly splits scorecards
+// created on either side of a Monday 00:00 UTC boundary into separate ISO
+// weeks.  One scorecard is created 1 second before the boundary (Sunday
+// 23:59:59 UTC → prior week) and one is created 1 second after it (Monday
+// 00:00:01 UTC → current week).  The quality-trend response must place each
+// in its correct week and must not omit or double-count either one.
+// ---------------------------------------------------------------------------
+
+describe("executive quality-trend endpoint: week-boundary accuracy", () => {
+  const BOUNDARY_OWNER = "exec_owner_boundary_clerk_id";
+  const BOUNDARY_CO_SLUG = "exec-week-boundary-co";
+
+  let boundaryCompanyId: number;
+  let boundaryInspBeforeId: number;
+  let boundaryInspAfterId: number;
+
+  // Compute the Monday that starts the current ISO week (UTC-anchored, same
+  // logic the endpoint uses).
+  function thisMonday(): Date {
+    const now = new Date();
+    const dayOfWeek = now.getUTCDay(); // 0=Sun, 1=Mon, …, 6=Sat
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    return new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysToMonday),
+    );
+  }
+
+  beforeAll(async () => {
+    boundaryCompanyId = await findOrCreateCompany("Exec Week Boundary Co", BOUNDARY_CO_SLUG);
+    await ensureActiveBranding(boundaryCompanyId, "Exec Week Boundary Co");
+
+    // Full teardown so reruns start clean.
+    await db
+      .delete(inspectionScorecardsTable)
+      .where(eq(inspectionScorecardsTable.companyId, boundaryCompanyId));
+    await db
+      .delete(inspectionsTable)
+      .where(eq(inspectionsTable.companyId, boundaryCompanyId));
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, BOUNDARY_OWNER));
+
+    await db.insert(usersTable).values({
+      clerkUserId: BOUNDARY_OWNER,
+      role: "owner",
+      companyId: boundaryCompanyId,
+    });
+
+    // Create two inspections via the API (timestamps are reset below).
+    boundaryInspBeforeId = await createInspectionViaApi(BOUNDARY_OWNER, "1 Boundary Ave");
+    boundaryInspAfterId  = await createInspectionViaApi(BOUNDARY_OWNER, "2 Boundary Ave");
+
+    // Compute boundary timestamps.
+    const monday = thisMonday();
+    const oneSecond = 1000;
+    const beforeBoundary = new Date(monday.getTime() - oneSecond); // Sunday 23:59:59 UTC
+    const afterBoundary  = new Date(monday.getTime() + oneSecond); // Monday 00:00:01 UTC
+
+    // Seed the two scorecards with controlled quality scores.
+    await db.insert(inspectionScorecardsTable).values([
+      {
+        companyId:      boundaryCompanyId,
+        inspectionId:   boundaryInspBeforeId,
+        technicianName: "BoundaryTech",
+        qualityScore:   70,
+        riskScore:      50,
+        riskLevel:      "medium",
+        components: {
+          photoCoverage: 70,
+          evidenceQuality: 70,
+          avgConfidence: 70,
+          recommendationCoverage: 70,
+        },
+      },
+      {
+        companyId:      boundaryCompanyId,
+        inspectionId:   boundaryInspAfterId,
+        technicianName: "BoundaryTech",
+        qualityScore:   85,
+        riskScore:      30,
+        riskLevel:      "low",
+        components: {
+          photoCoverage: 85,
+          evidenceQuality: 85,
+          avgConfidence: 85,
+          recommendationCoverage: 85,
+        },
+      },
+    ]);
+
+    // Override createdAt on the scorecards so they straddle the boundary.
+    // drizzle update by inspectionId within this company to avoid touching
+    // other companies' rows.
+    await db
+      .update(inspectionScorecardsTable)
+      .set({ createdAt: beforeBoundary })
+      .where(eq(inspectionScorecardsTable.inspectionId, boundaryInspBeforeId));
+
+    await db
+      .update(inspectionScorecardsTable)
+      .set({ createdAt: afterBoundary })
+      .where(eq(inspectionScorecardsTable.inspectionId, boundaryInspAfterId));
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(inspectionScorecardsTable)
+      .where(eq(inspectionScorecardsTable.companyId, boundaryCompanyId));
+    await db
+      .delete(inspectionsTable)
+      .where(eq(inspectionsTable.companyId, boundaryCompanyId));
+    await db.delete(usersTable).where(eq(usersTable.clerkUserId, BOUNDARY_OWNER));
+  });
+
+  it("places the Sunday-23:59:59 scorecard in the prior ISO week", async () => {
+    asUser(BOUNDARY_OWNER);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+
+    const monday = thisMonday();
+    const priorWeekKey = new Date(monday.getTime() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const weeks: Array<{ weekStart: string; avgQuality: number }> = res.body.weeks;
+    const priorWeek = weeks.find((w) => w.weekStart === priorWeekKey);
+
+    // The prior-week bucket must exist and carry the "before" scorecard's score (70).
+    expect(priorWeek).toBeDefined();
+    expect(priorWeek!.avgQuality).toBe(70);
+  });
+
+  it("places the Monday-00:00:01 scorecard in the current ISO week", async () => {
+    asUser(BOUNDARY_OWNER);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+
+    const currentWeekKey = thisMonday().toISOString().slice(0, 10);
+
+    const weeks: Array<{ weekStart: string; avgQuality: number }> = res.body.weeks;
+    const currentWeek = weeks.find((w) => w.weekStart === currentWeekKey);
+
+    // The current-week bucket must exist and carry the "after" scorecard's score (85).
+    expect(currentWeek).toBeDefined();
+    expect(currentWeek!.avgQuality).toBe(85);
+  });
+
+  it("does not omit either scorecard — both ISO weeks appear with non-zero scores", async () => {
+    asUser(BOUNDARY_OWNER);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+
+    const monday = thisMonday();
+    const priorWeekKey   = new Date(monday.getTime() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const currentWeekKey = monday.toISOString().slice(0, 10);
+
+    const weeks: Array<{ weekStart: string; avgQuality: number }> = res.body.weeks;
+
+    const priorWeek   = weeks.find((w) => w.weekStart === priorWeekKey);
+    const currentWeek = weeks.find((w) => w.weekStart === currentWeekKey);
+
+    expect(priorWeek?.avgQuality).toBeGreaterThan(0);
+    expect(currentWeek?.avgQuality).toBeGreaterThan(0);
+  });
+
+  it("does not double-count either scorecard into the same week", async () => {
+    asUser(BOUNDARY_OWNER);
+    const res = await request(app).get("/api/executive/quality-trend");
+    expect(res.status).toBe(200);
+
+    const monday = thisMonday();
+    const priorWeekKey   = new Date(monday.getTime() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const currentWeekKey = monday.toISOString().slice(0, 10);
+
+    const weeks: Array<{ weekStart: string; avgQuality: number }> = res.body.weeks;
+
+    const priorWeek   = weeks.find((w) => w.weekStart === priorWeekKey);
+    const currentWeek = weeks.find((w) => w.weekStart === currentWeekKey);
+
+    // If both scorecards landed in the same week the average would be
+    // round((70 + 85) / 2) = 78, which is neither 70 nor 85.
+    // Asserting exact values confirms no cross-week leakage.
+    expect(priorWeek!.avgQuality).toBe(70);   // only the "before" scorecard
+    expect(currentWeek!.avgQuality).toBe(85); // only the "after" scorecard
+  });
+});
