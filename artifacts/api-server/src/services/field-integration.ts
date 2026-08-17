@@ -103,6 +103,13 @@ export interface SyncResult {
   noteRetries: number;
   /** Total number of retries across all attachment uploads (0 = all succeeded first try). */
   attachmentRetries: number;
+  /**
+   * Number of attachments that failed with a permanent (non-retryable) error
+   * such as 401 Unauthorized or 403 Forbidden.  When this is non-zero the
+   * operator should inspect the integration credential — the attachment was
+   * silently skipped, not posted.
+   */
+  attachmentErrors: number;
   error?: string;
 }
 
@@ -155,6 +162,7 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
   // 2 — Attach photos (up to 3 attempts each with exponential back-off)
   let attachmentsPosted = 0;
   let attachmentRetries = 0;
+  let attachmentErrors = 0;
   for (const photo of payload.photos) {
     try {
       const { result: attachRes, retries } = await withRetryTracked(
@@ -177,10 +185,23 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
       } else {
         // All retry attempts returned a non-OK response — log and continue.
         const body = await attachRes.text();
-        logger.warn(
-          { status: attachRes.status, body },
-          "PestPac attachment POST failed after retries",
-        );
+        // Permanent auth failures (401/403) are non-retryable and indicate a
+        // dead credential — count them separately so the caller can surface
+        // this to the operator rather than silently treating it as success.
+        const isPermanentAuthFailure =
+          attachRes.status === 401 || attachRes.status === 403;
+        if (isPermanentAuthFailure) {
+          attachmentErrors++;
+          logger.warn(
+            { status: attachRes.status, body, url: photo.url },
+            "PestPac attachment POST rejected with auth error — credential may be invalid",
+          );
+        } else {
+          logger.warn(
+            { status: attachRes.status, body },
+            "PestPac attachment POST failed after retries",
+          );
+        }
       }
     } catch (err) {
       // Network-level error (fetch threw) after all retries — non-fatal, skip this photo.
@@ -193,7 +214,7 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
     }
   }
 
-  return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted, noteRetries, attachmentRetries };
+  return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted, noteRetries, attachmentRetries, attachmentErrors };
 }
 
 // ─── FieldRoutes ──────────────────────────────────────────────────────────────
@@ -254,7 +275,7 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
   }
 
   // FieldRoutes bundles media into the service-history POST — no separate
-  // attachment step, so attachmentRetries is always 0.
+  // attachment step, so attachmentRetries and attachmentErrors are always 0.
   return {
     success: true,
     externalSystem: "fieldroutes",
@@ -262,6 +283,7 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
     attachmentsPosted: payload.photos.length,
     noteRetries,
     attachmentRetries: 0,
+    attachmentErrors: 0,
   };
 }
 

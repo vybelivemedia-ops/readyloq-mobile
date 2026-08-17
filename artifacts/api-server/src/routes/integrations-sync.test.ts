@@ -64,6 +64,7 @@ const { syncMock } = vi.hoisted(() => ({
     attachmentsPosted: 0,
     noteRetries: 0,
     attachmentRetries: 0,
+    attachmentErrors: 0,
   })),
 }));
 
@@ -374,6 +375,7 @@ describe("POST /api/integrations/sync", () => {
         attachmentsPosted: 3,
         noteRetries: 0,
         attachmentRetries: 0,
+        attachmentErrors: 0,
       });
 
       asUser(OWNER_ID);

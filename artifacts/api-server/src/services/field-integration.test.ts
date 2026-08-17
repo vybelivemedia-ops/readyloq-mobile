@@ -405,6 +405,83 @@ describe("syncToPestPac", () => {
       });
     }
   });
+
+  it("logs a warning and reports attachmentsPosted=0 / attachmentErrors=3 when every attachment returns 401 — does not throw", async () => {
+    let callCount = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      // Call 1: note POST — succeeds
+      if (callCount === 1) return makeOkResponse();
+      // All subsequent calls: attachment POSTs — permanent 401 (fast-fail, no retry)
+      return makeErrorResponse(401, "Unauthorized");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const warnSpy = vi.spyOn(
+      (await import("../lib/logger")).logger,
+      "warn",
+    );
+
+    const result = await syncInspectionToExternalSystem({
+      ...basePayload,
+      externalSystem: "pestpac",
+    });
+
+    // Must not throw — attachment failures are non-fatal
+    expect(result.success).toBe(true);
+    expect(result.postedNotes).toBe(true);
+
+    // No attachments were posted
+    expect(result.attachmentsPosted).toBe(0);
+
+    // Every attachment failure is counted in attachmentErrors
+    expect(result.attachmentErrors).toBe(3);
+
+    // 401 is non-retryable — exactly 1 attempt per photo (1 note + 3 attachment calls)
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    // A warning must have been logged for each failed attachment
+    const authWarnCalls = warnSpy.mock.calls.filter(
+      ([, msg]) => typeof msg === "string" && msg.includes("auth error"),
+    );
+    expect(authWarnCalls).toHaveLength(3);
+
+    warnSpy.mockRestore();
+  });
+
+  it("reports attachmentErrors=0 when all attachments succeed", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeOkResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await syncInspectionToExternalSystem({ ...basePayload, externalSystem: "pestpac" });
+
+    expect(result.attachmentErrors).toBe(0);
+  });
+
+  it("reports attachmentErrors=1 when one attachment returns 401 and the rest succeed", async () => {
+    let callCount = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      // Call 1: note POST — succeeds
+      if (callCount === 1) return makeOkResponse();
+      // Call 2: first attachment — permanent 401
+      if (callCount === 2) return makeErrorResponse(401, "Unauthorized");
+      // Remaining attachment calls — succeed
+      return makeOkResponse();
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await syncInspectionToExternalSystem({
+      ...basePayload,
+      externalSystem: "pestpac",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.attachmentsPosted).toBe(2);
+    expect(result.attachmentErrors).toBe(1);
+    // 401 is non-retryable: 1 note + 1 failed attachment (1 attempt) + 2 successful = 4
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
 });
 
 // ─── FieldRoutes ──────────────────────────────────────────────────────────────
