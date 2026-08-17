@@ -240,9 +240,9 @@ export interface CoPilotHUDProps {
   /**
    * True when glasses are in use — either BLE-connected directly to this
    * device OR a cloud-relay session is active. When false the badge is omitted.
-   * Pass `bleGlasses.isBleConnected || glassesSession.isActive` from the
-   * inspection screen so BLE-only devices (cloud registration unavailable)
-   * still show the badge.
+   * Compute this with `shouldShowBleBadge(bleGlasses.isBleConnected, bleGlasses.frameCount) || glassesSession.isActive`
+   * so the BLE half routes through the canonical tested rule and the cloud-relay
+   * flag is preserved for sessions where no BLE frames have arrived yet.
    */
   glassesSessionActive?: boolean;
 }

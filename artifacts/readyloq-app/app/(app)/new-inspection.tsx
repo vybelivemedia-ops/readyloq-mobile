@@ -51,7 +51,7 @@ import { useAllDevicesHealthCheck } from "@/hooks/useAllDevicesHealthCheck";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
 import { useMetaGlassesSession, type GlassesEvent } from "@/hooks/useMetaGlassesSession";
 import { useSmartGlassesBleFrames } from "@/hooks/useSmartGlassesBleFrames";
-import { getBleBadgeStyle } from "@/lib/ble/badge-display";
+import { getBleBadgeStyle, shouldShowBleBadge } from "@/lib/ble/badge-display";
 import { smartGlassesBle } from "@/lib/ble";
 import {
   loadCalibrationProfile,
@@ -2796,7 +2796,7 @@ export default function NewInspectionScreen() {
                     onZoomSuggestion={handleCopilotZoom}
                     isBleConnected={bleGlasses.isBleConnected}
                     bleFrameCount={bleGlasses.frameCount}
-                    glassesSessionActive={bleGlasses.isBleConnected || glassesSession.isActive}
+                    glassesSessionActive={shouldShowBleBadge(bleGlasses.isBleConnected, bleGlasses.frameCount) || glassesSession.isActive}
                   />
                   <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 8 }}>
                     <Pressable
@@ -3195,7 +3195,7 @@ export default function NewInspectionScreen() {
                 onZoomSuggestion={handleCopilotZoom}
                 isBleConnected={bleGlasses.isBleConnected}
                 bleFrameCount={bleGlasses.frameCount}
-                glassesSessionActive={bleGlasses.isBleConnected || glassesSession.isActive}
+                glassesSessionActive={shouldShowBleBadge(bleGlasses.isBleConnected, bleGlasses.frameCount) || glassesSession.isActive}
               />
               <View style={{ borderTopWidth: 1, borderTopColor: colors.border + "55", paddingVertical: 6 }}>
                 <Pressable
