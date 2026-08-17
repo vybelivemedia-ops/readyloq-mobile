@@ -1113,6 +1113,20 @@ describe("bait-station writes are isolated per company", () => {
     const ids = res.body.map((s: { id: number }) => s.id);
     expect(ids).toContain(stationAId);
   });
+
+  it("GET returns 404 when the inspection belongs to another company", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app).get(`/api/inspections/${inspAId}/bait-stations`);
+    expect(res.status).toBe(404);
+  });
+
+  it("GET does not expose company A's bait-station data to company B", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app).get(`/api/inspections/${inspAId}/bait-stations`);
+    // Must be a 404, not an empty array that silently leaks the inspection's existence.
+    expect(res.status).toBe(404);
+    expect(Array.isArray(res.body)).toBe(false);
+  });
 });
 
 describe("DB invariant: every tenant row has a non-null company_id", () => {

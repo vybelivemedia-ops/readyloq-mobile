@@ -25,6 +25,13 @@ router.get("/", async (req: Request<Params>, res) => {
     const inspectionId = Number(req.params.inspectionId);
     if (isNaN(inspectionId)) return res.status(400).json({ error: "Invalid inspection ID" });
 
+    // Verify the parent inspection belongs to this company before listing stations.
+    const [inspection] = await db
+      .select({ id: inspectionsTable.id })
+      .from(inspectionsTable)
+      .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+
     const rows = await db
       .select()
       .from(baitStationsTable)
