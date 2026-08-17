@@ -26,7 +26,13 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 import type { InspectionFinalizedEvent } from "../../lib/enterprise-event-bus";
-import type { EnterpriseSyncFinding, EnterpriseSyncPayload } from "../../types/enterprise-payload";
+import type {
+  EnterpriseSyncFinding,
+  EnterpriseSyncPayload,
+  HardenedInspectionPayload,
+  DeliveryOutcome,
+} from "../../types/enterprise-payload";
+import { EnterpriseBridgeProductionService } from "./enterprise-bridge-production";
 import { sendPestPacSOAP } from "./adapters/pestPacSoapAdapter";
 import { sendServSuiteREST } from "./adapters/servsuiteAdapter";
 import { syncInspectionToExternalSystem } from "../field-integration";
@@ -118,7 +124,10 @@ export class EnterpriseAdapterRouter {
       };
     });
 
-    const payload: EnterpriseSyncPayload = {
+    const insp = inspection as Record<string, unknown>;
+
+    // ── Legacy payload (FieldRoutes adapter unchanged) ────────────────────
+    const legacyPayload: EnterpriseSyncPayload = {
       ExternalWorkOrderId: String(inspection.id),
       LocationReference: {
         PropertyCode: inspection.siteAddress ?? "",
@@ -130,31 +139,79 @@ export class EnterpriseAdapterRouter {
       },
       InspectionFindings: inspectionFindings,
       SignatureAudit: {
-        technicianSigned: !!(inspection as Record<string, unknown>)["technicianSignature"],
-        ownerSigned: !!(inspection as Record<string, unknown>)["ownerSignature"],
-        ownerNotAvailable: !!((inspection as Record<string, unknown>)["ownerNotAvailable"] ?? false),
-        signedAt:
-          ((inspection as Record<string, unknown>)["signedAt"] as Date | null)?.toISOString() ??
-          null,
+        technicianSigned: !!insp["technicianSignature"],
+        ownerSigned: !!insp["ownerSignature"],
+        ownerNotAvailable: !!(insp["ownerNotAvailable"] ?? false),
+        signedAt: (insp["signedAt"] as Date | null)?.toISOString() ?? null,
       },
     };
 
+    // ── Hardened payload (PestPac + ServSuite production bridge) ──────────
+    // Build measurements from findings that have a measurementEstimate so the
+    // ID-based matcher in normalizePayload has entries to resolve against.
+    const hardenedMeasurements: HardenedInspectionPayload["measurements"] = rawFindings
+      .filter((f) => f.measurementEstimate != null)
+      .map((f) => {
+        const meas = f.measurementEstimate!;
+        return {
+          measurementId: `finding-${f.id}-meas`,
+          elementId: String(f.id),
+          widthMm: meas.gapWidthIn != null ? Math.round(meas.gapWidthIn * 25.4) : 0,
+          heightMm: meas.heightFt != null ? Math.round(meas.heightFt * 304.8) : 0,
+          confidence: meas.confidence,
+          surfaceType: "",
+        };
+      });
+
+    const signedAt = (insp["signedAt"] as Date | null)?.toISOString() ?? new Date().toISOString();
+
+    const hardenedPayload: HardenedInspectionPayload = {
+      inspectionId: String(inspection.id),
+      companyId: String(companyId),
+      propertyId: inspection.siteAddress ?? String(inspection.id),
+      technicianId: inspection.technicianId ?? String(config.accountId ?? ""),
+      timestamp: (inspection.completedAt ?? inspection.createdAt).toISOString(),
+      signatures: {
+        technicianUserId: inspection.technicianId ?? "",
+        technicianSignatureUrl: (insp["technicianSignature"] as string | null) ?? "",
+        customerSignatureUrl: (insp["ownerSignature"] as string | null) ?? "",
+        signedAt,
+        signatureVersion: "v1",
+      },
+      measurements: hardenedMeasurements,
+      aiFindings: rawFindings.map((f) => ({
+        findingId: String(f.id),
+        measurementId: f.measurementEstimate != null ? `finding-${f.id}-meas` : undefined,
+        category: f.category,
+        severity: f.severity,
+        aiPrediction: f.description,
+        // reviewStatus "accepted" or "corrected" means the technician confirmed it
+        technicianConfirmed:
+          f.reviewStatus === "accepted" || f.reviewStatus === "corrected",
+        managerVerified: false, // populated by future manager-review workflow
+        confidence: f.confidence,
+        evidencePhotoUrl: f.imageUrl ?? "",
+      })),
+    };
+
+    let outcome: DeliveryOutcome | null = null;
     let success = false;
     let errorMessage: string | null = null;
 
     try {
-      if (config.systemType === "pestpac") {
-        await sendPestPacSOAP(payload, {
-          apiKey: config.apiKey,
-          apiBaseUrl: config.apiBaseUrl,
-        });
-        success = true;
-      } else if (config.systemType === "servsuite") {
-        await sendServSuiteREST(payload, {
-          apiKey: config.apiKey,
-          apiBaseUrl: config.apiBaseUrl,
-        });
-        success = true;
+      if (config.systemType === "pestpac" || config.systemType === "servsuite") {
+        outcome = await EnterpriseBridgeProductionService.dispatchToSystem(
+          {
+            targetSystem: config.systemType,
+            endpointUrl: config.apiBaseUrl ?? "",
+            decryptedApiKey: config.apiKey ?? "",
+          },
+          hardenedPayload,
+        );
+        success = outcome === "DELIVERED";
+        if (!success) {
+          errorMessage = `Delivery outcome: ${outcome}`;
+        }
       } else if (config.systemType === "fieldroutes") {
         // FieldRoutes uses the existing text-note adapter which is already
         // tested and handles the dual-token auth correctly via apiToken.
@@ -206,7 +263,7 @@ export class EnterpriseAdapterRouter {
               },
             }),
           })),
-          signatureAudit: payload.SignatureAudit,
+          signatureAudit: legacyPayload.SignatureAudit,
           inspectionDate: (inspection.completedAt ?? inspection.createdAt)
             .toISOString()
             .split("T")[0],

@@ -6,6 +6,74 @@
  * Adapters are responsible for serialising this into their target format.
  */
 
+// ─── Production-hardened types (EnterpriseBridgeProductionService) ────────────
+
+export interface HardenedInspectionPayload {
+  inspectionId: string;
+  companyId: string;
+  propertyId: string;
+  technicianId: string;
+  timestamp: string;
+  signatures: {
+    technicianUserId: string;
+    /** Raw SVG or URL of the technician's captured signature */
+    technicianSignatureUrl: string;
+    /** Raw SVG or URL of the customer's captured signature */
+    customerSignatureUrl: string;
+    signedAt: string;
+    signatureVersion: string;
+  };
+  measurements: Array<{
+    /** Stable ID linking measurements back to findings */
+    measurementId: string;
+    /** Finding ID used as a fallback correlation key */
+    elementId: string;
+    widthMm: number;
+    heightMm: number;
+    confidence: number;
+    surfaceType: string;
+  }>;
+  aiFindings: Array<{
+    findingId: string;
+    /** Explicit foreign key to measurements[].measurementId */
+    measurementId?: string;
+    category: string;
+    severity: string;
+    aiPrediction: string;
+    technicianConfirmed: boolean;
+    managerVerified: boolean;
+    confidence: number;
+    evidencePhotoUrl: string;
+  }>;
+}
+
+/**
+ * Granular delivery outcome from the production bridge dispatch.
+ *
+ * DELIVERED          — 2xx received from the external system
+ * RETRYABLE_FAILURE  — transient error (5xx, network blip) — safe to retry
+ * PERMANENT_FAILURE  — 400/422 malformed payload — dead-letter, do not retry
+ * UNAUTHORIZED       — 401/403 — credentials need rotation
+ * INVALID_CONFIGURATION — missing endpoint or API key in DB record
+ * TIMEOUT            — no response within the per-system deadline
+ */
+export type DeliveryOutcome =
+  | "DELIVERED"
+  | "RETRYABLE_FAILURE"
+  | "PERMANENT_FAILURE"
+  | "UNAUTHORIZED"
+  | "INVALID_CONFIGURATION"
+  | "TIMEOUT";
+
+export interface DispatchResult {
+  status: DeliveryOutcome;
+  httpStatus?: number;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+// ─── Legacy payload types (FieldRoutes adapter — kept for compat) ─────────────
+
 export interface EnterpriseSyncFinding {
   /** e.g. "RODENT_ACTIVITY_HIGH" — category + severity slug */
   Code: string;
