@@ -97,6 +97,9 @@ import {
   intelligenceVotesTable,
   inspectionScorecardsTable,
   baitStationsTable,
+  treatmentLogsTable,
+  productsTable,
+  productLabelRulesTable,
   READYLOQ_DEFAULT_PROFILE,
 } from "@workspace/db";
 import { eq, isNull, or } from "drizzle-orm";
@@ -1126,6 +1129,110 @@ describe("bait-station writes are isolated per company", () => {
     // Must be a 404, not an empty array that silently leaks the inspection's existence.
     expect(res.status).toBe(404);
     expect(Array.isArray(res.body)).toBe(false);
+  });
+});
+
+describe("treatment-log writes are isolated per company", () => {
+  let inspAId: number;
+  let logAId: number;
+
+  beforeAll(async () => {
+    // Clean up any treatment logs and products from other suites.
+    await db.delete(treatmentLogsTable);
+    await db.delete(productLabelRulesTable);
+    await db.delete(productsTable);
+
+    // Create an inspection owned by company A.
+    const insp = await createInspection(OWNER_A_ID, "400 Treatment A Street");
+    inspAId = insp.id;
+
+    // Seed a product + label rules directly (no rate, no checklists) so we can
+    // insert a treatment log without running through the full compliance wizard.
+    const [product] = await db
+      .insert(productsTable)
+      .values({
+        name: "Test Product Alpha",
+        productType: "general-use",
+        activeIngredients: "Permethrin 0.5%",
+      })
+      .returning();
+
+    await db.insert(productLabelRulesTable).values({
+      productId: product.id,
+      approvedPestTypes: [],
+      approvedSiteClassifications: [],
+      requiredEquipmentTypes: [],
+    });
+
+    // Insert a treatment log directly as company A.
+    const [log] = await db
+      .insert(treatmentLogsTable)
+      .values({
+        companyId: companyAId,
+        inspectionId: inspAId,
+        productId: product.id,
+        targetPest: "Ants",
+        siteClassification: "residential_interior",
+        environmentalWarningAcknowledged: false,
+      })
+      .returning();
+    logAId = log.id;
+
+    asUser(null);
+  });
+
+  it("POST returns 404 when the parent inspection belongs to another company", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app)
+      .post(`/api/inspections/${inspAId}/treatment-logs`)
+      .send({
+        productId: 9999,
+        targetPest: "Ants",
+        siteClassification: "residential_interior",
+      });
+    expect(res.status).toBe(404);
+  });
+
+  it("POST does not create a treatment log when the inspection is cross-tenant", async () => {
+    const rows = await db
+      .select()
+      .from(treatmentLogsTable)
+      .then((r) => r.filter((l) => l.companyId === companyBId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("PATCH returns 404 for a cross-tenant logId", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app)
+      .patch(`/api/inspections/${inspAId}/treatment-logs/${logAId}`)
+      .send({ notes: "tampered" });
+    expect(res.status).toBe(404);
+  });
+
+  it("PATCH leaves the original treatment log unchanged after a cross-tenant attempt", async () => {
+    asUser(OWNER_A_ID);
+    const rows = await db
+      .select()
+      .from(treatmentLogsTable)
+      .where(eq(treatmentLogsTable.id, logAId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].notes).toBeNull(); // not "tampered"
+  });
+
+  it("DELETE returns 404 for a cross-tenant logId", async () => {
+    asUser(OWNER_B_ID);
+    const res = await request(app).delete(
+      `/api/inspections/${inspAId}/treatment-logs/${logAId}`,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("DELETE leaves the original treatment log intact after a cross-tenant attempt", async () => {
+    const rows = await db
+      .select()
+      .from(treatmentLogsTable)
+      .where(eq(treatmentLogsTable.id, logAId));
+    expect(rows).toHaveLength(1);
   });
 });
 

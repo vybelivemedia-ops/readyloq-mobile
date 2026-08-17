@@ -244,6 +244,82 @@ router.post("/", async (req: Request<Params>, res) => {
   }
 });
 
+// ─── PATCH /inspections/:inspectionId/treatment-logs/:logId ──────────────────
+
+const patchTreatmentLogSchema = z.object({
+  notes: z.string().optional(),
+  equipmentUsed: z.string().optional(),
+  tempAtApplicationF: z.number().int().optional(),
+  environmentalWarningAcknowledged: z.boolean().optional(),
+  appliedAt: z.string().datetime().optional(),
+});
+
+router.patch("/:logId", async (req: Request<Params & { logId: string }>, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    const logId = Number((req.params as { logId: string }).logId);
+    if (Number.isNaN(inspectionId) || Number.isNaN(logId)) {
+      return res.status(400).json({ error: "Invalid ID" });
+    }
+
+    const parse = patchTreatmentLogSchema.safeParse(req.body);
+    if (!parse.success) {
+      return res.status(400).json({ error: "Invalid body", detail: parse.error.issues });
+    }
+
+    const data = parse.data;
+    const update: Record<string, unknown> = { ...data };
+    if (data.appliedAt) update.appliedAt = new Date(data.appliedAt);
+
+    const [row] = await db
+      .update(treatmentLogsTable)
+      .set(update)
+      .where(
+        and(
+          eq(treatmentLogsTable.id, logId),
+          eq(treatmentLogsTable.inspectionId, inspectionId),
+          eq(treatmentLogsTable.companyId, companyId),
+        ),
+      )
+      .returning();
+
+    if (!row) return res.status(404).json({ error: "Treatment log not found" });
+    return res.json(serializeLog(row));
+  } catch {
+    return res.status(500).json({ error: "Failed to update treatment log" });
+  }
+});
+
+// ─── DELETE /inspections/:inspectionId/treatment-logs/:logId ─────────────────
+
+router.delete("/:logId", async (req: Request<Params & { logId: string }>, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    const logId = Number((req.params as { logId: string }).logId);
+    if (Number.isNaN(inspectionId) || Number.isNaN(logId)) {
+      return res.status(400).json({ error: "Invalid ID" });
+    }
+
+    const deleted = await db
+      .delete(treatmentLogsTable)
+      .where(
+        and(
+          eq(treatmentLogsTable.id, logId),
+          eq(treatmentLogsTable.inspectionId, inspectionId),
+          eq(treatmentLogsTable.companyId, companyId),
+        ),
+      )
+      .returning({ id: treatmentLogsTable.id });
+
+    if (deleted.length === 0) return res.status(404).json({ error: "Treatment log not found" });
+    return res.status(204).send();
+  } catch {
+    return res.status(500).json({ error: "Failed to delete treatment log" });
+  }
+});
+
 // ─── GET /inspections/:inspectionId/treatment-logs ────────────────────────────
 
 router.get("/", async (req: Request<Params>, res) => {
