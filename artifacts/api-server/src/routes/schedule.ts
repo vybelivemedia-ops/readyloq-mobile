@@ -273,7 +273,7 @@ router.patch("/:id", async (req, res) => {
     const [updated] = await db
       .update(inspectionsTable)
       .set(update)
-      .where(eq(inspectionsTable.id, id))
+      .where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)))
       .returning();
 
     const calDate = updated.scheduledDate ?? updated.createdAt;
