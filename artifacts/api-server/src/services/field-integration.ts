@@ -205,8 +205,12 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
       }
     } catch (err) {
       // Network-level error (fetch threw) after all retries — non-fatal, skip this photo.
-      // Count the retries that were consumed before the throw (maxAttempts - 1 = 2).
-      attachmentRetries += 2;
+      // withRetryTracked rethrows on the final exhausted attempt without returning a
+      // retry count, so we add the consumed retries as a fixed estimate.
+      // The value is (maxAttempts - 1): the first attempt is attempt 1, and retries
+      // are attempts 2…maxAttempts. With maxAttempts=3 (passed above) that is 3-1=2.
+      // If the maxAttempts argument above ever changes, update this constant to match.
+      attachmentRetries += 2; // maxAttempts - 1 = 3 - 1 = 2
       logger.warn(
         { url: photo.url, err: String(err) },
         "PestPac attachment POST threw after retries",

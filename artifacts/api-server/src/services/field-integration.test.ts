@@ -230,6 +230,50 @@ describe("syncToPestPac", () => {
     expect(result.attachmentsPosted).toBe(2);
     // 1 note + 3 attempts for failing attachment + 2 successful attachments = 6
     expect(fetchMock).toHaveBeenCalledTimes(6);
+    // The 2 consumed retries (maxAttempts-1) must be counted even though withRetryTracked threw
+    expect(result.attachmentRetries).toBe(2);
+  });
+
+  it("counts attachmentRetries=2 (maxAttempts-1) when fetch throws on every attempt for one attachment", async () => {
+    // This test specifically exercises the network-blip / throw path.
+    // withRetryTracked rethrows on the final exhausted attempt without returning
+    // a retry count, so field-integration.ts adds a fixed estimate of (maxAttempts-1)=2.
+    // This test pins that behaviour so any change to maxAttempts is caught immediately.
+    vi.useFakeTimers();
+    let callCount = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      // Call 1: note POST — succeeds
+      if (callCount === 1) return makeOkResponse();
+      // All 3 attachment attempts — fetch always throws (network unreachable)
+      throw new Error("ECONNREFUSED");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = syncInspectionToExternalSystem({
+      ...basePayload,
+      externalSystem: "pestpac",
+      // Single photo: all 3 attempts throw
+      photos: [{ url: "https://cdn.example.com/photo1.jpg", caption: "Front door", severity: "high" }],
+    });
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    vi.useRealTimers();
+
+    // The sync must not throw — network failure for an attachment is non-fatal
+    expect(result.success).toBe(true);
+    expect(result.postedNotes).toBe(true);
+
+    // Photo was skipped (all 3 fetch attempts threw)
+    expect(result.attachmentsPosted).toBe(0);
+
+    // attachmentRetries must reflect the 2 retries consumed before the final throw.
+    // The hardcoded estimate in field-integration.ts is (maxAttempts - 1) = 3 - 1 = 2.
+    expect(result.attachmentRetries).toBe(2);
+
+    // 1 note POST + 3 attachment attempts = 4 total fetch calls
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("retries a failed attachment and counts it as posted when the retry succeeds", async () => {
