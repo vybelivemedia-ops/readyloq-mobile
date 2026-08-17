@@ -23,6 +23,7 @@ export default defineConfig({
       "lib/dashboard/__tests__/**/*.test.ts",
       "hooks/__tests__/useAllDevicesHealthCheck.test.ts",
       "lib/risk-drill-down/__tests__/**/*.test.ts",
+      "app/\\(app\\)/inspection-summary/__tests__/**/*.test.ts",
     ],
   },
   resolve: {

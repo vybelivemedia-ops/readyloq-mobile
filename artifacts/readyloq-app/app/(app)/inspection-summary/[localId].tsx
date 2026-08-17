@@ -57,6 +57,11 @@ import { enqueueDelivery, updateLocalInspection, updatePhotoDescription } from "
 import { InspectionSignaturePanel } from "@/components/InspectionSignaturePanel";
 import { syncNow } from "@/lib/sync/engine";
 import { describeCaptureSource, isLowQuality } from "@/lib/vision";
+import {
+  resolveAnalysisCardVariant,
+  resolveDeliveryCardVariant,
+  resolveSyncStatusVariant,
+} from "./inspection-summary-logic";
 
 /**
  * Post-completion summary: shown immediately after "Complete Inspection",
@@ -312,107 +317,107 @@ export default function InspectionSummaryScreen() {
         </Card>
 
         {/* AI results — appear as the server finishes finalization.
-            Status semantics (AnalysisResult.status):
-              "complete"  — server finished the pipeline; findings may be empty (clean inspection)
-              anything else — still processing or a terminal failure
-            analysisErrors (number | null) — count of per-image errors during the run;
-              > 0 on an otherwise "complete" result means partial generation. */}
-        {finalized ? (
-          analysisQ.isError ? (
-            // HTTP-level failure: the query itself failed (network, 500, auth).
-            <Card style={{ gap: 8 }}>
-              <SectionTitle icon="sparkles" title="AI findings" />
-              <SectionNotGenerated
-                reason="AI analysis couldn't be retrieved. This may be a temporary issue — try viewing the full inspection or contact support if it persists."
-                icon="alert-circle-outline"
-                tone="error"
-              />
-            </Card>
-          ) : analysisQ.isSuccess && analysis != null && analysis.status !== "complete" ? (
-            // Result returned but the pipeline didn't finish (status != "complete").
-            <Card style={{ gap: 8 }}>
-              <SectionTitle icon="sparkles" title="AI findings" />
-              <SectionNotGenerated
-                reason="AI analysis didn't complete for this inspection. The server may have skipped it or encountered an error — no action needed."
-                icon="alert-circle-outline"
-                tone="error"
-              />
-            </Card>
-          ) : analysisQ.isSuccess && analysis != null ? (
-            // Pipeline completed (status === "complete"). Show findings or clean-inspection copy.
-            <Card style={{ gap: 8 }}>
-              <SectionTitle icon="sparkles" title={`AI findings (${findings.length})`} />
-              {(analysis.analysisErrors ?? 0) > 0 && findings.length === 0 ? (
-                // Completed with errors and zero usable findings — partial failure.
-                <SectionNotGenerated
-                  reason={`Analysis completed with ${analysis.analysisErrors} error${(analysis.analysisErrors ?? 0) !== 1 ? "s" : ""}. Some or all photos couldn't be processed — check the full inspection for details.`}
-                  icon="alert-circle-outline"
-                  tone="error"
-                />
-              ) : findings.length === 0 && record.photos.length === 0 ? (
-                // No photos captured at all — AI had nothing to work with.
-                <SectionNotGenerated
-                  reason="No photos were captured for this inspection, so AI analysis was skipped."
-                  icon="camera-outline"
-                />
-              ) : findings.length === 0 ? (
-                // Completed successfully with zero findings (clean inspection).
-                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
-                  No pest activity or conducive conditions detected in the evidence.
-                </Text>
-              ) : (
-                findings.slice(0, 5).map((f) => <FindingRow key={f.id} finding={f} />)
-              )}
-              {(analysis.analysisErrors ?? 0) > 0 && findings.length > 0 ? (
-                // Completed with some errors but still produced findings — warn without hiding.
-                <SectionNotGenerated
-                  reason={`${analysis.analysisErrors} photo${(analysis.analysisErrors ?? 0) !== 1 ? "s" : ""} couldn't be processed — findings above may be incomplete.`}
-                  icon="alert-circle-outline"
-                  tone="error"
-                />
-              ) : null}
-              {findings.length > 5 ? (
-                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-                  +{findings.length - 5} more — view the full inspection for everything.
-                </Text>
-              ) : null}
-            </Card>
-          ) : analysisQ.isSuccess && analysis == null ? (
-            // Server finalized the inspection but produced no analysis record at all —
-            // the AI pipeline was skipped (e.g. no analyzable photos or a server-side
-            // skip). This is a stable terminal state, not a loading state.
-            <Card style={{ gap: 8 }}>
-              <SectionTitle icon="sparkles" title="AI findings" />
-              {record.photos.length === 0 ? (
-                <SectionNotGenerated
-                  reason="No photos were captured for this inspection, so AI analysis was skipped."
-                  icon="camera-outline"
-                />
-              ) : (
-                <SectionNotGenerated
-                  reason="AI analysis wasn't generated for this inspection. This can happen when photos couldn't be processed — no action is needed."
-                  icon="sparkles-outline"
-                />
-              )}
-            </Card>
-          ) : (
-            // Query still in flight — show progress indicator.
-            <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
-                Generating report, customer summary, and business insights…
-              </Text>
-            </Card>
-          )
-        ) : (
-          <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <Ionicons name="cloud-upload-outline" size={20} color={colors.mutedForeground} />
-            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
-              AI analysis, the service report, and insights will generate automatically once
-              this inspection syncs.
-            </Text>
-          </Card>
-        )}
+            Rendering is driven by resolveAnalysisCardVariant() (inspection-summary-logic.ts)
+            so the same decision function is exercised by unit tests and by this component. */}
+        {(() => {
+          const aiVariant = resolveAnalysisCardVariant({
+            finalized,
+            isError: analysisQ.isError,
+            isSuccess: analysisQ.isSuccess,
+            analysis: analysis ?? (analysisQ.isSuccess ? null : undefined),
+            photoCount: record.photos.length,
+          });
+
+          switch (aiVariant.kind) {
+            case "not-finalized":
+              return (
+                <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Ionicons name="cloud-upload-outline" size={20} color={colors.mutedForeground} />
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
+                    AI analysis, the service report, and insights will generate automatically once
+                    this inspection syncs.
+                  </Text>
+                </Card>
+              );
+
+            case "query-error":
+            case "pipeline-incomplete":
+              return (
+                <Card style={{ gap: 8 }}>
+                  <SectionTitle icon="sparkles" title="AI findings" />
+                  <SectionNotGenerated {...aiVariant.placeholder} />
+                </Card>
+              );
+
+            case "analysis-errors-no-findings":
+              return (
+                <Card style={{ gap: 8 }}>
+                  <SectionTitle icon="sparkles" title="AI findings (0)" />
+                  <SectionNotGenerated {...aiVariant.placeholder} />
+                </Card>
+              );
+
+            case "no-photos":
+              return (
+                <Card style={{ gap: 8 }}>
+                  <SectionTitle icon="sparkles" title="AI findings" />
+                  <SectionNotGenerated {...aiVariant.placeholder} />
+                </Card>
+              );
+
+            case "no-analysis-record":
+              return (
+                <Card style={{ gap: 8 }}>
+                  <SectionTitle icon="sparkles" title="AI findings" />
+                  <SectionNotGenerated {...aiVariant.placeholder} />
+                </Card>
+              );
+
+            case "clean":
+              return (
+                <Card style={{ gap: 8 }}>
+                  <SectionTitle icon="sparkles" title={`AI findings (${findings.length})`} />
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                    No pest activity or conducive conditions detected in the evidence.
+                  </Text>
+                </Card>
+              );
+
+            case "findings": {
+              const errCount = aiVariant.analysisErrors;
+              return (
+                <Card style={{ gap: 8 }}>
+                  <SectionTitle icon="sparkles" title={`AI findings (${findings.length})`} />
+                  {findings.slice(0, 5).map((f) => <FindingRow key={f.id} finding={f} />)}
+                  {errCount > 0 ? (
+                    // Completed with some errors but still produced findings — warn without hiding.
+                    <SectionNotGenerated
+                      reason={`${errCount} photo${errCount !== 1 ? "s" : ""} couldn't be processed — findings above may be incomplete.`}
+                      icon="alert-circle-outline"
+                      tone="error"
+                    />
+                  ) : null}
+                  {findings.length > 5 ? (
+                    <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                      +{findings.length - 5} more — view the full inspection for everything.
+                    </Text>
+                  ) : null}
+                </Card>
+              );
+            }
+
+            case "loading":
+            default:
+              return (
+                <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
+                    Generating report, customer summary, and business insights…
+                  </Text>
+                </Card>
+              );
+          }
+        })()}
 
         {/* Photo gallery — capture order, straight from durable local files. */}
         <Card style={{ gap: 10 }}>
@@ -768,19 +773,15 @@ function DeliverySection({
     };
   }, []);
 
-  // While the registry is still probing available channels, render nothing —
-  // the Promise resolves in milliseconds and we don't want a flash of
-  // "unavailable" before the methods list is known.
-  if (!methodsLoaded) return null;
-
-  if (methods.length === 0) {
+  // Delegate the loading/no-methods/has-methods decision to the shared logic
+  // function so unit tests can exercise the same branch without rendering.
+  const deliveryVariant = resolveDeliveryCardVariant(methodsLoaded, methods.length);
+  if (deliveryVariant.kind === "loading") return null;
+  if (deliveryVariant.kind === "no-methods") {
     return (
       <Card style={{ gap: 8 }}>
         <SectionTitle icon="paper-plane-outline" title="Deliver report" />
-        <SectionNotGenerated
-          reason="No delivery channels are available on this device. Try again after the app updates."
-          icon="alert-circle-outline"
-        />
+        <SectionNotGenerated {...deliveryVariant.placeholder} />
       </Card>
     );
   }
@@ -1090,12 +1091,15 @@ function SyncStatusCard({
   syncAttempts?: number;
 }) {
   const colors = useColors();
-  if (!phase) {
+  // Delegate the null-phase decision to the shared logic function so unit
+  // tests can exercise the "Sync status unavailable" branch without rendering.
+  const syncVariant = resolveSyncStatusVariant(phase);
+  if (syncVariant.kind === "unavailable") {
     return (
       <Card style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <Ionicons name="cloud-offline-outline" size={22} color={colors.mutedForeground} />
         <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
-          Sync status unavailable
+          {syncVariant.label}
         </Text>
       </Card>
     );
@@ -1137,11 +1141,14 @@ function SyncStatusCard({
       color: colors.destructive,
     },
   };
-  const c = config[phase];
+  // syncVariant is narrowed to { kind: "phase"; phase: LocalSyncPhase } here
+  // because the "unavailable" branch returned above.  Use syncVariant.phase so
+  // TypeScript sees a non-null LocalSyncPhase for the Record<> indexing below.
+  const c = config[syncVariant.phase];
 
   return (
     <Card style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-      {phase === "syncing" ? (
+      {syncVariant.phase === "syncing" ? (
         <ActivityIndicator size="small" color={c.color} />
       ) : (
         <Ionicons name={c.icon} size={22} color={c.color} />
@@ -1154,7 +1161,7 @@ function SyncStatusCard({
           {c.detail}
         </Text>
       </View>
-      {phase === "failed" || phase === "waiting" ? (
+      {syncVariant.phase === "failed" || syncVariant.phase === "waiting" ? (
         <Pressable
           onPress={() => void syncNow(localId).catch(() => {})}
           style={{
