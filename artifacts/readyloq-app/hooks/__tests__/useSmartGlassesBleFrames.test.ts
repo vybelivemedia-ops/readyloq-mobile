@@ -1121,3 +1121,193 @@ describe("useSmartGlassesBleFrames — Android background/foreground cycle", () 
     unmount2();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite 6 — eviction via stalled onFrame consumer callback
+//
+// Task #566: confirm evicted frames are visible in the drop counter so
+// technicians know storage pressure is happening.
+//
+// Previous suites (3) verify the cap via a deferred deleteAsync — the
+// reservation is never released because the delete never settles.  This
+// suite drives the same cap by stalling the *onFrame* consumer instead:
+// frames are written successfully but the consumer (ingestEvidence) hasn't
+// finished yet, so the slot is still occupied.  Concurrent frames that arrive
+// while all 100 slots are in-flight must be dropped and the drop counter must
+// reflect each eviction.
+//
+// Assertions:
+//   ✓ droppedFrameCount increments by 1 for each frame that arrives when
+//     all MAX_CACHED_FRAMES slots are occupied
+//   ✓ writeAsStringAsync is called at most MAX_CACHED_FRAMES (100) times
+//     (i.e. writtenUrisRef.current never exceeds MAX_CACHED_FRAMES)
+//   ✓ deleteAsync is called for every URI that was written once the stall
+//     is released (no written URIs are leaked)
+//   ✓ onDroppedFrame telemetry fires with reason "cap_exceeded" for each
+//     drop caused by the stalled-consumer eviction
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("useSmartGlassesBleFrames — eviction via stalled onFrame consumer", () => {
+  async function flushMicrotasks(ticks = 400) {
+    for (let i = 0; i < ticks; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  it("increments droppedFrameCount for each frame dropped while all slots are occupied by stalled consumers", async () => {
+    mockBle = buildMockBle("connected");
+
+    // Stall every onFrame call — the consumer never resolves, so the URI
+    // reservation is never released and writtenUrisRef fills up.
+    const stallPromise = new Promise<void>(() => {});
+    const onFrame = vi.fn().mockReturnValue(stallPromise);
+
+    const { result, unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      // First 100 frames fill all slots (each onFrame stalls, slot stays reserved).
+      for (let i = 0; i < 100; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(400);
+
+      // Next 10 frames: every slot is occupied → all 10 must be dropped.
+      for (let i = 0; i < 10; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    // Exactly 10 frames were evicted (drop counter must reflect all of them).
+    expect(result.current.droppedFrameCount).toBeGreaterThanOrEqual(10);
+
+    unmount();
+  });
+
+  it("never calls writeAsStringAsync more than MAX_CACHED_FRAMES (100) times when the consumer is stalled", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    const stallPromise = new Promise<void>(() => {});
+    const onFrame = vi.fn().mockReturnValue(stallPromise);
+
+    const { unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      // Emit 115 frames — 100 fill the cap; 15 must be silently dropped.
+      for (let i = 0; i < 115; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(500);
+    });
+
+    // writtenUrisRef is bounded by MAX_CACHED_FRAMES — verify via write call count.
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(100);
+
+    unmount();
+  });
+
+  it("calls deleteAsync for every written URI once the stalled consumer is released", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+
+    // Use a resolvable stall so we can release all in-flight frames at will.
+    let releaseAll!: () => void;
+    const stallPromise = new Promise<void>((resolve) => {
+      releaseAll = resolve;
+    });
+    const onFrame = vi.fn().mockReturnValue(stallPromise);
+
+    const { unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    await act(async () => {
+      // Fill up all 100 slots.
+      for (let i = 0; i < 100; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(400);
+    });
+
+    // 100 writes done, deleteAsync not yet called (consumer still stalled).
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(100);
+    const writtenUris = vi
+      .mocked(fs.writeAsStringAsync)
+      .mock.calls.map((c) => c[0]);
+
+    // Release the stall — all 100 consumer promises resolve simultaneously.
+    await act(async () => {
+      releaseAll();
+      await flushMicrotasks(500);
+    });
+
+    // Every written URI must now have been passed to deleteAsync.
+    const deletedUris = vi
+      .mocked(fs.deleteAsync)
+      .mock.calls.filter(([uri]) => (uri as string).endsWith(".jpg"))
+      .map(([uri]) => uri);
+
+    for (const uri of writtenUris) {
+      expect(deletedUris).toContain(uri);
+    }
+
+    unmount();
+  });
+
+  it("fires onDroppedFrame with reason 'cap_exceeded' for each frame evicted by the stalled-consumer cap", async () => {
+    mockBle = buildMockBle("connected");
+
+    const stallPromise = new Promise<void>(() => {});
+    const onFrame = vi.fn().mockReturnValue(stallPromise);
+    const onDroppedFrame = vi.fn();
+
+    // Use renderHook directly so we can pass onDroppedFrame.
+    const { result, unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame, onDroppedFrame }),
+    );
+
+    // Flush the async startup effect (getInfoAsync → makeDirectoryAsync → setSetupComplete).
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      // Fill all 100 slots — consumer stalls on every frame.
+      for (let i = 0; i < 100; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(400);
+
+      // Emit 5 more while all slots are occupied — each must fire cap_exceeded.
+      for (let i = 0; i < 5; i++) {
+        mockBle.emitFrame();
+      }
+      await flushMicrotasks(200);
+    });
+
+    const capExceededCalls = onDroppedFrame.mock.calls.filter(
+      ([, reason]) => reason === "cap_exceeded",
+    );
+    expect(capExceededCalls.length).toBe(5);
+
+    // Each cap_exceeded call must report exactly 1 dropped frame.
+    for (const [count] of capExceededCalls) {
+      expect(count).toBe(1);
+    }
+
+    // The React state must also reflect all 5 evictions.
+    expect(result.current.droppedFrameCount).toBeGreaterThanOrEqual(5);
+
+    unmount();
+  });
+});
