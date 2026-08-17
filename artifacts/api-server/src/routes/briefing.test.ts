@@ -382,6 +382,38 @@ describe("building history pest-type union", () => {
   });
 });
 
+describe("site history lastFindingsCount ordering", () => {
+  it("reports the most-recent visit's findingsCount, not the first visit's", async () => {
+    // Older visit: 3 findings.
+    await seedInspection(companyAId, "60 Findings Way", {
+      completed: true,
+      completedDaysAgo: 10,
+      findingsCount: 3,
+    });
+    // Newer visit: 7 findings — this is the value that must win.
+    await seedInspection(companyAId, "60 Findings Way", {
+      completed: true,
+      completedDaysAgo: 2,
+      findingsCount: 7,
+    });
+
+    asUser(TECH_A_ID);
+    const res = await request(app).get("/api/briefing");
+    expect(res.status).toBe(200);
+
+    const history = res.body.technician.siteHistory as Array<{
+      siteAddress: string;
+      visitCount: number;
+      lastFindingsCount: number;
+    }>;
+    const entry = history.find((h) => h.siteAddress === "60 Findings Way");
+    expect(entry).toBeDefined();
+    expect(entry!.visitCount).toBe(2);
+    // Must reflect the newer visit (7), not the older one (3).
+    expect(entry!.lastFindingsCount).toBe(7);
+  });
+});
+
 describe("site history ordering and limit", () => {
   it("returns exactly the 8 most-recently-visited addresses and omits the oldest when 9+ distinct addresses exist", async () => {
     // Seed 9 distinct addresses.  Address 9 is the oldest and must be dropped.
