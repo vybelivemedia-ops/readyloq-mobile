@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 /**
@@ -523,6 +523,110 @@ describe("POST /api/integrations/sync", () => {
         .send({ inspectionId: completedInspectionId });
 
       // Cooldown cache hit → 200 with _idempotent flag, no external call.
+      expect(res.status).toBe(200);
+      expect(res.body._idempotent).toBe(true);
+      expect(syncMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("cooldown — scoped per inspectionId, not per company", () => {
+    // Regression guard: the cooldown query filters on BOTH inspectionId AND
+    // companyId.  If a future change widens the WHERE clause to match any
+    // recent sync for the same company, inspection B would incorrectly receive
+    // inspection A's cached result.
+
+    let inspectionBId: number;
+
+    beforeEach(async () => {
+      // Ensure the company has an active integration config.
+      await db
+        .delete(companyFieldIntegrationsTable)
+        .where(eq(companyFieldIntegrationsTable.companyId, companyId));
+      await db.insert(companyFieldIntegrationsTable).values({
+        companyId,
+        systemType: "pestpac",
+        accountId: "acc-scope-test",
+        apiKey: "key-scope-test",
+        enabled: true,
+      });
+
+      // Create a second completed inspection at the same company.
+      const [inspB] = await db
+        .insert(inspectionsTable)
+        .values({
+          companyId,
+          siteAddress: "99 Scope Test Blvd",
+          technicianName: "Tech",
+          status: "completed",
+        })
+        .returning();
+      inspectionBId = inspB.id;
+
+      // Wipe any pre-existing logs for both inspections so the only signal is
+      // the one seeded below.
+      await db
+        .delete(inspectionSyncLogsTable)
+        .where(eq(inspectionSyncLogsTable.companyId, companyId));
+
+      // Seed a fresh successful sync log for inspection A (completedInspectionId).
+      await db.insert(inspectionSyncLogsTable).values({
+        companyId,
+        inspectionId: completedInspectionId,
+        systemType: "pestpac",
+        success: true,
+        errorMessage: null,
+        resultJson: {
+          success: true,
+          externalSystem: "pestpac",
+          postedNotes: true,
+          attachmentsPosted: 1,
+          noteRetries: 0,
+          attachmentRetries: 0,
+          _seedMarker: "inspection-a-cached",
+        },
+      });
+    });
+
+    afterEach(async () => {
+      // Clean up the extra inspection created for this suite.
+      if (inspectionBId) {
+        await db
+          .delete(inspectionSyncLogsTable)
+          .where(eq(inspectionSyncLogsTable.inspectionId, inspectionBId));
+        await db
+          .delete(inspectionsTable)
+          .where(eq(inspectionsTable.id, inspectionBId));
+      }
+    });
+
+    it("inspection B calls the external system — it is not served inspection A's cached cooldown result", async () => {
+      asUser(OWNER_ID);
+      const res = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: inspectionBId });
+
+      // The sync must have hit the external system — not returned the cache.
+      expect(res.status).toBe(200);
+      expect(res.body._idempotent).toBeUndefined();
+      expect(syncMock).toHaveBeenCalledTimes(1);
+      // Response must not carry inspection A's marker.
+      expect(JSON.stringify(res.body)).not.toContain("inspection-a-cached");
+    });
+
+    it("inspection A still returns its own cached result after inspection B's fresh sync", async () => {
+      // First sync inspection B so it does not interfere.
+      asUser(OWNER_ID);
+      await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: inspectionBId });
+      syncMock.mockClear();
+
+      // Now request inspection A — it should hit the cooldown cache seeded in
+      // beforeEach and return the stored result without calling the adapter.
+      const res = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+
       expect(res.status).toBe(200);
       expect(res.body._idempotent).toBe(true);
       expect(syncMock).not.toHaveBeenCalled();
