@@ -1,3 +1,4 @@
+- [Metro vite/vitest blockList](metro-vite-blockList.md) — four regexes must stay in metro.config.js or builds fail at ~2279 modules with module-runner.js SyntaxError
 - [ReadyLoq Architecture](readyloq-architecture.md) — stack, conventions, API routes, real-capture/no-simulation beta model (0–1 confidence, batched AI), Wouter base path fix
 - [ReadyLoq multi-tenancy](readyloq-multitenancy.md) — per-company isolation rules, reserved platform/legacy companies, storage scoping, vitest harness, frontend typecheck gotcha
 - [API Server Testing](api-server-testing.md) — vitest + isolated `<db>_test` DB + Clerk getAuth mock; pre-existing TS7030 typecheck failures are baseline
