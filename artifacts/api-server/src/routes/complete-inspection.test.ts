@@ -102,6 +102,7 @@ import {
   inspectionsTable,
   reportsTable,
   customerSummariesTable,
+  analysisResultsTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 
@@ -409,5 +410,69 @@ describe("POST /inspections/:id/complete", () => {
     asUser(null);
     const res = await request(app).post(`/api/inspections/${inspectionId}/complete`).send();
     expect(res.status).toBe(401);
+  });
+
+  it("strips malformed findings before writing the report snapshot — validateFindings fires on the finalization path", async () => {
+    // Create an inspection (no media needed — we seed analysisResultsTable directly).
+    asUser(OWNER_ID);
+    const created = await request(app)
+      .post("/api/inspections")
+      .send({ siteAddress: "Malformed Guard Ln", technicianName: "Tech", clientName: "Client" });
+    expect(created.status).toBe(201);
+    const inspectionId = created.body.id as number;
+
+    // Seed an analysisResultsTable row that contains a mix of valid and invalid
+    // findings. This simulates data that bypassed an earlier write guard or was
+    // corrupted in-place — the finalization path must strip the bad entries.
+    //
+    // findingSchema requires: id (number), category, description, confidence,
+    // severity, location (nullable), imageUrl (nullable), treatment (nullable),
+    // exclusionOpportunity (boolean|null).
+    const validFinding = {
+      id: 1,
+      category: "pest",
+      description: "Cockroach activity near sink",
+      confidence: 0.88,
+      severity: "high",
+      location: "kitchen",
+      imageUrl: null,
+      treatment: "Apply gel bait",
+      exclusionOpportunity: false,
+      possiblePest: "German cockroach",
+      zone: "kitchen",
+    };
+    const invalidFindings = [
+      // Missing all required fields — schema parse fails
+      { confidence: 0.5, subcategory: "rodent" },
+      // id is the wrong type (string instead of number) — fails z.number()
+      { id: "not-a-number", category: "pest", description: "Mouse", confidence: 0.7,
+        severity: "medium", location: null, imageUrl: null, treatment: null,
+        exclusionOpportunity: false },
+    ];
+
+    await db.insert(analysisResultsTable).values({
+      companyId,
+      inspectionId,
+      findings: [validFinding, ...invalidFindings],
+      recommendations: ["Apply gel bait"],
+      overallConfidence: 0.88,
+    });
+
+    // Complete the inspection — this triggers ensureReportForInspection which
+    // reads the seeded findings and must run validateFindings before writing.
+    const res = await request(app).post(`/api/inspections/${inspectionId}/complete`).send();
+    expect(res.status).toBe(200);
+    expect(res.body.reportId).toBeTypeOf("number");
+
+    // The report snapshot must only contain the single valid finding; both
+    // invalid entries must have been stripped by validateFindings.
+    const [report] = await db
+      .select()
+      .from(reportsTable)
+      .where(and(eq(reportsTable.id, res.body.reportId), eq(reportsTable.companyId, companyId)));
+    expect(report).toBeTruthy();
+    const storedFindings = report.findings as unknown[];
+    expect(storedFindings).toHaveLength(1);
+    expect((storedFindings[0] as { category: string }).category).toBe("pest");
   });
 });
