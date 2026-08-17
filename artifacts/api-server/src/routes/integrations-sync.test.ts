@@ -904,6 +904,82 @@ describe("POST /api/integrations/sync", () => {
     });
   });
 
+  describe("failure log — sync error is persisted and visible in sync-history", () => {
+    // Ensures the catch block in POST /api/integrations/sync actually writes a
+    // failure row (success: false, errorMessage set) and that the row is
+    // subsequently retrievable via GET /api/integrations/sync-history.
+    //
+    // If the insert were silently swallowed (e.g. the .catch(() => {}) around
+    // it masked a real bug), owners would have no visibility into why a sync
+    // failed — this test would catch that regression.
+
+    const KNOWN_ERROR = "PestPac upstream returned 503 Service Unavailable";
+
+    beforeEach(async () => {
+      // Ensure the company has an active integration config.
+      await db
+        .delete(companyFieldIntegrationsTable)
+        .where(eq(companyFieldIntegrationsTable.companyId, companyId));
+      await db.insert(companyFieldIntegrationsTable).values({
+        companyId,
+        systemType: "pestpac",
+        accountId: "acc-faillog",
+        apiKey: "key-faillog",
+        enabled: true,
+      });
+
+      // Wipe any pre-existing sync logs for the test inspection so the only
+      // log after the sync attempt is the failure we are about to produce.
+      await db
+        .delete(inspectionSyncLogsTable)
+        .where(
+          and(
+            eq(inspectionSyncLogsTable.inspectionId, completedInspectionId),
+            eq(inspectionSyncLogsTable.companyId, companyId),
+          ),
+        );
+    });
+
+    it("returns 502 and writes a failure log that appears in sync-history", async () => {
+      // Make the external adapter throw with a known message.
+      syncMock.mockRejectedValueOnce(new Error(KNOWN_ERROR));
+
+      asUser(OWNER_ID);
+
+      // ── Step 1: trigger the failing sync ────────────────────────────────────
+      const syncRes = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+
+      expect(syncRes.status).toBe(502);
+      expect(syncRes.body.error).toContain(KNOWN_ERROR);
+
+      // ── Step 2: confirm the failure log is in the database ──────────────────
+      const historyRes = await request(app)
+        .get(`/api/integrations/sync-history?inspectionId=${completedInspectionId}`);
+
+      expect(historyRes.status).toBe(200);
+
+      const logs: Array<{
+        inspectionId: number;
+        success: boolean;
+        errorMessage: string | null;
+        systemType: string;
+      }> = historyRes.body.logs;
+
+      // At least one log row must exist for this inspection.
+      expect(logs.length).toBeGreaterThanOrEqual(1);
+
+      // The most recent entry (index 0 — logs are ordered newest-first) must
+      // record the failure with the correct error message.
+      const failureLog = logs[0];
+      expect(failureLog.inspectionId).toBe(completedInspectionId);
+      expect(failureLog.success).toBe(false);
+      expect(failureLog.errorMessage).toBe(KNOWN_ERROR);
+      expect(failureLog.systemType).toBe("pestpac");
+    });
+  });
+
   describe("input validation", () => {
     it("returns 400 for a missing inspectionId", async () => {
       asUser(OWNER_ID);
