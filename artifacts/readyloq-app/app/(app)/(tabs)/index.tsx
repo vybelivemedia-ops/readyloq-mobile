@@ -23,7 +23,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Href, useRouter } from "expo-router";
 import React, { useCallback } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
-import { dismissPushFailure } from "@/lib/api";
+import { dismissPushFailure, type CurrentUser } from "@/lib/api";
+import { runDismissPushFailure } from "@/lib/dashboard/push-failure-banner";
 
 import { MissionControlDashboard } from "@/components/MissionControlDashboard";
 import { RoleBriefingView } from "@/components/briefing/RoleBriefingView";
@@ -472,19 +473,18 @@ export default function DashboardScreen() {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
-  // Dismiss the push-failure banner: clear the server flag, then refetch the
-  // current-user cache so the banner hides without a full page reload.
-  const handleDismissPushFailure = useCallback(async () => {
-    try {
-      const token = await getToken();
-      await dismissPushFailure(token);
-      queryClient.setQueryData<typeof user>(["current-user"], (prev) =>
-        prev ? { ...prev, pushLastFailedAt: null } : prev,
-      );
-    } catch {
-      // Best-effort — banner will hide on next /me refetch anyway.
-    }
-  }, [getToken, queryClient]);
+  // Dismiss the push-failure banner with an optimistic local update so the
+  // banner hides immediately on tap — no reload required.
+  const handleDismissPushFailure = useCallback(
+    () =>
+      runDismissPushFailure<CurrentUser>({
+        getToken,
+        callDismissApi: dismissPushFailure,
+        setUserCache: (updater) =>
+          queryClient.setQueryData<CurrentUser | null | undefined>(["current-user"], updater),
+      }),
+    [getToken, queryClient],
+  );
 
   const briefing = useQuery(getGetBriefingQueryOptions());
   const dash     = useQuery(getGetAnalyticsDashboardQueryOptions());

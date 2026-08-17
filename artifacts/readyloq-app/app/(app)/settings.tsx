@@ -31,7 +31,7 @@ import { Card } from "@/components/ui/Card";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useViewPreference, resolveViewMode } from "@/hooks/useViewPreference";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGetBriefingQueryOptions } from "@/lib/api-client";
 import {
   bootstrapSuperAdmin,
@@ -43,10 +43,12 @@ import {
   setPushNotificationsEnabled,
   setBriefingEmailOptOut,
   registerPushToken,
+  type CurrentUser,
   type FieldIntegrationSystem,
   type IntegrationConfigResponse,
   type IntegrationProbeResult,
 } from "@/lib/api";
+import { runReRegisterPushToken } from "@/lib/dashboard/push-failure-banner";
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -761,6 +763,7 @@ export default function SettingsScreen() {
   const { getToken } = useAuth();
   const { user: clerkUser } = useUser();
   const { user, refetch: refetchUser } = useCurrentUser();
+  const queryClient = useQueryClient();
   const { viewMode, setMode, clearMode, isLoaded } = useViewPreference();
   const isOwner = user?.role === "owner";
   const isSuperAdmin = !!user?.isSuperAdmin;
@@ -816,43 +819,46 @@ export default function SettingsScreen() {
     if (pushReRegistering || !Device.isDevice) return;
     setPushReRegistering(true);
     try {
-      // Set up Android notification channels if needed.
-      if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("critical-alerts", {
-          name: "Critical Risk Alerts",
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: "#ef4444",
-        });
-      }
-
-      const existingPerm = await Notifications.getPermissionsAsync();
-      if (!existingPerm.granted) {
-        const requested = await Notifications.requestPermissionsAsync();
-        if (!requested.granted) {
-          // Permission denied — open Settings so the user can grant it manually.
-          void Linking.openSettings();
-          return;
-        }
-      }
-
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: "7927cf86-2cbd-4c14-9bd5-d43f2beabec8",
+      await runReRegisterPushToken<CurrentUser>({
+        currentPushLastFailedAt: user?.pushLastFailedAt ?? null,
+        setUserCache: (updater) =>
+          queryClient.setQueryData<CurrentUser | null | undefined>(["current-user"], updater),
+        acquireToken: async () => {
+          // Set up Android notification channels if needed.
+          if (Platform.OS === "android") {
+            await Notifications.setNotificationChannelAsync("critical-alerts", {
+              name: "Critical Risk Alerts",
+              importance: Notifications.AndroidImportance.MAX,
+              vibrationPattern: [0, 250, 250, 250],
+              lightColor: "#ef4444",
+            });
+          }
+          const existingPerm = await Notifications.getPermissionsAsync();
+          if (!existingPerm.granted) {
+            const requested = await Notifications.requestPermissionsAsync();
+            if (!requested.granted) return { status: "denied" };
+          }
+          const tokenData = await Notifications.getExpoPushTokenAsync({
+            projectId: "7927cf86-2cbd-4c14-9bd5-d43f2beabec8",
+          });
+          return { status: "granted", expoPushToken: tokenData.data };
+        },
+        getToken,
+        registerWithServer: registerPushToken,
+        onSuccess: () => { refetchUser(); },
+        onPermissionDenied: () => { void Linking.openSettings(); },
+        onError: (e) => {
+          console.warn("[PushToken] Re-registration failed:", e);
+          Alert.alert(
+            "Re-registration failed",
+            "Could not refresh your push token. Check that notifications are allowed in your device Settings.",
+            [
+              { text: "Open Settings", onPress: () => void Linking.openSettings() },
+              { text: "Cancel", style: "cancel" },
+            ],
+          );
+        },
       });
-      const authToken = await getToken();
-      await registerPushToken(authToken, tokenData.data);
-      // Refresh the user record so the banner disappears immediately.
-      refetchUser();
-    } catch (e: unknown) {
-      console.warn("[PushToken] Re-registration failed:", e);
-      Alert.alert(
-        "Re-registration failed",
-        "Could not refresh your push token. Check that notifications are allowed in your device Settings.",
-        [
-          { text: "Open Settings", onPress: () => void Linking.openSettings() },
-          { text: "Cancel", style: "cancel" },
-        ],
-      );
     } finally {
       setPushReRegistering(false);
     }
