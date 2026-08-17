@@ -659,6 +659,78 @@ export default function ConnectionsScreen() {
           )}
         </Section>
 
+        {/* ── Meta Ray-Ban · Live AI cloud session ─────────────────────── */}
+        <Section title="Meta Ray-Ban · Live AI" icon="glasses-outline">
+          <Card style={{ gap: 12 }}>
+            {/* Header row */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: "rgba(124,58,237,0.12)",
+                alignItems: "center", justifyContent: "center",
+              }}>
+                <Ionicons name="glasses-outline" size={20} color="#7c3aed" />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  Meta Ray-Ban Glasses
+                </Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                  Live AI via cloud session · not BLE
+                </Text>
+              </View>
+            </View>
+
+            {/* How-to steps */}
+            <View style={{ gap: 6 }}>
+              {([
+                ["1", "Open the Meta AI app and confirm the glasses are paired and connected"],
+                ["2", "Enable Developer Mode inside the Meta AI app settings"],
+                ["3", "Start or open an inspection — a 6-character pairing code will appear at the top of the screen"],
+                ["4", "Enter that code under App Connections in the Meta AI app"],
+              ] as [string, string][]).map(([step, label]) => (
+                <View key={step} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                  <View style={{
+                    width: 20, height: 20, borderRadius: 10,
+                    backgroundColor: "rgba(124,58,237,0.15)",
+                    alignItems: "center", justifyContent: "center",
+                    marginTop: 1,
+                  }}>
+                    <Text style={{ color: "#7c3aed", fontFamily: "Inter_700Bold", fontSize: 10 }}>
+                      {step}
+                    </Text>
+                  </View>
+                  <Text style={{
+                    color: colors.mutedForeground,
+                    fontFamily: "Inter_400Regular",
+                    fontSize: 12,
+                    lineHeight: 17,
+                    flex: 1,
+                  }}>
+                    {label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* CTA */}
+            <Pressable
+              onPress={() => router.push("/(app)/new-inspection" as Href)}
+              style={({ pressed }) => ({
+                backgroundColor: "#7c3aed",
+                borderRadius: 10,
+                paddingVertical: 11,
+                alignItems: "center",
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                Start Inspection
+              </Text>
+            </Pressable>
+          </Card>
+        </Section>
+
         {/* ── Wi-Fi Camera ─────────────────────────────────────────────────── */}
         <Section title="Wi-Fi Camera" icon="wifi-outline">
           <Card style={{ gap: 12 }}>
