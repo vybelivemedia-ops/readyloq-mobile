@@ -404,6 +404,47 @@ describe("generate-narrative — malformed findings", () => {
   });
 });
 
+// ─── Narrative generation — AI error propagation ─────────────────────────────
+
+describe("generate-narrative — AI error propagation", () => {
+  /**
+   * Verifies that when generateReportNarrative rejects (e.g. network failure,
+   * token-limit error, model error) the route:
+   *   1. Returns a 5xx (502) and NOT a 200 with an empty narrative.
+   *   2. Does NOT update the DB row — aiNarrative must remain null/unchanged.
+   */
+  it("returns 502 and leaves aiNarrative unchanged when the AI call throws", async () => {
+    // Arrange: force the AI stub to reject for this test only
+    vi.mocked(reportNarrativeAi.generateReportNarrative).mockRejectedValueOnce(
+      new Error("Simulated model failure"),
+    );
+
+    // Create a fresh report with no aiNarrative
+    asUser(OWNER_ID);
+    const createRes = await request(app)
+      .post("/api/reports")
+      .send({ inspectionId, title: "AI-error propagation test", includeAiFindings: false });
+    expect(createRes.status).toBe(201);
+    const reportId: number = createRes.body.id;
+
+    // Act: call the narrative endpoint — the AI will throw
+    const narRes = await request(app)
+      .post(`/api/reports/${reportId}/generate-narrative`)
+      .send({});
+
+    // Assert: route must propagate the error as a 5xx, not silently swallow it
+    expect(narRes.status).toBe(502);
+
+    // Assert: DB row must NOT have been updated — aiNarrative must remain null
+    const [row] = await db
+      .select()
+      .from(reportsTable)
+      .where(eq(reportsTable.id, reportId));
+    expect(row).toBeDefined();
+    expect(row.aiNarrative).toBeNull();
+  });
+});
+
 // ─── Non-empty exclusionOpportunities round-trip ─────────────────────────────
 
 describe("exclusionOpportunities — non-empty count", () => {
