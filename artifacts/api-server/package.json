@@ -26,6 +26,7 @@
     "drizzle-orm": "catalog:",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
+    "fast-xml-parser": "^5.10.1",
     "google-auth-library": "^10.7.0",
     "helmet": "^8.2.0",
     "http-proxy-middleware": "^4.1.0",

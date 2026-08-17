@@ -18886,14 +18886,14 @@ var require_etag = __commonJS({
   "../../node_modules/.pnpm/etag@1.8.1/node_modules/etag/index.js"(exports, module) {
     "use strict";
     module.exports = etag;
-    var crypto5 = __require("crypto");
+    var crypto6 = __require("crypto");
     var Stats = __require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto5.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto6.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -22368,17 +22368,17 @@ var require_content_disposition = __commonJS({
 // ../../node_modules/.pnpm/cookie-signature@1.2.2/node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "../../node_modules/.pnpm/cookie-signature@1.2.2/node_modules/cookie-signature/index.js"(exports) {
-    var crypto5 = __require("crypto");
+    var crypto6 = __require("crypto");
     exports.sign = function(val, secret) {
       if ("string" != typeof val) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val + "." + crypto5.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
+      return val + "." + crypto6.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
     };
     exports.unsign = function(input, secret) {
       if ("string" != typeof input) throw new TypeError("Signed cookie string must be provided.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
       var tentativeValue = input.slice(0, input.lastIndexOf(".")), expectedInput = exports.sign(tentativeValue, secret), expectedBuffer = Buffer.from(expectedInput), inputBuffer = Buffer.from(input);
-      return expectedBuffer.length === inputBuffer.length && crypto5.timingSafeEqual(expectedBuffer, inputBuffer) ? tentativeValue : false;
+      return expectedBuffer.length === inputBuffer.length && crypto6.timingSafeEqual(expectedBuffer, inputBuffer) ? tentativeValue : false;
     };
   }
 });
@@ -28712,7 +28712,7 @@ var require_tools = __commonJS({
         stream.flushSync();
       }
     }
-    function createArgsNormalizer(defaultOptions3) {
+    function createArgsNormalizer(defaultOptions4) {
       return function normalizeArgs(instance, caller, opts = {}, stream) {
         if (typeof opts === "string") {
           stream = buildSafeSonicBoom({ dest: opts });
@@ -28738,9 +28738,9 @@ var require_tools = __commonJS({
           }
           stream = transport({ caller, ...opts.transport, levels: customLevels });
         }
-        opts = Object.assign({}, defaultOptions3, opts);
-        opts.serializers = Object.assign({}, defaultOptions3.serializers, opts.serializers);
-        opts.formatters = Object.assign({}, defaultOptions3.formatters, opts.formatters);
+        opts = Object.assign({}, defaultOptions4, opts);
+        opts.serializers = Object.assign({}, defaultOptions4.serializers, opts.serializers);
+        opts.formatters = Object.assign({}, defaultOptions4.formatters, opts.formatters);
         if (opts.prettyPrint) {
           throw new Error("prettyPrint option is no longer supported, see the pino-pretty package (https://github.com/pinojs/pino-pretty)");
         }
@@ -30081,7 +30081,7 @@ var require_pino = __commonJS({
     var { pid } = process;
     var hostname2 = os2.hostname();
     var defaultErrorSerializer = stdSerializers.err;
-    var defaultOptions3 = {
+    var defaultOptions4 = {
       level: "info",
       levelComparison: SORTING_ORDER.ASC,
       levels: DEFAULT_LEVELS,
@@ -30113,7 +30113,7 @@ var require_pino = __commonJS({
       depthLimit: 5,
       edgeLimit: 100
     };
-    var normalize2 = createArgsNormalizer(defaultOptions3);
+    var normalize2 = createArgsNormalizer(defaultOptions4);
     var serializers = Object.assign(/* @__PURE__ */ Object.create(null), stdSerializers);
     function pino2(...args) {
       const instance = {};
@@ -32727,14 +32727,14 @@ var require_parse3 = __commonJS({
       };
       if (opts.fastpaths !== false && !/(^[*!]|[/()[\]{}"])/.test(input)) {
         let backslashes = false;
-        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc4, chars, first, rest, index2) => {
+        let output = input.replace(REGEX_SPECIAL_CHARS_BACKREF, (m, esc3, chars, first, rest, index2) => {
           if (first === "\\") {
             backslashes = true;
             return m;
           }
           if (first === "?") {
-            if (esc4) {
-              return esc4 + first + (rest ? QMARK.repeat(rest.length) : "");
+            if (esc3) {
+              return esc3 + first + (rest ? QMARK.repeat(rest.length) : "");
             }
             if (index2 === 0) {
               return qmarkNoDot + (rest ? QMARK.repeat(rest.length) : "");
@@ -32745,12 +32745,12 @@ var require_parse3 = __commonJS({
             return DOT_LITERAL.repeat(chars.length);
           }
           if (first === "*") {
-            if (esc4) {
-              return esc4 + first + (rest ? star : "");
+            if (esc3) {
+              return esc3 + first + (rest ? star : "");
             }
             return star;
           }
-          return esc4 ? m : `\\${m}`;
+          return esc3 ? m : `\\${m}`;
         });
         if (backslashes === true) {
           if (opts.unescape === true) {
@@ -34996,7 +34996,7 @@ var require_cert_signatures = __commonJS({
 var require_sasl = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/crypto/sasl.js"(exports, module) {
     "use strict";
-    var crypto5 = require_utils7();
+    var crypto6 = require_utils7();
     var { signatureAlgorithmHashFromCertificate } = require_cert_signatures();
     function startSession(mechanisms, stream) {
       const candidates = ["SCRAM-SHA-256"];
@@ -35008,7 +35008,7 @@ var require_sasl = __commonJS({
       if (mechanism === "SCRAM-SHA-256-PLUS" && typeof stream.getPeerCertificate !== "function") {
         throw new Error("SASL: Mechanism SCRAM-SHA-256-PLUS requires a certificate");
       }
-      const clientNonce = crypto5.randomBytes(18).toString("base64");
+      const clientNonce = crypto6.randomBytes(18).toString("base64");
       const gs2Header = mechanism === "SCRAM-SHA-256-PLUS" ? "p=tls-server-end-point" : stream ? "y" : "n";
       return {
         mechanism,
@@ -35043,20 +35043,20 @@ var require_sasl = __commonJS({
         const peerCert = stream.getPeerCertificate().raw;
         let hashName = signatureAlgorithmHashFromCertificate(peerCert);
         if (hashName === "MD5" || hashName === "SHA-1") hashName = "SHA-256";
-        const certHash = await crypto5.hashByName(hashName, peerCert);
+        const certHash = await crypto6.hashByName(hashName, peerCert);
         const bindingData = Buffer.concat([Buffer.from("p=tls-server-end-point,,"), Buffer.from(certHash)]);
         channelBinding = bindingData.toString("base64");
       }
       const clientFinalMessageWithoutProof = "c=" + channelBinding + ",r=" + sv.nonce;
       const authMessage = clientFirstMessageBare + "," + serverFirstMessage + "," + clientFinalMessageWithoutProof;
       const saltBytes = Buffer.from(sv.salt, "base64");
-      const saltedPassword = await crypto5.deriveKey(password, saltBytes, sv.iteration);
-      const clientKey = await crypto5.hmacSha256(saltedPassword, "Client Key");
-      const storedKey = await crypto5.sha256(clientKey);
-      const clientSignature = await crypto5.hmacSha256(storedKey, authMessage);
+      const saltedPassword = await crypto6.deriveKey(password, saltBytes, sv.iteration);
+      const clientKey = await crypto6.hmacSha256(saltedPassword, "Client Key");
+      const storedKey = await crypto6.sha256(clientKey);
+      const clientSignature = await crypto6.hmacSha256(storedKey, authMessage);
       const clientProof = xorBuffers(Buffer.from(clientKey), Buffer.from(clientSignature)).toString("base64");
-      const serverKey = await crypto5.hmacSha256(saltedPassword, "Server Key");
-      const serverSignatureBytes = await crypto5.hmacSha256(serverKey, authMessage);
+      const serverKey = await crypto6.hmacSha256(saltedPassword, "Server Key");
+      const serverSignatureBytes = await crypto6.hmacSha256(serverKey, authMessage);
       session.message = "SASLResponse";
       session.serverSignature = Buffer.from(serverSignatureBytes).toString("base64");
       session.response = clientFinalMessageWithoutProof + ",p=" + clientProof;
@@ -37224,7 +37224,7 @@ var require_client = __commonJS({
     var Query2 = require_query();
     var defaults4 = require_defaults();
     var Connection2 = require_connection();
-    var crypto5 = require_utils7();
+    var crypto6 = require_utils7();
     var activeQueryDeprecationNotice = nodeUtils.deprecate(
       () => {
       },
@@ -37459,7 +37459,7 @@ var require_client = __commonJS({
       _handleAuthMD5Password(msg) {
         this._getPassword(async () => {
           try {
-            const hashedPassword = await crypto5.postgresMd5PasswordHash(this.user, this.password, msg.salt);
+            const hashedPassword = await crypto6.postgresMd5PasswordHash(this.user, this.password, msg.salt);
             this.connection.password(hashedPassword);
           } catch (e) {
             this.emit("error", e);
@@ -77592,13 +77592,13 @@ function __classPrivateFieldGet(receiver, state, kind, f) {
 
 // ../../node_modules/.pnpm/openai@6.44.0_ws@8.21.0_zod@3.25.76/node_modules/openai/internal/utils/uuid.mjs
 var uuid42 = function() {
-  const { crypto: crypto5 } = globalThis;
-  if (crypto5?.randomUUID) {
-    uuid42 = crypto5.randomUUID.bind(crypto5);
-    return crypto5.randomUUID();
+  const { crypto: crypto6 } = globalThis;
+  if (crypto6?.randomUUID) {
+    uuid42 = crypto6.randomUUID.bind(crypto6);
+    return crypto6.randomUUID();
   }
   const u8 = new Uint8Array(1);
-  const randomByte = crypto5 ? () => crypto5.getRandomValues(u8)[0] : () => Math.random() * 255 & 255;
+  const randomByte = crypto6 ? () => crypto6.getRandomValues(u8)[0] : () => Math.random() * 255 & 255;
   return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (+c ^ randomByte() & 15 >> +c / 4).toString(16));
 };
 
@@ -87862,8 +87862,7 @@ function parseCandidates(raw, validFindingIds) {
 function sleep3(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-async function callAiWithRetry(messages2) {
-  const RETRY_DELAY_MS = 1500;
+async function callAiWithRetry(messages2, retryDelayMs = 1500) {
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -87878,17 +87877,17 @@ async function callAiWithRetry(messages2) {
       lastErr = err;
       if (attempt === 0) {
         logger2.warn(
-          { err: err instanceof Error ? err.message : String(err), retryDelayMs: RETRY_DELAY_MS },
+          { err: err instanceof Error ? err.message : String(err), retryDelayMs },
           "[opportunity-synthesis] AI call failed on attempt 1, retrying"
         );
-        await sleep3(RETRY_DELAY_MS);
+        await sleep3(retryDelayMs);
       }
     }
   }
   throw lastErr;
 }
 async function runOpportunitySynthesisCore(input) {
-  const { companyId, inspectionId, findings } = input;
+  const { companyId, inspectionId, findings, retryDelayMs } = input;
   if (findings.length === 0) return;
   const settings = await getSettings(companyId);
   if (!settings.enabled) return;
@@ -87907,10 +87906,13 @@ async function runOpportunitySynthesisCore(input) {
     ),
     propertySpeciesTrend(companyId, siteAddress)
   ]);
-  const raw = await callAiWithRetry([
-    { role: "system", content: SYSTEM_PROMPT3 },
-    { role: "user", content: userPrompt({ findings, openOpportunities, trend }) }
-  ]);
+  const raw = await callAiWithRetry(
+    [
+      { role: "system", content: SYSTEM_PROMPT3 },
+      { role: "user", content: userPrompt({ findings, openOpportunities, trend }) }
+    ],
+    retryDelayMs
+  );
   if (!raw) {
     console.info(
       `[opportunity-synthesis] AI returned empty content \u2014 no opportunities written`,
@@ -96153,13 +96155,13 @@ function __classPrivateFieldGet2(receiver, state, kind, f) {
 
 // ../../node_modules/openai/internal/utils/uuid.mjs
 var uuid43 = function() {
-  const { crypto: crypto5 } = globalThis;
-  if (crypto5?.randomUUID) {
-    uuid43 = crypto5.randomUUID.bind(crypto5);
-    return crypto5.randomUUID();
+  const { crypto: crypto6 } = globalThis;
+  if (crypto6?.randomUUID) {
+    uuid43 = crypto6.randomUUID.bind(crypto6);
+    return crypto6.randomUUID();
   }
   const u8 = new Uint8Array(1);
-  const randomByte = crypto5 ? () => crypto5.getRandomValues(u8)[0] : () => Math.random() * 255 & 255;
+  const randomByte = crypto6 ? () => crypto6.getRandomValues(u8)[0] : () => Math.random() * 255 & 255;
   return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (+c ^ randomByte() & 15 >> +c / 4).toString(16));
 };
 
@@ -124564,20 +124566,24 @@ var import_express34 = __toESM(require_express2(), 1);
 function sleep5(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-async function withRetryTracked(operation, shouldRetry, maxAttempts = 3, baseDelayMs = 500) {
+async function withRetryTracked(operation, shouldRetry, maxAttempts = 3, baseDelayMs = 500, isFatal) {
   let lastResult;
   let attempts = 0;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     attempts = attempt;
+    let result;
     try {
-      const result = await operation();
-      if (!shouldRetry(result)) return { result, retries: attempt - 1 };
-      lastResult = result;
+      result = await operation();
     } catch (err) {
       if (attempt === maxAttempts) throw err;
       await sleep5(baseDelayMs * 2 ** (attempt - 1));
       continue;
     }
+    if (isFatal?.(result)) {
+      throw Object.assign(new Error("Fatal result \u2014 retries skipped"), { result });
+    }
+    if (!shouldRetry(result)) return { result, retries: attempt - 1 };
+    lastResult = result;
     if (attempt < maxAttempts) {
       await sleep5(baseDelayMs * 2 ** (attempt - 1));
     }
@@ -124592,6 +124598,9 @@ function isRetryableResponse(res) {
     return false;
   }
   return true;
+}
+function isFatalResponse(res) {
+  return res.status === 401 || res.status === 403;
 }
 var PESTPAC_DEFAULT_BASE = "https://api.pestpac.com/v1";
 async function syncToPestPac(payload) {
@@ -124621,7 +124630,10 @@ async function syncToPestPac(payload) {
         ...payload.signatureAudit && { signatureAudit: payload.signatureAudit }
       })
     }),
-    isRetryableResponse
+    isRetryableResponse,
+    3,
+    500,
+    isFatalResponse
   );
   if (!noteRes.ok) {
     const body = await noteRes.text();
@@ -124640,7 +124652,10 @@ async function syncToPestPac(payload) {
             description: `${photo.severity.toUpperCase()}: ${photo.caption ?? ""}`
           })
         }),
-        isRetryableResponse
+        isRetryableResponse,
+        3,
+        500,
+        isFatalResponse
       );
       attachmentRetries += retries;
       if (attachRes.ok) {
@@ -124698,7 +124713,10 @@ async function syncToFieldRoutes(payload) {
         ...payload.signatureAudit && { signatureAudit: payload.signatureAudit }
       })
     }),
-    isRetryableResponse
+    isRetryableResponse,
+    3,
+    500,
+    isFatalResponse
   );
   if (!histRes.ok) {
     const body = await histRes.text();
@@ -127176,63 +127194,1582 @@ var WebhookHandlers = class _WebhookHandlers {
   }
 };
 
-// src/services/integration/adapters/pestPacSoapAdapter.ts
-var PESTPAC_SOAP_DEFAULT_BASE = "https://api.workwave.com/pestpac/v1/soap";
-async function sendPestPacSOAP(payload, config2) {
-  const base = (config2.apiBaseUrl ?? PESTPAC_SOAP_DEFAULT_BASE).replace(/\/$/, "");
-  const findingsXml = payload.InspectionFindings.map(
-    (f) => `
-      <pp:Finding>
-        <pp:Code>${esc3(f.Code)}</pp:Code>
-        <pp:Description>${esc3(f.Description)}</pp:Description>
-        <pp:Severity>${esc3(f.Severity)}</pp:Severity>
-        ${f.CustomFields.WidthMm !== void 0 ? `<pp:WidthMm>${f.CustomFields.WidthMm}</pp:WidthMm>` : ""}
-        ${f.CustomFields.HeightMm !== void 0 ? `<pp:HeightMm>${f.CustomFields.HeightMm}</pp:HeightMm>` : ""}
-        ${f.CustomFields.VerifiedConfidence !== void 0 ? `<pp:VerifiedConfidence>${f.CustomFields.VerifiedConfidence}</pp:VerifiedConfidence>` : ""}
-        ${f.CustomFields.SurfaceType ? `<pp:SurfaceType>${esc3(f.CustomFields.SurfaceType)}</pp:SurfaceType>` : ""}
-        ${f.AttachmentUrl ? `<pp:AttachmentUrl>${esc3(f.AttachmentUrl)}</pp:AttachmentUrl>` : ""}
-      </pp:Finding>`
-  ).join("");
-  const envelope = `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope
-  xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
-  xmlns:pp="http://tempuri.org/PestPacService">
-  <soap:Body>
-    <pp:SaveInspectionRecord>
-      <pp:WorkOrderId>${esc3(payload.ExternalWorkOrderId)}</pp:WorkOrderId>
-      <pp:PropertyCode>${esc3(payload.LocationReference.PropertyCode)}</pp:PropertyCode>
-      <pp:EmployeeId>${esc3(payload.ServiceDetails.CompletedByEmployeeId)}</pp:EmployeeId>
-      <pp:TechnicianName>${esc3(payload.ServiceDetails.TechnicianName)}</pp:TechnicianName>
-      <pp:ServiceDate>${esc3(payload.ServiceDetails.ServiceDate)}</pp:ServiceDate>
-      <pp:TechnicianSigned>${payload.SignatureAudit.technicianSigned}</pp:TechnicianSigned>
-      <pp:OwnerSigned>${payload.SignatureAudit.ownerSigned}</pp:OwnerSigned>
-      <pp:OwnerNotAvailable>${payload.SignatureAudit.ownerNotAvailable}</pp:OwnerNotAvailable>
-      ${payload.SignatureAudit.signedAt ? `<pp:SignedTimestamp>${esc3(payload.SignatureAudit.signedAt)}</pp:SignedTimestamp>` : ""}
-      <pp:Findings>${findingsXml}
-      </pp:Findings>
-    </pp:SaveInspectionRecord>
-  </soap:Body>
-</soap:Envelope>`;
-  const res = await fetch(`${base}/SaveInspectionRecord`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/xml; charset=utf-8",
-      SOAPAction: "http://tempuri.org/PestPacService/SaveInspectionRecord",
-      "X-WorkWave-Key": config2.apiKey
-    },
-    body: envelope
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(no body)");
-    throw new Error(`PestPac SOAP failed (${res.status}): ${body}`);
+// ../../node_modules/.pnpm/path-expression-matcher@1.6.2/node_modules/path-expression-matcher/src/Expression.js
+var Expression = class {
+  /**
+   * Create a new Expression
+   * @param {string} pattern - Pattern string (e.g., "root.users.user", "..user[id]")
+   * @param {Object} options - Configuration options
+   * @param {string} options.separator - Path separator (default: '.')
+   */
+  constructor(pattern, options = {}, data) {
+    this.pattern = pattern;
+    this.separator = options.separator || ".";
+    this.segments = this._parse(pattern);
+    this.data = data;
+    this._hasDeepWildcard = this.segments.some((seg) => seg.type === "deep-wildcard");
+    this._hasAttributeCondition = this.segments.some((seg) => seg.attrName !== void 0);
+    this._hasPositionSelector = this.segments.some((seg) => seg.position !== void 0);
   }
+  /**
+   * Parse pattern string into segments
+   * @private
+   * @param {string} pattern - Pattern to parse
+   * @returns {Array} Array of segment objects
+   */
+  _parse(pattern) {
+    const segments = [];
+    let i = 0;
+    let currentPart = "";
+    while (i < pattern.length) {
+      if (pattern[i] === this.separator) {
+        if (i + 1 < pattern.length && pattern[i + 1] === this.separator) {
+          if (currentPart.trim()) {
+            segments.push(this._parseSegment(currentPart.trim()));
+            currentPart = "";
+          }
+          segments.push({ type: "deep-wildcard" });
+          i += 2;
+        } else {
+          if (currentPart.trim()) {
+            segments.push(this._parseSegment(currentPart.trim()));
+          }
+          currentPart = "";
+          i++;
+        }
+      } else {
+        currentPart += pattern[i];
+        i++;
+      }
+    }
+    if (currentPart.trim()) {
+      segments.push(this._parseSegment(currentPart.trim()));
+    }
+    return segments;
+  }
+  /**
+   * Parse a single segment
+   * @private
+   * @param {string} part - Segment string (e.g., "user", "ns::user", "user[id]", "ns::user:first")
+   * @returns {Object} Segment object
+   */
+  _parseSegment(part) {
+    const segment = { type: "tag" };
+    let bracketContent = null;
+    let withoutBrackets = part;
+    const bracketMatch = part.match(/^([^\[]+)(\[[^\]]*\])(.*)$/);
+    if (bracketMatch) {
+      withoutBrackets = bracketMatch[1] + bracketMatch[3];
+      if (bracketMatch[2]) {
+        const content = bracketMatch[2].slice(1, -1);
+        if (content) {
+          bracketContent = content;
+        }
+      }
+    }
+    let namespace = void 0;
+    let tagAndPosition = withoutBrackets;
+    if (withoutBrackets.includes("::")) {
+      const nsIndex = withoutBrackets.indexOf("::");
+      namespace = withoutBrackets.substring(0, nsIndex).trim();
+      tagAndPosition = withoutBrackets.substring(nsIndex + 2).trim();
+      if (!namespace) {
+        throw new Error(`Invalid namespace in pattern: ${part}`);
+      }
+    }
+    let tag = void 0;
+    let positionMatch = null;
+    if (tagAndPosition.includes(":")) {
+      const colonIndex = tagAndPosition.lastIndexOf(":");
+      const tagPart = tagAndPosition.substring(0, colonIndex).trim();
+      const posPart = tagAndPosition.substring(colonIndex + 1).trim();
+      const isPositionKeyword = ["first", "last", "odd", "even"].includes(posPart) || /^nth\(\d+\)$/.test(posPart);
+      if (isPositionKeyword) {
+        tag = tagPart;
+        positionMatch = posPart;
+      } else {
+        tag = tagAndPosition;
+      }
+    } else {
+      tag = tagAndPosition;
+    }
+    if (!tag) {
+      throw new Error(`Invalid segment pattern: ${part}`);
+    }
+    segment.tag = tag;
+    if (namespace) {
+      segment.namespace = namespace;
+    }
+    if (bracketContent) {
+      if (bracketContent.includes("=")) {
+        const eqIndex = bracketContent.indexOf("=");
+        segment.attrName = bracketContent.substring(0, eqIndex).trim();
+        segment.attrValue = bracketContent.substring(eqIndex + 1).trim();
+      } else {
+        segment.attrName = bracketContent.trim();
+      }
+    }
+    if (positionMatch) {
+      const nthMatch = positionMatch.match(/^nth\((\d+)\)$/);
+      if (nthMatch) {
+        segment.position = "nth";
+        segment.positionValue = parseInt(nthMatch[1], 10);
+      } else {
+        segment.position = positionMatch;
+      }
+    }
+    return segment;
+  }
+  /**
+   * Get the number of segments
+   * @returns {number}
+   */
+  get length() {
+    return this.segments.length;
+  }
+  /**
+   * Check if expression contains deep wildcard
+   * @returns {boolean}
+   */
+  hasDeepWildcard() {
+    return this._hasDeepWildcard;
+  }
+  /**
+   * Check if expression has attribute conditions
+   * @returns {boolean}
+   */
+  hasAttributeCondition() {
+    return this._hasAttributeCondition;
+  }
+  /**
+   * Check if expression has position selectors
+   * @returns {boolean}
+   */
+  hasPositionSelector() {
+    return this._hasPositionSelector;
+  }
+  /**
+   * Get string representation
+   * @returns {string}
+   */
+  toString() {
+    return this.pattern;
+  }
+};
+
+// ../../node_modules/.pnpm/path-expression-matcher@1.6.2/node_modules/path-expression-matcher/src/Matcher.js
+var MatcherView = class {
+  /**
+   * @param {Matcher} matcher - The parent Matcher instance to read from.
+   */
+  constructor(matcher) {
+    this._matcher = matcher;
+  }
+  /**
+   * Get the path separator used by the parent matcher.
+   * @returns {string}
+   */
+  get separator() {
+    return this._matcher.separator;
+  }
+  /**
+   * Get current tag name.
+   * @returns {string|undefined}
+   */
+  getCurrentTag() {
+    const path4 = this._matcher.path;
+    return path4.length > 0 ? path4[path4.length - 1].tag : void 0;
+  }
+  /**
+   * Get current namespace.
+   * @returns {string|undefined}
+   */
+  getCurrentNamespace() {
+    const path4 = this._matcher.path;
+    return path4.length > 0 ? path4[path4.length - 1].namespace : void 0;
+  }
+  /**
+   * Get current node's attribute value.
+   * @param {string} attrName
+   * @returns {*}
+   */
+  getAttrValue(attrName) {
+    const path4 = this._matcher.path;
+    if (path4.length === 0) return void 0;
+    return path4[path4.length - 1].values?.[attrName];
+  }
+  /**
+   * Check if current node has an attribute.
+   * @param {string} attrName
+   * @returns {boolean}
+   */
+  hasAttr(attrName) {
+    const path4 = this._matcher.path;
+    if (path4.length === 0) return false;
+    const current = path4[path4.length - 1];
+    return current.values !== void 0 && attrName in current.values;
+  }
+  /**
+   * Get the value of a "kept" attribute from the nearest ancestor (or
+   * current node) that declared it via `push(tag, attrs, ns, { keep: [...] })`.
+   * @param {string} attrName
+   * @returns {*}
+   */
+  getAnyParentAttr(attrName) {
+    return this._matcher.getAnyParentAttr(attrName);
+  }
+  /**
+   * Check whether any ancestor (or the current node) kept the given
+   * attribute via `push(tag, attrs, ns, { keep: [...] })`.
+   * @param {string} attrName
+   * @returns {boolean}
+   */
+  hasAnyParentAttr(attrName) {
+    return this._matcher.hasAnyParentAttr(attrName);
+  }
+  /**
+   * Get current node's sibling position (child index in parent).
+   * @returns {number}
+   */
+  getPosition() {
+    const path4 = this._matcher.path;
+    if (path4.length === 0) return -1;
+    return path4[path4.length - 1].position ?? 0;
+  }
+  /**
+   * Get current node's repeat counter (occurrence count of this tag name).
+   * @returns {number}
+   */
+  getCounter() {
+    const path4 = this._matcher.path;
+    if (path4.length === 0) return -1;
+    return path4[path4.length - 1].counter ?? 0;
+  }
+  /**
+   * Get current node's sibling index (alias for getPosition).
+   * @returns {number}
+   * @deprecated Use getPosition() or getCounter() instead
+   */
+  getIndex() {
+    return this.getPosition();
+  }
+  /**
+   * Get current path depth.
+   * @returns {number}
+   */
+  getDepth() {
+    return this._matcher.path.length;
+  }
+  /**
+   * Get path as string.
+   * @param {string} [separator] - Optional separator (uses default if not provided)
+   * @param {boolean} [includeNamespace=true]
+   * @returns {string}
+   */
+  toString(separator, includeNamespace = true) {
+    return this._matcher.toString(separator, includeNamespace);
+  }
+  /**
+   * Get path as array of tag names.
+   * @returns {string[]}
+   */
+  toArray() {
+    return this._matcher.path.map((n) => n.tag);
+  }
+  /**
+   * Match current path against an Expression.
+   * @param {Expression} expression
+   * @returns {boolean}
+   */
+  matches(expression) {
+    return this._matcher.matches(expression);
+  }
+  /**
+   * Match any expression in the given set against the current path.
+   * @param {ExpressionSet} exprSet
+   * @returns {boolean}
+   */
+  matchesAny(exprSet) {
+    return exprSet.matchesAny(this._matcher);
+  }
+};
+var Matcher = class {
+  /**
+   * Create a new Matcher.
+   * @param {Object} [options={}]
+   * @param {string} [options.separator='.'] - Default path separator
+   */
+  constructor(options = {}) {
+    this.separator = options.separator || ".";
+    this.path = [];
+    this.siblingStacks = [];
+    this._pathStringCache = null;
+    this._view = new MatcherView(this);
+    this._keptAttrs = [];
+  }
+  /**
+   * Push a new tag onto the path.
+   * @param {string} tagName
+   * @param {Object|null} [attrValues=null]
+   * @param {string|null} [namespace=null]
+   * @param {Object|null} [options=null]
+   * @param {string[]} [options.keep] - Names of attributes (from attrValues)
+   */
+  push(tagName, attrValues = null, namespace = null, options = null) {
+    this._pathStringCache = null;
+    if (this.path.length > 0) {
+      this.path[this.path.length - 1].values = void 0;
+    }
+    const currentLevel = this.path.length;
+    let level = this.siblingStacks[currentLevel];
+    if (!level) {
+      level = { counts: /* @__PURE__ */ new Map(), total: 0 };
+      this.siblingStacks[currentLevel] = level;
+    }
+    const siblingKey = namespace ? `${namespace}:${tagName}` : tagName;
+    const counter = level.counts.get(siblingKey) || 0;
+    const position = level.total;
+    level.counts.set(siblingKey, counter + 1);
+    level.total++;
+    const node = {
+      tag: tagName,
+      position,
+      counter
+    };
+    if (namespace !== null && namespace !== void 0) {
+      node.namespace = namespace;
+    }
+    if (attrValues !== null && attrValues !== void 0) {
+      node.values = attrValues;
+    }
+    this.path.push(node);
+    const depth = this.path.length;
+    const keep = options !== null ? options.keep : null;
+    if (keep !== null && keep !== void 0 && keep.length > 0 && attrValues) {
+      for (let i = 0; i < keep.length; i++) {
+        const name = keep[i];
+        if (attrValues[name] !== void 0) {
+          this._keptAttrs.push({ depth, name, value: attrValues[name] });
+        }
+      }
+    }
+  }
+  /**
+   * Pop the last tag from the path.
+   * @returns {Object|undefined} The popped node
+   */
+  pop() {
+    if (this.path.length === 0) return void 0;
+    this._pathStringCache = null;
+    const node = this.path.pop();
+    if (this.siblingStacks.length > this.path.length + 1) {
+      this.siblingStacks.length = this.path.length + 1;
+    }
+    const poppedDepth = this.path.length + 1;
+    while (this._keptAttrs.length > 0 && this._keptAttrs[this._keptAttrs.length - 1].depth >= poppedDepth) {
+      this._keptAttrs.pop();
+    }
+    return node;
+  }
+  /**
+   * Update current node's attribute values.
+   * Useful when attributes are parsed after push.
+   * @param {Object} attrValues
+   */
+  updateCurrent(attrValues) {
+    if (this.path.length > 0) {
+      const current = this.path[this.path.length - 1];
+      if (attrValues !== null && attrValues !== void 0) {
+        current.values = attrValues;
+      }
+    }
+  }
+  /**
+   * Get current tag name.
+   * @returns {string|undefined}
+   */
+  getCurrentTag() {
+    return this.path.length > 0 ? this.path[this.path.length - 1].tag : void 0;
+  }
+  /**
+   * Get current namespace.
+   * @returns {string|undefined}
+   */
+  getCurrentNamespace() {
+    return this.path.length > 0 ? this.path[this.path.length - 1].namespace : void 0;
+  }
+  /**
+   * Get current node's attribute value.
+   * @param {string} attrName
+   * @returns {*}
+   */
+  getAttrValue(attrName) {
+    if (this.path.length === 0) return void 0;
+    return this.path[this.path.length - 1].values?.[attrName];
+  }
+  /**
+   * Check if current node has an attribute.
+   * @param {string} attrName
+   * @returns {boolean}
+   */
+  hasAttr(attrName) {
+    if (this.path.length === 0) return false;
+    const current = this.path[this.path.length - 1];
+    return current.values !== void 0 && attrName in current.values;
+  }
+  /**
+   * Get the value of a "kept" attribute from the nearest ancestor (or
+   * current node) that declared it via `push(tag, attrs, ns, { keep: [...] })`.
+   * Unlike getAttrValue(), this works regardless of how deep the path has
+   * gone since the attribute was pushed — but only for attribute names that
+   * were explicitly marked with `keep` at push time. Cost is proportional to
+   * the number of currently-kept attributes (typically 0-3), not path depth.
+   * @param {string} attrName
+   * @returns {*} the value, or undefined if no ancestor kept this attribute
+   */
+  getAnyParentAttr(attrName) {
+    const kept = this._keptAttrs;
+    for (let i = kept.length - 1; i >= 0; i--) {
+      if (kept[i].name === attrName) return kept[i].value;
+    }
+    return void 0;
+  }
+  /**
+   * Check whether any ancestor (or the current node) kept the given
+   * attribute via `push(tag, attrs, ns, { keep: [...] })`.
+   * @param {string} attrName
+   * @returns {boolean}
+   */
+  hasAnyParentAttr(attrName) {
+    const kept = this._keptAttrs;
+    for (let i = kept.length - 1; i >= 0; i--) {
+      if (kept[i].name === attrName) return true;
+    }
+    return false;
+  }
+  /**
+   * Get current node's sibling position (child index in parent).
+   * @returns {number}
+   */
+  getPosition() {
+    if (this.path.length === 0) return -1;
+    return this.path[this.path.length - 1].position ?? 0;
+  }
+  /**
+   * Get current node's repeat counter (occurrence count of this tag name).
+   * @returns {number}
+   */
+  getCounter() {
+    if (this.path.length === 0) return -1;
+    return this.path[this.path.length - 1].counter ?? 0;
+  }
+  /**
+   * Get current node's sibling index (alias for getPosition).
+   * @returns {number}
+   * @deprecated Use getPosition() or getCounter() instead
+   */
+  getIndex() {
+    return this.getPosition();
+  }
+  /**
+   * Get current path depth.
+   * @returns {number}
+   */
+  getDepth() {
+    return this.path.length;
+  }
+  /**
+   * Get path as string.
+   * @param {string} [separator] - Optional separator (uses default if not provided)
+   * @param {boolean} [includeNamespace=true]
+   * @returns {string}
+   */
+  toString(separator, includeNamespace = true) {
+    const sep = separator || this.separator;
+    const isDefault = sep === this.separator && includeNamespace === true;
+    if (isDefault) {
+      if (this._pathStringCache !== null) {
+        return this._pathStringCache;
+      }
+      const result = this.path.map(
+        (n) => n.namespace ? `${n.namespace}:${n.tag}` : n.tag
+      ).join(sep);
+      this._pathStringCache = result;
+      return result;
+    }
+    return this.path.map(
+      (n) => includeNamespace && n.namespace ? `${n.namespace}:${n.tag}` : n.tag
+    ).join(sep);
+  }
+  /**
+   * Get path as array of tag names.
+   * @returns {string[]}
+   */
+  toArray() {
+    return this.path.map((n) => n.tag);
+  }
+  /**
+   * Reset the path to empty.
+   */
+  reset() {
+    this._pathStringCache = null;
+    this.path = [];
+    this.siblingStacks = [];
+    this._keptAttrs = [];
+  }
+  /**
+   * Match current path against an Expression.
+   * @param {Expression} expression
+   * @returns {boolean}
+   */
+  matches(expression) {
+    const segments = expression.segments;
+    if (segments.length === 0) {
+      return false;
+    }
+    if (expression.hasDeepWildcard()) {
+      return this._matchWithDeepWildcard(segments);
+    }
+    return this._matchSimple(segments);
+  }
+  /**
+   * @private
+   */
+  _matchSimple(segments) {
+    if (this.path.length !== segments.length) {
+      return false;
+    }
+    for (let i = 0; i < segments.length; i++) {
+      if (!this._matchSegment(segments[i], this.path[i], i === this.path.length - 1)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  /**
+   * @private
+   */
+  _matchWithDeepWildcard(segments) {
+    let pathIdx = this.path.length - 1;
+    let segIdx = segments.length - 1;
+    while (segIdx >= 0 && pathIdx >= 0) {
+      const segment = segments[segIdx];
+      if (segment.type === "deep-wildcard") {
+        segIdx--;
+        if (segIdx < 0) {
+          return true;
+        }
+        const nextSeg = segments[segIdx];
+        let found = false;
+        for (let i = pathIdx; i >= 0; i--) {
+          if (this._matchSegment(nextSeg, this.path[i], i === this.path.length - 1)) {
+            pathIdx = i - 1;
+            segIdx--;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          return false;
+        }
+      } else {
+        if (!this._matchSegment(segment, this.path[pathIdx], pathIdx === this.path.length - 1)) {
+          return false;
+        }
+        pathIdx--;
+        segIdx--;
+      }
+    }
+    return segIdx < 0;
+  }
+  /**
+   * @private
+   */
+  _matchSegment(segment, node, isCurrentNode) {
+    if (segment.tag !== "*" && segment.tag !== node.tag) {
+      return false;
+    }
+    if (segment.namespace !== void 0) {
+      if (segment.namespace !== "*" && segment.namespace !== node.namespace) {
+        return false;
+      }
+    }
+    if (segment.attrName !== void 0) {
+      if (!isCurrentNode) {
+        return false;
+      }
+      if (!node.values || !(segment.attrName in node.values)) {
+        return false;
+      }
+      if (segment.attrValue !== void 0) {
+        if (String(node.values[segment.attrName]) !== String(segment.attrValue)) {
+          return false;
+        }
+      }
+    }
+    if (segment.position !== void 0) {
+      if (!isCurrentNode) {
+        return false;
+      }
+      const counter = node.counter ?? 0;
+      if (segment.position === "first" && counter !== 0) {
+        return false;
+      } else if (segment.position === "odd" && counter % 2 !== 1) {
+        return false;
+      } else if (segment.position === "even" && counter % 2 !== 0) {
+        return false;
+      } else if (segment.position === "nth" && counter !== segment.positionValue) {
+        return false;
+      }
+    }
+    return true;
+  }
+  /**
+   * Match any expression in the given set against the current path.
+   * @param {ExpressionSet} exprSet
+   * @returns {boolean}
+   */
+  matchesAny(exprSet) {
+    return exprSet.matchesAny(this);
+  }
+  /**
+   * Create a snapshot of current state.
+   * @returns {Object}
+   */
+  snapshot() {
+    return {
+      path: this.path.map((node) => ({ ...node })),
+      siblingStacks: this.siblingStacks.map((level) => level ? { counts: new Map(level.counts), total: level.total } : level),
+      keptAttrs: this._keptAttrs.map((entry) => ({ ...entry }))
+    };
+  }
+  /**
+   * Restore state from snapshot.
+   * @param {Object} snapshot
+   */
+  restore(snapshot) {
+    this._pathStringCache = null;
+    this.path = snapshot.path.map((node) => ({ ...node }));
+    this.siblingStacks = snapshot.siblingStacks.map((level) => level ? { counts: new Map(level.counts), total: level.total } : level);
+    this._keptAttrs = (snapshot.keptAttrs || []).map((entry) => ({ ...entry }));
+  }
+  /**
+   * Return the read-only {@link MatcherView} for this matcher.
+   *
+   * The same instance is returned on every call — no allocation occurs.
+   * It always reflects the current parser state and is safe to pass to
+   * user callbacks without risk of accidental mutation.
+   *
+   * @returns {MatcherView}
+   *
+   * @example
+   * const view = matcher.readOnly();
+   * // pass view to callbacks — it stays in sync automatically
+   * view.matches(expr);       // ✓
+   * view.getCurrentTag();     // ✓
+   * // view.push(...)         // ✗ method does not exist — caught by TypeScript
+   */
+  readOnly() {
+    return this._view;
+  }
+};
+
+// ../../node_modules/.pnpm/fast-xml-builder@1.2.0/node_modules/fast-xml-builder/src/util.js
+function safeComment(val) {
+  return String(val).replace(/--/g, "- -").replace(/--/g, "- -").replace(/-$/, "- ");
 }
-function esc3(str4) {
-  return str4.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+function safeCdata(val) {
+  return String(val).replace(/\]\]>/g, "]]]]><![CDATA[>");
+}
+function escapeAttribute(val) {
+  return String(val).replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
+// ../../node_modules/.pnpm/xml-naming@0.1.0/node_modules/xml-naming/src/index.js
+var nameStartChar10 = ":A-Za-z_\xC0-\xD6\xD8-\xF6\xF8-\u02FF\u0370-\u037D\u037F-\u0486\u0488-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD";
+var nameChar10 = nameStartChar10 + "\\-\\.\\d\xB7\u0300-\u036F\u203F-\u2040";
+var nameStartChar11 = ":A-Za-z_\xC0-\u02FF\u0370-\u037D\u037F-\u0486\u0488-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u{10000}-\u{EFFFF}";
+var nameChar11 = nameStartChar11 + "\\-\\.\\d\xB7\u0300-\u036F\u0487\u203F-\u2040";
+var buildRegexes = (startChar, char2, flags = "") => {
+  const ncStart = startChar.replace(":", "");
+  const ncChar = char2.replace(":", "");
+  const ncNamePat = `[${ncStart}][${ncChar}]*`;
+  return {
+    name: new RegExp(`^[${startChar}][${char2}]*$`, flags),
+    ncName: new RegExp(`^${ncNamePat}$`, flags),
+    qName: new RegExp(`^${ncNamePat}(?::${ncNamePat})?$`, flags),
+    nmToken: new RegExp(`^[${char2}]+$`, flags),
+    nmTokens: new RegExp(`^[${char2}]+(?:\\s+[${char2}]+)*$`, flags)
+  };
+};
+var regexes10 = buildRegexes(nameStartChar10, nameChar10);
+var regexes11 = buildRegexes(nameStartChar11, nameChar11, "u");
+var getRegexes = (xmlVersion = "1.0") => xmlVersion === "1.1" ? regexes11 : regexes10;
+var qName = (str4, { xmlVersion = "1.0" } = {}) => getRegexes(xmlVersion).qName.test(str4);
+
+// ../../node_modules/.pnpm/fast-xml-builder@1.2.0/node_modules/fast-xml-builder/src/orderedJs2Xml.js
+var EOL = "\n";
+function detectXmlVersionFromArray(jArray, options) {
+  if (!Array.isArray(jArray) || jArray.length === 0) return "1.0";
+  const first = jArray[0];
+  const firstKey = propName(first);
+  if (firstKey === "?xml") {
+    const attrs = first[":@"];
+    if (attrs) {
+      const versionKey = options.attributeNamePrefix + "version";
+      if (attrs[versionKey]) return attrs[versionKey];
+    }
+  }
+  return "1.0";
+}
+function resolveTagName(name, isAttribute2, options, matcher, xmlVersion) {
+  if (!options.sanitizeName) return name;
+  if (qName(name, { xmlVersion })) return name;
+  return options.sanitizeName(name, { isAttribute: isAttribute2, matcher: matcher.readOnly() });
+}
+function toXml(jArray, options) {
+  let indentation = "";
+  if (options.format) {
+    indentation = EOL;
+  }
+  const stopNodeExpressions = [];
+  if (options.stopNodes && Array.isArray(options.stopNodes)) {
+    for (let i = 0; i < options.stopNodes.length; i++) {
+      const node = options.stopNodes[i];
+      if (typeof node === "string") {
+        stopNodeExpressions.push(new Expression(node));
+      } else if (node instanceof Expression) {
+        stopNodeExpressions.push(node);
+      }
+    }
+  }
+  const xmlVersion = detectXmlVersionFromArray(jArray, options);
+  const matcher = new Matcher();
+  return arrToStr(jArray, options, indentation, matcher, stopNodeExpressions, xmlVersion);
+}
+function arrToStr(arr, options, indentation, matcher, stopNodeExpressions, xmlVersion) {
+  let xmlStr = "";
+  let isPreviousElementTag = false;
+  if (options.maxNestedTags && matcher.getDepth() > options.maxNestedTags) {
+    throw new Error("Maximum nested tags exceeded");
+  }
+  if (!Array.isArray(arr)) {
+    if (arr !== void 0 && arr !== null) {
+      let text2 = arr.toString();
+      text2 = replaceEntitiesValue(text2, options);
+      return text2;
+    }
+    return "";
+  }
+  for (let i = 0; i < arr.length; i++) {
+    const tagObj = arr[i];
+    const rawTagName = propName(tagObj);
+    if (rawTagName === void 0) continue;
+    const isSpecialName = rawTagName === options.textNodeName || rawTagName === options.cdataPropName || rawTagName === options.commentPropName || rawTagName[0] === "?";
+    const tagName = isSpecialName ? rawTagName : resolveTagName(rawTagName, false, options, matcher, xmlVersion);
+    const attrValues = extractAttributeValues(tagObj[":@"], options);
+    matcher.push(tagName, attrValues);
+    const isStopNode = checkStopNode(matcher, stopNodeExpressions);
+    if (tagName === options.textNodeName) {
+      let tagText = tagObj[rawTagName];
+      if (!isStopNode) {
+        tagText = options.tagValueProcessor(tagName, tagText);
+        tagText = replaceEntitiesValue(tagText, options);
+      }
+      if (isPreviousElementTag) {
+        xmlStr += indentation;
+      }
+      xmlStr += tagText;
+      isPreviousElementTag = false;
+      matcher.pop();
+      continue;
+    } else if (tagName === options.cdataPropName) {
+      if (isPreviousElementTag) {
+        xmlStr += indentation;
+      }
+      const val = tagObj[rawTagName][0][options.textNodeName];
+      const safeVal = safeCdata(val);
+      xmlStr += `<![CDATA[${safeVal}]]>`;
+      isPreviousElementTag = false;
+      matcher.pop();
+      continue;
+    } else if (tagName === options.commentPropName) {
+      const val = tagObj[rawTagName][0][options.textNodeName];
+      const safeVal = safeComment(val);
+      xmlStr += indentation + `<!--${safeVal}-->`;
+      isPreviousElementTag = true;
+      matcher.pop();
+      continue;
+    } else if (tagName[0] === "?") {
+      const attStr2 = attr_to_str(tagObj[":@"], options, isStopNode, matcher, xmlVersion);
+      const tempInd = tagName === "?xml" ? "" : indentation;
+      xmlStr += tempInd + `<${tagName}${attStr2}?>`;
+      isPreviousElementTag = true;
+      matcher.pop();
+      continue;
+    }
+    let newIdentation = indentation;
+    if (newIdentation !== "") {
+      newIdentation += options.indentBy;
+    }
+    const attStr = attr_to_str(tagObj[":@"], options, isStopNode, matcher, xmlVersion);
+    const tagStart = indentation + `<${tagName}${attStr}`;
+    let tagValue;
+    if (isStopNode) {
+      tagValue = getRawContent(tagObj[rawTagName], options);
+    } else {
+      tagValue = arrToStr(tagObj[rawTagName], options, newIdentation, matcher, stopNodeExpressions, xmlVersion);
+    }
+    if (options.unpairedTags.indexOf(tagName) !== -1) {
+      if (options.suppressUnpairedNode) xmlStr += tagStart + ">";
+      else xmlStr += tagStart + "/>";
+    } else if ((!tagValue || tagValue.length === 0) && options.suppressEmptyNode) {
+      xmlStr += tagStart + "/>";
+    } else if (tagValue && tagValue.endsWith(">")) {
+      xmlStr += tagStart + `>${tagValue}${indentation}</${tagName}>`;
+    } else {
+      xmlStr += tagStart + ">";
+      if (tagValue && indentation !== "" && (tagValue.includes("/>") || tagValue.includes("</"))) {
+        xmlStr += indentation + options.indentBy + tagValue + indentation;
+      } else {
+        xmlStr += tagValue;
+      }
+      xmlStr += `</${tagName}>`;
+    }
+    isPreviousElementTag = true;
+    matcher.pop();
+  }
+  return xmlStr;
+}
+function extractAttributeValues(attrMap, options) {
+  if (!attrMap || options.ignoreAttributes) return null;
+  const attrValues = {};
+  let hasAttrs = false;
+  for (let attr in attrMap) {
+    if (!Object.prototype.hasOwnProperty.call(attrMap, attr)) continue;
+    const cleanAttrName = attr.startsWith(options.attributeNamePrefix) ? attr.substr(options.attributeNamePrefix.length) : attr;
+    attrValues[cleanAttrName] = escapeAttribute(attrMap[attr]);
+    hasAttrs = true;
+  }
+  return hasAttrs ? attrValues : null;
+}
+function getRawContent(arr, options) {
+  if (!Array.isArray(arr)) {
+    if (arr !== void 0 && arr !== null) {
+      return arr.toString();
+    }
+    return "";
+  }
+  let content = "";
+  for (let i = 0; i < arr.length; i++) {
+    const item = arr[i];
+    const tagName = propName(item);
+    if (tagName === options.textNodeName) {
+      content += item[tagName];
+    } else if (tagName === options.cdataPropName) {
+      content += item[tagName][0][options.textNodeName];
+    } else if (tagName === options.commentPropName) {
+      content += item[tagName][0][options.textNodeName];
+    } else if (tagName && tagName[0] === "?") {
+      continue;
+    } else if (tagName) {
+      const attStr = attr_to_str_raw(item[":@"], options);
+      const nestedContent = getRawContent(item[tagName], options);
+      if (!nestedContent || nestedContent.length === 0) {
+        content += `<${tagName}${attStr}/>`;
+      } else {
+        content += `<${tagName}${attStr}>${nestedContent}</${tagName}>`;
+      }
+    }
+  }
+  return content;
+}
+function attr_to_str_raw(attrMap, options) {
+  let attrStr = "";
+  if (attrMap && !options.ignoreAttributes) {
+    for (let attr in attrMap) {
+      if (!Object.prototype.hasOwnProperty.call(attrMap, attr)) continue;
+      let attrVal = attrMap[attr];
+      if (attrVal === true && options.suppressBooleanAttributes) {
+        attrStr += ` ${attr.substr(options.attributeNamePrefix.length)}`;
+      } else {
+        attrStr += ` ${attr.substr(options.attributeNamePrefix.length)}="${escapeAttribute(attrVal)}"`;
+      }
+    }
+  }
+  return attrStr;
+}
+function propName(obj) {
+  const keys = Object.keys(obj);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+    if (key !== ":@") return key;
+  }
+}
+function attr_to_str(attrMap, options, isStopNode, matcher, xmlVersion) {
+  let attrStr = "";
+  if (attrMap && !options.ignoreAttributes) {
+    for (let attr in attrMap) {
+      if (!Object.prototype.hasOwnProperty.call(attrMap, attr)) continue;
+      const cleanAttrName = attr.substr(options.attributeNamePrefix.length);
+      const resolvedAttrName = isStopNode ? cleanAttrName : resolveTagName(cleanAttrName, true, options, matcher, xmlVersion);
+      let attrVal;
+      if (isStopNode) {
+        attrVal = attrMap[attr];
+      } else {
+        attrVal = options.attributeValueProcessor(attr, attrMap[attr]);
+        attrVal = replaceEntitiesValue(attrVal, options);
+      }
+      if (attrVal === true && options.suppressBooleanAttributes) {
+        attrStr += ` ${resolvedAttrName}`;
+      } else {
+        attrStr += ` ${resolvedAttrName}="${escapeAttribute(attrVal)}"`;
+      }
+    }
+  }
+  return attrStr;
+}
+function checkStopNode(matcher, stopNodeExpressions) {
+  if (!stopNodeExpressions || stopNodeExpressions.length === 0) return false;
+  for (let i = 0; i < stopNodeExpressions.length; i++) {
+    if (matcher.matches(stopNodeExpressions[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+function replaceEntitiesValue(textValue, options) {
+  if (textValue && textValue.length > 0 && options.processEntities) {
+    for (let i = 0; i < options.entities.length; i++) {
+      const entity = options.entities[i];
+      textValue = textValue.replace(entity.regex, entity.val);
+    }
+  }
+  return textValue;
+}
+
+// ../../node_modules/.pnpm/fast-xml-builder@1.2.0/node_modules/fast-xml-builder/src/ignoreAttributes.js
+function getIgnoreAttributesFn(ignoreAttributes) {
+  if (typeof ignoreAttributes === "function") {
+    return ignoreAttributes;
+  }
+  if (Array.isArray(ignoreAttributes)) {
+    return (attrName) => {
+      for (const pattern of ignoreAttributes) {
+        if (typeof pattern === "string" && attrName === pattern) {
+          return true;
+        }
+        if (pattern instanceof RegExp && pattern.test(attrName)) {
+          return true;
+        }
+      }
+    };
+  }
+  return () => false;
+}
+
+// ../../node_modules/.pnpm/fast-xml-builder@1.2.0/node_modules/fast-xml-builder/src/fxb.js
+var defaultOptions3 = {
+  attributeNamePrefix: "@_",
+  attributesGroupName: false,
+  textNodeName: "#text",
+  ignoreAttributes: true,
+  cdataPropName: false,
+  format: false,
+  indentBy: "  ",
+  suppressEmptyNode: false,
+  suppressUnpairedNode: true,
+  suppressBooleanAttributes: true,
+  tagValueProcessor: function(key, a) {
+    return a;
+  },
+  attributeValueProcessor: function(attrName, a) {
+    return a;
+  },
+  preserveOrder: false,
+  commentPropName: false,
+  unpairedTags: [],
+  entities: [
+    { regex: new RegExp("&", "g"), val: "&amp;" },
+    //it must be on top
+    { regex: new RegExp(">", "g"), val: "&gt;" },
+    { regex: new RegExp("<", "g"), val: "&lt;" },
+    { regex: new RegExp("'", "g"), val: "&apos;" },
+    { regex: new RegExp('"', "g"), val: "&quot;" }
+  ],
+  processEntities: true,
+  stopNodes: [],
+  // transformTagName: false,
+  // transformAttributeName: false,
+  oneListGroup: false,
+  maxNestedTags: 100,
+  jPath: true,
+  // When true, callbacks receive string jPath; when false, receive Matcher instance
+  sanitizeName: false
+  // false = allow all names as-is (default, backward-compatible).
+  // Set to a function (name, { isAttribute, matcher }) => string to
+  // validate/sanitize tag and attribute names. Throw inside the function
+  // to reject an invalid name.
+};
+function Builder(options) {
+  this.options = Object.assign({}, defaultOptions3, options);
+  if (this.options.stopNodes && Array.isArray(this.options.stopNodes)) {
+    this.options.stopNodes = this.options.stopNodes.map((node) => {
+      if (typeof node === "string" && node.startsWith("*.")) {
+        return ".." + node.substring(2);
+      }
+      return node;
+    });
+  }
+  this.stopNodeExpressions = [];
+  if (this.options.stopNodes && Array.isArray(this.options.stopNodes)) {
+    for (let i = 0; i < this.options.stopNodes.length; i++) {
+      const node = this.options.stopNodes[i];
+      if (typeof node === "string") {
+        this.stopNodeExpressions.push(new Expression(node));
+      } else if (node instanceof Expression) {
+        this.stopNodeExpressions.push(node);
+      }
+    }
+  }
+  if (this.options.ignoreAttributes === true || this.options.attributesGroupName) {
+    this.isAttribute = function() {
+      return false;
+    };
+  } else {
+    this.ignoreAttributesFn = getIgnoreAttributesFn(this.options.ignoreAttributes);
+    this.attrPrefixLen = this.options.attributeNamePrefix.length;
+    this.isAttribute = isAttribute;
+  }
+  this.processTextOrObjNode = processTextOrObjNode;
+  if (this.options.format) {
+    this.indentate = indentate;
+    this.tagEndChar = ">\n";
+    this.newLine = "\n";
+  } else {
+    this.indentate = function() {
+      return "";
+    };
+    this.tagEndChar = ">";
+    this.newLine = "";
+  }
+}
+function detectXmlVersionFromObj(jObj, options) {
+  const decl = jObj["?xml"];
+  if (decl && typeof decl === "object") {
+    if (options.attributesGroupName && decl[options.attributesGroupName]) {
+      const v2 = decl[options.attributesGroupName][options.attributeNamePrefix + "version"];
+      if (v2) return v2;
+    }
+    const v = decl[options.attributeNamePrefix + "version"];
+    if (v) return v;
+  }
+  return "1.0";
+}
+function resolveTagName2(name, isAttribute2, options, matcher, xmlVersion) {
+  if (!options.sanitizeName) return name;
+  if (qName(name, { xmlVersion })) return name;
+  return options.sanitizeName(name, { isAttribute: isAttribute2, matcher: matcher.readOnly() });
+}
+Builder.prototype.build = function(jObj) {
+  if (this.options.preserveOrder) {
+    return toXml(jObj, this.options);
+  } else {
+    if (Array.isArray(jObj) && this.options.arrayNodeName && this.options.arrayNodeName.length > 1) {
+      jObj = {
+        [this.options.arrayNodeName]: jObj
+      };
+    }
+    const matcher = new Matcher();
+    const xmlVersion = detectXmlVersionFromObj(jObj, this.options);
+    return this.j2x(jObj, 0, matcher, xmlVersion).val;
+  }
+};
+Builder.prototype.j2x = function(jObj, level, matcher, xmlVersion) {
+  let attrStr = "";
+  let val = "";
+  if (this.options.maxNestedTags && matcher.getDepth() >= this.options.maxNestedTags) {
+    throw new Error("Maximum nested tags exceeded");
+  }
+  const jPath = this.options.jPath ? matcher.toString() : matcher;
+  const isCurrentStopNode = this.checkStopNode(matcher);
+  for (let key in jObj) {
+    if (!Object.prototype.hasOwnProperty.call(jObj, key)) continue;
+    const isSpecialKey = key === this.options.textNodeName || key === this.options.cdataPropName || key === this.options.commentPropName || this.options.attributesGroupName && key === this.options.attributesGroupName || this.isAttribute(key) || key[0] === "?";
+    const resolvedKey = isSpecialKey ? key : resolveTagName2(key, false, this.options, matcher, xmlVersion);
+    if (typeof jObj[key] === "undefined") {
+      if (this.isAttribute(key)) {
+        val += "";
+      }
+    } else if (jObj[key] === null) {
+      if (this.isAttribute(key)) {
+        val += "";
+      } else if (resolvedKey === this.options.cdataPropName || resolvedKey === this.options.commentPropName) {
+        val += "";
+      } else if (resolvedKey[0] === "?") {
+        val += this.indentate(level) + "<" + resolvedKey + "?" + this.tagEndChar;
+      } else {
+        val += this.indentate(level) + "<" + resolvedKey + "/" + this.tagEndChar;
+      }
+    } else if (jObj[key] instanceof Date) {
+      val += this.buildTextValNode(jObj[key], resolvedKey, "", level, matcher);
+    } else if (typeof jObj[key] !== "object") {
+      const attr = this.isAttribute(key);
+      if (attr && !this.ignoreAttributesFn(attr, jPath)) {
+        const resolvedAttr = resolveTagName2(attr, true, this.options, matcher, xmlVersion);
+        attrStr += this.buildAttrPairStr(resolvedAttr, "" + jObj[key], isCurrentStopNode);
+      } else if (!attr) {
+        if (key === this.options.textNodeName) {
+          let newval = this.options.tagValueProcessor(key, "" + jObj[key]);
+          val += this.replaceEntitiesValue(newval);
+        } else {
+          matcher.push(resolvedKey);
+          const isStopNode = this.checkStopNode(matcher);
+          matcher.pop();
+          if (isStopNode) {
+            const textValue = "" + jObj[key];
+            if (textValue === "") {
+              val += this.indentate(level) + "<" + resolvedKey + this.closeTag(resolvedKey) + this.tagEndChar;
+            } else {
+              val += this.indentate(level) + "<" + resolvedKey + ">" + textValue + "</" + resolvedKey + this.tagEndChar;
+            }
+          } else {
+            val += this.buildTextValNode(jObj[key], resolvedKey, "", level, matcher);
+          }
+        }
+      }
+    } else if (Array.isArray(jObj[key])) {
+      const arrLen = jObj[key].length;
+      let listTagVal = "";
+      let listTagAttr = "";
+      for (let j = 0; j < arrLen; j++) {
+        const item = jObj[key][j];
+        if (typeof item === "undefined") {
+        } else if (item === null) {
+          if (resolvedKey[0] === "?") val += this.indentate(level) + "<" + resolvedKey + "?" + this.tagEndChar;
+          else val += this.indentate(level) + "<" + resolvedKey + "/" + this.tagEndChar;
+        } else if (typeof item === "object") {
+          if (this.options.oneListGroup) {
+            matcher.push(resolvedKey);
+            const result = this.j2x(item, level + 1, matcher, xmlVersion);
+            matcher.pop();
+            listTagVal += result.val;
+            if (this.options.attributesGroupName && item.hasOwnProperty(this.options.attributesGroupName)) {
+              listTagAttr += result.attrStr;
+            }
+          } else {
+            listTagVal += this.processTextOrObjNode(item, resolvedKey, level, matcher, xmlVersion);
+          }
+        } else {
+          if (this.options.oneListGroup) {
+            let textValue = this.options.tagValueProcessor(resolvedKey, item);
+            textValue = this.replaceEntitiesValue(textValue);
+            listTagVal += textValue;
+          } else {
+            matcher.push(resolvedKey);
+            const isStopNode = this.checkStopNode(matcher);
+            matcher.pop();
+            if (isStopNode) {
+              const textValue = "" + item;
+              if (textValue === "") {
+                listTagVal += this.indentate(level) + "<" + resolvedKey + this.closeTag(resolvedKey) + this.tagEndChar;
+              } else {
+                listTagVal += this.indentate(level) + "<" + resolvedKey + ">" + textValue + "</" + resolvedKey + this.tagEndChar;
+              }
+            } else {
+              listTagVal += this.buildTextValNode(item, resolvedKey, "", level, matcher);
+            }
+          }
+        }
+      }
+      if (this.options.oneListGroup) {
+        listTagVal = this.buildObjectNode(listTagVal, resolvedKey, listTagAttr, level);
+      }
+      val += listTagVal;
+    } else {
+      if (this.options.attributesGroupName && key === this.options.attributesGroupName) {
+        const Ks = Object.keys(jObj[key]);
+        const L2 = Ks.length;
+        for (let j = 0; j < L2; j++) {
+          const resolvedAttr = resolveTagName2(Ks[j], true, this.options, matcher, xmlVersion);
+          attrStr += this.buildAttrPairStr(resolvedAttr, "" + jObj[key][Ks[j]], isCurrentStopNode);
+        }
+      } else {
+        val += this.processTextOrObjNode(jObj[key], resolvedKey, level, matcher, xmlVersion);
+      }
+    }
+  }
+  return { attrStr, val };
+};
+Builder.prototype.buildAttrPairStr = function(attrName, val, isStopNode) {
+  if (!isStopNode) {
+    val = this.options.attributeValueProcessor(attrName, "" + val);
+    val = this.replaceEntitiesValue(val);
+  }
+  if (this.options.suppressBooleanAttributes && val === "true") {
+    return " " + attrName;
+  } else return " " + attrName + '="' + escapeAttribute(val) + '"';
+};
+function processTextOrObjNode(object2, key, level, matcher, xmlVersion) {
+  const attrValues = this.extractAttributes(object2);
+  matcher.push(key, attrValues);
+  const isStopNode = this.checkStopNode(matcher);
+  if (isStopNode) {
+    const rawContent = this.buildRawContent(object2);
+    const attrStr = this.buildAttributesForStopNode(object2);
+    matcher.pop();
+    return this.buildObjectNode(rawContent, key, attrStr, level);
+  }
+  const result = this.j2x(object2, level + 1, matcher, xmlVersion);
+  matcher.pop();
+  if (key[0] === "?") {
+    return this.buildTextValNode("", key, result.attrStr, level, matcher);
+  } else if (object2[this.options.textNodeName] !== void 0 && Object.keys(object2).length === 1) {
+    return this.buildTextValNode(object2[this.options.textNodeName], key, result.attrStr, level, matcher);
+  } else {
+    return this.buildObjectNode(result.val, key, result.attrStr, level);
+  }
+}
+Builder.prototype.extractAttributes = function(obj) {
+  if (!obj || typeof obj !== "object") return null;
+  const attrValues = {};
+  let hasAttrs = false;
+  if (this.options.attributesGroupName && obj[this.options.attributesGroupName]) {
+    const attrGroup = obj[this.options.attributesGroupName];
+    for (let attrKey in attrGroup) {
+      if (!Object.prototype.hasOwnProperty.call(attrGroup, attrKey)) continue;
+      const cleanKey = attrKey.startsWith(this.options.attributeNamePrefix) ? attrKey.substring(this.options.attributeNamePrefix.length) : attrKey;
+      attrValues[cleanKey] = escapeAttribute(attrGroup[attrKey]);
+      hasAttrs = true;
+    }
+  } else {
+    for (let key in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+      const attr = this.isAttribute(key);
+      if (attr) {
+        attrValues[attr] = escapeAttribute(obj[key]);
+        hasAttrs = true;
+      }
+    }
+  }
+  return hasAttrs ? attrValues : null;
+};
+Builder.prototype.buildRawContent = function(obj) {
+  if (typeof obj === "string") {
+    return obj;
+  }
+  if (typeof obj !== "object" || obj === null) {
+    return String(obj);
+  }
+  if (obj[this.options.textNodeName] !== void 0) {
+    return obj[this.options.textNodeName];
+  }
+  let content = "";
+  for (let key in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+    if (this.isAttribute(key)) continue;
+    if (this.options.attributesGroupName && key === this.options.attributesGroupName) continue;
+    const value = obj[key];
+    if (key === this.options.textNodeName) {
+      content += value;
+    } else if (Array.isArray(value)) {
+      for (let item of value) {
+        if (typeof item === "string" || typeof item === "number") {
+          content += `<${key}>${item}</${key}>`;
+        } else if (typeof item === "object" && item !== null) {
+          const nestedContent = this.buildRawContent(item);
+          const nestedAttrs = this.buildAttributesForStopNode(item);
+          if (nestedContent === "") {
+            content += `<${key}${nestedAttrs}/>`;
+          } else {
+            content += `<${key}${nestedAttrs}>${nestedContent}</${key}>`;
+          }
+        }
+      }
+    } else if (typeof value === "object" && value !== null) {
+      const nestedContent = this.buildRawContent(value);
+      const nestedAttrs = this.buildAttributesForStopNode(value);
+      if (nestedContent === "") {
+        content += `<${key}${nestedAttrs}/>`;
+      } else {
+        content += `<${key}${nestedAttrs}>${nestedContent}</${key}>`;
+      }
+    } else {
+      content += `<${key}>${value}</${key}>`;
+    }
+  }
+  return content;
+};
+Builder.prototype.buildAttributesForStopNode = function(obj) {
+  if (!obj || typeof obj !== "object") return "";
+  let attrStr = "";
+  if (this.options.attributesGroupName && obj[this.options.attributesGroupName]) {
+    const attrGroup = obj[this.options.attributesGroupName];
+    for (let attrKey in attrGroup) {
+      if (!Object.prototype.hasOwnProperty.call(attrGroup, attrKey)) continue;
+      const cleanKey = attrKey.startsWith(this.options.attributeNamePrefix) ? attrKey.substring(this.options.attributeNamePrefix.length) : attrKey;
+      const val = attrGroup[attrKey];
+      if (val === true && this.options.suppressBooleanAttributes) {
+        attrStr += " " + cleanKey;
+      } else {
+        attrStr += " " + cleanKey + '="' + val + '"';
+      }
+    }
+  } else {
+    for (let key in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+      const attr = this.isAttribute(key);
+      if (attr) {
+        const val = obj[key];
+        if (val === true && this.options.suppressBooleanAttributes) {
+          attrStr += " " + attr;
+        } else {
+          attrStr += " " + attr + '="' + val + '"';
+        }
+      }
+    }
+  }
+  return attrStr;
+};
+Builder.prototype.buildObjectNode = function(val, key, attrStr, level) {
+  if (val === "") {
+    if (key[0] === "?") return this.indentate(level) + "<" + key + attrStr + "?" + this.tagEndChar;
+    else {
+      return this.indentate(level) + "<" + key + attrStr + this.closeTag(key) + this.tagEndChar;
+    }
+  } else if (key[0] === "?") {
+    return this.indentate(level) + "<" + key + attrStr + "?" + this.tagEndChar;
+  } else {
+    let tagEndExp = "</" + key + this.tagEndChar;
+    let piClosingChar = "";
+    if (key[0] === "?") {
+      piClosingChar = "?";
+      tagEndExp = "";
+    }
+    if ((attrStr || attrStr === "") && val.indexOf("<") === -1) {
+      return this.indentate(level) + "<" + key + attrStr + piClosingChar + ">" + val + tagEndExp;
+    } else if (this.options.commentPropName !== false && key === this.options.commentPropName && piClosingChar.length === 0) {
+      return this.indentate(level) + `<!--${val}-->` + this.newLine;
+    } else {
+      return this.indentate(level) + "<" + key + attrStr + piClosingChar + this.tagEndChar + val + this.indentate(level) + tagEndExp;
+    }
+  }
+};
+Builder.prototype.closeTag = function(key) {
+  let closeTag = "";
+  if (this.options.unpairedTags.indexOf(key) !== -1) {
+    if (!this.options.suppressUnpairedNode) closeTag = "/";
+  } else if (this.options.suppressEmptyNode) {
+    closeTag = "/";
+  } else {
+    closeTag = `></${key}`;
+  }
+  return closeTag;
+};
+Builder.prototype.checkStopNode = function(matcher) {
+  if (!this.stopNodeExpressions || this.stopNodeExpressions.length === 0) return false;
+  for (let i = 0; i < this.stopNodeExpressions.length; i++) {
+    if (matcher.matches(this.stopNodeExpressions[i])) {
+      return true;
+    }
+  }
+  return false;
+};
+Builder.prototype.buildTextValNode = function(val, key, attrStr, level, matcher) {
+  if (this.options.cdataPropName !== false && key === this.options.cdataPropName) {
+    const safeVal = safeCdata(val);
+    return this.indentate(level) + `<![CDATA[${safeVal}]]>` + this.newLine;
+  } else if (this.options.commentPropName !== false && key === this.options.commentPropName) {
+    const safeVal = safeComment(val);
+    return this.indentate(level) + `<!--${safeVal}-->` + this.newLine;
+  } else if (key[0] === "?") {
+    return this.indentate(level) + "<" + key + attrStr + "?" + this.tagEndChar;
+  } else {
+    let textValue = this.options.tagValueProcessor(key, val);
+    textValue = this.replaceEntitiesValue(textValue);
+    if (textValue === "") {
+      return this.indentate(level) + "<" + key + attrStr + this.closeTag(key) + this.tagEndChar;
+    } else {
+      return this.indentate(level) + "<" + key + attrStr + ">" + textValue + "</" + key + this.tagEndChar;
+    }
+  }
+};
+Builder.prototype.replaceEntitiesValue = function(textValue) {
+  if (textValue && textValue.length > 0 && this.options.processEntities) {
+    for (let i = 0; i < this.options.entities.length; i++) {
+      const entity = this.options.entities[i];
+      textValue = textValue.replace(entity.regex, entity.val);
+    }
+  }
+  return textValue;
+};
+function indentate(level) {
+  return this.options.indentBy.repeat(level);
+}
+function isAttribute(name) {
+  if (name.startsWith(this.options.attributeNamePrefix) && name !== this.options.textNodeName) {
+    return name.substr(this.attrPrefixLen);
+  } else {
+    return false;
+  }
+}
+
+// ../../node_modules/.pnpm/fast-xml-parser@5.10.1/node_modules/fast-xml-parser/src/xmlbuilder/json2xml.js
+var json2xml_default = Builder;
+
+// src/services/integration/enterprise-bridge-production.ts
+import * as crypto5 from "crypto";
+var EnterpriseBridgeProductionService = class {
+  // ─── Cryptographic hashing ───────────────────────────────────────────────
+  /**
+   * SHA-256 of the canonical inspection payload (signatures excluded).
+   * Bound into SignatureAudit so any post-signing mutation breaks the hash.
+   */
+  static generateInspectionHash(payload) {
+    const canonical = JSON.stringify(payload);
+    return crypto5.createHash("sha256").update(canonical).digest("hex");
+  }
+  // ─── Payload normalisation ───────────────────────────────────────────────
+  /**
+   * Produces the canonical normalised form consumed by both adapters.
+   * Uses explicit measurementId / elementId matching — never array-index coupling.
+   */
+  static normalizePayload(data) {
+    const { signatures, ...restOfPayload } = data;
+    const inspectionHash = this.generateInspectionHash(restOfPayload);
+    return {
+      ExternalWorkOrderId: data.inspectionId,
+      LocationReference: {
+        PropertyCode: data.propertyId
+      },
+      ServiceDetails: {
+        CompletedByEmployeeId: data.technicianId,
+        ServiceDate: data.timestamp
+      },
+      SignatureAudit: {
+        TechnicianUserId: signatures.technicianUserId,
+        TechnicianSignatureUrl: signatures.technicianSignatureUrl,
+        CustomerSignatureUrl: signatures.customerSignatureUrl,
+        SignedAt: signatures.signedAt,
+        SignatureVersion: signatures.signatureVersion,
+        InspectionHash: inspectionHash,
+        PayloadHash: inspectionHash
+      },
+      InspectionFindings: data.aiFindings.map((finding) => {
+        const measurement = data.measurements.find(
+          (m) => m.measurementId === finding.measurementId || m.elementId === finding.findingId
+        );
+        return {
+          Code: `${finding.category.toUpperCase()}_${finding.severity.toUpperCase()}`,
+          Description: `AI prediction: '${finding.aiPrediction}'. Confirmed by tech: ${finding.technicianConfirmed}.`,
+          VerificationStatus: {
+            AiConfidence: finding.confidence,
+            TechnicianConfirmed: finding.technicianConfirmed,
+            ManagerVerified: finding.managerVerified
+          },
+          CustomFields: measurement ? {
+            WidthMm: measurement.widthMm,
+            HeightMm: measurement.heightMm,
+            SurfaceType: measurement.surfaceType
+          } : {},
+          AttachmentUrl: finding.evidencePhotoUrl
+        };
+      })
+    };
+  }
+  // ─── Dispatch ────────────────────────────────────────────────────────────
+  /**
+   * Dispatches the normalised payload to PestPac or ServSuite.
+   *
+   * @param resolvedConfig  Pre-resolved DB config (credentials injected by router)
+   * @param payload         Fully-populated HardenedInspectionPayload
+   */
+  static async dispatchToSystem(resolvedConfig, payload) {
+    if (!resolvedConfig.endpointUrl || !resolvedConfig.decryptedApiKey) {
+      return "INVALID_CONFIGURATION";
+    }
+    const normalized = this.normalizePayload(payload);
+    try {
+      if (resolvedConfig.targetSystem === "pestpac") {
+        return await this._dispatchPestPac(resolvedConfig, normalized);
+      } else {
+        return await this._dispatchServSuite(resolvedConfig, normalized);
+      }
+    } catch (error40) {
+      return this._classifyError(error40);
+    }
+  }
+  // ─── Private adapter methods ─────────────────────────────────────────────
+  static async _dispatchPestPac(cfg, normalized) {
+    const xmlBuilder = new json2xml_default({ ignoreAttributes: false, format: false });
+    const serializedWorkOrder = xmlBuilder.build(normalized);
+    const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ImportInspectionResult xmlns="http://tempuri.org/">
+      <apiKey>${this._escapeXml(cfg.decryptedApiKey)}</apiKey>
+      <workOrderData>${serializedWorkOrder}</workOrderData>
+    </ImportInspectionResult>
+  </soap:Body>
+</soap:Envelope>`;
+    const response = await fetch(cfg.endpointUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: "http://tempuri.org/ImportInspectionResult"
+      },
+      body: soapEnvelope,
+      signal: AbortSignal.timeout(15e3)
+    });
+    if (response.status === 401 || response.status === 403) return "UNAUTHORIZED";
+    if (response.status === 400 || response.status === 422) return "PERMANENT_FAILURE";
+    return response.status === 200 ? "DELIVERED" : "RETRYABLE_FAILURE";
+  }
+  static async _dispatchServSuite(cfg, normalized) {
+    const response = await fetch(cfg.endpointUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cfg.decryptedApiKey}`,
+        "Content-Type": "application/json",
+        "X-ReadyLoq-Bridge": "v2-hardened"
+      },
+      body: JSON.stringify(normalized),
+      signal: AbortSignal.timeout(1e4)
+    });
+    if (response.status === 401 || response.status === 403) return "UNAUTHORIZED";
+    if (response.status === 400 || response.status === 422) return "PERMANENT_FAILURE";
+    return response.status >= 200 && response.status < 300 ? "DELIVERED" : "RETRYABLE_FAILURE";
+  }
+  static _classifyError(error40) {
+    if (error40 instanceof Error) {
+      const name = error40.name;
+      if (name === "TimeoutError" || name === "AbortError") return "TIMEOUT";
+    }
+    return "RETRYABLE_FAILURE";
+  }
+  /** Full XML special-character escaping (prevents injection into SOAP body). */
+  static _escapeXml(unsafe) {
+    return unsafe.replace(/[<>&'"]/g, (c) => {
+      switch (c) {
+        case "<":
+          return "&lt;";
+        case ">":
+          return "&gt;";
+        case "&":
+          return "&amp;";
+        case "'":
+          return "&apos;";
+        case '"':
+          return "&quot;";
+        default:
+          return c;
+      }
+    });
+  }
+};
+
 // src/services/integration/enterprise-router.ts
-init_servsuiteAdapter();
 var EnterpriseAdapterRouter = class {
   /**
    * Main entry point — called by the enterprise event bus listener.
@@ -127287,7 +128824,8 @@ var EnterpriseAdapterRouter = class {
         ...evidenceMedia?.url && { AttachmentUrl: evidenceMedia.url }
       };
     });
-    const payload = {
+    const insp = inspection;
+    const legacyPayload = {
       ExternalWorkOrderId: String(inspection.id),
       LocationReference: {
         PropertyCode: inspection.siteAddress ?? ""
@@ -127299,27 +128837,69 @@ var EnterpriseAdapterRouter = class {
       },
       InspectionFindings: inspectionFindings,
       SignatureAudit: {
-        technicianSigned: !!inspection["technicianSignature"],
-        ownerSigned: !!inspection["ownerSignature"],
-        ownerNotAvailable: !!(inspection["ownerNotAvailable"] ?? false),
-        signedAt: inspection["signedAt"]?.toISOString() ?? null
+        technicianSigned: !!insp["technicianSignature"],
+        ownerSigned: !!insp["ownerSignature"],
+        ownerNotAvailable: !!(insp["ownerNotAvailable"] ?? false),
+        signedAt: insp["signedAt"]?.toISOString() ?? null
       }
     };
+    const hardenedMeasurements = rawFindings.filter((f) => f.measurementEstimate != null).map((f) => {
+      const meas = f.measurementEstimate;
+      return {
+        measurementId: `finding-${f.id}-meas`,
+        elementId: String(f.id),
+        widthMm: meas.gapWidthIn != null ? Math.round(meas.gapWidthIn * 25.4) : 0,
+        heightMm: meas.heightFt != null ? Math.round(meas.heightFt * 304.8) : 0,
+        confidence: meas.confidence,
+        surfaceType: ""
+      };
+    });
+    const signedAt = insp["signedAt"]?.toISOString() ?? (/* @__PURE__ */ new Date()).toISOString();
+    const hardenedPayload = {
+      inspectionId: String(inspection.id),
+      companyId: String(companyId),
+      propertyId: inspection.siteAddress ?? String(inspection.id),
+      technicianId: inspection.technicianId ?? String(config2.accountId ?? ""),
+      timestamp: (inspection.completedAt ?? inspection.createdAt).toISOString(),
+      signatures: {
+        technicianUserId: inspection.technicianId ?? "",
+        technicianSignatureUrl: insp["technicianSignature"] ?? "",
+        customerSignatureUrl: insp["ownerSignature"] ?? "",
+        signedAt,
+        signatureVersion: "v1"
+      },
+      measurements: hardenedMeasurements,
+      aiFindings: rawFindings.map((f) => ({
+        findingId: String(f.id),
+        measurementId: f.measurementEstimate != null ? `finding-${f.id}-meas` : void 0,
+        category: f.category,
+        severity: f.severity,
+        aiPrediction: f.description,
+        // reviewStatus "accepted" or "corrected" means the technician confirmed it
+        technicianConfirmed: f.reviewStatus === "accepted" || f.reviewStatus === "corrected",
+        managerVerified: false,
+        // populated by future manager-review workflow
+        confidence: f.confidence,
+        evidencePhotoUrl: f.imageUrl ?? ""
+      }))
+    };
+    let outcome = null;
     let success2 = false;
     let errorMessage = null;
     try {
-      if (config2.systemType === "pestpac") {
-        await sendPestPacSOAP(payload, {
-          apiKey: config2.apiKey,
-          apiBaseUrl: config2.apiBaseUrl
-        });
-        success2 = true;
-      } else if (config2.systemType === "servsuite") {
-        await sendServSuiteREST(payload, {
-          apiKey: config2.apiKey,
-          apiBaseUrl: config2.apiBaseUrl
-        });
-        success2 = true;
+      if (config2.systemType === "pestpac" || config2.systemType === "servsuite") {
+        outcome = await EnterpriseBridgeProductionService.dispatchToSystem(
+          {
+            targetSystem: config2.systemType,
+            endpointUrl: config2.apiBaseUrl ?? "",
+            decryptedApiKey: config2.apiKey ?? ""
+          },
+          hardenedPayload
+        );
+        success2 = outcome === "DELIVERED";
+        if (!success2) {
+          errorMessage = `Delivery outcome: ${outcome}`;
+        }
       } else if (config2.systemType === "fieldroutes") {
         const photos = mediaRows.filter((m) => (m.mediaType === "photo" || m.mediaType === "image") && m.url).map((m) => ({
           url: m.url,
@@ -127355,7 +128935,7 @@ var EnterpriseAdapterRouter = class {
               }
             }
           })),
-          signatureAudit: payload.SignatureAudit,
+          signatureAudit: legacyPayload.SignatureAudit,
           inspectionDate: (inspection.completedAt ?? inspection.createdAt).toISOString().split("T")[0],
           reportSummary: summary,
           photos,
