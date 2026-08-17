@@ -341,3 +341,162 @@ describe("Viewer close effect — zoom state resets when Modal closes", () => {
     expect(after).toEqual(zoomed);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7. Pinch-to-zoom boundary — pan stays in bounds at maximum zoom
+//
+//    The viewerPan gesture in InspectionDetail.tsx does:
+//      onUpdate: translateX = clampViewerTranslation(baseTX, e.translationX, W, scale)
+//      onEnd:    baseTX     = commitPan(translateX)
+//
+//    A rapid pan that fires onEnd before onUpdate completes can produce a
+//    stale baseTX.  These tests confirm that:
+//      a) Multiple sequential onEnd calls never push baseTX outside the
+//         clamped boundary for the current scale.
+//      b) When scale drops mid-pan the boundary shrinks; the very next
+//         clampViewerTranslation call corrects any out-of-range base.
+// ---------------------------------------------------------------------------
+
+describe("Pan boundary — baseTX/baseTY never exceed clamped limit at max zoom", () => {
+  const W = 390; // typical iPhone screen width
+  const H = 844; // typical iPhone screen height
+
+  /**
+   * Simulate one complete pan gesture cycle (onUpdate then onEnd).
+   * Returns the new baseTX that would be stored in the shared value.
+   */
+  function panCycle(baseTX: number, deltaX: number, screenW: number, scale: number): number {
+    const liveTranslateX = clampViewerTranslation(baseTX, deltaX, screenW, scale);
+    return commitPan(liveTranslateX); // mirrors viewerBaseTX.value = commitPan(viewerTranslateX.value)
+  }
+
+  it("baseTX stays within bounds across many sequential pan gestures at 8× zoom", () => {
+    const scale = VIEWER_MAX_SCALE; // 8×
+    const maxTX = (W * (scale - 1)) / 2; // 1365 px
+    let baseTX = 0;
+
+    // Simulate 20 rapid pan gestures, each pushing hard in the +X direction
+    for (let i = 0; i < 20; i++) {
+      baseTX = panCycle(baseTX, 200, W, scale);
+      expect(Math.abs(baseTX)).toBeLessThanOrEqual(maxTX + Number.EPSILON);
+    }
+  });
+
+  it("baseTX stays within bounds across many sequential pan gestures in the −X direction", () => {
+    const scale = VIEWER_MAX_SCALE;
+    const maxTX = (W * (scale - 1)) / 2;
+    let baseTX = 0;
+
+    for (let i = 0; i < 20; i++) {
+      baseTX = panCycle(baseTX, -200, W, scale);
+      expect(Math.abs(baseTX)).toBeLessThanOrEqual(maxTX + Number.EPSILON);
+    }
+  });
+
+  it("baseTY stays within bounds across many sequential pan gestures at 8× zoom", () => {
+    const scale = VIEWER_MAX_SCALE;
+    const maxTY = (H * (scale - 1)) / 2;
+    let baseTY = 0;
+
+    for (let i = 0; i < 20; i++) {
+      const liveTranslateY = clampViewerTranslation(baseTY, 300, H, scale);
+      baseTY = commitPan(liveTranslateY);
+      expect(Math.abs(baseTY)).toBeLessThanOrEqual(maxTY + Number.EPSILON);
+    }
+  });
+
+  it("baseTX accumulates correctly up to the boundary and then stops growing", () => {
+    const scale = 4;
+    const maxTX = (W * (scale - 1)) / 2; // 585 px
+    let baseTX = 0;
+
+    // Each gesture adds 200 px; it should saturate at maxTX within a few iterations
+    const history: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      baseTX = panCycle(baseTX, 200, W, scale);
+      history.push(baseTX);
+    }
+
+    // After saturation every value must equal the cap
+    const saturatedValues = history.filter((v) => v >= maxTX - Number.EPSILON);
+    expect(saturatedValues.length).toBeGreaterThan(0);
+    saturatedValues.forEach((v) => expect(v).toBeCloseTo(maxTX));
+  });
+
+  it("stale baseTX at old boundary is immediately corrected when scale drops", () => {
+    // The 'stale base' edge case: onEnd committed baseTX at the 8× boundary,
+    // then the user pinched out (scale dropped to 2×).  The very next
+    // onUpdate call must clamp to the smaller 2× boundary.
+    const oldScale = VIEWER_MAX_SCALE; // 8×
+    const newScale = 2;
+
+    const oldMaxTX = (W * (oldScale - 1)) / 2; // 1365 px
+    const newMaxTX = (W * (newScale - 1)) / 2; //  195 px
+
+    // baseTX is at the 8× edge — valid then, but outside the 2× boundary now
+    const staleBateTX = oldMaxTX;
+    expect(staleBateTX).toBeGreaterThan(newMaxTX); // confirms it IS out of range
+
+    // Any pan at the new (lower) scale must clamp it back in range immediately
+    const corrected = clampViewerTranslation(staleBateTX, 0, W, newScale);
+    expect(corrected).toBeCloseTo(newMaxTX);
+    expect(Math.abs(corrected)).toBeLessThanOrEqual(newMaxTX + Number.EPSILON);
+  });
+
+  it("stale baseTX in the −X direction is corrected when scale drops", () => {
+    const oldScale = VIEWER_MAX_SCALE;
+    const newScale = 2;
+    const oldMaxTX = (W * (oldScale - 1)) / 2;
+    const newMaxTX = (W * (newScale - 1)) / 2;
+
+    const staleBateTX = -oldMaxTX; // fully negative edge
+    const corrected = clampViewerTranslation(staleBateTX, 0, W, newScale);
+    expect(corrected).toBeCloseTo(-newMaxTX);
+    expect(Math.abs(corrected)).toBeLessThanOrEqual(newMaxTX + Number.EPSILON);
+  });
+
+  it("committed base after scale-drop correction stays within new boundary on next pan", () => {
+    const oldScale = VIEWER_MAX_SCALE;
+    const newScale = 3;
+    const newMaxTX = (W * (newScale - 1)) / 2; // 390 px
+
+    // Stale base at old 8× max
+    const staleBase = (W * (oldScale - 1)) / 2;
+
+    // First onUpdate at new scale corrects to newMaxTX; onEnd commits it
+    const correctedBase = commitPan(clampViewerTranslation(staleBase, 0, W, newScale));
+    expect(Math.abs(correctedBase)).toBeLessThanOrEqual(newMaxTX + Number.EPSILON);
+
+    // Subsequent pans from the corrected base must also stay within bounds
+    const nextTX = clampViewerTranslation(correctedBase, 50, W, newScale);
+    expect(Math.abs(nextTX)).toBeLessThanOrEqual(newMaxTX + Number.EPSILON);
+
+    const nextTXNeg = clampViewerTranslation(correctedBase, -9999, W, newScale);
+    expect(Math.abs(nextTXNeg)).toBeLessThanOrEqual(newMaxTX + Number.EPSILON);
+  });
+
+  it("alternating direction pans at max zoom never exceed boundary", () => {
+    const scale = VIEWER_MAX_SCALE;
+    const maxTX = (W * (scale - 1)) / 2;
+    let baseTX = 0;
+
+    const deltas = [300, -300, 500, -500, 200, -900, 1500, -1500, 100, -100];
+    for (const delta of deltas) {
+      baseTX = panCycle(baseTX, delta, W, scale);
+      expect(Math.abs(baseTX)).toBeLessThanOrEqual(maxTX + Number.EPSILON);
+    }
+  });
+
+  it("boundary formula matches for both axes at every integer zoom level", () => {
+    for (let scale = VIEWER_MIN_SCALE; scale <= VIEWER_MAX_SCALE; scale++) {
+      const maxX = (W * (scale - 1)) / 2;
+      const maxY = (H * (scale - 1)) / 2;
+
+      // Panning past the edge on each axis must land exactly on the boundary
+      expect(clampViewerTranslation(0, 99999, W, scale)).toBeCloseTo(maxX);
+      expect(clampViewerTranslation(0, -99999, W, scale)).toBeCloseTo(-maxX);
+      expect(clampViewerTranslation(0, 99999, H, scale)).toBeCloseTo(maxY);
+      expect(clampViewerTranslation(0, -99999, H, scale)).toBeCloseTo(-maxY);
+    }
+  });
+});
