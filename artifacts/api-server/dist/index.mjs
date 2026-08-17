@@ -68963,6 +68963,11 @@ var analysisResultsTable = pgTable("analysis_results", {
   // (storage/model/parse errors). Null = pre-migration row or no run yet;
   // 0 = run completed with zero failures; >0 = partial failure.
   analysisErrors: integer("analysis_errors"),
+  // Human-readable reason the analysis was skipped or failed, set by the
+  // server pipeline when it cannot complete analysis (e.g. "Image resolution
+  // too low", "Service temporarily unavailable"). Null = no specific reason
+  // provided or analysis succeeded.
+  failureReason: text("failure_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow()
 });
 var insertAnalysisResultSchema = createInsertSchema(analysisResultsTable).omit({ id: true, createdAt: true, companyId: true });
@@ -74630,6 +74635,47 @@ var coerce = {
 var NEVER2 = INVALID;
 
 // ../../lib/api-zod/src/generated/api.ts
+var GetScheduleQueryParams = objectType({
+  "start": dateType().describe("Start date (YYYY-MM-DD), inclusive"),
+  "end": dateType().describe("End date (YYYY-MM-DD), inclusive")
+});
+var GetScheduleResponseItem = objectType({
+  "id": numberType(),
+  "siteAddress": stringType(),
+  "clientName": stringType().nullish(),
+  "technicianName": stringType(),
+  "technicianId": stringType().nullish(),
+  "status": stringType(),
+  "severity": stringType().nullish(),
+  "pestTypes": arrayType(stringType()).optional(),
+  "scheduledDate": stringType().nullish().describe("ISO-8601 datetime when explicitly scheduled by a manager"),
+  "calendarDate": stringType().describe("YYYY-MM-DD date used to place the entry on the grid (scheduledDate ?? createdAt)"),
+  "createdAt": stringType(),
+  "completedAt": stringType().nullish()
+});
+var GetScheduleResponse = arrayType(GetScheduleResponseItem);
+var ReassignInspectionParams = objectType({
+  "id": coerce.number()
+});
+var ReassignInspectionBody = objectType({
+  "scheduledDate": stringType().nullish().describe("ISO-8601 datetime; null clears an existing scheduled date"),
+  "technicianName": stringType().min(1).optional(),
+  "technicianId": stringType().nullish()
+});
+var ReassignInspectionResponse = objectType({
+  "id": numberType(),
+  "siteAddress": stringType(),
+  "clientName": stringType().nullish(),
+  "technicianName": stringType(),
+  "technicianId": stringType().nullish(),
+  "status": stringType(),
+  "severity": stringType().nullish(),
+  "pestTypes": arrayType(stringType()).optional(),
+  "scheduledDate": stringType().nullish().describe("ISO-8601 datetime when explicitly scheduled by a manager"),
+  "calendarDate": stringType().describe("YYYY-MM-DD date used to place the entry on the grid (scheduledDate ?? createdAt)"),
+  "createdAt": stringType(),
+  "completedAt": stringType().nullish()
+});
 var HealthCheckResponse = objectType({
   "status": stringType()
 });
@@ -74938,6 +74984,7 @@ var ListAnalysisResultsResponseItem = objectType({
   "technicianFeedback": stringType().nullish(),
   "feedbackStatus": stringType().nullish(),
   "analysisErrors": numberType().nullish(),
+  "failureReason": stringType().nullish().describe('Human-readable reason the analysis was skipped or failed (e.g. "Photos could not be processed by the AI service"). Absent when analysis succeeded or no specific reason was recorded.'),
   "createdAt": stringType()
 });
 var ListAnalysisResultsResponse = arrayType(ListAnalysisResultsResponseItem);
@@ -75112,6 +75159,7 @@ var GetAnalysisResultResponse = objectType({
   "technicianFeedback": stringType().nullish(),
   "feedbackStatus": stringType().nullish(),
   "analysisErrors": numberType().nullish(),
+  "failureReason": stringType().nullish().describe('Human-readable reason the analysis was skipped or failed (e.g. "Photos could not be processed by the AI service"). Absent when analysis succeeded or no specific reason was recorded.'),
   "createdAt": stringType()
 });
 var SubmitAnalysisFeedbackParams = objectType({
@@ -75256,6 +75304,7 @@ var SubmitAnalysisFeedbackResponse = objectType({
   "technicianFeedback": stringType().nullish(),
   "feedbackStatus": stringType().nullish(),
   "analysisErrors": numberType().nullish(),
+  "failureReason": stringType().nullish().describe('Human-readable reason the analysis was skipped or failed (e.g. "Photos could not be processed by the AI service"). Absent when analysis succeeded or no specific reason was recorded.'),
   "createdAt": stringType()
 });
 var GetAnalysisSummaryResponse = objectType({
@@ -77107,6 +77156,14 @@ var GetBriefingResponse = objectType({
       "status": stringType(),
       "findingsCount": numberType(),
       "createdAt": stringType()
+    })),
+    "siteHistory": arrayType(objectType({
+      "siteAddress": stringType(),
+      "visitCount": numberType(),
+      "lastVisitedAt": stringType().nullish(),
+      "lastInspectionId": numberType(),
+      "lastFindingsCount": numberType(),
+      "pestTypes": arrayType(stringType())
     }))
   }).optional(),
   "sales": objectType({
@@ -89835,6 +89892,7 @@ router3.post("/analyze", async (req, res) => {
     const photoZones = {};
     let nextId = 1;
     let analysisErrors = 0;
+    let newPhotosAttempted = 0;
     const cropCandidates = [];
     for (const image of images.slice(0, MAX_ANALYZE_IMAGES)) {
       if (!image?.imageUrl) continue;
@@ -89849,6 +89907,7 @@ router3.post("/analyze", async (req, res) => {
         if (prior) aiFindings.push({ ...prior, id: nextId++ });
         continue;
       }
+      newPhotosAttempted++;
       const technicianNote = captionByPath.get(storagePath) ?? null;
       const prediction = await analyzePhoto(storagePath, technicianNote);
       if (prediction === null) {
@@ -89946,6 +90005,7 @@ router3.post("/analyze", async (req, res) => {
       pestTypes: inspection.pestTypes ?? [],
       coveredZoneSlugs
     });
+    const failureReason = newPhotosAttempted > 0 && analysisErrors === newPhotosAttempted ? "Photos could not be processed by the AI analysis service. This is usually a temporary issue \u2014 retrying the inspection sync should resolve it." : null;
     const [row] = await db.insert(analysisResultsTable).values({
       companyId,
       inspectionId,
@@ -89960,7 +90020,10 @@ router3.post("/analyze", async (req, res) => {
       riskLevel,
       // Persist the failure count so GET endpoints can surface it to the
       // summary screen without relying on the ephemeral POST response.
-      analysisErrors: analysisErrors > 0 ? analysisErrors : 0
+      analysisErrors: analysisErrors > 0 ? analysisErrors : 0,
+      // User-safe reason when all new photos failed; null on success or
+      // partial success.
+      failureReason
     }).returning();
     if (cropCandidates.length > 0) {
       void cropPhonePhotos(companyId, cropCandidates);
@@ -90052,11 +90115,15 @@ router3.patch("/:id/findings/correct", async (req, res) => {
       reviewStatus,
       technicianSpecies: action === "correct" ? technicianSpecies?.trim() ?? null : findings[idx].technicianSpecies ?? null
     };
-    const updatedFindings = [
+    const rawUpdatedFindings = [
       ...findings.slice(0, idx),
       updatedFinding,
       ...findings.slice(idx + 1)
     ];
+    const [updatedFindings] = validateFindings(
+      rawUpdatedFindings,
+      "PATCH /analysis/:id/findings/correct"
+    );
     const [updated] = await db.update(analysisResultsTable).set({ findings: updatedFindings }).where(and(eq(analysisResultsTable.id, id), eq(analysisResultsTable.companyId, companyId))).returning();
     if (!updated) return res.status(404).json({ error: "Not found" });
     const userId = req.user?.id;
@@ -95310,6 +95377,8 @@ router22.get("/", async (req, res) => {
     const companyId = getCompanyId(req);
     const inspectionId = Number(req.params.inspectionId);
     if (isNaN(inspectionId)) return res.status(400).json({ error: "Invalid inspection ID" });
+    const [inspection] = await db.select({ id: inspectionsTable.id }).from(inspectionsTable).where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
+    if (!inspection) return res.status(404).json({ error: "Inspection not found" });
     const rows = await db.select().from(baitStationsTable).where(
       and(
         eq(baitStationsTable.companyId, companyId),
@@ -95606,6 +95675,62 @@ router24.post("/", async (req, res) => {
     return res.status(201).json(serializeLog(row));
   } catch {
     return res.status(500).json({ error: "Failed to create treatment log" });
+  }
+});
+var patchTreatmentLogSchema = external_exports.object({
+  notes: external_exports.string().optional(),
+  equipmentUsed: external_exports.string().optional(),
+  tempAtApplicationF: external_exports.number().int().optional(),
+  environmentalWarningAcknowledged: external_exports.boolean().optional(),
+  appliedAt: external_exports.string().datetime().optional()
+});
+router24.patch("/:logId", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    const logId = Number(req.params.logId);
+    if (Number.isNaN(inspectionId) || Number.isNaN(logId)) {
+      return res.status(400).json({ error: "Invalid ID" });
+    }
+    const parse4 = patchTreatmentLogSchema.safeParse(req.body);
+    if (!parse4.success) {
+      return res.status(400).json({ error: "Invalid body", detail: parse4.error.issues });
+    }
+    const data = parse4.data;
+    const update = { ...data };
+    if (data.appliedAt) update.appliedAt = new Date(data.appliedAt);
+    const [row] = await db.update(treatmentLogsTable).set(update).where(
+      and(
+        eq(treatmentLogsTable.id, logId),
+        eq(treatmentLogsTable.inspectionId, inspectionId),
+        eq(treatmentLogsTable.companyId, companyId)
+      )
+    ).returning();
+    if (!row) return res.status(404).json({ error: "Treatment log not found" });
+    return res.json(serializeLog(row));
+  } catch {
+    return res.status(500).json({ error: "Failed to update treatment log" });
+  }
+});
+router24.delete("/:logId", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const inspectionId = Number(req.params.inspectionId);
+    const logId = Number(req.params.logId);
+    if (Number.isNaN(inspectionId) || Number.isNaN(logId)) {
+      return res.status(400).json({ error: "Invalid ID" });
+    }
+    const deleted = await db.delete(treatmentLogsTable).where(
+      and(
+        eq(treatmentLogsTable.id, logId),
+        eq(treatmentLogsTable.inspectionId, inspectionId),
+        eq(treatmentLogsTable.companyId, companyId)
+      )
+    ).returning({ id: treatmentLogsTable.id });
+    if (deleted.length === 0) return res.status(404).json({ error: "Treatment log not found" });
+    return res.status(204).send();
+  } catch {
+    return res.status(500).json({ error: "Failed to delete treatment log" });
   }
 });
 router24.get("/", async (req, res) => {
@@ -124599,9 +124724,6 @@ function isRetryableResponse(res) {
   }
   return true;
 }
-function isFatalResponse(res) {
-  return res.status === 401 || res.status === 403;
-}
 var PESTPAC_DEFAULT_BASE = "https://api.pestpac.com/v1";
 async function syncToPestPac(payload) {
   const base = payload.apiBaseUrl?.replace(/\/$/, "") ?? PESTPAC_DEFAULT_BASE;
@@ -124632,8 +124754,7 @@ async function syncToPestPac(payload) {
     }),
     isRetryableResponse,
     3,
-    500,
-    isFatalResponse
+    500
   );
   if (!noteRes.ok) {
     const body = await noteRes.text();
@@ -124641,6 +124762,7 @@ async function syncToPestPac(payload) {
   }
   let attachmentsPosted = 0;
   let attachmentRetries = 0;
+  let attachmentErrors = 0;
   for (const photo of payload.photos) {
     try {
       const { result: attachRes, retries } = await withRetryTracked(
@@ -124654,18 +124776,26 @@ async function syncToPestPac(payload) {
         }),
         isRetryableResponse,
         3,
-        500,
-        isFatalResponse
+        500
       );
       attachmentRetries += retries;
       if (attachRes.ok) {
         attachmentsPosted++;
       } else {
         const body = await attachRes.text();
-        logger2.warn(
-          { status: attachRes.status, body },
-          "PestPac attachment POST failed after retries"
-        );
+        const isPermanentAuthFailure = attachRes.status === 401 || attachRes.status === 403;
+        if (isPermanentAuthFailure) {
+          attachmentErrors++;
+          logger2.warn(
+            { status: attachRes.status, body, url: photo.url },
+            "PestPac attachment POST rejected with auth error \u2014 credential may be invalid"
+          );
+        } else {
+          logger2.warn(
+            { status: attachRes.status, body },
+            "PestPac attachment POST failed after retries"
+          );
+        }
       }
     } catch (err) {
       attachmentRetries += 2;
@@ -124675,7 +124805,7 @@ async function syncToPestPac(payload) {
       );
     }
   }
-  return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted, noteRetries, attachmentRetries };
+  return { success: true, externalSystem: "pestpac", postedNotes: true, attachmentsPosted, noteRetries, attachmentRetries, attachmentErrors };
 }
 var FIELDROUTES_DEFAULT_BASE = "https://api.fieldroutes.com/api/v1";
 async function syncToFieldRoutes(payload) {
@@ -124715,8 +124845,7 @@ async function syncToFieldRoutes(payload) {
     }),
     isRetryableResponse,
     3,
-    500,
-    isFatalResponse
+    500
   );
   if (!histRes.ok) {
     const body = await histRes.text();
@@ -124728,7 +124857,8 @@ async function syncToFieldRoutes(payload) {
     postedNotes: true,
     attachmentsPosted: payload.photos.length,
     noteRetries,
-    attachmentRetries: 0
+    attachmentRetries: 0,
+    attachmentErrors: 0
   };
 }
 async function probePestPac(apiKey, accountId, apiBaseUrl) {
@@ -125751,26 +125881,39 @@ router34.get(
       monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
       label = monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
     }
+    const technicianNameFilter = typeof req.query.technicianName === "string" && req.query.technicianName.trim() ? req.query.technicianName.trim() : void 0;
     try {
-      const rows = await db.select({
-        inspectionId: inspectionsTable.id,
-        siteAddress: inspectionsTable.siteAddress,
-        technicianName: inspectionsTable.technicianName,
-        completedAt: inspectionsTable.completedAt
-      }).from(inspectionsTable).where(
-        and(
-          eq(inspectionsTable.companyId, companyId),
-          eq(inspectionsTable.status, "completed"),
-          isNotNull(inspectionsTable.completedAt),
-          sql`${inspectionsTable.completedAt} >= ${monthStart.toISOString()}::timestamptz`,
-          sql`${inspectionsTable.completedAt} < ${monthEnd.toISOString()}::timestamptz`
-        )
-      ).orderBy(sql`${inspectionsTable.completedAt} desc`);
+      const baseConditions = [
+        eq(inspectionsTable.companyId, companyId),
+        eq(inspectionsTable.status, "completed"),
+        isNotNull(inspectionsTable.completedAt),
+        sql`${inspectionsTable.completedAt} >= ${monthStart.toISOString()}::timestamptz`,
+        sql`${inspectionsTable.completedAt} < ${monthEnd.toISOString()}::timestamptz`
+      ];
+      const [rows, techRows] = await Promise.all([
+        db.select({
+          inspectionId: inspectionsTable.id,
+          siteAddress: inspectionsTable.siteAddress,
+          technicianName: inspectionsTable.technicianName,
+          completedAt: inspectionsTable.completedAt
+        }).from(inspectionsTable).where(
+          and(
+            ...baseConditions,
+            ...technicianNameFilter ? [ilike(inspectionsTable.technicianName, `%${technicianNameFilter}%`)] : []
+          )
+        ).orderBy(sql`${inspectionsTable.completedAt} desc`),
+        // Distinct technician names for the month — always unfiltered so the
+        // client can show all available filter options regardless of the
+        // currently active filter.
+        db.selectDistinct({ technicianName: inspectionsTable.technicianName }).from(inspectionsTable).where(and(...baseConditions)).orderBy(inspectionsTable.technicianName)
+      ]);
+      const technicians = techRows.map((r) => r.technicianName || "Unknown").filter((n, i, arr) => arr.indexOf(n) === i).sort();
       return res.json({
         success: true,
         month: monthParam,
         label,
         count: rows.length,
+        technicians,
         inspections: rows.map((r) => ({
           inspectionId: r.inspectionId,
           siteAddress: r.siteAddress,
@@ -129372,6 +129515,23 @@ async function migrateAnalysisErrors() {
   }
 }
 
+// src/lib/migrate-analysis-failure-reason.ts
+async function columnExists5(table, column) {
+  const result = await db.execute(
+    sql`SELECT 1 FROM information_schema.columns
+        WHERE table_name = ${table} AND column_name = ${column}`
+  );
+  return result.rows.length > 0;
+}
+async function migrateAnalysisFailureReason() {
+  if (!await columnExists5("analysis_results", "failure_reason")) {
+    await db.execute(
+      sql`ALTER TABLE analysis_results ADD COLUMN failure_reason TEXT`
+    );
+    logger2.info("migrateAnalysisFailureReason: added analysis_results.failure_reason");
+  }
+}
+
 // src/lib/briefing-scheduler.ts
 import cron from "node-cron";
 
@@ -129744,6 +129904,7 @@ async function startup() {
   await migrateSyncLogs();
   await migrateBriefingEmailColumn();
   await migrateAnalysisErrors();
+  await migrateAnalysisFailureReason();
   app_default.listen(port, (err) => {
     if (err) {
       logger2.error({ err }, "Error listening on port");

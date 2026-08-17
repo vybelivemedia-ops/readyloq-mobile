@@ -6,10 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface GeminiMessage {
-  id: number;
-  conversationId: number;
-  role: string;
-  content: string;
-  createdAt: Date;
-}
+export type GetScheduleParams = {
+/**
+ * Start date (YYYY-MM-DD), inclusive
+ */
+start: Date;
+/**
+ * End date (YYYY-MM-DD), inclusive
+ */
+end: Date;
+};

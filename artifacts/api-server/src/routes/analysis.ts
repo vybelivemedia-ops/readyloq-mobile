@@ -515,6 +515,9 @@ router.post("/analyze", async (req, res) => {
     const photoZones: Record<string, string> = {};
     let nextId = 1;
     let analysisErrors = 0;
+    // Count of newly-submitted photos (not from cache) that we attempted to
+    // analyze. Used to produce a user-safe failureReason when all of them fail.
+    let newPhotosAttempted = 0;
     // #116 — collect newly-analyzed phone-camera photos with real findings for background crop.
     const cropCandidates: Array<{ storagePath: string; confidence: number; species: string | null }> = [];
     for (const image of images.slice(0, MAX_ANALYZE_IMAGES)) {
@@ -534,6 +537,9 @@ router.post("/analyze", async (req, res) => {
         if (prior) aiFindings.push({ ...prior, id: nextId++ });
         continue;
       }
+
+      // New photo — count it before the analysis attempt so failures are included.
+      newPhotosAttempted++;
 
       const technicianNote = captionByPath.get(storagePath) ?? null;
       const prediction = await analyzePhoto(storagePath, technicianNote);
@@ -729,6 +735,15 @@ router.post("/analyze", async (req, res) => {
       coveredZoneSlugs,
     });
 
+    // Compute a user-safe failure reason when every newly-submitted photo
+    // failed. Partial failures (some succeeded) are surfaced via analysisErrors
+    // alone since the count-based message is more informative in that case.
+    // failureReason is null when analysis fully succeeded or partially succeeded.
+    const failureReason: string | null =
+      newPhotosAttempted > 0 && analysisErrors === newPhotosAttempted
+        ? "Photos could not be processed by the AI analysis service. This is usually a temporary issue — retrying the inspection sync should resolve it."
+        : null;
+
     const [row] = await db
       .insert(analysisResultsTable)
       .values({
@@ -746,6 +761,9 @@ router.post("/analyze", async (req, res) => {
         // Persist the failure count so GET endpoints can surface it to the
         // summary screen without relying on the ephemeral POST response.
         analysisErrors: analysisErrors > 0 ? analysisErrors : 0,
+        // User-safe reason when all new photos failed; null on success or
+        // partial success.
+        failureReason,
       })
       .returning();
 

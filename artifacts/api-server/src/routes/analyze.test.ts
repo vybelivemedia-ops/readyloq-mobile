@@ -586,3 +586,92 @@ describe("POST /analysis/analyze remembers prior visits (Inspection Memory)", ()
     expect(latest.guidance.next.category).toBe("memory_rodent");
   });
 });
+
+// ---------------------------------------------------------------------------
+// failureReason persistence and serialization
+// ---------------------------------------------------------------------------
+
+describe("POST /analysis/analyze — failureReason persistence", () => {
+  it("persists a user-safe failureReason when all new photos fail, and returns it via GET /analysis", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("fr-all-fail");
+    // Every analyzePhoto call returns null → all-failure scenario.
+    analyzePhotoMock.mockResolvedValueOnce(null);
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.analysisErrors).toBe(1);
+    expect(res.body.findings).toEqual([]);
+    // The response must carry a non-null failureReason so the mobile
+    // summary screen can surface it instead of the generic fallback.
+    expect(typeof res.body.failureReason).toBe("string");
+    expect(res.body.failureReason).toBeTruthy();
+
+    // Verify the reason is also returned by the GET list endpoint
+    // (failureReason is persisted in the DB row and serialized via ...row spread).
+    const listRes = await request(app).get(`/api/analysis?inspectionId=${inspectionId}`);
+    expect(listRes.status).toBe(200);
+    expect(listRes.body[0].failureReason).toBe(res.body.failureReason);
+  });
+
+  it("does NOT set failureReason when at least one photo succeeds (partial success)", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("fr-partial");
+    const imageUrl2 = `/api/storage/objects/companies/${companyId}/uploads/photo-fr-partial2`;
+    asUser(OWNER_ID);
+    await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "photo", url: imageUrl2 });
+
+    // First fails, second succeeds.
+    analyzePhotoMock
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(pestPrediction());
+
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }, { imageUrl: imageUrl2 }] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.analysisErrors).toBe(1);
+    // Partial success → failureReason is null.
+    expect(res.body.failureReason).toBeNull();
+  });
+
+  it("does NOT set failureReason when all photos succeed", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("fr-success");
+    analyzePhotoMock.mockResolvedValueOnce(pestPrediction());
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.analysisErrors).toBe(0);
+    expect(res.body.failureReason).toBeNull();
+  });
+
+  it("does NOT set failureReason when no new photos are submitted (cached run)", async () => {
+    // First run: analyze one photo successfully.
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("fr-cached");
+    analyzePhotoMock.mockResolvedValueOnce(pestPrediction());
+
+    asUser(OWNER_ID);
+    await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }] });
+
+    // Second run: same photo, now cached — no new analysis calls, no errors.
+    analyzePhotoMock.mockReset(); // should not be called
+    const res2 = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl }] });
+
+    expect(res2.status).toBe(201);
+    expect(res2.body.analysisErrors).toBe(0);
+    expect(res2.body.failureReason).toBeNull();
+  });
+});

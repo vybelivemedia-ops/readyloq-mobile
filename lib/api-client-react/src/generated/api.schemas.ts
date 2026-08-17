@@ -281,6 +281,42 @@ export interface LeadInput {
   source?: string;
 }
 
+export interface ScheduleEntry {
+  id: number;
+  siteAddress: string;
+  /** @nullable */
+  clientName?: string | null;
+  technicianName: string;
+  /** @nullable */
+  technicianId?: string | null;
+  status: string;
+  /** @nullable */
+  severity?: string | null;
+  pestTypes?: string[];
+  /**
+     * ISO-8601 datetime when explicitly scheduled by a manager
+     * @nullable
+     */
+  scheduledDate?: string | null;
+  /** YYYY-MM-DD date used to place the entry on the grid (scheduledDate ?? createdAt) */
+  calendarDate: string;
+  createdAt: string;
+  /** @nullable */
+  completedAt?: string | null;
+}
+
+export interface ReassignInput {
+  /**
+     * ISO-8601 datetime; null clears an existing scheduled date
+     * @nullable
+     */
+  scheduledDate?: string | null;
+  /** @minLength 1 */
+  technicianName?: string;
+  /** @nullable */
+  technicianId?: string | null;
+}
+
 /**
  * @nullable
  */
@@ -578,6 +614,11 @@ export interface AnalysisResult {
   feedbackStatus?: string | null;
   /** @nullable */
   analysisErrors?: number | null;
+  /**
+     * Human-readable reason the analysis was skipped or failed (e.g. "Photos could not be processed by the AI service"). Absent when analysis succeeded or no specific reason was recorded.
+     * @nullable
+     */
+  failureReason?: string | null;
   createdAt: string;
 }
 
@@ -1753,12 +1794,22 @@ export interface BriefingRecentInspection {
   createdAt: string;
 }
 
+export interface BriefingSiteHistory {
+  siteAddress: string;
+  visitCount: number;
+  lastVisitedAt?: string | null;
+  lastInspectionId: number;
+  lastFindingsCount: number;
+  pestTypes: string[];
+}
+
 export interface TechnicianBriefing {
   totalInspections: number;
   completedInspections: number;
   openInspections: number;
   completedThisWeek: number;
   recentInspections: BriefingRecentInspection[];
+  siteHistory: BriefingSiteHistory[];
 }
 
 export interface BriefingTopOpportunity {
@@ -1941,6 +1992,17 @@ export interface GeminiImageOutput {
 export interface GeminiError {
   error: string;
 }
+
+export type GetScheduleParams = {
+/**
+ * Start date (YYYY-MM-DD), inclusive
+ */
+start: string;
+/**
+ * End date (YYYY-MM-DD), inclusive
+ */
+end: string;
+};
 
 export type ListInspectionsParams = {
 status?: string;

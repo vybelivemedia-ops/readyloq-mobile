@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BriefingRecentInspection } from './briefingRecentInspection';
+import type { BriefingSiteHistory } from './briefingSiteHistory';
 
 export interface TechnicianBriefing {
   totalInspections: number;
@@ -13,4 +14,5 @@ export interface TechnicianBriefing {
   openInspections: number;
   completedThisWeek: number;
   recentInspections: BriefingRecentInspection[];
+  siteHistory: BriefingSiteHistory[];
 }

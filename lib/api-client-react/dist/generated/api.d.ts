@@ -1,10 +1,64 @@
 import type { QueryKey, UseMutationOptions, UseMutationResult, UseQueryOptions, UseQueryResult } from '@tanstack/react-query';
-import type { AnalysisResult, AnalysisSummary, AnalyticsDashboard, AnalyzeInspectionInput, BetaFeedback, BrandingProfile, BrandingProfileInput, CallbackIntelligence, ChecklistResponse, ChecklistToggleResult, ClientErrorInput, CompleteInspectionResult, CreateInviteInput, CustomerSummary, CustomerSummaryApprove, CustomerSummaryUpdate, DatasetCategory, DatasetPage, Error, ErrorEventList, FeedbackInput, GeminiConversation, GeminiConversationInput, GeminiConversationWithMessages, GeminiError, GeminiImageInput, GeminiImageOutput, GeminiMessage, GeminiMessageInput, GenerateNarrativeInput, GetAnalyticsTrendsParams, HealthStatus, InfestationRisk, Inspection, InspectionInput, InspectionMedia, InspectionScorecard, InspectionScorecardListItem, InspectionUpdate, IntelligenceAnalytics, IntelligenceCategory, IntelligenceConfirmInput, IntelligenceRecord, IntelligenceRecordInput, IntelligenceRecordPage, IntelligenceReviewInput, IntelligenceSettings, IntelligenceSettingsInput, IntelligenceVoteInput, Invite, Lead, LeadInput, ListAnalysisResultsParams, ListDatasetImagesParams, ListFeedbackParams, ListInspectionsParams, ListIntelligenceRecordsParams, ListProposalsParams, ListSalesOpportunitiesParams, ListScorecardsParams, LookupPropertyParams, MediaInput, OkResponse, OpportunityIntelligence, OpportunityNote, OpportunityNoteCreate, OpportunitySettings, OpportunitySettingsUpdate, PropertyFeed, PropertyLookupResult, PropertyNote, PropertyNoteInput, PropertyProfileUpdate, PropertyRiskInsights, PropertySummary, Report, ReportInput, RoleBriefing, SalesOpportunity, SalesOpportunityDetail, SalesOpportunityTrends, SalesOpportunityUpdate, SalesProposal, SalesProposalCreate, SalesProposalDetail, SalesProposalUpdate, ScorecardSummary, SubmitFeedbackInput, TechnicianPerformance, Tester, TesterAccessResult, ToggleAccessInput, ToggleChecklistInput, TrendDataPoint, UpdateFeedbackInput } from './api.schemas';
+import type { AnalysisResult, AnalysisSummary, AnalyticsDashboard, AnalyzeInspectionInput, BetaFeedback, BrandingProfile, BrandingProfileInput, CallbackIntelligence, ChecklistResponse, ChecklistToggleResult, ClientErrorInput, CompleteInspectionResult, CreateInviteInput, CustomerSummary, CustomerSummaryApprove, CustomerSummaryUpdate, DatasetCategory, DatasetPage, Error, ErrorEventList, FeedbackInput, GeminiConversation, GeminiConversationInput, GeminiConversationWithMessages, GeminiError, GeminiImageInput, GeminiImageOutput, GeminiMessage, GeminiMessageInput, GenerateNarrativeInput, GetAnalyticsTrendsParams, GetScheduleParams, HealthStatus, InfestationRisk, Inspection, InspectionInput, InspectionMedia, InspectionScorecard, InspectionScorecardListItem, InspectionUpdate, IntelligenceAnalytics, IntelligenceCategory, IntelligenceConfirmInput, IntelligenceRecord, IntelligenceRecordInput, IntelligenceRecordPage, IntelligenceReviewInput, IntelligenceSettings, IntelligenceSettingsInput, IntelligenceVoteInput, Invite, Lead, LeadInput, ListAnalysisResultsParams, ListDatasetImagesParams, ListFeedbackParams, ListInspectionsParams, ListIntelligenceRecordsParams, ListProposalsParams, ListSalesOpportunitiesParams, ListScorecardsParams, LookupPropertyParams, MediaInput, OkResponse, OpportunityIntelligence, OpportunityNote, OpportunityNoteCreate, OpportunitySettings, OpportunitySettingsUpdate, PropertyFeed, PropertyLookupResult, PropertyNote, PropertyNoteInput, PropertyProfileUpdate, PropertyRiskInsights, PropertySummary, ReassignInput, Report, ReportInput, RoleBriefing, SalesOpportunity, SalesOpportunityDetail, SalesOpportunityTrends, SalesOpportunityUpdate, SalesProposal, SalesProposalCreate, SalesProposalDetail, SalesProposalUpdate, ScheduleEntry, ScorecardSummary, SubmitFeedbackInput, TechnicianPerformance, Tester, TesterAccessResult, ToggleAccessInput, ToggleChecklistInput, TrendDataPoint, UpdateFeedbackInput } from './api.schemas';
 import { customFetch } from '../custom-fetch';
 import type { ErrorType, BodyType } from '../custom-fetch';
 type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export declare const getGetScheduleUrl: (params: GetScheduleParams) => string;
+/**
+ * @summary List inspections for the scheduling calendar (manager+)
+ */
+export declare const getSchedule: (params: GetScheduleParams, options?: RequestInit) => Promise<ScheduleEntry[]>;
+export declare const getGetScheduleQueryKey: (params?: GetScheduleParams) => readonly ["/api/schedule", ...GetScheduleParams[]];
+export declare const getGetScheduleQueryOptions: <TData = Awaited<ReturnType<typeof getSchedule>>, TError = ErrorType<void>>(params: GetScheduleParams, options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getSchedule>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseQueryOptions<Awaited<ReturnType<typeof getSchedule>>, TError, TData> & {
+    queryKey: QueryKey;
+};
+export type GetScheduleQueryResult = NonNullable<Awaited<ReturnType<typeof getSchedule>>>;
+export type GetScheduleQueryError = ErrorType<void>;
+/**
+ * @summary List inspections for the scheduling calendar (manager+)
+ */
+export declare function useGetSchedule<TData = Awaited<ReturnType<typeof getSchedule>>, TError = ErrorType<void>>(params: GetScheduleParams, options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getSchedule>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+};
+export declare const getReassignInspectionUrl: (id: number) => string;
+/**
+ * @summary Reschedule or reassign a technician (manager+)
+ */
+export declare const reassignInspection: (id: number, reassignInput: ReassignInput, options?: RequestInit) => Promise<ScheduleEntry>;
+export declare const getReassignInspectionMutationOptions: <TError = ErrorType<void>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof reassignInspection>>, TError, {
+        id: number;
+        data: BodyType<ReassignInput>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationOptions<Awaited<ReturnType<typeof reassignInspection>>, TError, {
+    id: number;
+    data: BodyType<ReassignInput>;
+}, TContext>;
+export type ReassignInspectionMutationResult = NonNullable<Awaited<ReturnType<typeof reassignInspection>>>;
+export type ReassignInspectionMutationBody = BodyType<ReassignInput>;
+export type ReassignInspectionMutationError = ErrorType<void>;
+/**
+* @summary Reschedule or reassign a technician (manager+)
+*/
+export declare const useReassignInspection: <TError = ErrorType<void>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof reassignInspection>>, TError, {
+        id: number;
+        data: BodyType<ReassignInput>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationResult<Awaited<ReturnType<typeof reassignInspection>>, TError, {
+    id: number;
+    data: BodyType<ReassignInput>;
+}, TContext>;
 export declare const getHealthCheckUrl: () => string;
 /**
  * @summary Health check

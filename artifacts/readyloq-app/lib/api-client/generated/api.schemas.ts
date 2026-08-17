@@ -592,6 +592,9 @@ export interface AnalysisResult {
   feedbackStatus?: string | null;
   /** @nullable */
   analysisErrors?: number | null;
+  /** Human-readable reason the analysis was skipped or failed (e.g. "Image resolution too low"). Absent when the analysis succeeded or no specific reason was recorded.
+   * @nullable */
+  failureReason?: string | null;
   createdAt: string;
 }
 

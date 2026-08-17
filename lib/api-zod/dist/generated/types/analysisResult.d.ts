@@ -36,6 +36,11 @@ export interface AnalysisResult {
     feedbackStatus?: string | null;
     /** @nullable */
     analysisErrors?: number | null;
+    /**
+       * Human-readable reason the analysis was skipped or failed (e.g. "Photos could not be processed by the AI service"). Absent when analysis succeeded or no specific reason was recorded.
+       * @nullable
+       */
+    failureReason?: string | null;
     createdAt: string;
 }
 //# sourceMappingURL=analysisResult.d.ts.map

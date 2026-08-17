@@ -90,12 +90,46 @@ describe("resolveAnalysisCardVariant — pipeline-incomplete branch", () => {
     expect(resolveAnalysisCardVariant(base).kind).toBe("pipeline-incomplete");
   });
 
-  it("carries the correct placeholder text for the pipeline-incomplete state", () => {
+  it("carries the generic placeholder text when failureReason is absent", () => {
     const variant = resolveAnalysisCardVariant(base);
     if (variant.kind === "pipeline-incomplete") {
       expect(variant.placeholder.reason).toMatch(/AI analysis didn't complete/);
       expect(variant.placeholder.icon).toBe("alert-circle-outline");
       expect(variant.placeholder.tone).toBe("error");
+    }
+  });
+
+  it("uses the server-provided failureReason instead of the generic fallback when present", () => {
+    const variant = resolveAnalysisCardVariant({
+      ...base,
+      analysis: { status: "failed", findings: [], failureReason: "Image resolution too low" },
+    });
+    expect(variant.kind).toBe("pipeline-incomplete");
+    if (variant.kind === "pipeline-incomplete") {
+      expect(variant.placeholder.reason).toBe("Image resolution too low");
+    }
+  });
+
+  it("falls back to the generic reason when failureReason is null", () => {
+    const variant = resolveAnalysisCardVariant({
+      ...base,
+      analysis: { status: "failed", findings: [], failureReason: null },
+    });
+    expect(variant.kind).toBe("pipeline-incomplete");
+    if (variant.kind === "pipeline-incomplete") {
+      expect(variant.placeholder.reason).toMatch(/AI analysis didn't complete/);
+    }
+  });
+
+  it("uses the server failureReason verbatim for any failure message", () => {
+    const reason = "Service temporarily unavailable — please retry later";
+    const variant = resolveAnalysisCardVariant({
+      ...base,
+      analysis: { status: "skipped", findings: [], failureReason: reason },
+    });
+    expect(variant.kind).toBe("pipeline-incomplete");
+    if (variant.kind === "pipeline-incomplete") {
+      expect(variant.placeholder.reason).toBe(reason);
     }
   });
 
@@ -145,6 +179,42 @@ describe("resolveAnalysisCardVariant — analysis-errors-no-findings branch", ()
     });
     if (result.kind === "analysis-errors-no-findings") {
       expect(result.placeholder.reason).toMatch(/1 error[^s]/);
+    }
+  });
+
+  it("uses the server failureReason instead of the count-based fallback when present", () => {
+    const result = resolveAnalysisCardVariant({
+      finalized: true,
+      isError: false,
+      isSuccess: true,
+      analysis: {
+        status: "complete",
+        analysisErrors: 3,
+        findings: [],
+        failureReason: "Photos could not be processed by the AI analysis service. This is usually a temporary issue — retrying the inspection sync should resolve it.",
+      },
+      photoCount: 3,
+    });
+    expect(result.kind).toBe("analysis-errors-no-findings");
+    if (result.kind === "analysis-errors-no-findings") {
+      expect(result.placeholder.reason).toBe(
+        "Photos could not be processed by the AI analysis service. This is usually a temporary issue — retrying the inspection sync should resolve it.",
+      );
+      // Count-based generic text should NOT appear when the server provides a reason.
+      expect(result.placeholder.reason).not.toMatch(/Analysis completed with \d+ error/);
+    }
+  });
+
+  it("falls back to the count-based generic reason when failureReason is null", () => {
+    const result = resolveAnalysisCardVariant({
+      finalized: true,
+      isError: false,
+      isSuccess: true,
+      analysis: { status: "complete", analysisErrors: 2, findings: [], failureReason: null },
+      photoCount: 5,
+    });
+    if (result.kind === "analysis-errors-no-findings") {
+      expect(result.placeholder.reason).toMatch(/Analysis completed with 2 errors/);
     }
   });
 

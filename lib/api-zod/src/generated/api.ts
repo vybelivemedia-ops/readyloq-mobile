@@ -9,6 +9,63 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary List inspections for the scheduling calendar (manager+)
+ */
+export const GetScheduleQueryParams = zod.object({
+  "start": zod.date().describe('Start date (YYYY-MM-DD), inclusive'),
+  "end": zod.date().describe('End date (YYYY-MM-DD), inclusive')
+})
+
+export const GetScheduleResponseItem = zod.object({
+  "id": zod.number(),
+  "siteAddress": zod.string(),
+  "clientName": zod.string().nullish(),
+  "technicianName": zod.string(),
+  "technicianId": zod.string().nullish(),
+  "status": zod.string(),
+  "severity": zod.string().nullish(),
+  "pestTypes": zod.array(zod.string()).optional(),
+  "scheduledDate": zod.string().nullish().describe('ISO-8601 datetime when explicitly scheduled by a manager'),
+  "calendarDate": zod.string().describe('YYYY-MM-DD date used to place the entry on the grid (scheduledDate ?? createdAt)'),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().nullish()
+})
+export const GetScheduleResponse = zod.array(GetScheduleResponseItem)
+
+
+/**
+ * @summary Reschedule or reassign a technician (manager+)
+ */
+export const ReassignInspectionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const ReassignInspectionBody = zod.object({
+  "scheduledDate": zod.string().nullish().describe('ISO-8601 datetime; null clears an existing scheduled date'),
+  "technicianName": zod.string().min(1).optional(),
+  "technicianId": zod.string().nullish()
+})
+
+export const ReassignInspectionResponse = zod.object({
+  "id": zod.number(),
+  "siteAddress": zod.string(),
+  "clientName": zod.string().nullish(),
+  "technicianName": zod.string(),
+  "technicianId": zod.string().nullish(),
+  "status": zod.string(),
+  "severity": zod.string().nullish(),
+  "pestTypes": zod.array(zod.string()).optional(),
+  "scheduledDate": zod.string().nullish().describe('ISO-8601 datetime when explicitly scheduled by a manager'),
+  "calendarDate": zod.string().describe('YYYY-MM-DD date used to place the entry on the grid (scheduledDate ?? createdAt)'),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().nullish()
+})
+
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -367,6 +424,7 @@ export const ListAnalysisResultsResponseItem = zod.object({
   "technicianFeedback": zod.string().nullish(),
   "feedbackStatus": zod.string().nullish(),
   "analysisErrors": zod.number().nullish(),
+  "failureReason": zod.string().nullish().describe('Human-readable reason the analysis was skipped or failed (e.g. \"Photos could not be processed by the AI service\"). Absent when analysis succeeded or no specific reason was recorded.'),
   "createdAt": zod.string()
 })
 export const ListAnalysisResultsResponse = zod.array(ListAnalysisResultsResponseItem)
@@ -552,6 +610,7 @@ export const GetAnalysisResultResponse = zod.object({
   "technicianFeedback": zod.string().nullish(),
   "feedbackStatus": zod.string().nullish(),
   "analysisErrors": zod.number().nullish(),
+  "failureReason": zod.string().nullish().describe('Human-readable reason the analysis was skipped or failed (e.g. \"Photos could not be processed by the AI service\"). Absent when analysis succeeded or no specific reason was recorded.'),
   "createdAt": zod.string()
 })
 
@@ -703,6 +762,7 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
   "technicianFeedback": zod.string().nullish(),
   "feedbackStatus": zod.string().nullish(),
   "analysisErrors": zod.number().nullish(),
+  "failureReason": zod.string().nullish().describe('Human-readable reason the analysis was skipped or failed (e.g. \"Photos could not be processed by the AI service\"). Absent when analysis succeeded or no specific reason was recorded.'),
   "createdAt": zod.string()
 })
 
@@ -3011,6 +3071,14 @@ export const GetBriefingResponse = zod.object({
   "status": zod.string(),
   "findingsCount": zod.number(),
   "createdAt": zod.string()
+})),
+  "siteHistory": zod.array(zod.object({
+  "siteAddress": zod.string(),
+  "visitCount": zod.number(),
+  "lastVisitedAt": zod.string().nullish(),
+  "lastInspectionId": zod.number(),
+  "lastFindingsCount": zod.number(),
+  "pestTypes": zod.array(zod.string())
 }))
 }).optional(),
   "sales": zod.object({

@@ -38,6 +38,11 @@ export const analysisResultsTable = pgTable("analysis_results", {
   // (storage/model/parse errors). Null = pre-migration row or no run yet;
   // 0 = run completed with zero failures; >0 = partial failure.
   analysisErrors: integer("analysis_errors"),
+  // Human-readable reason the analysis was skipped or failed, set by the
+  // server pipeline when it cannot complete analysis (e.g. "Image resolution
+  // too low", "Service temporarily unavailable"). Null = no specific reason
+  // provided or analysis succeeded.
+  failureReason: text("failure_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

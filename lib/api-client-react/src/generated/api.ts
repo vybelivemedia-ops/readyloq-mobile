@@ -15,20 +15,9 @@ import type {
   QueryKey,
   UseMutationOptions,
   UseMutationResult,
-  UseQueryOptions as UseQueryOptionsBase,
+  UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
-
-// Allow callers to omit queryKey — generated query-options functions always
-// provide a default key, so requiring it at every call site is unnecessary.
-type UseQueryOptions<
-  TQueryFnData = unknown,
-  TError = unknown,
-  TData = TQueryFnData,
-  TQueryKey extends QueryKey = QueryKey,
-> = Omit<UseQueryOptionsBase<TQueryFnData, TError, TData, TQueryKey>, 'queryKey'> & {
-  queryKey?: TQueryKey;
-};
 
 import type {
   AnalysisResult,
@@ -62,6 +51,7 @@ import type {
   GeminiMessageInput,
   GenerateNarrativeInput,
   GetAnalyticsTrendsParams,
+  GetScheduleParams,
   HealthStatus,
   InfestationRisk,
   Inspection,
@@ -106,6 +96,7 @@ import type {
   PropertyProfileUpdate,
   PropertyRiskInsights,
   PropertySummary,
+  ReassignInput,
   Report,
   ReportInput,
   RoleBriefing,
@@ -117,6 +108,7 @@ import type {
   SalesProposalCreate,
   SalesProposalDetail,
   SalesProposalUpdate,
+  ScheduleEntry,
   ScorecardSummary,
   SubmitFeedbackInput,
   TechnicianPerformance,
@@ -139,6 +131,162 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getGetScheduleUrl = (params: GetScheduleParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule?${stringifiedParams}` : `/api/schedule`
+}
+
+/**
+ * @summary List inspections for the scheduling calendar (manager+)
+ */
+export const getSchedule = async (params: GetScheduleParams, options?: RequestInit): Promise<ScheduleEntry[]> => {
+
+  return customFetch<ScheduleEntry[]>(getGetScheduleUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScheduleQueryKey = (params?: GetScheduleParams,) => {
+    return [
+    `/api/schedule`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetScheduleQueryOptions = <TData = Awaited<ReturnType<typeof getSchedule>>, TError = ErrorType<void>>(params: GetScheduleParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSchedule>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScheduleQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSchedule>>> = ({ signal }) => getSchedule(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSchedule>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScheduleQueryResult = NonNullable<Awaited<ReturnType<typeof getSchedule>>>
+export type GetScheduleQueryError = ErrorType<void>
+
+
+/**
+ * @summary List inspections for the scheduling calendar (manager+)
+ */
+
+export function useGetSchedule<TData = Awaited<ReturnType<typeof getSchedule>>, TError = ErrorType<void>>(
+ params: GetScheduleParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSchedule>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScheduleQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReassignInspectionUrl = (id: number,) => {
+
+
+
+
+  return `/api/schedule/${id}`
+}
+
+/**
+ * @summary Reschedule or reassign a technician (manager+)
+ */
+export const reassignInspection = async (id: number,
+    reassignInput: ReassignInput, options?: RequestInit): Promise<ScheduleEntry> => {
+
+  return customFetch<ScheduleEntry>(getReassignInspectionUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      reassignInput,)
+  }
+);}
+
+
+
+
+export const getReassignInspectionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reassignInspection>>, TError,{id: number;data: BodyType<ReassignInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reassignInspection>>, TError,{id: number;data: BodyType<ReassignInput>}, TContext> => {
+
+const mutationKey = ['reassignInspection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reassignInspection>>, {id: number;data: BodyType<ReassignInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reassignInspection(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReassignInspectionMutationResult = NonNullable<Awaited<ReturnType<typeof reassignInspection>>>
+    export type ReassignInspectionMutationBody = BodyType<ReassignInput>
+    export type ReassignInspectionMutationError = ErrorType<void>
+
+    /**
+ * @summary Reschedule or reassign a technician (manager+)
+ */
+export const useReassignInspection = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reassignInspection>>, TError,{id: number;data: BodyType<ReassignInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reassignInspection>>,
+        TError,
+        {id: number;data: BodyType<ReassignInput>},
+        TContext
+      > => {
+      return useMutation(getReassignInspectionMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

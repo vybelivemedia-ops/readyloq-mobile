@@ -71,6 +71,8 @@ export interface AnalysisQueryState {
         status: string;
         analysisErrors?: number | null;
         findings?: Array<unknown>;
+        /** Server-provided reason the analysis was skipped or failed. */
+        failureReason?: string | null;
       }
     | null
     | undefined;
@@ -101,11 +103,12 @@ export function resolveAnalysisCardVariant(s: AnalysisQueryState): AnalysisCardV
 
     if (analysis != null) {
       if (analysis.status !== "complete") {
+        const genericReason =
+          "AI analysis didn't complete for this inspection. The server may have skipped it or encountered an error — no action needed.";
         return {
           kind: "pipeline-incomplete",
           placeholder: {
-            reason:
-              "AI analysis didn't complete for this inspection. The server may have skipped it or encountered an error — no action needed.",
+            reason: analysis.failureReason ?? genericReason,
             icon: "alert-circle-outline",
             tone: "error",
           },
@@ -116,11 +119,12 @@ export function resolveAnalysisCardVariant(s: AnalysisQueryState): AnalysisCardV
       const errCount = analysis.analysisErrors ?? 0;
 
       if (errCount > 0 && findings.length === 0) {
+        const genericErrorReason = `Analysis completed with ${errCount} error${errCount !== 1 ? "s" : ""}. Some or all photos couldn't be processed — check the full inspection for details.`;
         return {
           kind: "analysis-errors-no-findings",
           errorCount: errCount,
           placeholder: {
-            reason: `Analysis completed with ${errCount} error${errCount !== 1 ? "s" : ""}. Some or all photos couldn't be processed — check the full inspection for details.`,
+            reason: analysis.failureReason ?? genericErrorReason,
             icon: "alert-circle-outline",
             tone: "error",
           },

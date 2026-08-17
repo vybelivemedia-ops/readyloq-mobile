@@ -2260,6 +2260,12 @@ components:
         technicianFeedback: { type: ["string", "null"] }
         feedbackStatus: { type: ["string", "null"] }
         analysisErrors: { type: ["integer", "null"] }
+        failureReason:
+          type: ["string", "null"]
+          description: >-
+            Human-readable reason the analysis was skipped or failed (e.g.
+            "Photos could not be processed by the AI service"). Absent when
+            analysis succeeded or no specific reason was recorded.
         createdAt:    { type: string }
 
     CoverageZone:

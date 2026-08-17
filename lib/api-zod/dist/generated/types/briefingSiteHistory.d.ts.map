@@ -1,0 +1,1 @@
+{"version":3,"file":"briefingSiteHistory.d.ts","sourceRoot":"","sources":["../../../src/generated/types/briefingSiteHistory.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,MAAM,WAAW,mBAAmB;IAClC,WAAW,EAAE,MAAM,CAAC;IACpB,UAAU,EAAE,MAAM,CAAC;IACnB,aAAa,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IAC9B,gBAAgB,EAAE,MAAM,CAAC;IACzB,iBAAiB,EAAE,MAAM,CAAC;IAC1B,SAAS,EAAE,MAAM,EAAE,CAAC;CACrB"}
