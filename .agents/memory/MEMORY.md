@@ -36,3 +36,4 @@
 - [BLE sensor React Fragment pattern](ble-sensor-react-fragment.md) — map() that returns two sibling cards (sensor card + station-slot card) must wrap in React.Fragment with key; single-root JSX return; station-slot is acoustic-only conditional
 - [Company Playbooks & Learning Engine](playbooks-learning-engine.md) — DB table + API routes + compliance evaluator; drizzle-zod .extend() version mismatch workaround; table created manually via pg node client
 - [EAS Android bundle fix](eas-android-bundle-fix.md) — expoRouterBabelPlugin must be explicit in babel.config.js; pnpm worker isolation breaks hasModule('expo-router') inside babel-preset-expo
+- [R8 full mode startup crash](r8-fullmode-crash.md) — keep android.enableR8.fullMode=false; full mode causes runtime NoClassDefFoundError for expo-task-manager classes that exist at runtime but fail R8 static analysis
