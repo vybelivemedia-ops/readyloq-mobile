@@ -64,6 +64,14 @@ const blockListRegexes = [
   /[/\\]node_modules[/\\]\.pnpm[/\\]vitest[@+]/,
   /[/\\]node_modules[/\\]vite[/\\]/,
   /[/\\]node_modules[/\\]vitest[/\\]/,
+  // Test files must never enter the bundle.  Expo Router's require.context
+  // scans the entire app/ directory tree, which includes __tests__ folders
+  // placed inside app/ subdirectories.  Those test files import vitest/jest
+  // globals which are never available at runtime.  Blocking them here is the
+  // authoritative guard — do not rely on file naming conventions alone.
+  /[/\\]__tests__[/\\]/,
+  /\.test\.[jt]sx?$/,
+  /\.spec\.[jt]sx?$/,
 ];
 
 config.resolver = {
