@@ -320,6 +320,90 @@ describe("generate-narrative — empty findings", () => {
   });
 });
 
+// ─── Narrative generation — malformed findings ───────────────────────────────
+
+describe("generate-narrative — malformed findings", () => {
+  /**
+   * Seeds a report whose findings column contains a mix of valid and malformed
+   * entries (missing required fields such as `category` or `description`).
+   * The route passes findings through safeParseFindings, which silently drops
+   * malformed entries.  The test confirms:
+   *   - The route returns 200 (no crash or 500) despite the stripped findings.
+   *   - The response body includes a non-empty aiNarrative object.
+   *   - The DB row is updated with the generated narrative.
+   */
+  it("returns 200, persists aiNarrative, and does not crash when findings are partially malformed", async () => {
+    vi.mocked(reportNarrativeAi.generateReportNarrative).mockClear();
+
+    // Build a mixed array: one well-formed entry + several malformed entries.
+    // Use raw SQL to bypass Drizzle's type coercion so the DB actually stores
+    // the structurally invalid objects.
+    const mixedFindings = [
+      // Well-formed — must survive safeParseFindings
+      { category: "pest", description: "Active rodent harborage under sink", severity: "high" },
+      // Missing description — safeParseFindings must drop this
+      { category: "structural" },
+      // Missing category — safeParseFindings must drop this
+      { description: "Water stain on ceiling tile" },
+      // Null entry — must be dropped
+      null,
+      // Empty object — must be dropped
+      {},
+      // Non-object primitive — must be dropped
+      "not-an-object",
+    ];
+    const mixedJson = JSON.stringify(mixedFindings);
+
+    const insertResult = await db.execute(sql`
+      INSERT INTO reports (company_id, inspection_id, title, site_address, status,
+                           findings, recommendations, exclusion_opportunities,
+                           technician_name, inspection_date)
+      VALUES (${companyId}, ${inspectionId}, 'Malformed findings narrative test',
+              '42 Empty St', 'complete',
+              ${mixedJson}::jsonb, '[]'::jsonb, '[]'::jsonb,
+              'Smoky', CURRENT_DATE)
+      RETURNING id
+    `);
+    const reportId = (insertResult.rows[0] as { id: number }).id;
+
+    asUser(OWNER_ID);
+    const narRes = await request(app)
+      .post(`/api/reports/${reportId}/generate-narrative`)
+      .send({});
+
+    // Must not crash — the route should return 200 even after safeParseFindings
+    // strips all the invalid entries down to the single well-formed finding.
+    expect(narRes.status).toBe(200);
+
+    // The AI narrative must be present and non-empty.
+    expect(narRes.body.aiNarrative).toBeDefined();
+    expect(typeof narRes.body.aiNarrative).toBe("object");
+    expect(typeof narRes.body.aiNarrative.executiveSummary).toBe("string");
+    expect(narRes.body.aiNarrative.executiveSummary.length).toBeGreaterThan(0);
+
+    // The stub was called exactly once — malformed entries must not cause
+    // generateReportNarrative to be skipped or called multiple times.
+    expect(reportNarrativeAi.generateReportNarrative).toHaveBeenCalledOnce();
+
+    // Only the well-formed finding should have reached the generator.
+    const callArg = vi.mocked(reportNarrativeAi.generateReportNarrative).mock.calls[0]![0];
+    expect(Array.isArray(callArg.findings)).toBe(true);
+    expect(callArg.findings).toHaveLength(1);
+    expect(callArg.findings[0].category).toBe("pest");
+
+    // The DB row must be updated with the aiNarrative so it persists.
+    const [row] = await db
+      .select()
+      .from(reportsTable)
+      .where(eq(reportsTable.id, reportId));
+    expect(row).toBeDefined();
+    expect(row.aiNarrative).toBeDefined();
+    expect(typeof row.aiNarrative).toBe("object");
+    expect(typeof row.aiNarrative!.executiveSummary).toBe("string");
+    expect(row.aiNarrative!.executiveSummary.length).toBeGreaterThan(0);
+  });
+});
+
 // ─── Non-empty exclusionOpportunities round-trip ─────────────────────────────
 
 describe("exclusionOpportunities — non-empty count", () => {
