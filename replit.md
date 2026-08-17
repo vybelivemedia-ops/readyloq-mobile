@@ -150,6 +150,7 @@ Required env: `DATABASE_URL` (Postgres), `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_
 - Deprioritize dashboards/settings/analytics/admin behind the 8 field pillars.
 - For hardware: build the abstraction, do **not** integrate real devices unless explicitly asked.
 - **EAS builds** — never trigger a build for any reason unless explicitly told to. Not after fixes, not after task merges, not proactively. Ask if a build seems needed; never start one unilaterally.
+  - Both EAS workflows have a reconciliation guard: they exit immediately unless a sentinel file exists. To trigger a preview build: `touch /tmp/eas-preview-approved` then restart "EAS Preview Build". For production: `touch /tmp/eas-production-approved` then restart "EAS Production Build". The file is deleted on first run so subsequent auto-restarts are no-ops.
 - **`Button` size prop** — only accepts `"md" | "lg"`, no `"sm"`.
 
 ---
