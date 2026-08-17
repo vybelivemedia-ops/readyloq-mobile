@@ -1471,3 +1471,197 @@ describe("notifyTechnicianRouteUpdated — manager/owner Clerk IDs are excluded 
     expect(expoCalls()).toHaveLength(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stale-token lifecycle — end-to-end round-trip
+//
+// This suite validates the full stale-token round-trip required by Task 370:
+//
+//   1. notifyCriticalInspection receives a DeviceNotRegistered ticket from the
+//      mocked Expo API → pushToken must be NULL in the DB afterward.
+//   2. The owner re-registers via POST /me/push-token → new token stored,
+//      pushLastFailedAt cleared.
+//   3. A subsequent notifyCriticalInspection reaches the NEW token and does not
+//      attempt to send to the old (now-null) token.
+//
+// Coverage gap: prior individual tests exercised each step in isolation.  This
+// suite is the only place that stitches all three steps into a single
+// continuous flow, ensuring no regression can silently break the hand-off
+// between stale-token cleanup and re-registration.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("stale-token lifecycle — end-to-end round-trip", () => {
+  const STALE_OWNER_CLERK = "pn_stale_lifecycle_owner";
+  const STALE_TOKEN = "ExponentPushToken[stale_token_original]";
+  const NEW_TOKEN = "ExponentPushToken[stale_token_renewed]";
+  const STALE_SITE = "1 Stale Token Way";
+
+  beforeEach(async () => {
+    // Seed an owner with a valid-looking push token and notifications enabled.
+    await db.insert(usersTable).values({
+      clerkUserId: STALE_OWNER_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: STALE_TOKEN,
+      pushNotificationsEnabled: true,
+    });
+    asUser(STALE_OWNER_CLERK);
+
+    // Expo returns DeviceNotRegistered for the seeded token.
+    fetchState.responseBody = {
+      data: [
+        {
+          status: "error",
+          message: "InvalidCredentials",
+          details: { error: "DeviceNotRegistered" },
+        },
+      ],
+    };
+  });
+
+  it("step 1 — DeviceNotRegistered clears pushToken to null in the DB", async () => {
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: STALE_SITE,
+      technicianName: "Eve",
+    });
+
+    // The fire-and-forget DB update needs a moment to settle.
+    await new Promise((r) => setTimeout(r, 100));
+
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken, pushLastFailedAt: usersTable.pushLastFailedAt })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, STALE_OWNER_CLERK));
+
+    expect(user.pushToken).toBeNull();
+    expect(user.pushLastFailedAt).toBeInstanceOf(Date);
+  });
+
+  it("step 2 — POST /me/push-token re-registers the new token and clears the failure flag", async () => {
+    // Simulate the stale-token state already being in the DB (token was cleared
+    // by a prior DeviceNotRegistered ticket, failure timestamp was set).
+    await db
+      .update(usersTable)
+      .set({ pushToken: null, pushLastFailedAt: new Date() })
+      .where(eq(usersTable.clerkUserId, STALE_OWNER_CLERK));
+
+    const res = await request(app)
+      .post("/api/auth/me/push-token")
+      .send({ token: NEW_TOKEN });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken, pushLastFailedAt: usersTable.pushLastFailedAt })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, STALE_OWNER_CLERK));
+
+    // New token must be persisted.
+    expect(user.pushToken).toBe(NEW_TOKEN);
+    // Failure flag must be cleared so the dashboard banner disappears.
+    expect(user.pushLastFailedAt).toBeNull();
+  });
+
+  it("step 3 — subsequent notifyCriticalInspection delivers to the new token only", async () => {
+    // Simulate the post-re-registration DB state: new token stored, no failure.
+    await db
+      .update(usersTable)
+      .set({ pushToken: NEW_TOKEN, pushLastFailedAt: null })
+      .where(eq(usersTable.clerkUserId, STALE_OWNER_CLERK));
+
+    // Expo now returns success for any token.
+    fetchState.responseBody = {
+      data: [{ status: "ok", id: "ticket-renewed" }],
+    };
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: STALE_SITE,
+      technicianName: "Eve",
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(1);
+
+    // Must deliver to the new token — not to the old stale one.
+    expect(messages[0].to).toBe(NEW_TOKEN);
+    expect(messages[0].to).not.toBe(STALE_TOKEN);
+  });
+
+  it("full round-trip — DeviceNotRegistered → re-register → next push uses new token", async () => {
+    // ── Phase 1: fire a critical inspection → Expo returns DeviceNotRegistered ──
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: STALE_SITE,
+      technicianName: "Eve",
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Token must be cleared in the DB.
+    const [afterPhase1] = await db
+      .select({ pushToken: usersTable.pushToken, pushLastFailedAt: usersTable.pushLastFailedAt })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, STALE_OWNER_CLERK));
+
+    expect(afterPhase1.pushToken).toBeNull();
+    expect(afterPhase1.pushLastFailedAt).toBeInstanceOf(Date);
+
+    // ── Phase 2: owner re-registers with a new token ───────────────────────────
+    const regRes = await request(app)
+      .post("/api/auth/me/push-token")
+      .send({ token: NEW_TOKEN });
+
+    expect(regRes.status).toBe(200);
+
+    const [afterPhase2] = await db
+      .select({ pushToken: usersTable.pushToken, pushLastFailedAt: usersTable.pushLastFailedAt })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, STALE_OWNER_CLERK));
+
+    expect(afterPhase2.pushToken).toBe(NEW_TOKEN);
+    expect(afterPhase2.pushLastFailedAt).toBeNull();
+
+    // ── Phase 3: next critical inspection reaches the new token ───────────────
+    // Reset the fetch spy and return success for the new token.
+    fetchState.calls = [];
+    fetchState.responseBody = {
+      data: [{ status: "ok", id: "ticket-after-reregister" }],
+    };
+
+    // Create a fresh inspection so the FK constraint is satisfied.
+    const [freshInsp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: STALE_SITE,
+        technicianName: "Eve",
+        clientName: "Stale Test Client",
+        pestTypes: ["rodents"],
+      })
+      .returning();
+
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId: freshInsp.id,
+      siteAddress: STALE_SITE,
+      technicianName: "Eve",
+    });
+
+    const calls = expoCalls();
+    expect(calls).toHaveLength(1);
+
+    const messages = calls[0].body as Array<Record<string, unknown>>;
+    expect(messages).toHaveLength(1);
+    expect(messages[0].to).toBe(NEW_TOKEN);
+    expect(messages[0].to).not.toBe(STALE_TOKEN);
+  });
+});
