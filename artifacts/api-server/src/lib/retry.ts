@@ -23,11 +23,26 @@ export function sleep(ms: number): Promise<void> {
  *   attempt 2 → 500 ms
  *   attempt 3 → 1 000 ms
  *
+ * When `isFatal` is provided and returns true for a result, the helper throws
+ * immediately without consuming any further retry attempts.  Use this for
+ * unrecoverable errors (e.g. 401/403 auth failures) where retrying would only
+ * waste time and back-off budget.
+ *
  * @example
  * // Retry an HTTP fetch until the response is OK, up to 3 times.
  * const res = await withRetry(
  *   () => fetch(url, options),
  *   (r) => !r.ok,
+ * );
+ *
+ * @example
+ * // Same, but fast-fail on auth errors.
+ * const res = await withRetry(
+ *   () => fetch(url, options),
+ *   (r) => !r.ok,
+ *   3,
+ *   500,
+ *   (r) => r.status === 401 || r.status === 403,
  * );
  */
 export async function withRetry<T>(
@@ -35,18 +50,24 @@ export async function withRetry<T>(
   shouldRetry: (result: T) => boolean,
   maxAttempts = 3,
   baseDelayMs = 500,
+  isFatal?: (result: T) => boolean,
 ): Promise<T> {
   let lastResult: T | undefined;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let result: T;
     try {
-      const result = await operation();
-      if (!shouldRetry(result)) return result;
-      lastResult = result;
+      result = await operation();
     } catch (err) {
       if (attempt === maxAttempts) throw err;
       await sleep(baseDelayMs * 2 ** (attempt - 1));
       continue;
     }
+    // Fast-fail: unrecoverable error — throw immediately, skip remaining retries.
+    if (isFatal?.(result)) {
+      throw Object.assign(new Error("Fatal result — retries skipped"), { result });
+    }
+    if (!shouldRetry(result)) return result;
+    lastResult = result;
     if (attempt < maxAttempts) {
       await sleep(baseDelayMs * 2 ** (attempt - 1));
     }
@@ -61,26 +82,35 @@ export async function withRetry<T>(
  * `retries` is the number of *extra* attempts beyond the first (0 = succeeded
  * on the first try, 1 = one retry needed, etc.).  This lets callers surface
  * flakiness to operators without changing the existing `withRetry` signature.
+ *
+ * Accepts the same optional `isFatal` predicate as `withRetry` — when it
+ * returns true the helper throws immediately without consuming further retries.
  */
 export async function withRetryTracked<T>(
   operation: () => Promise<T>,
   shouldRetry: (result: T) => boolean,
   maxAttempts = 3,
   baseDelayMs = 500,
+  isFatal?: (result: T) => boolean,
 ): Promise<{ result: T; retries: number }> {
   let lastResult: T | undefined;
   let attempts = 0;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     attempts = attempt;
+    let result: T;
     try {
-      const result = await operation();
-      if (!shouldRetry(result)) return { result, retries: attempt - 1 };
-      lastResult = result;
+      result = await operation();
     } catch (err) {
       if (attempt === maxAttempts) throw err;
       await sleep(baseDelayMs * 2 ** (attempt - 1));
       continue;
     }
+    // Fast-fail: unrecoverable error — throw immediately, skip remaining retries.
+    if (isFatal?.(result)) {
+      throw Object.assign(new Error("Fatal result — retries skipped"), { result });
+    }
+    if (!shouldRetry(result)) return { result, retries: attempt - 1 };
+    lastResult = result;
     if (attempt < maxAttempts) {
       await sleep(baseDelayMs * 2 ** (attempt - 1));
     }

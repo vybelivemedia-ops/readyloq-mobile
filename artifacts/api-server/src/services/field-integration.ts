@@ -30,6 +30,16 @@ function isRetryableResponse(res: Response): boolean {
   return true;
 }
 
+/**
+ * Returns true for auth failures that can never succeed on a retry regardless
+ * of back-off.  Passing this as the `isFatal` predicate to `withRetryTracked`
+ * causes the helper to throw immediately instead of burning through the
+ * retry budget on a dead credential.
+ */
+function isFatalResponse(res: Response): boolean {
+  return res.status === 401 || res.status === 403;
+}
+
 export interface PhotoSyncItem {
   url: string;
   caption: string | null;
@@ -140,6 +150,9 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
         }),
       }),
     isRetryableResponse,
+    3,
+    500,
+    isFatalResponse,
   );
   if (!noteRes.ok) {
     const body = await noteRes.text();
@@ -162,6 +175,9 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
             }),
           }),
         isRetryableResponse,
+        3,
+        500,
+        isFatalResponse,
       );
       attachmentRetries += retries;
       if (attachRes.ok) {
@@ -234,6 +250,9 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
         }),
       }),
     isRetryableResponse,
+    3,
+    500,
+    isFatalResponse,
   );
 
   if (!histRes.ok) {
