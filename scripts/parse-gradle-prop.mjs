@@ -60,7 +60,7 @@ function parseProperties(text) {
   // A physical line ending with an odd number of backslashes continues on the next line;
   // the continuation backslash is dropped, AND any leading whitespace on the following
   // line is stripped before concatenation (per the Java Properties spec).
-  const physical = text.split(/\r?\n/);
+  const physical = text.split(/\r\n|\n|\r/);
   const logical  = [];
   let pending = '';
   let inContinuation = false;

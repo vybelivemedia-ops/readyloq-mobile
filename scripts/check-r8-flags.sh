@@ -161,6 +161,14 @@ run_tests() {
   assert_resolves "continuation leading ws"   $'android.enableMinifyInReleaseBuilds=tru\\\n   e' "android.enableMinifyInReleaseBuilds" "true"
 
   echo ""
+  echo "=== resolve_flag() — CR-only line endings ==="
+  # Java Properties accepts LF, CRLF, and bare CR as line terminators.
+  assert_resolves "CR separator true"         $'android.enableR8.fullMode=true\r'              "android.enableR8.fullMode" "true"
+  assert_resolves "CR separator false"        $'android.enableR8.fullMode=false\r'             "android.enableR8.fullMode" "false"
+  assert_resolves "CR last-wins false→true"   $'android.enableR8.fullMode=false\randroid.enableR8.fullMode=true\r' "android.enableR8.fullMode" "true"
+  assert_resolves "CR last-wins true→false"   $'android.enableR8.fullMode=true\randroid.enableR8.fullMode=false\r' "android.enableR8.fullMode" "false"
+
+  echo ""
   echo "=== resolve_flag() — Unicode escapes ==="
   # \u0074 = 't', so \u0074rue = true
   assert_resolves "unicode \\u0074rue"        $'android.enableR8.fullMode=\\u0074rue'          "android.enableR8.fullMode" "true"
