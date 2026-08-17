@@ -1182,6 +1182,80 @@ describe("POST /me/push-token — re-registration clears push_last_failed_at", (
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// push_last_failed_at must never be set on owners who never registered a token
+//
+// An owner with hasPushToken = false and pushNotificationsEnabled = false
+// (the default new-account state) must never have pushLastFailedAt written,
+// because no push was ever attempted on their behalf.  Without this guarantee
+// the dashboard banner can fire for owners who simply never enabled push.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("notifyCriticalInspection — zero eligible tokens leaves push_last_failed_at null", () => {
+  const ZERO_TOKEN_OWNER_CLERK = "pn_test_zero_token_owner";
+
+  beforeEach(async () => {
+    // Insert an owner who has never registered a push token and has the
+    // default opted-out state (pushNotificationsEnabled = false, pushToken = null).
+    await db.insert(usersTable).values({
+      clerkUserId: ZERO_TOKEN_OWNER_CLERK,
+      role: "owner",
+      companyId,
+      pushToken: null,
+      pushNotificationsEnabled: false,
+    });
+    asUser(ZERO_TOKEN_OWNER_CLERK);
+  });
+
+  it("leaves pushLastFailedAt null for an owner who never registered a push token", async () => {
+    // The Expo API must not be called — no eligible token exists.
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: "Alice",
+    });
+
+    // Wait briefly to allow any fire-and-forget DB writes to settle.
+    await new Promise((r) => setTimeout(r, 100));
+
+    const [user] = await db
+      .select({
+        pushToken: usersTable.pushToken,
+        pushLastFailedAt: usersTable.pushLastFailedAt,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, ZERO_TOKEN_OWNER_CLERK));
+
+    // No send was ever attempted — the failure timestamp must remain null.
+    expect(user.pushToken).toBeNull();
+    expect(user.pushLastFailedAt).toBeNull();
+
+    // Expo was never called because there were no eligible tokens.
+    expect(expoCalls()).toHaveLength(0);
+  });
+
+  it("GET /me returns hasPushToken=false and pushLastFailedAt=null for a never-registered owner after a critical inspection fires", async () => {
+    await notifyCriticalInspection({
+      companyId,
+      inspectionId,
+      siteAddress: SITE_ADDRESS,
+      technicianName: null,
+    });
+
+    // Wait briefly for any fire-and-forget writes.
+    await new Promise((r) => setTimeout(r, 100));
+
+    const res = await request(app).get("/api/auth/me");
+
+    expect(res.status).toBe(200);
+    // The owner never registered a push token — hasPushToken must be false.
+    expect(res.body.hasPushToken).toBe(false);
+    // No delivery was ever attempted — the failure flag must be null.
+    expect(res.body.pushLastFailedAt).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // notifyTechnicianRouteUpdated — route-reassignment notification delivery
 //
 // The schedule PATCH handler calls this function to push a "Route Updated"
