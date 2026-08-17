@@ -6,12 +6,14 @@
 # (NoClassDefFoundError in expo-task-manager). All three must stay false for beta stability.
 # See .agents/memory/r8-fullmode-crash.md for full context.
 #
-# Parsing rules (matches Gradle + Groovy behaviour):
-#   - Optional whitespace around '='
-#   - Leading/trailing whitespace on key and value
-#   - Inline # comments stripped
-#   - Last occurrence of a duplicate key wins
-#   - Truthy values: case-insensitive "true", "y", "1"  (Groovy String.toBoolean() + ints)
+# Parsing rules (Java .properties spec, Gradle-compatible):
+#   - Key/value separators: '=', ':', or whitespace (all are valid)
+#   - Leading whitespace on the key is ignored
+#   - Whitespace around the separator is ignored
+#   - Inline '#' or '!' comments are stripped
+#   - Last occurrence of a duplicate key wins (Gradle behaviour)
+#   - Truthy values: case-insensitive "true", "y", "1"
+#   - Exits non-zero (fails closed) if the properties file cannot be read
 #
 # Usage:
 #   bash scripts/check-r8-flags.sh          # normal check
@@ -23,25 +25,41 @@ GRADLE_PROPS="artifacts/readyloq-app/android/gradle.properties"
 
 # ---------------------------------------------------------------------------
 # resolve_flag <flag-name> <file>
-#   Returns the effective value of the last matching key, with whitespace and
-#   inline comments stripped.  Dots in the key are escaped for the regex.
+#   Returns the effective value of the last matching key.
+#   Supports all three Java .properties separators: '=', ':', and whitespace.
 # ---------------------------------------------------------------------------
 resolve_flag() {
   local flag="$1"
   local file="$2"
+
+  # Fail closed: if the file is missing or unreadable, exit the whole script.
+  if [ ! -r "$file" ]; then
+    echo "ERROR: cannot read ${file}" >&2
+    exit 2
+  fi
+
   local escaped_flag
   escaped_flag=$(printf '%s' "$flag" | sed 's/\./\\./g')
-  # Wrap grep in a group so a no-match exit-1 doesn't abort under pipefail.
-  { grep -E "^[[:space:]]*${escaped_flag}[[:space:]]*=" "$file" 2>/dev/null || true; } \
+
+  # Grep for lines where the key appears with any valid separator.
+  # Pattern: optional-leading-space KEY optional-space (=|:) or KEY whitespace+
+  # The awk step extracts the value and strips inline comments.
+  { grep -E "^[[:space:]]*${escaped_flag}([[:space:]]*[=:]|[[:space:]]+)" "$file" 2>/dev/null || true; } \
     | tail -1 \
-    | sed -E 's/^[[:space:]]*[^=]+=[[:space:]]*//' \
-    | sed -E 's/[[:space:]]*#.*//'                 \
-    | tr -d '[:space:]'
+    | awk -v key="$flag" '{
+        sub(/^[[:space:]]+/, "")            # strip leading whitespace
+        rest = substr($0, length(key) + 1)  # everything after the key
+        sub(/^[[:space:]]*[=:][[:space:]]*/, "", rest)  # remove = or : separator
+        sub(/^[[:space:]]+/, "", rest)      # remove whitespace-only separator
+        sub(/[[:space:]]*[#!].*$/, "", rest) # strip inline comment (# or !)
+        sub(/[[:space:]]+$/, "", rest)      # strip trailing whitespace
+        print rest
+      }'
 }
 
 # ---------------------------------------------------------------------------
 # is_truthy <value>
-#   Returns 0 (true) for case-insensitive "true", "y", or "1".
+#   Returns 0 (success/true) for any Groovy-truthy alias.
 # ---------------------------------------------------------------------------
 is_truthy() {
   local val
@@ -53,7 +71,7 @@ is_truthy() {
 }
 
 # ---------------------------------------------------------------------------
-# check_flag <flag-name> <file> <failed-ref>
+# check_flag <flag-name> <file>  — sets FAILED=1 on a truthy value
 # ---------------------------------------------------------------------------
 check_flag() {
   local flag="$1"
@@ -65,11 +83,10 @@ check_flag() {
     echo "FAIL: ${flag}=${value}"
     echo "      This setting crashes the app at startup (NoClassDefFoundError in expo-task-manager)."
     echo "      Set it to false in ${file}."
-    return 1
+    FAILED=1
   else
     local display="${value:-<not set>}"
     echo "OK:   ${flag}=${display}"
-    return 0
   fi
 }
 
@@ -85,7 +102,7 @@ run_tests() {
       echo "  PASS  is_truthy('${val}')"
       ((pass++)) || true
     else
-      echo "  FAIL  is_truthy('${val}') expected truthy"
+      echo "  FAIL  is_truthy('${val}') — expected truthy"
       ((fail++)) || true
     fi
   }
@@ -96,7 +113,7 @@ run_tests() {
       echo "  PASS  is_truthy('${val}') => falsy"
       ((pass++)) || true
     else
-      echo "  FAIL  is_truthy('${val}') expected falsy"
+      echo "  FAIL  is_truthy('${val}') — expected falsy"
       ((fail++)) || true
     fi
   }
@@ -131,20 +148,33 @@ run_tests() {
   assert_falsy  ""
 
   echo ""
-  echo "=== resolve_flag() ==="
+  echo "=== resolve_flag() — '=' separator ==="
   assert_resolves "normal false"              "android.enableR8.fullMode=false"              "android.enableR8.fullMode" "false"
-  assert_resolves "normal true"              "android.enableR8.fullMode=true"               "android.enableR8.fullMode" "true"
-  assert_resolves "uppercase TRUE"           "android.enableR8.fullMode=TRUE"               "android.enableR8.fullMode" "TRUE"
-  assert_resolves "spaces around ="         "android.enableR8.fullMode = true"             "android.enableR8.fullMode" "true"
-  assert_resolves "leading whitespace"       "  android.enableR8.fullMode=true"             "android.enableR8.fullMode" "true"
-  assert_resolves "inline comment stripped"  "android.enableR8.fullMode=true # enabled"    "android.enableR8.fullMode" "true"
-  assert_resolves "last-wins false→true"     "$(printf 'android.enableR8.fullMode=false\nandroid.enableR8.fullMode=true')" \
-                                                                                            "android.enableR8.fullMode" "true"
-  assert_resolves "last-wins true→false"     "$(printf 'android.enableR8.fullMode=true\nandroid.enableR8.fullMode=false')" \
-                                                                                            "android.enableR8.fullMode" "false"
-  assert_resolves "value 1 (int truthy)"     "android.enableMinifyInReleaseBuilds=1"        "android.enableMinifyInReleaseBuilds" "1"
-  assert_resolves "value y (char truthy)"    "android.enableShrinkResourcesInReleaseBuilds=y" "android.enableShrinkResourcesInReleaseBuilds" "y"
-  assert_resolves "missing key"              "something.else=true"                          "android.enableR8.fullMode" ""
+  assert_resolves "normal true"               "android.enableR8.fullMode=true"               "android.enableR8.fullMode" "true"
+  assert_resolves "uppercase TRUE"            "android.enableR8.fullMode=TRUE"               "android.enableR8.fullMode" "TRUE"
+  assert_resolves "spaces around ="           "android.enableR8.fullMode = true"             "android.enableR8.fullMode" "true"
+  assert_resolves "leading whitespace"        "  android.enableR8.fullMode=true"             "android.enableR8.fullMode" "true"
+  assert_resolves "inline # comment"         "android.enableR8.fullMode=true # enabled"     "android.enableR8.fullMode" "true"
+  assert_resolves "inline ! comment"         "android.enableR8.fullMode=true ! note"        "android.enableR8.fullMode" "true"
+  assert_resolves "last-wins false→true"      "$(printf 'android.enableR8.fullMode=false\nandroid.enableR8.fullMode=true')"  "android.enableR8.fullMode" "true"
+  assert_resolves "last-wins true→false"      "$(printf 'android.enableR8.fullMode=true\nandroid.enableR8.fullMode=false')" "android.enableR8.fullMode" "false"
+  assert_resolves "value 1 (int truthy)"      "android.enableMinifyInReleaseBuilds=1"        "android.enableMinifyInReleaseBuilds" "1"
+  assert_resolves "value y (char truthy)"     "android.enableShrinkResourcesInReleaseBuilds=y" "android.enableShrinkResourcesInReleaseBuilds" "y"
+  assert_resolves "missing key"               "something.else=true"                          "android.enableR8.fullMode" ""
+
+  echo ""
+  echo "=== resolve_flag() — ':' separator ==="
+  assert_resolves "colon separator true"      "android.enableR8.fullMode:true"               "android.enableR8.fullMode" "true"
+  assert_resolves "colon + spaces true"       "android.enableR8.fullMode : true"             "android.enableR8.fullMode" "true"
+  assert_resolves "colon separator false"     "android.enableMinifyInReleaseBuilds:false"    "android.enableMinifyInReleaseBuilds" "false"
+  assert_resolves "colon + leading ws TRUE"   "  android.enableR8.fullMode:TRUE"             "android.enableR8.fullMode" "TRUE"
+
+  echo ""
+  echo "=== resolve_flag() — whitespace-only separator ==="
+  assert_resolves "ws separator true"         "android.enableR8.fullMode true"               "android.enableR8.fullMode" "true"
+  assert_resolves "ws separator false"        "android.enableMinifyInReleaseBuilds false"    "android.enableMinifyInReleaseBuilds" "false"
+  assert_resolves "ws separator TRUE"         "android.enableShrinkResourcesInReleaseBuilds TRUE" "android.enableShrinkResourcesInReleaseBuilds" "TRUE"
+  assert_resolves "ws sep + leading ws"       "  android.enableR8.fullMode  true"            "android.enableR8.fullMode" "true"
 
   echo ""
   if [ "$fail" -gt 0 ]; then
@@ -167,9 +197,9 @@ echo "Checking R8/minification flags in ${GRADLE_PROPS} ..."
 echo ""
 
 FAILED=0
-check_flag "android.enableR8.fullMode"                    "$GRADLE_PROPS" || FAILED=1
-check_flag "android.enableMinifyInReleaseBuilds"          "$GRADLE_PROPS" || FAILED=1
-check_flag "android.enableShrinkResourcesInReleaseBuilds" "$GRADLE_PROPS" || FAILED=1
+check_flag "android.enableR8.fullMode"                    "$GRADLE_PROPS"
+check_flag "android.enableMinifyInReleaseBuilds"          "$GRADLE_PROPS"
+check_flag "android.enableShrinkResourcesInReleaseBuilds" "$GRADLE_PROPS"
 
 echo ""
 
