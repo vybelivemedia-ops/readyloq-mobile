@@ -35,6 +35,7 @@ import {
   type DailyBriefing,
 } from "@/lib/api";
 import { isCopyButtonDisabled, runCopySnapshot } from "@/lib/dashboard/copy-button";
+import { isShareButtonDisabled, runShareSnapshot } from "@/lib/dashboard/share-snapshot";
 import { KPI_DEEP_LINK_FILTERS } from "@/lib/dashboard/kpi-deep-links";
 import { isWeekBarTappable, weekBarNavigates, ZERO_WEEK_ALERT_TITLE, zeroWeekAlertBody } from "@/lib/dashboard/week-bar-guard";
 
@@ -653,34 +654,28 @@ export default function ExecutiveDashboardScreen() {
     }
   }, [getToken]);
 
-  const handleShare = useCallback(async () => {
-    setSharing(true);
-    try {
-      const token = await getToken();
-      const available = await MailComposer.isAvailableAsync();
-
-      if (available) {
-        // Primary path: compose a rich HTML email
-        const { html, subject } = await fetchExecutiveEmailPreview(token);
-        await MailComposer.composeAsync({
-          subject,
-          body: html,
-          isHtml: true,
-        });
-      } else {
-        // Fallback path: open the native share sheet with plain text
-        const { text, subject } = await fetchExecutiveTextPreview(token);
-        await Share.share({ message: text, title: subject });
-      }
-    } catch (e) {
-      Alert.alert(
-        "Export Failed",
-        e instanceof Error ? e.message : "Could not generate dashboard snapshot.",
-      );
-    } finally {
-      setSharing(false);
-    }
-  }, [getToken]);
+  const handleShare = useCallback(
+    () =>
+      runShareSnapshot({
+        getToken,
+        checkMailAvailable: MailComposer.isAvailableAsync,
+        fetchEmailPreview: fetchExecutiveEmailPreview,
+        fetchTextPreview: fetchExecutiveTextPreview,
+        composeEmail: async ({ subject, body, isHtml }) => {
+          await MailComposer.composeAsync({ subject, body, isHtml });
+        },
+        shareText: async ({ message, title }) => {
+          await Share.share({ message, title });
+        },
+        setSharing,
+        onError: (e) =>
+          Alert.alert(
+            "Export Failed",
+            e instanceof Error ? e.message : "Could not generate dashboard snapshot.",
+          ),
+      }),
+    [getToken],
+  );
 
   const handleCopy = useCallback(
     () =>
@@ -835,7 +830,7 @@ export default function ExecutiveDashboardScreen() {
         {/* Share / email button */}
         <TouchableOpacity
           onPress={() => void handleShare()}
-          disabled={sharing || loading}
+          disabled={isShareButtonDisabled(loading, sharing)}
           style={{
             width: 36,
             height: 36,
