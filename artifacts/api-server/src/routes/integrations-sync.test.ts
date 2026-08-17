@@ -611,6 +611,21 @@ describe("POST /api/integrations/sync", () => {
       expect(syncMock).toHaveBeenCalledTimes(1);
       // Response must not carry inspection A's marker.
       expect(JSON.stringify(res.body)).not.toContain("inspection-a-cached");
+
+      // Inspection A's cooldown log must still be present in the DB — syncing
+      // inspection B must never touch or delete inspection A's log row.
+      const [logA] = await db
+        .select()
+        .from(inspectionSyncLogsTable)
+        .where(
+          and(
+            eq(inspectionSyncLogsTable.inspectionId, completedInspectionId),
+            eq(inspectionSyncLogsTable.companyId, companyId),
+            eq(inspectionSyncLogsTable.success, true),
+          ),
+        );
+      expect(logA).toBeTruthy();
+      expect((logA.resultJson as Record<string, unknown>)._seedMarker).toBe("inspection-a-cached");
     });
 
     it("inspection A still returns its own cached result after inspection B's fresh sync", async () => {
