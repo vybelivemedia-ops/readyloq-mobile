@@ -83,7 +83,7 @@ import {
   opportunitiesTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { runOpportunitySynthesis } from "../opportunity-ai";
+import { runOpportunitySynthesis, runOpportunitySynthesisCore } from "../opportunity-ai";
 import type { Finding } from "@workspace/db";
 
 // ── Fixture constants ─────────────────────────────────────────────────────────
@@ -236,5 +236,129 @@ describe("runOpportunitySynthesis — total AI failure logging", () => {
         findings: [STUB_FINDING],
       }),
     ).resolves.toBeUndefined();
+  });
+});
+
+// ── Batch catch-up simulation ─────────────────────────────────────────────────
+//
+// These tests exercise `runOpportunitySynthesisCore` directly — the throwing
+// variant — to confirm that:
+//   (a) every AI failure surfaces as a thrown error a batch loop can count, and
+//   (b) a mixed batch (some succeed, some fail) produces exactly the right split.
+//
+// The 1500 ms retry sleep is real here; a future task will inject fake timers
+// to keep the suite fast.
+
+describe("runOpportunitySynthesisCore — all-failure batch", () => {
+  it("throws for every inspection when AI always fails, so the batch loop counts failures accurately", async () => {
+    // AI fails on every attempt — no successful run possible.
+    openaiMock.failCount = 100;
+
+    // Second inspection alongside the one created by beforeEach.
+    const [insp2] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: SITE_ADDRESS,
+        technicianName: "Test Tech",
+        clientName: "Test Client",
+        pestTypes: ["moisture"],
+      })
+      .returning();
+
+    const batch = [
+      { companyId, inspectionId, findings: [STUB_FINDING] },
+      { companyId, inspectionId: insp2.id, findings: [STUB_FINDING] },
+    ];
+
+    // Simulate what a batch catch-up endpoint does: call Core for each item,
+    // catch thrown errors, and accumulate the counts.
+    let successes = 0;
+    let failures = 0;
+    for (const item of batch) {
+      try {
+        await runOpportunitySynthesisCore(item);
+        successes++;
+      } catch {
+        failures++;
+      }
+    }
+
+    // Every item in the batch must have been counted as a failure.
+    expect(failures).toBe(2);
+    expect(successes).toBe(0);
+
+    // No opportunity rows should have been written.
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe("runOpportunitySynthesisCore — mixed batch", () => {
+  it("produces the correct success/failure split when only some inspections fail", async () => {
+    // The first two AI calls fail (exhausting both attempts for inspection 1),
+    // so inspection 1 throws.  Calls 3+ succeed, so inspections 2 and 3 write
+    // opportunities.  Expected split: 1 failure, 2 successes.
+    openaiMock.failCount = 2;
+
+    // Use distinct addresses so opportunities get their own fingerprints and
+    // the success count (rows written) is unambiguous.
+    const [insp2] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: SITE_ADDRESS + " Unit B",
+        technicianName: "Test Tech",
+        clientName: "Test Client",
+        pestTypes: ["moisture"],
+      })
+      .returning();
+
+    const [insp3] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId,
+        siteAddress: SITE_ADDRESS + " Unit C",
+        technicianName: "Test Tech",
+        clientName: "Test Client",
+        pestTypes: ["moisture"],
+      })
+      .returning();
+
+    const batch = [
+      { companyId, inspectionId, findings: [STUB_FINDING] },
+      { companyId, inspectionId: insp2.id, findings: [STUB_FINDING] },
+      { companyId, inspectionId: insp3.id, findings: [STUB_FINDING] },
+    ];
+
+    let successes = 0;
+    let failures = 0;
+    for (const item of batch) {
+      try {
+        await runOpportunitySynthesisCore(item);
+        successes++;
+      } catch {
+        failures++;
+      }
+    }
+
+    // Counts must reflect the exact split driven by failCount.
+    expect(failures).toBe(1);
+    expect(successes).toBe(2);
+
+    // Each successful inspection wrote one opportunity at its distinct address,
+    // so the total row count must be 2.
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(eq(opportunitiesTable.companyId, companyId));
+    expect(rows).toHaveLength(2);
+
+    // The two written rows belong to the inspections that succeeded.
+    const writtenInspectionIds = rows.map((r) => r.inspectionId).sort();
+    expect(writtenInspectionIds).toEqual([insp2.id, insp3.id].sort());
   });
 });
