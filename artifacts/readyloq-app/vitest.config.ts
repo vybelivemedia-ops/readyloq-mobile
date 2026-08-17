@@ -19,6 +19,7 @@ export default defineConfig({
       "lib/finding-card/__tests__/**/*.test.ts",
       "lib/delivery/__tests__/**/*.test.ts",
       "lib/local/__tests__/**/*.test.ts",
+      "lib/vision/__tests__/**/*.test.ts",
       "hooks/__tests__/useAllDevicesHealthCheck.test.ts",
     ],
   },

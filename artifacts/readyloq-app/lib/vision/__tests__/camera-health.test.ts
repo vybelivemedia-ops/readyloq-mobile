@@ -368,3 +368,107 @@ describe("DeviceRegistry.getPrimary()", () => {
     expect(registry.getPrimary("camera")?.id).toBe("cam-b-mid");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Health recovery: granted → revoked → re-granted
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DeviceRegistry — permission recovery lifecycle", () => {
+  it("returns to healthy and re-selects the provider after a revoked permission is re-granted", async () => {
+    const registry = createDeviceRegistry();
+
+    // Provider A (high-priority), Provider B (low-priority fallback)
+    const providerA = makeStubProvider("cam-recover-a", 100, "healthy");
+    const providerB = makeStubProvider("cam-recover-b", 50, "healthy");
+    registry.register(providerA);
+    registry.register(providerB);
+
+    const emittedEvents: Array<{ id: string; status: string }> = [];
+    registry.subscribe((event) => {
+      if (event.kind === "provider.health_changed" && event.health != null) {
+        emittedEvents.push({ id: event.providerId, status: event.health.status });
+      }
+    });
+
+    // ── Phase 1: both granted ─────────────────────────────────────────────────
+    await registry.checkAllHealth();
+
+    expect(registry.getHealth("cam-recover-a")?.status).toBe("healthy");
+    expect(registry.getHealth("cam-recover-b")?.status).toBe("healthy");
+    // A wins on priority when both healthy
+    expect(registry.getPrimary("camera")?.id).toBe("cam-recover-a");
+    // health_changed emitted for both providers
+    expect(emittedEvents.filter((e) => e.id === "cam-recover-a" && e.status === "healthy")).toHaveLength(1);
+    expect(emittedEvents.filter((e) => e.id === "cam-recover-b" && e.status === "healthy")).toHaveLength(1);
+
+    // ── Phase 2: A's permission revoked → degraded ────────────────────────────
+    (providerA.checkHealth as ReturnType<typeof vi.fn>).mockResolvedValue({
+      status: "degraded",
+      message: "Camera permission revoked by user",
+      checkedAt: new Date().toISOString(),
+      latencyMs: 1,
+    } satisfies HealthCheckResult);
+
+    await registry.checkAllHealth();
+
+    expect(registry.getHealth("cam-recover-a")?.status).toBe("degraded");
+    expect(registry.getHealth("cam-recover-b")?.status).toBe("healthy");
+    // B is now primary — A is degraded
+    expect(registry.getPrimary("camera")?.id).toBe("cam-recover-b");
+    // health_changed emitted for A with degraded status
+    expect(emittedEvents.filter((e) => e.id === "cam-recover-a" && e.status === "degraded")).toHaveLength(1);
+
+    // ── Phase 3: A's permission re-granted → healthy again ────────────────────
+    (providerA.checkHealth as ReturnType<typeof vi.fn>).mockResolvedValue({
+      status: "healthy",
+      message: "Camera permission granted",
+      checkedAt: new Date().toISOString(),
+      latencyMs: 1,
+    } satisfies HealthCheckResult);
+
+    await registry.checkAllHealth();
+
+    expect(registry.getHealth("cam-recover-a")?.status).toBe("healthy");
+    expect(registry.getHealth("cam-recover-b")?.status).toBe("healthy");
+    // A is re-selected as primary — higher priority, now healthy again
+    expect(registry.getPrimary("camera")?.id).toBe("cam-recover-a");
+    // health_changed emitted for A with healthy status (second time)
+    expect(emittedEvents.filter((e) => e.id === "cam-recover-a" && e.status === "healthy")).toHaveLength(2);
+  });
+
+  it("emits health_changed on every transition — not only on first change", async () => {
+    const registry = createDeviceRegistry();
+    const provider = makeStubProvider("cam-transitions", 100, "healthy");
+    registry.register(provider);
+
+    const statuses: string[] = [];
+    registry.subscribe((event) => {
+      if (event.kind === "provider.health_changed" && event.health != null && event.providerId === "cam-transitions") {
+        statuses.push(event.health.status);
+      }
+    });
+
+    // Check 1 — healthy
+    await registry.checkAllHealth();
+
+    // Check 2 — degraded (permission revoked)
+    (provider.checkHealth as ReturnType<typeof vi.fn>).mockResolvedValue({
+      status: "degraded",
+      message: "Permission denied",
+      checkedAt: new Date().toISOString(),
+      latencyMs: 1,
+    } satisfies HealthCheckResult);
+    await registry.checkAllHealth();
+
+    // Check 3 — healthy again (permission re-granted)
+    (provider.checkHealth as ReturnType<typeof vi.fn>).mockResolvedValue({
+      status: "healthy",
+      message: "Permission granted",
+      checkedAt: new Date().toISOString(),
+      latencyMs: 1,
+    } satisfies HealthCheckResult);
+    await registry.checkAllHealth();
+
+    expect(statuses).toEqual(["healthy", "degraded", "healthy"]);
+  });
+});
