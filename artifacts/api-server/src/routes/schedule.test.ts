@@ -582,3 +582,116 @@ describe("GET /api/schedule — DB-level date filter", () => {
     expect(r2.status).toBe(400);
   });
 });
+
+// ── POST /api/inspections → GET /api/schedule: immediate availability ─────────
+//
+// These tests confirm the end-to-end "book from calendar → card appears
+// immediately" behaviour: once the server responds 201 to the create request,
+// a subsequent GET /schedule for the same week must include the new entry in
+// the correct calendarDate cell — no server restart or cache warm-up required.
+//
+// This mirrors what the portal does: `useCreateInspection.onSuccess` calls
+// `queryClient.invalidateQueries({ queryKey: ['schedule'] })`, which triggers
+// a refetch of the active `['schedule', start, end]` query. The test verifies
+// the server side of that round-trip is immediately consistent.
+
+describe("POST /api/inspections → GET /api/schedule — immediate availability", () => {
+  it("new inspection appears in the schedule grid cell immediately after creation", async () => {
+    asUser(MANAGER_ID);
+
+    const scheduledDate = "2026-10-15T00:00:00.000Z"; // Wednesday; well within the query window
+    const start = "2026-10-13";
+    const end   = "2026-10-19";
+
+    // Create the inspection (mirrors the portal's useCreateInspection mutation).
+    const createRes = await request(app)
+      .post("/api/inspections")
+      .send({
+        siteAddress: "42 Calendar Lane, Anytown, CA",
+        clientName: "Instant Show Corp",
+        technicianName: "Tech A",
+        technicianId: TECH_A_ID,
+        scheduledDate,
+      });
+
+    expect(createRes.status).toBe(201);
+    const newId: number = createRes.body.id;
+
+    // Immediately query the schedule — no delay, no server restart.
+    const schedRes = await request(app)
+      .get(`/api/schedule?start=${start}&end=${end}`);
+
+    expect(schedRes.status).toBe(200);
+    const ids: number[] = schedRes.body.map((e: { id: number }) => e.id);
+    expect(ids).toContain(newId);
+
+    // Confirm the entry lands in the correct calendar cell.
+    const entry = schedRes.body.find((e: { id: number }) => e.id === newId);
+    expect(entry).toBeDefined();
+    expect(entry.calendarDate).toBe("2026-10-15");
+    expect(entry.siteAddress).toBe("42 Calendar Lane, Anytown, CA");
+    expect(entry.technicianName).toBe("Tech A");
+    expect(entry.status).toBe("pending");
+  });
+
+  it("new inspection does NOT appear in a different week's schedule", async () => {
+    asUser(MANAGER_ID);
+
+    const scheduledDate = "2026-11-05T00:00:00.000Z"; // Wednesday of week 1
+    const differentWeekStart = "2026-11-09"; // Following Monday
+    const differentWeekEnd   = "2026-11-15"; // Following Sunday
+
+    const createRes = await request(app)
+      .post("/api/inspections")
+      .send({
+        siteAddress: "99 Wrong Week Rd",
+        technicianName: "Tech A",
+        technicianId: TECH_A_ID,
+        scheduledDate,
+      });
+
+    expect(createRes.status).toBe(201);
+    const newId: number = createRes.body.id;
+
+    // Schedule query for a different (later) week must NOT include this entry.
+    const schedRes = await request(app)
+      .get(`/api/schedule?start=${differentWeekStart}&end=${differentWeekEnd}`);
+
+    expect(schedRes.status).toBe(200);
+    const ids: number[] = schedRes.body.map((e: { id: number }) => e.id);
+    expect(ids).not.toContain(newId);
+  });
+
+  it("new inspection without a scheduledDate appears on the day it was created", async () => {
+    asUser(MANAGER_ID);
+
+    // No scheduledDate — server falls back to createdAt for the calendar date.
+    const createRes = await request(app)
+      .post("/api/inspections")
+      .send({
+        siteAddress: "1 Now St, Anytown, CA",
+        technicianName: "Tech A",
+        technicianId: TECH_A_ID,
+        // scheduledDate omitted intentionally
+      });
+
+    expect(createRes.status).toBe(201);
+    const newId: number = createRes.body.id;
+
+    // Derive the expected calendar date from the returned createdAt.
+    const createdAt: string = createRes.body.createdAt;
+    const expectedDate = createdAt.slice(0, 10); // YYYY-MM-DD in UTC
+
+    // Schedule query centred on today must include the new entry.
+    const schedRes = await request(app)
+      .get(`/api/schedule?start=${expectedDate}&end=${expectedDate}`);
+
+    expect(schedRes.status).toBe(200);
+    const ids: number[] = schedRes.body.map((e: { id: number }) => e.id);
+    expect(ids).toContain(newId);
+
+    // calendarDate must equal the UTC date of createdAt.
+    const entry = schedRes.body.find((e: { id: number }) => e.id === newId);
+    expect(entry?.calendarDate).toBe(expectedDate);
+  });
+});
