@@ -76,3 +76,30 @@ export function shouldShowBleBadge(
   return isBleConnected || bleFrameCount > 0;
 }
 
+/**
+ * Returns whether the CoPilotHUD header should render the BLE/Cloud badge.
+ *
+ * This is the single source of truth for the badge visibility guard used in
+ * CoPilotHUD.tsx. It combines the `glassesSessionActive` prop (set by the
+ * parent screen for any glasses session, including cloud-relay where no BLE
+ * frames arrive) with `shouldShowBleBadge` so that:
+ *
+ *   • Phone-only inspection (all inputs false/0) → badge omitted entirely
+ *   • Cloud-relay session active → badge shown
+ *   • BLE-connected or frames received → badge shown
+ *
+ * Extracting this predicate as a named export lets unit tests assert the
+ * production guard directly instead of duplicating its logic.
+ *
+ * @param glassesSessionActive - `true` when any glasses session (BLE or cloud) is in use
+ * @param isBleConnected       - `true` when BLE link is currently up
+ * @param bleFrameCount        - total frames received in this inspection session
+ */
+export function hudShouldShowBadge(
+  glassesSessionActive: boolean,
+  isBleConnected: boolean,
+  bleFrameCount: number,
+): boolean {
+  return glassesSessionActive || shouldShowBleBadge(isBleConnected, bleFrameCount);
+}
+

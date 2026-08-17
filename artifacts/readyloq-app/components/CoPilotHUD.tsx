@@ -12,7 +12,7 @@ import {
 } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
-import { getBleBadgeStyle, shouldShowBleBadge } from "@/lib/ble/badge-display";
+import { getBleBadgeStyle, hudShouldShowBadge } from "@/lib/ble/badge-display";
 
 // ─── Ghost prompt definitions ────────────────────────────────────────────────
 
@@ -599,11 +599,11 @@ export function CoPilotHUD({
         </Text>
 
         {/* BLE / Cloud connection badge — omitted when no glasses session is active.
-            Uses shouldShowBleBadge so a badge that was "BLE · direct" (green) correctly
-            stays visible as "Cloud · relay" (amber) after a mid-inspection disconnect,
-            as long as at least one BLE frame was received.  glassesSessionActive still
-            covers cloud-relay sessions where no BLE frames ever arrived. */}
-        {(glassesSessionActive || shouldShowBleBadge(isBleConnected, bleFrameCount)) && (() => {
+            hudShouldShowBadge combines glassesSessionActive (cloud-relay) with the BLE
+            frame/connection state so the badge stays visible as "Cloud · relay" (amber)
+            after a mid-inspection BLE disconnect, as long as at least one frame was
+            received or a cloud session is live. */}
+        {hudShouldShowBadge(glassesSessionActive, isBleConnected, bleFrameCount) && (() => {
           const badge = getBleBadgeStyle(isBleConnected);
           return (
             <View
