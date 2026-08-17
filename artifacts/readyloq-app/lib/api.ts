@@ -532,12 +532,20 @@ export interface VelocityDetailResponse {
   month: VelocityMonth;
   label: string;
   count: number;
+  /** Distinct technician names for the month (always unfiltered). */
+  technicians: string[];
   inspections: VelocityInspection[];
 }
 
-export function fetchVelocityDetail(token: string | null, month: VelocityMonth) {
+export function fetchVelocityDetail(
+  token: string | null,
+  month: VelocityMonth,
+  technicianName?: string,
+) {
+  const params = new URLSearchParams({ month });
+  if (technicianName) params.set("technicianName", technicianName);
   return request<VelocityDetailResponse>(
-    `/api/executive/velocity-detail?month=${encodeURIComponent(month)}`,
+    `/api/executive/velocity-detail?${params.toString()}`,
     token,
   );
 }

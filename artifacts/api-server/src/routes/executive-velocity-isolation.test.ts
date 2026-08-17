@@ -451,4 +451,132 @@ describe("GET /executive/velocity-detail — month filter correctness", () => {
       expect(row).toHaveProperty("completedAt");
     }
   });
+
+  it("response includes a top-level technicians array", async () => {
+    asUser(VEL_OWNER_A);
+    const res = await request(app)
+      .get("/api/executive/velocity-detail")
+      .query({ month: "current" });
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.technicians)).toBe(true);
+  });
+});
+
+// ── Technician filter ──────────────────────────────────────────────────────────
+
+describe("GET /executive/velocity-detail — technician filter", () => {
+  /**
+   * Co A fixture (current month):
+   *   Alice — 2 inspections ("1 Alpha St", "2 Alpha St")
+   *   Bob   — 1 inspection  ("3 Alpha St")
+   *
+   * The filter must be case-insensitive and support partial substring matches.
+   * The `technicians` array must always reflect the full unfiltered set for the
+   * month, regardless of which filter is applied.
+   */
+
+  it("exact name match (Alice) returns only Alice's inspections", async () => {
+    asUser(VEL_OWNER_A);
+    const res = await request(app)
+      .get("/api/executive/velocity-detail")
+      .query({ month: "current", technicianName: "Alice" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.inspections).toHaveLength(2);
+    for (const row of res.body.inspections) {
+      expect(row.technicianName).toBe("Alice");
+    }
+  });
+
+  it("filter is case-insensitive — 'alice' matches 'Alice'", async () => {
+    asUser(VEL_OWNER_A);
+    const res = await request(app)
+      .get("/api/executive/velocity-detail")
+      .query({ month: "current", technicianName: "alice" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.inspections).toHaveLength(2);
+    for (const row of res.body.inspections) {
+      expect(row.technicianName).toBe("Alice");
+    }
+  });
+
+  it("partial name match — 'Al' matches 'Alice'", async () => {
+    asUser(VEL_OWNER_A);
+    const res = await request(app)
+      .get("/api/executive/velocity-detail")
+      .query({ month: "current", technicianName: "Al" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.inspections.length).toBeGreaterThan(0);
+    for (const row of res.body.inspections) {
+      expect(row.technicianName.toLowerCase()).toContain("al");
+    }
+  });
+
+  it("filter for Bob returns only Bob's inspection", async () => {
+    asUser(VEL_OWNER_A);
+    const res = await request(app)
+      .get("/api/executive/velocity-detail")
+      .query({ month: "current", technicianName: "Bob" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.inspections).toHaveLength(1);
+    expect(res.body.inspections[0].technicianName).toBe("Bob");
+  });
+
+  it("filter with no match returns an empty inspections array", async () => {
+    asUser(VEL_OWNER_A);
+    const res = await request(app)
+      .get("/api/executive/velocity-detail")
+      .query({ month: "current", technicianName: "Nobody" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.inspections).toHaveLength(0);
+    expect(res.body.count).toBe(0);
+  });
+
+  it("technicians array is always the full unfiltered set — even when a filter is active", async () => {
+    asUser(VEL_OWNER_A);
+
+    // Fetch with filter applied
+    const filtered = await request(app)
+      .get("/api/executive/velocity-detail")
+      .query({ month: "current", technicianName: "Alice" });
+
+    expect(filtered.status).toBe(200);
+    // Inspections are filtered to Alice only
+    expect(filtered.body.inspections.every(
+      (r: { technicianName: string }) => r.technicianName === "Alice"
+    )).toBe(true);
+
+    // But technicians[] still includes both Alice and Bob
+    const techSet = new Set<string>(filtered.body.technicians);
+    expect(techSet.has("Alice")).toBe(true);
+    expect(techSet.has("Bob")).toBe(true);
+  });
+
+  it("filter is scoped to the requesting company — Co A owner cannot see Co B technicians", async () => {
+    asUser(VEL_OWNER_A);
+    const res = await request(app)
+      .get("/api/executive/velocity-detail")
+      .query({ month: "current", technicianName: "Charlie" });
+
+    expect(res.status).toBe(200);
+    // Charlie belongs to Co B — result must be empty
+    expect(res.body.inspections).toHaveLength(0);
+  });
+
+  it("empty technicianName param is treated as no filter", async () => {
+    asUser(VEL_OWNER_A);
+    const res = await request(app)
+      .get("/api/executive/velocity-detail")
+      .query({ month: "current", technicianName: "   " });
+
+    expect(res.status).toBe(200);
+    // All 3 Co A this-month completions are returned
+    expect(res.body.inspections).toHaveLength(3);
+  });
 });

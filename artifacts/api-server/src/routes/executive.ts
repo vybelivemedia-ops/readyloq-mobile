@@ -6,7 +6,7 @@
  */
 import { Router } from "express";
 import { db, opportunitiesTable, inspectionScorecardsTable, inspectionsTable, companiesTable } from "@workspace/db";
-import { and, avg, count, eq, inArray, isNotNull, sql, sum } from "drizzle-orm";
+import { and, avg, count, eq, ilike, inArray, isNotNull, sql, sum } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { requireAuth, requireCompany, requireBetaAccess, requireRole } from "../middleware/require-auth";
 import { generateDailyExecutiveBriefing } from "../services/briefing";
@@ -391,31 +391,66 @@ router.get(
       label      = monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
     }
 
+    // Optional technician name filter — case-insensitive substring match.
+    const technicianNameFilter =
+      typeof req.query.technicianName === "string" && req.query.technicianName.trim()
+        ? req.query.technicianName.trim()
+        : undefined;
+
     try {
-      const rows = await db
-        .select({
-          inspectionId:   inspectionsTable.id,
-          siteAddress:    inspectionsTable.siteAddress,
-          technicianName: inspectionsTable.technicianName,
-          completedAt:    inspectionsTable.completedAt,
-        })
-        .from(inspectionsTable)
-        .where(
-          and(
-            eq(inspectionsTable.companyId, companyId),
-            eq(inspectionsTable.status, "completed"),
-            isNotNull(inspectionsTable.completedAt),
-            sql`${inspectionsTable.completedAt} >= ${monthStart.toISOString()}::timestamptz`,
-            sql`${inspectionsTable.completedAt} < ${monthEnd.toISOString()}::timestamptz`,
-          ),
-        )
-        .orderBy(sql`${inspectionsTable.completedAt} desc`);
+      // Base conditions shared by both the filtered list query and the
+      // unfiltered distinct-technician query.
+      const baseConditions = [
+        eq(inspectionsTable.companyId, companyId),
+        eq(inspectionsTable.status, "completed"),
+        isNotNull(inspectionsTable.completedAt),
+        sql`${inspectionsTable.completedAt} >= ${monthStart.toISOString()}::timestamptz`,
+        sql`${inspectionsTable.completedAt} < ${monthEnd.toISOString()}::timestamptz`,
+      ] as const;
+
+      // Run the filtered list query and the distinct-technician query in
+      // parallel to keep round-trip latency low.
+      const [rows, techRows] = await Promise.all([
+        db
+          .select({
+            inspectionId:   inspectionsTable.id,
+            siteAddress:    inspectionsTable.siteAddress,
+            technicianName: inspectionsTable.technicianName,
+            completedAt:    inspectionsTable.completedAt,
+          })
+          .from(inspectionsTable)
+          .where(
+            and(
+              ...baseConditions,
+              ...(technicianNameFilter
+                ? [ilike(inspectionsTable.technicianName, `%${technicianNameFilter}%`)]
+                : []),
+            ),
+          )
+          .orderBy(sql`${inspectionsTable.completedAt} desc`),
+
+        // Distinct technician names for the month — always unfiltered so the
+        // client can show all available filter options regardless of the
+        // currently active filter.
+        db
+          .selectDistinct({ technicianName: inspectionsTable.technicianName })
+          .from(inspectionsTable)
+          .where(and(...baseConditions))
+          .orderBy(inspectionsTable.technicianName),
+      ]);
+
+      // Collect distinct non-empty technician names in alphabetical order.
+      const technicians = techRows
+        .map((r) => r.technicianName || "Unknown")
+        .filter((n, i, arr) => arr.indexOf(n) === i)
+        .sort();
 
       return res.json({
         success: true,
         month: monthParam,
         label,
         count: rows.length,
+        technicians,
         inspections: rows.map((r) => ({
           inspectionId:   r.inspectionId,
           siteAddress:    r.siteAddress,
