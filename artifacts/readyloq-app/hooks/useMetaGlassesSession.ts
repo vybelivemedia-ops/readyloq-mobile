@@ -93,6 +93,12 @@ interface MetaGlassesSessionState {
     reason?: string;
     count?: number;
   }): void;
+  /**
+   * Retry session registration immediately.  Call this after fixing whatever
+   * caused a previous failure (e.g. Meta app was closed, network was down).
+   * Safe to call at any time — no-ops when registration is already active.
+   */
+  retrySession(): void;
 }
 
 const POLL_INTERVAL_MS = 3_000;        // poll every 3 s
@@ -121,20 +127,29 @@ export function useMetaGlassesSession({
   // Stable ref so the polling closure always calls the latest onFinding.
   const onFindingRef     = useRef(onFinding);
   onFindingRef.current   = onFinding;
-  // Prevent duplicate registration for the same inspection.
+  // Set to inspectionId only after a successful registration.  Not set on
+  // failure so the next render (or retrySession() call) can try again.
   const registeredForRef = useRef<number | null>(null);
+  // True while an async registration POST is in-flight; prevents concurrent
+  // duplicate requests without permanently blocking retries on failure.
+  const registeringRef   = useRef(false);
   // Always-current copy of inspectionId for use inside async poll closure.
   const inspectionIdRef  = useRef(inspectionId);
   inspectionIdRef.current = inspectionId;
   // #111 — set of delivered event IDs; prevents re-delivery if cursor races.
   const seenEventIdsRef  = useRef(new Set<string>());
+  // Incrementing counter: bumping this forces the registration effect to
+  // re-run even when active/inspectionId/getToken haven't changed (retry).
+  const [retryCount, setRetryCount] = useState(0);
 
   // ── Session registration ───────────────────────────────────────────────────
   useEffect(() => {
-    if (!active || !inspectionId || registeredForRef.current === inspectionId) return;
+    if (!active || !inspectionId) return;
+    if (registeredForRef.current === inspectionId) return; // already succeeded
+    if (registeringRef.current) return;                    // POST in-flight
 
     let cancelled = false;
-    registeredForRef.current = inspectionId;
+    registeringRef.current = true;
 
     (async () => {
       try {
@@ -144,8 +159,19 @@ export function useMetaGlassesSession({
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ inspectionId }),
         });
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (!res.ok) {
+          // Surface a visible error so the user knows registration failed.
+          // registeredForRef is NOT set — the next retrySession() call retries.
+          setStatus(
+            `Glasses session failed (${res.status}) — check Meta app is open & paired`,
+          );
+          return;
+        }
         const data = (await res.json()) as { sessionId: string; code: string };
+        // Only mark as registered after confirmed success so failures don't
+        // permanently block retries (the original bug: ref was set up-front).
+        registeredForRef.current = inspectionId;
         setSessionId(data.sessionId);
         setCode(data.code);
         setIsActive(true);
@@ -154,12 +180,23 @@ export function useMetaGlassesSession({
         lastSeenRef.current      = Date.now();
         lastEventTimeRef.current = Date.now();
       } catch {
-        if (!cancelled) setStatus(null);
+        if (!cancelled) {
+          setStatus("Glasses session failed — check network and Meta app connection");
+        }
+        // registeredForRef NOT set; next retrySession() call retries.
+      } finally {
+        if (!cancelled) registeringRef.current = false;
       }
     })();
 
-    return () => { cancelled = true; };
-  }, [active, inspectionId, getToken]);
+    return () => {
+      cancelled = true;
+      registeringRef.current = false;
+    };
+  // retryCount is intentionally included: incrementing it forces a retry
+  // without requiring active/inspectionId/getToken to change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, inspectionId, getToken, retryCount]);
 
   // ── Polling ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -312,5 +349,13 @@ export function useMetaGlassesSession({
     [getToken], // getToken is stable from Clerk; sessionId is read via ref
   );
 
-  return { sessionId, code, eventCount, status, isActive, isInactive, codeJustChanged, postTelemetryEvent };
+  const retrySession = useCallback(() => {
+    // Clear success flag so the registration effect re-runs on next render.
+    registeredForRef.current = null;
+    registeringRef.current   = false;
+    setStatus(null);
+    setRetryCount((c) => c + 1);
+  }, []);
+
+  return { sessionId, code, eventCount, status, isActive, isInactive, codeJustChanged, postTelemetryEvent, retrySession };
 }

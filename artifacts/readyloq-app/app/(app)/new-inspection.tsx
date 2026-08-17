@@ -2199,13 +2199,62 @@ export default function NewInspectionScreen() {
       />
     ) : null;
 
-    // Meta glasses activity strip — shown when a Live AI session is active.
+    // Meta glasses activity strip — shown when a Live AI session is active,
+    // OR when registration failed (error strip with a visible retry button).
     const glassesCaptures = glassesFindings.filter((e) => e.finding || e.mediaId);
     // #106 — amber strip when glasses have gone silent for 2+ minutes
     const glassesStripBg = glassesSession.isInactive
       ? "rgba(202,138,4,0.92)"
       : "rgba(124,58,237,0.88)";
-    const glassesStrip = glassesSession.isActive ? (
+
+    // Error strip — shown when registration failed so the user knows and can retry.
+    const glassesErrorStrip =
+      !glassesSession.isActive &&
+      wsInspectionId != null &&
+      glassesSession.status !== null ? (
+        <View
+          style={{
+            backgroundColor: "rgba(185,28,28,0.90)",
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 10,
+            maxWidth: 440,
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.2)",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Ionicons name="glasses-outline" size={15} color="#fff" />
+          <Text
+            style={{
+              color: "#fff",
+              fontFamily: "Inter_400Regular",
+              fontSize: 12,
+              flex: 1,
+              flexShrink: 1,
+            }}
+          >
+            {glassesSession.status}
+          </Text>
+          <Pressable
+            onPress={glassesSession.retrySession}
+            style={{
+              backgroundColor: "rgba(255,255,255,0.20)",
+              borderRadius: 6,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+            }}
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+              Retry
+            </Text>
+          </Pressable>
+        </View>
+      ) : null;
+
+    const glassesStrip = glassesErrorStrip ?? (glassesSession.isActive ? (
       <View
         style={{
           backgroundColor: glassesStripBg,
@@ -2335,7 +2384,7 @@ export default function NewInspectionScreen() {
           </View>
         ) : null}
       </View>
-    ) : null;
+    ) : null);
 
     // Compact BLE-only badge — shown when glasses are BLE-connected but no
     // cloud session is active yet.  Gives the technician confirmation that the
