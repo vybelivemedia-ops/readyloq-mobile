@@ -53,6 +53,161 @@ const RISK_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   low: "checkmark-circle",
 };
 
+// ─── Summary card ─────────────────────────────────────────────────────────────
+
+interface WeekSummary {
+  avgScore: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+function deriveWeekSummary(items: WeeklyQualityInspection[]): WeekSummary {
+  const n = items.length;
+  if (n === 0) return { avgScore: 0, critical: 0, high: 0, medium: 0, low: 0 };
+  const total = items.reduce((s, i) => s + i.qualityScore, 0);
+  const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+  for (const item of items) {
+    const k = item.riskLevel as keyof typeof counts;
+    if (k in counts) counts[k]++;
+  }
+  return { avgScore: Math.round(total / n), ...counts };
+}
+
+function WeeklySummaryCard({ summary }: { summary: WeekSummary }) {
+  const scoreColor =
+    summary.avgScore >= 80 ? C.success : summary.avgScore >= 60 ? C.warning : C.danger;
+
+  type RiskCountKey = keyof Pick<WeekSummary, "critical" | "high" | "medium" | "low">;
+  const RISK_CHIPS: Array<{ key: RiskCountKey; label: string }> = [
+    { key: "critical", label: "Critical" },
+    { key: "high", label: "High" },
+    { key: "medium", label: "Medium" },
+    { key: "low", label: "Low" },
+  ];
+
+  return (
+    <View
+      style={{
+        marginHorizontal: 16,
+        marginTop: 16,
+        marginBottom: 4,
+        backgroundColor: C.surface,
+        borderWidth: 1,
+        borderColor: C.border,
+        borderRadius: 14,
+        overflow: "hidden",
+      }}
+    >
+      {/* Card header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: C.border,
+          backgroundColor: "#ffffff06",
+          gap: 8,
+        }}
+      >
+        <Ionicons name="stats-chart" size={15} color={C.primary} />
+        <Text
+          style={{
+            flex: 1,
+            color: C.text,
+            fontFamily: "Inter_700Bold",
+            fontSize: 13,
+            letterSpacing: 0.2,
+          }}
+        >
+          Week Summary
+        </Text>
+
+        {/* Avg score badge */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            paddingHorizontal: 12,
+            paddingVertical: 5,
+            borderRadius: 20,
+            backgroundColor: scoreColor + "22",
+            borderWidth: 1,
+            borderColor: scoreColor + "55",
+          }}
+        >
+          <Text style={{ color: C.muted, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+            Avg
+          </Text>
+          <Text style={{ color: scoreColor, fontFamily: "Inter_800ExtraBold", fontSize: 18 }}>
+            {summary.avgScore}
+          </Text>
+        </View>
+      </View>
+
+      {/* Risk breakdown row */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          gap: 8,
+        }}
+      >
+        {RISK_CHIPS.map(({ key, label }) => {
+          const color = RISK_COLOR[key];
+          const count = summary[key];
+          return (
+            <View
+              key={key}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                paddingVertical: 10,
+                borderRadius: 10,
+                backgroundColor: count > 0 ? color + "18" : "#ffffff08",
+                borderWidth: 1,
+                borderColor: count > 0 ? color + "44" : C.border,
+                gap: 4,
+              }}
+            >
+              <Ionicons
+                name={RISK_ICON[key]}
+                size={16}
+                color={count > 0 ? color : C.muted}
+              />
+              <Text
+                style={{
+                  color: count > 0 ? color : C.muted,
+                  fontFamily: "Inter_800ExtraBold",
+                  fontSize: 18,
+                  lineHeight: 22,
+                }}
+              >
+                {count}
+              </Text>
+              <Text
+                style={{
+                  color: C.muted,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 10,
+                  letterSpacing: 0.3,
+                }}
+              >
+                {label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 // ─── Row component ────────────────────────────────────────────────────────────
 
 function InspectionRow({
@@ -362,6 +517,9 @@ export default function ExecutiveWeekInspectionsScreen() {
           }
           ListHeaderComponent={
             <>
+              {/* ── Week summary card ── */}
+              <WeeklySummaryCard summary={deriveWeekSummary(items)} />
+
               {/* Summary strip */}
               <View
                 style={{
