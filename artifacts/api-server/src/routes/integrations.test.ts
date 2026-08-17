@@ -925,3 +925,32 @@ describe("POST /api/integrations/sync — cooldown boundary", () => {
     expect(logs[0].resultJson).toMatchObject(SUCCESS_RESULT);
   });
 });
+
+// ─── sync-history — invalid inspectionId format ───────────────────────────────
+//
+// The GET /api/integrations/sync-history route validates the optional
+// ?inspectionId= query param and must return 400 (not a silent empty array)
+// for any value that is not a positive integer.
+
+describe("GET /api/integrations/sync-history — invalid inspectionId format", () => {
+  it("returns 400 for a non-numeric inspectionId (abc)", async () => {
+    asUser(OWNER_ID);
+    const res = await request(app).get("/api/integrations/sync-history?inspectionId=abc");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Invalid inspectionId");
+  });
+
+  it("returns 400 for inspectionId=0 (not positive)", async () => {
+    asUser(OWNER_ID);
+    const res = await request(app).get("/api/integrations/sync-history?inspectionId=0");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Invalid inspectionId");
+  });
+
+  it("returns 400 for a negative inspectionId (-5)", async () => {
+    asUser(OWNER_ID);
+    const res = await request(app).get("/api/integrations/sync-history?inspectionId=-5");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Invalid inspectionId");
+  });
+});
