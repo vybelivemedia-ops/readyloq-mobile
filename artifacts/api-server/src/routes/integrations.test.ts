@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 /**
@@ -923,6 +923,293 @@ describe("POST /api/integrations/sync — cooldown boundary", () => {
 
     expect(logs).toHaveLength(1);
     expect(logs[0].resultJson).toMatchObject(SUCCESS_RESULT);
+  });
+});
+
+// ─── sync-history — retry ordering and errorMessage ──────────────────────────
+//
+// This suite exercises the full retry sequence via actual HTTP POST
+// /api/integrations/sync calls (not direct DB inserts) so the assertions
+// reflect exactly what the UI owner sees after repeated attempts:
+//
+//   1. Three failed attempts followed by one success.
+//   2. GET /api/integrations/sync-history returns all four entries.
+//   3. Entries are newest-first (the latest attempt is history[0]).
+//   4. Failed rows carry a non-empty errorMessage; the success row has null.
+//
+// The client-side sliceSyncHistory() cap (SYNC_HISTORY_DISPLAY_LIMIT = 10) is
+// tested separately in the mobile app's
+// lib/sync-history/__tests__/sliceSyncHistory.test.ts.
+
+describe("GET /api/integrations/sync-history — retry ordering and errorMessage", () => {
+  const RETRY_OWNER_ID = "retry_order_owner_clerk_id";
+
+  let retryCompanyId: number;
+  let retryInspectionId: number;
+
+  beforeAll(async () => {
+    retryCompanyId = await findOrCreateCompany("Retry Order Co", "retry-order-co");
+
+    const existing = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, RETRY_OWNER_ID));
+    if (existing.length === 0) {
+      await db.insert(usersTable).values({
+        clerkUserId: RETRY_OWNER_ID,
+        role: "owner",
+        companyId: retryCompanyId,
+      });
+    }
+
+    // Integration config for this company.
+    await db
+      .delete(companyFieldIntegrationsTable)
+      .where(eq(companyFieldIntegrationsTable.companyId, retryCompanyId));
+    await db.insert(companyFieldIntegrationsTable).values({
+      companyId: retryCompanyId,
+      systemType: "pestpac",
+      accountId: "retry-acct",
+      apiKey: "retry-key",
+      enabled: true,
+    });
+
+    // Completed inspection owned by this company.
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId: retryCompanyId,
+        siteAddress: "77 Order Blvd",
+        technicianName: "Tech R",
+        status: "completed",
+      })
+      .returning();
+    retryInspectionId = insp.id;
+
+    // ── Exercise the real retry sequence via HTTP ────────────────────────────
+    // Attempt 1 — fail.
+    syncMock.mockRejectedValueOnce(new Error("PestPac 503: gateway timeout"));
+    authState.userId = RETRY_OWNER_ID;
+    await request(app).post("/api/integrations/sync").send({ inspectionId: retryInspectionId });
+
+    // Attempt 2 — fail.
+    syncMock.mockRejectedValueOnce(new Error("PestPac 503: still unavailable"));
+    await request(app).post("/api/integrations/sync").send({ inspectionId: retryInspectionId });
+
+    // Attempt 3 — fail.
+    syncMock.mockRejectedValueOnce(new Error("PestPac 401: credentials expired"));
+    await request(app).post("/api/integrations/sync").send({ inspectionId: retryInspectionId });
+
+    // Attempt 4 — succeed (syncMock restored to default success by outer beforeEach
+    // but since this is beforeAll, re-set it explicitly).
+    syncMock.mockResolvedValueOnce({
+      success: true,
+      externalSystem: "pestpac",
+      postedNotes: true,
+      attachmentsPosted: 0,
+    });
+    await request(app).post("/api/integrations/sync").send({ inspectionId: retryInspectionId });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(inspectionSyncLogsTable)
+      .where(eq(inspectionSyncLogsTable.companyId, retryCompanyId));
+    await db
+      .delete(inspectionsTable)
+      .where(eq(inspectionsTable.id, retryInspectionId));
+    await db
+      .delete(companyFieldIntegrationsTable)
+      .where(eq(companyFieldIntegrationsTable.companyId, retryCompanyId));
+  });
+
+  it("returns all retry attempts (3 failures + 1 success = 4 entries)", async () => {
+    authState.userId = RETRY_OWNER_ID;
+
+    const res = await request(app)
+      .get(`/api/integrations/sync-history?inspectionId=${retryInspectionId}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.logs).toHaveLength(4);
+  });
+
+  it("returns entries newest-first — the successful attempt is history[0]", async () => {
+    authState.userId = RETRY_OWNER_ID;
+
+    const res = await request(app)
+      .get(`/api/integrations/sync-history?inspectionId=${retryInspectionId}`);
+
+    expect(res.status).toBe(200);
+    const logs: { syncedAt: string; success: boolean }[] = res.body.logs;
+
+    // Newest entry must be the success (attempt 4).
+    expect(logs[0].success).toBe(true);
+
+    // Each subsequent entry must be no newer than the previous one.
+    for (let i = 1; i < logs.length; i++) {
+      const prev = new Date(logs[i - 1].syncedAt).getTime();
+      const curr = new Date(logs[i].syncedAt).getTime();
+      expect(prev).toBeGreaterThanOrEqual(curr);
+    }
+  });
+
+  it("returns entries in exact newest-first order with correct success flags and distinct error messages", async () => {
+    // Expected sequence newest-first:
+    //   [0] success      → errorMessage null
+    //   [1] attempt 3    → "PestPac 401: credentials expired"
+    //   [2] attempt 2    → "PestPac 503: still unavailable"
+    //   [3] attempt 1    → "PestPac 503: gateway timeout"
+    authState.userId = RETRY_OWNER_ID;
+
+    const res = await request(app)
+      .get(`/api/integrations/sync-history?inspectionId=${retryInspectionId}`);
+
+    expect(res.status).toBe(200);
+    const logs: { success: boolean; errorMessage: string | null; syncedAt: string }[] =
+      res.body.logs;
+
+    expect(logs).toHaveLength(4);
+
+    // Entry 0 — the successful attempt is the newest.
+    expect(logs[0].success).toBe(true);
+    expect(logs[0].errorMessage).toBeNull();
+
+    // Entry 1 — most-recent failure (attempt 3: credentials expired).
+    expect(logs[1].success).toBe(false);
+    expect(logs[1].errorMessage).toBe("PestPac 401: credentials expired");
+
+    // Entry 2 — second failure (attempt 2: still unavailable).
+    expect(logs[2].success).toBe(false);
+    expect(logs[2].errorMessage).toBe("PestPac 503: still unavailable");
+
+    // Entry 3 — oldest failure (attempt 1: gateway timeout).
+    expect(logs[3].success).toBe(false);
+    expect(logs[3].errorMessage).toBe("PestPac 503: gateway timeout");
+
+    // Confirm monotonically non-increasing timestamps (newest-first ordering).
+    for (let i = 1; i < logs.length; i++) {
+      const prev = new Date(logs[i - 1].syncedAt).getTime();
+      const curr = new Date(logs[i].syncedAt).getTime();
+      expect(prev).toBeGreaterThanOrEqual(curr);
+    }
+  });
+});
+
+// ─── sync-history — API returns >10 entries; UI display cap is client-side ───
+//
+// The server returns up to 100 entries; the client caps display at 10 via
+// sliceSyncHistory() in SyncHistoryBadge.  This suite drives 11 sync attempts
+// (10 failures + 1 success — failures are never cooled down, so each is
+// retryable immediately) and confirms the API returns all 11.  The slicing
+// behaviour is covered independently in the mobile-app unit test
+// lib/sync-history/__tests__/sliceSyncHistory.test.ts.
+
+describe("GET /api/integrations/sync-history — API returns all entries above the display cap", () => {
+  const DISPLAY_CAP_OWNER_ID = "display_cap_owner_clerk_id";
+
+  let displayCapCompanyId: number;
+  let displayCapInspectionId: number;
+
+  beforeAll(async () => {
+    displayCapCompanyId = await findOrCreateCompany(
+      "Display Cap Co",
+      "display-cap-co",
+    );
+
+    const existing = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, DISPLAY_CAP_OWNER_ID));
+    if (existing.length === 0) {
+      await db.insert(usersTable).values({
+        clerkUserId: DISPLAY_CAP_OWNER_ID,
+        role: "owner",
+        companyId: displayCapCompanyId,
+      });
+    }
+
+    await db
+      .delete(companyFieldIntegrationsTable)
+      .where(eq(companyFieldIntegrationsTable.companyId, displayCapCompanyId));
+    await db.insert(companyFieldIntegrationsTable).values({
+      companyId: displayCapCompanyId,
+      systemType: "pestpac",
+      accountId: "cap-acct",
+      apiKey: "cap-key",
+      enabled: true,
+    });
+
+    const [insp] = await db
+      .insert(inspectionsTable)
+      .values({
+        companyId: displayCapCompanyId,
+        siteAddress: "11 Cap Lane",
+        technicianName: "Tech C",
+        status: "completed",
+      })
+      .returning();
+    displayCapInspectionId = insp.id;
+
+    // Exercise 10 failed sync attempts (failures are never subject to cooldown,
+    // so each call reaches the external-system mock and writes a log row).
+    authState.userId = DISPLAY_CAP_OWNER_ID;
+    for (let i = 0; i < 10; i++) {
+      syncMock.mockRejectedValueOnce(new Error(`timeout attempt ${i}`));
+      await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: displayCapInspectionId });
+    }
+
+    // One final successful attempt — brings the total to 11.
+    syncMock.mockResolvedValueOnce({
+      success: true,
+      externalSystem: "pestpac",
+      postedNotes: true,
+      attachmentsPosted: 0,
+    });
+    await request(app)
+      .post("/api/integrations/sync")
+      .send({ inspectionId: displayCapInspectionId });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(inspectionSyncLogsTable)
+      .where(eq(inspectionSyncLogsTable.companyId, displayCapCompanyId));
+    await db
+      .delete(inspectionsTable)
+      .where(eq(inspectionsTable.id, displayCapInspectionId));
+    await db
+      .delete(companyFieldIntegrationsTable)
+      .where(eq(companyFieldIntegrationsTable.companyId, displayCapCompanyId));
+  });
+
+  it("returns all 11 entries — the API does not apply the 10-entry UI cap", async () => {
+    authState.userId = DISPLAY_CAP_OWNER_ID;
+
+    const res = await request(app)
+      .get(`/api/integrations/sync-history?inspectionId=${displayCapInspectionId}`);
+
+    expect(res.status).toBe(200);
+    // 11 entries must be returned even though the UI cap is 10.
+    // sliceSyncHistory() in SyncHistoryBadge enforces the cap client-side.
+    expect(res.body.logs).toHaveLength(11);
+  });
+
+  it("newest entry is the successful attempt — the 10 failures precede it in the list", async () => {
+    authState.userId = DISPLAY_CAP_OWNER_ID;
+
+    const res = await request(app)
+      .get(`/api/integrations/sync-history?inspectionId=${displayCapInspectionId}`);
+
+    expect(res.status).toBe(200);
+    const logs: { success: boolean }[] = res.body.logs;
+
+    expect(logs[0].success).toBe(true);
+    // All remaining entries must be failures.
+    for (const log of logs.slice(1)) {
+      expect(log.success).toBe(false);
+    }
   });
 });
 

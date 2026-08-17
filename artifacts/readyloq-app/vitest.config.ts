@@ -24,6 +24,7 @@ export default defineConfig({
       "hooks/__tests__/useAllDevicesHealthCheck.test.ts",
       "lib/risk-drill-down/__tests__/**/*.test.ts",
       "app/\\(app\\)/inspection-summary/__tests__/**/*.test.ts",
+      "lib/sync-history/__tests__/**/*.test.ts",
     ],
   },
   resolve: {
