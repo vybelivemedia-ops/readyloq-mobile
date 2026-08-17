@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import {
   format, startOfWeek, endOfWeek, addWeeks, subWeeks,
-  eachDayOfInterval, isSameDay, parseISO, isValid,
+  eachDayOfInterval, isSameDay, parseISO, isValid, isWithinInterval,
 } from 'date-fns';
 import {
   ChevronLeft, ChevronRight, CalendarDays, Users, AlertCircle,
@@ -169,6 +169,7 @@ interface BookForm {
 function NewInspectionSheet({
   open,
   onClose,
+  onSuccess,
   technicians,
   technicianIdMap,
   initialDate,
@@ -176,6 +177,7 @@ function NewInspectionSheet({
 }: {
   open: boolean;
   onClose: () => void;
+  onSuccess?: (scheduledDate: string) => void;
   technicians: string[];
   technicianIdMap: Map<string, string | null>;
   initialDate?: string;
@@ -223,7 +225,9 @@ function NewInspectionSheet({
         ...(typeof resolvedId === 'string' ? { technicianId: resolvedId } : {}),
         scheduledDate: form.scheduledDate ? `${form.scheduledDate}T00:00:00.000Z` : undefined,
       });
+      const bookedDate = form.scheduledDate;
       handleClose();
+      onSuccess?.(bookedDate);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create inspection');
     }
@@ -514,6 +518,28 @@ export function Schedule() {
   function handleOpenBook(date?: string, tech?: string) {
     setBookPreset(date || tech ? { date: date ?? toYMD(new Date()), tech: tech ?? '' } : null);
     setBookOpen(true);
+  }
+
+  function handleBookSuccess(scheduledDate: string) {
+    if (!scheduledDate) return;
+    const parsed = parseISO(scheduledDate);
+    if (!isValid(parsed)) return;
+
+    const inCurrentWeek = isWithinInterval(parsed, { start: weekStart, end: weekEnd });
+
+    if (!inCurrentWeek) {
+      const targetWeekStart = startOfWeek(parsed, { weekStartsOn: 1 });
+      setWeekStart(targetWeekStart);
+      toast({
+        title: 'Inspection booked',
+        description: `Scheduled for ${format(parsed, 'EEEE, MMM d')} — calendar has jumped to that week.`,
+      });
+    } else {
+      toast({
+        title: 'Inspection booked',
+        description: `Scheduled for ${format(parsed, 'EEEE, MMM d')}.`,
+      });
+    }
   }
 
   function handleSave(technicianName: string, scheduledDate: string) {
@@ -833,6 +859,7 @@ export function Schedule() {
         key={bookPreset ? `${bookPreset.date}:${bookPreset.tech}` : 'default'}
         open={bookOpen}
         onClose={() => { setBookOpen(false); setBookPreset(null); }}
+        onSuccess={handleBookSuccess}
         technicians={technicians}
         technicianIdMap={technicianIdMap}
         initialDate={bookPreset?.date}
