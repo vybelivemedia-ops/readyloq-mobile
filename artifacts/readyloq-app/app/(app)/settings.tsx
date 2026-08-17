@@ -14,6 +14,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -23,6 +24,8 @@ import {
 } from "react-native";
 
 import { useAuth, useUser } from "@clerk/expo";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
 import { Screen } from "@/components/ui/Screen";
 import { Card } from "@/components/ui/Card";
 import { useColors } from "@/hooks/useColors";
@@ -39,6 +42,7 @@ import {
   testIntegrationCredentials,
   setPushNotificationsEnabled,
   setBriefingEmailOptOut,
+  registerPushToken,
   type FieldIntegrationSystem,
   type IntegrationConfigResponse,
   type IntegrationProbeResult,
@@ -800,6 +804,59 @@ export default function SettingsScreen() {
     user?.pushNotificationsEnabled ?? true,
   );
   const [pushToggling, setPushToggling] = React.useState(false);
+  const [pushReRegistering, setPushReRegistering] = React.useState(false);
+
+  /**
+   * Re-register the Expo push token after a DeviceNotRegistered or other delivery
+   * failure. Mirrors the layout-level registration so the owner can self-heal
+   * without reopening the app. On success the server clears pushLastFailedAt and
+   * stores the fresh token; refetchUser() removes the banner.
+   */
+  const handleReRegisterPushToken = async () => {
+    if (pushReRegistering || !Device.isDevice) return;
+    setPushReRegistering(true);
+    try {
+      // Set up Android notification channels if needed.
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("critical-alerts", {
+          name: "Critical Risk Alerts",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#ef4444",
+        });
+      }
+
+      const existingPerm = await Notifications.getPermissionsAsync();
+      if (!existingPerm.granted) {
+        const requested = await Notifications.requestPermissionsAsync();
+        if (!requested.granted) {
+          // Permission denied — open Settings so the user can grant it manually.
+          void Linking.openSettings();
+          return;
+        }
+      }
+
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: "7927cf86-2cbd-4c14-9bd5-d43f2beabec8",
+      });
+      const authToken = await getToken();
+      await registerPushToken(authToken, tokenData.data);
+      // Refresh the user record so the banner disappears immediately.
+      refetchUser();
+    } catch (e: unknown) {
+      console.warn("[PushToken] Re-registration failed:", e);
+      Alert.alert(
+        "Re-registration failed",
+        "Could not refresh your push token. Check that notifications are allowed in your device Settings.",
+        [
+          { text: "Open Settings", onPress: () => void Linking.openSettings() },
+          { text: "Cancel", style: "cancel" },
+        ],
+      );
+    } finally {
+      setPushReRegistering(false);
+    }
+  };
 
   const handlePushToggle = async (value: boolean) => {
     if (pushToggling) return;
@@ -962,11 +1019,14 @@ export default function SettingsScreen() {
                 : "Critical risk alerts are off. Enable to get instant push notifications."}
             </Text>
 
-            {/* Stale-token warning: push is on but the token was cleared (e.g.
-                DeviceNotRegistered after an OS update or reinstall). */}
-            {pushEnabled && user?.hasPushToken === false && (
+            {/* Push alert warning: shown when the token is missing OR when the
+                server recorded a delivery failure (pushLastFailedAt is set).
+                Tapping re-registers the Expo push token so the owner can
+                self-heal without closing and reopening the app. */}
+            {pushEnabled && (user?.hasPushToken === false || !!user?.pushLastFailedAt) && (
               <Pressable
-                onPress={() => void Linking.openSettings()}
+                onPress={() => void handleReRegisterPushToken()}
+                disabled={pushReRegistering}
                 style={({ pressed }) => ({
                   flexDirection: "row",
                   alignItems: "flex-start",
@@ -977,7 +1037,7 @@ export default function SettingsScreen() {
                   backgroundColor: "#f97316" + "18",
                   borderWidth: 1,
                   borderColor: "#f97316" + "44",
-                  opacity: pressed ? 0.75 : 1,
+                  opacity: pressed || pushReRegistering ? 0.75 : 1,
                 })}
               >
                 <Ionicons name="warning-outline" size={16} color="#f97316" style={{ marginTop: 1 }} />
@@ -986,12 +1046,16 @@ export default function SettingsScreen() {
                     Alerts may not be reaching you
                   </Text>
                   <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 }}>
-                    Your push token expired or was cleared. Re-open the app to
-                    re-register, or check that notifications are allowed in your
-                    device Settings.
+                    {user?.hasPushToken === false
+                      ? "Your push token expired or was cleared. Tap to re-register and restore alerts."
+                      : "A recent alert could not be delivered. Tap to refresh your push token and restore alerts."}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} style={{ marginTop: 2 }} />
+                {pushReRegistering ? (
+                  <ActivityIndicator size="small" color="#f97316" style={{ marginTop: 2 }} />
+                ) : (
+                  <Ionicons name="refresh-outline" size={14} color="#f97316" style={{ marginTop: 2 }} />
+                )}
               </Pressable>
             )}
           </View>
