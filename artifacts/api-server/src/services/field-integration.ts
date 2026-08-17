@@ -156,7 +156,11 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
   );
   if (!noteRes.ok) {
     const body = await noteRes.text();
-    throw new Error(`PestPac note POST failed (${noteRes.status}): ${body}`);
+    const isAuthFailure = noteRes.status === 401 || noteRes.status === 403;
+    const label = isAuthFailure
+      ? `auth failure (${noteRes.status}) — dead credential, no retries performed`
+      : `HTTP ${noteRes.status}`;
+    throw new Error(`PestPac note POST failed [${label}]: ${body}`);
   }
 
   // 2 — Attach photos (up to 3 attempts each with exponential back-off)
@@ -275,7 +279,11 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
 
   if (!histRes.ok) {
     const body = await histRes.text();
-    throw new Error(`FieldRoutes service-history POST failed (${histRes.status}): ${body}`);
+    const isAuthFailure = histRes.status === 401 || histRes.status === 403;
+    const label = isAuthFailure
+      ? `auth failure (${histRes.status}) — dead credential, no retries performed`
+      : `HTTP ${histRes.status}`;
+    throw new Error(`FieldRoutes service-history POST failed [${label}]: ${body}`);
   }
 
   // FieldRoutes bundles media into the service-history POST — no separate
