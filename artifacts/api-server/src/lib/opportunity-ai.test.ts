@@ -51,7 +51,7 @@ vi.mock("@clerk/express", async (importOriginal) => {
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { parseCandidates, runOpportunitySynthesis, runOpportunitySynthesisCore } from "./opportunity-ai";
+import { getSettings, parseCandidates, runOpportunitySynthesis, runOpportunitySynthesisCore } from "./opportunity-ai";
 import {
   db,
   companiesTable,
@@ -602,4 +602,42 @@ describe("runOpportunitySynthesis — synthesisFailuresSinceLastSuccess counter"
     await runOpportunitySynthesis({ companyId, inspectionId, findings });
     await waitForCounter(companyId, 0);
   }, 10_000);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getSettings default — synthesisFailuresSinceLastSuccess must be 0 for a
+// brand-new company that has never had an opportunity_settings row.
+//
+// This pins the fallback value so that removing the hard-coded `0` in
+// getSettings (opportunity-ai.ts) immediately breaks this test, preventing a
+// phantom failure banner from appearing for companies with no synthesis history.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("getSettings — default settings for a company with no opportunity_settings row", () => {
+  it("returns synthesisFailuresSinceLastSuccess: 0 when no row exists", async () => {
+    // Guarantee the fixture company has no settings row before calling getSettings.
+    await db
+      .delete(opportunitySettingsTable)
+      .where(eq(opportunitySettingsTable.companyId, companyId));
+
+    const settings = await getSettings(companyId);
+
+    expect(settings.synthesisFailuresSinceLastSuccess).toBe(0);
+  });
+
+  it("returns enabled: true and minConfidence: 0.5 in the default settings object", async () => {
+    await db
+      .delete(opportunitySettingsTable)
+      .where(eq(opportunitySettingsTable.companyId, companyId));
+
+    const settings = await getSettings(companyId);
+
+    // Belt-and-braces: confirm the full default shape so no single field
+    // can silently flip without a test failure.
+    expect(settings.enabled).toBe(true);
+    expect(settings.minConfidence).toBe(0.5);
+    expect(settings.enabledCategories).toBeNull();
+    expect(settings.synthesisFailuresSinceLastSuccess).toBe(0);
+    expect(settings.companyId).toBe(companyId);
+  });
 });

@@ -118,7 +118,7 @@ export function opportunityFingerprint(category: string, title: string): string 
   return `${category}|${normalized}`;
 }
 
-async function getSettings(companyId: number): Promise<OpportunitySettings> {
+export async function getSettings(companyId: number): Promise<OpportunitySettings> {
   const [existing] = await db
     .select()
     .from(opportunitySettingsTable)
