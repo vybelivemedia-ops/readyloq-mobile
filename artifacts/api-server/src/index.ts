@@ -11,6 +11,7 @@ import { migrateSyncLogs } from "./lib/migrate-sync-logs";
 import { migrateBriefingEmailColumn } from "./lib/migrate-briefing-email";
 import { migrateAnalysisErrors } from "./lib/migrate-analysis-errors";
 import { migrateAnalysisFailureReason } from "./lib/migrate-analysis-failure-reason";
+import { migrateScheduleIndex } from "./lib/migrate-schedule-index";
 import { startBriefingScheduler } from "./lib/briefing-scheduler";
 
 const rawPort = process.env["PORT"];
@@ -36,6 +37,7 @@ async function startup() {
   await migrateBriefingEmailColumn();
   await migrateAnalysisErrors();
   await migrateAnalysisFailureReason();
+  await migrateScheduleIndex();
 
   app.listen(port, (err) => {
     if (err) {

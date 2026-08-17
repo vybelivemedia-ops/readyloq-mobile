@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { companiesTable } from "./companies";
@@ -51,6 +52,14 @@ export const inspectionsTable = pgTable(
     index("inspections_technician_id_idx").on(t.technicianId),
     index("inspections_status_idx").on(t.status),
     index("inspections_company_status_idx").on(t.companyId, t.status),
+    // Composite expression index supporting GET /api/schedule — allows the DB
+    // to seek directly to the requested date window using COALESCE(scheduled_date,
+    // created_at) without scanning every company inspection.
+    index("inspections_company_cal_date_idx").using(
+      "btree",
+      t.companyId,
+      sql`COALESCE(${t.scheduledDate}, ${t.createdAt})`,
+    ),
   ],
 );
 

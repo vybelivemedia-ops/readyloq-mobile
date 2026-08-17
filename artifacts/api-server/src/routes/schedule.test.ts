@@ -505,3 +505,80 @@ describe("PATCH /api/schedule/:id — push notifications", () => {
     expect(unchanged.scheduledDate?.toISOString()).toBe("2026-08-20T00:00:00.000Z");
   });
 });
+
+// ── GET /api/schedule date-filter tests ───────────────────────────────────────
+
+describe("GET /api/schedule — DB-level date filter", () => {
+  it("returns only inspections within the date window (scheduledDate)", async () => {
+    // One inspection inside the window, one outside.
+    await createInspection({ technicianName: "Tech A", technicianId: TECH_A_ID, scheduledDate: "2026-09-10T00:00:00.000Z" });
+    await createInspection({ technicianName: "Tech A", technicianId: TECH_A_ID, scheduledDate: "2026-09-20T00:00:00.000Z" });
+
+    asUser(MANAGER_ID);
+    const res = await request(app).get("/api/schedule?start=2026-09-10&end=2026-09-10");
+
+    expect(res.status).toBe(200);
+    const dates: string[] = res.body.map((e: { calendarDate: string }) => e.calendarDate);
+    expect(dates.every((d) => d === "2026-09-10")).toBe(true);
+    expect(dates).toHaveLength(1);
+  });
+
+  it("returns inspections using createdAt as fallback when scheduledDate is null", async () => {
+    // Insert a row without scheduledDate — the DB query must fall back to createdAt.
+    // We can't control the exact createdAt timestamp, so we query a wide window.
+    const id = await createInspection({ technicianName: "Tech A", technicianId: TECH_A_ID });
+
+    // Fetch the actual createdAt from the DB so we can build a precise window.
+    const [row] = await db
+      .select({ createdAt: inspectionsTable.createdAt })
+      .from(inspectionsTable)
+      .where(eq(inspectionsTable.id, id));
+    const dateStr = row.createdAt.toISOString().slice(0, 10);
+
+    asUser(MANAGER_ID);
+    const res = await request(app).get(`/api/schedule?start=${dateStr}&end=${dateStr}`);
+
+    expect(res.status).toBe(200);
+    // The inspection without a scheduledDate must appear in the result.
+    const ids: number[] = res.body.map((e: { id: number }) => e.id);
+    expect(ids).toContain(id);
+  });
+
+  it("excludes inspections outside the requested window entirely", async () => {
+    // Insert one inspection far in the past (scheduledDate in 2020).
+    await createInspection({ technicianName: "Tech A", technicianId: TECH_A_ID, scheduledDate: "2020-01-01T00:00:00.000Z" });
+
+    asUser(MANAGER_ID);
+    // Query only the current week — 2020 row must NOT appear.
+    const res = await request(app).get("/api/schedule?start=2026-09-01&end=2026-09-07");
+
+    expect(res.status).toBe(200);
+    const dates: string[] = res.body.map((e: { calendarDate: string }) => e.calendarDate);
+    expect(dates.some((d) => d.startsWith("2020"))).toBe(false);
+  });
+
+  it("never returns inspections from another company (tenant isolation)", async () => {
+    const otherId = await createInspection({
+      technicianName: "Other Tech",
+      technicianId: null,
+      scheduledDate: "2026-09-15T00:00:00.000Z",
+      cid: otherCompanyId,
+    });
+
+    asUser(MANAGER_ID);
+    const res = await request(app).get("/api/schedule?start=2026-09-01&end=2026-09-30");
+
+    expect(res.status).toBe(200);
+    const ids: number[] = res.body.map((e: { id: number }) => e.id);
+    expect(ids).not.toContain(otherId);
+  });
+
+  it("returns 400 when start or end params are missing", async () => {
+    asUser(MANAGER_ID);
+    const r1 = await request(app).get("/api/schedule?start=2026-09-01");
+    expect(r1.status).toBe(400);
+
+    const r2 = await request(app).get("/api/schedule?end=2026-09-07");
+    expect(r2.status).toBe(400);
+  });
+});

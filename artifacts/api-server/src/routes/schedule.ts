@@ -10,7 +10,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { inspectionsTable, usersTable } from "@workspace/db";
-import { eq, and, isNotNull, desc } from "drizzle-orm";
+import { eq, and, isNotNull, desc, sql } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import { z } from "zod";
 import { notifyTechnicianRouteUpdated } from "../lib/push-notifications";
@@ -46,35 +46,37 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ error: "Invalid date format — use YYYY-MM-DD" });
     }
 
-    // Pull everything for the company; we post-filter in JS so we can apply
-    // the "scheduledDate ?? createdAt" fallback without a DB-level expression.
+    // Apply the date-range filter at the DB level using a COALESCE expression
+    // so only the relevant rows are fetched (avoids loading the full company
+    // inspection history into memory for each calendar request).
     const rows = await db
       .select()
       .from(inspectionsTable)
-      .where(eq(inspectionsTable.companyId, companyId));
+      .where(
+        and(
+          eq(inspectionsTable.companyId, companyId),
+          sql`COALESCE(${inspectionsTable.scheduledDate}, ${inspectionsTable.createdAt}) >= ${startDate}`,
+          sql`COALESCE(${inspectionsTable.scheduledDate}, ${inspectionsTable.createdAt}) <= ${endDate}`,
+        ),
+      );
 
-    const entries = rows
-      .map((r) => {
-        const calDate = r.scheduledDate ?? r.createdAt;
-        return {
-          id: r.id,
-          siteAddress: r.siteAddress,
-          clientName: r.clientName ?? null,
-          technicianName: r.technicianName,
-          technicianId: r.technicianId ?? null,
-          status: r.status,
-          severity: r.severity ?? null,
-          pestTypes: r.pestTypes ?? [],
-          scheduledDate: r.scheduledDate?.toISOString() ?? null,
-          calendarDate: toISODate(calDate),   // YYYY-MM-DD — used by the grid
-          createdAt: r.createdAt.toISOString(),
-          completedAt: r.completedAt?.toISOString() ?? null,
-        };
-      })
-      .filter((e) => {
-        const d = new Date(e.calendarDate + "T00:00:00.000Z");
-        return d >= startDate && d <= endDate;
-      });
+    const entries = rows.map((r) => {
+      const calDate = r.scheduledDate ?? r.createdAt;
+      return {
+        id: r.id,
+        siteAddress: r.siteAddress,
+        clientName: r.clientName ?? null,
+        technicianName: r.technicianName,
+        technicianId: r.technicianId ?? null,
+        status: r.status,
+        severity: r.severity ?? null,
+        pestTypes: r.pestTypes ?? [],
+        scheduledDate: r.scheduledDate?.toISOString() ?? null,
+        calendarDate: toISODate(calDate),   // YYYY-MM-DD — used by the grid
+        createdAt: r.createdAt.toISOString(),
+        completedAt: r.completedAt?.toISOString() ?? null,
+      };
+    });
 
     return res.json(entries);
   } catch {
