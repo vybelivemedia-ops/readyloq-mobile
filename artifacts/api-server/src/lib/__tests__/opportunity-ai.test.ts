@@ -167,6 +167,7 @@ describe("runOpportunitySynthesis — retry behaviour", () => {
       companyId,
       inspectionId,
       findings: [STUB_FINDING],
+      retryDelayMs: 0,
     });
 
     // Both attempts should have been made.
@@ -199,6 +200,7 @@ describe("runOpportunitySynthesis — total AI failure logging", () => {
       companyId,
       inspectionId,
       findings: [STUB_FINDING],
+      retryDelayMs: 0,
     });
 
     // Both AI calls should have been attempted.
@@ -234,6 +236,7 @@ describe("runOpportunitySynthesis — total AI failure logging", () => {
         companyId,
         inspectionId,
         findings: [STUB_FINDING],
+        retryDelayMs: 0,
       }),
     ).resolves.toBeUndefined();
   });
@@ -246,8 +249,8 @@ describe("runOpportunitySynthesis — total AI failure logging", () => {
 //   (a) every AI failure surfaces as a thrown error a batch loop can count, and
 //   (b) a mixed batch (some succeed, some fail) produces exactly the right split.
 //
-// The 1500 ms retry sleep is real here; a future task will inject fake timers
-// to keep the suite fast.
+// retryDelayMs: 0 is passed to each call so the retry path completes without
+// any real wait — no fake timers needed.
 
 describe("runOpportunitySynthesisCore — all-failure batch", () => {
   it("throws for every inspection when AI always fails, so the batch loop counts failures accurately", async () => {
@@ -267,8 +270,8 @@ describe("runOpportunitySynthesisCore — all-failure batch", () => {
       .returning();
 
     const batch = [
-      { companyId, inspectionId, findings: [STUB_FINDING] },
-      { companyId, inspectionId: insp2.id, findings: [STUB_FINDING] },
+      { companyId, inspectionId, findings: [STUB_FINDING], retryDelayMs: 0 },
+      { companyId, inspectionId: insp2.id, findings: [STUB_FINDING], retryDelayMs: 0 },
     ];
 
     // Simulate what a batch catch-up endpoint does: call Core for each item,
@@ -329,9 +332,9 @@ describe("runOpportunitySynthesisCore — mixed batch", () => {
       .returning();
 
     const batch = [
-      { companyId, inspectionId, findings: [STUB_FINDING] },
-      { companyId, inspectionId: insp2.id, findings: [STUB_FINDING] },
-      { companyId, inspectionId: insp3.id, findings: [STUB_FINDING] },
+      { companyId, inspectionId, findings: [STUB_FINDING], retryDelayMs: 0 },
+      { companyId, inspectionId: insp2.id, findings: [STUB_FINDING], retryDelayMs: 0 },
+      { companyId, inspectionId: insp3.id, findings: [STUB_FINDING], retryDelayMs: 0 },
     ];
 
     let successes = 0;

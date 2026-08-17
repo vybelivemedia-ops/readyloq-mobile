@@ -377,13 +377,16 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Attempt the AI completion once. On network/rate-limit error, wait
- * RETRY_DELAY_MS and try once more. Throws on the second failure so the
+ * `retryDelayMs` and try once more. Throws on the second failure so the
  * caller can log it distinctly from "AI returned an empty list".
+ *
+ * `retryDelayMs` defaults to 1 500 ms in production. Pass 0 in tests to
+ * avoid real waits when fake timers cannot be used safely with the pg pool.
  */
 async function callAiWithRetry(
   messages: Parameters<typeof openai.chat.completions.create>[0]["messages"],
+  retryDelayMs = 1_500,
 ): Promise<string | null> {
-  const RETRY_DELAY_MS = 1_500;
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -398,10 +401,10 @@ async function callAiWithRetry(
       lastErr = err;
       if (attempt === 0) {
         logger.warn(
-          { err: err instanceof Error ? err.message : String(err), retryDelayMs: RETRY_DELAY_MS },
+          { err: err instanceof Error ? err.message : String(err), retryDelayMs },
           "[opportunity-synthesis] AI call failed on attempt 1, retrying",
         );
-        await sleep(RETRY_DELAY_MS);
+        await sleep(retryDelayMs);
       }
     }
   }
@@ -420,8 +423,11 @@ export async function runOpportunitySynthesisCore(input: {
   companyId: number;
   inspectionId: number;
   findings: Finding[];
+  /** Override the between-attempt sleep duration. Defaults to 1 500 ms.
+   *  Pass 0 in tests to avoid real waits. */
+  retryDelayMs?: number;
 }): Promise<void> {
-  const { companyId, inspectionId, findings } = input;
+  const { companyId, inspectionId, findings, retryDelayMs } = input;
 
   if (findings.length === 0) return;
 
@@ -454,10 +460,13 @@ export async function runOpportunitySynthesisCore(input: {
 
   // callAiWithRetry throws on both-attempt failure — the throw propagates to
   // the caller so batch endpoints can count it as a real failure.
-  const raw = await callAiWithRetry([
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: userPrompt({ findings, openOpportunities, trend }) },
-  ]);
+  const raw = await callAiWithRetry(
+    [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userPrompt({ findings, openOpportunities, trend }) },
+    ],
+    retryDelayMs,
+  );
   if (!raw) {
     console.info(
       `[opportunity-synthesis] AI returned empty content — no opportunities written`,
@@ -652,6 +661,9 @@ export async function runOpportunitySynthesis(input: {
   companyId: number;
   inspectionId: number;
   findings: Finding[];
+  /** Override the between-attempt sleep duration. Defaults to 1 500 ms.
+   *  Pass 0 in tests to avoid real waits. */
+  retryDelayMs?: number;
 }): Promise<void> {
   const { companyId, inspectionId } = input;
   try {
