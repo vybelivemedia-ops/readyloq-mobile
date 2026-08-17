@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   useListIntelligenceRecords,
   useListIntelligenceCategories,
@@ -12,6 +12,8 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  X,
+  ZoomIn,
   Brain,
   UserCheck,
   ShieldCheck,
@@ -185,6 +187,7 @@ export function IntelligenceReview() {
   const [comment, setComment] = useState('');
   const [page, setPage] = useState(1);
   const [editOpen, setEditOpen] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [edits, setEdits] = useState<LabelEdits>({
     category: '',
     subcategory: '',
@@ -213,6 +216,15 @@ export function IntelligenceReview() {
     setEdits(initEdits(selected));
     setEditOpen(false);
   }, [selected?.id]);
+
+  // Close lightbox on Escape.
+  const closeLightbox = useCallback(() => setLightboxUrl(null), []);
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeLightbox(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxUrl, closeLightbox]);
 
   const selectedCategory = categories.find((c) => c.slug === edits.category);
   const subcategoryOptions = selectedCategory?.subcategories ?? [];
@@ -315,11 +327,21 @@ export function IntelligenceReview() {
                     onClick={() => { setSelectedId(r.id); setComment(''); }}
                     data-testid={`review-queue-item-${r.id}`}
                   >
-                    <img
-                      src={r.thumbnailUrl ?? r.imageUrl}
-                      alt=""
-                      className="w-14 h-14 rounded-md object-cover bg-muted shrink-0"
-                    />
+                    <div className="relative group/thumb shrink-0">
+                      <img
+                        src={r.thumbnailUrl ?? r.imageUrl}
+                        alt=""
+                        className="w-14 h-14 rounded-md object-cover bg-muted"
+                      />
+                      <button
+                        className="absolute inset-0 flex items-center justify-center rounded-md bg-black/0 group-hover/thumb:bg-black/40 transition-colors"
+                        onClick={(e) => { e.stopPropagation(); setLightboxUrl(r.imageUrl); }}
+                        aria-label="View full image"
+                        tabIndex={-1}
+                      >
+                        <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
+                      </button>
+                    </div>
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">
                         {labelize(r.category)}{r.subcategory ? ` · ${labelize(r.subcategory)}` : ''}
@@ -381,11 +403,20 @@ export function IntelligenceReview() {
                   </div>
                 </div>
 
-                <img
-                  src={selected.imageUrl}
-                  alt="Finding"
-                  className="w-full max-h-96 object-contain rounded-lg bg-black/40"
-                />
+                <button
+                  className="group/mainimg relative w-full block rounded-lg overflow-hidden bg-black/40"
+                  onClick={() => setLightboxUrl(selected.imageUrl)}
+                  aria-label="View full-size image"
+                >
+                  <img
+                    src={selected.imageUrl}
+                    alt="Finding"
+                    className="w-full max-h-96 object-contain"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/mainimg:bg-black/30 transition-colors">
+                    <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover/mainimg:opacity-100 transition-opacity drop-shadow-lg" />
+                  </div>
+                </button>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -645,6 +676,31 @@ export function IntelligenceReview() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Lightbox ────────────────────────────────────────────────────── */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+          onClick={closeLightbox}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Full-size evidence photo"
+        >
+          <button
+            className="absolute top-4 right-4 z-10 flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 text-white text-sm font-medium transition-colors"
+            onClick={closeLightbox}
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" /> Close
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Full-size evidence photo"
+            className="max-w-[92vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
