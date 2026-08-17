@@ -15,6 +15,26 @@
 export type CopyLabel = "copy" | "copied";
 
 /**
+ * Returns the VoiceOver / TalkBack accessibility label for the copy button.
+ *
+ * The label must always describe the button's *current* state so that screen
+ * readers announce the right thing regardless of the button's visual shape:
+ *
+ *  - "copy"   (idle / icon-only) → "Copy snapshot"
+ *  - "copied" (brief confirmation text) → "Copied!"
+ *
+ * `copying` (in-flight) keeps the "Copy snapshot" label; the button is
+ * disabled so VoiceOver will additionally announce "dimmed".
+ */
+export function getCopyButtonAccessibilityLabel(
+  copying: boolean,
+  copyLabel: CopyLabel,
+): string {
+  if (!copying && copyLabel === "copied") return "Copied!";
+  return "Copy snapshot";
+}
+
+/**
  * Returns true when the copy button should be inert.
  * Mirrors the `disabled={copying || loading}` prop on the TouchableOpacity.
  */

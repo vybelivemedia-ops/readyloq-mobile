@@ -15,6 +15,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   isCopyButtonDisabled,
   runCopySnapshot,
+  getCopyButtonAccessibilityLabel,
   type CopySnapshotDeps,
 } from "../copy-button";
 
@@ -249,5 +250,28 @@ describe("runCopySnapshot — error path", () => {
 
     expect(deps.writeClipboard).not.toHaveBeenCalled();
     expect(deps.onError).toHaveBeenCalled();
+  });
+});
+
+// ─── 6. Accessibility label — VoiceOver / TalkBack announcement ───────────────
+
+describe("getCopyButtonAccessibilityLabel", () => {
+  it("returns 'Copy snapshot' when idle (copyLabel='copy', not copying)", () => {
+    expect(getCopyButtonAccessibilityLabel(false, "copy")).toBe("Copy snapshot");
+  });
+
+  it("returns 'Copied!' when the confirmation state is shown (copyLabel='copied', not copying)", () => {
+    expect(getCopyButtonAccessibilityLabel(false, "copied")).toBe("Copied!");
+  });
+
+  it("returns 'Copy snapshot' while in-flight (copying=true, copyLabel='copy')", () => {
+    // The button is disabled during the fetch; VoiceOver reads "Copy snapshot, dimmed"
+    expect(getCopyButtonAccessibilityLabel(true, "copy")).toBe("Copy snapshot");
+  });
+
+  it("returns 'Copy snapshot' while in-flight even if copyLabel happens to be 'copied'", () => {
+    // Defensive: copying=true means the flow is still running — label should
+    // not flip to 'Copied!' until the write has completed and copying resets.
+    expect(getCopyButtonAccessibilityLabel(true, "copied")).toBe("Copy snapshot");
   });
 });

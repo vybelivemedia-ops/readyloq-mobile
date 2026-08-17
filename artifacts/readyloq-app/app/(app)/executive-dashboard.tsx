@@ -34,7 +34,7 @@ import {
   type ExecutiveQualityWeek,
   type DailyBriefing,
 } from "@/lib/api";
-import { isCopyButtonDisabled, runCopySnapshot } from "@/lib/dashboard/copy-button";
+import { isCopyButtonDisabled, runCopySnapshot, getCopyButtonAccessibilityLabel } from "@/lib/dashboard/copy-button";
 import { isShareButtonDisabled, runShareSnapshot } from "@/lib/dashboard/share-snapshot";
 import { KPI_DEEP_LINK_FILTERS } from "@/lib/dashboard/kpi-deep-links";
 import { isWeekBarTappable, weekBarNavigates, ZERO_WEEK_ALERT_TITLE, zeroWeekAlertBody } from "@/lib/dashboard/week-bar-guard";
@@ -804,6 +804,9 @@ export default function ExecutiveDashboardScreen() {
           onPress={() => void handleCopy()}
           onLongPress={handleLongPressCopy}
           disabled={isCopyButtonDisabled(loading, copying)}
+          accessibilityRole="button"
+          accessibilityLabel={getCopyButtonAccessibilityLabel(copying, copyLabel)}
+          accessibilityState={{ disabled: isCopyButtonDisabled(loading, copying) }}
           style={{
             height: 36,
             borderRadius: 18,
