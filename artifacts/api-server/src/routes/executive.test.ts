@@ -2044,3 +2044,236 @@ describe("executive quality-trend endpoint: cross-company isolation", () => {
     expect(currentWeekB.avgQuality).toBe(40);  // B's average: 40
   });
 });
+
+// ---------------------------------------------------------------------------
+// Quality-trend inspections drill-down endpoint tests (Task #358)
+//
+// GET /api/executive/quality-trend/inspections?weekStart=YYYY-MM-DD
+//
+// Fixture recap (seeded in beforeAll above):
+//   Company A — 2 scorecards in the current ISO week:
+//     inspAId  → qualityScore 88, riskLevel "high",     technicianName "Alice", siteAddress "1 Exec Ave"
+//     inspA2Id → qualityScore 92, riskLevel "low",      technicianName "Alice", siteAddress "2 Exec Ave"
+//   Company B — 1 scorecard in the current ISO week:
+//     inspBId  → qualityScore 40, riskLevel "critical",  technicianName "Bob",   siteAddress "99 B Street"
+//   Empty company — 0 scorecards
+// ---------------------------------------------------------------------------
+
+/** Returns the ISO-date string (YYYY-MM-DD) for the Monday of the current UTC week. */
+function currentWeekStart(): string {
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay(); // 0=Sun … 6=Sat
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysToMonday),
+  );
+  return monday.toISOString().slice(0, 10);
+}
+
+describe("quality-trend/inspections endpoint: authentication & role guards", () => {
+  it("returns 401 when unauthenticated", async () => {
+    asUser(null);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when called by a technician (not an owner)", async () => {
+    asUser(EXEC_TECH_A);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("quality-trend/inspections endpoint: input validation", () => {
+  it("returns 400 when weekStart is omitted", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app).get("/api/executive/quality-trend/inspections");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/weekStart/i);
+  });
+
+  it("returns 400 when weekStart is not a valid date string", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app)
+      .get("/api/executive/quality-trend/inspections?weekStart=not-a-date");
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/weekStart/i);
+  });
+});
+
+describe("quality-trend/inspections endpoint: response shape", () => {
+  it("returns success:true with inspections array for an owner", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.inspections)).toBe(true);
+    expect(typeof res.body.count).toBe("number");
+    expect(typeof res.body.weekStart).toBe("string");
+  });
+
+  it("each inspection entry has the required fields", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    for (const insp of res.body.inspections) {
+      expect(typeof insp.inspectionId).toBe("number");
+      expect(typeof insp.siteAddress).toBe("string");
+      expect(typeof insp.technicianName).toBe("string");
+      expect(typeof insp.qualityScore).toBe("number");
+      expect(typeof insp.riskLevel).toBe("string");
+      expect(typeof insp.scoredAt).toBe("string");
+    }
+  });
+
+  it("returns inspections sorted by qualityScore ascending (lowest first)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    const scores: number[] = res.body.inspections.map(
+      (i: { qualityScore: number }) => i.qualityScore,
+    );
+    const sorted = [...scores].sort((a, b) => a - b);
+    expect(scores).toEqual(sorted);
+  });
+
+  it("count field matches the length of the inspections array", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(res.body.inspections.length);
+  });
+
+  it("returns an empty inspections array for a week with no scorecards", async () => {
+    asUser(EXEC_OWNER_A);
+    // A week far in the past guaranteed to have no scorecards.
+    const res = await request(app)
+      .get("/api/executive/quality-trend/inspections?weekStart=2000-01-03");
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.inspections).toHaveLength(0);
+    expect(res.body.count).toBe(0);
+  });
+});
+
+describe("quality-trend/inspections endpoint: cross-company isolation", () => {
+  /**
+   * Company A has 2 scorecards (scores 88 and 92) and Company B has 1 (score 40).
+   * All three were created ~now and fall in the same ISO week. Isolation means:
+   *   - Company A sees exactly its 2 inspections, not B's.
+   *   - Company B sees exactly its 1 inspection, not A's.
+   *   - The empty company sees 0 inspections.
+   */
+
+  it("company A owner sees exactly 2 inspections — its own scorecards only", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(2);
+    expect(res.body.inspections).toHaveLength(2);
+  });
+
+  it("company A's inspections show quality scores 88 and 92, not 40 (company B's score)", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    const scores: number[] = res.body.inspections.map(
+      (i: { qualityScore: number }) => i.qualityScore,
+    );
+    // Sorted ascending: [88, 92]
+    expect(scores).toEqual([88, 92]);
+    // Company B's score must not appear.
+    expect(scores).not.toContain(40);
+  });
+
+  it("company A's results reference its own site addresses, not company B's", async () => {
+    asUser(EXEC_OWNER_A);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    const addresses: string[] = res.body.inspections.map(
+      (i: { siteAddress: string }) => i.siteAddress,
+    );
+    // Must contain A's addresses.
+    expect(addresses).toContain("1 Exec Ave");
+    expect(addresses).toContain("2 Exec Ave");
+    // Must not contain B's address.
+    expect(addresses).not.toContain("99 B Street");
+  });
+
+  it("company B owner sees exactly 1 inspection — its own scorecard only", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(1);
+    expect(res.body.inspections).toHaveLength(1);
+  });
+
+  it("company B's inspection has qualityScore 40 and riskLevel critical", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    const insp = res.body.inspections[0];
+    expect(insp.qualityScore).toBe(40);
+    expect(insp.riskLevel).toBe("critical");
+    expect(insp.siteAddress).toBe("99 B Street");
+  });
+
+  it("company B's results do not include company A's inspections (scores 88, 92)", async () => {
+    asUser(EXEC_OWNER_B);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    const scores: number[] = res.body.inspections.map(
+      (i: { qualityScore: number }) => i.qualityScore,
+    );
+    expect(scores).not.toContain(88);
+    expect(scores).not.toContain(92);
+  });
+
+  it("empty-company owner sees 0 inspections even though other companies have scorecards this week", async () => {
+    asUser(EXEC_OWNER_EMPTY);
+    const res = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(0);
+    expect(res.body.inspections).toHaveLength(0);
+  });
+
+  it("both companies share the same ISO weekStart but see different inspection lists", async () => {
+    asUser(EXEC_OWNER_A);
+    const resA = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+
+    asUser(EXEC_OWNER_B);
+    const resB = await request(app)
+      .get(`/api/executive/quality-trend/inspections?weekStart=${currentWeekStart()}`);
+
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+
+    // Both use the same weekStart — cross-tenant bleed would surface here.
+    expect(resA.body.weekStart).toBe(resB.body.weekStart);
+
+    // But each returns only its own data.
+    expect(resA.body.count).toBe(2);
+    expect(resB.body.count).toBe(1);
+
+    const aIds: number[] = resA.body.inspections.map((i: { inspectionId: number }) => i.inspectionId);
+    const bIds: number[] = resB.body.inspections.map((i: { inspectionId: number }) => i.inspectionId);
+
+    // The inspection ID sets must be disjoint.
+    const overlap = aIds.filter((id) => bIds.includes(id));
+    expect(overlap).toHaveLength(0);
+  });
+});
