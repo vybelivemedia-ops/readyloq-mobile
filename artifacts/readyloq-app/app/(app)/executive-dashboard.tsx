@@ -717,17 +717,30 @@ export default function ExecutiveDashboardScreen() {
           text: "Copy full snapshot",
           onPress: () => void handleCopy(),
         },
-        {
-          text: "Copy summary only",
-          onPress: () => void handleCopySummary(),
-        },
+        ...(briefing?.summary
+          ? [
+              {
+                text: "Copy summary only",
+                onPress: () => void handleCopySummary(),
+              },
+            ]
+          : [
+              {
+                text: "Copy summary only",
+                onPress: () =>
+                  Alert.alert(
+                    "No Summary Yet",
+                    "The daily briefing hasn't loaded. Pull down to refresh or try again in a moment.",
+                  ),
+              },
+            ]),
         {
           text: "Cancel",
-          style: "cancel",
+          style: "cancel" as const,
         },
       ],
     );
-  }, [handleCopy, handleCopySummary]);
+  }, [briefing, handleCopy, handleCopySummary]);
 
   // Load on mount
   React.useEffect(() => { void load(); }, [load]);
