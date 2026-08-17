@@ -6,14 +6,8 @@
 # (NoClassDefFoundError in expo-task-manager). All three must stay false for beta stability.
 # See .agents/memory/r8-fullmode-crash.md for full context.
 #
-# Parsing rules (Java .properties spec, Gradle-compatible):
-#   - Key/value separators: '=', ':', or whitespace (all are valid)
-#   - Leading whitespace on the key is ignored
-#   - Whitespace around the separator is ignored
-#   - Inline '#' or '!' comments are stripped
-#   - Last occurrence of a duplicate key wins (Gradle behaviour)
-#   - Truthy values: case-insensitive "true", "y", "1"
-#   - Exits non-zero (fails closed) if the properties file cannot be read
+# Parsing: delegates to scripts/parse-gradle-prop.mjs — a full Java Properties spec
+# parser that handles line continuations, Unicode escapes, and all separator forms.
 #
 # Usage:
 #   bash scripts/check-r8-flags.sh          # normal check
@@ -22,44 +16,27 @@
 set -euo pipefail
 
 GRADLE_PROPS="artifacts/readyloq-app/android/gradle.properties"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PARSER="${SCRIPT_DIR}/parse-gradle-prop.mjs"
 
 # ---------------------------------------------------------------------------
 # resolve_flag <flag-name> <file>
-#   Returns the effective value of the last matching key.
-#   Supports all three Java .properties separators: '=', ':', and whitespace.
+#   Delegates to the Node.js parser for spec-compliant Java properties parsing.
+#   Exits 2 if the file cannot be read.
 # ---------------------------------------------------------------------------
 resolve_flag() {
   local flag="$1"
   local file="$2"
-
-  # Fail closed: if the file is missing or unreadable, exit the whole script.
   if [ ! -r "$file" ]; then
     echo "ERROR: cannot read ${file}" >&2
     exit 2
   fi
-
-  local escaped_flag
-  escaped_flag=$(printf '%s' "$flag" | sed 's/\./\\./g')
-
-  # Grep for lines where the key appears with any valid separator.
-  # Pattern: optional-leading-space KEY optional-space (=|:) or KEY whitespace+
-  # The awk step extracts the value and strips inline comments.
-  { grep -E "^[[:space:]]*${escaped_flag}([[:space:]]*[=:]|[[:space:]]+)" "$file" 2>/dev/null || true; } \
-    | tail -1 \
-    | awk -v key="$flag" '{
-        sub(/^[[:space:]]+/, "")            # strip leading whitespace
-        rest = substr($0, length(key) + 1)  # everything after the key
-        sub(/^[[:space:]]*[=:][[:space:]]*/, "", rest)  # remove = or : separator
-        sub(/^[[:space:]]+/, "", rest)      # remove whitespace-only separator
-        sub(/[[:space:]]*[#!].*$/, "", rest) # strip inline comment (# or !)
-        sub(/[[:space:]]+$/, "", rest)      # strip trailing whitespace
-        print rest
-      }'
+  node "$PARSER" "$file" "$flag"
 }
 
 # ---------------------------------------------------------------------------
 # is_truthy <value>
-#   Returns 0 (success/true) for any Groovy-truthy alias.
+#   Returns 0 (success/true) for Groovy-truthy aliases: true/TRUE/y/Y/1.
 # ---------------------------------------------------------------------------
 is_truthy() {
   local val
@@ -118,10 +95,11 @@ run_tests() {
     fi
   }
 
+  # assert_resolves <desc> <file-content> <flag> <expected-value>
   assert_resolves() {
     local desc="$1" content="$2" flag="$3" expected="$4"
     local tmpf; tmpf=$(mktemp)
-    printf '%s\n' "$content" > "$tmpf"
+    printf '%s' "$content" > "$tmpf"
     local got; got=$(resolve_flag "$flag" "$tmpf")
     rm -f "$tmpf"
     if [ "$got" = "$expected" ]; then
@@ -149,32 +127,45 @@ run_tests() {
 
   echo ""
   echo "=== resolve_flag() — '=' separator ==="
-  assert_resolves "normal false"              "android.enableR8.fullMode=false"              "android.enableR8.fullMode" "false"
-  assert_resolves "normal true"               "android.enableR8.fullMode=true"               "android.enableR8.fullMode" "true"
-  assert_resolves "uppercase TRUE"            "android.enableR8.fullMode=TRUE"               "android.enableR8.fullMode" "TRUE"
-  assert_resolves "spaces around ="           "android.enableR8.fullMode = true"             "android.enableR8.fullMode" "true"
-  assert_resolves "leading whitespace"        "  android.enableR8.fullMode=true"             "android.enableR8.fullMode" "true"
-  assert_resolves "inline # comment"         "android.enableR8.fullMode=true # enabled"     "android.enableR8.fullMode" "true"
-  assert_resolves "inline ! comment"         "android.enableR8.fullMode=true ! note"        "android.enableR8.fullMode" "true"
-  assert_resolves "last-wins false→true"      "$(printf 'android.enableR8.fullMode=false\nandroid.enableR8.fullMode=true')"  "android.enableR8.fullMode" "true"
-  assert_resolves "last-wins true→false"      "$(printf 'android.enableR8.fullMode=true\nandroid.enableR8.fullMode=false')" "android.enableR8.fullMode" "false"
-  assert_resolves "value 1 (int truthy)"      "android.enableMinifyInReleaseBuilds=1"        "android.enableMinifyInReleaseBuilds" "1"
-  assert_resolves "value y (char truthy)"     "android.enableShrinkResourcesInReleaseBuilds=y" "android.enableShrinkResourcesInReleaseBuilds" "y"
-  assert_resolves "missing key"               "something.else=true"                          "android.enableR8.fullMode" ""
+  assert_resolves "normal false"              $'android.enableR8.fullMode=false'               "android.enableR8.fullMode" "false"
+  assert_resolves "normal true"               $'android.enableR8.fullMode=true'                "android.enableR8.fullMode" "true"
+  assert_resolves "uppercase TRUE"            $'android.enableR8.fullMode=TRUE'                "android.enableR8.fullMode" "TRUE"
+  assert_resolves "spaces around ="           $'android.enableR8.fullMode = true'              "android.enableR8.fullMode" "true"
+  assert_resolves "leading whitespace"        $'  android.enableR8.fullMode=true'              "android.enableR8.fullMode" "true"
+  assert_resolves "last-wins false→true"      $'android.enableR8.fullMode=false\nandroid.enableR8.fullMode=true'  "android.enableR8.fullMode" "true"
+  assert_resolves "last-wins true→false"      $'android.enableR8.fullMode=true\nandroid.enableR8.fullMode=false' "android.enableR8.fullMode" "false"
+  assert_resolves "value 1 (int truthy)"      $'android.enableMinifyInReleaseBuilds=1'         "android.enableMinifyInReleaseBuilds" "1"
+  assert_resolves "value y (char truthy)"     $'android.enableShrinkResourcesInReleaseBuilds=y' "android.enableShrinkResourcesInReleaseBuilds" "y"
+  assert_resolves "missing key"               $'something.else=true'                           "android.enableR8.fullMode" ""
+  assert_resolves "# comment line skipped"    $'# android.enableR8.fullMode=true\nandroid.enableR8.fullMode=false' "android.enableR8.fullMode" "false"
 
   echo ""
   echo "=== resolve_flag() — ':' separator ==="
-  assert_resolves "colon separator true"      "android.enableR8.fullMode:true"               "android.enableR8.fullMode" "true"
-  assert_resolves "colon + spaces true"       "android.enableR8.fullMode : true"             "android.enableR8.fullMode" "true"
-  assert_resolves "colon separator false"     "android.enableMinifyInReleaseBuilds:false"    "android.enableMinifyInReleaseBuilds" "false"
-  assert_resolves "colon + leading ws TRUE"   "  android.enableR8.fullMode:TRUE"             "android.enableR8.fullMode" "TRUE"
+  assert_resolves "colon separator true"      $'android.enableR8.fullMode:true'                "android.enableR8.fullMode" "true"
+  assert_resolves "colon + spaces true"       $'android.enableR8.fullMode : true'              "android.enableR8.fullMode" "true"
+  assert_resolves "colon separator false"     $'android.enableMinifyInReleaseBuilds:false'     "android.enableMinifyInReleaseBuilds" "false"
+  assert_resolves "colon + leading ws TRUE"   $'  android.enableR8.fullMode:TRUE'              "android.enableR8.fullMode" "TRUE"
 
   echo ""
   echo "=== resolve_flag() — whitespace-only separator ==="
-  assert_resolves "ws separator true"         "android.enableR8.fullMode true"               "android.enableR8.fullMode" "true"
-  assert_resolves "ws separator false"        "android.enableMinifyInReleaseBuilds false"    "android.enableMinifyInReleaseBuilds" "false"
-  assert_resolves "ws separator TRUE"         "android.enableShrinkResourcesInReleaseBuilds TRUE" "android.enableShrinkResourcesInReleaseBuilds" "TRUE"
-  assert_resolves "ws sep + leading ws"       "  android.enableR8.fullMode  true"            "android.enableR8.fullMode" "true"
+  assert_resolves "ws separator true"         $'android.enableR8.fullMode true'                "android.enableR8.fullMode" "true"
+  assert_resolves "ws separator false"        $'android.enableMinifyInReleaseBuilds false'     "android.enableMinifyInReleaseBuilds" "false"
+  assert_resolves "ws separator TRUE"         $'android.enableShrinkResourcesInReleaseBuilds TRUE' "android.enableShrinkResourcesInReleaseBuilds" "TRUE"
+  assert_resolves "ws sep + leading ws"       $'  android.enableR8.fullMode  true'             "android.enableR8.fullMode" "true"
+
+  echo ""
+  echo "=== resolve_flag() — line continuation ==="
+  # Trailing backslash: value spans two physical lines (the bypass vector from reviewer)
+  assert_resolves "continuation tru+e"        $'android.enableR8.fullMode=tru\\\ne'            "android.enableR8.fullMode" "true"
+  assert_resolves "continuation fal+se"       $'android.enableR8.fullMode=fal\\\nse'           "android.enableR8.fullMode" "false"
+  assert_resolves "continuation leading ws"   $'android.enableMinifyInReleaseBuilds=tru\\\n   e' "android.enableMinifyInReleaseBuilds" "true"
+
+  echo ""
+  echo "=== resolve_flag() — Unicode escapes ==="
+  # \u0074 = 't', so \u0074rue = true
+  assert_resolves "unicode \\u0074rue"        $'android.enableR8.fullMode=\\u0074rue'          "android.enableR8.fullMode" "true"
+  assert_resolves "unicode \\u0066alse"       $'android.enableR8.fullMode=\\u0066alse'         "android.enableR8.fullMode" "false"
+  assert_resolves "unicode TRUE all caps"     $'android.enableMinifyInReleaseBuilds=\\u0054RUE' "android.enableMinifyInReleaseBuilds" "TRUE"
 
   echo ""
   if [ "$fail" -gt 0 ]; then
