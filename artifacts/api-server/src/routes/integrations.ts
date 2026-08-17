@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { PoolClient } from "pg";
 import { db, pool } from "@workspace/db";
 import { logger } from "../lib/logger";
 import {
@@ -151,6 +152,13 @@ router.post("/sync", async (req, res) => {
     systemType: FieldIntegrationSystem;
   } | null = null;
 
+  // Session-level advisory lock bookkeeping.  Declared here so the finally
+  // block can release the lock and the connection regardless of how the try
+  // block exits (return, throw, or normal fall-through).
+  let poolClient: PoolClient | null = null;
+  let sessionLockHeld = false;
+  let sessionLockKey: number | null = null;
+
   try {
     const companyId = getCompanyId(req);
     const parsed = syncInputSchema.safeParse(req.body);
@@ -158,6 +166,9 @@ router.post("/sync", async (req, res) => {
       return res.status(400).json({ error: "Invalid request", issues: parsed.error.issues });
     }
     const { inspectionId } = parsed.data;
+    // Record the key before the lock attempt so the finally block can clean up
+    // even if pool.connect() succeeds but the unlock query later throws.
+    sessionLockKey = inspectionId;
 
     // Load integration config (includes api_key — server-side only).
     const [config] = await db
@@ -189,64 +200,45 @@ router.post("/sync", async (req, res) => {
     // Record this so the catch block can safely write a failure log.
     validatedSyncCtx = { companyId, inspectionId, systemType: config.systemType };
 
-    // ── Idempotency: run the rest inside a transaction so the advisory lock
-    //    and the sync-log insert are atomic. ────────────────────────────────
-    const result = await pool.connect().then(async (client) => {
-      try {
-        await client.query("BEGIN");
-
-        // Advisory lock scoped to this inspection (released when txn ends).
-        // If another request already holds it, we bail immediately — the
-        // concurrent request will also see the cooldown record and return early.
-        const { rows: lockRows } = await client.query<{ locked: boolean }>(
-          "SELECT pg_try_advisory_xact_lock($1) AS locked",
-          [inspectionId],
-        );
-        if (!lockRows[0]?.locked) {
-          await client.query("ROLLBACK");
-          return { _conflict: true } as const;
-        }
-
-        // ── Cooldown: return cached result only for recent *successful* syncs.
-        //    Failed attempts must remain retryable immediately so the owner
-        //    can correct transient external-system errors without waiting.
-        const cooldownCutoff = new Date(Date.now() - SYNC_COOLDOWN_SECONDS * 1000);
-        const [recentSuccess] = await db
-          .select()
-          .from(inspectionSyncLogsTable)
-          .where(
-            and(
-              eq(inspectionSyncLogsTable.inspectionId, inspectionId),
-              eq(inspectionSyncLogsTable.companyId, companyId),
-              eq(inspectionSyncLogsTable.success, true),
-              isNotNull(inspectionSyncLogsTable.resultJson),
-            ),
-          )
-          .orderBy(desc(inspectionSyncLogsTable.syncedAt))
-          .limit(1);
-
-        if (recentSuccess && recentSuccess.syncedAt >= cooldownCutoff) {
-          await client.query("ROLLBACK");
-          return { _cached: true, result: recentSuccess.resultJson } as const;
-        }
-
-        // ── Not a duplicate: load data and call the external system. ───────
-        await client.query("COMMIT");
-        return { _cached: false } as const;
-      } catch (err) {
-        await client.query("ROLLBACK");
-        throw err;
-      } finally {
-        client.release();
-      }
-    });
-
-    if (result._conflict) {
-      // Another concurrent request is already syncing — tell the client to retry.
+    // ── Idempotency: acquire a session-level advisory lock so that exclusivity
+    //    spans the full critical section — cooldown check → external call →
+    //    success-log write.  Unlike pg_try_advisory_xact_lock, a session lock
+    //    is NOT released at transaction end; it persists until pg_advisory_unlock
+    //    is called explicitly (see the finally block below).  This prevents a
+    //    second concurrent request from slipping past the cooldown guard after
+    //    the first request's transaction has already committed.
+    poolClient = await pool.connect();
+    const { rows: lockRows } = await poolClient.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_lock($1) AS locked",
+      [inspectionId],
+    );
+    if (!lockRows[0]?.locked) {
+      // Another concurrent request already holds the session lock — tell the
+      // client to retry once the ongoing sync completes.
       return res.status(409).json({ error: "Sync already in progress for this inspection" });
     }
-    if (result._cached) {
-      return res.json({ ...(result.result as Record<string, unknown>), _idempotent: true });
+    sessionLockHeld = true;
+
+    // ── Cooldown: return cached result only for recent *successful* syncs.
+    //    Failed attempts must remain retryable immediately so the owner
+    //    can correct transient external-system errors without waiting.
+    const cooldownCutoff = new Date(Date.now() - SYNC_COOLDOWN_SECONDS * 1000);
+    const [recentSuccess] = await db
+      .select()
+      .from(inspectionSyncLogsTable)
+      .where(
+        and(
+          eq(inspectionSyncLogsTable.inspectionId, inspectionId),
+          eq(inspectionSyncLogsTable.companyId, companyId),
+          eq(inspectionSyncLogsTable.success, true),
+          isNotNull(inspectionSyncLogsTable.resultJson),
+        ),
+      )
+      .orderBy(desc(inspectionSyncLogsTable.syncedAt))
+      .limit(1);
+
+    if (recentSuccess && recentSuccess.syncedAt >= cooldownCutoff) {
+      return res.json({ ...(recentSuccess.resultJson as Record<string, unknown>), _idempotent: true });
     }
 
     // Load analysis + media in parallel.
@@ -493,6 +485,22 @@ router.post("/sync", async (req, res) => {
     }
 
     return res.status(502).json({ error: message });
+  } finally {
+    // Always release the session advisory lock and return the connection to the
+    // pool — regardless of whether the handler returned normally, returned with
+    // a 4xx/5xx, or threw an exception.  The lock must be released explicitly
+    // because session locks are NOT auto-released at transaction end.
+    if (poolClient) {
+      if (sessionLockHeld && sessionLockKey !== null) {
+        await poolClient
+          .query("SELECT pg_advisory_unlock($1)", [sessionLockKey])
+          .catch(() => {
+            // Swallow — the connection is about to be returned anyway; the
+            // lock will be released when the underlying socket closes.
+          });
+      }
+      poolClient.release();
+    }
   }
 });
 

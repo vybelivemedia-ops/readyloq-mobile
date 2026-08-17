@@ -26,16 +26,20 @@ vi.mock("@clerk/express", async (importOriginal) => {
 });
 
 // ── Pool mock ─────────────────────────────────────────────────────────────────
-// The sync route uses pool.connect() to run an advisory-lock transaction before
-// calling the external system.  We intercept this so tests stay fast and
-// self-contained.  By default the mock simulates: lock acquired, no cached
-// result, transaction committed successfully.
+// The sync route acquires a session-level advisory lock (pg_try_advisory_lock)
+// that spans the full critical section — cooldown check → external call →
+// success-log write — and releases it explicitly via pg_advisory_unlock in a
+// finally block.  We intercept pool.connect() so tests stay fast and
+// self-contained.
+//
+// Default behaviour: lock acquired on first attempt, unlock is a no-op.
 const { poolClientMock } = vi.hoisted(() => {
   const client = {
     query: vi.fn(async (sql: string) => {
-      if (sql.includes("pg_try_advisory_xact_lock")) {
+      if (sql.includes("pg_try_advisory_lock")) {
         return { rows: [{ locked: true }] };
       }
+      // pg_advisory_unlock, BEGIN, COMMIT, ROLLBACK, etc. — no-op by default.
       return { rows: [] };
     }),
     release: vi.fn(),
@@ -162,9 +166,9 @@ beforeEach(() => {
   syncMock.mockClear();
   poolClientMock.query.mockClear();
   poolClientMock.release.mockClear();
-  // Reset to default: lock acquired, no cooldown hit
+  // Reset to default: session lock acquired, unlock is a no-op.
   poolClientMock.query.mockImplementation(async (sql: string) => {
-    if (sql.includes("pg_try_advisory_xact_lock")) {
+    if (sql.includes("pg_try_advisory_lock")) {
       return { rows: [{ locked: true }] };
     }
     return { rows: [] };
@@ -603,6 +607,181 @@ describe("POST /api/integrations/sync", () => {
       expect(res.body.attachmentsPosted).toBe(2);
       // The external adapter must NOT have been called.
       expect(syncMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("advisory lock — concurrent sync prevention", () => {
+    // Ensure company has an active integration config and no stale sync logs
+    // so neither request hits the cooldown cache before the lock is reached.
+    beforeEach(async () => {
+      await db
+        .delete(inspectionSyncLogsTable)
+        .where(
+          and(
+            eq(inspectionSyncLogsTable.inspectionId, completedInspectionId),
+            eq(inspectionSyncLogsTable.companyId, companyId),
+          ),
+        );
+
+      await db
+        .delete(companyFieldIntegrationsTable)
+        .where(eq(companyFieldIntegrationsTable.companyId, companyId));
+      await db.insert(companyFieldIntegrationsTable).values({
+        companyId,
+        systemType: "pestpac",
+        accountId: "acc-concurrent",
+        apiKey: "key-concurrent",
+        enabled: true,
+      });
+    });
+
+    it("request 2 gets 409 while request 1 is actively calling the external system", async () => {
+      // This test validates that the session advisory lock is still held DURING
+      // the external sync call — not just during the cooldown check.
+      //
+      // Mechanism:
+      //   1. The pool mock tracks a stateful "lock held" flag:
+      //      pg_try_advisory_lock succeeds once (request 1) and returns false
+      //      thereafter; pg_advisory_unlock clears the flag.
+      //   2. syncMock uses a deferred promise so request 1 pauses at the adapter
+      //      call site; it also sets a flag the moment it is entered.
+      //   3. Request 1 is started imperatively via .end(cb) so the HTTP request
+      //      is initiated immediately (supertest defers the request until await
+      //      when you use the promise API).  We wait for request 1 to reach the
+      //      adapter via vi.waitFor on the flag before sending request 2.
+
+      let lockHeld = false;
+      poolClientMock.query.mockImplementation(async (sql: string) => {
+        if (sql.includes("pg_try_advisory_lock")) {
+          if (lockHeld) return { rows: [{ locked: false }] };
+          lockHeld = true;
+          return { rows: [{ locked: true }] };
+        }
+        if (sql.includes("pg_advisory_unlock")) {
+          lockHeld = false;
+          return { rows: [] };
+        }
+        return { rows: [] };
+      });
+
+      // Deferred adapter: request 1 pauses here; the flag tells us it arrived.
+      let req1InAdapter = false;
+      let resolveSync!: (v: Awaited<ReturnType<typeof syncMock>>) => void;
+      const syncDeferred = new Promise<Awaited<ReturnType<typeof syncMock>>>(
+        (resolve) => { resolveSync = resolve; },
+      );
+      syncMock.mockImplementationOnce(async () => {
+        req1InAdapter = true;
+        return syncDeferred;
+      });
+
+      asUser(OWNER_ID);
+
+      // Wrap request 1 in a real Promise so it resolves as soon as the HTTP
+      // response arrives — supertest's promise API is lazy (only fires when
+      // awaited); .end(cb) starts the request immediately.
+      const req1Done = new Promise<{ status: number; body: Record<string, unknown> }>(
+        (resolve) => {
+          request(app)
+            .post("/api/integrations/sync")
+            .send({ inspectionId: completedInspectionId })
+            .end((_err, res) => resolve(res));
+        },
+      );
+
+      // Wait until request 1 has acquired the lock and entered the adapter.
+      await vi.waitFor(() => req1InAdapter, { timeout: 10_000 });
+
+      // Request 2 arrives while the lock is still held by request 1.
+      const req2 = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+
+      expect(req2.status).toBe(409);
+      expect(req2.body.error).toMatch(/sync already in progress/i);
+
+      // Unblock request 1 — it now completes, writes the log, and releases the lock.
+      resolveSync({
+        success: true,
+        externalSystem: "pestpac" as const,
+        postedNotes: true,
+        attachmentsPosted: 0,
+        noteRetries: 0,
+        attachmentRetries: 0,
+        attachmentErrors: 0,
+      });
+
+      // Wait for request 1's HTTP response to arrive.
+      const req1 = await req1Done;
+
+      expect(req1.status).toBe(200);
+      // The external adapter must have been called exactly once.
+      expect(syncMock).toHaveBeenCalledTimes(1);
+    }, 15_000);
+
+    it("the 409 body carries only the error field — no inspection data leaks", async () => {
+      // When locked=false the route must return immediately with a minimal body.
+      poolClientMock.query.mockImplementation(async (sql: string) => {
+        if (sql.includes("pg_try_advisory_lock")) {
+          return { rows: [{ locked: false }] };
+        }
+        return { rows: [] };
+      });
+
+      asUser(OWNER_ID);
+      const res = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+
+      expect(res.status).toBe(409);
+      expect(Object.keys(res.body)).toEqual(["error"]);
+      expect(syncMock).not.toHaveBeenCalled();
+    });
+
+    it("the session lock is released after the sync so the next request can proceed", async () => {
+      // pg_advisory_unlock must be called (lockHeld reset to false) after the
+      // sync so a subsequent non-racing request can acquire the lock and succeed.
+      let unlockCalled = false;
+      let lockHeld = false;
+      poolClientMock.query.mockImplementation(async (sql: string) => {
+        if (sql.includes("pg_try_advisory_lock")) {
+          if (lockHeld) return { rows: [{ locked: false }] };
+          lockHeld = true;
+          return { rows: [{ locked: true }] };
+        }
+        if (sql.includes("pg_advisory_unlock")) {
+          lockHeld = false;
+          unlockCalled = true;
+          return { rows: [] };
+        }
+        return { rows: [] };
+      });
+
+      asUser(OWNER_ID);
+
+      // First request — should succeed and release the lock.
+      const res1 = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+      expect(res1.status).toBe(200);
+      expect(unlockCalled).toBe(true);
+
+      // Clean up the success log so the second request is not served the cache.
+      await db
+        .delete(inspectionSyncLogsTable)
+        .where(
+          and(
+            eq(inspectionSyncLogsTable.inspectionId, completedInspectionId),
+            eq(inspectionSyncLogsTable.companyId, companyId),
+          ),
+        );
+
+      // Second request — lock is free again, should also succeed.
+      const res2 = await request(app)
+        .post("/api/integrations/sync")
+        .send({ inspectionId: completedInspectionId });
+      expect(res2.status).toBe(200);
+      expect(syncMock).toHaveBeenCalledTimes(2);
     });
   });
 
