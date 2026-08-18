@@ -111,7 +111,16 @@ let _persistedFrameCount = 0;
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /** Drop reason codes reported via onDroppedFrame. */
-export type BleFrameDropReason = "driver_drop" | "cap_exceeded" | "processing_error";
+export type BleFrameDropReason =
+  | "driver_drop"
+  | "cap_exceeded"
+  | "processing_error"
+  /**
+   * Frame arrived while the hook's startup effect was still running
+   * (session directory not yet created).  Counted as a drop so the
+   * technician can see the loss in the UI rather than losing frames silently.
+   */
+  | "setup_pending";
 
 interface UseSmartGlassesBleFramesOptions {
   /**
@@ -371,12 +380,39 @@ export function useSmartGlassesBleFrames({
     return unsub;
   }, []);
 
-  // ── Subscribe to JPEG frames when active + BLE connected + setup done ─────
+  // ── Subscribe to JPEG frames when active + BLE connected ─────────────────
   //
-  // `setupComplete` in deps ensures no frame can be written until the startup
-  // cleanup and session-dir creation have fully resolved.
+  // When setupComplete is false the session directory does not yet exist, so
+  // frames cannot be written.  Rather than returning early (which would silently
+  // discard every frame the BLE driver delivers during startup), we register a
+  // lightweight drop-counter subscriber.  Each frame it receives increments
+  // droppedFrameCount with reason "setup_pending" so the loss is user-visible
+  // and reported to telemetry — matching the behaviour expected by the UI.
+  //
+  // When setupComplete becomes true React cleans up the drop-counter subscriber
+  // and re-runs the effect with the full write path.
   useEffect(() => {
-    if (!active || !isBleConnected || !setupComplete) return;
+    if (!active || !isBleConnected) return;
+
+    if (!setupComplete) {
+      // Startup window: count incoming frames as drops (not silently discard).
+      const unsub = smartGlassesBle.onFrame(() => {
+        droppedFrameCountRef.current += 1;
+        _persistedDroppedFrameCount = droppedFrameCountRef.current;
+        if (reconnectNoticeTimerRef.current != null) {
+          clearTimeout(reconnectNoticeTimerRef.current);
+          reconnectNoticeTimerRef.current = null;
+          setReconnectNotice(null);
+        }
+        setDroppedFrameCount(droppedFrameCountRef.current);
+        onDroppedFrameRef.current?.(
+          1,
+          "setup_pending",
+          smartGlassesBle.getState().connectedDeviceId ?? null,
+        );
+      });
+      return unsub;
+    }
 
     const baseDir =
       FileSystem.cacheDirectory ?? FileSystem.documentDirectory ?? "";

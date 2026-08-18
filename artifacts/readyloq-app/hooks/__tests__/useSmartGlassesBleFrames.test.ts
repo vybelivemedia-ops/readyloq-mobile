@@ -37,6 +37,8 @@ function buildMockBle(initial: GlassesConnectionState = "idle"): {
   onDroppedFrame: ReturnType<typeof vi.fn>;
   setConnectionState: (next: GlassesConnectionState) => void;
   emitFrame: () => void;
+  emitCustomFrame: (byteSize: number) => void;
+  emitDroppedFrame: (count: number, reason?: "disconnect" | "timeout") => void;
   frameSubscriberCount: () => number;
   stateSubscriberCount: () => number;
 } {
@@ -86,6 +88,17 @@ function buildMockBle(initial: GlassesConnectionState = "idle"): {
     emitFrame() {
       const fakeJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
       frameCallbacks.forEach((cb) => cb(fakeJpeg));
+    },
+
+    /**
+     * Simulate the BLE driver reporting N dropped frames (e.g. because no
+     * subscriber was registered when the frame was delivered, or because the
+     * BLE reassembly layer timed out).  The hook's `onDroppedFrame` subscriber
+     * IS registered unconditionally (not gated on setupComplete), so these must
+     * always appear in the hook's droppedFrameCount.
+     */
+    emitDroppedFrame(count: number, reason: "disconnect" | "timeout" = "disconnect") {
+      droppedFrameCallbacks.forEach((cb) => cb(count, reason));
     },
 
     /**
@@ -1691,5 +1704,263 @@ describe("useSmartGlassesBleFrames — persisted drop count reset across backgro
     expect(result2.current.droppedFrameCount).toBe(2);
 
     unmount2();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite N — startup window: frames emitted before setupComplete
+//
+// Task #580: Confirm frames captured while the screen transitions back from
+// background are not silently lost.
+//
+// There is a window between Android foregrounding the app and the hook's
+// startup effect completing (setupComplete becoming true) during which the BLE
+// driver may already be delivering frames.  The frame-subscription effect is
+// gated on `setupComplete`, so no `onFrame` subscriber is registered with the
+// BLE driver until after the session directory has been created.
+//
+// These tests verify:
+//   1. No file write is attempted for frames emitted before setup completes
+//      (the session directory does not yet exist; writing would fail silently).
+//   2. The hook has zero frame subscribers during the startup window, so emitted
+//      frames are never received — they cannot be written to a missing directory.
+//   3. BLE-driver-level drops reported via onDroppedFrame (which IS subscribed
+//      unconditionally, without waiting for setupComplete) ARE counted in
+//      droppedFrameCount, making them user-visible and not silently swallowed.
+//   4. After setup completes the hook correctly registers its frame subscriber
+//      and processes all subsequent frames normally.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("useSmartGlassesBleFrames — startup window: frames emitted before setupComplete", () => {
+  async function flushMicrotasks(ticks = 50) {
+    for (let i = 0; i < ticks; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  it("does not call writeAsStringAsync for frames emitted before the startup effect flushes", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    // Mount but do NOT flush the startup async effect — setupComplete is still false.
+    const { unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame }),
+    );
+
+    // Emit 5 frames synchronously before any microtask has run.
+    // The frame-subscription effect has not executed yet (React effects are
+    // flushed asynchronously), so no onFrame subscriber is registered with the
+    // BLE driver and frameCallbacks is empty.
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+
+    // Confirm: no write was attempted — the session directory does not exist yet.
+    expect(fs.writeAsStringAsync).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it("counts frames received during the startup window as drops (not silently discarded)", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+    const onDroppedFrame = vi.fn();
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    // Make getInfoAsync never resolve — startup is permanently stuck so every
+    // frame the BLE driver delivers hits the pre-setupComplete drop path.
+    vi.mocked(fs.getInfoAsync).mockReturnValue(new Promise(() => {}));
+
+    let unmount!: () => void;
+    let result!: { current: ReturnType<typeof useSmartGlassesBleFrames> };
+    await act(async () => {
+      ({ unmount, result } = renderHook(() =>
+        useSmartGlassesBleFrames({ active: true, onFrame, onDroppedFrame }),
+      ));
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+    });
+
+    // Emit 3 frames while setup is stuck — the drop-counter subscriber must
+    // intercept them, increment droppedFrameCount, and fire onDroppedFrame.
+    await act(async () => {
+      mockBle.emitFrame();
+      mockBle.emitFrame();
+      mockBle.emitFrame();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+    });
+
+    // 3 drops must be visible in state — not silently lost.
+    expect(result.current.droppedFrameCount).toBe(3);
+    // The consumer's onDroppedFrame telemetry callback must have fired three times.
+    expect(onDroppedFrame).toHaveBeenCalledTimes(3);
+    // All three calls must use reason "setup_pending".
+    for (const call of onDroppedFrame.mock.calls) {
+      expect(call[1]).toBe("setup_pending");
+    }
+    // No file write must have been attempted.
+    expect(fs.writeAsStringAsync).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it("registers exactly one frame subscriber after setup completes", async () => {
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    // Mount and flush the full startup sequence.
+    const { unmount } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    // After setup completes the effect replaces the pre-setup drop-counter
+    // subscriber with the full write subscriber.  The net result is exactly one
+    // active subscriber in the BLE driver's callback set.
+    // (onFrame is called twice total — once per effect run — but only one
+    //  subscriber remains after cleanup, so frameSubscriberCount === 1.)
+    expect(mockBle.frameSubscriberCount()).toBe(1);
+
+    unmount();
+  });
+
+  it("counts BLE-driver-reported drops that arrive during the startup window in droppedFrameCount", async () => {
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    // Mount but do NOT flush startup yet.
+    const { result, unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame }),
+    );
+
+    // The onDroppedFrame subscription is registered unconditionally (not gated
+    // on setupComplete) so the BLE driver can report drops even during startup.
+    // Simulate the driver reporting 3 frames it could not deliver — e.g. because
+    // its internal reassembly buffer timed out while waiting for a subscriber.
+    await act(async () => {
+      mockBle.emitDroppedFrame(3);
+      await flushMicrotasks(10);
+    });
+
+    // Those 3 driver-reported drops must be visible in the hook's state —
+    // they are NOT silently swallowed.
+    expect(result.current.droppedFrameCount).toBe(3);
+
+    unmount();
+  });
+
+  it("processes frames normally after the startup window closes even when pre-startup frames were emitted", async () => {
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    // Mount WITHOUT flushing — startup is pending.
+    const { result, unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame }),
+    );
+
+    // Emit 3 frames during the startup window.
+    // The drop-counter subscriber intercepts them: no file writes, but each
+    // frame increments droppedFrameCount.
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+
+    // Confirm: still no writes while setup is pending.
+    expect(fs.writeAsStringAsync).not.toHaveBeenCalled();
+
+    // Flush the startup effect fully so setupComplete → true: the drop-counter
+    // subscriber is cleaned up and the full write subscriber is registered.
+    await act(async () => {
+      await flushMicrotasks(10);
+    });
+
+    // Emit 2 frames after setup — these must now be received and written.
+    await act(async () => {
+      mockBle.emitFrame();
+      mockBle.emitFrame();
+      await flushMicrotasks(20);
+    });
+
+    // Exactly 2 writes — only the post-setup frames.
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(2);
+    // 3 startup-window frames were counted as drops — user-visible, not silent.
+    expect(result.current.droppedFrameCount).toBe(3);
+
+    unmount();
+  });
+
+  it("onFrame callback is not invoked for frames emitted before setup completes", async () => {
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    // Mount without flushing startup.
+    const { unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame }),
+    );
+
+    // Emit 5 frames before setup.
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+
+    // The consumer callback must not have been called.
+    expect(onFrame).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it("startup-window drops and post-setup successful frames are both user-visible in hook state", async () => {
+    // End-to-end lifecycle test: 2 frames arrive before setupComplete (counted
+    // as setup_pending drops by the drop-counter subscriber), then 3 frames
+    // arrive after setupComplete (written, ingested, counted in frameCount).
+    // Verifies neither set is silently lost.
+    mockBle = buildMockBle("connected");
+    const fs = await import("expo-file-system/legacy");
+    const onDroppedFrame = vi.fn();
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    // Mount WITHOUT flushing so the drop-counter subscriber is active first.
+    const { result, unmount } = renderHook(() =>
+      useSmartGlassesBleFrames({ active: true, onFrame, onDroppedFrame }),
+    );
+
+    // ── Startup window: 2 frames delivered before setup completes ────────────
+    // These hit the drop-counter subscriber; no file is written.
+    mockBle.emitFrame();
+    mockBle.emitFrame();
+
+    // Flush the startup effect so setupComplete → true: the drop-counter
+    // subscriber is cleaned up and the full write subscriber takes over.
+    await act(async () => {
+      await flushMicrotasks(10);
+    });
+
+    // ── Post-setup: 3 normal frames ───────────────────────────────────────────
+    await act(async () => {
+      mockBle.emitFrame();
+      mockBle.emitFrame();
+      mockBle.emitFrame();
+      await flushMicrotasks(20);
+    });
+
+    // 3 frames written and ingested successfully after setup.
+    expect(fs.writeAsStringAsync).toHaveBeenCalledTimes(3);
+    expect(onFrame).toHaveBeenCalledTimes(3);
+    // 2 startup-window drops are visible in state — user can see the loss.
+    expect(result.current.droppedFrameCount).toBe(2);
+    // The drops were reported to telemetry with reason "setup_pending".
+    expect(onDroppedFrame).toHaveBeenCalledTimes(2);
+    for (const call of onDroppedFrame.mock.calls) {
+      expect(call[1]).toBe("setup_pending");
+    }
+    // Successful frame count is exactly 3.
+    expect(result.current.frameCount).toBe(3);
+
+    unmount();
   });
 });
