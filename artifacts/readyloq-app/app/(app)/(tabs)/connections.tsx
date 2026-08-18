@@ -201,6 +201,84 @@ export default function ConnectionsScreen() {
   const btOff = ble.hwState !== BleHwState.PoweredOn;
   const busy = isConnecting || isDisconnecting;
 
+  // ── Calibration nudge ────────────────────────────────────────────────────────
+  // Shown when glasses first connect and no calibration profile exists yet.
+  const [nudgeBannerVisible, setNudgeBannerVisible] = useState(false);
+  const [nudgeCalibModalOpen, setNudgeCalibModalOpen] = useState(false);
+  // The device ID that caused the nudge to appear.  The nudge modal is bound
+  // to this ID so a disconnect/swap can't write calibration data to the wrong
+  // device.  Cleared to null when the nudge is dismissed or the device disconnects.
+  const [nudgeDeviceId, setNudgeDeviceId] = useState<string | null>(null);
+  // Tracks the active connected device ID. Updated synchronously so the async
+  // eligibility check can verify it hasn't changed before writing state.
+  const activeConnectedDeviceIdRef = useRef<string | null>(null);
+  // Incremented when the parent-owned nudge modal saves a profile; used to
+  // signal ConnectedGlassesCard to refresh its calibration status row.
+  const [calibRefreshKey, setCalibRefreshKey] = useState(0);
+
+  // Eligibility check — fires on every BLE connection-state / device change.
+  useEffect(() => {
+    const currDeviceId = ble.connectedDeviceId ?? null;
+    const prevDeviceId = activeConnectedDeviceIdRef.current;
+
+    if (ble.connectionState === "connected" && currDeviceId && currDeviceId !== prevDeviceId) {
+      // New successful connection (including A→B swap while remaining connected).
+      // Update the ref immediately so any in-flight check for the previous device
+      // sees a stale ID and bails.
+      activeConnectedDeviceIdRef.current = currDeviceId;
+
+      // Synchronously clear any nudge that belongs to the prior device so A's
+      // banner is never shown above B's ConnectedGlassesCard, even if B's async
+      // check is slow or returns early (already calibrated / dismissed).
+      setNudgeBannerVisible(false);
+      setNudgeDeviceId(null);
+      setNudgeCalibModalOpen(false);
+
+      const checkDeviceId = currDeviceId; // stable capture for the async closure
+      void (async () => {
+        const safeId = checkDeviceId.replace(/[^a-zA-Z0-9\-:]/g, "_");
+        const dismissKey = `@readyloq:calib_nudge_dismissed:${safeId}`;
+        const dismissed = await AsyncStorage.getItem(dismissKey);
+        // Guard: bail if the active device changed while we awaited
+        if (activeConnectedDeviceIdRef.current !== checkDeviceId) return;
+        if (dismissed) return;
+        const profile = await loadCalibrationProfile(checkDeviceId);
+        // Guard again after the second await
+        if (activeConnectedDeviceIdRef.current !== checkDeviceId) return;
+        if (!profile) {
+          setNudgeDeviceId(checkDeviceId);
+          setNudgeBannerVisible(true);
+        }
+      })();
+    } else if (ble.connectionState !== "connected") {
+      // Invalidate any pending check and clear all nudge state on disconnect.
+      activeConnectedDeviceIdRef.current = null;
+      setNudgeBannerVisible(false);
+      setNudgeDeviceId(null);
+      setNudgeCalibModalOpen(false);
+    }
+  }, [ble.connectionState, ble.connectedDeviceId]);
+
+  // Auto-close the nudge modal whenever the live connected device diverges from
+  // the device that opened it (covers disconnect and swap-to-different-device).
+  useEffect(() => {
+    if (nudgeCalibModalOpen && ble.connectedDeviceId !== nudgeDeviceId) {
+      setNudgeCalibModalOpen(false);
+    }
+  }, [nudgeCalibModalOpen, ble.connectedDeviceId, nudgeDeviceId]);
+
+  const handleDismissNudge = useCallback(() => {
+    // Capture the originating device ID synchronously.
+    const deviceId = nudgeDeviceId;
+    // Hide the banner immediately — before any async work — so a slow persist
+    // for device A can't suppress a banner for device B that connected later.
+    setNudgeBannerVisible(false);
+    if (deviceId) {
+      const safeId = deviceId.replace(/[^a-zA-Z0-9\-:]/g, "_");
+      void AsyncStorage.setItem(`@readyloq:calib_nudge_dismissed:${safeId}`, "1");
+    }
+  }, [nudgeDeviceId]);
+
   // ── BLE sensor state ────────────────────────────────────────────────────────
   const { plugin } = useDeviceRegistry();
   /** Which sensor's scanner modal is currently open (null = none). */
@@ -579,12 +657,25 @@ export default function ConnectionsScreen() {
         {/* ── Connected device ── */}
         <Section title="Connected" icon="radio-outline">
           {isConnected && ble.connectedDeviceId ? (
-            <ConnectedGlassesCard
-              deviceId={ble.connectedDeviceId}
-              deviceName={ble.connectedDeviceName ?? "Meta Ray-Ban Glasses"}
-              colors={colors}
-              onDisconnect={handleDisconnect}
-            />
+            <>
+              {nudgeBannerVisible && nudgeDeviceId === ble.connectedDeviceId && (
+                <CalibrationNudgeBanner
+                  colors={colors}
+                  onCalibrate={() => {
+                    setNudgeBannerVisible(false);
+                    setNudgeCalibModalOpen(true);
+                  }}
+                  onDismiss={() => void handleDismissNudge()}
+                />
+              )}
+              <ConnectedGlassesCard
+                deviceId={ble.connectedDeviceId}
+                deviceName={ble.connectedDeviceName ?? "Meta Ray-Ban Glasses"}
+                colors={colors}
+                onDisconnect={handleDisconnect}
+                calibRefreshKey={calibRefreshKey}
+              />
+            </>
           ) : busy ? (
             <Card>
               <View
@@ -981,6 +1072,24 @@ export default function ConnectionsScreen() {
           onConnected={handleWifiConnected}
         />
 
+        {/* Calibration nudge modal — opened from the first-connection banner.
+            deviceId is the ID that triggered the nudge (not the live BLE ID)
+            so a disconnect/swap during calibration cannot write data for the
+            wrong device.  The modal is auto-closed by the useEffect above if
+            the connected device diverges from nudgeDeviceId. */}
+        {nudgeDeviceId !== null && nudgeDeviceId === ble.connectedDeviceId && (
+          <GlassesCalibrationModal
+            visible={nudgeCalibModalOpen}
+            deviceId={nudgeDeviceId}
+            onClose={() => setNudgeCalibModalOpen(false)}
+            onSaved={() => {
+              setNudgeCalibModalOpen(false);
+              // Signal ConnectedGlassesCard to reload its calibration status row
+              setCalibRefreshKey((k) => k + 1);
+            }}
+          />
+        )}
+
         {/* ── Coming soon ── */}
         <Section title="Coming soon" icon="time-outline">
           {COMING_SOON_DEVICES.map((d) => (
@@ -1077,6 +1186,115 @@ function Section({
   );
 }
 
+// ─── Calibration nudge banner ─────────────────────────────────────────────────
+
+/**
+ * Shown above ConnectedGlassesCard when glasses first connect and no
+ * calibration profile exists for that device ID.  The technician can either
+ * open the calibration modal immediately or dismiss the banner (the dismiss
+ * flag is persisted so the banner won't re-appear on subsequent reconnects).
+ */
+function CalibrationNudgeBanner({
+  colors,
+  onCalibrate,
+  onDismiss,
+}: {
+  colors: ReturnType<typeof useColors>;
+  onCalibrate: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <Card
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        backgroundColor: "#17c4d318",
+        borderColor: "#17c4d355",
+        borderWidth: 1,
+      }}
+    >
+      {/* Icon */}
+      <View
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 11,
+          backgroundColor: "#17c4d322",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Ionicons name="aperture-outline" size={20} color="#17c4d3" />
+      </View>
+
+      {/* Text */}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text
+          style={{
+            color: colors.foreground,
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 13,
+          }}
+        >
+          Calibrate for accurate measurements
+        </Text>
+        <Text
+          style={{
+            color: colors.mutedForeground,
+            fontFamily: "Inter_400Regular",
+            fontSize: 11,
+            lineHeight: 15,
+          }}
+        >
+          Glasses camera isn't calibrated yet — measurements use an 800 px
+          default which may be off by up to 30%.
+        </Text>
+      </View>
+
+      {/* Actions */}
+      <View style={{ gap: 5, flexShrink: 0 }}>
+        <Pressable
+          onPress={onCalibrate}
+          style={({ pressed }) => ({
+            backgroundColor: "#17c4d3",
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            alignItems: "center",
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Text
+            style={{
+              color: "#fff",
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 12,
+            }}
+          >
+            Calibrate now
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onDismiss}
+          style={({ pressed }) => ({ alignItems: "center", opacity: pressed ? 0.7 : 1 })}
+        >
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontFamily: "Inter_400Regular",
+              fontSize: 11,
+            }}
+          >
+            Dismiss
+          </Text>
+        </Pressable>
+      </View>
+    </Card>
+  );
+}
+
 // ─── Connected glasses card ───────────────────────────────────────────────────
 
 function ConnectedGlassesCard({
@@ -1084,17 +1302,22 @@ function ConnectedGlassesCard({
   deviceName,
   colors,
   onDisconnect,
+  calibRefreshKey = 0,
 }: {
   deviceId: string;
   deviceName: string;
   colors: ReturnType<typeof useColors>;
   onDisconnect: () => void;
+  /** Increment to trigger an immediate re-read of the calibration profile
+   *  (e.g. after the parent-owned nudge modal saves a new profile). */
+  calibRefreshKey?: number;
 }) {
   const [calibModalVisible, setCalibModalVisible] = useState(false);
   const [calibProfile, setCalibProfile] = useState<BasicCalibrationProfile | null>(null);
   const [calibLoading, setCalibLoading] = useState(true);
 
-  // Load existing calibration profile on mount and after save.
+  // Load existing calibration profile on mount, after save, and whenever the
+  // parent signals a refresh via calibRefreshKey.
   const refreshCalib = useCallback(async () => {
     setCalibLoading(true);
     try {
@@ -1105,7 +1328,7 @@ function ConnectedGlassesCard({
     }
   }, [deviceId]);
 
-  useEffect(() => { void refreshCalib(); }, [refreshCalib]);
+  useEffect(() => { void refreshCalib(); }, [refreshCalib, calibRefreshKey]);
 
   const handleClearCalib = useCallback(() => {
     Alert.alert(
