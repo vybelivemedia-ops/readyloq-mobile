@@ -26,6 +26,8 @@ export default defineConfig({
       "hooks/__tests__/useMetaGlassesSession.test.ts",
       "lib/risk-drill-down/__tests__/**/*.test.ts",
       "__tests__/\\(app\\)/inspection-summary/**/*.test.ts",
+      "__tests__/\\(app\\)/frame-buffer-delete-failure.test.ts",
+      "lib/voice-context/__tests__/**/*.test.ts",
       "lib/sync-history/__tests__/**/*.test.ts",
       "components/__tests__/copilot-hud-badge-visibility.test.ts",
     ],
