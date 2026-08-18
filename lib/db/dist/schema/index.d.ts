@@ -27,4 +27,5 @@ export * from "./playbooks";
 export * from "./client-portal";
 export * from "./meta-glasses";
 export * from "./portal-messages";
+export * from "./enterprise-outbox";
 //# sourceMappingURL=index.d.ts.map
