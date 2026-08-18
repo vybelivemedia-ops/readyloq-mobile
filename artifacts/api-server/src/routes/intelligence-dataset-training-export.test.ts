@@ -272,6 +272,74 @@ describe("rejected records are excluded from the corrections export", () => {
   });
 });
 
+describe("a manager cannot re-approve a rejected record without force", () => {
+  it("returns 409 when a manager sends action:approve on a rejected record without force", async () => {
+    const rec = await createRecord();
+    await promoteToL3(rec.id);
+
+    asUser(MANAGER_ID);
+    // First manager rejects.
+    const rejected = await request(app)
+      .post(`/api/intelligence-dataset/records/${rec.id}/review`)
+      .send({ action: "reject", comment: "Bad quality image" });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.status).toBe("rejected");
+
+    // Second manager (or accidental double-click) tries to approve without force.
+    const reapprove = await request(app)
+      .post(`/api/intelligence-dataset/records/${rec.id}/review`)
+      .send({ action: "approve" });
+    expect(reapprove.status).toBe(409);
+    expect(reapprove.body.error).toMatch(/force/i);
+
+    // Record remains rejected.
+    const after = await request(app).get(
+      `/api/intelligence-dataset/records/${rec.id}`,
+    );
+    expect(after.body.status).toBe("rejected");
+    expect(after.body.approvedForTraining).toBe(false);
+  });
+
+  it("returns 409 when a manager sends action:expert_verify on a rejected record without force", async () => {
+    const rec = await createRecord();
+    await promoteToL3(rec.id);
+
+    asUser(MANAGER_ID);
+    await request(app)
+      .post(`/api/intelligence-dataset/records/${rec.id}/review`)
+      .send({ action: "reject" });
+
+    const reapprove = await request(app)
+      .post(`/api/intelligence-dataset/records/${rec.id}/review`)
+      .send({ action: "expert_verify" });
+    expect(reapprove.status).toBe(409);
+
+    const after = await request(app).get(
+      `/api/intelligence-dataset/records/${rec.id}`,
+    );
+    expect(after.body.status).toBe("rejected");
+    expect(after.body.approvedForTraining).toBe(false);
+  });
+
+  it("allows re-approval when force:true is supplied", async () => {
+    const rec = await createRecord();
+    await promoteToL3(rec.id);
+
+    asUser(MANAGER_ID);
+    await request(app)
+      .post(`/api/intelligence-dataset/records/${rec.id}/review`)
+      .send({ action: "reject" });
+
+    // Deliberate override with force flag.
+    const override = await request(app)
+      .post(`/api/intelligence-dataset/records/${rec.id}/review`)
+      .send({ action: "approve", force: true });
+    expect(override.status).toBe(200);
+    expect(override.body.status).toBe("approved");
+    expect(override.body.approvedForTraining).toBe(true);
+  });
+});
+
 describe("a technician cannot re-confirm a rejected record", () => {
   it("returns 409 when a technician tries to confirm/correct a rejected record", async () => {
     const rec = await createRecord();

@@ -2725,6 +2725,7 @@ components:
         notes:                      { type: string }
         treatmentOutcome:           { type: string, enum: [resolved, improved, unchanged, worsened, pending, not_applicable] }
         daysUntilFollowup:          { type: integer, minimum: 0 }
+        force:                      { type: boolean, description: "Pass true to override a prior rejection. Required when re-approving a rejected record." }
 
     IntelligenceCategoryStat:
       type: object

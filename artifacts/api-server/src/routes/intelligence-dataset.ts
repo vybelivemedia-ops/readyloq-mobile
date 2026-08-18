@@ -922,6 +922,21 @@ router.post(
 
       const data = parsed.data;
 
+      // Guard: a manager cannot silently re-approve a record that was already
+      // explicitly rejected.  They must pass force:true to override a
+      // colleague's rejection — this prevents accidental double-clicks and
+      // quiet reversals of quality decisions.
+      if (
+        record.status === "rejected" &&
+        (data.action === "approve" || data.action === "expert_verify") &&
+        data.force !== true
+      ) {
+        return res.status(409).json({
+          error:
+            "Record has already been rejected. Pass force:true to override the rejection.",
+        });
+      }
+
       // Optional label corrections a manager may apply on any review action.
       const labelUpdates: Partial<typeof intelligenceRecordsTable.$inferInsert> =
         {};

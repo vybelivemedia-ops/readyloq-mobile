@@ -5807,6 +5807,7 @@ export declare const ReviewIntelligenceRecordBody: zod.ZodObject<{
     notes: zod.ZodOptional<zod.ZodString>;
     treatmentOutcome: zod.ZodOptional<zod.ZodEnum<["resolved", "improved", "unchanged", "worsened", "pending", "not_applicable"]>>;
     daysUntilFollowup: zod.ZodOptional<zod.ZodNumber>;
+    force: zod.ZodOptional<zod.ZodBoolean>;
 }, "strip", zod.ZodTypeAny, {
     action: "approve" | "reject" | "edit" | "expert_verify";
     severity?: "low" | "moderate" | "high" | "critical" | undefined;
@@ -5822,6 +5823,7 @@ export declare const ReviewIntelligenceRecordBody: zod.ZodObject<{
     treatmentOutcome?: "resolved" | "improved" | "unchanged" | "worsened" | "pending" | "not_applicable" | undefined;
     daysUntilFollowup?: number | undefined;
     comment?: string | undefined;
+    force?: boolean | undefined;
 }, {
     action: "approve" | "reject" | "edit" | "expert_verify";
     severity?: "low" | "moderate" | "high" | "critical" | undefined;
@@ -5837,6 +5839,7 @@ export declare const ReviewIntelligenceRecordBody: zod.ZodObject<{
     treatmentOutcome?: "resolved" | "improved" | "unchanged" | "worsened" | "pending" | "not_applicable" | undefined;
     daysUntilFollowup?: number | undefined;
     comment?: string | undefined;
+    force?: boolean | undefined;
 }>;
 export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     id: zod.ZodNumber;

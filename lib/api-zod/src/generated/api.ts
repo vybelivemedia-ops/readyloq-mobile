@@ -1265,7 +1265,8 @@ export const ReviewIntelligenceRecordBody = zod.object({
   "whyItMatters": zod.string().optional(),
   "notes": zod.string().optional(),
   "treatmentOutcome": zod.enum(['resolved', 'improved', 'unchanged', 'worsened', 'pending', 'not_applicable']).optional(),
-  "daysUntilFollowup": zod.number().min(reviewIntelligenceRecordBodyDaysUntilFollowupMin).optional()
+  "daysUntilFollowup": zod.number().min(reviewIntelligenceRecordBodyDaysUntilFollowupMin).optional(),
+  "force": zod.boolean().optional().describe('Pass true to override a prior rejection. Required when re-approving a rejected record.')
 })
 
 export const ReviewIntelligenceRecordResponse = zod.object({

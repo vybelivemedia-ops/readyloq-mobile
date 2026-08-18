@@ -24,5 +24,7 @@ export interface IntelligenceReviewInput {
     treatmentOutcome?: IntelligenceReviewInputTreatmentOutcome;
     /** @minimum 0 */
     daysUntilFollowup?: number;
+    /** Pass true to override a prior rejection. Required when re-approving a rejected record. */
+    force?: boolean;
 }
 //# sourceMappingURL=intelligenceReviewInput.d.ts.map
