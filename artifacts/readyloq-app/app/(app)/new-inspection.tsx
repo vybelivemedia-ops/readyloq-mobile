@@ -79,6 +79,10 @@ import {
   setLastMeasurementReading,
 } from "@/lib/measurement";
 import {
+  assertFiniteDimensions,
+  isStampableResult,
+} from "@/lib/measurement/degenerate-guard";
+import {
   BurstMeasurementPipeline,
   FallbackSfMProvider,
   ReferenceScaleAnchor,
@@ -344,15 +348,9 @@ export default function NewInspectionScreen() {
 
         // Final guard: degenerate reference geometry can drive the scale
         // anchor to divide by ~0 — never display or stamp Infinity/NaN.
-        if (
-          !Number.isFinite(result.widthInches) ||
-          !Number.isFinite(result.heightInches) ||
-          !Number.isFinite(result.areaSqInches)
-        ) {
-          throw new Error(
-            "Measurement produced invalid dimensions — refit the reference box and try again",
-          );
-        }
+        // assertFiniteDimensions() is the single source of truth for this check;
+        // it throws DEGENERATE_GEOMETRY_ERROR when any dimension is non-finite.
+        assertFiniteDimensions(result);
         setMeasureResult(result);
       } catch (e) {
         Alert.alert(
@@ -369,7 +367,7 @@ export default function NewInspectionScreen() {
   );
 
   const handleStampMeasureResult = useCallback(() => {
-    if (!measureResult || !Number.isFinite(measureResult.widthInches)) return;
+    if (!isStampableResult(measureResult)) return;
     // Same stamp path as MeasurementDevicePanel.onStamp: the measurement bridge
     // caches the reading and consumeLastMeasurementReading() attaches it to the
     // next captured photo's finding record (captureMetadata).

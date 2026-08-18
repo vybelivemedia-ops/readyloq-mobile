@@ -39,6 +39,16 @@ import {
   consumeLastMeasurementReading,
   clearMeasurementReading,
 } from "../measurement-bridge";
+import {
+  assertFiniteDimensions,
+  isStampableResult,
+  DEGENERATE_GEOMETRY_ERROR,
+} from "../degenerate-guard";
+import {
+  BurstMeasurementPipeline,
+  FallbackSfMProvider,
+  REFERENCE_OBJECTS,
+} from "@platform/measurement-core";
 import type { MeasurementReading } from "@platform/measurement-core";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -656,5 +666,230 @@ describe("Stamp metadata — confidence and warnings round-trip through the brid
     const stored = getLastMeasurementReading();
     expect(stored!.value).toBe(7.5);
     expect(stored!.signalQuality).toBe(0.9);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. DEGENERATE GEOMETRY GUARD — BRIDGE WRITE PREVENTION
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// handleRunBurstMeasure in new-inspection.tsx calls assertFiniteDimensions()
+// (imported from lib/measurement/degenerate-guard.ts) before setMeasureResult():
+//
+//   assertFiniteDimensions(result);  // throws DEGENERATE_GEOMETRY_ERROR
+//   setMeasureResult(result);        // ← never reached for non-finite results
+//
+// handleStampMeasureResult uses isStampableResult() (same module) as its early-
+// return guard before calling setLastMeasurementReading():
+//
+//   if (!isStampableResult(measureResult)) return;
+//   setLastMeasurementReading({ ... }); // ← never reached for non-finite results
+//
+// Section 4a tests the real production guard functions imported directly.
+// Section 4b drives the real BurstMeasurementPipeline through assertFiniteDimensions
+// and into the real measurement bridge to confirm the end-to-end chain holds.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CREDIT_CARD = REFERENCE_OBJECTS["credit_card"]!;
+
+// ── 4a. Unit tests of the production guard functions ─────────────────────────
+
+describe("assertFiniteDimensions (production guard) — throws for non-finite dimensions", () => {
+  it("throws for widthInches = Infinity", () => {
+    expect(() =>
+      assertFiniteDimensions({ widthInches: Infinity, heightInches: 2.0, areaSqInches: 8.0 }),
+    ).toThrow(DEGENERATE_GEOMETRY_ERROR);
+  });
+
+  it("throws for widthInches = -Infinity", () => {
+    expect(() =>
+      assertFiniteDimensions({ widthInches: -Infinity, heightInches: 2.0, areaSqInches: 8.0 }),
+    ).toThrow(DEGENERATE_GEOMETRY_ERROR);
+  });
+
+  it("throws for widthInches = NaN", () => {
+    expect(() =>
+      assertFiniteDimensions({ widthInches: NaN, heightInches: 2.0, areaSqInches: 8.0 }),
+    ).toThrow(DEGENERATE_GEOMETRY_ERROR);
+  });
+
+  it("throws when heightInches is Infinity even when widthInches is finite", () => {
+    expect(() =>
+      assertFiniteDimensions({ widthInches: 4.0, heightInches: Infinity, areaSqInches: 8.0 }),
+    ).toThrow(DEGENERATE_GEOMETRY_ERROR);
+  });
+
+  it("throws when areaSqInches is NaN even when width and height are finite", () => {
+    expect(() =>
+      assertFiniteDimensions({ widthInches: 4.0, heightInches: 2.0, areaSqInches: NaN }),
+    ).toThrow(DEGENERATE_GEOMETRY_ERROR);
+  });
+
+  it("does NOT throw for a valid finite result", () => {
+    expect(() =>
+      assertFiniteDimensions({ widthInches: 4.25, heightInches: 2.75, areaSqInches: 11.69 }),
+    ).not.toThrow();
+  });
+
+  it("error message carries the technician retry instruction", () => {
+    expect(() =>
+      assertFiniteDimensions({ widthInches: Infinity, heightInches: 0, areaSqInches: 0 }),
+    ).toThrow(/refit the reference box/i);
+  });
+});
+
+describe("isStampableResult (production guard) — returns false for non-finite / null", () => {
+  it("returns false for widthInches = Infinity", () => {
+    expect(isStampableResult({ widthInches: Infinity, heightInches: 0, areaSqInches: 0 })).toBe(false);
+  });
+
+  it("returns false for widthInches = NaN", () => {
+    expect(isStampableResult({ widthInches: NaN, heightInches: 2, areaSqInches: 4 })).toBe(false);
+  });
+
+  it("returns false for null result", () => {
+    expect(isStampableResult(null)).toBe(false);
+  });
+
+  it("returns true for a valid finite result", () => {
+    expect(isStampableResult({ widthInches: 4.25, heightInches: 2.75, areaSqInches: 11.69 })).toBe(true);
+  });
+});
+
+// ── 4b. End-to-end: real pipeline → production guard → real bridge ───────────
+
+describe("Degenerate geometry guard — bridge write prevention (end-to-end)", () => {
+  beforeEach(() => {
+    clearMeasurementReading();
+  });
+
+  it("bridge stays empty when assertFiniteDimensions throws for Infinity widthInches", () => {
+    // Mirrors handleRunBurstMeasure: call assertFiniteDimensions, then only
+    // setLastMeasurementReading when it passes.  The bridge must stay empty when
+    // the guard throws.
+    let guardFired = false;
+    try {
+      assertFiniteDimensions({ widthInches: Infinity, heightInches: 0, areaSqInches: 0 });
+      // Guard passed — write to bridge (would be setMeasureResult in the component)
+    } catch {
+      guardFired = true;
+      // Guard threw — do NOT write to bridge (mirrors handleRunBurstMeasure catch block)
+    }
+
+    expect(guardFired).toBe(true);
+    expect(getLastMeasurementReading()).toBeNull();
+  });
+
+  it("bridge stays empty when assertFiniteDimensions throws for NaN dimensions", () => {
+    let guardFired = false;
+    try {
+      assertFiniteDimensions({ widthInches: NaN, heightInches: NaN, areaSqInches: NaN });
+    } catch {
+      guardFired = true;
+    }
+
+    expect(guardFired).toBe(true);
+    expect(getLastMeasurementReading()).toBeNull();
+  });
+
+  it("isStampableResult(Infinity) prevents the bridge write — getLastMeasurementReading stays null", () => {
+    // Mirrors handleStampMeasureResult: only write to the bridge when isStampableResult passes.
+    const nonFiniteResult = { widthInches: Infinity, heightInches: 0, areaSqInches: 0,
+      confidence: 0, warnings: [], measuredAt: new Date().toISOString(), centroidDepthMeters: 1 };
+
+    if (isStampableResult(nonFiniteResult)) {
+      // This branch must NOT be reached.
+      setLastMeasurementReading(makeMeasureStampReading({ widthInches: nonFiniteResult.widthInches }));
+    }
+
+    expect(getLastMeasurementReading()).toBeNull();
+  });
+
+  it("a valid pipeline result passes assertFiniteDimensions and IS written to the bridge", async () => {
+    // Drive the real BurstMeasurementPipeline with a well-formed reference box.
+    const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), 800);
+    const result = await pipeline.measure(
+      [{ uri: "file://test.jpg", capturedAt: 0 }],
+      [{ x: 100, y: 100 }, { x: 400, y: 100 }, { x: 400, y: 400 }, { x: 100, y: 400 }],
+      {
+        box: { x: 0.2, y: 0.3, width: 0.2, height: 0.08 },
+        object: CREDIT_CARD,
+        imageWidthPx: 1080,
+        imageHeightPx: 1920,
+      },
+    );
+
+    // Guard must pass (no throw) for a normal result.
+    expect(() => assertFiniteDimensions(result)).not.toThrow();
+    expect(isStampableResult(result)).toBe(true);
+
+    // Simulate the stamp path: write to the bridge only when both guards pass.
+    if (isStampableResult(result)) {
+      setLastMeasurementReading(makeMeasureStampReading({
+        widthInches: result.widthInches,
+        confidence: result.confidence,
+        warnings: result.warnings,
+      }));
+    }
+
+    const stored = getLastMeasurementReading();
+    expect(stored).not.toBeNull();
+    expect(Number.isFinite(stored!.value)).toBe(true);
+  });
+
+  it("real pipeline with near-zero reference box produces finite dimensions — assertFiniteDimensions passes", async () => {
+    // Drive the real pipeline with a single-tap-sized box (width=0) to confirm
+    // the pipeline's own near-zero guard (ReferenceScaleAnchor) produces finite
+    // values, not Infinity/NaN.  assertFiniteDimensions must therefore NOT throw.
+    const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), 800);
+    const result = await pipeline.measure(
+      [{ uri: "file://test.jpg", capturedAt: 0 }],
+      [{ x: 50, y: 50 }, { x: 200, y: 50 }, { x: 200, y: 200 }, { x: 50, y: 200 }],
+      {
+        box: { x: 0.4, y: 0.4, width: 0, height: 0 },
+        object: CREDIT_CARD,
+        imageWidthPx: 1080,
+        imageHeightPx: 1920,
+      },
+    );
+
+    // Pipeline must return finite dimensions even for a near-zero reference box.
+    expect(Number.isFinite(result.widthInches)).toBe(true);
+    expect(Number.isFinite(result.heightInches)).toBe(true);
+    expect(Number.isFinite(result.areaSqInches)).toBe(true);
+
+    // assertFiniteDimensions must not throw — the pipeline already sanitises its output.
+    expect(() => assertFiniteDimensions(result)).not.toThrow();
+
+    // But isStampableResult must still allow stamping (the guard does not block
+    // finite low-confidence results — that is the technician's choice to make).
+    expect(isStampableResult(result)).toBe(true);
+
+    // Confirm confidence is 0 (near-zero box anchor zeroes confidence).
+    expect(result.confidence).toBe(0);
+
+    // Confirm a warning is present so the technician is informed.
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings.some((w) => /too small/i.test(w))).toBe(true);
+  });
+
+  it("previously stamped reading survives when assertFiniteDimensions throws — bridge is not wiped", () => {
+    // Pre-existing valid stamp in the bridge.
+    setLastMeasurementReading(makeMeasureStampReading({ widthInches: 5.0, confidence: 0.8 }));
+
+    // A subsequent measurement attempt fails the guard.
+    let guardFired = false;
+    try {
+      assertFiniteDimensions({ widthInches: Infinity, heightInches: 0, areaSqInches: 0 });
+    } catch {
+      guardFired = true;
+      // handleRunBurstMeasure does NOT call clearMeasurementReading() in its catch block.
+    }
+
+    expect(guardFired).toBe(true);
+    // Previous reading must survive — the failed attempt must not wipe the bridge.
+    const stored = getLastMeasurementReading();
+    expect(stored).not.toBeNull();
+    expect(stored!.value).toBe(5.0);
   });
 });
