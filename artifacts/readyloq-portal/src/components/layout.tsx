@@ -89,8 +89,11 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-foreground">
+            <Button variant="ghost" size="icon" className="relative text-foreground">
               <Menu className="w-5 h-5" />
+              {reviewQueueCount > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" aria-label={`${reviewQueueCount} pending AI reviews`} />
+              )}
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 bg-card border-r border-border p-0 flex flex-col">
