@@ -493,6 +493,11 @@ export interface BasicCalibrationProfile {
     pixelToInchRatio: number;
     /** Unix timestamp (ms) when the profile was captured. */
     calibratedAt: number;
+    /**
+     * ISO-8601 timestamp after which the profile should be treated as stale.
+     * Absent on legacy profiles saved before expiry tracking was introduced.
+     */
+    expiresAt?: string;
 }
 /**
  * Raw depth-map buffer as produced by a monocular depth model or hardware

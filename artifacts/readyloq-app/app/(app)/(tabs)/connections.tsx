@@ -33,7 +33,9 @@ import { WifiCameraModal } from "@/components/WifiCameraModal";
 import { GlassesCalibrationModal } from "@/components/GlassesCalibrationModal";
 import {
   loadCalibrationProfile,
+  loadCalibrationProfileWithStatus,
   clearCalibrationProfile,
+  type CalibrationLoadResult,
 } from "@/lib/meta-glasses/calibration";
 import type { BasicCalibrationProfile } from "@platform/measurement-core";
 import { useColors } from "@/hooks/useColors";
@@ -1313,7 +1315,7 @@ function ConnectedGlassesCard({
   calibRefreshKey?: number;
 }) {
   const [calibModalVisible, setCalibModalVisible] = useState(false);
-  const [calibProfile, setCalibProfile] = useState<BasicCalibrationProfile | null>(null);
+  const [calibResult, setCalibResult] = useState<CalibrationLoadResult | null>(null);
   const [calibLoading, setCalibLoading] = useState(true);
 
   // Load existing calibration profile on mount, after save, and whenever the
@@ -1321,8 +1323,8 @@ function ConnectedGlassesCard({
   const refreshCalib = useCallback(async () => {
     setCalibLoading(true);
     try {
-      const profile = await loadCalibrationProfile(deviceId);
-      setCalibProfile(profile);
+      const result = await loadCalibrationProfileWithStatus(deviceId);
+      setCalibResult(result);
     } finally {
       setCalibLoading(false);
     }
@@ -1339,13 +1341,37 @@ function ConnectedGlassesCard({
         {
           text: "Clear",
           style: "destructive",
-          onPress: () => {
-            void clearCalibrationProfile(deviceId).then(refreshCalib);
-          },
+          onPress: () => { void clearCalibrationProfile(deviceId).then(refreshCalib); },
         },
       ],
     );
   }, [deviceId, refreshCalib]);
+
+  // Derived expiry helpers — computed synchronously from calibResult.
+  const calibProfile = calibResult?.profile ?? null;
+  const calibStatus  = calibResult?.status ?? null;
+  const calibDaysLeft = calibResult?.daysUntilExpiry ?? null;
+
+  /** Icon colour reflects freshness: green → amber → red. */
+  const calibIconColor =
+    !calibResult         ? colors.mutedForeground
+    : calibStatus === "expired"       ? "#ef4444"
+    : calibStatus === "expiring_soon" ? "#f59e0b"
+    : "#22c55e";
+
+  /** One-line calibration date string, e.g. "Jun 15, 2026". */
+  const calibDateLabel = calibProfile
+    ? new Date(calibProfile.calibratedAt).toLocaleDateString("en-US", {
+        month: "short", day: "numeric", year: "numeric",
+      })
+    : null;
+
+  /** Effective expiry date string, e.g. "Aug 13, 2026". Null when unavailable. */
+  const calibExpiryDateLabel = calibResult?.effectiveExpiresAt
+    ? new Date(calibResult.effectiveExpiresAt).toLocaleDateString("en-US", {
+        month: "short", day: "numeric", year: "numeric",
+      })
+    : null;
 
   return (
     <Card style={{ gap: 12 }}>
@@ -1412,10 +1438,14 @@ function ConnectedGlassesCard({
         style={{
           borderRadius: 10,
           borderWidth: 1,
-          borderColor: colors.border,
+          borderColor:
+            calibStatus === "expired"       ? "#ef444440"
+            : calibStatus === "expiring_soon" ? "#f59e0b40"
+            : colors.border,
           overflow: "hidden",
         }}
       >
+        {/* Status header */}
         <View
           style={{
             flexDirection: "row",
@@ -1425,11 +1455,7 @@ function ConnectedGlassesCard({
             gap: 10,
           }}
         >
-          <Ionicons
-            name="aperture-outline"
-            size={18}
-            color={calibProfile ? "#22c55e" : colors.mutedForeground}
-          />
+          <Ionicons name="aperture-outline" size={18} color={calibIconColor} />
           <View style={{ flex: 1, gap: 1 }}>
             <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
               Camera calibration
@@ -1438,22 +1464,72 @@ function ConnectedGlassesCard({
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
                 Loading…
               </Text>
-            ) : calibProfile ? (
-              <Text style={{ color: "#22c55e", fontFamily: "Inter_400Regular", fontSize: 11 }}>
-                {`Calibrated · ${Math.round(calibProfile.focalLengthPx)} px focal length`}
-              </Text>
-            ) : (
+            ) : !calibResult ? (
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
                 Not calibrated — using 800 px default
               </Text>
+            ) : calibStatus === "expired" ? (
+              <Text style={{ color: "#ef4444", fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                {calibExpiryDateLabel
+                  ? `Calibrated ${calibDateLabel} · Expired ${calibExpiryDateLabel}`
+                  : `Calibrated ${calibDateLabel} · Expired — Re-calibrate required`}
+              </Text>
+            ) : calibStatus === "expiring_soon" ? (
+              <Text style={{ color: "#f59e0b", fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                {`Calibrated ${calibDateLabel} · Expires ${calibExpiryDateLabel ?? "soon"} · ${calibDaysLeft} day${calibDaysLeft === 1 ? "" : "s"} left`}
+              </Text>
+            ) : (
+              /* valid (including legacy profiles with a derived expiry still in the future) */
+              <Text style={{ color: "#22c55e", fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                {`Calibrated ${calibDateLabel} · Expires ${calibExpiryDateLabel ?? `in ${calibDaysLeft} days`}`}
+              </Text>
             )}
           </View>
-          {calibProfile && (
+          {calibResult && (
             <Pressable onPress={handleClearCalib} hitSlop={8}>
               <Ionicons name="trash-outline" size={16} color={colors.mutedForeground} />
             </Pressable>
           )}
         </View>
+
+        {/* Expiry nudge — shown for expired and expiring_soon profiles */}
+        {(calibStatus === "expired" || calibStatus === "expiring_soon") && (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              backgroundColor:
+                calibStatus === "expired" ? "#ef444412" : "#f59e0b12",
+              borderTopWidth: 1,
+              borderTopColor:
+                calibStatus === "expired" ? "#ef444430" : "#f59e0b30",
+            }}
+          >
+            <Ionicons
+              name="warning-outline"
+              size={14}
+              color={calibStatus === "expired" ? "#ef4444" : "#f59e0b"}
+            />
+            <Text
+              style={{
+                flex: 1,
+                color: calibStatus === "expired" ? "#ef4444" : "#f59e0b",
+                fontFamily: "Inter_400Regular",
+                fontSize: 11,
+                lineHeight: 15,
+              }}
+            >
+              {calibStatus === "expired"
+                ? "Measurements use the 800 px default until you re-calibrate."
+                : "Recalibrate soon to keep measurement accuracy."}
+            </Text>
+          </View>
+        )}
+
+        {/* Recalibrate CTA */}
         <Pressable
           onPress={() => setCalibModalVisible(true)}
           style={({ pressed }) => ({
@@ -1469,7 +1545,7 @@ function ConnectedGlassesCard({
         >
           <Ionicons name="camera-outline" size={15} color="#17c4d3" />
           <Text style={{ color: "#17c4d3", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>
-            {calibProfile ? "Re-calibrate glasses camera" : "Calibrate glasses camera"}
+            {calibResult ? "Re-calibrate glasses camera" : "Calibrate glasses camera"}
           </Text>
         </Pressable>
       </View>
@@ -1509,8 +1585,8 @@ function ConnectedGlassesCard({
         visible={calibModalVisible}
         deviceId={deviceId}
         onClose={() => setCalibModalVisible(false)}
-        onSaved={(profile) => {
-          setCalibProfile(profile);
+        onSaved={() => {
+          void refreshCalib();
           setCalibModalVisible(false);
         }}
       />

@@ -38,8 +38,11 @@ import {
   buildCalibrationProfile,
   saveCalibrationProfile,
   loadCalibrationProfile,
+  loadCalibrationProfileWithStatus,
   clearCalibrationProfile,
   DEFAULT_FOCAL_LENGTH_PX,
+  CALIBRATION_EXPIRY_DAYS,
+  CALIBRATION_WARN_DAYS,
 } from "../calibration";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,6 +175,9 @@ describe("saveCalibrationProfile / loadCalibrationProfile — round-trip", () =>
       focalLengthPx:    2102.8,
       pixelToInchRatio: 0.000285,
       calibratedAt:     1_700_000_000_000,
+      // expiresAt keeps the fixture valid under the derived-expiry check:
+      // without it, calibratedAt (~Nov 2023) + 90 days falls in the past.
+      expiresAt:        new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
     };
 
     await saveCalibrationProfile(DEVICE_ID, profile);
@@ -207,11 +213,14 @@ describe("saveCalibrationProfile / loadCalibrationProfile — round-trip", () =>
     const deviceA = "device-aa";
     const deviceB = "device-bb";
 
+    const futureExpiry = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
     const profileA: BasicCalibrationProfile = {
       deviceId: deviceA, focalLengthPx: 800, pixelToInchRatio: 0.001, calibratedAt: 1,
+      expiresAt: futureExpiry,
     };
     const profileB: BasicCalibrationProfile = {
       deviceId: deviceB, focalLengthPx: 2102.8, pixelToInchRatio: 0.000285, calibratedAt: 2,
+      expiresAt: futureExpiry,
     };
 
     await Promise.all([
@@ -264,6 +273,322 @@ describe("DEFAULT_FOCAL_LENGTH_PX", () => {
   it("is a positive finite number", () => {
     expect(DEFAULT_FOCAL_LENGTH_PX).toBeGreaterThan(0);
     expect(Number.isFinite(DEFAULT_FOCAL_LENGTH_PX)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildCalibrationProfile — expiresAt field (task #608)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("buildCalibrationProfile — expiresAt field", () => {
+  it("sets expiresAt to an ISO-8601 string", () => {
+    const p = buildCalibrationProfile("dev", 2102.8, 1080, 0.6);
+    expect(typeof p.expiresAt).toBe("string");
+    // ISO-8601 date-time strings always contain a 'T' separator.
+    expect(p.expiresAt).toContain("T");
+    expect(() => new Date(p.expiresAt!)).not.toThrow();
+  });
+
+  it(`expiresAt is exactly ${CALIBRATION_EXPIRY_DAYS} days after calibratedAt (within 1 second)`, () => {
+    const p = buildCalibrationProfile("dev", 2102.8, 1080, 0.6);
+    const expiresMs = new Date(p.expiresAt!).getTime();
+    const expectedMs = p.calibratedAt + CALIBRATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+    expect(Math.abs(expiresMs - expectedMs)).toBeLessThan(1000);
+  });
+
+  it("expiresAt is in the future at the time of creation", () => {
+    const before = Date.now();
+    const p = buildCalibrationProfile("dev", 2102.8, 1080, 0.6);
+    const expiresMs = new Date(p.expiresAt!).getTime();
+    expect(expiresMs).toBeGreaterThan(before);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// loadCalibrationProfile — expiry enforcement (task #608)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("loadCalibrationProfile — expiry enforcement", () => {
+  const DEVICE_ID = "expiry-test-device";
+
+  beforeEach(() => {
+    _secureStore.clear();
+  });
+
+  it("returns null for an expired profile (expiresAt in the past)", async () => {
+    const expired: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now() - 100 * 24 * 60 * 60 * 1000, // 100 days ago
+      expiresAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
+    };
+    await saveCalibrationProfile(DEVICE_ID, expired);
+    const result = await loadCalibrationProfile(DEVICE_ID);
+    expect(result).toBeNull();
+  });
+
+  it("returns the profile when expiresAt is in the future (not yet expired)", async () => {
+    const valid: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days out
+    };
+    await saveCalibrationProfile(DEVICE_ID, valid);
+    const result = await loadCalibrationProfile(DEVICE_ID);
+    expect(result).not.toBeNull();
+    expect(result!.focalLengthPx).toBe(2102.8);
+  });
+
+  it("returns null for an old legacy profile (no expiresAt, calibratedAt > 90 days ago)", async () => {
+    // Pre-#608 profiles have no expiresAt; derived expiry = calibratedAt + 90 days.
+    // A profile saved years ago therefore has a derived expiry far in the past.
+    const legacy: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 800,
+      pixelToInchRatio: 0.001,
+      calibratedAt: 1_000_000_000_000, // ~2001-09-08 — ancient; derived expiry passed long ago
+    };
+    await saveCalibrationProfile(DEVICE_ID, legacy);
+    const result = await loadCalibrationProfile(DEVICE_ID);
+    // Old legacy profiles are expired once their derived window passes.
+    expect(result).toBeNull();
+  });
+
+  it("returns a recent legacy profile (no expiresAt, calibratedAt < 90 days ago)", async () => {
+    // A profile saved recently without an expiresAt is still within its derived window.
+    const legacy: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now() - 30 * 24 * 60 * 60 * 1000, // 30 days ago
+    };
+    await saveCalibrationProfile(DEVICE_ID, legacy);
+    const result = await loadCalibrationProfile(DEVICE_ID);
+    expect(result).not.toBeNull();
+    expect(result!.focalLengthPx).toBe(2102.8);
+  });
+
+  it("returns null for a profile with a malformed expiresAt (fail-closed)", async () => {
+    // A corrupt or unreadable expiresAt must never silently allow stale use.
+    const malformed: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now(),
+      expiresAt: "not-a-date",
+    };
+    await saveCalibrationProfile(DEVICE_ID, malformed);
+    const result = await loadCalibrationProfile(DEVICE_ID);
+    expect(result).toBeNull();
+  });
+
+  it("returns null for a profile that expires exactly now (boundary)", async () => {
+    const boundary: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now() - CALIBRATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+      expiresAt: new Date(Date.now() - 1).toISOString(), // 1 ms ago
+    };
+    await saveCalibrationProfile(DEVICE_ID, boundary);
+    const result = await loadCalibrationProfile(DEVICE_ID);
+    expect(result).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// loadCalibrationProfileWithStatus (task #608)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("loadCalibrationProfileWithStatus", () => {
+  const DEVICE_ID = "status-test-device";
+
+  beforeEach(() => {
+    _secureStore.clear();
+  });
+
+  it("returns null when no profile has been saved", async () => {
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result).toBeNull();
+  });
+
+  it("returns status 'expired' and a negative daysUntilExpiry for an expired profile", async () => {
+    const expired: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now() - 100 * 24 * 60 * 60 * 1000,
+      expiresAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    await saveCalibrationProfile(DEVICE_ID, expired);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe("expired");
+    expect(result!.daysUntilExpiry).toBeLessThan(0);
+    // The profile is returned even though it's expired (UI needs date for display).
+    expect(result!.profile.focalLengthPx).toBe(2102.8);
+  });
+
+  it(`returns status 'expiring_soon' when fewer than ${CALIBRATION_WARN_DAYS} days remain`, async () => {
+    const soonExpiry = new Date(
+      Date.now() + (CALIBRATION_WARN_DAYS - 1) * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const soon: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now() - 84 * 24 * 60 * 60 * 1000,
+      expiresAt: soonExpiry,
+    };
+    await saveCalibrationProfile(DEVICE_ID, soon);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result!.status).toBe("expiring_soon");
+    expect(result!.daysUntilExpiry).toBeGreaterThanOrEqual(0);
+    expect(result!.daysUntilExpiry!).toBeLessThan(CALIBRATION_WARN_DAYS);
+  });
+
+  it("returns status 'valid' when more than CALIBRATION_WARN_DAYS days remain", async () => {
+    const valid: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now(),
+      expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    await saveCalibrationProfile(DEVICE_ID, valid);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result!.status).toBe("valid");
+    expect(result!.daysUntilExpiry).toBeGreaterThan(CALIBRATION_WARN_DAYS);
+  });
+
+  it("returns status 'expired' for an old legacy profile (no expiresAt, calibratedAt > 90 days ago)", async () => {
+    // Pre-#608 profiles without expiresAt get a derived expiry = calibratedAt + 90 days.
+    // A very old profile's derived window has long passed → expired.
+    const legacy: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 800,
+      pixelToInchRatio: 0.001,
+      calibratedAt: 1_000_000_000_000, // ~2001 — derived expiry passed long ago
+    };
+    await saveCalibrationProfile(DEVICE_ID, legacy);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    // Profile is still returned by loadCalibrationProfileWithStatus for UI display.
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe("expired");
+    expect(result!.daysUntilExpiry).toBeLessThan(0);
+    expect(result!.profile.focalLengthPx).toBe(800);
+  });
+
+  it("returns status 'valid' and positive daysUntilExpiry for a recent legacy profile", async () => {
+    const legacy: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now() - 30 * 24 * 60 * 60 * 1000, // 30 days ago
+    };
+    await saveCalibrationProfile(DEVICE_ID, legacy);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result!.status).toBe("valid");
+    // Derived expiry is calibratedAt + 90 days = ~60 days from now.
+    expect(result!.daysUntilExpiry).toBeGreaterThan(CALIBRATION_WARN_DAYS);
+    expect(result!.daysUntilExpiry).toBeLessThanOrEqual(CALIBRATION_EXPIRY_DAYS);
+  });
+
+  it("returns status 'expired' and null daysUntilExpiry for a malformed expiresAt (fail-closed)", async () => {
+    const malformed: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now(),
+      expiresAt: "not-a-date",
+    };
+    await saveCalibrationProfile(DEVICE_ID, malformed);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result!.status).toBe("expired");
+    // NaN expiry → daysUntilExpiry is null (can't compute a meaningful delta).
+    expect(result!.daysUntilExpiry).toBeNull();
+  });
+
+  it("a freshly built profile (via buildCalibrationProfile) loads as 'valid'", async () => {
+    const profile = buildCalibrationProfile(DEVICE_ID, 2102.8, 1080, 0.6);
+    await saveCalibrationProfile(DEVICE_ID, profile);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result!.status).toBe("valid");
+    expect(result!.daysUntilExpiry).toBeCloseTo(CALIBRATION_EXPIRY_DAYS, -1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// effectiveExpiresAt — date surface for UI display (task #608)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("loadCalibrationProfileWithStatus — effectiveExpiresAt", () => {
+  const DEVICE_ID = "expiry-date-device";
+
+  beforeEach(() => { _secureStore.clear(); });
+
+  it("equals the stored expiresAt for a profile that has one", async () => {
+    const storedExpiry = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+    const profile: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now(),
+      expiresAt: storedExpiry,
+    };
+    await saveCalibrationProfile(DEVICE_ID, profile);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result!.effectiveExpiresAt).toBe(storedExpiry);
+  });
+
+  it("is derived as calibratedAt + 90 days for a legacy profile (no expiresAt)", async () => {
+    const calibratedAt = Date.now() - 30 * 24 * 60 * 60 * 1000; // 30 days ago
+    const legacy: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 800,
+      pixelToInchRatio: 0.001,
+      calibratedAt,
+    };
+    await saveCalibrationProfile(DEVICE_ID, legacy);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    const expectedExpiryMs = calibratedAt + CALIBRATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+    const actualExpiryMs = new Date(result!.effectiveExpiresAt!).getTime();
+    // Allow 1 second tolerance.
+    expect(Math.abs(actualExpiryMs - expectedExpiryMs)).toBeLessThan(1000);
+  });
+
+  it("is null when expiresAt is malformed (cannot produce a display date)", async () => {
+    const malformed: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now(),
+      expiresAt: "not-a-date",
+    };
+    await saveCalibrationProfile(DEVICE_ID, malformed);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result!.status).toBe("expired");
+    expect(result!.effectiveExpiresAt).toBeNull();
+  });
+
+  it("is a valid ISO-8601 string for an expired profile (for tombstone display)", async () => {
+    const expiredAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    const expired: BasicCalibrationProfile = {
+      deviceId: DEVICE_ID,
+      focalLengthPx: 2102.8,
+      pixelToInchRatio: 0.000285,
+      calibratedAt: Date.now() - 100 * 24 * 60 * 60 * 1000,
+      expiresAt: expiredAt,
+    };
+    await saveCalibrationProfile(DEVICE_ID, expired);
+    const result = await loadCalibrationProfileWithStatus(DEVICE_ID);
+    expect(result!.status).toBe("expired");
+    // effectiveExpiresAt is still set so the UI can show "Expired Aug 13, 2026".
+    expect(result!.effectiveExpiresAt).toBe(expiredAt);
+    expect(() => new Date(result!.effectiveExpiresAt!)).not.toThrow();
   });
 });
 
