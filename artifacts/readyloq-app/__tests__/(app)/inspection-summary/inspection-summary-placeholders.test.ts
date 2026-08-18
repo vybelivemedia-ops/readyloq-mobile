@@ -25,7 +25,7 @@ import {
   resolveSyncStatusVariant,
   SYNC_STATUS_UNAVAILABLE_LABEL,
   type AnalysisQueryState,
-} from "../inspection-summary-logic";
+} from "@/app/(app)/inspection-summary/inspection-summary-logic";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. AI findings card — error placeholder (task spec #1)
