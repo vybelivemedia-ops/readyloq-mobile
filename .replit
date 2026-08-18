@@ -26,15 +26,11 @@ args = "API Server"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "EAS Production Build"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "EAS Preview Build"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "android-r8-guard"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "android-metro-check"
 
 [[workflows.workflow]]
 name = "Expo Dev Server"
@@ -60,34 +56,23 @@ waitForPort = 3000
 outputType = "console"
 
 [[workflows.workflow]]
-name = "EAS Preview Build"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash -c 'if [ ! -f /tmp/eas-preview-approved ]; then echo \"EAS Preview Build skipped — reconciliation guard active.\"; echo \"To run: touch /tmp/eas-preview-approved, then restart this workflow.\"; exit 0; fi; rm -f /tmp/eas-preview-approved; cd /home/runner/workspace/artifacts/readyloq-app && pnpm install 2>&1 | tail -3 && EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN=$EXPO_TOKEN npx eas build --platform android --profile preview --non-interactive --no-wait 2>&1; echo EAS_DONE'"
-
-[[workflows.workflow]]
-name = "EAS Production Build"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash -c 'if [ ! -f /tmp/eas-production-approved ]; then echo \"EAS Production Build skipped — reconciliation guard active.\"; echo \"To run: touch /tmp/eas-production-approved, then restart this workflow.\"; exit 0; fi; rm -f /tmp/eas-production-approved; cd /home/runner/workspace/artifacts/readyloq-app && pnpm install 2>&1 | tail -3 && EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN=$EXPO_TOKEN npx eas build --platform android --profile production --non-interactive --no-wait 2>&1; echo EAS_DONE'"
-
-[[workflows.workflow]]
 name = "android-r8-guard"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/check-r8-flags.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "android-metro-check"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash artifacts/readyloq-app/scripts/check-metro-bundle.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
