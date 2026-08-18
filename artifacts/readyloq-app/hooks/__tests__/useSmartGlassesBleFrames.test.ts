@@ -1470,3 +1470,226 @@ describe("useSmartGlassesBleFrames — eviction via stalled onFrame consumer", (
     unmount();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite 7 — persisted drop count reset across a background cycle + reconnect
+//
+// Task #579: verify the interaction between _persistedDroppedFrameCount and a
+// BLE reconnect recovery that spans the Android unmount+remount boundary.
+//
+// On Android, switching away from the app unmounts and remounts the inspection
+// screen.  The module-level _persistedDroppedFrameCount survives this cycle and
+// seeds the droppedFrameCountRef on remount.  If a disconnect→connected
+// transition then fires on the remounted hook, the reconnect recovery must:
+//   (a) read the correct pre-reconnect baseline from droppedFrameCountRef
+//       (which was seeded from _persistedDroppedFrameCount, not from 0)
+//   (b) reset droppedFrameCount to only the post-reconnect drops
+//   (c) write the new value back to _persistedDroppedFrameCount so a
+//       subsequent remount also starts from the correct count
+//
+// Assertions:
+//   ✓ droppedFrameCount on the remounted hook is 0 after a clean reconnect
+//     (pre-disconnect drops accumulated pre-background are cleared)
+//   ✓ _persistedDroppedFrameCount is 0 after the recovery (verified by mounting
+//     a third time and confirming it seeds from 0)
+//   ✓ only post-reconnect drops are preserved when new drops arrive between
+//     the reconnect transition and the first successful frame
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("useSmartGlassesBleFrames — persisted drop count reset across background cycle + reconnect", () => {
+  async function flushMicrotasks(ticks = 300) {
+    for (let i = 0; i < ticks; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  /**
+   * Returns the onDroppedFrame callback registered with smartGlassesBle
+   * by the hook's useEffect (used to synthesise driver-level drops).
+   */
+  function captureRegisteredDropCb(): (count: number) => void {
+    const cb = vi.mocked(mockBle.onDroppedFrame).mock.calls[0]?.[0] as
+      | ((count: number) => void)
+      | undefined;
+    if (!cb) throw new Error("onDroppedFrame was not registered");
+    return cb;
+  }
+
+  it("resets droppedFrameCount to 0 on the remounted hook after a clean reconnect that spans a background cycle", async () => {
+    // ── First mount (inspection in progress, glasses connected) ─────────────
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    const { result: result1, unmount: unmount1 } = await mountHook(
+      useSmartGlassesBleFrames,
+      { active: true, onFrame },
+    );
+
+    // Emit 5 driver-level drops so _persistedDroppedFrameCount becomes 5.
+    const dropCb1 = captureRegisteredDropCb();
+    await act(async () => {
+      dropCb1(5);
+      await flushMicrotasks(50);
+    });
+
+    expect(result1.current.droppedFrameCount).toBe(5);
+
+    // ── Android background (unmount) ─────────────────────────────────────────
+    unmount1();
+
+    // ── Android foreground (remount) — droppedFrameCount seeds from 5 ────────
+    const hookAfterRemount = await importHook();
+    const { result: result2, unmount: unmount2 } = await mountHook(
+      hookAfterRemount,
+      { active: true, onFrame },
+    );
+
+    // Confirm the remounted hook picked up the persisted count.
+    expect(result2.current.droppedFrameCount).toBe(5);
+
+    // ── BLE reconnect: disconnected → connected ───────────────────────────────
+    // Transition through disconnected so the hook's subscriber sees
+    // !wasConnected → nowConnected and arms pendingReconnectRef.
+    await act(async () => {
+      mockBle.setConnectionState("disconnected");
+      mockBle.setConnectionState("connected");
+      await flushMicrotasks(50);
+    });
+
+    // ── First successful frame after reconnect triggers recovery ─────────────
+    await act(async () => {
+      mockBle.emitFrame();
+      await flushMicrotasks(100);
+    });
+
+    // The reconnect recovery must reset droppedFrameCount to 0
+    // (no drops occurred between the reconnect event and this frame).
+    expect(result2.current.droppedFrameCount).toBe(0);
+
+    unmount2();
+  });
+
+  it("updates _persistedDroppedFrameCount to 0 after the cross-cycle reconnect recovery so a third mount also starts at 0", async () => {
+    // ── First mount: accumulate 6 drops ─────────────────────────────────────
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    const { unmount: unmount1 } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    const dropCb1 = captureRegisteredDropCb();
+    await act(async () => {
+      dropCb1(6);
+      await flushMicrotasks(50);
+    });
+
+    // ── Android background ───────────────────────────────────────────────────
+    unmount1();
+
+    // ── Android foreground (remount) — seeds from 6 ──────────────────────────
+    const hookAfterRemount = await importHook();
+    const { result: result2, unmount: unmount2 } = await mountHook(
+      hookAfterRemount,
+      { active: true, onFrame },
+    );
+
+    expect(result2.current.droppedFrameCount).toBe(6);
+
+    // ── Disconnect → connect transition ──────────────────────────────────────
+    await act(async () => {
+      mockBle.setConnectionState("disconnected");
+      mockBle.setConnectionState("connected");
+      await flushMicrotasks(50);
+    });
+
+    // ── First successful frame — recovery fires, _persistedDroppedFrameCount → 0
+    await act(async () => {
+      mockBle.emitFrame();
+      await flushMicrotasks(100);
+    });
+
+    expect(result2.current.droppedFrameCount).toBe(0);
+
+    // ── Second Android background ────────────────────────────────────────────
+    unmount2();
+
+    // ── Third mount — must seed from 0 (not from 6) ──────────────────────────
+    const hookThirdMount = await importHook();
+    const { result: result3, unmount: unmount3 } = await mountHook(
+      hookThirdMount,
+      { active: true, onFrame },
+    );
+
+    expect(result3.current.droppedFrameCount).toBe(0);
+
+    unmount3();
+  });
+
+  it("preserves only post-reconnect drops when new drops arrive between the reconnect transition and the first successful frame", async () => {
+    // ── First mount: accumulate 4 drops ─────────────────────────────────────
+    mockBle = buildMockBle("connected");
+    const onFrame = vi.fn().mockResolvedValue(undefined);
+
+    const { unmount: unmount1 } = await mountHook(useSmartGlassesBleFrames, {
+      active: true,
+      onFrame,
+    });
+
+    const dropCb1 = captureRegisteredDropCb();
+    await act(async () => {
+      dropCb1(4);
+      await flushMicrotasks(50);
+    });
+
+    // ── Android background ───────────────────────────────────────────────────
+    unmount1();
+
+    // Record how many times onDroppedFrame has been called so far so we can
+    // isolate the callback registered by the remounted hook.
+    const callCountBeforeRemount = vi.mocked(mockBle.onDroppedFrame).mock.calls.length;
+
+    // ── Android foreground (remount) — seeds from 4 ──────────────────────────
+    const hookAfterRemount = await importHook();
+    const { result: result2, unmount: unmount2 } = await mountHook(
+      hookAfterRemount,
+      { active: true, onFrame },
+    );
+
+    expect(result2.current.droppedFrameCount).toBe(4);
+
+    // ── Disconnect → connect transition: droppedAtReconnect captured as 4 ─────
+    await act(async () => {
+      mockBle.setConnectionState("disconnected");
+      mockBle.setConnectionState("connected");
+      await flushMicrotasks(20);
+    });
+
+    // ── 2 new driver drops arrive between the reconnect and the first frame ───
+    // These belong to the new session and must be kept (not cleared).
+    // Use the callback registered by the remounted hook (not the first mount's
+    // already-unsubscribed callback at calls[0]).
+    const dropCb2 = vi.mocked(mockBle.onDroppedFrame).mock.calls[callCountBeforeRemount]?.[0] as
+      | ((count: number) => void)
+      | undefined;
+    if (!dropCb2) throw new Error("onDroppedFrame not registered on remount");
+
+    await act(async () => {
+      dropCb2(2);
+      await flushMicrotasks(20);
+    });
+
+    // ── First successful frame — recovery calculates postReconnectDrops = 2 ───
+    await act(async () => {
+      mockBle.emitFrame();
+      await flushMicrotasks(100);
+    });
+
+    // droppedFrameCount must be exactly 2 (the 4 pre-reconnect drops are cleared;
+    // only the 2 post-reconnect drops are preserved).
+    expect(result2.current.droppedFrameCount).toBe(2);
+
+    unmount2();
+  });
+});
