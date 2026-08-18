@@ -81,10 +81,13 @@ import {
 import {
   BurstMeasurementPipeline,
   FallbackSfMProvider,
+  ReferenceScaleAnchor,
+  REFERENCE_OBJECTS,
   type BoundingRegion,
   type BurstFrame,
   type BurstMeasurementResult,
   type ReferenceObject,
+  type SfMDepthMap,
 } from "@platform/measurement-core";
 import {
   deleteLocalInspection,
@@ -1911,7 +1914,7 @@ export default function NewInspectionScreen() {
       >
         <Ionicons name="warning" size={14} color="#fff" />
         <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 12, flex: 1, flexShrink: 1 }}>
-          {_refWarnings[0] ?? "Reference partially out of frame — re-centre and retry"}
+          {_refWarnings[0] ?? "Re-centre reference object"}
         </Text>
         <Pressable
           hitSlop={8}
@@ -1972,23 +1975,45 @@ export default function NewInspectionScreen() {
               _setRefSelectMode("p2");
             } else if (_refSelectMode === "p2" && _refP1) {
               const p2 = { x, y };
-              // Compute clipping IMMEDIATELY — before _handleRefSelected — so
-              // the amber banner renders right away rather than waiting for the
-              // hook's result (which only fires after a target is also set).
-              const EDGE = 2;
-              const pts = [_refP1, p2];
-              const clipped = pts.some(
-                (p) =>
-                  p.x <= EDGE ||
-                  p.y <= EDGE ||
-                  p.x >= _cameraW - EDGE ||
-                  p.y >= _cameraH - EDGE,
+              // Convert the two tap endpoints to a normalised BoundingRegion so
+              // ReferenceScaleAnchor.anchor() can apply the canonical clipping
+              // detection (normalised coords outside [0,1]) instead of a local
+              // pixel-edge heuristic.  We supply a 1×1 uniform depth map because
+              // the clipped flag only inspects box coords — no depth needed here.
+              const minX = Math.min(_refP1.x, p2.x);
+              const maxX = Math.max(_refP1.x, p2.x);
+              const minY = Math.min(_refP1.y, p2.y);
+              const maxY = Math.max(_refP1.y, p2.y);
+              const normBox: BoundingRegion = {
+                x:      minX / _cameraW,
+                y:      minY / _cameraH,
+                width:  (maxX - minX) / _cameraW,
+                height: (maxY - minY) / _cameraH,
+              };
+              const dummyDepthMap: SfMDepthMap = {
+                width: 1,
+                height: 1,
+                relativeDepth: new Float32Array([0.5]),
+                scaleVariance: 0,
+                frameCount: 1,
+              };
+              const anchorResult = new ReferenceScaleAnchor(
+                _burstFocalLengthRef.current,
+              ).anchor(
+                normBox,
+                _cameraW,
+                _cameraH,
+                REFERENCE_OBJECTS.CREDIT_CARD,
+                dummyDepthMap,
               );
-              _setReferenceClipped(clipped);
+              _setReferenceClipped(anchorResult.clipped);
+              // When clipped the technician needs to re-frame the reference; when
+              // not clipped surface any size/distance warnings from the anchor so
+              // the technician knows to move closer before tapping Measure.
               _setRefWarnings(
-                clipped
-                  ? ["Reference object partially out of frame — re-centre and retry"]
-                  : [],
+                anchorResult.clipped
+                  ? ["Re-centre reference object"]
+                  : anchorResult.warnings,
               );
               _handleRefSelected(_refP1, p2);
               _setRefSelectMode("idle");
