@@ -35,248 +35,112 @@ installed APK via Metro dev server — they do not need a new build.
 | API server changes | `artifacts/api-server/` — not bundled into APK |
 | Portal / marketing changes | Other workspace artifacts |
 
-**When in doubt:** if the change is only in `app/`, `src/`, or `hooks/` and touches
-no file listed in the "Needs a build" table, it does not need a build.
+**When in doubt:** if the change is only in `app/`, `hooks/`, `components/`, or `lib/`
+and touches no file listed in the "Needs a build" table, it does not need a build.
 
 ---
 
-## Step 2 — Run both pre-flight checks (mandatory)
+## Step 2 — Submit via the wrapper (mandatory)
 
-Both checks must pass before submitting. They run in under 2 minutes combined and
-catch the two failure modes that caused builds 194–206 to burn through $184 in credits.
-
-### Check 1: R8 flags guard
-Verifies that the three minification flags in `android/gradle.properties` are all
-`false`. R8 full mode causes a `NoClassDefFoundError` startup crash in
-`expo-task-manager` that is not caught until the APK is installed and launched.
+Use `scripts/eas-submit.sh` instead of calling `eas build` directly. The wrapper
+runs both mandatory pre-flight checks and aborts before spending a build credit if
+either fails.
 
 ```bash
-bash scripts/check-r8-flags.sh
+# From workspace root:
+bash scripts/eas-submit.sh \
+  --platform android --profile preview --non-interactive --no-wait
 ```
 
-Expected output: `R8 guard PASSED — all flags are correctly set to false.`
+The wrapper:
+1. Runs `check-r8-flags.sh` (~1 s) — aborts if any R8/minification flag is enabled
+2. Runs `check-metro-bundle.sh` (~60–90 s) — aborts if the bundle has a Hermes-illegal module
+3. Calls `eas build` with all forwarded flags only if both pass
 
-If it fails: revert all three flags to `false` in
-`artifacts/readyloq-app/android/gradle.properties`. Do not add `-dontwarn` rules
-as a workaround — they silence the compile error but not the runtime crash.
+### Dry run (verify checks without spending a credit)
 
-### Check 2: Metro bundle check
+```bash
+bash scripts/eas-submit.sh \
+  --platform android --profile preview --non-interactive --no-wait --dry-run
+```
+
+Runs both checks and prints what the `eas build` command would be, without submitting.
+
+### What each check catches
+
+**R8 flags guard** (`scripts/check-r8-flags.sh`):
+Verifies all three minification flags in `android/gradle.properties` are `false`.
+R8 full mode causes a `NoClassDefFoundError` startup crash in `expo-task-manager` —
+build passes but APK crashes immediately on launch (builds 194–201).
+
+If it fails: revert all three flags to `false`. Do not add `-dontwarn` rules as a
+workaround — they silence the compile error but not the runtime crash.
+
+```properties
+android.enableR8.fullMode=false
+android.enableMinifyInReleaseBuilds=false
+android.enableShrinkResourcesInReleaseBuilds=false
+```
+
+**Metro bundle check** (`artifacts/readyloq-app/scripts/check-metro-bundle.sh`):
 Runs `expo export --platform android --no-minify` locally. Catches any module that
-Metro would bundle but Hermes cannot execute (e.g. vite/vitest leaking in via a
-transitive import). Builds 204 and 205 both failed on EAS for exactly this reason;
-this check catches it in ~60–90 seconds without spending a credit.
+Metro bundles but Hermes cannot execute (e.g. `vite/module-runner.js` leaking in via
+a transitive import). Builds 204 and 205 both failed this way; this check catches it
+locally without spending a credit.
 
-```bash
-bash artifacts/readyloq-app/scripts/check-metro-bundle.sh
-```
+If it fails: fix the bundling error shown in the output, confirm the fix passes
+locally, then re-run.
 
-Expected output: `Metro bundle check PASSED — bundle is clean.`
-
-If it fails: fix the bundling error shown in the output (typically a blocked module
-leaking through a new import path), confirm the fix passes locally, then re-run
-before submitting.
-
-#### Verifying the guard itself (after any metro.config.js change)
-
-If you refactor `metro.config.js` — especially the `blockList` section — run the
-self-test to confirm the vite/vitest guard is still effective:
+#### Verifying the Metro guard itself (after any `metro.config.js` change)
 
 ```bash
 bash artifacts/readyloq-app/scripts/check-metro-bundle.sh --test
 ```
 
-The `--test` flag temporarily comments out the four vite/vitest `blockList` regexes,
-runs a full `expo export`, and asserts the export **fails**. A `Self-test PASSED`
-result means removing the guard actually breaks the build — i.e. the guard is real.
-A `Self-test FAILED` result means vite/vitest are no longer reachable from the import
-graph and the guard may need updating; investigate before relying on this check.
-
-This self-test takes the same ~60–90 seconds as a normal check and restores
-`metro.config.js` unconditionally (even on Ctrl-C).
+Temporarily comments out the vite/vitest `blockList` regexes, runs a full export,
+and asserts the export fails. A `Self-test PASSED` result means the guard is real.
+Restores `metro.config.js` unconditionally even on Ctrl-C.
 
 ---
 
-## Step 3 — Submit with `--no-wait`
+## Check build status
 
-Always use `--no-wait`. Never block a tool call waiting for the build to finish —
-the bash tool has a 120-second timeout and the build takes 15–25 minutes.
-
-```bash
-cd artifacts/readyloq-app
-EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN=$EXPO_TOKEN \
-  npx eas build --platform android --profile preview --non-interactive --no-wait
-```
-
-Check build status later via:
 ```bash
 cd artifacts/readyloq-app && EXPO_TOKEN=$EXPO_TOKEN npx eas build:list --limit 5
 ```
 
+Always use `--no-wait` when submitting. Never block a tool call waiting for a build
+to finish — the bash tool has a 120-second timeout and builds take 15–25 minutes.
+
 ---
 
-## Failure triage (do not re-submit blindly)
-
-If a build errors, diagnose the failure **before** submitting again.
+## Failure triage — do not re-submit blindly
 
 | Error in EAS log | Fix | Re-submit? |
 |---|---|---|
-| `Metro bundling failed` / `module-runner.js SyntaxError` | A blocked module leaked in. Update `metro.config.js` blockList. Run Metro check locally first. | Only after local Metro check passes |
-| `NoClassDefFoundError` at startup | R8 flags re-enabled. Run R8 guard. | Only after R8 guard passes |
-| `Unknown error in Bundle JavaScript phase` | `watchFolders` missing pnpm root. Check `metro.config.js` `watchFolders` includes `../../node_modules`. | Only after local Metro check passes |
-| Gradle compile error (not R8) | Read the full Gradle log on expo.dev — usually a missing dependency or API level mismatch | Fix root cause first |
+| `Metro bundling failed` / `module-runner.js SyntaxError` | Blocked module leaked in. Fix `metro.config.js` blockList. Re-run Metro check locally. | Only after Metro check passes |
+| `NoClassDefFoundError` at startup | R8 flags re-enabled. Re-run R8 guard. | Only after R8 guard passes |
+| `Unknown error in Bundle JavaScript phase` | `watchFolders` missing pnpm root. Verify `metro.config.js` `watchFolders` includes `../../node_modules`. | Only after Metro check passes |
+| Gradle compile error (not R8) | Read the full Gradle log on expo.dev — usually a missing dep or API level mismatch | Fix root cause first |
 | Upload / network timeout | Retry once; if it times out again check EAS status page | Yes, once |
 
 **Never submit a second build to "see if it fixes itself."** Every build is a charge.
 
 ---
 
-## Workflows already wired (run before submitting)
+## Replit validation workflows
 
-Two Replit workflows exist for exactly this purpose:
+Two Replit workflows run these checks on demand from the workflow panel:
 
 - **`android-r8-guard`** — runs `bash scripts/check-r8-flags.sh`
 - **`android-metro-check`** — runs `bash artifacts/readyloq-app/scripts/check-metro-bundle.sh`
 
-Run both from the Replit workflow panel and confirm both show green before submitting.
-
-# EAS Build Guidelines — ReadyLoq Android App
-
-> **$184 in overages this billing period** came from repeated debug builds during the R8 crash investigation. Every EAS build costs a credit and real money. Read this before submitting one.
-
 ---
-
-
-## When you DO need an EAS build
-
-Trigger a new EAS build only when the change involves one or more of the following:
-
-| Category | Examples |
-|----------|----------|
-| **New native package** | Adding a package with a `plugin` in `app.json`, native modules, JNI code, or anything listed under `expo-modules-core` |
-| **Gradle change** | `android/build.gradle`, `android/app/build.gradle`, `android/gradle.properties` |
-| **app.json plugin change** | Adding, removing, or modifying any entry under `"plugins"` in `app.json` |
-| **Android manifest change** | `android/app/src/main/AndroidManifest.xml` — new permissions, intent filters, receivers |
-| **Native code change** | Any file under `android/` or `ios/` that isn't auto-generated by Expo |
-| **SDK upgrade** | Bumping the `expo` package version itself, which may update native module versions |
-| **EAS config change** | Modifying `eas.json` build profiles — env vars, gradleCommand, distribution |
-
----
-
-
-## When you do NOT need an EAS build
-
-These changes are pure JS/TS and are served by the Metro bundler at runtime via the Expo dev server or an OTA update:
-
-- Screen changes, component refactors, new hooks
-- API call changes (URLs, payloads, headers)
-- Copy, labels, or color/style changes
-- New context providers, state management, or React Navigation routes
-- New TypeScript types or interfaces
-- Changes to workspace library packages (`lib/`, `repos/platform/packages/`) that have no native code
-- Bug fixes in `.ts` / `.tsx` files
-- Adding or modifying tests
-
-**When in doubt:** if `grep -r "android\|ios\|native\|plugin" <changed-file>` returns nothing relevant, it is almost certainly a JS-only change.
-
----
-
-
-### 2. R8 flag guard (`android-r8-guard`)
-
-```bash
-bash scripts/check-r8-flags.sh
-```
-
-**What it catches:**
-- Any of the three R8/minification flags being re-enabled in `android/gradle.properties`
-
-The three flags that **must stay `false`**:
-
-```properties
-android.enableMinifyInReleaseBuilds=false
-android.enableShrinkResourcesInReleaseBuilds=false
-android.enableR8.fullMode=false
-```
-
-Enabling any of them caused builds 194–201 to either fail at compile time or crash immediately at startup with `NoClassDefFoundError` in `expo-task-manager`. The parser handles all Java Properties spec forms (`:` separator, whitespace separator, line continuations, Unicode escapes) — it cannot be bypassed by formatting tricks.
-
----
-
-
-### 1. Metro bundle check (`android-metro-check`)
-
-```bash
-bash artifacts/readyloq-app/scripts/check-metro-bundle.sh
-```
-
-**What it catches:**
-- `vite` / `vitest` modules leaking into the Android bundle (the root cause of the builds 204–205 failures — Metro bundled `vite/module-runner.js`, which is illegal in Hermes)
-- Any bundling error that would cause EAS to fail at the JS compilation step
-- Test files (`__tests__/`, `.test.ts`, `.spec.ts`) accidentally included in the bundle
-
-Runs `expo export --platform android --no-minify` in an isolated temp directory (~30–90 seconds). Output is discarded; only the exit code matters.
-
-**The authoritative guard** is the `blockList` in `metro.config.js`. This script confirms the guard is working.
-
-
-## Build profiles quick reference
-
-| Profile | `buildType` | Use for |
-|---------|-------------|---------|
-| `development` | `apk` | Local dev client — install on a physical device for native debugging |
-| `preview` | `apk` (assembleRelease) | Beta / internal testing via `preview` channel |
-| `production` | `app-bundle` (bundleRelease) | Play Store submission |
-
-**Development builds** use the `developmentClient: true` flag — they include the Expo dev client so you can load JS over the network. They are the most expensive to rebuild because they bundle all native modules. Prefer the Expo dev server (`npx expo start`) for day-to-day work and only submit a `development` build when you need a new native module tested on a physical device.
-
----
-
-
-## Quick decision flowchart
-
-```
-Did you change a file under android/, ios/, or app.json plugins?
-  YES → Did check-metro-bundle.sh and check-r8-flags.sh both pass?
-          YES → Submit EAS build
-          NO  → Fix the failure first
-  NO  → Is it a new package that has native code (expo plugin / JNI)?
-          YES → Same as above
-          NO  → No EAS build needed. Use `npx expo start` or push an OTA update.
-```
-
----
-
 
 ## Historical context
 
 | Incident | Root cause | Cost |
-|----------|-----------|------|
+|---|---|---|
 | Builds 194–201 | R8 full mode + minify enabled → `NoClassDefFoundError` at startup | ~8 build credits |
 | Builds 204–205 | `vite/module-runner.js` bundled by Metro → Hermes parse failure | 2 build credits |
 | This billing period | Repeated debug builds during R8 investigation | $184 overages |
-
-The `android-r8-guard` and `android-metro-check` workflows exist specifically to prevent these from recurring.
-
-## Required pre-flight checks before any EAS build
-
-Both of the following workflow checks **must pass** before you submit an EAS build. They run locally in seconds and catch the failures that previously burned debug build credits.
-
-
-## The core question: does this change touch native code?
-
-If the answer is **no**, you do not need an EAS build. Use the Expo dev server instead.
-
----
-
-
-## Pre-build checklist
-
-Before submitting any EAS build, confirm all of the following:
-
-- [ ] The change actually requires a native rebuild (see the table above)
-- [ ] `bash artifacts/readyloq-app/scripts/check-metro-bundle.sh` exits 0
-- [ ] `bash scripts/check-r8-flags.sh` exits 0
-- [ ] The correct EAS profile is selected (`development` / `preview` / `production`)
-- [ ] You know why the previous build failed before submitting a retry
-
----
