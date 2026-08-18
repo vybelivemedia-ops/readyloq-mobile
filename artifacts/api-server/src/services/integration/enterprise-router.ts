@@ -200,10 +200,16 @@ export class EnterpriseAdapterRouter {
 
     try {
       if (config.systemType === "pestpac" || config.systemType === "servsuite") {
+        // Fall back to the documented vendor production endpoint when the
+        // owner has not configured a custom base URL override.
+        const defaultEndpoint =
+          config.systemType === "pestpac"
+            ? "https://api.pestpac.com/v1"
+            : "https://api.servsuite.com/v1";
         outcome = await EnterpriseBridgeProductionService.dispatchToSystem(
           {
             targetSystem: config.systemType,
-            endpointUrl: config.apiBaseUrl ?? "",
+            endpointUrl: config.apiBaseUrl ?? defaultEndpoint,
             decryptedApiKey: config.apiKey ?? "",
           },
           hardenedPayload,

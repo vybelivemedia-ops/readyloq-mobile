@@ -142,7 +142,7 @@ describe("PUT /api/integrations/config — connect", () => {
     asUser(OWNER_ID);
     const res = await request(app)
       .put("/api/integrations/config")
-      .send({ systemType: "fieldroutes", accountId: "fr-acct", apiKey: "fr-secret" });
+      .send({ systemType: "fieldroutes", accountId: "fr-acct", apiKey: "fr-secret", apiToken: "fr-token" });
 
     expect(res.status).toBe(200);
     expect(res.body.systemType).toBe("fieldroutes");
@@ -306,7 +306,7 @@ describe("full connect → update → disconnect lifecycle", () => {
       .send({ systemType: "pestpac", accountId: "dup-test", apiKey: "key-1" });
     await request(app)
       .put("/api/integrations/config")
-      .send({ systemType: "fieldroutes", accountId: "dup-test-v2", apiKey: "key-2" });
+      .send({ systemType: "fieldroutes", accountId: "dup-test-v2", apiKey: "key-2", apiToken: "token-2" });
 
     // Only one row should exist in the DB for this company.
     const rows = await db
@@ -720,7 +720,7 @@ describe("tenant isolation — config is scoped per company", () => {
     asUser(OTHER_OWNER_ID);
     await request(app)
       .put("/api/integrations/config")
-      .send({ systemType: "fieldroutes", accountId: "co-b-acct", apiKey: "co-b-key" });
+      .send({ systemType: "fieldroutes", accountId: "co-b-acct", apiKey: "co-b-key", apiToken: "co-b-token" });
 
     // Each company sees only its own config.
     asUser(OWNER_ID);

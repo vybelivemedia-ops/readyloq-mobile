@@ -1,4 +1,5 @@
 import { CRMAdapter, ExternalClient, InspectionPayload } from '../../../types/integration';
+import { ssrfSafeFetch } from '../../../lib/ssrf-safe-fetch';
 
 /**
  * FieldRoutes CRM adapter.
@@ -34,8 +35,9 @@ export class FieldRoutesAdapter implements CRMAdapter {
   }
 
   async fetchClients(): Promise<ExternalClient[]> {
-    const res = await fetch(`${this.baseUrl}/customer/search`, {
+    const res = await ssrfSafeFetch(`${this.baseUrl}/customer/search`, {
       method: 'POST',
+      redirect: "error", // never follow redirects — a redirect could point to a private host
       headers: this.headers,
       body: JSON.stringify({ officeIDs: [this.officeId], status: 1, includeData: 1 }),
     });
@@ -58,8 +60,9 @@ export class FieldRoutesAdapter implements CRMAdapter {
   async pushInspection(payload: InspectionPayload): Promise<boolean> {
     const body = buildFieldRoutesNote(payload, this.officeId);
 
-    const res = await fetch(`${this.baseUrl}/note/create`, {
+    const res = await ssrfSafeFetch(`${this.baseUrl}/note/create`, {
       method: 'POST',
+      redirect: "error", // never follow redirects — a redirect could point to a private host
       headers: this.headers,
       body: JSON.stringify(body),
     });

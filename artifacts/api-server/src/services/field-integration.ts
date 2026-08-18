@@ -12,6 +12,7 @@
 import type { FieldIntegrationSystem } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { withRetryTracked } from "../lib/retry";
+import { ssrfSafeFetch } from "../lib/ssrf-safe-fetch";
 
 /**
  * Returns true only for errors that are worth retrying.
@@ -131,8 +132,9 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
   // and the !noteRes.ok check below surfaces the proper error message.
   const { result: noteRes, retries: noteRetries } = await withRetryTracked(
     () =>
-      fetch(`${base}/customers/${customerId}/notes`, {
+      ssrfSafeFetch(`${base}/customers/${customerId}/notes`, {
         method: "POST",
+        redirect: "error", // never follow redirects — a redirect could point to a private host
         headers,
         body: JSON.stringify({
           note: `[ReadyLoq AI Report] ${payload.reportSummary}`,
@@ -171,8 +173,9 @@ async function syncToPestPac(payload: SyncPayload): Promise<SyncResult> {
     try {
       const { result: attachRes, retries } = await withRetryTracked(
         () =>
-          fetch(`${base}/customers/${customerId}/attachments`, {
+          ssrfSafeFetch(`${base}/customers/${customerId}/attachments`, {
             method: "POST",
+            redirect: "error",
             headers,
             body: JSON.stringify({
               fileUrl: photo.url,
@@ -247,8 +250,9 @@ async function syncToFieldRoutes(payload: SyncPayload): Promise<SyncResult> {
   // predicate is needed — the !histRes.ok check below surfaces the proper message.
   const { result: histRes, retries: noteRetries } = await withRetryTracked(
     () =>
-      fetch(`${base}/customer/${customerId}/service-history`, {
+      ssrfSafeFetch(`${base}/customer/${customerId}/service-history`, {
         method: "POST",
+        redirect: "error",
         headers,
         body: JSON.stringify({
           summary: payload.reportSummary,
@@ -321,8 +325,9 @@ export interface ProbeResult {
 async function probePestPac(apiKey: string, accountId: string, apiBaseUrl?: string | null): Promise<ProbeResult> {
   const base = apiBaseUrl?.replace(/\/$/, "") ?? PESTPAC_DEFAULT_BASE;
   try {
-    const res = await fetch(`${base}/customers/${encodeURIComponent(accountId)}`, {
+    const res = await ssrfSafeFetch(`${base}/customers/${encodeURIComponent(accountId)}`, {
       method: "GET",
+      redirect: "error", // never follow redirects — a redirect could point to a private host
       headers: { Authorization: `Bearer ${apiKey}` },
       // Short timeout — we only want to confirm auth, not wait for a slow response.
       signal: AbortSignal.timeout(8_000),
@@ -358,8 +363,9 @@ async function probeFieldRoutes(
     // FieldRoutes requires BOTH credentials: authenticationKey (apiKey) and
     // authenticationToken (apiToken) — same header contract as syncToFieldRoutes.
     // The Bearer header is kept for older gateway deployments that proxy on it.
-    const res = await fetch(`${base}/customer/${encodeURIComponent(accountId)}`, {
+    const res = await ssrfSafeFetch(`${base}/customer/${encodeURIComponent(accountId)}`, {
       method: "GET",
+      redirect: "error", // never follow redirects — a redirect could point to a private host
       headers: {
         Authorization: `Bearer ${apiKey}`,
         authenticationKey: apiKey,

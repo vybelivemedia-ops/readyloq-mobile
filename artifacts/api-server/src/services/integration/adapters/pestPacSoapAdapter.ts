@@ -10,6 +10,7 @@
  */
 
 import type { EnterpriseSyncPayload } from "../../../types/enterprise-payload";
+import { ssrfSafeFetch } from "../../../lib/ssrf-safe-fetch";
 
 const PESTPAC_SOAP_DEFAULT_BASE = "https://api.workwave.com/pestpac/v1/soap";
 
@@ -59,8 +60,9 @@ export async function sendPestPacSOAP(
   </soap:Body>
 </soap:Envelope>`;
 
-  const res = await fetch(`${base}/SaveInspectionRecord`, {
+  const res = await ssrfSafeFetch(`${base}/SaveInspectionRecord`, {
     method: "POST",
+    redirect: "error", // never follow redirects — a redirect could point to a private host
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
       SOAPAction: "http://tempuri.org/PestPacService/SaveInspectionRecord",

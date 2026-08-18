@@ -17,10 +17,18 @@
 import { XMLBuilder } from "fast-xml-parser";
 import * as crypto from "crypto";
 import type { HardenedInspectionPayload, DeliveryOutcome } from "../../types/enterprise-payload";
+import { ssrfSafeFetch } from "../../lib/ssrf-safe-fetch";
 
 export interface ResolvedEnterpriseConfig {
   targetSystem: "pestpac" | "servsuite";
-  /** Fully-qualified endpoint URL for the external system */
+  /**
+   * Base URL for the external system (trailing slash optional).
+   * The adapter appends the correct operation path internally:
+   *   • PestPac:   <baseUrl>/ImportInspectionResult
+   *   • ServSuite: <baseUrl>/workorders
+   * Owners who leave apiBaseUrl blank get the vendor production default;
+   * those who set a custom override control the base only — not the path.
+   */
   endpointUrl: string;
   /** Decrypted API key / bearer token resolved from the DB record */
   decryptedApiKey: string;
@@ -132,6 +140,12 @@ export class EnterpriseBridgeProductionService {
     cfg: ResolvedEnterpriseConfig,
     normalized: ReturnType<typeof EnterpriseBridgeProductionService.normalizePayload>,
   ): Promise<DeliveryOutcome> {
+    // Append the SOAP operation path to the base URL.
+    // apiBaseUrl is always a base (e.g. https://api.pestpac.com/v1); the operation
+    // path /ImportInspectionResult is appended here so the contract is consistent
+    // with the concrete adapter (pestPacSoapAdapter: ${base}/SaveInspectionRecord).
+    const operationUrl = cfg.endpointUrl.replace(/\/$/, "") + "/ImportInspectionResult";
+
     // XMLBuilder serialises the normalised payload object — no string interpolation.
     const xmlBuilder = new XMLBuilder({ ignoreAttributes: false, format: false });
     const serializedWorkOrder = xmlBuilder.build(normalized);
@@ -146,8 +160,9 @@ export class EnterpriseBridgeProductionService {
   </soap:Body>
 </soap:Envelope>`;
 
-    const response = await fetch(cfg.endpointUrl, {
+    const response = await ssrfSafeFetch(operationUrl, {
       method: "POST",
+      redirect: "error", // never follow redirects — a redirect could point to a private host
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: "http://tempuri.org/ImportInspectionResult",
@@ -165,8 +180,15 @@ export class EnterpriseBridgeProductionService {
     cfg: ResolvedEnterpriseConfig,
     normalized: ReturnType<typeof EnterpriseBridgeProductionService.normalizePayload>,
   ): Promise<DeliveryOutcome> {
-    const response = await fetch(cfg.endpointUrl, {
+    // Append the REST operation path to the base URL.
+    // apiBaseUrl is always a base (e.g. https://api.servsuite.com/v1); the path
+    // /workorders is appended here so the contract is consistent with the concrete
+    // adapter (servsuiteAdapter: ${base}/workorders).
+    const operationUrl = cfg.endpointUrl.replace(/\/$/, "") + "/workorders";
+
+    const response = await ssrfSafeFetch(operationUrl, {
       method: "POST",
+      redirect: "error", // never follow redirects — a redirect could point to a private host
       headers: {
         Authorization: `Bearer ${cfg.decryptedApiKey}`,
         "Content-Type": "application/json",

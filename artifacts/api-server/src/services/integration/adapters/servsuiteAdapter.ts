@@ -9,6 +9,7 @@
  */
 
 import type { EnterpriseSyncPayload } from "../../../types/enterprise-payload";
+import { ssrfSafeFetch } from "../../../lib/ssrf-safe-fetch";
 
 const SERVSUITE_DEFAULT_BASE = "https://api.servsuite.com/v1";
 
@@ -23,8 +24,9 @@ export async function sendServSuiteREST(
 ): Promise<void> {
   const base = (config.apiBaseUrl ?? SERVSUITE_DEFAULT_BASE).replace(/\/$/, "");
 
-  const res = await fetch(`${base}/workorders`, {
+  const res = await ssrfSafeFetch(`${base}/workorders`, {
     method: "POST",
+    redirect: "error", // never follow redirects — a redirect could point to a private host
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.apiKey}`,
@@ -49,7 +51,8 @@ export async function probeServSuite(
 ): Promise<{ ok: boolean; reason?: "auth_failed" | "network_error"; message?: string }> {
   const base = (apiBaseUrl ?? SERVSUITE_DEFAULT_BASE).replace(/\/$/, "");
   try {
-    const res = await fetch(`${base}/ping`, {
+    const res = await ssrfSafeFetch(`${base}/ping`, {
+      redirect: "error", // never follow redirects — a redirect could point to a private host
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     if (res.ok) return { ok: true };

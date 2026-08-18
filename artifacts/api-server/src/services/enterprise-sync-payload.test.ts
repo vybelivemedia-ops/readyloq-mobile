@@ -32,6 +32,7 @@ import {
 
 import { sendServSuiteREST } from "./integration/adapters/servsuiteAdapter";
 import type { EnterpriseSyncPayload } from "../types/enterprise-payload";
+import * as ssrfModule from "../lib/ssrf-safe-fetch";
 
 // ─── Shared fixtures ──────────────────────────────────────────────────────────
 
@@ -106,7 +107,8 @@ const TREATMENT = {
 let fetchSpy: MockInstance;
 
 beforeEach(() => {
-  fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+  // Adapters call ssrfSafeFetch (undici-backed DNS-pinning fetch), not globalThis.fetch.
+  fetchSpy = vi.spyOn(ssrfModule, "ssrfSafeFetch").mockResolvedValue(
     new Response("", { status: 200 }),
   );
 });

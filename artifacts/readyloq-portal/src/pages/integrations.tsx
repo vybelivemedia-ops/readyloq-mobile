@@ -83,6 +83,23 @@ export function Integrations() {
       });
       return;
     }
+    if (systemType === 'fieldroutes' && !apiToken.trim()) {
+      toast({
+        title: 'Authentication Token required for FieldRoutes',
+        description:
+          'FieldRoutes requires both an API Key and an Authentication Token. Saved tokens are never displayed — re-enter it to save changes.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (apiBaseUrl.trim() && !apiBaseUrl.trim().startsWith('https://')) {
+      toast({
+        title: 'API Base URL must use HTTPS',
+        description: 'Plain HTTP is not accepted — credentials would be transmitted unencrypted.',
+        variant: 'destructive',
+      });
+      return;
+    }
     try {
       await saveConfig.mutateAsync({
         systemType,

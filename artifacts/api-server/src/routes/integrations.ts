@@ -17,6 +17,10 @@ import { eq, and, inArray, desc, isNotNull } from "drizzle-orm";
 import { z } from "zod/v4";
 import { getCompanyId } from "../lib/tenant";
 import { requireRole } from "../middleware/require-auth";
+import {
+  isSafeBaseUrl,
+  validateBaseUrlDns,
+} from "../lib/ssrf-guard";
 import { syncInspectionToExternalSystem, probeIntegrationCredentials } from "../services/field-integration";
 import { sendServSuiteREST } from "../services/integration/adapters/servsuiteAdapter";
 import type { EnterpriseSyncFinding, EnterpriseSyncPayload } from "../types/enterprise-payload";
@@ -27,17 +31,37 @@ const SYNC_COOLDOWN_SECONDS = 60;
 const router = Router();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+// isSafeBaseUrl and validateBaseUrlDns are imported from ssrf-guard.ts.
+// All adapter fetch calls use ssrfSafeFetch from ssrf-safe-fetch.ts which
+// pins connections to the validated resolved IP (eliminating TOCTOU).
 
-const configInputSchema = z.object({
-  systemType: z.enum(["pestpac", "fieldroutes", "servsuite"]),
-  accountId: z.string().min(1),
-  apiKey: z.string().min(1),
-  // FieldRoutes requires both apiKey (authenticationKey) and apiToken
-  // (authenticationToken). Ignored for PestPac and ServSuite.
-  apiToken: z.string().optional(),
-  apiBaseUrl: z.string().url().optional(),
-  enabled: z.boolean().optional(),
-});
+const configInputSchema = z
+  .object({
+    systemType: z.enum(["pestpac", "fieldroutes", "servsuite"]),
+    accountId: z.string().min(1),
+    apiKey: z.string().min(1),
+    // FieldRoutes requires both apiKey (authenticationKey) and apiToken
+    // (authenticationToken).  Ignored for PestPac and ServSuite.
+    apiToken: z.string().optional(),
+    apiBaseUrl: z.string().url().optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine(
+    (d) => d.systemType !== "fieldroutes" || (typeof d.apiToken === "string" && d.apiToken.length > 0),
+    {
+      message:
+        "FieldRoutes requires apiToken (authenticationToken). Re-enter the token to save changes.",
+      path: ["apiToken"],
+    },
+  )
+  .refine(
+    (d) => d.apiBaseUrl === undefined || isSafeBaseUrl(d.apiBaseUrl),
+    {
+      message:
+        "apiBaseUrl must use HTTPS and must not target a private, internal, link-local, or loopback address",
+      path: ["apiBaseUrl"],
+    },
+  );
 
 // ─── GET /api/integrations/config ────────────────────────────────────────────
 // Returns current integration type and account ID for this company.
@@ -74,6 +98,19 @@ router.put("/config", requireRole("owner"), async (req, res) => {
     const parsed = configInputSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid config", issues: parsed.error.issues });
+    }
+    // DNS-level SSRF guard: resolve the hostname and reject if any returned
+    // address maps to a private/reserved range.  This catches "DNS rebinding"
+    // variants where a resolvable public hostname points to a private IP.
+    // Only runs for named hosts — IP literals were already rejected above.
+    if (parsed.data.apiBaseUrl) {
+      const dnsError = await validateBaseUrlDns(parsed.data.apiBaseUrl);
+      if (dnsError) {
+        return res.status(400).json({
+          error: "Invalid config",
+          issues: [{ path: ["apiBaseUrl"], message: dnsError }],
+        });
+      }
     }
     const { systemType, accountId, apiKey, apiToken, apiBaseUrl, enabled } = parsed.data;
     const now = new Date();
@@ -178,6 +215,25 @@ router.post("/sync", async (req, res) => {
       .limit(1);
     if (!config || !config.enabled) {
       return res.status(422).json({ error: "No active field-service integration configured" });
+    }
+    // Defense-in-depth: reject any row whose stored apiBaseUrl is no longer
+    // safe (e.g. saved before the SSRF guard was introduced).
+    if (config.apiBaseUrl && !isSafeBaseUrl(config.apiBaseUrl)) {
+      return res.status(422).json({
+        error:
+          "The stored API base URL is not permitted. Remove or replace it in Integration Settings before syncing.",
+      });
+    }
+    // DNS-level SSRF guard at connection time — fail closed so a DNS rebinding
+    // attack (hostname resolves publicly at save time, privately at sync time)
+    // is blocked.  DNS failure also fails closed here: if the host is
+    // unreachable the sync will fail anyway, and failing here prevents using
+    // the DNS outage window to bypass the guard.
+    if (config.apiBaseUrl) {
+      const dnsErr = await validateBaseUrlDns(config.apiBaseUrl, true /* strict */);
+      if (dnsErr) {
+        return res.status(422).json({ error: dnsErr });
+      }
     }
 
     // Load inspection — enforce tenant isolation.
@@ -520,6 +576,23 @@ router.post("/test", requireRole("owner"), async (req, res) => {
 
     if (!config) {
       return res.status(422).json({ ok: false, reason: "network_error", message: "No integration configured for this company." });
+    }
+    // Defense-in-depth: reject any stored apiBaseUrl that is no longer safe.
+    if (config.apiBaseUrl && !isSafeBaseUrl(config.apiBaseUrl)) {
+      return res.json({
+        ok: false,
+        reason: "network_error",
+        message:
+          "The stored API base URL is not permitted. Remove or replace it in Integration Settings before testing.",
+      });
+    }
+    // DNS-level SSRF guard at connection time — strict mode: fail closed so a
+    // DNS rebinding attack cannot bypass the guard between save and test time.
+    if (config.apiBaseUrl) {
+      const dnsErr = await validateBaseUrlDns(config.apiBaseUrl, true /* strict */);
+      if (dnsErr) {
+        return res.json({ ok: false, reason: "network_error", message: dnsErr });
+      }
     }
 
     const result = await probeIntegrationCredentials(

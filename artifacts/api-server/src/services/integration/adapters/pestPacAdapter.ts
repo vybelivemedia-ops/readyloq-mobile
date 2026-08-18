@@ -1,4 +1,5 @@
 import { CRMAdapter, ExternalClient, InspectionPayload } from '../../../types/integration';
+import { ssrfSafeFetch } from '../../../lib/ssrf-safe-fetch';
 
 /**
  * PestPac (WorkWave) CRM adapter.
@@ -30,7 +31,10 @@ export class PestPacAdapter implements CRMAdapter {
   }
 
   async fetchClients(): Promise<ExternalClient[]> {
-    const res = await fetch(`${this.baseUrl}/customers`, { headers: this.headers });
+    const res = await ssrfSafeFetch(`${this.baseUrl}/customers`, {
+      redirect: "error", // never follow redirects — a redirect could point to a private host
+      headers: this.headers,
+    });
 
     if (!res.ok) {
       throw new Error(`PestPac fetchClients failed: ${res.status} ${await res.text()}`);
@@ -50,8 +54,9 @@ export class PestPacAdapter implements CRMAdapter {
   async pushInspection(payload: InspectionPayload): Promise<boolean> {
     const body = buildPestPacNote(payload);
 
-    const res = await fetch(`${this.baseUrl}/customers/${payload.clientId}/notes`, {
+    const res = await ssrfSafeFetch(`${this.baseUrl}/customers/${payload.clientId}/notes`, {
       method: 'POST',
+      redirect: "error", // never follow redirects — a redirect could point to a private host
       headers: this.headers,
       body: JSON.stringify(body),
     });

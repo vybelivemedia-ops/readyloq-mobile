@@ -18,6 +18,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { syncInspectionToExternalSystem } from "./field-integration";
 import type { SyncPayload } from "./field-integration";
+import * as ssrfModule from "../lib/ssrf-safe-fetch";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -47,7 +48,8 @@ describe("syncInspectionToExternalSystem — auth failure fast-path (PestPac)", 
   let fetchSpy: MockInstance;
 
   beforeEach(() => {
-    fetchSpy = vi.spyOn(globalThis, "fetch");
+    // Adapters call ssrfSafeFetch (DNS-pinning undici fetch), not globalThis.fetch.
+    fetchSpy = vi.spyOn(ssrfModule, "ssrfSafeFetch");
   });
 
   afterEach(() => {
