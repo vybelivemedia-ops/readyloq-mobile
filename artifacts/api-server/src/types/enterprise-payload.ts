@@ -13,6 +13,7 @@ export interface HardenedInspectionPayload {
   companyId: string;
   propertyId: string;
   technicianId: string;
+  /** ISO 8601 UTC timestamp, e.g. '2026-08-16T14:30:00.000Z' */
   timestamp: string;
   signatures: {
     technicianUserId: string;
@@ -20,16 +21,22 @@ export interface HardenedInspectionPayload {
     technicianSignatureUrl: string;
     /** Raw SVG or URL of the customer's captured signature */
     customerSignatureUrl: string;
+    /** ISO 8601 UTC timestamp of the first signature captured */
     signedAt: string;
-    signatureVersion: string;
+    /** Schema version of the signature capture workflow */
+    signatureVersion: "v1" | "v2";
   };
   measurements: Array<{
     /** Stable ID linking measurements back to findings */
     measurementId: string;
-    /** Finding ID used as a fallback correlation key */
+    /**
+     * Building element ID (wall, vent, pipe, etc.).
+     * Separate namespace from findingId — never compare the two.
+     */
     elementId: string;
     widthMm: number;
     heightMm: number;
+    /** Confidence score in the range [0, 1] */
     confidence: number;
     surfaceType: string;
   }>;
@@ -42,6 +49,7 @@ export interface HardenedInspectionPayload {
     aiPrediction: string;
     technicianConfirmed: boolean;
     managerVerified: boolean;
+    /** Confidence score in the range [0, 1] */
     confidence: number;
     evidencePhotoUrl: string;
   }>;
@@ -53,7 +61,7 @@ export interface HardenedInspectionPayload {
  * DELIVERED          — 2xx received from the external system
  * RETRYABLE_FAILURE  — transient error (5xx, network blip) — safe to retry
  * PERMANENT_FAILURE  — 400/422 malformed payload — dead-letter, do not retry
- * UNAUTHORIZED       — 401/403 — credentials need rotation
+ * UNAUTHORIZED       — 401/403 or SOAP auth fault — credentials need rotation
  * INVALID_CONFIGURATION — missing endpoint or API key in DB record
  * TIMEOUT            — no response within the per-system deadline
  */
@@ -65,12 +73,21 @@ export type DeliveryOutcome =
   | "INVALID_CONFIGURATION"
   | "TIMEOUT";
 
-export interface DispatchResult {
-  status: DeliveryOutcome;
-  httpStatus?: number;
-  errorCode?: string;
-  errorMessage?: string;
-}
+/**
+ * Discriminated union — each variant carries only the fields relevant to its
+ * outcome so callers can switch-narrow without null-checking optionals.
+ *
+ * Note: httpStatus is optional on UNAUTHORIZED because SOAP auth faults are
+ * delivered inside an HTTP 200 body; the status field conveys the semantic
+ * outcome regardless of the transport-level code.
+ */
+export type DispatchResult =
+  | { status: "DELIVERED"; httpStatus?: number }
+  | { status: "RETRYABLE_FAILURE"; httpStatus?: number; errorCode?: string; errorMessage: string }
+  | { status: "PERMANENT_FAILURE"; httpStatus?: number; errorCode?: string; errorMessage: string }
+  | { status: "UNAUTHORIZED";      httpStatus?: number; errorCode?: string; errorMessage: string }
+  | { status: "INVALID_CONFIGURATION";                                       errorMessage: string }
+  | { status: "TIMEOUT";           errorCode?: string;                       errorMessage: string };
 
 // ─── Legacy payload types (FieldRoutes adapter — kept for compat) ─────────────
 

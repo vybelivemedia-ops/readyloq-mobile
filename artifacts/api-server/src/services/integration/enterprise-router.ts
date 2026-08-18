@@ -206,7 +206,7 @@ export class EnterpriseAdapterRouter {
           config.systemType === "pestpac"
             ? "https://api.pestpac.com/v1"
             : "https://api.servsuite.com/v1";
-        outcome = await EnterpriseBridgeProductionService.dispatchToSystem(
+        const dispatchResult = await EnterpriseBridgeProductionService.dispatchToSystem(
           {
             targetSystem: config.systemType,
             endpointUrl: config.apiBaseUrl ?? defaultEndpoint,
@@ -214,9 +214,13 @@ export class EnterpriseAdapterRouter {
           },
           hardenedPayload,
         );
-        success = outcome === "DELIVERED";
+        outcome = dispatchResult.status;
+        success = dispatchResult.status === "DELIVERED";
         if (!success) {
-          errorMessage = `Delivery outcome: ${outcome}`;
+          errorMessage =
+            "errorMessage" in dispatchResult
+              ? dispatchResult.errorMessage
+              : `Delivery outcome: ${dispatchResult.status}`;
         }
       } else if (config.systemType === "fieldroutes") {
         // FieldRoutes uses the existing text-note adapter which is already
