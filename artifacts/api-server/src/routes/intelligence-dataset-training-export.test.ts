@@ -204,6 +204,97 @@ describe("rejecting a finding sets the correct fields", () => {
   });
 });
 
+describe("unreviewed confirmed records (approvedForTraining=false) are excluded from the export", () => {
+  /**
+   * Regression guard: the schema stores approvedForTraining as NOT NULL DEFAULT
+   * false, so a confirmed-but-never-reviewed record has approvedForTraining=false.
+   * The export gate is eq(approvedForTraining, true), which correctly excludes
+   * them.  If a future migration changes the column default to true, or the ORM
+   * changes how the equality filter compiles, unreviewed records would silently
+   * appear in training exports.  This test seeds a confirmed-but-never-reviewed
+   * record alongside one explicitly approved record and asserts only the approved
+   * record is visible in both JSON and NDJSON formats.
+   */
+  let unreviewedId: number;
+  let approvedId: number;
+
+  beforeAll(async () => {
+    // Clear the company's records so the export totals are deterministic.
+    await db
+      .delete(intelligenceRecordsTable)
+      .where(eq(intelligenceRecordsTable.companyId, companyId));
+
+    // Create a confirmed (L3) record that is never submitted to the review
+    // endpoint → approvedForTraining stays at the schema default (false).
+    const unreviewed = await createRecord();
+    await promoteToL3(unreviewed.id);
+    unreviewedId = unreviewed.id;
+
+    // Verify the seed data is correct: the record is confirmed but unreviewed.
+    const [seed] = await db
+      .select({ approvedForTraining: intelligenceRecordsTable.approvedForTraining })
+      .from(intelligenceRecordsTable)
+      .where(eq(intelligenceRecordsTable.id, unreviewedId));
+    // The schema default is false (NOT NULL DEFAULT false); a manager review
+    // is required to flip it to true.  If this assertion ever fails with true,
+    // the schema default has changed and unreviewed records will leak into exports.
+    expect(seed.approvedForTraining).toBe(false);
+
+    // Create and approve a second record so the export is non-empty.
+    const toApprove = await createRecord();
+    await promoteToL3(toApprove.id);
+    asUser(MANAGER_ID);
+    const appRes = await request(app)
+      .post(`/api/intelligence-dataset/records/${toApprove.id}/review`)
+      .send({ action: "approve" });
+    expect(appRes.body.approvedForTraining).toBe(true);
+    approvedId = toApprove.id;
+    asUser(null);
+  });
+
+  it("JSON export excludes the unreviewed record and includes only the approved one", async () => {
+    asUser(MANAGER_ID);
+    const res = await request(app).get(
+      "/api/intelligence-dataset/corrections/export",
+    );
+    expect(res.status).toBe(200);
+
+    const ids: number[] = res.body.records.map((r: { id: number }) => r.id);
+    expect(ids).toContain(approvedId);
+    expect(ids).not.toContain(unreviewedId);
+    // Every record returned must carry approvedForTraining=true.
+    for (const row of res.body.records as { approvedForTraining: unknown }[]) {
+      expect(row.approvedForTraining).toBe(true);
+    }
+    // The count field is consistent with the array length.
+    expect(res.body.count).toBe(res.body.records.length);
+  });
+
+  it("NDJSON export also excludes the unreviewed record", async () => {
+    asUser(MANAGER_ID);
+    const res = await request(app).get(
+      "/api/intelligence-dataset/corrections/export?format=ndjson",
+    );
+    expect(res.status).toBe(200);
+
+    const lines = (res.text as string)
+      .split("\n")
+      .filter(Boolean)
+      .map(
+        (l) =>
+          JSON.parse(l) as { id: number; approvedForTraining: boolean | null },
+      );
+
+    const ids = lines.map((r) => r.id);
+    expect(ids).toContain(approvedId);
+    expect(ids).not.toContain(unreviewedId);
+    // Every row must have approvedForTraining strictly true, not null or false.
+    for (const row of lines) {
+      expect(row.approvedForTraining).toBe(true);
+    }
+  });
+});
+
 describe("rejected records are excluded from the corrections export", () => {
   let rejectedId: number;
   let approvedId: number;
