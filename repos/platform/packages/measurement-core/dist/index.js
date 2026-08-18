@@ -230,6 +230,14 @@ export class FallbackSfMProvider {
  */
 export const MIN_REFERENCE_PIXEL_WIDTH = 5;
 /**
+ * Minimum reference object pixel width for a reliable (non-distant) anchor.
+ * Between MIN_REFERENCE_PIXEL_WIDTH and this value the math is finite, but the
+ * result is likely inaccurate because the reference object is too far away.
+ * anchor() emits a user-visible warning so the technician knows to move closer
+ * before stamping the measurement into the inspection record.
+ */
+export const MIN_REFERENCE_RELIABLE_PIXEL_WIDTH = 40;
+/**
  * Anchors a relative SfMDepthMap to metric (absolute) scale using a reference
  * object with known physical dimensions.
  *
@@ -278,6 +286,15 @@ export class ReferenceScaleAnchor {
         if (tooSmall) {
             anchorWarnings.push(`Reference box is too small to anchor scale (${pixelWidth.toFixed(1)} px width, ` +
                 `minimum is ${MIN_REFERENCE_PIXEL_WIDTH} px) — draw a larger box around the reference object`);
+        }
+        // Guard: a reference object that is too far away produces a finite but
+        // unreliable scale estimate.  The result looks plausible to the UI yet is
+        // systematically wrong.  Warn the technician to move closer rather than
+        // silently accepting a low-confidence number into the inspection record.
+        const tooDistant = !tooSmall && pixelWidth < MIN_REFERENCE_RELIABLE_PIXEL_WIDTH;
+        if (tooDistant) {
+            anchorWarnings.push(`Reference object too small / too far away — move closer and retry ` +
+                `(${pixelWidth.toFixed(1)} px observed, ${MIN_REFERENCE_RELIABLE_PIXEL_WIDTH} px recommended)`);
         }
         // Pinhole depth back-projection (metres).
         // When pixelWidth is below the threshold we clamp to the minimum so that

@@ -690,6 +690,14 @@ export interface ScaleAnchorResult {
  */
 export declare const MIN_REFERENCE_PIXEL_WIDTH = 5;
 /**
+ * Minimum reference object pixel width for a reliable (non-distant) anchor.
+ * Between MIN_REFERENCE_PIXEL_WIDTH and this value the math is finite, but the
+ * result is likely inaccurate because the reference object is too far away.
+ * anchor() emits a user-visible warning so the technician knows to move closer
+ * before stamping the measurement into the inspection record.
+ */
+export declare const MIN_REFERENCE_RELIABLE_PIXEL_WIDTH = 40;
+/**
  * Anchors a relative SfMDepthMap to metric (absolute) scale using a reference
  * object with known physical dimensions.
  *

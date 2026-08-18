@@ -23,7 +23,7 @@
  *   4. Run: pnpm --filter @platform/measurement-core test
  */
 import { describe, it, expect } from "vitest";
-import { MEASUREMENT_EVENT_KINDS, ReferenceScaleAnchor, FallbackSfMProvider, BurstMeasurementPipeline, REFERENCE_OBJECTS, MIN_REFERENCE_PIXEL_WIDTH, } from "../index.js";
+import { MEASUREMENT_EVENT_KINDS, ReferenceScaleAnchor, FallbackSfMProvider, BurstMeasurementPipeline, REFERENCE_OBJECTS, MIN_REFERENCE_PIXEL_WIDTH, MIN_REFERENCE_RELIABLE_PIXEL_WIDTH, } from "../index.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // MOCK FACTORIES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -430,7 +430,7 @@ describe("ReferenceScaleAnchor — near-zero reference box guard", () => {
         const box = { x: 0.4, y: 0.4, width: 0.001, height: 0.001 };
         const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
         expect(result.warnings.length).toBeGreaterThan(0);
-        expect(result.warnings[0]).toMatch(/too small/i);
+        expect(result.warnings[0]).toMatch(/too small to anchor/i);
     });
     it("returns zero confidence for a near-zero reference box", async () => {
         const depthMap = await makeFlatDepthMap();
@@ -457,12 +457,15 @@ describe("ReferenceScaleAnchor — near-zero reference box guard", () => {
         expect(result.warnings).toEqual([]);
         expect(result.confidence).toBeGreaterThan(0);
     });
-    it("emits an empty warnings array when pixelWidth is exactly at the threshold", async () => {
+    it("emits only the distant guard warning (not the near-zero guard) at MIN_REFERENCE_PIXEL_WIDTH", async () => {
         const depthMap = await makeFlatDepthMap();
-        // pixelWidth = MIN_REFERENCE_PIXEL_WIDTH exactly → should NOT trigger the guard
+        // pixelWidth = MIN_REFERENCE_PIXEL_WIDTH exactly → near-zero guard does NOT fire
+        // (tooSmall is strictly < threshold), but the value still falls in the distant zone
+        // (< MIN_REFERENCE_RELIABLE_PIXEL_WIDTH), so the distant warning should fire.
         const box = { x: 0.4, y: 0.4, width: MIN_REFERENCE_PIXEL_WIDTH / 1080, height: 0.05 };
         const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
-        expect(result.warnings).toEqual([]);
+        expect(result.warnings.filter((w) => /too small to anchor/i.test(w))).toHaveLength(0);
+        expect(result.warnings.filter((w) => /too far away/i.test(w))).toHaveLength(1);
     });
     it("forces confidence to 0 even when the depth map has low variance (scaleVariance=0)", async () => {
         // Construct a synthetic low-variance depth map (all values = 0.5, scaleVariance=0).
@@ -480,6 +483,59 @@ describe("ReferenceScaleAnchor — near-zero reference box guard", () => {
         // Must be exactly 0 — varianceConfidence must not bleed through
         expect(result.confidence).toBe(0);
         expect(result.warnings.length).toBeGreaterThan(0);
+    });
+});
+// ─────────────────────────────────────────────────────────────────────────────
+// DISTANT REFERENCE OBJECT GUARD (Task 601)
+// ReferenceScaleAnchor must emit a warning when the reference object is too far
+// away (pixelWidth between MIN_REFERENCE_PIXEL_WIDTH and
+// MIN_REFERENCE_RELIABLE_PIXEL_WIDTH) so the technician knows to move closer.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("ReferenceScaleAnchor — distant reference object guard", () => {
+    const anchor = new ReferenceScaleAnchor(800);
+    it("emits a 'too far away' warning when pixelWidth is between the two thresholds", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // pixelWidth = 20 px → between MIN_REFERENCE_PIXEL_WIDTH (5) and
+        // MIN_REFERENCE_RELIABLE_PIXEL_WIDTH (40) → should trigger the distant guard
+        const box = { x: 0.3, y: 0.3, width: 20 / 1080, height: 0.05 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.warnings.length).toBeGreaterThan(0);
+        expect(result.warnings.some((w) => /too far away/i.test(w))).toBe(true);
+    });
+    it("does NOT emit a distant warning when pixelWidth is at MIN_REFERENCE_RELIABLE_PIXEL_WIDTH", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // pixelWidth = 40 px exactly → at the boundary, should NOT trigger the guard
+        const box = {
+            x: 0.3,
+            y: 0.3,
+            width: MIN_REFERENCE_RELIABLE_PIXEL_WIDTH / 1080,
+            height: 0.05,
+        };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.warnings.filter((w) => /too far away/i.test(w))).toHaveLength(0);
+    });
+    it("does NOT emit a distant warning for a normal-sized reference box", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // pixelWidth ≈ 200 px → well above both thresholds
+        const box = { x: 0.2, y: 0.3, width: 0.185, height: 0.07 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.warnings).toEqual([]);
+    });
+    it("does NOT emit a distant warning when the near-zero guard has already fired", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // pixelWidth = 1 px → below MIN_REFERENCE_PIXEL_WIDTH; the near-zero guard fires,
+        // and the distant guard must NOT fire a second warning on top
+        const box = { x: 0.4, y: 0.4, width: 0.001, height: 0.001 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.warnings.filter((w) => /too far away/i.test(w))).toHaveLength(0);
+        expect(result.warnings.filter((w) => /too small/i.test(w))).toHaveLength(1);
+    });
+    it("still returns a non-zero confidence for a distant (but valid) reference box", async () => {
+        const depthMap = await makeFlatDepthMap();
+        // pixelWidth = 20 px → warns but does not zero out confidence
+        const box = { x: 0.3, y: 0.3, width: 20 / 1080, height: 0.05 };
+        const result = anchor.anchor(box, 1080, 1920, CREDIT_CARD, depthMap);
+        expect(result.confidence).toBeGreaterThan(0);
     });
 });
 /** A synthetic low-variance SfMDepthMap (scaleVariance=0, uniform 0.5 depth). */
