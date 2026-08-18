@@ -84,7 +84,9 @@ function filterToParams(filter: ReportFilter, timeframe: ReportTimeframe): Repor
   return params;
 }
 
-const INFORMATIONAL_FILTERS: ReportFilter[] = ["quality", "opportunities", "stale"];
+// "opportunities" is intentionally NOT informational — it sends `opportunities: true`
+// to the server which actively filters to reports with linked pipeline value.
+const INFORMATIONAL_FILTERS: ReportFilter[] = ["quality", "stale"];
 
 // Chips shown in the scrollable filter row — informational-only filters are
 // intentionally excluded because they don't actually narrow the list.
@@ -99,9 +101,8 @@ const FILTER_CHIPS: { filter: ReportFilter; label: string }[] = [
 ];
 
 const INFORMATIONAL_MESSAGES: Partial<Record<ReportFilter, string>> = {
-  quality:       "Showing all reports — detailed quality scores appear in inspection scorecards.",
-  opportunities: "Showing all reports — open opportunities are linked to their source inspection.",
-  stale:         "Showing all reports — stale pipeline items appear in the Leads tab.",
+  quality: "Showing all reports — detailed quality scores appear in inspection scorecards.",
+  stale:   "Showing all reports — stale pipeline items appear in the Leads tab.",
 };
 
 // ─── Saved Reports section ────────────────────────────────────────────────────
@@ -334,46 +335,101 @@ export default function ReportsScreen() {
   const isSearching = trimmedQuery.length > 0;
   const isInformational = INFORMATIONAL_FILTERS.includes(activeFilter);
 
-  const renderItem = ({ item }: { item: Report }) => (
-    <Card
-      onPress={() => openItem(item)}
-      style={[
-        { gap: 10 },
-        numColumns > 1 && { flex: 1 },
-        isExpanded && selectedId === item.id && { borderColor: colors.primary },
-      ]}
-    >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-        <Text
-          numberOfLines={2}
-          style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 16, flex: 1 }}
-        >
-          {item.title}
-        </Text>
-        <Badge label={formatStatus(item.status)} tone={statusTone(item.status)} />
-      </View>
-      {item.siteAddress ? (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
-          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
-            {item.siteAddress}
+  const renderItem = ({ item }: { item: Report }) => {
+    // Format pipeline value — show nothing if absent or zero
+    const pipelineLabel =
+      item.pipelineValue && item.pipelineValue > 0
+        ? item.pipelineValue >= 1_000_000
+          ? `$${(item.pipelineValue / 1_000_000).toFixed(1)}M`
+          : item.pipelineValue >= 1_000
+          ? `$${(item.pipelineValue / 1_000).toFixed(0)}K`
+          : `$${item.pipelineValue.toLocaleString()}`
+        : null;
+
+    return (
+      <Card
+        onPress={() => openItem(item)}
+        style={[
+          { gap: 10 },
+          numColumns > 1 && { flex: 1 },
+          isExpanded && selectedId === item.id && { borderColor: colors.primary },
+        ]}
+      >
+        {/* Title row — falls back to site address when title is absent */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+          <Text
+            numberOfLines={2}
+            style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 16, flex: 1 }}
+          >
+            {item.title || item.siteAddress || "Untitled report"}
           </Text>
+          <Badge label={formatStatus(item.status)} tone={statusTone(item.status)} />
         </View>
-      ) : null}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        {item.aiNarrative ? <Badge label="AI narrative" tone="primary" /> : null}
-        {item.severity ? (
-          <Badge label={formatStatus(item.severity)} tone={severityTone(item.severity)} />
+
+        {/* Address — only when it differs from the displayed title */}
+        {item.siteAddress && item.siteAddress !== (item.title || item.siteAddress) ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+              {item.siteAddress}
+            </Text>
+          </View>
         ) : null}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
-          <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-            {formatDate(item.createdAt)}
-          </Text>
+
+        {/* Pipeline value — hero row when present */}
+        {pipelineLabel ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 8,
+              backgroundColor: (colors.success ?? "#16a34a") + "18",
+              borderWidth: 1,
+              borderColor: (colors.success ?? "#16a34a") + "44",
+              alignSelf: "flex-start",
+            }}
+          >
+            <Ionicons name="trending-up-outline" size={13} color={colors.success ?? "#16a34a"} />
+            <Text
+              style={{
+                color: colors.success ?? "#16a34a",
+                fontFamily: "Inter_700Bold",
+                fontSize: 13,
+              }}
+            >
+              {pipelineLabel}
+            </Text>
+            <Text
+              style={{
+                color: (colors.success ?? "#16a34a") + "bb",
+                fontFamily: "Inter_400Regular",
+                fontSize: 11,
+              }}
+            >
+              pipeline value
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Badge row */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {item.aiNarrative ? <Badge label="AI narrative" tone="primary" /> : null}
+          {item.severity ? (
+            <Badge label={formatStatus(item.severity)} tone={severityTone(item.severity)} />
+          ) : null}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+              {formatDate(item.createdAt)}
+            </Text>
+          </View>
         </View>
-      </View>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   const listPane = (
     <View style={{ flex: 1 }}>
