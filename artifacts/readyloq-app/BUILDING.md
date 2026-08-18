@@ -76,6 +76,24 @@ If it fails: fix the bundling error shown in the output (typically a blocked mod
 leaking through a new import path), confirm the fix passes locally, then re-run
 before submitting.
 
+#### Verifying the guard itself (after any metro.config.js change)
+
+If you refactor `metro.config.js` — especially the `blockList` section — run the
+self-test to confirm the vite/vitest guard is still effective:
+
+```bash
+bash artifacts/readyloq-app/scripts/check-metro-bundle.sh --test
+```
+
+The `--test` flag temporarily comments out the four vite/vitest `blockList` regexes,
+runs a full `expo export`, and asserts the export **fails**. A `Self-test PASSED`
+result means removing the guard actually breaks the build — i.e. the guard is real.
+A `Self-test FAILED` result means vite/vitest are no longer reachable from the import
+graph and the guard may need updating; investigate before relying on this check.
+
+This self-test takes the same ~60–90 seconds as a normal check and restores
+`metro.config.js` unconditionally (even on Ctrl-C).
+
 ---
 
 ## Step 3 — Submit with `--no-wait`
