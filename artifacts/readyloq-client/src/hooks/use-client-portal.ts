@@ -32,6 +32,12 @@ export interface ClientInspection {
   createdAt: string;
   completedAt: string | null;
   signedAt: string | null;
+  /** True when the technician signed on behalf of an absent owner/tenant. */
+  ownerNotAvailable: boolean;
+  /** True when a technician signature is on file (SVG not returned). */
+  technicianSigned: boolean;
+  /** True when an owner/tenant signature is on file (SVG not returned). */
+  ownerSigned: boolean;
 }
 
 export interface ClientReport {

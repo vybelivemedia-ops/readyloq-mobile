@@ -137,6 +137,10 @@ router.get("/buildings/:address/inspections", async (req, res) => {
       createdAt: inspectionsTable.createdAt,
       completedAt: inspectionsTable.completedAt,
       signedAt: inspectionsTable.signedAt,
+      ownerNotAvailable: inspectionsTable.ownerNotAvailable,
+      // Expose presence only — never return the raw SVG signature strings.
+      technicianSignature: inspectionsTable.technicianSignature,
+      ownerSignature: inspectionsTable.ownerSignature,
     })
     .from(inspectionsTable)
     .where(
@@ -148,12 +152,17 @@ router.get("/buildings/:address/inspections", async (req, res) => {
     .orderBy(desc(inspectionsTable.createdAt));
 
   return res.json(
-    rows.map((r) => ({
+    // Destructure the raw SVG strings out before spreading so they are never
+    // sent over the wire — only boolean presence flags are exposed.
+    rows.map(({ technicianSignature, ownerSignature, ...r }) => ({
       ...r,
       pestTypes: r.pestTypes ?? [],
       createdAt: r.createdAt.toISOString(),
       completedAt: r.completedAt?.toISOString() ?? null,
       signedAt: r.signedAt?.toISOString() ?? null,
+      ownerNotAvailable: r.ownerNotAvailable,
+      technicianSigned: technicianSignature !== null,
+      ownerSigned: ownerSignature !== null,
     })),
   );
 });

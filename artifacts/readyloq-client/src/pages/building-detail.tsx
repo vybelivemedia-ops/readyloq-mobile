@@ -283,6 +283,25 @@ export function BuildingDetail() {
                             </span>
                           )}
                         </div>
+                        {insp.signedAt && (
+                          <div className="flex flex-wrap gap-2 mt-1 pl-6 items-center">
+                            <span className="text-xs text-green-700 font-medium">
+                              Signed {format(new Date(insp.signedAt), 'MMM d, yyyy')}
+                            </span>
+                            <span className="text-xs text-muted-foreground">·</span>
+                            <span className="text-xs text-muted-foreground">
+                              {insp.technicianSigned && insp.ownerSigned
+                                ? 'Tech + Owner'
+                                : insp.technicianSigned && insp.ownerNotAvailable
+                                  ? 'Tech (Owner N/A)'
+                                  : insp.technicianSigned
+                                    ? 'Tech only'
+                                    : insp.ownerSigned
+                                      ? 'Owner only'
+                                      : 'Signed'}
+                            </span>
+                          </div>
+                        )}
                         {insp.pestTypes.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2 pl-6">
                             {insp.pestTypes.map((p) => (
