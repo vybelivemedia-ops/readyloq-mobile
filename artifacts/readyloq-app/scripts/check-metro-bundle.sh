@@ -142,6 +142,49 @@ echo ""
 
 cd "$APP_ROOT"
 
+# ── Stale-probe guard ─────────────────────────────────────────────────────────
+# test-new-dep-vite-leak.sh injects a probe import into app/_layout.tsx.  If
+# that script was killed with SIGKILL (which cannot be caught by a trap), it
+# leaves a dirty _layout.tsx.  Detect and remove the marker line so the normal
+# check is never broken by a stale regression-test run.
+#
+# IMPORTANT: test-new-dep-vite-leak.sh sets METRO_BUNDLE_CHECK_SKIP_STALE_PROBE=1
+# when invoking this script so that the guard does NOT run during an active test
+# (the probe is intentionally present in that case).  The guard only fires for
+# ordinary invocations where the probe is a leftover from an interrupted run.
+LAYOUT_FILE_NRM="${APP_ROOT}/app/_layout.tsx"
+LAYOUT_BAK_NRM="${LAYOUT_FILE_NRM}.new-dep-test-bak"
+PROBE_FILE_NRM="${APP_ROOT}/app/__new-dep-probe__.ts"
+if [ -z "${METRO_BUNDLE_CHECK_SKIP_STALE_PROBE:-}" ]; then
+  if grep -q "REGRESSION-TEST-PROBE" "$LAYOUT_FILE_NRM" 2>/dev/null; then
+    # Probe marker still in layout — remove it (sed is safest: preserves any
+    # legitimate edits to other parts of the file made after the injection).
+    echo "WARNING: Removing stale regression-test probe import from app/_layout.tsx"
+    echo "  (left by an interrupted run of test-new-dep-vite-leak.sh)"
+    sed -i '/REGRESSION-TEST-PROBE/d' "$LAYOUT_FILE_NRM"
+    # Also delete the backup now that the marker is gone; it must not be
+    # restored by a later regression-test stale_cleanup call.
+    rm -f "$LAYOUT_BAK_NRM"
+  elif [ -f "$LAYOUT_BAK_NRM" ]; then
+    # Marker already gone (probe was cleaned elsewhere) but orphaned backup
+    # still exists.  Delete it — never restore it over the current file because
+    # _layout.tsx may have legitimate edits made after the interrupted run.
+    echo "WARNING: Removing orphaned layout backup from an interrupted test run"
+    echo "  (probe already cleaned; backup at ${LAYOUT_BAK_NRM} is safe to delete)"
+    rm -f "$LAYOUT_BAK_NRM"
+  fi
+  # Remove any lingering metro.config.js blockList mutations from the script.
+  if grep -q "REGRESSION-TEST-DISABLED" "$METRO_CONFIG" 2>/dev/null; then
+    echo "WARNING: Removing stale regression-test blockList disablement from metro.config.js"
+    sed -i 's|^// REGRESSION-TEST-DISABLED: ||' "$METRO_CONFIG"
+  fi
+  # Remove the probe file itself if present.
+  if [ -f "$PROBE_FILE_NRM" ]; then
+    echo "WARNING: Removing stale probe file app/__new-dep-probe__.ts"
+    rm -f "$PROBE_FILE_NRM"
+  fi
+fi
+
 # ── Isolated output directory ─────────────────────────────────────────────────
 # Write the export to a temporary directory so the committed dist/ tree is
 # never modified.  The cleanup trap runs on success, failure, and interruption.

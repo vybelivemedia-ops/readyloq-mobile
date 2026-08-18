@@ -144,3 +144,48 @@ Two Replit workflows run these checks on demand from the workflow panel:
 | Builds 194–201 | R8 full mode + minify enabled → `NoClassDefFoundError` at startup | ~8 build credits |
 | Builds 204–205 | `vite/module-runner.js` bundled by Metro → Hermes parse failure | 2 build credits |
 | This billing period | Repeated debug builds during R8 investigation | $184 overages |
+
+#### Confirming the guard catches a new dependency that imports vite
+
+The `--test` flag above tests from the blockList side (removes the guard). A
+complementary regression test confirms the guard catches contamination that arrives
+**via a new package's import graph** — the real-world failure mode when a developer
+adds a dependency that transitively pulls in vite.
+
+```bash
+bash artifacts/readyloq-app/scripts/test-new-dep-vite-leak.sh
+```
+
+This script runs a **single export with three enforced assertions** (~60–90 s):
+
+**Pre-conditions (verified before the export):**
+1. vite is present in the workspace `node_modules` (i.e., it is installed and in a
+   path Metro's `nodeModulesPaths` would find).
+2. vite is resolvable via `Node.js require()` from the `app/` directory using the
+   same paths Metro uses — proving that without the blockList the probe's
+   `import "vite"` would reach vite.
+
+**Enforced assertions on the export output:**
+1. `check-metro-bundle.sh` must exit non-zero.
+2. The error output must contain `__new-dep-probe__` — proving Metro traversed
+   the import chain to the probe file (not a generic unrelated failure).
+3. A single output line must contain both `vite` and `__new-dep-probe__` — matching
+   Metro's resolver diagnostic (`Unable to resolve module vite from .../app/__new-dep-probe__.ts`).
+   No line in the probe's source file contains both strings, so this cannot be a
+   false positive from Metro echoing the probe's source context.
+
+Together the pre-conditions and all three assertions prove the blockList is the
+specific cause: vite IS reachable without it, and the error is traceable to the
+probe's `import "vite"`.
+
+**Cleanup and safety:** `app/_layout.tsx` is restored unconditionally on EXIT,
+SIGTERM, and SIGHUP. Every mutation uses a unique marker string so that
+`check-metro-bundle.sh` (and the stale-run guard at the top of this script) can
+detect and clean up leftover changes even after a SIGKILL.
+
+Run this test any time a new dependency is added that might pull vite into its
+transitive closure, or after any change to `metro.config.js` resolver configuration.
+
+---
+
+
