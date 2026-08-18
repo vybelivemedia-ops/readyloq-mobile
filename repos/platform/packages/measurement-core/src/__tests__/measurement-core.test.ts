@@ -838,3 +838,143 @@ describe("BurstMeasurementPipeline — clipping warnings propagation", () => {
     expect(result.warnings).toEqual([]);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PIPELINE WITH BACK-SOLVED FOCAL LENGTH (Task 607)
+//
+// Verifies that BurstMeasurementPipeline instantiated with a focalLengthPx
+// derived from the pinhole back-solve formula produces accurate widthInches
+// (within ±5%) across multiple physically consistent calibration distances.
+//
+// The back-solve formula (from calibration.ts):
+//   focalLengthPx = pixelWidth × depthMeters × 1000 / knownWidthMm
+//
+// Note: backSolveFocalLength tests live in the app's calibration.test.ts
+// so the production function (not a duplicate) is exercised.  Here we use
+// the formula directly as numeric expressions in the test setup.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("BurstMeasurementPipeline — back-solved focalLength accuracy", () => {
+  const CARD = REFERENCE_OBJECTS["credit_card"]!;
+
+  // True focal length of this synthetic camera:
+  //   credit card (85.6 mm) at 0.6 m spanning 300 px in a 1080-wide image
+  //   focalLengthPx = 300 × 0.6 × 1000 / 85.6 ≈ 2102.8
+  const TRUE_FL = (300 * 0.6 * 1000) / CARD.widthMm;
+
+  // Fixed target polygon (600×300 px rectangle, 1080×1920 image)
+  const TARGET_VERTICES = [
+    { x: 300, y: 400 },
+    { x: 900, y: 400 },
+    { x: 900, y: 700 },
+    { x: 300, y: 700 },
+  ] as const;
+  const FRAMES = [{ uri: "file://calib.jpg", capturedAt: 0 }];
+  const IMAGE_W = 1080, IMAGE_H = 1920;
+
+  // Analytically expected widthInches for the target polygon with the true FL.
+  // FallbackSfMProvider produces uniform relativeDepth=0.5:
+  //   referenceDepthMeters = FL × 85.6 / (refPixW × 1000)
+  //   metersPerRelativeUnit = refDepth / 0.5
+  //   vertex depth = 0.5 × metersPerRelUnit = refDepth
+  //   worldX span = targetSpanPx × refDepth / FL
+  // With refPixW=300 → refDepth=0.6 m, targetSpanPx=600:
+  //   widthM = 600 × 0.6 / TRUE_FL ≈ 0.1712 m → 6.74 in
+  function expectedWidthIn(refPixW: number, refDepth: number, fl: number): number {
+    const refDepthM   = (fl * CARD.widthMm) / (refPixW * 1000);
+    const targetSpan  = TARGET_VERTICES[1].x - TARGET_VERTICES[0].x; // 600 px
+    return (targetSpan * refDepthM / fl) * 39.3701;
+  }
+
+  it("calibration at 0.6 m (300 px) produces widthInches within ±5% of expected", async () => {
+    const refPixW = 300, refDepth = 0.6;
+    const fl       = (refPixW * refDepth * 1000) / CARD.widthMm; // = TRUE_FL
+
+    const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), fl);
+    const result   = await pipeline.measure([...FRAMES], [...TARGET_VERTICES], {
+      box:          { x: 0.1, y: 0.1, width: refPixW / IMAGE_W, height: 0.04 },
+      object:       CARD, imageWidthPx: IMAGE_W, imageHeightPx: IMAGE_H,
+    });
+
+    expect(Number.isFinite(result.widthInches)).toBe(true);
+    expect(result.widthInches).toBeGreaterThan(0);
+    const expected = expectedWidthIn(refPixW, refDepth, fl);
+    expect(result.widthInches).toBeGreaterThanOrEqual(expected * 0.95);
+    expect(result.widthInches).toBeLessThanOrEqual(expected * 1.05);
+  });
+
+  it("re-calibrating at 0.3 m (600 px) yields the same focalLengthPx as 0.6 m / 300 px", () => {
+    // When pixel width scales in proportion with depth, the back-solve formula
+    // recovers the same true focal length regardless of which distance was used.
+    const fl_06m_300px = (300 * 0.6 * 1000) / CARD.widthMm;
+    const fl_03m_600px = (600 * 0.3 * 1000) / CARD.widthMm;
+    const fl_12m_150px = (150 * 1.2 * 1000) / CARD.widthMm;
+    expect(fl_06m_300px).toBeCloseTo(fl_03m_600px, 5);
+    expect(fl_06m_300px).toBeCloseTo(fl_12m_150px, 5);
+  });
+
+  it("re-calibration at 0.3 m (600 px) produces the same focalLengthPx and identical pipeline output", async () => {
+    // Both calibrations use physically consistent geometry → same true FL.
+    const fl_06m = (300 * 0.6 * 1000) / CARD.widthMm;
+    const fl_03m = (600 * 0.3 * 1000) / CARD.widthMm;
+
+    // focalLengthPx must be identical (the core invariant this task guards).
+    expect(fl_03m).toBeCloseTo(fl_06m, 5);
+
+    // With the SAME in-scene reference box (same capture image), two pipelines
+    // that differ only in which calibration distance was used must produce
+    // identical measurements — because focalLengthPx is the same in both.
+    // (The in-scene reference governs per-measurement depth; calibration only
+    //  produces focalLengthPx, not a per-shot depth estimate.)
+    const SAME_REF = { box: { x: 0.1, y: 0.1, width: 300 / IMAGE_W, height: 0.04 },
+                       object: CARD, imageWidthPx: IMAGE_W, imageHeightPx: IMAGE_H };
+
+    const [r06, r03] = await Promise.all([
+      new BurstMeasurementPipeline(new FallbackSfMProvider(), fl_06m)
+        .measure([...FRAMES], [...TARGET_VERTICES], SAME_REF),
+      new BurstMeasurementPipeline(new FallbackSfMProvider(), fl_03m)
+        .measure([...FRAMES], [...TARGET_VERTICES], SAME_REF),
+    ]);
+
+    expect(r06.widthInches).toBeGreaterThan(0);
+    // Identical focalLengthPx → identical pipeline output (within rounding)
+    expect(r03.widthInches).toBeGreaterThanOrEqual(r06.widthInches * 0.95);
+    expect(r03.widthInches).toBeLessThanOrEqual(r06.widthInches * 1.05);
+    // And both within ±5% of the analytically expected value
+    const expected = expectedWidthIn(300, 0.6, fl_06m);
+    expect(r06.widthInches).toBeGreaterThanOrEqual(expected * 0.95);
+    expect(r06.widthInches).toBeLessThanOrEqual(expected * 1.05);
+    expect(r03.widthInches).toBeGreaterThanOrEqual(expected * 0.95);
+    expect(r03.widthInches).toBeLessThanOrEqual(expected * 1.05);
+  });
+
+  it("wrong depth (0.3 m entered instead of 0.6 m with 300 px) produces ~2× off measurements when no reference is in the scene", async () => {
+    // The dangerous case: technician holds card at 0.6 m (300 px observed) but
+    // enters 0.3 m into the calibration UI.  focalLengthPx is halved.  The
+    // in-scene reference corrects the error when used, but follow-up shots
+    // without a reference object rely on the stored focalLengthPx directly:
+    //   widthInches = (pixelWidth × depth) / focalLengthPx × 39.3701
+    // A 2× wrong focalLengthPx produces 2× wrong widthInches.
+    const correctFl = TRUE_FL;
+    const wrongFl   = (300 * 0.3 * 1000) / CARD.widthMm; // half of TRUE_FL
+
+    const [correctResult, wrongResult] = await Promise.all([
+      new BurstMeasurementPipeline(new FallbackSfMProvider(), correctFl)
+        .measure([...FRAMES], [...TARGET_VERTICES]),        // no reference object
+      new BurstMeasurementPipeline(new FallbackSfMProvider(), wrongFl)
+        .measure([...FRAMES], [...TARGET_VERTICES]),        // no reference object
+    ]);
+
+    const ratio = wrongResult.widthInches / correctResult.widthInches;
+    expect(ratio).toBeCloseTo(2.0, 0); // ≈ 2× error, within nearest integer
+  });
+
+  it("correct focalLength produces non-zero confidence when reference box is valid", async () => {
+    const pipeline = new BurstMeasurementPipeline(new FallbackSfMProvider(), TRUE_FL);
+    const result   = await pipeline.measure([...FRAMES], [...TARGET_VERTICES], {
+      box:          { x: 0.1, y: 0.1, width: 300 / IMAGE_W, height: 0.04 },
+      object:       CARD, imageWidthPx: IMAGE_W, imageHeightPx: IMAGE_H,
+    });
+    expect(result.confidence).toBeGreaterThan(0);
+  });
+});

@@ -15,6 +15,7 @@ export default defineConfig({
     // app (e.g. lib/audio/__tests__/faie.stress.test.ts) require the full React
     // Native / Jest environment and will fail under vitest's node runner.
     include: [
+      "lib/meta-glasses/__tests__/**/*.test.ts",
       "lib/measurement/__tests__/**/*.test.ts",
       "lib/finding-card/__tests__/**/*.test.ts",
       "lib/delivery/__tests__/**/*.test.ts",
