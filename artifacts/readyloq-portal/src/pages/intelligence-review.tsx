@@ -7,6 +7,7 @@ import {
   type IntelligenceRecord,
   type IntelligenceReviewInputSeverity,
 } from '@workspace/api-client-react';
+import { REVIEW_QUEUE_COUNT_QUERY_KEY } from '@/hooks/use-review-queue-count';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Loader2,
@@ -264,7 +265,14 @@ export function IntelligenceReview() {
         setEditOpen(false);
         // If this was the last record on the last page, step back a page.
         if (records.length <= 1 && page > 1) setPage(page - 1);
-        queryClient.invalidateQueries({ queryKey: [getListIntelligenceRecordsQueryKey()[0]] });
+        // Invalidate the queue list and the sidebar badge count in one shot.
+        // Using the root key (no params) prefix-matches every listIntelligenceRecords
+        // query — both the paginated list and the badge's limit:1 query.
+        queryClient.invalidateQueries({ queryKey: getListIntelligenceRecordsQueryKey() });
+        // Belt-and-suspenders: also invalidate the badge key directly so the
+        // badge always refetches even if prefix matching behaves differently
+        // in the installed React Query version.
+        queryClient.invalidateQueries({ queryKey: REVIEW_QUEUE_COUNT_QUERY_KEY });
       },
       onError: (err: any) => {
         toast({
