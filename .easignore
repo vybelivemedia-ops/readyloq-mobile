@@ -30,3 +30,11 @@ artifacts/readyloq-app/.expo
 *.log
 *.zip
 **/*.tsbuildinfo
+
+# Workspace-level hidden dirs (pnpm store, caches, tool state) — 2+ GB combined
+.local
+.cache
+.config
+.upm
+.agents
+
