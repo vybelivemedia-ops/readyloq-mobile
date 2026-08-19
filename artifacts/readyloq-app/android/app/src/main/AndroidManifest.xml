@@ -17,6 +17,8 @@
     </intent>
   </queries>
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:allowBackup="true" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false" android:fullBackupContent="@xml/secure_store_backup_rules" android:dataExtractionRules="@xml/secure_store_data_extraction_rules" android:extractNativeLibs="true">
+    <meta-data android:name="com.meta.wearable.mwdat.APPLICATION_ID" android:value="@string/meta_wearables_application_id"/>
+    <meta-data android:name="com.meta.wearable.mwdat.CLIENT_TOKEN" android:value="@string/meta_wearables_client_token"/>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize|density" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="unspecified">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
@@ -28,6 +30,12 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="readyloq-app"/>
         <data android:scheme="exp+readyloq-app"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="readyloq" android:host="mwdat"/>
       </intent-filter>
     </activity>
   </application>
