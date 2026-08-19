@@ -15,7 +15,8 @@
 
 set -euo pipefail
 
-GRADLE_PROPS="artifacts/readyloq-app/android/gradle.properties"
+# Allow callers (and tests) to override the properties file path via env var.
+GRADLE_PROPS="${GRADLE_PROPS:-artifacts/readyloq-app/android/gradle.properties}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARSER="${SCRIPT_DIR}/parse-gradle-prop.mjs"
 

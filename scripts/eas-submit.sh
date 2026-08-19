@@ -31,7 +31,9 @@ WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 APP_ROOT="${WORKSPACE_ROOT}/artifacts/readyloq-app"
 
 R8_CHECK="${SCRIPT_DIR}/check-r8-flags.sh"
-METRO_CHECK="${APP_ROOT}/scripts/check-metro-bundle.sh"
+# Allow env-var override so tests can stub the Metro check without modifying
+# the actual bundle script or running a full 60–90 s Metro build.
+METRO_CHECK="${METRO_CHECK:-${APP_ROOT}/scripts/check-metro-bundle.sh}"
 
 # ── Parse flags ────────────────────────────────────────────────────────────────
 # Strip --dry-run before forwarding the rest to eas build.
@@ -52,6 +54,80 @@ ok()      { echo "  ✔  $*"; }
 err()     { echo "  ✖  $*" >&2; }
 
 # ── Guard: EXPO_TOKEN ─────────────────────────────────────────────────────────
+# ── Self-test mode ─────────────────────────────────────────────────────────────
+# bash scripts/eas-submit.sh --test
+# Verifies that:
+#   1. A truthy R8 flag in gradle.properties aborts the wrapper with exit 1
+#      BEFORE `eas build` would be called.
+#   2. All three flags being falsy allows the wrapper to proceed (in dry-run).
+# Uses GRADLE_PROPS env-var override accepted by check-r8-flags.sh so no real
+# file is modified; the EXPO_TOKEN guard is bypassed because --dry-run is used.
+if [ "${1:-}" = "--test" ]; then
+  PASS=0; FAIL=0
+  pass_test() { echo "  PASS  $1"; ((PASS++)) || true; }
+  fail_test() { echo "  FAIL  $1"; ((FAIL++)) || true; }
+
+  # ── Test 1: R8 flag truthy → wrapper exits 1 (eas build NOT called) ──────────
+  TMP_PROPS=$(mktemp)
+  cat > "$TMP_PROPS" <<'PROPS'
+android.enableR8.fullMode=true
+android.enableMinifyInReleaseBuilds=false
+android.enableShrinkResourcesInReleaseBuilds=false
+PROPS
+
+  # Run wrapper in dry-run to avoid needing EXPO_TOKEN; truthy flag must abort.
+  GRADLE_PROPS="$TMP_PROPS" bash "$0" --dry-run >/dev/null 2>&1
+  EXIT_CODE=$?
+  if [ "$EXIT_CODE" -ne 0 ]; then
+    pass_test "truthy R8 flag: wrapper exits non-zero (eas build blocked)"
+  else
+    fail_test "truthy R8 flag: wrapper should have exited non-zero but returned 0"
+  fi
+
+  # Confirm the guard stops BEFORE the dry-run 'would run' message.
+  OUTPUT=$(GRADLE_PROPS="$TMP_PROPS" bash "$0" --dry-run 2>&1 || true)
+  if echo "$OUTPUT" | grep -q "Would run"; then
+    fail_test "truthy R8 flag: 'Would run' message should NOT appear when guard fails"
+  else
+    pass_test "truthy R8 flag: 'Would run' message absent — eas build truly blocked"
+  fi
+
+  rm -f "$TMP_PROPS"
+
+  # ── Test 2: all flags false → wrapper proceeds past R8 guard ─────────────────
+  TMP_PROPS=$(mktemp)
+  cat > "$TMP_PROPS" <<'PROPS'
+android.enableR8.fullMode=false
+android.enableMinifyInReleaseBuilds=false
+android.enableShrinkResourcesInReleaseBuilds=false
+PROPS
+
+  # Metro check will also run; stub it by temporarily overriding METRO_CHECK.
+  # We only care that the R8 guard passes and the wrapper reaches dry-run output.
+  # Use an inline stub that always succeeds so Metro doesn't slow down the test.
+  TMPMETRO=$(mktemp)
+  echo '#!/bin/bash'; echo 'exit 0' > "$TMPMETRO"
+  chmod +x "$TMPMETRO"
+
+  OUTPUT=$(GRADLE_PROPS="$TMP_PROPS" METRO_CHECK="$TMPMETRO" bash "$0" --dry-run 2>&1 || true)
+  if echo "$OUTPUT" | grep -q "Would run"; then
+    pass_test "all flags false: wrapper proceeds to dry-run output"
+  else
+    fail_test "all flags false: expected 'Would run' in output but got: ${OUTPUT}"
+  fi
+
+  rm -f "$TMP_PROPS" "$TMPMETRO"
+
+  echo ""
+  if [ "$FAIL" -gt 0 ]; then
+    echo "EAS submit wrapper tests FAILED: ${PASS} passed, ${FAIL} failed"
+    exit 1
+  else
+    echo "EAS submit wrapper tests PASSED (${PASS} assertions)"
+    exit 0
+  fi
+fi
+
 if [ -z "${EXPO_TOKEN:-}" ] && [ "$DRY_RUN" -eq 0 ]; then
   err "EXPO_TOKEN is not set. Export it before running this script."
   echo ""

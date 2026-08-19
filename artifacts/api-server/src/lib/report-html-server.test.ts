@@ -156,13 +156,17 @@ const FAKE_JPEG_BYTES = Buffer.from([0xff, 0xd8, 0x00, 0x00]);
 // A minimal PNG byte sequence (0x89 0x50 'N' 'G').
 const FAKE_PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
-// Use vi.spyOn on the prototype so we avoid vi.mock() factory/hoisting edge
-// cases. Importing the real module and spying on prototype methods is simpler
-// and works reliably with ESM in this version of vitest.
+// Spy on ObjectStorageService prototype methods so no real GCS calls are made.
+// Cast method names via `as any` to avoid TypeScript widening the spy to a
+// union of all method signatures (which loses .mockResolvedValue etc.), and
+// re-assert as `Mock` so the vitest mock API is fully available in the tests.
+import type { Mock } from "vitest";
 import { ObjectStorageService } from "./objectStorage.js";
 
-const mockGetObjectEntityFile = vi.spyOn(ObjectStorageService.prototype, "getObjectEntityFile" as never);
-const mockDownloadObject = vi.spyOn(ObjectStorageService.prototype, "downloadObject" as never);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockGetObjectEntityFile = vi.spyOn(ObjectStorageService.prototype, "getObjectEntityFile" as any) as unknown as Mock;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDownloadObject = vi.spyOn(ObjectStorageService.prototype, "downloadObject" as any) as unknown as Mock;
 
 describe("buildFindingImageMap", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -178,8 +182,12 @@ describe("buildFindingImageMap", () => {
     expect(map.size).toBe(0);
   });
 
+  // Shorthand: return a fake GCS File object typed to satisfy ObjectStorageService.
+  // The implementation only passes this to downloadObject, so {} suffices.
+  const fakeFile = () => ({}) as unknown as File;
+
   it("normalizes /objects/… paths so getObjectEntityFile receives /objects/… unchanged", async () => {
-    mockGetObjectEntityFile.mockResolvedValue({});
+    mockGetObjectEntityFile.mockResolvedValue(fakeFile());
     mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
 
     const imageUrl = "/objects/companies/1/uploads/photo.jpg";
@@ -189,7 +197,7 @@ describe("buildFindingImageMap", () => {
   });
 
   it("strips /api/storage prefix so getObjectEntityFile receives /objects/… for intelligence-AI paths", async () => {
-    mockGetObjectEntityFile.mockResolvedValue({});
+    mockGetObjectEntityFile.mockResolvedValue(fakeFile());
     mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
 
     const imageUrl = "/api/storage/objects/companies/2/uploads/ai-photo.jpg";
@@ -200,7 +208,7 @@ describe("buildFindingImageMap", () => {
   });
 
   it("keys the returned map by the original imageUrl (not the normalized path)", async () => {
-    mockGetObjectEntityFile.mockResolvedValue({});
+    mockGetObjectEntityFile.mockResolvedValue(fakeFile());
     mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
 
     const imageUrl = "/api/storage/objects/companies/3/uploads/photo.png";
@@ -212,7 +220,7 @@ describe("buildFindingImageMap", () => {
   });
 
   it("detects JPEG from magic bytes and returns a data:image/jpeg URI", async () => {
-    mockGetObjectEntityFile.mockResolvedValue({});
+    mockGetObjectEntityFile.mockResolvedValue(fakeFile());
     mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
 
     const imageUrl = "/objects/companies/1/uploads/img.jpg";
@@ -223,7 +231,7 @@ describe("buildFindingImageMap", () => {
   });
 
   it("detects PNG from magic bytes and returns a data:image/png URI", async () => {
-    mockGetObjectEntityFile.mockResolvedValue({});
+    mockGetObjectEntityFile.mockResolvedValue(fakeFile());
     mockDownloadObject.mockResolvedValue(new Response(FAKE_PNG_BYTES, { status: 200 }));
 
     const imageUrl = "/objects/companies/1/uploads/img.png";
@@ -234,7 +242,7 @@ describe("buildFindingImageMap", () => {
   });
 
   it("omits an image from the map when downloadObject returns a non-OK response", async () => {
-    mockGetObjectEntityFile.mockResolvedValue({});
+    mockGetObjectEntityFile.mockResolvedValue(fakeFile());
     mockDownloadObject.mockResolvedValue(new Response("Not Found", { status: 404 }));
 
     const map = await buildFindingImageMap([{ imageUrl: "/objects/companies/1/uploads/missing.jpg" }]);
@@ -252,8 +260,8 @@ describe("buildFindingImageMap", () => {
     // First call: never resolves (simulates a hung storage connection)
     // Second call: resolves immediately
     mockGetObjectEntityFile
-      .mockImplementationOnce(() => new Promise(() => { /* intentionally never resolves */ }))
-      .mockImplementation(() => Promise.resolve({}));
+      .mockImplementationOnce(() => new Promise<File>(() => { /* intentionally never resolves */ }))
+      .mockImplementation(() => Promise.resolve(fakeFile()));
     mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
 
     vi.useFakeTimers();
@@ -271,7 +279,7 @@ describe("buildFindingImageMap", () => {
   });
 
   it("deduplicates findings that share the same imageUrl (one download per unique URL)", async () => {
-    mockGetObjectEntityFile.mockResolvedValue({});
+    mockGetObjectEntityFile.mockResolvedValue(fakeFile());
     mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
 
     const imageUrl = "/objects/companies/1/uploads/shared.jpg";
