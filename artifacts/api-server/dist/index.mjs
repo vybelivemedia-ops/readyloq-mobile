@@ -110092,6 +110092,46 @@ function section(title, content) {
       ${content}
     </div>`;
 }
+function toObjectsPath(imageUrl) {
+  if (imageUrl.startsWith("/api/storage/objects/")) {
+    return imageUrl.slice("/api/storage".length);
+  }
+  return imageUrl;
+}
+async function buildFindingImageMap(findings) {
+  const uniqueUrls = [
+    ...new Set(findings.map((f) => f.imageUrl).filter((u) => !!u))
+  ];
+  if (uniqueUrls.length === 0) return /* @__PURE__ */ new Map();
+  const objStore = new ObjectStorageService();
+  const entries = await Promise.all(
+    uniqueUrls.map(async (imageUrl) => {
+      const objectsPath = toObjectsPath(imageUrl);
+      const timeout = new Promise(
+        (_2, rej) => setTimeout(() => rej(new Error("timeout")), 4e3)
+      );
+      try {
+        const objectFile = await Promise.race([
+          objStore.getObjectEntityFile(objectsPath),
+          timeout
+        ]);
+        const response = await Promise.race([
+          objStore.downloadObject(objectFile),
+          timeout
+        ]);
+        if (!response.ok) return null;
+        const buffer = await Promise.race([response.arrayBuffer(), timeout]);
+        const base643 = Buffer.from(buffer).toString("base64");
+        const bytes = new Uint8Array(buffer.slice(0, 4));
+        const mime = bytes[0] === 255 && bytes[1] === 216 ? "image/jpeg" : bytes[0] === 137 && bytes[1] === 80 ? "image/png" : "image/jpeg";
+        return [imageUrl, `data:${mime};base64,${base643}`];
+      } catch {
+        return null;
+      }
+    })
+  );
+  return new Map(entries.filter((e) => e !== null));
+}
 function buildServerReportHtml(report, inspection, media = [], imageDataMap = /* @__PURE__ */ new Map()) {
   const findings = (report.findings ?? []).filter(
     (f) => f.category || f.description
@@ -110495,28 +110535,7 @@ router6.get("/:id/html", async (req, res) => {
       )
     );
     const reportFindings = report.findings ?? [];
-    const uniqueImageUrls = [
-      ...new Set(reportFindings.map((f) => f.imageUrl).filter((u) => !!u))
-    ];
-    const imageDataMap = /* @__PURE__ */ new Map();
-    if (uniqueImageUrls.length > 0) {
-      const objStore = new ObjectStorageService();
-      await Promise.all(
-        uniqueImageUrls.map(async (imageUrl) => {
-          try {
-            const objectFile = await objStore.getObjectEntityFile(imageUrl);
-            const response = await objStore.downloadObject(objectFile);
-            if (!response.ok) return;
-            const buffer = await response.arrayBuffer();
-            const base643 = Buffer.from(buffer).toString("base64");
-            const bytes = new Uint8Array(buffer.slice(0, 4));
-            const mime = bytes[0] === 255 && bytes[1] === 216 ? "image/jpeg" : bytes[0] === 137 && bytes[1] === 80 ? "image/png" : "image/jpeg";
-            imageDataMap.set(imageUrl, `data:${mime};base64,${base643}`);
-          } catch {
-          }
-        })
-      );
-    }
+    const imageDataMap = await buildFindingImageMap(reportFindings);
     const html = buildServerReportHtml(report, inspection, mediaRows, imageDataMap);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "private, max-age=300");
@@ -145658,7 +145677,9 @@ router36.get("/reports/:id/html", async (req, res) => {
       inArray(inspectionMediaTable.mediaType, ["photo", "image"])
     )
   );
-  const html = buildServerReportHtml(report, inspection, mediaRows);
+  const reportFindings = report.findings ?? [];
+  const imageDataMap = await buildFindingImageMap(reportFindings);
+  const html = buildServerReportHtml(report, inspection, mediaRows, imageDataMap);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "private, max-age=300");
   return res.send(html);

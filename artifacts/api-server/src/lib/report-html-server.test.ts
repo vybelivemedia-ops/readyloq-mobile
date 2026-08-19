@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { fmtIn, fmtArea, buildServerReportHtml } from "./report-html-server.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { fmtIn, fmtArea, buildServerReportHtml, buildFindingImageMap } from "./report-html-server.js";
 
 // Minimal stubs for buildServerReportHtml
 function makeReport(overrides: Record<string, unknown> = {}) {
@@ -143,6 +143,181 @@ describe("buildServerReportHtml — signature section", () => {
     expect(html).toContain(Buffer.from(malicious).toString("base64"));
     expect(html).not.toContain("<foreignObject");
     expect(html).not.toContain("alert(1)");
+  });
+});
+
+// ─── buildFindingImageMap ─────────────────────────────────────────────────────
+// Mocks ObjectStorageService so no real GCS calls are made.
+// Each test exercises a distinct code path in the helper.
+
+// A minimal JPEG byte sequence (SOI marker 0xFF 0xD8) padded to 4 bytes so
+// the MIME-type detector sees the correct magic bytes.
+const FAKE_JPEG_BYTES = Buffer.from([0xff, 0xd8, 0x00, 0x00]);
+// A minimal PNG byte sequence (0x89 0x50 'N' 'G').
+const FAKE_PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
+// Use vi.spyOn on the prototype so we avoid vi.mock() factory/hoisting edge
+// cases. Importing the real module and spying on prototype methods is simpler
+// and works reliably with ESM in this version of vitest.
+import { ObjectStorageService } from "./objectStorage.js";
+
+const mockGetObjectEntityFile = vi.spyOn(ObjectStorageService.prototype, "getObjectEntityFile" as never);
+const mockDownloadObject = vi.spyOn(ObjectStorageService.prototype, "downloadObject" as never);
+
+describe("buildFindingImageMap", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.clearAllMocks());
+
+  it("returns an empty map when there are no findings", async () => {
+    const map = await buildFindingImageMap([]);
+    expect(map.size).toBe(0);
+  });
+
+  it("returns an empty map when all findings lack imageUrl", async () => {
+    const map = await buildFindingImageMap([{ imageUrl: null }, { imageUrl: undefined }]);
+    expect(map.size).toBe(0);
+  });
+
+  it("normalizes /objects/… paths so getObjectEntityFile receives /objects/… unchanged", async () => {
+    mockGetObjectEntityFile.mockResolvedValue({});
+    mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
+
+    const imageUrl = "/objects/companies/1/uploads/photo.jpg";
+    await buildFindingImageMap([{ imageUrl }]);
+
+    expect(mockGetObjectEntityFile).toHaveBeenCalledWith("/objects/companies/1/uploads/photo.jpg");
+  });
+
+  it("strips /api/storage prefix so getObjectEntityFile receives /objects/… for intelligence-AI paths", async () => {
+    mockGetObjectEntityFile.mockResolvedValue({});
+    mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
+
+    const imageUrl = "/api/storage/objects/companies/2/uploads/ai-photo.jpg";
+    await buildFindingImageMap([{ imageUrl }]);
+
+    // Must strip /api/storage → /objects/…
+    expect(mockGetObjectEntityFile).toHaveBeenCalledWith("/objects/companies/2/uploads/ai-photo.jpg");
+  });
+
+  it("keys the returned map by the original imageUrl (not the normalized path)", async () => {
+    mockGetObjectEntityFile.mockResolvedValue({});
+    mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
+
+    const imageUrl = "/api/storage/objects/companies/3/uploads/photo.png";
+    const map = await buildFindingImageMap([{ imageUrl }]);
+
+    // The key must be the original /api/storage/… URL so it matches finding.imageUrl
+    expect(map.has(imageUrl)).toBe(true);
+    expect(map.has("/objects/companies/3/uploads/photo.png")).toBe(false);
+  });
+
+  it("detects JPEG from magic bytes and returns a data:image/jpeg URI", async () => {
+    mockGetObjectEntityFile.mockResolvedValue({});
+    mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
+
+    const imageUrl = "/objects/companies/1/uploads/img.jpg";
+    const map = await buildFindingImageMap([{ imageUrl }]);
+
+    const value = map.get(imageUrl)!;
+    expect(value).toMatch(/^data:image\/jpeg;base64,/);
+  });
+
+  it("detects PNG from magic bytes and returns a data:image/png URI", async () => {
+    mockGetObjectEntityFile.mockResolvedValue({});
+    mockDownloadObject.mockResolvedValue(new Response(FAKE_PNG_BYTES, { status: 200 }));
+
+    const imageUrl = "/objects/companies/1/uploads/img.png";
+    const map = await buildFindingImageMap([{ imageUrl }]);
+
+    const value = map.get(imageUrl)!;
+    expect(value).toMatch(/^data:image\/png;base64,/);
+  });
+
+  it("omits an image from the map when downloadObject returns a non-OK response", async () => {
+    mockGetObjectEntityFile.mockResolvedValue({});
+    mockDownloadObject.mockResolvedValue(new Response("Not Found", { status: 404 }));
+
+    const map = await buildFindingImageMap([{ imageUrl: "/objects/companies/1/uploads/missing.jpg" }]);
+    expect(map.size).toBe(0);
+  });
+
+  it("omits an image from the map when getObjectEntityFile throws", async () => {
+    mockGetObjectEntityFile.mockRejectedValue(new Error("not found"));
+
+    const map = await buildFindingImageMap([{ imageUrl: "/objects/companies/1/uploads/gone.jpg" }]);
+    expect(map.size).toBe(0);
+  });
+
+  it("omits a timed-out image but still returns successful ones", async () => {
+    // First call: never resolves (simulates a hung storage connection)
+    // Second call: resolves immediately
+    mockGetObjectEntityFile
+      .mockImplementationOnce(() => new Promise(() => { /* intentionally never resolves */ }))
+      .mockImplementation(() => Promise.resolve({}));
+    mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
+
+    vi.useFakeTimers();
+    const pendingMap = buildFindingImageMap([
+      { imageUrl: "/objects/companies/1/uploads/hung.jpg" },
+      { imageUrl: "/objects/companies/1/uploads/ok.jpg" },
+    ]);
+    // Advance past the 4 s per-image timeout so the hung download times out.
+    await vi.runAllTimersAsync();
+    const map = await pendingMap;
+    vi.useRealTimers();
+
+    expect(map.has("/objects/companies/1/uploads/hung.jpg")).toBe(false);
+    expect(map.has("/objects/companies/1/uploads/ok.jpg")).toBe(true);
+  });
+
+  it("deduplicates findings that share the same imageUrl (one download per unique URL)", async () => {
+    mockGetObjectEntityFile.mockResolvedValue({});
+    mockDownloadObject.mockResolvedValue(new Response(FAKE_JPEG_BYTES, { status: 200 }));
+
+    const imageUrl = "/objects/companies/1/uploads/shared.jpg";
+    await buildFindingImageMap([{ imageUrl }, { imageUrl }, { imageUrl }]);
+
+    expect(mockGetObjectEntityFile).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("buildServerReportHtml — evidence photo embedding", () => {
+  it("embeds a finding photo as an <img> tag when imageDataMap has an entry for its imageUrl", () => {
+    const imageUrl = "/objects/companies/1/uploads/evidence.jpg";
+    const dataUri = "data:image/jpeg;base64,/9j/TEST";
+    const imageDataMap = new Map([[imageUrl, dataUri]]);
+
+    const html = buildServerReportHtml(
+      makeReport({ findings: [{ category: "Rodent", imageUrl }] }),
+      makeInspection(),
+      [],
+      imageDataMap,
+    );
+
+    expect(html).toContain(`src="${dataUri}"`);
+    expect(html).toContain("<img");
+  });
+
+  it("renders the finding card without an <img> tag when imageDataMap does not contain its imageUrl", () => {
+    const imageUrl = "/objects/companies/1/uploads/no-fetch.jpg";
+    const html = buildServerReportHtml(
+      makeReport({ findings: [{ category: "Cockroach", imageUrl }] }),
+      makeInspection(),
+      [],
+      new Map(), // empty map — image not fetched
+    );
+
+    expect(html).not.toContain("data:image/");
+    expect(html).toContain("Cockroach");
+  });
+
+  it("renders correctly when no imageDataMap is supplied (backward compat)", () => {
+    const html = buildServerReportHtml(
+      makeReport({ findings: [{ category: "Ant", imageUrl: "/objects/1.jpg" }] }),
+      makeInspection(),
+    );
+    expect(html).toContain("Ant");
+    expect(html).not.toContain("data:image/");
   });
 });
 
