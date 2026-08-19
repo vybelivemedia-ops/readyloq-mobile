@@ -31,3 +31,12 @@ description: How the Ray-Ban Meta glasses integrate into the ReadyLoq inspection
 
 ## Why
 Real-time voice + image capture without phone-in-hand. Glasses push events via Meta's cloud; phone receives findings, persists frames to object storage, and displays a compact strip with the pairing code, live status, and detection count.
+
+## Native Android delivery
+- When the app keeps its `android/` directory in source control, EAS builds do not automatically run Expo config plugins against that native project. Manifest requirements for Meta Wearables must therefore be present in the checked-in Android manifest.
+- Supply the Meta application ID and client token to Android through Gradle-generated resources populated from encrypted EAS environment variables; do not commit either value or rely on `$VARIABLE` strings in `eas.json`.
+- Verify a release by inspecting the built APK's manifest for the two MWDAT metadata keys and `readyloq://mwdat`, without printing credential values.
+
+**Why:** A successful EAS build can silently omit config-plugin-only native changes when an existing Android project is used.
+
+**How to apply:** Any new Android native integration should update the native manifest/Gradle directly (and retain a plugin only for future clean prebuilds), then validate the packaged APK rather than only its source configuration.
