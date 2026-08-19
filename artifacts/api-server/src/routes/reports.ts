@@ -16,8 +16,7 @@ import {
   derivePropertyType,
 } from "../lib/report-narrative-ai";
 import { logErrorEvent } from "../lib/error-events";
-import { buildServerReportHtml, type FindingImageMap } from "../lib/report-html-server";
-import { ObjectStorageService } from "../lib/objectStorage";
+import { buildServerReportHtml, buildFindingImageMap } from "../lib/report-html-server";
 
 const router = Router();
 
@@ -433,46 +432,14 @@ router.get("/:id/html", async (req, res) => {
       );
 
     // ── Embed finding evidence photos ────────────────────────────────────────
-    // Download each unique finding imageUrl from private object storage and
-    // encode it as a base64 data URI.  This makes the HTML document fully
-    // self-contained so it can be printed or shared offline without hitting
-    // the authenticated /storage/objects/* endpoint.
-    //
-    // A single ObjectStorageService instance is created per request — it
-    // holds no mutable state so this is safe.  Downloads are parallelised.
-    // Any image that cannot be fetched (not found, network blip) is silently
-    // omitted from the map; the finding still renders without its photo.
-    const reportFindings = ((report.findings ?? []) as Array<{ imageUrl?: string | null }>);
-    const uniqueImageUrls = [
-      ...new Set(reportFindings.map((f) => f.imageUrl).filter((u): u is string => !!u)),
-    ];
-
-    const imageDataMap: Map<string, string> = new Map();
-    if (uniqueImageUrls.length > 0) {
-      const objStore = new ObjectStorageService();
-      await Promise.all(
-        uniqueImageUrls.map(async (imageUrl) => {
-          try {
-            const objectFile = await objStore.getObjectEntityFile(imageUrl);
-            const response = await objStore.downloadObject(objectFile);
-            if (!response.ok) return;
-            const buffer = await response.arrayBuffer();
-            const base64 = Buffer.from(buffer).toString("base64");
-            // Detect MIME type from the first bytes (JPEG magic bytes 0xFF 0xD8)
-            const bytes = new Uint8Array(buffer.slice(0, 4));
-            const mime =
-              bytes[0] === 0xff && bytes[1] === 0xd8
-                ? "image/jpeg"
-                : bytes[0] === 0x89 && bytes[1] === 0x50
-                  ? "image/png"
-                  : "image/jpeg";
-            imageDataMap.set(imageUrl, `data:${mime};base64,${base64}`);
-          } catch {
-            // Silently skip — finding card renders without an image.
-          }
-        }),
-      );
-    }
+    // buildFindingImageMap downloads each unique finding imageUrl from private
+    // object storage in parallel (4 s per-image timeout) and returns a map of
+    // imageUrl → base64 data URI.  Both canonical URL forms are handled:
+    //   /objects/companies/…/uploads/…        (written by FAIE)
+    //   /api/storage/objects/companies/…/…    (written by intelligence-AI)
+    // Any image that cannot be fetched is silently omitted.
+    const reportFindings = (report.findings ?? []) as Array<{ imageUrl?: string | null }>;
+    const imageDataMap = await buildFindingImageMap(reportFindings);
 
     const html = buildServerReportHtml(report, inspection, mediaRows, imageDataMap);
     res.setHeader("Content-Type", "text/html; charset=utf-8");

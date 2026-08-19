@@ -24,7 +24,7 @@ import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
 import { requireCompany, requireRole } from "../middleware/require-auth";
-import { buildServerReportHtml } from "../lib/report-html-server";
+import { buildServerReportHtml, buildFindingImageMap } from "../lib/report-html-server";
 import { messageBus } from "../lib/message-bus";
 
 const router = Router();
@@ -317,7 +317,13 @@ router.get("/reports/:id/html", async (req, res) => {
       ),
     );
 
-  const html = buildServerReportHtml(report, inspection, mediaRows);
+  // Embed finding evidence photos as base64 data URIs so the HTML document
+  // is fully self-contained for printing and offline viewing.  Both canonical
+  // imageUrl forms (/objects/… and /api/storage/objects/…) are handled.
+  const reportFindings = (report.findings ?? []) as Array<{ imageUrl?: string | null }>;
+  const imageDataMap = await buildFindingImageMap(reportFindings);
+
+  const html = buildServerReportHtml(report, inspection, mediaRows, imageDataMap);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "private, max-age=300");
   return res.send(html);

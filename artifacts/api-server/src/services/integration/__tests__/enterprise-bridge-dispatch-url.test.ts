@@ -167,7 +167,8 @@ describe("dispatchToSystem — configuration guard", () => {
       { targetSystem: "servsuite", endpointUrl: "", decryptedApiKey: "k" },
       MINIMAL_PAYLOAD,
     );
-    expect(outcome).toBe("INVALID_CONFIGURATION");
+    // dispatchToSystem now returns a DispatchResult discriminated union.
+    expect(outcome.status).toBe("INVALID_CONFIGURATION");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -176,7 +177,8 @@ describe("dispatchToSystem — configuration guard", () => {
       { targetSystem: "pestpac", endpointUrl: PESTPAC_DEFAULT_BASE, decryptedApiKey: "" },
       MINIMAL_PAYLOAD,
     );
-    expect(outcome).toBe("INVALID_CONFIGURATION");
+    // dispatchToSystem now returns a DispatchResult discriminated union.
+    expect(outcome.status).toBe("INVALID_CONFIGURATION");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

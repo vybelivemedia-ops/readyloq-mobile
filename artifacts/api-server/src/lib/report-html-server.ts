@@ -1,4 +1,5 @@
 import type { reportsTable, inspectionsTable } from "@workspace/db";
+import { ObjectStorageService } from "./objectStorage";
 
 type Report = typeof reportsTable.$inferSelect;
 type Inspection = typeof inspectionsTable.$inferSelect;
@@ -187,16 +188,86 @@ function section(title: string, content: string) {
 }
 
 /**
- * Map from a finding's imageUrl (the canonical /objects/… storage path) to a
- * base64-encoded data URI for the evidence photo.  When provided, each finding
- * card in the HTML report will embed the evidence photo so the document is
- * fully self-contained for printing and offline viewing.
+ * Map from a finding's imageUrl (as stored in the DB) to a base64-encoded
+ * data URI for the evidence photo.  When provided, each finding card in the
+ * HTML report embeds the evidence photo so the document is fully self-contained
+ * for printing and offline viewing.
  *
- * The route handler populates this map by downloading each unique image from
- * private object storage before calling buildServerReportHtml.  Findings whose
- * imageUrl is absent from the map simply render without a photo.
+ * Use `buildFindingImageMap` to populate this map; it handles both canonical
+ * URL forms and downloads images in parallel with a per-image timeout.
  */
 export type FindingImageMap = ReadonlyMap<string, string>;
+
+/**
+ * Strip the /api/storage prefix that the mobile client prepends so
+ * ObjectStorageService.getObjectEntityFile always receives a /objects/… path.
+ *
+ * Two forms appear in finding.imageUrl:
+ *   • /objects/companies/<id>/uploads/<uuid>        — written by FAIE
+ *   • /api/storage/objects/companies/<id>/uploads/… — written by intelligence-AI
+ */
+function toObjectsPath(imageUrl: string): string {
+  if (imageUrl.startsWith("/api/storage/objects/")) {
+    return imageUrl.slice("/api/storage".length); // → /objects/…
+  }
+  return imageUrl; // already /objects/…
+}
+
+/**
+ * Download each unique finding evidence photo from private object storage and
+ * return a map keyed by the original imageUrl value (as stored in the DB) so
+ * it matches the key used inside buildServerReportHtml.
+ *
+ * Downloads run in parallel with a 4-second per-image timeout.  Any image
+ * that cannot be fetched (not found, timeout, storage blip) is silently
+ * omitted — the finding still renders without a photo.
+ */
+export async function buildFindingImageMap(
+  findings: Array<{ imageUrl?: string | null }>,
+): Promise<FindingImageMap> {
+  const uniqueUrls = [
+    ...new Set(findings.map((f) => f.imageUrl).filter((u): u is string => !!u)),
+  ];
+  if (uniqueUrls.length === 0) return new Map();
+
+  const objStore = new ObjectStorageService();
+  const entries = await Promise.all(
+    uniqueUrls.map(async (imageUrl): Promise<[string, string] | null> => {
+      const objectsPath = toObjectsPath(imageUrl);
+      // Per-image 4 s timeout so a slow storage connection cannot block
+      // the entire report response indefinitely.
+      const timeout = new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("timeout")), 4_000),
+      );
+      try {
+        const objectFile = await Promise.race([
+          objStore.getObjectEntityFile(objectsPath),
+          timeout,
+        ]);
+        const response = await Promise.race([
+          objStore.downloadObject(objectFile),
+          timeout,
+        ]);
+        if (!response.ok) return null;
+        const buffer = await Promise.race([response.arrayBuffer(), timeout]);
+        const base64 = Buffer.from(buffer).toString("base64");
+        const bytes = new Uint8Array(buffer.slice(0, 4));
+        const mime =
+          bytes[0] === 0xff && bytes[1] === 0xd8
+            ? "image/jpeg"
+            : bytes[0] === 0x89 && bytes[1] === 0x50
+              ? "image/png"
+              : "image/jpeg";
+        // Key by the ORIGINAL imageUrl so it matches finding.imageUrl in the map lookup.
+        return [imageUrl, `data:${mime};base64,${base64}`];
+      } catch {
+        return null; // silently skip — finding renders without a photo
+      }
+    }),
+  );
+
+  return new Map(entries.filter((e): e is [string, string] => e !== null));
+}
 
 export function buildServerReportHtml(
   report: Report,
