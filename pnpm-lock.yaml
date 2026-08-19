@@ -786,8 +786,8 @@ importers:
         specifier: ^16.0.8
         version: 16.0.8(expo@54.0.36)(react-native-web@0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       expo-background-fetch:
-        specifier: ^57.0.10
-        version: 57.0.10(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
+        specifier: 57.0.9
+        version: 57.0.9(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
       expo-camera:
         specifier: ~17.0.10
         version: 17.0.10(expo@54.0.36)(react-native-web@0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -819,8 +819,8 @@ importers:
         specifier: ^14.0.8
         version: 14.0.8(expo@54.0.36)
       expo-task-manager:
-        specifier: ^57.0.10
-        version: 57.0.10(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
+        specifier: 57.0.9
+        version: 57.0.9(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
       jpeg-js:
         specifier: ^0.4.4
         version: 0.4.4
@@ -7068,8 +7068,8 @@ packages:
       react-native-web:
         optional: true
 
-  expo-background-fetch@57.0.10:
-    resolution: {integrity: sha512-cWUJwtodmwawm3dn+ls5tO8C9JPwdshqhgKdw9VqEzddFvgnBrVsJwnWG2O/C+s1FL2VclcNc5QhoFsJk9waZw==}
+  expo-background-fetch@57.0.9:
+    resolution: {integrity: sha512-X0kLAWCLMCN7/82GYGbVaFW2tsERrpHKe3yKbE1YrneoPOztIqaFnZZmtvx3MwKcdcrCIkkvewpc1my1cwUCpQ==}
     peerDependencies:
       expo: '*'
 
@@ -7330,8 +7330,8 @@ packages:
       react-native-web:
         optional: true
 
-  expo-task-manager@57.0.10:
-    resolution: {integrity: sha512-K43+CdKXOvFteatTFzP9lOtpLq0Rzm7VWxIGTPe2Eue61Q/IBHdBuyK7ElKdsXAt0zUFeZDEuIVoLhJLMSwGYQ==}
+  expo-task-manager@57.0.9:
+    resolution: {integrity: sha512-98L0EIexQkAxJ1GKPAev9rJcEJvZDfZOF8vmanvXisvfpC/Z0Rsel4vzV1bVldzXwQ4rMBu3V5C9evFJQMh1PA==}
     peerDependencies:
       expo: '*'
       react-native: '*'
@@ -16155,10 +16155,10 @@ snapshots:
     optionalDependencies:
       react-native-web: 0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
 
-  expo-background-fetch@57.0.10(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
+  expo-background-fetch@57.0.9(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
     dependencies:
       expo: 54.0.36(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.24)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
-      expo-task-manager: 57.0.10(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
+      expo-task-manager: 57.0.9(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
     transitivePeerDependencies:
       - react-native
 
@@ -16443,7 +16443,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  expo-task-manager@57.0.10(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
+  expo-task-manager@57.0.9(expo@54.0.36)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
     dependencies:
       expo: 54.0.36(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.24)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
       react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)

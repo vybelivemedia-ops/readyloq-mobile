@@ -137,10 +137,13 @@
 -keepclassmembers class kotlin.Lazy { *; }
 
 # ── expo-task-manager / expo-background-fetch internal references ─────────────
-# expo-modules-core@3.x moved or removed these internal Kotlin classes.
-# expo-task-manager and expo-background-fetch still reference them at compile
-# time but they are not present in the published AAR.  R8 full mode treats any
-# missing class reference as a hard error, so we suppress them explicitly.
+# expo-background-fetch and expo-task-manager >= 57.0.10 are compiled by the
+# expo team against a newer expo-modules-core that contains AnyTypeCache and
+# related classes.  Our pinned expo-modules-core@3.0.30 does not contain those
+# classes, so they are missing at runtime — not stripped by R8.
+# Fix: both packages are pinned to 57.0.9 in package.json (compiled against the
+# older expo-modules-core we have).  These -dontwarn rules remain as a belt-
+# and-suspenders safety net in case a future transitive bump slips through.
 -dontwarn expo.modules.kotlin.services.**
 -dontwarn expo.modules.kotlin.types.**
 
