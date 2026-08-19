@@ -131,7 +131,8 @@
           "isBackgroundEnabled": true
         }
       ],
-      "./plugins/withFoldableConfigChanges.js"
+      "./plugins/withFoldableConfigChanges.js",
+      "./plugins/withMetaWearables.js"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -29,7 +29,9 @@
         "EXPO_PUBLIC_DOMAIN": "readyloq.com",
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsucmVhZHlsb3EuY29tJA",
         "EXPO_PUBLIC_CLERK_PROXY_URL": "https://readyloq.com/api/__clerk",
-        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
+        "META_APP_ID": "$META_APP_ID",
+        "META_CLIENT_TOKEN": "$META_CLIENT_TOKEN"
       }
     },
     "production": {
@@ -44,7 +46,9 @@
         "EXPO_PUBLIC_DOMAIN": "readyloq.com",
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsucmVhZHlsb3EuY29tJA",
         "EXPO_PUBLIC_CLERK_PROXY_URL": "https://readyloq.com/api/__clerk",
-        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
+        "META_APP_ID": "$META_APP_ID",
+        "META_CLIENT_TOKEN": "$META_CLIENT_TOKEN"
       }
     }
   },
