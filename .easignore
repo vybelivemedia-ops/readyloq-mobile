@@ -7,3 +7,26 @@ node_modules
 **/ios/build
 **/ios/Pods
 **/.expo
+
+# Other artifacts — only artifacts/readyloq-app is needed for the Android build
+artifacts/api-server
+artifacts/readyloq-client
+artifacts/readyloq-portal
+artifacts/readyloq-launch
+artifacts/readyloq-growth-plan
+artifacts/readyloq-marketing
+artifacts/readyloq
+artifacts/mockup-sandbox
+artifacts/readyloq-api
+
+# Attached assets (crash logs, screenshots, etc.) — not referenced by the app
+attached_assets/
+
+# Build outputs inside the app that Metro re-generates from source
+artifacts/readyloq-app/dist
+artifacts/readyloq-app/.expo
+
+# Large build/cache artefacts
+*.log
+*.zip
+**/*.tsbuildinfo
