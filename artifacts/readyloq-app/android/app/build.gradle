@@ -112,7 +112,7 @@ android {
         applicationId 'com.hgwashingllc.readyloqmobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 218
+        versionCode 219
         versionName "1.0.0"
 
         resValue "string", "meta_wearables_application_id", metaWearablesAppId ?: ""
