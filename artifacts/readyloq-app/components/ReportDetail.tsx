@@ -3,7 +3,7 @@ import {
   getGetReportQueryOptions,
   useGenerateReportNarrative,
 } from "@/lib/api-client";
-import type { AiReportNarrative } from "@/lib/api-client";
+import type { AiReportNarrative, Report } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -211,6 +211,16 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
           <Text style={{ color: colors.destructive, fontSize: 14, textAlign: "center" }}>{error}</Text>
         ) : null}
 
+        {/* ── Owner & Management Summary ──────────────────────────────────────
+            Shown whenever there is pipeline value or identified exclusion
+            opportunities so owners and managers can immediately see the
+            financial context of this inspection without reading through all
+            findings first. */}
+        {((report as Report & { pipelineValue?: number }).pipelineValue ?? 0) > 0 ||
+        (report.exclusionOpportunities?.length ?? 0) > 0 ? (
+          <OwnerManagementSummary report={report} colors={colors} />
+        ) : null}
+
         {/* AI narrative */}
         <View style={{ gap: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -323,6 +333,190 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
       <TopBar onBack={() => router.back()} colors={colors} />
       {body}
     </Screen>
+  );
+}
+
+// ─── Owner & Management Summary ───────────────────────────────────────────────
+
+/** Format a dollar amount as $950, $4K, or $1.2M. */
+function fmtMoney(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+  return `$${value.toLocaleString()}`;
+}
+
+/**
+ * Prominent financial + risk summary for owners and management.
+ * Rendered above the AI narrative so the key business data is visible
+ * without scrolling through the full technical findings.
+ */
+function OwnerManagementSummary({
+  report,
+  colors,
+}: {
+  report: Report & { pipelineValue?: number };
+  colors: ReturnType<typeof useColors>;
+}) {
+  const pipelineValue = report.pipelineValue ?? 0;
+  const opportunities = report.exclusionOpportunities ?? [];
+  const sevColor =
+    report.severity === "critical"
+      ? "#F85149"
+      : report.severity === "high"
+        ? "#E3882A"
+        : report.severity === "medium"
+          ? "#D29922"
+          : report.severity === "low"
+            ? "#3FB950"
+            : null;
+
+  return (
+    <View
+      style={{
+        backgroundColor: "#0D1117",
+        borderWidth: 1,
+        borderColor: "#30363D",
+        borderRadius: 14,
+        overflow: "hidden",
+      }}
+    >
+      {/* Header band */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          backgroundColor: "#161B22",
+          borderBottomWidth: 1,
+          borderBottomColor: "#30363D",
+        }}
+      >
+        <Ionicons name="briefcase-outline" size={16} color="#17C4D3" />
+        <Text style={{ color: "#E6EDF3", fontFamily: "Inter_700Bold", fontSize: 14, flex: 1 }}>
+          Owner &amp; Management Summary
+        </Text>
+        {sevColor ? (
+          <View
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 3,
+              borderRadius: 999,
+              backgroundColor: sevColor + "20",
+              borderWidth: 1,
+              borderColor: sevColor + "55",
+            }}
+          >
+            <Text style={{ color: sevColor, fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.5 }}>
+              {report.severity?.toUpperCase()} RISK
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* KPI row */}
+      <View style={{ flexDirection: "row", padding: 16, gap: 12 }}>
+        {/* Pipeline value */}
+        {pipelineValue > 0 ? (
+          <View
+            style={{
+              flex: 1,
+              gap: 4,
+              padding: 12,
+              borderRadius: 10,
+              backgroundColor: "#3FB95014",
+              borderWidth: 1,
+              borderColor: "#3FB95040",
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <Ionicons name="trending-up-outline" size={12} color="#3FB950" />
+              <Text style={{ color: "#8B949E", fontFamily: "Inter_600SemiBold", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Pipeline value
+              </Text>
+            </View>
+            <Text style={{ color: "#3FB950", fontFamily: "Inter_800ExtraBold", fontSize: 22, lineHeight: 26 }}>
+              {fmtMoney(pipelineValue)}
+            </Text>
+            <Text style={{ color: "#8B949E", fontFamily: "Inter_400Regular", fontSize: 11 }}>
+              Est. annual contract
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Exclusion opportunities count */}
+        {opportunities.length > 0 ? (
+          <View
+            style={{
+              flex: 1,
+              gap: 4,
+              padding: 12,
+              borderRadius: 10,
+              backgroundColor: "#17C4D314",
+              borderWidth: 1,
+              borderColor: "#17C4D340",
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <Ionicons name="lock-closed-outline" size={12} color="#17C4D3" />
+              <Text style={{ color: "#8B949E", fontFamily: "Inter_600SemiBold", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Opportunities
+              </Text>
+            </View>
+            <Text style={{ color: "#17C4D3", fontFamily: "Inter_800ExtraBold", fontSize: 22, lineHeight: 26 }}>
+              {opportunities.length}
+            </Text>
+            <Text style={{ color: "#8B949E", fontFamily: "Inter_400Regular", fontSize: 11 }}>
+              Exclusion site{opportunities.length === 1 ? "" : "s"} identified
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Opportunity list */}
+      {opportunities.length > 0 ? (
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingBottom: 16,
+            gap: 8,
+          }}
+        >
+          <Text style={{ color: "#8B949E", fontFamily: "Inter_600SemiBold", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            Identified exclusion opportunities
+          </Text>
+          {opportunities.map((opp, i) => (
+            <View
+              key={i}
+              style={{
+                flexDirection: "row",
+                gap: 8,
+                padding: 10,
+                borderRadius: 8,
+                backgroundColor: "#161B22",
+                borderWidth: 1,
+                borderColor: "#30363D",
+              }}
+            >
+              <Ionicons name="shield-outline" size={14} color="#17C4D3" style={{ marginTop: 1 }} />
+              <Text style={{ color: "#E6EDF3", fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19, flex: 1 }}>
+                {opp}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {/* No-pipeline notice for when the section shows based on opportunities only */}
+      {pipelineValue === 0 && opportunities.length > 0 ? (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+          <Text style={{ color: "#8B949E", fontFamily: "Inter_400Regular", fontSize: 12 }}>
+            Pipeline value will appear once an exclusion opportunity is priced by the system.
+          </Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 

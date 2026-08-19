@@ -186,10 +186,23 @@ function section(title: string, content: string) {
     </div>`;
 }
 
+/**
+ * Map from a finding's imageUrl (the canonical /objects/… storage path) to a
+ * base64-encoded data URI for the evidence photo.  When provided, each finding
+ * card in the HTML report will embed the evidence photo so the document is
+ * fully self-contained for printing and offline viewing.
+ *
+ * The route handler populates this map by downloading each unique image from
+ * private object storage before calling buildServerReportHtml.  Findings whose
+ * imageUrl is absent from the map simply render without a photo.
+ */
+export type FindingImageMap = ReadonlyMap<string, string>;
+
 export function buildServerReportHtml(
   report: Report,
   inspection: Inspection,
   media: MediaRecord[] = [],
+  imageDataMap: FindingImageMap = new Map(),
 ): string {
   const findings = ((report.findings ?? []) as Finding[]).filter(
     (f) => f.category || f.description,
@@ -214,8 +227,19 @@ export function buildServerReportHtml(
             const laser = resolveLaserMeasurement(captureMetadata);
             const measurementHtml = laser ? buildMeasurementStripHtml(laser) : "";
 
+            // Embed the evidence photo when we have a pre-fetched base64 data URI.
+            // The map key is the canonical /objects/… path stored in imageUrl.
+            const evidenceDataUri = f.imageUrl ? imageDataMap.get(f.imageUrl) ?? null : null;
+            const evidenceHtml = evidenceDataUri
+              ? `<div style="margin-bottom:10px">
+                   <img src="${evidenceDataUri}" alt="Evidence photo for ${esc(f.category ?? "finding")}"
+                        style="width:100%;max-height:320px;object-fit:contain;border-radius:6px;background:#f1f5f9;display:block" />
+                 </div>`
+              : "";
+
             return `
           <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:${fb}">
+            ${evidenceHtml}
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
               <strong style="font-size:13px;color:#111827">${esc(f.category ?? "Finding")}</strong>
               ${fsev ? badge(fsev, fc, fb) : ""}

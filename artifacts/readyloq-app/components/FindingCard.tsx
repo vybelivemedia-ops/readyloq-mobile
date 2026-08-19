@@ -1,12 +1,31 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { Finding } from "@/lib/api-client";
 import React, { useState } from "react";
-import { Image, Modal, Pressable, Text, TouchableOpacity, View } from "react-native";
+import { Modal, Pressable, Text, TouchableOpacity, View } from "react-native";
 
+import { AuthedImage } from "@/components/AuthedImage";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { useColors } from "@/hooks/useColors";
 import { confidencePct, formatStatus, severityTone } from "@/constants/inspection";
+
+/**
+ * Normalize a finding's imageUrl to the `/api/storage/objects/…` path that
+ * AuthedImage needs to add auth headers and resolve to a full HTTP URI.
+ *
+ * Two formats can appear in the DB:
+ *   • `/objects/companies/<id>/uploads/<uuid>` — written by the FAIE route
+ *     (storeBase64Image returns the raw storage path without the API prefix)
+ *   • `/api/storage/objects/companies/<id>/uploads/<uuid>` — written by the
+ *     intelligence-AI route (passes the client-side storagePath through as-is)
+ *
+ * AuthedImage prepends API_BASE (e.g. https://domain.com) to any path that
+ * doesn't start with "http", so the path must include the /api/storage prefix.
+ */
+function normalizeImagePath(imageUrl: string): string {
+  if (imageUrl.startsWith("/objects/")) return `/api/storage${imageUrl}`;
+  return imageUrl; // already /api/storage/objects/… or a full http URL
+}
 import {
   resolveLaserMeasurement,
   isBurstMeasurement,
@@ -95,13 +114,17 @@ export function FindingCard({ finding, onReview, savedAction, technicianName, ca
 
   return (
     <Card style={{ gap: 10 }}>
-      {/* Tappable evidence thumbnail — shown only when the finding has an image */}
+      {/* Tappable evidence thumbnail — shown only when the finding has an image.
+          AuthedImage attaches the Clerk bearer token so the private /storage/objects/*
+          endpoint returns the photo instead of 401-ing. normalizeImagePath converts
+          /objects/… paths (written by FAIE) to the /api/storage/objects/… prefix that
+          AuthedImage prepends API_BASE to. */}
       {finding.imageUrl ? (
         <TouchableOpacity onPress={() => setZoomVisible(true)} activeOpacity={0.8}>
-          <Image
-            source={{ uri: finding.imageUrl }}
-            style={{ width: "100%", height: 160, borderRadius: 8, backgroundColor: colors.muted }}
-            resizeMode="cover"
+          <AuthedImage
+            path={normalizeImagePath(finding.imageUrl)}
+            style={{ width: "100%", height: 160, borderRadius: 8 }}
+            contentFit="cover"
           />
         </TouchableOpacity>
       ) : null}
@@ -112,11 +135,13 @@ export function FindingCard({ finding, onReview, savedAction, technicianName, ca
           style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", justifyContent: "center", alignItems: "center" }}
           onPress={() => setZoomVisible(false)}
         >
-          <Image
-            source={{ uri: finding.imageUrl ?? "" }}
-            style={{ width: "92%", height: "75%", borderRadius: 10 }}
-            resizeMode="contain"
-          />
+          {finding.imageUrl ? (
+            <AuthedImage
+              path={normalizeImagePath(finding.imageUrl)}
+              style={{ width: "92%", height: "75%", borderRadius: 10 }}
+              contentFit="contain"
+            />
+          ) : null}
           <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginTop: 14 }}>
             Tap anywhere to close
           </Text>
