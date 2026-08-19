@@ -76012,6 +76012,7 @@ __export(schema_exports, {
   OPPORTUNITY_STATUSES: () => OPPORTUNITY_STATUSES,
   PROPOSAL_STATUSES: () => PROPOSAL_STATUSES,
   READYLOQ_DEFAULT_PROFILE: () => READYLOQ_DEFAULT_PROFILE,
+  RETRYABLE_OUTBOX_STATUSES: () => RETRYABLE_OUTBOX_STATUSES,
   TAXONOMY_CATEGORY_SLUGS: () => TAXONOMY_CATEGORY_SLUGS,
   analysisResultsTable: () => analysisResultsTable,
   baitStationsTable: () => baitStationsTable,
@@ -76027,6 +76028,7 @@ __export(schema_exports, {
   conversations: () => conversations,
   customerSummariesTable: () => customerSummariesTable,
   datasetImagesTable: () => datasetImagesTable,
+  enterpriseOutboxTable: () => enterpriseOutboxTable,
   errorEventsTable: () => errorEventsTable,
   faieTrainingImagesTable: () => faieTrainingImagesTable,
   insertAnalysisResultSchema: () => insertAnalysisResultSchema,
@@ -88824,6 +88826,50 @@ var portalMessagesTable = pgTable(
 var insertPortalMessageSchema = createInsertSchema(
   portalMessagesTable
 ).omit({ id: true, createdAt: true, companyId: true });
+
+// ../../lib/db/src/schema/enterprise-outbox.ts
+var RETRYABLE_OUTBOX_STATUSES = [
+  "QUEUED",
+  "RETRYABLE_FAILURE",
+  "TIMEOUT"
+];
+var enterpriseOutboxTable = pgTable(
+  "enterprise_outbox",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+    /**
+     * Stored as integer FK matching inspectionsTable.id.
+     * The HardenedInspectionPayload.inspectionId string is parsed to int by
+     * OutboxProcessor before insertion.
+     */
+    inspectionId: integer("inspection_id").notNull().references(() => inspectionsTable.id, { onDelete: "cascade" }),
+    /**
+     * Full HardenedInspectionPayload serialised for replay without re-fetching
+     * from the DB.  Treated as opaque JSON — do not query individual fields.
+     */
+    payloadJson: jsonb("payload_json").notNull(),
+    /** Current dispatch status (see OutboxStatus). */
+    status: text("status").$type().notNull().default("QUEUED"),
+    /** HTTP status code from the last attempt (null if QUEUED or network failure). */
+    lastHttpStatus: integer("last_http_status"),
+    /** External error code from the last attempt. */
+    lastErrorCode: text("last_error_code"),
+    /** Human-readable error from the last attempt. */
+    lastErrorMessage: text("last_error_message"),
+    /** Number of dispatch attempts (0 = queued but not yet attempted). */
+    retryCount: integer("retry_count").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    /** Timestamp of the most recent dispatch attempt. */
+    lastAttemptAt: timestamp("last_attempt_at")
+  },
+  (t) => [
+    index("enterprise_outbox_company_idx").on(t.companyId),
+    index("enterprise_outbox_inspection_idx").on(t.inspectionId),
+    // Lets the retry worker efficiently find rows that need re-processing.
+    index("enterprise_outbox_status_created_idx").on(t.status, t.createdAt)
+  ]
+);
 
 // ../../lib/db/src/seed/products.ts
 var SEED_PRODUCTS = [
@@ -110046,7 +110092,7 @@ function section(title, content) {
       ${content}
     </div>`;
 }
-function buildServerReportHtml(report, inspection, media = []) {
+function buildServerReportHtml(report, inspection, media = [], imageDataMap = /* @__PURE__ */ new Map()) {
   const findings = (report.findings ?? []).filter(
     (f) => f.category || f.description
   );
@@ -110062,8 +110108,14 @@ function buildServerReportHtml(report, inspection, media = []) {
     const captureMetadata = lookupCaptureMetadata(media, f.imageUrl);
     const laser = resolveLaserMeasurement(captureMetadata);
     const measurementHtml = laser ? buildMeasurementStripHtml(laser) : "";
+    const evidenceDataUri = f.imageUrl ? imageDataMap.get(f.imageUrl) ?? null : null;
+    const evidenceHtml = evidenceDataUri ? `<div style="margin-bottom:10px">
+                   <img src="${evidenceDataUri}" alt="Evidence photo for ${esc2(f.category ?? "finding")}"
+                        style="width:100%;max-height:320px;object-fit:contain;border-radius:6px;background:#f1f5f9;display:block" />
+                 </div>` : "";
     return `
           <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:${fb}">
+            ${evidenceHtml}
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">
               <strong style="font-size:13px;color:#111827">${esc2(f.category ?? "Finding")}</strong>
               ${fsev ? badge(fsev, fc, fb) : ""}
@@ -110442,7 +110494,30 @@ router6.get("/:id/html", async (req, res) => {
         inArray(inspectionMediaTable.mediaType, ["photo", "image"])
       )
     );
-    const html = buildServerReportHtml(report, inspection, mediaRows);
+    const reportFindings = report.findings ?? [];
+    const uniqueImageUrls = [
+      ...new Set(reportFindings.map((f) => f.imageUrl).filter((u) => !!u))
+    ];
+    const imageDataMap = /* @__PURE__ */ new Map();
+    if (uniqueImageUrls.length > 0) {
+      const objStore = new ObjectStorageService();
+      await Promise.all(
+        uniqueImageUrls.map(async (imageUrl) => {
+          try {
+            const objectFile = await objStore.getObjectEntityFile(imageUrl);
+            const response = await objStore.downloadObject(objectFile);
+            if (!response.ok) return;
+            const buffer = await response.arrayBuffer();
+            const base643 = Buffer.from(buffer).toString("base64");
+            const bytes = new Uint8Array(buffer.slice(0, 4));
+            const mime = bytes[0] === 255 && bytes[1] === 216 ? "image/jpeg" : bytes[0] === 137 && bytes[1] === 80 ? "image/png" : "image/jpeg";
+            imageDataMap.set(imageUrl, `data:${mime};base64,${base643}`);
+          } catch {
+          }
+        })
+      );
+    }
+    const html = buildServerReportHtml(report, inspection, mediaRows, imageDataMap);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "private, max-age=300");
     return res.send(html);
@@ -147604,25 +147679,61 @@ var json2xml_default = Builder;
 // src/services/integration/enterprise-bridge-production.ts
 init_ssrf_safe_fetch();
 import * as crypto5 from "crypto";
-var EnterpriseBridgeProductionService = class {
+var EnterpriseBridgeProductionService = class _EnterpriseBridgeProductionService {
+  // ─── Canonical serialisation ────────────────────────────────────────────
+  /**
+   * Key-sorted JSON serialisation that produces the same string regardless of
+   * the order in which object keys were inserted.  Required for a stable hash:
+   * JSON.stringify key order is implementation-defined and must not be trusted
+   * for cryptographic purposes.
+   */
+  static _stableStringify(value) {
+    if (Array.isArray(value)) {
+      return `[${value.map(_EnterpriseBridgeProductionService._stableStringify).join(",")}]`;
+    }
+    if (value !== null && typeof value === "object") {
+      const keys = Object.keys(value).sort();
+      const pairs = keys.map(
+        (k) => `${JSON.stringify(k)}:${_EnterpriseBridgeProductionService._stableStringify(
+          value[k]
+        )}`
+      );
+      return `{${pairs.join(",")}}`;
+    }
+    return JSON.stringify(value);
+  }
   // ─── Cryptographic hashing ───────────────────────────────────────────────
   /**
    * SHA-256 of the canonical inspection payload (signatures excluded).
-   * Bound into SignatureAudit so any post-signing mutation breaks the hash.
+   * Uses key-sorted serialisation so the hash is stable across runtimes and
+   * object construction order.
+   *
+   * Called with an explicit class reference (not `this`) so a subclass override
+   * cannot silently change the hashing algorithm for all callers of normalizePayload.
    */
   static generateInspectionHash(payload) {
-    const canonical = JSON.stringify(payload);
+    const canonical = _EnterpriseBridgeProductionService._stableStringify(payload);
     return crypto5.createHash("sha256").update(canonical).digest("hex");
   }
   // ─── Payload normalisation ───────────────────────────────────────────────
   /**
-   * Produces the canonical normalised form consumed by both adapters.
-   * Uses explicit measurementId / elementId matching — never array-index coupling.
+   * Produces the canonical NormalizedWorkOrder consumed by both adapters.
+   *
+   * Key invariants:
+   *   • InspectionHash covers everything except signatures — mutation detector.
+   *   • PayloadHash covers the full payload including signatures — proves the
+   *     signature block was not swapped after the inspection was hashed.
+   *   • Measurement lookup uses measurementId only — never crosses into the
+   *     elementId/findingId namespace (different entity types, separate ID spaces).
+   *   • Code is sanitised: spaces → underscores, non-alphanumeric chars stripped.
    */
   static normalizePayload(data) {
     const { signatures, ...restOfPayload } = data;
-    const inspectionHash = this.generateInspectionHash(restOfPayload);
+    const inspectionHash = _EnterpriseBridgeProductionService.generateInspectionHash(restOfPayload);
+    const payloadHash = crypto5.createHash("sha256").update(_EnterpriseBridgeProductionService._stableStringify(data)).digest("hex");
+    const sanitize2 = (s2) => s2.toUpperCase().replace(/\s+/g, "_").replace(/[^A-Z0-9_]/g, "");
     return {
+      CompanyId: data.companyId,
       ExternalWorkOrderId: data.inspectionId,
       LocationReference: {
         PropertyCode: data.propertyId
@@ -147638,25 +147749,28 @@ var EnterpriseBridgeProductionService = class {
         SignedAt: signatures.signedAt,
         SignatureVersion: signatures.signatureVersion,
         InspectionHash: inspectionHash,
-        PayloadHash: inspectionHash
+        PayloadHash: payloadHash
       },
       InspectionFindings: data.aiFindings.map((finding) => {
-        const measurement = data.measurements.find(
-          (m) => m.measurementId === finding.measurementId || m.elementId === finding.findingId
-        );
+        const measurement = finding.measurementId ? data.measurements.find((m) => m.measurementId === finding.measurementId) : void 0;
         return {
-          Code: `${finding.category.toUpperCase()}_${finding.severity.toUpperCase()}`,
+          Code: `${sanitize2(finding.category)}_${sanitize2(finding.severity)}`,
           Description: `AI prediction: '${finding.aiPrediction}'. Confirmed by tech: ${finding.technicianConfirmed}.`,
           VerificationStatus: {
             AiConfidence: finding.confidence,
             TechnicianConfirmed: finding.technicianConfirmed,
             ManagerVerified: finding.managerVerified
           },
-          CustomFields: measurement ? {
-            WidthMm: measurement.widthMm,
-            HeightMm: measurement.heightMm,
-            SurfaceType: measurement.surfaceType
-          } : {},
+          // Use conditional spread so the key is absent (not {}) when there is
+          // no linked measurement — some XML/SOAP parsers treat an empty element
+          // differently from an absent one.
+          ...measurement ? {
+            CustomFields: {
+              WidthMm: measurement.widthMm,
+              HeightMm: measurement.heightMm,
+              SurfaceType: measurement.surfaceType
+            }
+          } : { CustomFields: {} },
           AttachmentUrl: finding.evidencePhotoUrl
         };
       })
@@ -147671,17 +147785,26 @@ var EnterpriseBridgeProductionService = class {
    */
   static async dispatchToSystem(resolvedConfig, payload) {
     if (!resolvedConfig.endpointUrl || !resolvedConfig.decryptedApiKey) {
-      return "INVALID_CONFIGURATION";
+      return {
+        status: "INVALID_CONFIGURATION",
+        errorMessage: "Integration config is missing endpoint URL or API key."
+      };
     }
-    const normalized = this.normalizePayload(payload);
+    const normalized = _EnterpriseBridgeProductionService.normalizePayload(payload);
     try {
       if (resolvedConfig.targetSystem === "pestpac") {
-        return await this._dispatchPestPac(resolvedConfig, normalized);
+        return await _EnterpriseBridgeProductionService._dispatchPestPac(
+          resolvedConfig,
+          normalized
+        );
       } else {
-        return await this._dispatchServSuite(resolvedConfig, normalized);
+        return await _EnterpriseBridgeProductionService._dispatchServSuite(
+          resolvedConfig,
+          normalized
+        );
       }
     } catch (error40) {
-      return this._classifyError(error40);
+      return _EnterpriseBridgeProductionService._classifyError(error40);
     }
   }
   // ─── Private adapter methods ─────────────────────────────────────────────
@@ -147693,15 +147816,14 @@ var EnterpriseBridgeProductionService = class {
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
     <ImportInspectionResult xmlns="http://tempuri.org/">
-      <apiKey>${this._escapeXml(cfg.decryptedApiKey)}</apiKey>
-      <workOrderData>${serializedWorkOrder}</workOrderData>
+      <apiKey>${_EnterpriseBridgeProductionService._escapeXml(cfg.decryptedApiKey)}</apiKey>
+      <workOrderData><![CDATA[${serializedWorkOrder}]]></workOrderData>
     </ImportInspectionResult>
   </soap:Body>
 </soap:Envelope>`;
     const response = await ssrfSafeFetch(operationUrl, {
       method: "POST",
       redirect: "error",
-      // never follow redirects — a redirect could point to a private host
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: "http://tempuri.org/ImportInspectionResult"
@@ -147709,16 +147831,43 @@ var EnterpriseBridgeProductionService = class {
       body: soapEnvelope,
       signal: AbortSignal.timeout(15e3)
     });
-    if (response.status === 401 || response.status === 403) return "UNAUTHORIZED";
-    if (response.status === 400 || response.status === 422) return "PERMANENT_FAILURE";
-    return response.status === 200 ? "DELIVERED" : "RETRYABLE_FAILURE";
+    if (response.status === 401 || response.status === 403) {
+      return {
+        status: "UNAUTHORIZED",
+        httpStatus: response.status,
+        errorCode: "HTTP_UNAUTHORIZED",
+        errorMessage: "PestPac rejected the request at the HTTP level."
+      };
+    }
+    if (response.status === 400 || response.status === 422) {
+      return {
+        status: "PERMANENT_FAILURE",
+        httpStatus: response.status,
+        errorCode: "HTTP_BAD_REQUEST",
+        errorMessage: "PestPac returned a 400/422 \u2014 payload is malformed."
+      };
+    }
+    const responseBody = await response.text();
+    if (responseBody.includes("<soap:Fault>") || responseBody.includes("<faultcode>")) {
+      const isAuthFault = responseBody.includes("InvalidApiKey") || responseBody.includes("Authentication") || responseBody.includes("Unauthorized");
+      return {
+        status: isAuthFault ? "UNAUTHORIZED" : "PERMANENT_FAILURE",
+        httpStatus: response.status,
+        errorCode: "SOAP_FAULT",
+        errorMessage: isAuthFault ? "PestPac SOAP fault: authentication failed. Rotate the API key." : "PestPac SOAP fault: server rejected the payload. Check errorCode for details."
+      };
+    }
+    return response.status === 200 ? { status: "DELIVERED", httpStatus: response.status } : {
+      status: "RETRYABLE_FAILURE",
+      httpStatus: response.status,
+      errorMessage: `PestPac returned unexpected HTTP ${response.status}.`
+    };
   }
   static async _dispatchServSuite(cfg, normalized) {
     const operationUrl = cfg.endpointUrl.replace(/\/$/, "") + "/workorders";
     const response = await ssrfSafeFetch(operationUrl, {
       method: "POST",
       redirect: "error",
-      // never follow redirects — a redirect could point to a private host
       headers: {
         Authorization: `Bearer ${cfg.decryptedApiKey}`,
         "Content-Type": "application/json",
@@ -147727,20 +147876,50 @@ var EnterpriseBridgeProductionService = class {
       body: JSON.stringify(normalized),
       signal: AbortSignal.timeout(1e4)
     });
-    if (response.status === 401 || response.status === 403) return "UNAUTHORIZED";
-    if (response.status === 400 || response.status === 422) return "PERMANENT_FAILURE";
-    return response.status >= 200 && response.status < 300 ? "DELIVERED" : "RETRYABLE_FAILURE";
+    if (response.status === 401 || response.status === 403) {
+      return {
+        status: "UNAUTHORIZED",
+        httpStatus: response.status,
+        errorCode: "HTTP_UNAUTHORIZED",
+        errorMessage: "ServSuite rejected the bearer token."
+      };
+    }
+    if (response.status === 400 || response.status === 422) {
+      return {
+        status: "PERMANENT_FAILURE",
+        httpStatus: response.status,
+        errorCode: "HTTP_BAD_REQUEST",
+        errorMessage: "ServSuite returned a 400/422 \u2014 payload is malformed."
+      };
+    }
+    return response.status >= 200 && response.status < 300 ? { status: "DELIVERED", httpStatus: response.status } : {
+      status: "RETRYABLE_FAILURE",
+      httpStatus: response.status,
+      errorMessage: `ServSuite returned unexpected HTTP ${response.status}.`
+    };
   }
   static _classifyError(error40) {
     if (error40 instanceof Error) {
-      const name = error40.name;
-      if (name === "TimeoutError" || name === "AbortError") return "TIMEOUT";
+      if (error40.name === "TimeoutError" || error40.name === "AbortError") {
+        return {
+          status: "TIMEOUT",
+          errorCode: error40.name,
+          errorMessage: "Request timed out before a response was received."
+        };
+      }
+      return {
+        status: "RETRYABLE_FAILURE",
+        errorMessage: error40.message
+      };
     }
-    return "RETRYABLE_FAILURE";
+    return {
+      status: "RETRYABLE_FAILURE",
+      errorMessage: "An unknown error occurred during dispatch."
+    };
   }
-  /** Full XML special-character escaping (prevents injection into SOAP body). */
+  /** Full XML special-character escaping — prevents injection into SOAP body. */
   static _escapeXml(unsafe) {
-    return unsafe.replace(/[<>&'"]/g, (c) => {
+    return (unsafe ?? "").replace(/[<>&'"]/g, (c) => {
       switch (c) {
         case "<":
           return "&lt;";
@@ -147879,7 +148058,7 @@ var EnterpriseAdapterRouter = class {
     try {
       if (config2.systemType === "pestpac" || config2.systemType === "servsuite") {
         const defaultEndpoint = config2.systemType === "pestpac" ? "https://api.pestpac.com/v1" : "https://api.servsuite.com/v1";
-        outcome = await EnterpriseBridgeProductionService.dispatchToSystem(
+        const dispatchResult = await EnterpriseBridgeProductionService.dispatchToSystem(
           {
             targetSystem: config2.systemType,
             endpointUrl: config2.apiBaseUrl ?? defaultEndpoint,
@@ -147887,9 +148066,10 @@ var EnterpriseAdapterRouter = class {
           },
           hardenedPayload
         );
-        success2 = outcome === "DELIVERED";
+        outcome = dispatchResult.status;
+        success2 = dispatchResult.status === "DELIVERED";
         if (!success2) {
-          errorMessage = `Delivery outcome: ${outcome}`;
+          errorMessage = "errorMessage" in dispatchResult ? dispatchResult.errorMessage : `Delivery outcome: ${dispatchResult.status}`;
         }
       } else if (config2.systemType === "fieldroutes") {
         const photos = mediaRows.filter((m) => (m.mediaType === "photo" || m.mediaType === "image") && m.url).map((m) => ({
