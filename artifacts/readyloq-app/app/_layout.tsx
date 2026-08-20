@@ -21,6 +21,20 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DeviceRegistryProvider } from "@/lib/platform/DeviceRegistryContext";
 
+// Native Text does not allow long-press selection by default. Apply the
+// customer-facing default once at app startup so report details, findings, and
+// other readable content can be copied without every screen having to opt in.
+// A screen can still pass selectable={false} for text that should not select.
+type TextWithDefaults = typeof Text & {
+  defaultProps?: Partial<React.ComponentProps<typeof Text>>;
+};
+
+const textWithDefaults = Text as TextWithDefaults;
+textWithDefaults.defaultProps = {
+  ...textWithDefaults.defaultProps,
+  selectable: true,
+};
+
 // Point the shared API client at the deployment domain (same backend the web
 // app uses). This runs once at module load, before any query fires.
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
