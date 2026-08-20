@@ -7,11 +7,12 @@ import type { AiReportNarrative, Report } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useAuth } from "@clerk/expo";
 
+import { AuthedImage } from "@/components/AuthedImage";
 import { FindingCard } from "@/components/FindingCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -45,6 +46,22 @@ const SYSTEM_LABEL: Record<FieldIntegrationSystem, string> = {
   pestpac: "PestPac",
   fieldroutes: "FieldRoutes",
 };
+
+function normalizeReportImagePath(imageUrl: string): string {
+  return imageUrl.startsWith("/objects/") ? `/api/storage${imageUrl}` : imageUrl;
+}
+
+function splitExclusionOpportunity(opportunity: string) {
+  const separator = opportunity.indexOf(":");
+  if (separator <= 0) {
+    return { type: "Exclusion opportunity", description: opportunity };
+  }
+
+  return {
+    type: opportunity.slice(0, separator).trim() || "Exclusion opportunity",
+    description: opportunity.slice(separator + 1).trim() || opportunity,
+  };
+}
 
 export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
   const colors = useColors();
@@ -359,6 +376,10 @@ function OwnerManagementSummary({
 }) {
   const pipelineValue = report.pipelineValue ?? 0;
   const opportunities = report.exclusionOpportunities ?? [];
+  const [selectedImage, setSelectedImage] = useState<{ path: string; label: string } | null>(null);
+  const exclusionFindings = (report.findings ?? []).filter(
+    (finding) => finding.exclusionOpportunity === true,
+  );
   const sevColor =
     report.severity === "critical"
       ? "#F85149"
@@ -486,25 +507,96 @@ function OwnerManagementSummary({
           <Text style={{ color: "#8B949E", fontFamily: "Inter_600SemiBold", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>
             Identified exclusion opportunities
           </Text>
-          {opportunities.map((opp, i) => (
-            <View
-              key={i}
-              style={{
-                flexDirection: "row",
-                gap: 8,
-                padding: 10,
-                borderRadius: 8,
-                backgroundColor: "#161B22",
-                borderWidth: 1,
-                borderColor: "#30363D",
-              }}
-            >
-              <Ionicons name="shield-outline" size={14} color="#17C4D3" style={{ marginTop: 1 }} />
-              <Text style={{ color: "#E6EDF3", fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19, flex: 1 }}>
-                {opp}
-              </Text>
-            </View>
-          ))}
+          {opportunities.map((opportunity, index) => {
+            const opportunityDetails = splitExclusionOpportunity(opportunity);
+            const finding =
+              exclusionFindings.find(
+                (candidate) =>
+                  `${candidate.category}: ${candidate.description}` === opportunity,
+              ) ?? exclusionFindings[index];
+            const type = finding?.category ?? opportunityDetails.type;
+            const description = finding?.description ?? opportunityDetails.description;
+            const imagePath = finding?.imageUrl
+              ? normalizeReportImagePath(finding.imageUrl)
+              : null;
+
+            return (
+              <View
+                key={finding?.id ?? `${opportunity}-${index}`}
+                style={{
+                  flexDirection: "row",
+                  gap: 10,
+                  padding: 10,
+                  borderRadius: 8,
+                  backgroundColor: "#161B22",
+                  borderWidth: 1,
+                  borderColor: "#30363D",
+                }}
+              >
+                {imagePath ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`View evidence photo for ${type}`}
+                    activeOpacity={0.82}
+                    onPress={() => setSelectedImage({ path: imagePath, label: type })}
+                  >
+                    <AuthedImage
+                      path={imagePath}
+                      style={{ width: 64, height: 64, borderRadius: 6 }}
+                      contentFit="cover"
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <View
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 6,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#21262D",
+                    }}
+                  >
+                    <Ionicons name="image-outline" size={20} color="#8B949E" />
+                  </View>
+                )}
+
+                <View style={{ flex: 1, gap: 5 }}>
+                  <View
+                    style={{
+                      alignSelf: "flex-start",
+                      paddingHorizontal: 7,
+                      paddingVertical: 2,
+                      borderRadius: 999,
+                      backgroundColor: "#17C4D320",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#17C4D3",
+                        fontFamily: "Inter_700Bold",
+                        fontSize: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.4,
+                      }}
+                    >
+                      {type}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      color: "#E6EDF3",
+                      fontFamily: "Inter_400Regular",
+                      fontSize: 13,
+                      lineHeight: 19,
+                    }}
+                  >
+                    {description}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
         </View>
       ) : null}
 
@@ -516,6 +608,59 @@ function OwnerManagementSummary({
           </Text>
         </View>
       ) : null}
+
+      <Modal
+        visible={selectedImage !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedImage(null)}
+      >
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            backgroundColor: "rgba(0, 0, 0, 0.92)",
+          }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close enlarged evidence photo"
+            onPress={() => setSelectedImage(null)}
+            style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+          />
+          {selectedImage ? (
+            <View style={{ width: "100%", height: "82%", alignItems: "center", justifyContent: "center" }}>
+              <AuthedImage
+                path={selectedImage.path}
+                style={{ width: "100%", height: "100%", borderRadius: 10 }}
+                contentFit="contain"
+              />
+              <Text
+                style={{
+                  color: "#E6EDF3",
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 14,
+                  marginTop: 12,
+                }}
+              >
+                {selectedImage.label}
+              </Text>
+              <Text
+                style={{
+                  color: "#8B949E",
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 12,
+                  marginTop: 4,
+                }}
+              >
+                Tap outside the image to close
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 }
