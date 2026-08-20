@@ -11,6 +11,8 @@ export interface CorrectFindingInput {
   findingId: number;
   action: "accept" | "correct" | "dismiss";
   technicianSpecies?: string;
+  updateStrategy?: "keep_existing" | "ai_regenerate";
+  notes?: string;
 }
 
 /**

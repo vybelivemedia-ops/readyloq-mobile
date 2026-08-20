@@ -224,6 +224,79 @@ function parsePrediction(raw: string): AiPrediction | null {
   };
 }
 
+export interface RegeneratedFindingContent {
+  description: string;
+  treatment: string | null;
+}
+
+function boundedGeneratedText(value: unknown, limit: number): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > 0 ? normalized.slice(0, limit) : null;
+}
+
+/**
+ * Produces final, client-facing copy after a technician corrects the species.
+ *
+ * The technician's label is authoritative. This deliberately does not update
+ * the original prediction or its confidence because those fields are needed to
+ * retain a clean AI-to-human training signal.
+ */
+export async function regenerateFindingAfterTechnicianCorrection(input: {
+  category: string;
+  description: string;
+  treatment: string | null;
+  location: string | null;
+  correctedSpecies: string;
+  technicianNotes?: string | null;
+}): Promise<RegeneratedFindingContent | null> {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: MODEL,
+      max_completion_tokens: 8192,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You revise a pest-control inspection finding after an on-site technician " +
+            "has corrected the pest identification. The technician's corrected species is " +
+            "authoritative. Return JSON only. Preserve only evidence supplied in the input; " +
+            "do not invent visible damage, life stages, locations, products, application " +
+            "rates, dilution, or regulatory claims. The treatment field must be concise " +
+            "integrated-pest-management guidance, never chemical instructions. When product " +
+            "use may be appropriate, direct a licensed technician to the approved site " +
+            "protocol and product label.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            task: "Regenerate the final summary and treatment recommendation for this corrected finding.",
+            requiredResponse: {
+              description:
+                "One concise, factual sentence. Clearly identify the technician-verified species and use only supplied evidence.",
+              treatment:
+                "A concise IPM recommendation, or null when no recommendation can be supported from the supplied context.",
+            },
+            finding: input,
+          }),
+        },
+      ],
+    });
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const description = boundedGeneratedText(parsed.description, 800);
+    if (!description) return null;
+    return {
+      description,
+      treatment: boundedGeneratedText(parsed.treatment, 800),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Run the vision model against a stored object path (e.g.
  * `/objects/companies/5/uploads/abc`).

@@ -340,6 +340,7 @@ export interface Finding {
     confidenceLabel?: "identified" | "possible" | "unidentified";
     reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed";
     technicianSpecies?: string | null;
+    technicianCorrectionNotes?: string | null;
 }
 /** A single inspection zone in a coverage snapshot. */
 export interface CoverageZone {

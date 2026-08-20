@@ -131,6 +131,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const [reviewResults, setReviewResults] = useState<Record<number, ReviewAction>>({});
   const [correctingFinding, setCorrectingFinding] = useState<Finding | null>(null);
   const [customSpecies, setCustomSpecies] = useState("");
+  const [correctionNotes, setCorrectionNotes] = useState("");
   const [reviewSaving, setReviewSaving] = useState(false);
   // #110 — full-screen evidence viewer
   const [viewerPath, setViewerPath] = useState<string | null>(null);
@@ -342,6 +343,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
     if (action === "correct") {
       setCorrectingFinding(finding);
       setCustomSpecies(finding.species?.replace(/^Possible:\s*/i, "") ?? "");
+      setCorrectionNotes("");
       return;
     }
     void submitReview(finding.id, action, undefined, finding);
@@ -352,6 +354,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
     action: ReviewAction,
     species?: string,
     finding?: Finding,
+    notes?: string,
   ) => {
     const analysisId = analysis?.id;
     if (!analysisId) return;
@@ -365,7 +368,13 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ findingId, action, technicianSpecies: species }),
+        body: JSON.stringify({
+          findingId,
+          action,
+          technicianSpecies: species,
+          updateStrategy: action === "correct" ? "ai_regenerate" : "keep_existing",
+          notes: action === "correct" ? notes ?? "" : "",
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -401,9 +410,11 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
     const species = customSpecies.trim();
     if (!species) return;
     const finding = correctingFinding;
+    const notes = correctionNotes.trim();
     setCorrectingFinding(null);
     setCustomSpecies("");
-    void submitReview(finding.id, "correct", species, finding);
+    setCorrectionNotes("");
+    void submitReview(finding.id, "correct", species, finding, notes);
   };
 
   let body: React.ReactNode;
@@ -882,6 +893,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
         onRequestClose={() => {
           setCorrectingFinding(null);
           setCustomSpecies("");
+          setCorrectionNotes("");
         }}
       >
         <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}>
@@ -971,11 +983,55 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
               />
             </View>
 
+            <View style={{ gap: 6 }}>
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Notes for AI (optional)
+              </Text>
+              <TextInput
+                value={correctionNotes}
+                onChangeText={setCorrectionNotes}
+                placeholder="On-site context to include in the corrected summary"
+                placeholderTextColor={colors.mutedForeground}
+                multiline
+                maxLength={1000}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 8,
+                  padding: 12,
+                  minHeight: 76,
+                  color: colors.foreground,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 14,
+                  backgroundColor: colors.card,
+                  textAlignVertical: "top",
+                }}
+              />
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 12,
+                }}
+              >
+                The final summary and IPM treatment guidance will refresh before the correction is saved.
+              </Text>
+            </View>
+
             <View style={{ flexDirection: "row", gap: 10 }}>
               <Pressable
                 onPress={() => {
                   setCorrectingFinding(null);
                   setCustomSpecies("");
+                  setCorrectionNotes("");
                 }}
                 style={{
                   flex: 1,
@@ -1006,7 +1062,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                 }}
               >
                 <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
-                  {reviewSaving ? "Saving…" : "Save Correction"}
+                  {reviewSaving ? "Regenerating…" : "Save & Regenerate"}
                 </Text>
               </Pressable>
             </View>

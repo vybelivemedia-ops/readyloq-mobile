@@ -98,6 +98,9 @@ export interface Finding {
   // RLQ-001: species the technician selected / typed during review.
   // Only set when reviewStatus = "corrected".
   technicianSpecies?: string | null;
+  // Optional context supplied by the technician when correcting a finding.
+  // Kept with the reviewed finding so the revised client-facing copy is auditable.
+  technicianCorrectionNotes?: string | null;
 }
 
 /** A single inspection zone in a coverage snapshot. */

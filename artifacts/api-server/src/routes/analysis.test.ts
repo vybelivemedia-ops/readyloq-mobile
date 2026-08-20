@@ -558,6 +558,49 @@ describe("PATCH /analysis/:id/findings/correct — write-boundary finding valida
     expect(findings[0].reviewStatus).toBe("accepted");
   });
 
+  it("persists technician context without overwriting the original AI confidence", async () => {
+    asUser(OWNER_ID);
+    const original = validFinding({ id: 1, confidence: 0.42, description: "Small insect evidence near sink." });
+    const res = await request(app)
+      .post("/api/analysis")
+      .send({ inspectionId, findings: [original] });
+    expect(res.status).toBe(201);
+
+    const patch = await request(app)
+      .patch(`/api/analysis/${res.body.id}/findings/correct`)
+      .send({
+        findingId: 1,
+        action: "correct",
+        technicianSpecies: "German Cockroach",
+        updateStrategy: "keep_existing",
+        notes: "Observed live adults in the cabinet hinge.",
+      });
+    expect(patch.status).toBe(200);
+
+    const finding = (patch.body.findings as Array<Record<string, unknown>>)[0];
+    expect(finding.reviewStatus).toBe("corrected");
+    expect(finding.technicianSpecies).toBe("German Cockroach");
+    expect(finding.technicianCorrectionNotes).toBe(
+      "Observed live adults in the cabinet hinge.",
+    );
+    expect(finding.confidence).toBe(0.42);
+    expect(finding.description).toBe("Small insect evidence near sink.");
+  });
+
+  it("rejects AI regeneration when the finding is not being corrected", async () => {
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis")
+      .send({ inspectionId, findings: [validFinding({ id: 1 })] });
+    expect(res.status).toBe(201);
+
+    const patch = await request(app)
+      .patch(`/api/analysis/${res.body.id}/findings/correct`)
+      .send({ findingId: 1, action: "accept", updateStrategy: "ai_regenerate" });
+    expect(patch.status).toBe(400);
+    expect(patch.body.error).toBe("updateStrategy only applies when action is correct");
+  });
+
   it("strips a pre-existing invalid finding when the valid finding is corrected", async () => {
     asUser(OWNER_ID);
 

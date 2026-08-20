@@ -107603,6 +107603,48 @@ function parsePrediction(raw) {
     pestCandidates
   };
 }
+function boundedGeneratedText(value, limit3) {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > 0 ? normalized.slice(0, limit3) : null;
+}
+async function regenerateFindingAfterTechnicianCorrection(input) {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: MODEL4,
+      max_completion_tokens: 8192,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "You revise a pest-control inspection finding after an on-site technician has corrected the pest identification. The technician's corrected species is authoritative. Return JSON only. Preserve only evidence supplied in the input; do not invent visible damage, life stages, locations, products, application rates, dilution, or regulatory claims. The treatment field must be concise integrated-pest-management guidance, never chemical instructions. When product use may be appropriate, direct a licensed technician to the approved site protocol and product label."
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            task: "Regenerate the final summary and treatment recommendation for this corrected finding.",
+            requiredResponse: {
+              description: "One concise, factual sentence. Clearly identify the technician-verified species and use only supplied evidence.",
+              treatment: "A concise IPM recommendation, or null when no recommendation can be supported from the supplied context."
+            },
+            finding: input
+          })
+        }
+      ]
+    });
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const description = boundedGeneratedText(parsed.description, 800);
+    if (!description) return null;
+    return {
+      description,
+      treatment: boundedGeneratedText(parsed.treatment, 800)
+    };
+  } catch {
+    return null;
+  }
+}
 async function analyzePhoto(objectPath, technicianNote) {
   try {
     const dataUrl = await objectToDataUrl(objectPath);
@@ -108366,7 +108408,8 @@ var findingSchema = external_exports.object({
   candidates: external_exports.array(external_exports.object({ species: external_exports.string(), confidence: external_exports.number() })).optional(),
   confidenceLabel: external_exports.enum(["identified", "possible", "unidentified"]).optional(),
   reviewStatus: external_exports.enum(["pending", "accepted", "corrected", "dismissed"]).optional(),
-  technicianSpecies: external_exports.string().nullable().optional()
+  technicianSpecies: external_exports.string().nullable().optional(),
+  technicianCorrectionNotes: external_exports.string().nullable().optional()
 });
 function validateFindings(raw, context) {
   if (!Array.isArray(raw)) return [[], 0];
@@ -108831,7 +108874,7 @@ router3.patch("/:id/findings/correct", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
-    const { findingId, action, technicianSpecies } = req.body;
+    const { findingId, action, technicianSpecies, updateStrategy: rawUpdateStrategy, notes } = req.body;
     if (findingId == null || !action) {
       return res.status(400).json({ error: "findingId and action are required" });
     }
@@ -108841,16 +108884,46 @@ router3.patch("/:id/findings/correct", async (req, res) => {
     if (action === "correct" && !technicianSpecies?.trim()) {
       return res.status(400).json({ error: "technicianSpecies is required when action is correct" });
     }
+    const updateStrategy = rawUpdateStrategy ?? "keep_existing";
+    if (!["keep_existing", "ai_regenerate"].includes(updateStrategy)) {
+      return res.status(400).json({ error: "updateStrategy must be keep_existing or ai_regenerate" });
+    }
+    if (action !== "correct" && updateStrategy !== "keep_existing") {
+      return res.status(400).json({ error: "updateStrategy only applies when action is correct" });
+    }
+    if (notes !== void 0 && typeof notes !== "string") {
+      return res.status(400).json({ error: "notes must be a string" });
+    }
+    if (typeof notes === "string" && notes.length > 1e3) {
+      return res.status(400).json({ error: "notes must be 1000 characters or fewer" });
+    }
     const [row] = await db.select().from(analysisResultsTable).where(and(eq(analysisResultsTable.id, id), eq(analysisResultsTable.companyId, companyId)));
     if (!row) return res.status(404).json({ error: "Not found" });
     const findings = row.findings ?? [];
     const idx = findings.findIndex((f) => f.id === findingId);
     if (idx === -1) return res.status(404).json({ error: "Finding not found" });
     const reviewStatus = action === "accept" ? "accepted" : action === "correct" ? "corrected" : "dismissed";
+    const correctionNotes = typeof notes === "string" ? notes.trim() : "";
+    const regenerated = action === "correct" && updateStrategy === "ai_regenerate" ? await regenerateFindingAfterTechnicianCorrection({
+      category: findings[idx].category,
+      description: findings[idx].description,
+      treatment: findings[idx].treatment,
+      location: findings[idx].location,
+      correctedSpecies: technicianSpecies.trim(),
+      technicianNotes: correctionNotes || null
+    }) : null;
+    if (action === "correct" && updateStrategy === "ai_regenerate" && !regenerated) {
+      return res.status(502).json({
+        error: "Could not regenerate the corrected finding. Please try again."
+      });
+    }
     const updatedFinding = {
       ...findings[idx],
       reviewStatus,
-      technicianSpecies: action === "correct" ? technicianSpecies?.trim() ?? null : findings[idx].technicianSpecies ?? null
+      technicianSpecies: action === "correct" ? technicianSpecies?.trim() ?? null : findings[idx].technicianSpecies ?? null,
+      technicianCorrectionNotes: action === "correct" ? correctionNotes || null : findings[idx].technicianCorrectionNotes ?? null,
+      description: regenerated?.description ?? findings[idx].description,
+      treatment: regenerated ? regenerated.treatment : findings[idx].treatment
     };
     const rawUpdatedFindings = [
       ...findings.slice(0, idx),
@@ -108892,7 +108965,7 @@ router3.patch("/:id/findings/correct", async (req, res) => {
         // Ground-truth label after technician review.
         category: action !== "dismiss" ? f.category ?? null : null,
         possiblePest: action === "correct" ? technicianSpecies?.trim() ?? null : action === "accept" ? f.species ?? null : null,
-        correctiveAction: f.treatment ?? null,
+        correctiveAction: updatedFinding.treatment ?? null,
         aiCorrected: action === "correct",
         // L2 = technician review (L1 = AI only, L3 = peer-confirmed, L4/L5 = manager).
         verificationLevel: 2,

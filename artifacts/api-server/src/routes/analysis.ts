@@ -13,7 +13,10 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
-import { analyzePhoto } from "../lib/intelligence-ai";
+import {
+  analyzePhoto,
+  regenerateFindingAfterTechnicianCorrection,
+} from "../lib/intelligence-ai";
 import { runOpportunitySynthesis } from "../lib/opportunity-ai";
 import { runScorecardComputation } from "../lib/scorecard";
 import { objectPathCompanyScope, ObjectStorageService } from "../lib/objectStorage";
@@ -66,6 +69,7 @@ const findingSchema = z.object({
   confidenceLabel: z.enum(["identified", "possible", "unidentified"]).optional(),
   reviewStatus: z.enum(["pending", "accepted", "corrected", "dismissed"]).optional(),
   technicianSpecies: z.string().nullable().optional(),
+  technicianCorrectionNotes: z.string().nullable().optional(),
 });
 
 /**
@@ -875,10 +879,12 @@ router.patch("/:id/findings/correct", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
-    const { findingId, action, technicianSpecies } = req.body as {
+    const { findingId, action, technicianSpecies, updateStrategy: rawUpdateStrategy, notes } = req.body as {
       findingId?: number;
       action?: "accept" | "correct" | "dismiss";
       technicianSpecies?: string;
+      updateStrategy?: "keep_existing" | "ai_regenerate";
+      notes?: string;
     };
     if (findingId == null || !action) {
       return res.status(400).json({ error: "findingId and action are required" });
@@ -888,6 +894,19 @@ router.patch("/:id/findings/correct", async (req, res) => {
     }
     if (action === "correct" && !technicianSpecies?.trim()) {
       return res.status(400).json({ error: "technicianSpecies is required when action is correct" });
+    }
+    const updateStrategy = rawUpdateStrategy ?? "keep_existing";
+    if (!["keep_existing", "ai_regenerate"].includes(updateStrategy)) {
+      return res.status(400).json({ error: "updateStrategy must be keep_existing or ai_regenerate" });
+    }
+    if (action !== "correct" && updateStrategy !== "keep_existing") {
+      return res.status(400).json({ error: "updateStrategy only applies when action is correct" });
+    }
+    if (notes !== undefined && typeof notes !== "string") {
+      return res.status(400).json({ error: "notes must be a string" });
+    }
+    if (typeof notes === "string" && notes.length > 1000) {
+      return res.status(400).json({ error: "notes must be 1000 characters or fewer" });
     }
 
     const [row] = await db
@@ -902,6 +921,23 @@ router.patch("/:id/findings/correct", async (req, res) => {
 
     const reviewStatus: Finding["reviewStatus"] =
       action === "accept" ? "accepted" : action === "correct" ? "corrected" : "dismissed";
+    const correctionNotes = typeof notes === "string" ? notes.trim() : "";
+    const regenerated =
+      action === "correct" && updateStrategy === "ai_regenerate"
+        ? await regenerateFindingAfterTechnicianCorrection({
+            category: findings[idx].category,
+            description: findings[idx].description,
+            treatment: findings[idx].treatment,
+            location: findings[idx].location,
+            correctedSpecies: technicianSpecies!.trim(),
+            technicianNotes: correctionNotes || null,
+          })
+        : null;
+    if (action === "correct" && updateStrategy === "ai_regenerate" && !regenerated) {
+      return res.status(502).json({
+        error: "Could not regenerate the corrected finding. Please try again.",
+      });
+    }
 
     const updatedFinding: Finding = {
       ...findings[idx],
@@ -910,6 +946,12 @@ router.patch("/:id/findings/correct", async (req, res) => {
         action === "correct"
           ? (technicianSpecies?.trim() ?? null)
           : (findings[idx].technicianSpecies ?? null),
+      technicianCorrectionNotes:
+        action === "correct"
+          ? (correctionNotes || null)
+          : (findings[idx].technicianCorrectionNotes ?? null),
+      description: regenerated?.description ?? findings[idx].description,
+      treatment: regenerated ? regenerated.treatment : findings[idx].treatment,
     };
     const rawUpdatedFindings = [
       ...findings.slice(0, idx),
@@ -974,7 +1016,7 @@ router.patch("/:id/findings/correct", async (req, res) => {
               : action === "accept"
                 ? (f.species ?? null)
                 : null,
-          correctiveAction: f.treatment ?? null,
+          correctiveAction: updatedFinding.treatment ?? null,
           aiCorrected: action === "correct",
           // L2 = technician review (L1 = AI only, L3 = peer-confirmed, L4/L5 = manager).
           verificationLevel: 2,

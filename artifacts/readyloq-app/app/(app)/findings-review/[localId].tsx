@@ -28,6 +28,7 @@ type ReviewAction = "accepted" | "corrected" | "dismissed";
 interface LocalReview {
   action: ReviewAction;
   technicianSpecies?: string;
+  correctionNotes?: string;
 }
 
 export default function FindingsReviewScreen() {
@@ -52,7 +53,9 @@ export default function FindingsReviewScreen() {
   const [reviews, setReviews] = useState<Record<number, LocalReview>>({});
   const [correcting, setCorrecting] = useState<Finding | null>(null);
   const [customSpecies, setCustomSpecies] = useState("");
+  const [correctionNotes, setCorrectionNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const allReviewed = useMemo(
     () => findings.length > 0 && findings.every((f) => f.id in reviews),
@@ -61,8 +64,16 @@ export default function FindingsReviewScreen() {
   const reviewedCount = Object.keys(reviews).length;
 
   const applyReview = useCallback(
-    (finding: Finding, action: ReviewAction, technicianSpecies?: string) => {
-      setReviews((prev) => ({ ...prev, [finding.id]: { action, technicianSpecies } }));
+    (
+      finding: Finding,
+      action: ReviewAction,
+      technicianSpecies?: string,
+      notes?: string,
+    ) => {
+      setReviews((prev) => ({
+        ...prev,
+        [finding.id]: { action, technicianSpecies, correctionNotes: notes },
+      }));
     },
     [],
   );
@@ -71,17 +82,19 @@ export default function FindingsReviewScreen() {
     if (!correcting) return;
     const species = customSpecies.trim();
     if (!species) return;
-    applyReview(correcting, "corrected", species);
+    applyReview(correcting, "corrected", species, correctionNotes.trim());
     setCorrecting(null);
     setCustomSpecies("");
-  }, [correcting, customSpecies, applyReview]);
+    setCorrectionNotes("");
+  }, [correcting, customSpecies, correctionNotes, applyReview]);
 
   const handleDone = async () => {
     if (!analysis?.id || saving) return;
     setSaving(true);
+    setSaveError(null);
     try {
       const token = await getToken();
-      await Promise.allSettled(
+      await Promise.all(
         Object.entries(reviews).map(([findingId, review]) =>
           fetch(`${API_BASE}/api/analysis/${analysis.id}/findings/correct`, {
             method: "PATCH",
@@ -98,21 +111,27 @@ export default function FindingsReviewScreen() {
                     ? "dismiss"
                     : "correct",
               technicianSpecies: review.technicianSpecies,
+              updateStrategy:
+                review.action === "corrected" ? "ai_regenerate" : "keep_existing",
+              notes: review.action === "corrected" ? review.correctionNotes ?? "" : "",
             }),
+          }).then(async (response) => {
+            if (response.ok) return;
+            const body = (await response.json().catch(() => ({}))) as { error?: string };
+            throw new Error(body.error ?? "Failed to save review");
           }),
         ),
       );
-    } catch {
-      // best-effort; corrections are stored server-side
-    }
-    try {
       await updateLocalInspection(params.localId, (r) => {
         r.allFindingsReviewed = true;
       });
       await queryClient.invalidateQueries();
-    } catch {}
-    setSaving(false);
-    router.back();
+      router.back();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to save review");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const confidenceColor = (label?: string | null) => {
@@ -528,6 +547,19 @@ export default function FindingsReviewScreen() {
           borderTopColor: colors.border,
         }}
       >
+        {saveError ? (
+          <Text
+            style={{
+              color: colors.destructive,
+              fontFamily: "Inter_400Regular",
+              fontSize: 13,
+              marginBottom: 8,
+              textAlign: "center",
+            }}
+          >
+            {saveError}
+          </Text>
+        ) : null}
         <Button
           title={
             saving
@@ -547,7 +579,11 @@ export default function FindingsReviewScreen() {
         visible={correcting !== null}
         transparent
         animationType="slide"
-        onRequestClose={() => setCorrecting(null)}
+        onRequestClose={() => {
+          setCorrecting(null);
+          setCustomSpecies("");
+          setCorrectionNotes("");
+        }}
       >
         <View
           style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" }}
@@ -652,11 +688,58 @@ export default function FindingsReviewScreen() {
               />
             </View>
 
+            <View style={{ gap: 6 }}>
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Notes for AI (optional)
+              </Text>
+              <TextInput
+                value={correctionNotes}
+                onChangeText={setCorrectionNotes}
+                placeholder="On-site context to include in the corrected summary"
+                placeholderTextColor={colors.mutedForeground}
+                multiline
+                maxLength={1000}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 8,
+                  padding: 12,
+                  minHeight: 76,
+                  color: colors.foreground,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 14,
+                  backgroundColor: colors.card,
+                  textAlignVertical: "top",
+                }}
+              />
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 12,
+                }}
+              >
+                The final summary and IPM treatment guidance will refresh when you finish the review.
+              </Text>
+            </View>
+
             <View style={{ flexDirection: "row", gap: 10 }}>
               <Button
                 title="Cancel"
                 variant="outline"
-                onPress={() => setCorrecting(null)}
+                onPress={() => {
+                  setCorrecting(null);
+                  setCustomSpecies("");
+                  setCorrectionNotes("");
+                }}
                 style={{ flex: 1 }}
               />
               <Button
