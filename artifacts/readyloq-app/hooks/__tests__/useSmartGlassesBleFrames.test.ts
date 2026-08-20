@@ -1560,11 +1560,12 @@ describe("useSmartGlassesBleFrames — persisted drop count reset across backgro
     // Confirm the remounted hook picked up the persisted count.
     expect(result2.current.droppedFrameCount).toBe(5);
 
-    // ── BLE reconnect: disconnected → connected ───────────────────────────────
-    // Transition through disconnected so the hook's subscriber sees
+    // ── BLE reconnect: idle → connected ───────────────────────────────────────
+    // The driver uses idle to represent a dropped connection. Transition through
+    // it so the hook's subscriber sees
     // !wasConnected → nowConnected and arms pendingReconnectRef.
     await act(async () => {
-      mockBle.setConnectionState("disconnected");
+      mockBle.setConnectionState("idle");
       mockBle.setConnectionState("connected");
       await flushMicrotasks(50);
     });
@@ -1612,7 +1613,7 @@ describe("useSmartGlassesBleFrames — persisted drop count reset across backgro
 
     // ── Disconnect → connect transition ──────────────────────────────────────
     await act(async () => {
-      mockBle.setConnectionState("disconnected");
+      mockBle.setConnectionState("idle");
       mockBle.setConnectionState("connected");
       await flushMicrotasks(50);
     });
@@ -1674,7 +1675,7 @@ describe("useSmartGlassesBleFrames — persisted drop count reset across backgro
 
     // ── Disconnect → connect transition: droppedAtReconnect captured as 4 ─────
     await act(async () => {
-      mockBle.setConnectionState("disconnected");
+      mockBle.setConnectionState("idle");
       mockBle.setConnectionState("connected");
       await flushMicrotasks(20);
     });

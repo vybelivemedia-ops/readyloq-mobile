@@ -19,7 +19,9 @@
 
 // ─── Mocks (hoisted so they run before any import) ────────────────────────────
 
-const mockGetToken = vi.hoisted(() => vi.fn<[], Promise<string>>().mockResolvedValue("test-bearer-token"));
+const mockGetToken = vi.hoisted(() =>
+  vi.fn((): Promise<string> => Promise.resolve("test-bearer-token")),
+);
 
 vi.mock("@clerk/expo", () => ({
   useAuth: () => ({ getToken: mockGetToken }),

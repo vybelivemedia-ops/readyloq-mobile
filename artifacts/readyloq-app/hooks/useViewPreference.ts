@@ -26,7 +26,7 @@ const STORAGE_KEY = "@readyloq/view_mode";
 
 // Tiny inline emitter — avoids importing Node's `events` module which is not
 // available in React Native's Metro bundler on EAS cloud builds.
-type Listener = (...args: unknown[]) => void;
+type Listener = (mode: ViewMode | null) => void;
 const listeners: Map<string, Set<Listener>> = new Map();
 const emitter = {
   on(event: string, fn: Listener) {
@@ -36,8 +36,8 @@ const emitter = {
   off(event: string, fn: Listener) {
     listeners.get(event)?.delete(fn);
   },
-  emit(event: string, ...args: unknown[]) {
-    listeners.get(event)?.forEach((fn) => fn(...args));
+  emit(event: string, mode: ViewMode | null) {
+    listeners.get(event)?.forEach((fn) => fn(mode));
   },
 };
 const CHANGE_EVENT = "viewModeChanged";

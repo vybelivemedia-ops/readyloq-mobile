@@ -46,6 +46,6 @@ export function assertFiniteDimensions(result: BurstDimensions): void {
  * in handleStampMeasureResult — false prevents setLastMeasurementReading() from
  * being called for a non-finite result.
  */
-export function isStampableResult(result: BurstDimensions | null): boolean {
+export function isStampableResult<T extends BurstDimensions>(result: T | null): result is T {
   return result !== null && Number.isFinite(result.widthInches);
 }
