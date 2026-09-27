@@ -10,6 +10,7 @@ import { ClerkProvider } from "@clerk/clerk-react";
 import Home from "@/pages/home";
 import Features from "@/pages/features";
 import Solutions from "@/pages/solutions";
+import Pricing from "@/pages/pricing";
 import Demo from "@/pages/demo";
 import Contact from "@/pages/contact";
 import Privacy from "@/pages/privacy";
@@ -34,6 +35,7 @@ function Router() {
             <Route path="/" component={Home} />
             <Route path="/features" component={Features} />
             <Route path="/solutions" component={Solutions} />
+            <Route path="/pricing" component={Pricing} />
             <Route path="/demo" component={Demo} />
             <Route path="/contact" component={Contact} />
             <Route path="/privacy" component={Privacy} />

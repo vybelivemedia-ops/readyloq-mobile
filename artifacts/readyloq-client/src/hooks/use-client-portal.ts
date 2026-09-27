@@ -40,6 +40,19 @@ export interface ClientInspection {
   ownerSigned: boolean;
 }
 
+export interface ClientInspectionMedia {
+  id: number;
+  mediaType: 'photo' | 'image' | string;
+  filename: string | null;
+  caption: string | null;
+  captureSource: string;
+  qualityScore: number | null;
+  zoomSubject: string | null;
+  capturedAt: string;
+  /** Client-scoped URL; the underlying storage path is never exposed. */
+  imageUrl: string;
+}
+
 export interface ClientReport {
   id: number;
   inspectionId: number;
@@ -127,6 +140,15 @@ export function useClientInspections(address: string) {
     queryFn: () =>
       apiFetch(`/client/buildings/${encodeURIComponent(address)}/inspections`),
     enabled: !!address,
+  });
+}
+
+export function useClientInspectionMedia(inspectionId: number | null) {
+  return useQuery<ClientInspectionMedia[]>({
+    queryKey: ['client', 'inspections', inspectionId, 'media'],
+    queryFn: () => apiFetch(`/client/inspections/${inspectionId}/media`),
+    enabled: inspectionId != null,
+    staleTime: 60_000,
   });
 }
 

@@ -107,6 +107,11 @@ export const productLabelRulesTable = pgTable("product_label_rules", {
   /** Restricted-entry interval in hours (how long after application before
    *  re-entry without PPE). */
   reEntryIntervalHours: real("re_entry_interval_hours"),
+  /** Minimum whole days that must pass before this product may legally be
+   *  reapplied to the SAME site. Distinct from reEntryIntervalHours (a human
+   *  safety window measured in hours); this is a label-defined retreatment
+   *  interval measured in days. Null when the label sets no such minimum. */
+  retreatmentIntervalDays: integer("retreatment_interval_days"),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

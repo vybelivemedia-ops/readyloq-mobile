@@ -132,6 +132,22 @@ export class ObjectStorageService {
   }
 
   async getObjectEntityFile(objectPath: string): Promise<File> {
+    const objectFile = this.getObjectEntityFileHandle(objectPath);
+    const [exists] = await objectFile.exists();
+    if (!exists) {
+      throw new ObjectNotFoundError();
+    }
+    return objectFile;
+  }
+
+  /**
+   * Return the object handle after validating its canonical entity path.
+   *
+   * This deliberately does not call exists(). Callers that are going to read
+   * the object can let the read establish existence, avoiding a separate
+   * unbounded metadata request before the bounded read.
+   */
+  getObjectEntityFileHandle(objectPath: string): File {
     if (!objectPath.startsWith("/objects/")) {
       throw new ObjectNotFoundError();
     }
@@ -148,13 +164,7 @@ export class ObjectStorageService {
     }
     const objectEntityPath = `${entityDir}${entityId}`;
     const { bucketName, objectName } = parseObjectPath(objectEntityPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const objectFile = bucket.file(objectName);
-    const [exists] = await objectFile.exists();
-    if (!exists) {
-      throw new ObjectNotFoundError();
-    }
-    return objectFile;
+    return objectStorageClient.bucket(bucketName).file(objectName);
   }
 
   normalizeObjectEntityPath(rawPath: string): string {

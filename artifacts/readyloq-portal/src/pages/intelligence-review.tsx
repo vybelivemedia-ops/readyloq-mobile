@@ -23,6 +23,7 @@ import {
   Pencil,
   ChevronDown,
   ChevronUp,
+  Video,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -188,7 +189,7 @@ export function IntelligenceReview() {
   const [comment, setComment] = useState('');
   const [page, setPage] = useState(1);
   const [editOpen, setEditOpen] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxItem, setLightboxItem] = useState<{ url: string; mediaType: 'photo' | 'video' } | null>(null);
   const [edits, setEdits] = useState<LabelEdits>({
     category: '',
     subcategory: '',
@@ -219,13 +220,13 @@ export function IntelligenceReview() {
   }, [selected?.id]);
 
   // Close lightbox on Escape.
-  const closeLightbox = useCallback(() => setLightboxUrl(null), []);
+  const closeLightbox = useCallback(() => setLightboxItem(null), []);
   useEffect(() => {
-    if (!lightboxUrl) return;
+    if (!lightboxItem) return;
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeLightbox(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [lightboxUrl, closeLightbox]);
+  }, [lightboxItem, closeLightbox]);
 
   const selectedCategory = categories.find((c) => c.slug === edits.category);
   const subcategoryOptions = selectedCategory?.subcategories ?? [];
@@ -336,14 +337,20 @@ export function IntelligenceReview() {
                   {/* Thumbnail — opens lightbox */}
                   <button
                     className="group/thumb relative shrink-0 m-3 rounded-md overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    onClick={() => setLightboxUrl(r.imageUrl)}
-                    aria-label="View full-size image"
+                    onClick={() => setLightboxItem({ url: r.imageUrl, mediaType: r.mediaType ?? 'photo' })}
+                    aria-label={r.mediaType === 'video' ? 'Play full-size video' : 'View full-size image'}
                   >
-                    <img
-                      src={r.thumbnailUrl ?? r.imageUrl}
-                      alt=""
-                      className="w-14 h-14 object-cover bg-muted block"
-                    />
+                    {r.mediaType === 'video' ? (
+                      <div className="w-14 h-14 flex items-center justify-center bg-muted">
+                        <Video className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <img
+                        src={r.thumbnailUrl ?? r.imageUrl}
+                        alt=""
+                        className="w-14 h-14 object-cover bg-muted block"
+                      />
+                    )}
                     <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/thumb:bg-black/40 transition-colors rounded-md">
                       <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
                     </div>
@@ -413,20 +420,28 @@ export function IntelligenceReview() {
                   </div>
                 </div>
 
-                <button
-                  className="group/mainimg relative w-full block rounded-lg overflow-hidden bg-black/40"
-                  onClick={() => setLightboxUrl(selected.imageUrl)}
-                  aria-label="View full-size image"
-                >
-                  <img
+                {selected.mediaType === 'video' ? (
+                  <video
                     src={selected.imageUrl}
-                    alt="Finding"
-                    className="w-full max-h-96 object-contain"
+                    controls
+                    className="w-full max-h-96 rounded-lg bg-black/40"
                   />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/mainimg:bg-black/30 transition-colors">
-                    <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover/mainimg:opacity-100 transition-opacity drop-shadow-lg" />
-                  </div>
-                </button>
+                ) : (
+                  <button
+                    className="group/mainimg relative w-full block rounded-lg overflow-hidden bg-black/40"
+                    onClick={() => setLightboxItem({ url: selected.imageUrl, mediaType: 'photo' })}
+                    aria-label="View full-size image"
+                  >
+                    <img
+                      src={selected.imageUrl}
+                      alt="Finding"
+                      className="w-full max-h-96 object-contain"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/mainimg:bg-black/30 transition-colors">
+                      <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover/mainimg:opacity-100 transition-opacity drop-shadow-lg" />
+                    </div>
+                  </button>
+                )}
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -690,13 +705,13 @@ export function IntelligenceReview() {
       )}
 
       {/* ── Lightbox ────────────────────────────────────────────────────── */}
-      {lightboxUrl && (
+      {lightboxItem && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
           onClick={closeLightbox}
           role="dialog"
           aria-modal="true"
-          aria-label="Full-size evidence photo"
+          aria-label={lightboxItem.mediaType === 'video' ? 'Full-size evidence video' : 'Full-size evidence photo'}
         >
           <button
             className="absolute top-4 right-4 z-10 flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 text-white text-sm font-medium transition-colors"
@@ -705,12 +720,22 @@ export function IntelligenceReview() {
           >
             <X className="w-4 h-4" /> Close
           </button>
-          <img
-            src={lightboxUrl}
-            alt="Full-size evidence photo"
-            className="max-w-[92vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
+          {lightboxItem.mediaType === 'video' ? (
+            <video
+              src={lightboxItem.url}
+              controls
+              autoPlay
+              className="max-w-[92vw] max-h-[90vh] rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img
+              src={lightboxItem.url}
+              alt="Full-size evidence photo"
+              className="max-w-[92vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
         </div>
       )}
     </div>

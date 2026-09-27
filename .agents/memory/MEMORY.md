@@ -1,3 +1,4 @@
+- [iOS device testing reminder](ios-device-testing.md) — user wants to be reminded when iOS issues are resolved and device testing is due
 - [Metro vite/vitest blockList](metro-vite-blockList.md) — four regexes must stay in metro.config.js or builds fail at ~2279 modules with module-runner.js SyntaxError
 - [ReadyLoq Architecture](readyloq-architecture.md) — stack, conventions, API routes, real-capture/no-simulation beta model (0–1 confidence, batched AI), Wouter base path fix
 - [ReadyLoq multi-tenancy](readyloq-multitenancy.md) — per-company isolation rules, reserved platform/legacy companies, storage scoping, vitest harness, frontend typecheck gotcha
@@ -25,16 +26,45 @@
 - [DB schema rebuild](db-schema-rebuild.md) — after editing lib/db/src/schema/*.ts, run `pnpm exec tsc --build lib/db/tsconfig.json` or api-server sees stale .d.ts
 - [whisper.rn integration](whisper-rn-integration.md) — v0.6.0 quirks: no root exports entry (add tsconfig paths), transcribeRealtime removed (use expo-av + transcribe(file)), expo-file-system legacy import
 - [EAS build from Replit sandbox](eas-sandbox-build.md) — workflow trick to bypass 120s bash timeout for eas build + pnpm install
+- [EAS Update public environment](eas-update-public-env.md) — eas.json build-profile env is not automatically injected into local `eas update`; export production public env before publishing.
+- [GitHub push authentication](github-push-auth.md) — reauthorizing the GitHub connector does not refresh an invalid GH_TOKEN used by the local HTTPS remote
 - [Capture screen production wiring](capture-screen-production.md) — DeviceHealthStrip + useSmartGuidance + MeasurementDevicePanel wired into new-inspection.tsx; AppState permission recheck; Expo ENOSPC fix = clear .expo + node_modules/.cache
 - [Camera capture latency](camera-capture-latency.md) — skipProcessing:true eliminates 3–8s JPEG compression; release setCapturing before ingest; optimistic thumbnail via targeted setPhotos functional updater (never full rebuild mid-ingest)
+- [FAIE capture concurrency](faie-capture-concurrency.md) — voice context, shutter, ingestion, and analysis need shared queues, generation guards, stable drains, and commit-safe optimistic UI.
 - [BLE smart glasses driver](ble-smart-glasses.md) — react-native-ble-plx wiring; ReadyLoq GATT UUIDs; frame chunk protocol; tar@6.2.1 firewall workaround; monitorCharacteristicForService returns Subscription not Promise
 - [BLE runtime permissions](ble-runtime-permissions.md) — Android 12+: BLUETOOTH_SCAN+CONNECT; Android 6-11: ACCESS_FINE_LOCATION via expo-location; iOS: noop (system dialog); AppState recheck on foreground; lib/ble/permissions.ts
 - [Role-Based UI](role-based-ui.md) — tab bar per role via href:null; new screens: scan/review/team/leads; /api/review-queue; customFetch pattern; BadgeTone/OwnerBriefing.kpis type notes
 - [Meta glasses Live AI wiring](meta-glasses-wiring.md) — webhook transport (not BLE); in-memory session store; toFile from "openai" not integrations; AiPrediction field names; logErrorEvent 2-arg signature; codeJustChanged+seenEventIds dedup (#109/#111 done); full-screen viewer (#110 done); zoomSubject chip (#115 done)
 - [Stripe billing integration](stripe-billing.md) — connector field is `secret` (not `secret_key`); StripeSync param is `stripeSecretKey`; must externalize from esbuild; syncBackfill needs `{object:'all'}`
+- [Stripe pricing rollout](stripe-pricing-rollout.md) — use immutable versioned prices, grandfather subscribers, and require explicit post-pilot plan acceptance.
 - [Enterprise Bridge](enterprise-bridge.md) — event-driven: finalization emits `inspection:finalized`→EnterpriseAdapterRouter; PestPac=SOAP, ServSuite=REST, FieldRoutes=legacy notes; api_token column added for FieldRoutes; build required before restart
+- [PestPac bidirectional activation](pestpac-bidirectional-activation.md) — durable sync stays dormant until Nate’s production contract is confirmed and explicitly activated.
 - [BLE sensor persistence & background](ble-sensor-persistence-background.md) — storageKey 4th arg to BleSensorAdapter; restorePersistedDevice() in initialize(); AppState reconnect on foreground; app.json UIBackgroundModes + isBackgroundEnabled; MeasurementKind/Unit extended for temperature/co2/acoustic/humidity/pressure
 - [BLE sensor React Fragment pattern](ble-sensor-react-fragment.md) — map() that returns two sibling cards (sensor card + station-slot card) must wrap in React.Fragment with key; single-root JSX return; station-slot is acoustic-only conditional
 - [Company Playbooks & Learning Engine](playbooks-learning-engine.md) — DB table + API routes + compliance evaluator; drizzle-zod .extend() version mismatch workaround; table created manually via pg node client
 - [EAS Android bundle fix](eas-android-bundle-fix.md) — expoRouterBabelPlugin must be explicit in babel.config.js; pnpm worker isolation breaks hasModule('expo-router') inside babel-preset-expo
 - [R8 full mode startup crash](r8-fullmode-crash.md) — keep android.enableR8.fullMode=false; full mode causes runtime NoClassDefFoundError for expo-task-manager classes that exist at runtime but fail R8 static analysis
+- [Workspace lockfile refresh](workspace-lockfile-refresh.md) — root pnpm lockfile refreshes can recalculate unrelated Expo peer metadata; preserve targeted importer changes only.
+- [DeviceHealthStrip chip visibility](device-health-strip-visibility.md) — BLE sensors are always registered-but-disconnected at startup; filter UI by live connection state, not registration.
+- [Property-visit grouping & compliance](property-visit-compliance.md) — visit = company+address+calendar date; retreatment compliance is derive-on-read from prior treatment log, not stored.
+- [Mobile generated API client fork](mobile-generated-api-client-fork.md) — readyloq-app's lib/api-client/generated/ is a frozen Orval fork, not regenerated by lib/api-spec codegen; hand-patch both.
+- [Role access rank convention](role-access-rank.md) — ROLE_RANK: technician<sales<manager<owner; new endpoints must decide if sales gets company-wide reads, don't just copy a manager/owner check.
+- [React Query enabled-with-falsy gotcha](react-query-enabled-gotcha.md) — enabled:Boolean(x) on a defined-but-falsy value (e.g. "") disables the query forever, indistinguishable from a real error in isError/!data render logic.
+- [Warehouse tier & transaction ledger invariants](warehouse-ledger-schema.md) — ledger completeness, unit-safety + identity-scoped locking, live-record dependency checks before relaxing validation, multi-scope override table completeness.
+- [Route Readiness & Truck Stock Health](route-readiness-stock-health.md) — ledger-based (not totalProductOz) consumption math, reversal netting by referenceId, today-vs-trending signal split, shared calendar-tz.ts.
+- [Predictive restocking design](predictive-restocking-design.md) — recency-weight normalize-by-full-window, convert-into-existing-alert pattern, CASE-guarded upsert to protect acted-on rows, two status vocabularies gotcha.
+- [Orval path+query naming collision](openapi-path-plus-query-collision.md) — an OpenAPI GET with both a path param and a query param breaks lib/api-zod typecheck (TS2308); fix in hand-written index.ts, not generated files.
+- [ReadyLoq /api development routing](marketing-api-dev-proxy-collision.md) — the /api artifact must serve the backend in dev; Expo on that path shadows every web API call.
+- [SOC 2 readiness posture](soc2-readiness-findings.md) — full audit in soc2-readiness-audit.md; audit-trail claim > actual coverage, no backup/DR documented, admin bootstrap token under-rate-limited.
+- [pnpm selective overrides location](pnpm-selective-overrides.md) — `pkg@range`/`parent>pkg` override selectors are no-ops in pnpm-workspace.yaml; must go in root package.json's pnpm.overrides.
+- [Ledger immutability trigger pattern](ledger-immutability-trigger.md) — REVOKE is a no-op when the app connects as table owner; use a trigger + SET LOCAL GUC bypass instead; drizzle-kit push doesn't create triggers for the test DB.
+- [Lean deployment runtime](lean-deployment-runtime.md) — exclude the workspace pnpm tree; package API production dependencies inside dist or Autoscale exceeds 8 GiB.
+- [Technician completion boundary](technician-completion-boundary.md) — completion waits for durable local evidence, never AI; analysis continues through existing background sync.
+- [AI evidence acknowledgement](ai-evidence-acknowledgement.md) — persist exact storage paths as the AI sync cursor; counts are display-only and unsafe across photo edits.
+- [AI provider outcome compatibility](ai-provider-outcome-compatibility.md) — expose richer outcomes through the existing mocked provider call so route-test mocks remain compatible.
+- [Analysis request deduplication](analysis-request-deduplication.md) — single-flight identity must include the full canonical payload; cap only unique, eligible, uncached provider work.
+- [AI storage preparation limits](ai-storage-preparation-limits.md) — stream inspection images with a hard byte cap and deadline destruction; promise races alone do not bound SDK resource use.
+- [Finding contract boundary](finding-contract-boundary.md) — OpenAPI defines Finding; reject invalid client input exactly, but sanitize malformed AI and legacy persisted data tolerantly.
+- [Evidence capture timestamps](evidence-capture-timestamps.md) — preserve device capturedAt separately from server registration createdAt; historical media falls back to createdAt.
+- [Mobile preview mismatch](mobile-preview-mismatch.md) — ReadyLoq field app's dev workflow is separate from the registered mobile artifact; screenshot preview of the field app may be unavailable.
+- [Mission Control governed operations](mission-control-governance.md) — platform actions execute at second-admin approval, with stale-state checks; AI investigation is advisory and tenant-bounded.

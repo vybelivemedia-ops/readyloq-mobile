@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import request from "supertest";
+import crypto from "node:crypto";
 
 /**
  * Meta Glasses session tests.
@@ -195,6 +196,34 @@ describe("POST /api/meta-glasses/session — cross-company isolation", () => {
     expect(res.body).toHaveProperty("code");
   });
 
+  it("reuses a persisted session on repeated registration without changing its pairing code", async () => {
+    asUser(TECH_A_CLERK);
+    const first = await request(app).post("/api/meta-glasses/session").send({ inspectionId: inspectionAId });
+    const second = await request(app).post("/api/meta-glasses/session").send({ inspectionId: inspectionAId });
+    expect(second.status).toBe(200);
+    expect(second.body).toEqual(first.body);
+  });
+
+  it("returns one pairing code for concurrent registrations of a new inspection", async () => {
+    const [inspection] = await db.insert(inspectionsTable).values({
+      companyId: companyAId,
+      technicianId: techAId,
+      technicianName: "Tech A",
+      siteAddress: "3 Concurrent St",
+      status: "in_progress",
+    }).returning();
+    try {
+      asUser(TECH_A_CLERK);
+      const responses = await Promise.all(Array.from({ length: 5 }, () =>
+        request(app).post("/api/meta-glasses/session").send({ inspectionId: inspection.id }),
+      ));
+      expect(responses.every((response) => response.status === 200)).toBe(true);
+      expect(new Set(responses.map((response) => response.body.sessionId)).size).toBe(1);
+    } finally {
+      await db.delete(inspectionsTable).where(eq(inspectionsTable.id, inspection.id));
+    }
+  });
+
   it("returns 404 when Tech A supplies an inspection belonging to Company B", async () => {
     asUser(TECH_A_CLERK);
     const res = await request(app)
@@ -234,6 +263,20 @@ describe("POST /api/meta-glasses/session — cross-company isolation", () => {
   });
 });
 
+describe("glasses traffic has an independent API budget", () => {
+  it("does not consume the inspection API's shared IP budget", async () => {
+    // Meta webhook verification is cheap and does not need a valid session.
+    // This deliberately exceeds the ordinary API's 500/15-minute limit.
+    for (let i = 0; i < 501; i++) {
+      const response = await request(app).get("/api/meta-glasses/webhook");
+      expect(response.status).toBe(403);
+    }
+    asUser(null);
+    const inspection = await request(app).get("/api/inspections");
+    expect(inspection.status).toBe(401); // auth still runs, not a shared-budget 429
+  });
+});
+
 // ─── GET /events/:sessionId — cross-company isolation ────────────────────────
 
 describe("GET /api/meta-glasses/events/:sessionId — cross-company isolation", () => {
@@ -257,6 +300,52 @@ describe("GET /api/meta-glasses/events/:sessionId — cross-company isolation", 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("sessionId", sessionIdForA);
     expect(res.body).toHaveProperty("events");
+  });
+
+  it("reads a persisted session and sees events appended after an earlier poll", async () => {
+    const persistedId = crypto.randomUUID();
+    await db.insert(metaGlassesSessionsTable).values({
+      sessionId: persistedId,
+      code: "DBONLY",
+      inspectionId: inspectionAId,
+      companyId: companyAId,
+      userId: techAId,
+      events: [],
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    try {
+      asUser(TECH_A_CLERK);
+      const own = await request(app).get(`/api/meta-glasses/events/${persistedId}`);
+      expect(own.status).toBe(200);
+      expect(own.body.events).toEqual([]);
+      // Simulate a webhook on another API process writing to the shared DB.
+      const remoteEvent = { id: crypto.randomUUID(), type: "status", timestamp: Date.now(), text: "Remote frame" };
+      await db.update(metaGlassesSessionsTable).set({ events: [remoteEvent] })
+        .where(eq(metaGlassesSessionsTable.sessionId, persistedId));
+      const updated = await request(app).get(`/api/meta-glasses/events/${persistedId}`);
+      expect(updated.body.events).toEqual([remoteEvent]);
+      asUser(TECH_B_CLERK);
+      const other = await request(app).get(`/api/meta-glasses/events/${persistedId}`);
+      expect(other.status).toBe(404);
+    } finally {
+      await db.delete(metaGlassesSessionsTable).where(eq(metaGlassesSessionsTable.sessionId, persistedId));
+    }
+  });
+
+  it("keeps all events when several writers append to the same session at once", async () => {
+    asUser(TECH_A_CLERK);
+    const registration = await request(app).post("/api/meta-glasses/session")
+      .send({ inspectionId: inspectionAId });
+    const sessionId = registration.body.sessionId as string;
+    const marker = crypto.randomUUID();
+    const writes = await Promise.all(Array.from({ length: 5 }, (_, index) =>
+      request(app).post(`/api/meta-glasses/events/${sessionId}`)
+        .send({ type: "ble_reconnect", text: `${marker}-${index}` }),
+    ));
+    expect(writes.every((response) => response.status === 204)).toBe(true);
+    const polled = await request(app).get(`/api/meta-glasses/events/${sessionId}`);
+    expect(polled.body.events.filter((event: { text: string }) => event.text.startsWith(marker)))
+      .toHaveLength(5);
   });
 
   it("returns 404 when Tech B polls a session belonging to Company A", async () => {

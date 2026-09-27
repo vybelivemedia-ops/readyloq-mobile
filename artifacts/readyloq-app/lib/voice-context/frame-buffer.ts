@@ -3,8 +3,7 @@
  *
  * Maintains a rolling ~1 500 ms background snapshot of the camera so that
  * the FAIE (Field Audio Intelligence Engine) always has a recent spatial
- * context frame available, even when an on-demand takePictureAsync races a
- * 500 ms dispatch deadline.
+ * context frame available without competing with the technician's shutter.
  *
  * Designed for dependency injection so it can be tested without React or
  * React Native by swapping in mock camera / filesystem implementations.
@@ -13,7 +12,7 @@
 /** The interval between rolling background captures (ms). */
 export const FRAME_BUFFER_INTERVAL_MS = 1_500;
 
-/** The maximum time (ms) getFrame waits for a fresh on-demand capture. */
+/** The maximum time (ms) getFrame waits for an already-running rolling capture. */
 export const FRAME_BUFFER_DEADLINE_MS = 500;
 
 export interface FrameBufferDeps {
@@ -47,13 +46,12 @@ export interface FrameBuffer {
 
   /**
    * Returns the most up-to-date frame URI available:
-   * 1. Tries a fresh on-demand takePicture() raced against a 500 ms deadline.
-   * 2. If the fresh capture loses the race or fails, falls back to the last
-   *    rolling-buffer URI.
-   * 3. Returns null if no frame has ever been captured.
+   * 1. Returns the latest buffered URI immediately when one exists.
+   * 2. Otherwise waits up to 500 ms for an already-running rolling capture.
+   * 3. Returns null if no rolling capture has completed.
    *
-   * Orphan-safe: when the deadline wins, the still-running capture's .then()
-   * fires deleteTempFrameSilently() so the file is never abandoned.
+   * It never starts an on-demand camera request. Voice dispatch must not compete
+   * with the shutter or turn a slow camera into a backlog of native requests.
    */
   getFrame(): Promise<string | null>;
 
@@ -73,6 +71,9 @@ export function createFrameBuffer(deps: FrameBufferDeps): FrameBuffer {
 
   let lastFrameUri: string | null = null;
   let intervalHandle: ReturnType<typeof setInterval> | null = null;
+  let captureInFlight: Promise<string | null> | null = null;
+  let captureInFlightGeneration = 0;
+  let generation = 0;
   let active = false;
 
   /** Fire-and-forget delete — errors are intentionally swallowed. */
@@ -83,37 +84,58 @@ export function createFrameBuffer(deps: FrameBufferDeps): FrameBuffer {
     });
   }
 
+  function captureSingleFlight(currentGeneration: number): Promise<string | null> {
+    if (captureInFlight) return captureInFlight;
+    captureInFlightGeneration = currentGeneration;
+    const capture = takePicture()
+      .then(
+        (uri) => {
+          if (captureInFlight === capture) captureInFlight = null;
+          return uri ?? null;
+        },
+        (error) => {
+          if (captureInFlight === capture) captureInFlight = null;
+          throw error;
+        },
+      );
+    captureInFlight = capture;
+    return capture;
+  }
+
+  async function captureRollingFrame(currentGeneration: number): Promise<void> {
+    // Slow camera requests must never stack across interval ticks.
+    if (captureInFlight) return;
+    try {
+      const uri = await captureSingleFlight(currentGeneration);
+      if (!uri) return;
+      if (!active || generation !== currentGeneration) {
+        // stop() fired while this capture was in flight — delete the new
+        // file immediately so it never becomes an orphan.
+        deleteSilently(uri);
+        return;
+      }
+      if (lastFrameUri && lastFrameUri !== uri) {
+        deleteSilently(lastFrameUri);
+      }
+      lastFrameUri = uri;
+    } catch {
+      // Silently skip — keep the last successful frame URI in the buffer.
+    }
+  }
+
   function start(): void {
     if (intervalHandle !== null) return; // idempotent
     active = true;
+    const currentGeneration = ++generation;
     intervalHandle = setInterval(() => {
-      void (async () => {
-        try {
-          const uri = await takePicture();
-          if (uri) {
-            if (!active) {
-              // stop() fired while this capture was in flight — delete the new
-              // file immediately so it never becomes an orphan.
-              deleteSilently(uri);
-              return;
-            }
-            // Delete the previous temp frame before storing the new one so at
-            // most one voice-context frame file exists on disk at any time.
-            if (lastFrameUri) {
-              deleteSilently(lastFrameUri);
-            }
-            lastFrameUri = uri;
-          }
-        } catch {
-          // Silently skip — keep the last successful frame URI in the buffer.
-        }
-      })();
+      void captureRollingFrame(currentGeneration);
     }, FRAME_BUFFER_INTERVAL_MS);
   }
 
   function stop(): void {
     // Mark inactive first so any in-flight captures self-delete when they resolve.
     active = false;
+    generation += 1;
     if (intervalHandle !== null) {
       clearInterval(intervalHandle);
       intervalHandle = null;
@@ -126,30 +148,19 @@ export function createFrameBuffer(deps: FrameBufferDeps): FrameBuffer {
   }
 
   async function getFrame(): Promise<string | null> {
+    // The normal path is synchronous-from-buffer (one resolved Promise turn).
+    if (lastFrameUri) return lastFrameUri;
+
+    // Do not start a new capture for a voice event. If the rolling loop already
+    // owns the camera, briefly wait for that same single-flight request.
+    const runningCapture = captureInFlight;
+    if (!runningCapture || captureInFlightGeneration !== generation) return null;
     try {
       const deadline = new Promise<null>((resolve) =>
         setTimeout(() => resolve(null), FRAME_BUFFER_DEADLINE_MS),
       );
-      const capture = (async () => {
-        const uri = await takePicture();
-        return uri ?? null;
-      })();
-      const fresh = await Promise.race([capture, deadline]);
-      if (fresh) {
-        // Fresh capture won — replace the buffered frame.
-        if (lastFrameUri && lastFrameUri !== fresh) {
-          deleteSilently(lastFrameUri);
-        }
-        lastFrameUri = fresh;
-        return fresh;
-      }
-      // Deadline won — attach cleanup to the still-running capture so its file
-      // is deleted once it eventually resolves instead of becoming an orphan.
-      void capture
-        .then((uri) => {
-          if (uri) deleteSilently(uri);
-        })
-        .catch(() => {});
+      const fresh = await Promise.race([runningCapture, deadline]);
+      return fresh ?? lastFrameUri ?? null;
     } catch {
       // Fall through to buffer fallback.
     }

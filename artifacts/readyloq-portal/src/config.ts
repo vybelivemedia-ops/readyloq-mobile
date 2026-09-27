@@ -1,3 +1,5 @@
+import { resolveMediaUrl } from "./lib/media-url";
+
 /**
  * API URL helper for the ReadyLoq Company Portal.
  *
@@ -23,7 +25,15 @@ const API_ORIGIN: string = import.meta.env.VITE_API_URL
     ? stripTrailingSlash(import.meta.env.BASE_URL ?? "")
     : "";
 
+/** Base URL for generated API-client requests. */
+export const apiClientBaseUrl = API_ORIGIN || null;
+
 export function apiUrl(path: string): string {
   const clean = path.startsWith("/") ? path : `/${path}`;
   return `${API_ORIGIN}/api${clean}`;
+}
+
+/** Resolve uploaded evidence paths through the configured API/proxy origin. */
+export function mediaUrl(path: string): string {
+  return resolveMediaUrl(path, apiUrl);
 }

@@ -17,10 +17,14 @@ import {
   productsTable,
   productLabelRulesTable,
   treatmentLogsTable,
+  usersTable,
 } from "@workspace/db";
 import { and, eq, gte, desc, inArray } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
+import { requireRole } from "../middleware/require-auth";
 import { z } from "zod/v4";
+import { parseTzOffsetMinutes } from "../lib/calendar-tz";
+import { computeRouteReadiness } from "../lib/route-readiness";
 
 const router = Router();
 
@@ -219,6 +223,145 @@ router.get("/recent-mixes", async (req, res) => {
     );
   } catch {
     return res.status(500).json({ error: "Failed to fetch recent mixes" });
+  }
+});
+
+// ─── GET /technician/daily-rig/lookup?technicianId=&date= ────────────────────
+//
+// Read-only Route Readiness check for ANY technician/date pair, used by the
+// Integrated Route Calendar module so a manager (or a technician looking at a
+// future date) can see whether a stop's daily rig has been set up without
+// being able to edit it here. Self-lookups are always allowed; looking up
+// another technician requires manager/owner.
+
+router.get("/lookup", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const requester = req.user?.clerkUserId;
+    if (!requester) return res.status(401).json({ error: "Unauthorized" });
+
+    const technicianId = typeof req.query.technicianId === "string" ? req.query.technicianId : null;
+    const date =
+      typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
+        ? req.query.date
+        : null;
+    if (!technicianId || !date) {
+      return res.status(400).json({ error: "technicianId and date (YYYY-MM-DD) query params are required" });
+    }
+
+    if (technicianId !== requester) {
+      const actingRole = (req.user!.roleOverride ?? req.user!.role) as string;
+      // sales reps read other technicians' readiness through the Route
+      // Calendar module too (they have no stops of their own) — treat them
+      // the same as manager/owner here.
+      const isManager = actingRole === "manager" || actingRole === "owner" || actingRole === "sales";
+      if (!isManager) {
+        return res.status(403).json({ error: "Access denied: manager/owner only for other technicians" });
+      }
+    }
+
+    const [row] = await db
+      .select()
+      .from(technicianDailyRigsTable)
+      .where(
+        and(
+          eq(technicianDailyRigsTable.companyId, companyId),
+          eq(technicianDailyRigsTable.technicianId, technicianId),
+          eq(technicianDailyRigsTable.rigDate, date),
+        ),
+      )
+      .limit(1);
+
+    if (!row) {
+      return res.status(404).json({ error: "No route set up for this date", setUp: false });
+    }
+
+    const rawAssignments: RouteAssignment[] =
+      Array.isArray(row.assignments) && row.assignments.length > 0
+        ? (row.assignments as RouteAssignment[])
+        : (row.productIds ?? []).map((id: number) => ({ productId: id, targetPest: "" }));
+
+    const enriched = await enrichAssignments(rawAssignments);
+    return res.json({
+      setUp: true,
+      technicianId: row.technicianId,
+      rigDate: row.rigDate,
+      assignments: enriched,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch route" });
+  }
+});
+
+// ─── GET /technician/daily-rig/route-readiness?date=&tzOffsetMinutes= ────────
+//
+// Today's Route Readiness — compares the technician's scheduled stops for the
+// given calendar date against their truck's on-hand quantities for the
+// products declared on that day's rig, using recent per-application usage
+// history to project what today is likely to consume. This is a proactive,
+// TODAY-scoped signal — distinct from Truck Stock Health (a longer-range
+// trending projection, see /manager/team-stock-health and
+// /technician/inventory/stock-health) and from the existing reactive
+// restockThreshold alert, which is unchanged. Self-lookups are always
+// allowed; looking up another technician follows the same manager/owner/
+// sales rule as /lookup.
+
+router.get("/route-readiness", async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const requester = req.user?.clerkUserId;
+    if (!requester) return res.status(401).json({ error: "Unauthorized" });
+
+    const technicianId = typeof req.query.technicianId === "string" ? req.query.technicianId : requester;
+    const date =
+      typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
+        ? req.query.date
+        : todayUtc();
+    const tzOffsetMinutes = parseTzOffsetMinutes(req.query.tzOffsetMinutes);
+
+    if (technicianId !== requester) {
+      const actingRole = (req.user!.roleOverride ?? req.user!.role) as string;
+      const isManager = actingRole === "manager" || actingRole === "owner" || actingRole === "sales";
+      if (!isManager) {
+        return res.status(403).json({ error: "Access denied: manager/owner only for other technicians" });
+      }
+    }
+
+    const readiness = await computeRouteReadiness(companyId, technicianId, date, tzOffsetMinutes);
+    return res.json(readiness);
+  } catch {
+    return res.status(500).json({ error: "Failed to compute route readiness" });
+  }
+});
+
+// ─── GET /technician/daily-rig/team-route-readiness?date=&tzOffsetMinutes= ───
+//
+// Team-wide Today's Route Readiness, computed for every technician in the
+// company. Manager/owner only.
+
+router.get("/team-route-readiness", requireRole("manager"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const date =
+      typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
+        ? req.query.date
+        : todayUtc();
+    const tzOffsetMinutes = parseTzOffsetMinutes(req.query.tzOffsetMinutes);
+
+    const technicians = await db
+      .select({ clerkUserId: usersTable.clerkUserId })
+      .from(usersTable)
+      .where(and(eq(usersTable.companyId, companyId), eq(usersTable.role, "technician")));
+
+    const results = await Promise.all(
+      technicians.map((t) => computeRouteReadiness(companyId, t.clerkUserId, date, tzOffsetMinutes)),
+    );
+
+    return res.json(results);
+  } catch {
+    return res.status(500).json({ error: "Failed to compute team route readiness" });
   }
 });
 

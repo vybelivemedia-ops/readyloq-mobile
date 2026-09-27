@@ -40,6 +40,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { toFile } from "openai";
 import { db, inspectionsTable, inspectionMediaTable, metaGlassesSessionsTable } from "@workspace/db";
 import { and, eq, gt, lt, sql } from "drizzle-orm";
+import rateLimit from "express-rate-limit";
 import { ObjectStorageService } from "../lib/objectStorage";
 
 const objectStorageService = new ObjectStorageService();
@@ -48,7 +49,7 @@ import { analyzePhotoFromBase64 } from "../lib/intelligence-ai";
 import { zoomGlassesFrame } from "../lib/glasses-zoom";
 import { logErrorEvent } from "../lib/error-events";
 // Note: req.query values are string | string[] | ParsedQs | ParsedQs[].
-// Always coerce via String() before use in Map keys or comparisons.
+// Always coerce via String() before using them as session IDs or timestamps.
 
 // ─── Session store ────────────────────────────────────────────────────────────
 
@@ -106,51 +107,46 @@ interface ActiveSession {
   events: GlassesEvent[];
 }
 
-const sessions = new Map<string, ActiveSession>();
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 h
 const MAX_EVENTS = 100;
 
-/** Prune expired sessions every 15 minutes (memory + DB). */
+async function findSession(sessionId: string): Promise<ActiveSession | undefined> {
+  // Polls must see webhook/telemetry writes from any API instance, not an
+  // instance-local snapshot that can remain stale for the full session TTL.
+  const [row] = await db.select().from(metaGlassesSessionsTable)
+    .where(and(eq(metaGlassesSessionsTable.sessionId, sessionId), gt(metaGlassesSessionsTable.expiresAt, new Date())))
+    .limit(1);
+  if (!row) return undefined;
+  const session: ActiveSession = {
+    sessionId: row.sessionId,
+    code: row.code,
+    inspectionId: row.inspectionId,
+    companyId: row.companyId,
+    userId: row.userId,
+    createdAt: row.createdAt.getTime(),
+    events: (row.events as GlassesEvent[]) ?? [],
+  };
+  return session;
+}
+
+// Bound session creation per authenticated user, not per shared office IP.
+const sessionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(req.user!.id),
+  message: { error: "Too many glasses session requests, please try again later." },
+});
+
+/** Prune expired sessions every 15 minutes. */
 setInterval(() => {
-  const cutoff = Date.now() - SESSION_TTL_MS;
-  for (const [id, session] of sessions) {
-    if (session.createdAt < cutoff) sessions.delete(id);
-  }
   // Purge expired DB rows — fire-and-forget.
   void db
     .delete(metaGlassesSessionsTable)
     .where(lt(metaGlassesSessionsTable.expiresAt, new Date()))
     .catch(() => { /* best-effort — non-fatal */ });
 }, 15 * 60 * 1000).unref();
-
-// ─── Startup: restore sessions from DB ───────────────────────────────────────
-// Loads active (non-expired) sessions back into the in-memory Map so that
-// polling resumes seamlessly after an API restart mid-inspection.
-void (async () => {
-  try {
-    const rows = await db
-      .select()
-      .from(metaGlassesSessionsTable)
-      .where(gt(metaGlassesSessionsTable.expiresAt, new Date()));
-    for (const row of rows) {
-      sessions.set(row.sessionId, {
-        sessionId: row.sessionId,
-        code: row.code,
-        inspectionId: row.inspectionId,
-        companyId: row.companyId,
-        userId: row.userId,
-        createdAt: row.createdAt.getTime(),
-        events: (row.events as GlassesEvent[]) ?? [],
-      });
-    }
-    if (rows.length > 0) {
-      console.log(`[meta-glasses] Restored ${rows.length} active session(s) from DB`);
-    }
-  } catch (err) {
-    // Non-fatal: table may not exist yet in fresh dev environments.
-    console.warn("[meta-glasses] Could not restore sessions from DB:", String(err));
-  }
-})();
 
 function makeCode(): string {
   return crypto.randomBytes(3).toString("hex").toUpperCase(); // e.g. "A3F9BC"
@@ -160,17 +156,20 @@ function makeSessionId(): string {
   return crypto.randomUUID();
 }
 
-function pushEvent(session: ActiveSession, event: GlassesEvent): void {
-  session.events.push(event);
-  if (session.events.length > MAX_EVENTS) session.events.shift();
-  // Fire-and-forget DB sync — Map is the primary (fast) store; DB is durability.
-  void db
+async function pushEvent(session: ActiveSession, event: GlassesEvent): Promise<void> {
+  // PostgreSQL locks the row during UPDATE; each append sees the previous
+  // committed events even when webhooks hit different API processes.
+  await db
     .update(metaGlassesSessionsTable)
-    .set({ events: session.events as unknown[] })
+    .set({ events: sql`(
+      SELECT COALESCE(jsonb_agg(value ORDER BY ordinal), '[]'::jsonb)
+      FROM jsonb_array_elements(
+        ${metaGlassesSessionsTable.events} || ${JSON.stringify([event])}::jsonb
+      ) WITH ORDINALITY AS items(value, ordinal)
+      WHERE ordinal > GREATEST(0, jsonb_array_length(${metaGlassesSessionsTable.events}) + 1 - ${MAX_EVENTS})
+    )` })
     .where(eq(metaGlassesSessionsTable.sessionId, session.sessionId))
-    .catch((err) =>
-      logger.warn("[meta-glasses] DB event sync failed: " + String(err)),
-    );
+    .returning({ sessionId: metaGlassesSessionsTable.sessionId });
 }
 
 // ─── HMAC verification ────────────────────────────────────────────────────────
@@ -319,6 +318,7 @@ router.post(
   requireAuth,
   requireCompany,
   requireBetaAccess,
+  sessionLimiter,
   async (req: Request, res: Response) => {
     const { inspectionId } = req.body ?? {};
     if (!inspectionId || typeof inspectionId !== "number") {
@@ -338,23 +338,27 @@ router.post(
       return res.status(404).json({ error: "Inspection not found" });
     }
 
-    const sessionId = makeSessionId();
-    const code = makeCode();
+    // Serialize registrations across API instances. Without the DB lock,
+    // concurrent requests all observe "no session" and mint different codes.
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(977, ${inspectionId})`);
+      const [existing] = await tx.select({
+        sessionId: metaGlassesSessionsTable.sessionId,
+        code: metaGlassesSessionsTable.code,
+      }).from(metaGlassesSessionsTable)
+        .where(and(
+          eq(metaGlassesSessionsTable.inspectionId, inspectionId),
+          eq(metaGlassesSessionsTable.companyId, companyId),
+          eq(metaGlassesSessionsTable.userId, req.user!.id),
+          gt(metaGlassesSessionsTable.expiresAt, new Date()),
+        ))
+        .orderBy(sql`${metaGlassesSessionsTable.createdAt} DESC`)
+        .limit(1);
+      if (existing) return existing;
 
-    sessions.set(sessionId, {
-      sessionId,
-      code,
-      inspectionId,
-      companyId,
-      userId: req.user!.id,
-      createdAt: Date.now(),
-      events: [],
-    });
-
-    // Persist to DB so the session survives an API restart mid-inspection.
-    void db
-      .insert(metaGlassesSessionsTable)
-      .values({
+      const sessionId = makeSessionId();
+      const code = makeCode();
+      await tx.insert(metaGlassesSessionsTable).values({
         sessionId,
         code,
         inspectionId,
@@ -362,13 +366,12 @@ router.post(
         userId: req.user!.id,
         events: [],
         expiresAt: new Date(Date.now() + SESSION_TTL_MS),
-      })
-      .catch((err) =>
-        logger.warn("[meta-glasses] DB session insert failed: " + String(err)),
-      );
-
-    console.log(`[meta-glasses] session created: ${sessionId} inspection=${inspectionId} company=${companyId}`);
-    return res.json({ sessionId, code });
+      });
+      console.log(`[meta-glasses] session created: ${sessionId} inspection=${inspectionId} company=${companyId}`);
+      return { sessionId, code };
+    });
+    // Transaction has committed: another instance can immediately poll by ID.
+    return res.json(result);
   },
 );
 
@@ -417,7 +420,7 @@ router.post(
 
     // Resolve session from ?session= query param
     const sessionId = String(req.query.session ?? "");
-    const session = sessions.get(sessionId);
+    const session = await findSession(sessionId);
     if (!session) {
       // Return a friendly spoken response even for unknown sessions
       return res.json({
@@ -554,7 +557,7 @@ router.post(
         mediaId: persistedMediaId,
         zoomSubject: persistedZoomSubject,
       };
-      pushEvent(session, event);
+      await pushEvent(session, event);
     }
 
     // ── Build spoken response ────────────────────────────────────────────────
@@ -588,9 +591,9 @@ router.post(
   requireAuth,
   requireCompany,
   requireBetaAccess,
-  (req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     const sessionId = req.params.sessionId as string;
-    const session = sessions.get(sessionId);
+    const session = await findSession(sessionId);
 
     if (!session) {
       return res.status(404).json({ error: "Session not found or expired" });
@@ -641,7 +644,7 @@ router.post(
       count: validatedCount,
     };
 
-    pushEvent(session, event);
+    await pushEvent(session, event);
     return res.status(204).end();
   },
 );
@@ -652,9 +655,9 @@ router.get(
   requireAuth,
   requireCompany,
   requireBetaAccess,
-  (req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     const sessionId = req.params.sessionId as string;
-    const session = sessions.get(sessionId);
+    const session = await findSession(sessionId);
 
     if (!session) {
       return res.status(404).json({ error: "Session not found or expired" });

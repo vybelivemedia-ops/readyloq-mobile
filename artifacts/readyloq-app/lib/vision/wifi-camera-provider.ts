@@ -256,10 +256,16 @@ export function createWifiCameraProvider(): WifiCameraProvider {
       const probe = await probeWifiCamera();
       const now = new Date().toISOString();
       const reachable = probe.available;
+      // A reachable endpoint is not the same as an active connection: the
+      // camera may simply be sitting on the network without ever having been
+      // connect()-ed (or after a disconnect()). Report "connected" only when
+      // _connected is actually true, so callers (e.g. DeviceHealthStrip)
+      // can't mistake "reachable" for "in use" and render a false-healthy dot.
+      const state = _connected ? "connected" : reachable ? "disconnected" : "error";
       return {
         operational: reachable ? (_connected ? "idle" : "unavailable") : "error",
         connection: {
-          state: reachable ? "connected" : "error",
+          state,
           transport: "wifi",
           error: reachable ? undefined : (probe as { available: false; reason: string }).reason,
           connectedAt: _connected ? now : undefined,

@@ -9,6 +9,7 @@ import { ClerkProvider } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setBaseUrl } from "@/lib/api-client";
+import { setBaseUrl as setGeneratedApiBaseUrl } from "@workspace/api-client-react";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -40,6 +41,7 @@ textWithDefaults.defaultProps = {
 const domain = process.env.EXPO_PUBLIC_DOMAIN;
 if (domain) {
   setBaseUrl(`https://${domain}`);
+  setGeneratedApiBaseUrl(`https://${domain}`);
   console.log("[API] Base URL →", `https://${domain}`);
 } else {
   console.error("[API] EXPO_PUBLIC_DOMAIN is not set — API calls will fail");

@@ -13,15 +13,15 @@ import { useQuery } from "@tanstack/react-query";
 
 import { API_BASE } from "@/lib/api";
 
-export type SubscriptionTier = "solo" | "growth";
+export type SubscriptionTier = "solo" | "micro" | "small" | "growth" | "professional" | "enterprise" | "pilot";
 
 export interface LicenseStatus {
   tier: SubscriptionTier | null;
   status: string | null;           // Stripe subscription.status (active/trialing/past_due/canceled…)
   isActive: boolean;               // true when status === 'active' | 'trialing'
-  billedSeats: number;             // additional seats billed beyond the owner (Growth only)
-  activeTeamMembers: number;       // total active users in the company
-  seatOverage: number;             // members exceeding billed capacity
+  billedSeats: number;
+  activeTeamMembers: number;
+  seatOverage: number;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
 }

@@ -4,10 +4,8 @@ import request from "supertest";
 /**
  * Write-boundary finding validation tests for POST /analysis and POST /analysis/analyze.
  *
- * Task 317 added validateFindings() at every DB insert in analysis.ts so that
- * malformed AI output or client submissions can never enter the database.
- * These tests confirm the guard actually fires — a regression would silently
- * let bad data through and the invalid findings would appear in the response.
+ * Client finding arrays are strict all-or-nothing requests, while malformed AI
+ * output remains tolerant and is sanitized at the DB write boundary.
  */
 
 const { authState } = vi.hoisted(() => ({
@@ -57,6 +55,7 @@ import {
 import { eq, inArray } from "drizzle-orm";
 import { objectPathCompanyScope } from "../lib/objectStorage";
 import { analyzePhoto } from "../lib/intelligence-ai";
+import { FindingSchema } from "@workspace/api-zod";
 
 // ---------------------------------------------------------------------------
 // Test fixture identifiers — prefixed to avoid collisions with other suites.
@@ -174,6 +173,66 @@ function invalidFinding(overrides: Record<string, unknown> = {}) {
   };
 }
 
+describe("Finding OpenAPI/generated-schema agreement", () => {
+  it("parses representative persisted metadata through generated Zod", () => {
+    const result = FindingSchema.safeParse({
+      ...validFinding(),
+      evidenceQuality: "excellent",
+      possiblePest: "Mouse",
+      species: "Mus musculus",
+      lifeStage: "adult",
+      conduciveCondition: "food source",
+      harborage: "wall void",
+      moisture: null,
+      structuralIssue: "foundation gap",
+      measurementEstimate: {
+        linearFt: 2.5,
+        gapWidthIn: 0.25,
+        heightFt: null,
+        confidence: 0.8,
+        source: "ai_vision_estimate",
+      },
+      zone: "kitchen",
+      candidates: [{ species: "Mouse", confidence: 0.8 }],
+      confidenceLabel: "identified",
+      reviewStatus: "pending",
+      technicianSpecies: null,
+      technicianCorrectionNotes: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects omissions of published-required core fields", () => {
+    const { severity: _severity, ...missingRequired } = validFinding();
+    const result = FindingSchema.safeParse(missingRequired);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unknown top-level metadata fields", () => {
+    const result = FindingSchema.safeParse(
+      validFinding({ technicianCorrecionNotes: "misspelled field" }),
+    );
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unknown measurement and candidate fields", () => {
+    const measurementResult = FindingSchema.safeParse({
+      ...validFinding(),
+      measurementEstimate: {
+        confidence: 0.8,
+        source: "ai_vision_estimate",
+        widthMm: 4,
+      },
+    });
+    const candidateResult = FindingSchema.safeParse({
+      ...validFinding(),
+      candidates: [{ species: "Mouse", confidence: 0.8, scorePct: 80 }],
+    });
+    expect(measurementResult.success).toBe(false);
+    expect(candidateResult.success).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // POST /analysis — client-submitted findings
 // ---------------------------------------------------------------------------
@@ -184,7 +243,25 @@ describe("POST /analysis — write-boundary finding validation", () => {
     expect(res.status).toBe(401);
   });
 
-  it("strips the invalid finding and keeps only the valid one", async () => {
+  it("returns 400 for a non-array findings payload before DB work", async () => {
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis")
+      .send({ inspectionId, findings: { category: "not-an-array" } });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: "Invalid findings",
+      code: "INVALID_FINDINGS",
+      issues: [{ index: 0, path: [], message: "Expected an array" }],
+    });
+    const rows = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("rejects the request when any client finding is invalid", async () => {
     asUser(OWNER_ID);
 
     const res = await request(app)
@@ -194,35 +271,35 @@ describe("POST /analysis — write-boundary finding validation", () => {
         findings: [validFinding(), invalidFinding()],
       });
 
-    expect(res.status).toBe(201);
-
-    const findings: unknown[] = res.body.findings;
-    expect(findings).toHaveLength(1);
-    expect((findings[0] as Record<string, unknown>).category).toBe("Rodent Activity");
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      error: "Invalid findings",
+      code: "INVALID_FINDINGS",
+    });
+    expect(res.body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ index: 1, path: ["category"] }),
+      ]),
+    );
   });
 
-  it("does not persist the invalid finding in the database", async () => {
+  it("does not persist any findings when a client finding is invalid", async () => {
     asUser(OWNER_ID);
 
-    await request(app)
+    const res = await request(app)
       .post("/api/analysis")
       .send({
         inspectionId,
         findings: [validFinding(), invalidFinding()],
       });
+    expect(res.status).toBe(400);
 
     const rows = await db
       .select()
       .from(analysisResultsTable)
       .where(eq(analysisResultsTable.companyId, companyId));
 
-    expect(rows).toHaveLength(1);
-    const stored = (rows[0].findings as unknown) as Array<Record<string, unknown>>;
-    expect(stored).toHaveLength(1);
-    expect(stored[0].category).toBe("Rodent Activity");
-    // The invalid finding (no category) must not be present.
-    const hasInvalid = stored.some((f) => f.category === undefined || !("category" in f));
-    expect(hasInvalid).toBe(false);
+    expect(rows).toHaveLength(0);
   });
 
   it("accepts a payload with only valid findings unchanged", async () => {
@@ -239,7 +316,7 @@ describe("POST /analysis — write-boundary finding validation", () => {
     expect(res.body.findings).toHaveLength(2);
   });
 
-  it("returns an empty findings array when ALL submitted findings are invalid", async () => {
+  it("returns 400 when ALL submitted findings are invalid", async () => {
     asUser(OWNER_ID);
 
     const res = await request(app)
@@ -249,11 +326,11 @@ describe("POST /analysis — write-boundary finding validation", () => {
         findings: [invalidFinding({ id: 1 }), invalidFinding({ id: 2 })],
       });
 
-    expect(res.status).toBe(201);
-    expect(res.body.findings).toHaveLength(0);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_FINDINGS");
   });
 
-  it("strips a finding with a non-string category", async () => {
+  it("returns 400 for a finding with a non-string category", async () => {
     asUser(OWNER_ID);
 
     // category must be a string; passing a number makes it structurally invalid.
@@ -266,19 +343,16 @@ describe("POST /analysis — write-boundary finding validation", () => {
         findings: [validFinding({ id: 1 }), badTypeFinding],
       });
 
-    expect(res.status).toBe(201);
-    expect(res.body.findings).toHaveLength(1);
-    expect((res.body.findings[0] as Record<string, unknown>).category).toBe("Rodent Activity");
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_FINDINGS");
   });
 });
 
 // ---------------------------------------------------------------------------
 // POST /analysis/analyze — AI-run analysis (no real AI in these tests)
 //
-// technicianFindings are merged with AI findings and then run through
-// validateFindings() before the DB insert (analysis.ts ~line 679). Sending
-// malformed technicianFindings with no images is the cleanest way to exercise
-// that guard without real blobs or AI calls.
+// technicianFindings are validated before any inspection lookup/provider work;
+// malformed AI output still runs through validateFindings() after the merge.
 // ---------------------------------------------------------------------------
 
 describe("POST /analysis/analyze — write-boundary finding validation", () => {
@@ -288,7 +362,25 @@ describe("POST /analysis/analyze — write-boundary finding validation", () => {
     expect(res.status).toBe(400);
   });
 
-  it("strips the invalid technicianFinding and keeps only the valid one", async () => {
+  it("returns 400 for a non-array technicianFindings payload before provider work", async () => {
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, technicianFindings: { category: "not-an-array" } });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: "Invalid technician findings",
+      code: "INVALID_FINDINGS",
+      issues: [{ index: 0, path: [], message: "Expected an array" }],
+    });
+    const rows = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("rejects the request when any technician finding is invalid", async () => {
     asUser(OWNER_ID);
 
     const res = await request(app)
@@ -299,38 +391,112 @@ describe("POST /analysis/analyze — write-boundary finding validation", () => {
         technicianFindings: [validFinding({ id: 1 }), invalidFinding({ id: 2 })],
       });
 
-    expect([200, 201]).toContain(res.status);
-
-    const findings: unknown[] = res.body.findings;
-    expect(findings).toHaveLength(1);
-    expect((findings[0] as Record<string, unknown>).category).toBe("Rodent Activity");
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      error: "Invalid technician findings",
+      code: "INVALID_FINDINGS",
+    });
   });
 
-  it("does not persist the invalid technicianFinding in the database", async () => {
+  it("rejects unknown technician metadata before provider or DB work", async () => {
     asUser(OWNER_ID);
 
-    await request(app)
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({
+        inspectionId,
+        images: [],
+        technicianFindings: [
+          validFinding({ technicianCorrecionNotes: "misspelled field" }),
+        ],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      error: "Invalid technician findings",
+      code: "INVALID_FINDINGS",
+    });
+    expect(res.body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ index: 0, path: ["technicianCorrecionNotes"] }),
+      ]),
+    );
+    expect(analyzePhoto).not.toHaveBeenCalled();
+
+    const rows = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("rejects unknown nested metadata before provider or DB work", async () => {
+    asUser(OWNER_ID);
+
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({
+        inspectionId,
+        images: [],
+        technicianFindings: [
+          validFinding({
+            measurementEstimate: {
+              confidence: 0.8,
+              source: "ai_vision_estimate",
+              widthMm: 4,
+            },
+            candidates: [{ species: "Mouse", confidence: 0.8, scorePct: 80 }],
+          }),
+        ],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      error: "Invalid technician findings",
+      code: "INVALID_FINDINGS",
+    });
+    expect(res.body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          index: 0,
+          path: ["measurementEstimate", "widthMm"],
+        }),
+        expect.objectContaining({
+          index: 0,
+          path: ["candidates", 0, "scorePct"],
+        }),
+      ]),
+    );
+    expect(analyzePhoto).not.toHaveBeenCalled();
+
+    const rows = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("does not persist any findings when a technician finding is invalid", async () => {
+    asUser(OWNER_ID);
+
+    const res = await request(app)
       .post("/api/analysis/analyze")
       .send({
         inspectionId,
         images: [],
         technicianFindings: [validFinding({ id: 1 }), invalidFinding({ id: 2 })],
       });
+    expect(res.status).toBe(400);
 
     const rows = await db
       .select()
       .from(analysisResultsTable)
       .where(eq(analysisResultsTable.companyId, companyId));
 
-    expect(rows).toHaveLength(1);
-    const stored = (rows[0].findings as unknown) as Array<Record<string, unknown>>;
-    expect(stored).toHaveLength(1);
-    expect(stored[0].category).toBe("Rodent Activity");
-    const hasInvalid = stored.some((f) => !("category" in f) || f.category === undefined);
-    expect(hasInvalid).toBe(false);
+    expect(rows).toHaveLength(0);
   });
 
-  it("returns an empty findings array when ALL technicianFindings are invalid", async () => {
+  it("returns 400 when ALL technicianFindings are invalid", async () => {
     asUser(OWNER_ID);
 
     const res = await request(app)
@@ -341,8 +507,8 @@ describe("POST /analysis/analyze — write-boundary finding validation", () => {
         technicianFindings: [invalidFinding({ id: 1 }), invalidFinding({ id: 2 })],
       });
 
-    expect([200, 201]).toContain(res.status);
-    expect(res.body.findings).toHaveLength(0);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_FINDINGS");
   });
 
   it("persists all valid technicianFindings unchanged when none are invalid", async () => {
@@ -430,7 +596,7 @@ describe("POST /analysis/analyze — write-boundary finding validation", () => {
     expect(stored).toHaveLength(0);
   });
 
-  it("keeps the valid AI finding and strips the malformed technician finding in the same run", async () => {
+  it("rejects malformed technician findings before provider work", async () => {
     asUser(OWNER_ID);
 
     // Seed a media row for the AI photo.
@@ -474,10 +640,15 @@ describe("POST /analysis/analyze — write-boundary finding validation", () => {
         technicianFindings: [invalidFinding({ id: 99 })],
       });
 
-    expect([200, 201]).toContain(res.status);
-    // Only the valid AI finding survives; the malformed technician finding is stripped.
-    expect(res.body.findings).toHaveLength(1);
-    expect((res.body.findings[0] as Record<string, unknown>).category).toBe("Conducive Condition");
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_FINDINGS");
+    expect(analyzePhoto).not.toHaveBeenCalled();
+
+    const rows = await db
+      .select()
+      .from(analysisResultsTable)
+      .where(eq(analysisResultsTable.companyId, companyId));
+    expect(rows).toHaveLength(0);
   });
 });
 

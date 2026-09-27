@@ -3,6 +3,17 @@ import { stripeStorage } from "./stripeStorage";
 import { logger } from "./logger";
 import type Stripe from "stripe";
 
+/** Add calendar months in UTC, preserving end-of-month semantics safely. */
+export function addUtcMonths(unixSeconds: number, months: number): number {
+  const date = new Date(unixSeconds * 1000);
+  const day = date.getUTCDate();
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  date.setUTCDate(Math.min(day, lastDay));
+  return Math.floor(date.getTime() / 1000);
+}
+
 /**
  * WebhookHandlers: processes raw Stripe webhook payloads.
  *
@@ -62,7 +73,7 @@ export class WebhookHandlers {
         if (session.mode !== "subscription") break;
 
         const companyId = Number(session.metadata?.companyId);
-        const tier = session.metadata?.tier as "solo" | "growth" | undefined;
+        const tier = session.metadata?.tier as "solo" | "micro" | "small" | "growth" | "professional" | "enterprise" | "pilot" | undefined;
         const subscriptionId = session.subscription as string | undefined;
 
         if (!companyId || !tier || !subscriptionId) {
@@ -71,6 +82,21 @@ export class WebhookHandlers {
             "checkout.session.completed: missing companyId/tier/subscriptionId in metadata",
           );
           break;
+        }
+
+        if (tier === "pilot") {
+          const stripe = await getUncachableStripeClient();
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const anchor = subscription.billing_cycle_anchor;
+          const cancelAt = addUtcMonths(anchor, 3);
+          if (subscription.cancel_at !== cancelAt) {
+            await stripe.subscriptions.update(subscriptionId, {
+              // Preserve Stripe's original anchor; this makes the three-cycle
+              // cutoff deterministic without changing the grandfathered price.
+              billing_cycle_anchor: "unchanged",
+              cancel_at: cancelAt,
+            });
+          }
         }
 
         await stripeStorage.updateCompanyStripeInfo(companyId, {
@@ -85,7 +111,7 @@ export class WebhookHandlers {
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
         const companyId = Number(sub.metadata?.companyId);
-        const tier = sub.metadata?.tier as "solo" | "growth" | undefined;
+        const tier = sub.metadata?.tier as "solo" | "micro" | "small" | "growth" | "professional" | "enterprise" | "pilot" | undefined;
 
         if (!companyId) break;
 

@@ -685,7 +685,11 @@ export interface BulkIngestResult {
 
 export function bulkIngestDataset(
   token: string | null,
-  images: Array<{ objectPath: string; filename?: string }>,
+  images: Array<{
+    objectPath: string;
+    filename?: string;
+    mediaType?: "photo" | "video";
+  }>,
   metadata: BulkIngestMetadata,
 ) {
   return request<BulkIngestResult>("/api/intelligence-dataset/bulk-ingest", token, {

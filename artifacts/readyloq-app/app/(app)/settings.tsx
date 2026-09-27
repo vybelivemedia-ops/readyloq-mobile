@@ -1124,6 +1124,47 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* ── Chemical Inventory (all techs, managers, owners) ─────────── */}
+        {isLoaded && (
+          <View>
+            <SectionHeader label="Chemical Inventory" />
+            <Card style={{ overflow: "hidden", padding: 0 }}>
+              <SettingRow
+                icon="flask-outline"
+                label="My Inventory"
+                sublabel="Track on-hand chemicals and log restocks"
+                onPress={() => router.push("/inventory" as Href)}
+              />
+              <SettingRow
+                icon="time-outline"
+                label="Restock History"
+                sublabel="Deliveries, manual additions, supplier imports"
+                onPress={() => router.push("/inventory" as Href)}
+                isLast
+              />
+            </Card>
+          </View>
+        )}
+
+        {/* ── Supplier Connections (owners only) ───────────────────────── */}
+        {isOwner && isLoaded && (
+          <View>
+            <SectionHeader label="Supplier Connections" />
+            <Card style={{ overflow: "hidden", padding: 0 }}>
+              <SettingRow
+                icon="cloud-upload-outline"
+                label="Veseris / Target Specialty / Univar"
+                sublabel="Register distributor accounts for CSV order import"
+                onPress={() => router.push("/supplier-connections" as Href)}
+                isLast
+              />
+            </Card>
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 8, paddingHorizontal: 4, lineHeight: 17 }}>
+              Connect your distribution account so that when you export a CSV from your supplier portal, ReadyLoq can match orders to each technician's on-hand inventory automatically.
+            </Text>
+          </View>
+        )}
+
         {/* ── Dispatch Integration (owners only) ───────────────────────── */}
         {isOwner && <DispatchIntegrationSection />}
 

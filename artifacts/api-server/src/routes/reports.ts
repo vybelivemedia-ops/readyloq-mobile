@@ -37,6 +37,11 @@ function safeParseFindings(raw: unknown): Finding[] {
 function serializeReport(
   row: typeof reportsTable.$inferSelect,
   pipelineValue?: number | null,
+  evidenceRecovery?: {
+    syncedPhotoCount: number;
+    needsRegeneration: boolean;
+    latestEvidenceAt: string | null;
+  },
 ) {
   // Always pass findings through safeParseFindings so that:
   //   - null DB values (legacy rows) become []
@@ -53,6 +58,30 @@ function serializeReport(
       : [],
     createdAt: row.createdAt.toISOString(),
     ...(pipelineValue != null ? { pipelineValue } : {}),
+    ...(evidenceRecovery ? { evidenceRecovery } : {}),
+  };
+}
+
+function buildEvidenceRecovery(
+  report: typeof reportsTable.$inferSelect,
+  photoCreatedAt: Date[],
+  latestAnalysisAt: Date | null,
+) {
+  const latestEvidenceDate = [...photoCreatedAt, latestAnalysisAt]
+    .filter((value): value is Date => value instanceof Date)
+    .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+  const generatedAtRaw = report.aiNarrative?.generatedAt;
+  const generatedAt =
+    typeof generatedAtRaw === "string" && !Number.isNaN(Date.parse(generatedAtRaw))
+      ? new Date(generatedAtRaw)
+      : null;
+  return {
+    syncedPhotoCount: photoCreatedAt.length,
+    needsRegeneration:
+      photoCreatedAt.length > 0 &&
+      (generatedAt === null ||
+        (latestEvidenceDate !== null && latestEvidenceDate > generatedAt)),
+    latestEvidenceAt: latestEvidenceDate?.toISOString() ?? null,
   };
 }
 
@@ -210,7 +239,40 @@ router.get("/:id", async (req, res) => {
       .from(reportsTable)
       .where(and(eq(reportsTable.id, id), eq(reportsTable.companyId, companyId)));
     if (!row) return res.status(404).json({ error: "Not found" });
-    return res.json(serializeReport(row));
+    const [photoRows, analysisRows] = await Promise.all([
+      db
+        .select({ createdAt: inspectionMediaTable.createdAt })
+        .from(inspectionMediaTable)
+        .where(
+          and(
+            eq(inspectionMediaTable.companyId, companyId),
+            eq(inspectionMediaTable.inspectionId, row.inspectionId),
+            inArray(inspectionMediaTable.mediaType, ["photo", "image"]),
+          ),
+        ),
+      db
+        .select({ createdAt: analysisResultsTable.createdAt })
+        .from(analysisResultsTable)
+        .where(
+          and(
+            eq(analysisResultsTable.companyId, companyId),
+            eq(analysisResultsTable.inspectionId, row.inspectionId),
+          ),
+        )
+        .orderBy(desc(analysisResultsTable.createdAt))
+        .limit(1),
+    ]);
+    return res.json(
+      serializeReport(
+        row,
+        undefined,
+        buildEvidenceRecovery(
+          row,
+          photoRows.map((photo) => photo.createdAt),
+          analysisRows[0]?.createdAt ?? null,
+        ),
+      ),
+    );
   } catch (err) {
     return res.status(500).json({ error: "Failed to get report" });
   }
@@ -421,6 +483,9 @@ router.get("/:id/html", async (req, res) => {
       .select({
         url: inspectionMediaTable.url,
         captureMetadata: inspectionMediaTable.captureMetadata,
+        caption: inspectionMediaTable.caption,
+        unitNumber: inspectionMediaTable.unitNumber,
+        createdAt: inspectionMediaTable.createdAt,
       })
       .from(inspectionMediaTable)
       .where(
@@ -439,7 +504,12 @@ router.get("/:id/html", async (req, res) => {
     //   /api/storage/objects/companies/…/…    (written by intelligence-AI)
     // Any image that cannot be fetched is silently omitted.
     const reportFindings = (report.findings ?? []) as Array<{ imageUrl?: string | null }>;
-    const imageDataMap = await buildFindingImageMap(reportFindings);
+    // Include all captured photo rows so the PDF evidence section can render
+    // unclassified photos as well as those linked to an AI finding.
+    const imageDataMap = await buildFindingImageMap([
+      ...reportFindings,
+      ...mediaRows.map((media) => ({ imageUrl: media.url })),
+    ]);
 
     const html = buildServerReportHtml(report, inspection, mediaRows, imageDataMap);
     res.setHeader("Content-Type", "text/html; charset=utf-8");

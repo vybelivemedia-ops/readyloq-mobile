@@ -147,6 +147,25 @@ export declare const analysisResultsTable: import("drizzle-orm/pg-core").PgTable
         }, {}, {
             $type: string[];
         }>;
+        photoOutcomes: import("drizzle-orm/pg-core").PgColumn<{
+            name: "photo_outcomes";
+            tableName: "analysis_results";
+            dataType: "json";
+            columnType: "PgJsonb";
+            data: PhotoAnalysisOutcome[];
+            driverParam: unknown;
+            notNull: false;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: PhotoAnalysisOutcome[];
+        }>;
         photoZones: import("drizzle-orm/pg-core").PgColumn<{
             name: "photo_zones";
             tableName: "analysis_results";
@@ -525,6 +544,10 @@ export interface VideoEvidence {
     label: string | null;
     frameAnalysisStatus: "pending";
 }
+export interface PhotoAnalysisOutcome {
+    imagePath: string;
+    status: "completed" | "failed" | "deferred" | "rate_limited";
+}
 export declare const insertAnalysisResultSchema: z.ZodObject<{
     status: z.ZodOptional<z.ZodString>;
     inspectionId: z.ZodInt;
@@ -532,6 +555,7 @@ export declare const insertAnalysisResultSchema: z.ZodObject<{
     recommendations: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;
     videoEvidence: z.ZodOptional<z.ZodNullable<z.ZodType<VideoEvidence[], VideoEvidence[], z.core.$ZodTypeInternals<VideoEvidence[], VideoEvidence[]>>>>;
     analyzedImagePaths: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;
+    photoOutcomes: z.ZodOptional<z.ZodNullable<z.ZodType<PhotoAnalysisOutcome[], PhotoAnalysisOutcome[], z.core.$ZodTypeInternals<PhotoAnalysisOutcome[], PhotoAnalysisOutcome[]>>>>;
     photoZones: z.ZodOptional<z.ZodNullable<z.ZodType<Record<string, string>, Record<string, string>, z.core.$ZodTypeInternals<Record<string, string>, Record<string, string>>>>>;
     coverage: z.ZodOptional<z.ZodNullable<z.ZodType<import("drizzle-zod").Json, unknown, z.core.$ZodTypeInternals<import("drizzle-zod").Json, unknown>>>>;
     overallConfidence: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;

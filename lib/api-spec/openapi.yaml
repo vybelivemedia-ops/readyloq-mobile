@@ -33,6 +33,10 @@ tags:
     description: Closed-beta center (feedback, errors, checklist, testers, invites)
   - name: gemini
     description: Gemini AI chat and image operations
+  - name: technician
+    description: Technician daily route/rig assignments
+  - name: mission-control
+    description: ReadyLoq Mission Control super-admin operations
 
 paths:
   # ── SCHEDULE ─────────────────────────────────────────────────────────────────
@@ -87,6 +91,189 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ScheduleEntry"
+        "404":
+          description: Inspection not found
+
+  /schedule/property-profile:
+    get:
+      operationId: getPropertyProfile
+      tags: [schedule]
+      summary: >-
+        Pre-inspection briefing for a property address — the last 5
+        inspections at that address, AI-synthesised historical pests/findings
+        from property memory, property notes (access instructions, hazards,
+        special needs), and the active bait station count from the most
+        recent inspection there. Access rules mirror GET
+        /schedule/route-outlook/{inspectionId}: manager/owner/sales see any
+        company address; other roles must have an inspection of their own at
+        that address.
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema: { type: string }
+          description: Exact site address to look up (matches inspections.siteAddress)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyProfile"
+        "400":
+          description: Missing address query param
+        "403":
+          description: Access denied — no inspection assigned to the caller at this address
+
+  /schedule/stop-history/{inspectionId}:
+    get:
+      operationId: getStopHistory
+      tags: [schedule]
+      summary: >-
+        Complete pre-service history for one scheduled stop, including recent
+        inspection summaries, photo evidence, site notes, recurring findings,
+        and material/chemical history. Inspection-backed history is limited to
+        completed service records before the stop's scheduled timestamp; a
+        same-day sibling completed before that time is included, while pending
+        and later records are excluded. When the guarded PestPac bridge is
+        activated, the response also includes normalized legacy location notes.
+        Technicians must be assigned to the exact stop; manager/owner/sales roles
+        may read any stop in their company.
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema: { type: integer }
+          description: Scheduled inspection/stop ID
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StopHistory"
+        "400":
+          description: Invalid inspection id
+        "403":
+          description: Access denied — the stop is not assigned to the caller
+        "404":
+          description: Stop not found in the authenticated company
+
+  /schedule/property-visit/{inspectionId}:
+    get:
+      operationId: getPropertyVisit
+      tags: [schedule]
+      summary: >-
+        Drill-down detail for a "visit" — every inspection sharing the same
+        company + site address + calendar date as the given inspection
+        (covers a single-family stop and a same-day multi-unit property
+        alike) — plus every chemical application logged across all of that
+        visit's units, each carrying a retreatment-interval compliance check
+        against the most recent PRIOR application of the same product at
+        this address. Access rules mirror GET /schedule/property-profile.
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema: { type: integer }
+          description: >-
+            Any inspection belonging to the visit — used only to resolve the
+            address and calendar date; the response covers every sibling
+            inspection at that address/date, not just this one.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyVisitDetail"
+        "400":
+          description: Invalid inspection id
+        "403":
+          description: Access denied — no inspection assigned to the caller at this address
+        "404":
+          description: Inspection not found
+
+  /schedule/route-calendar:
+    get:
+      operationId: getRouteCalendar
+      tags: [schedule]
+      summary: >-
+        Integrated Route Calendar — stops for a date window grouped by
+        calendar day, each annotated with a Route Readiness flag (has the
+        assigned technician set up their daily rig for that date?) and a
+        rolled-up Route Chemical Outlook count (due-soon/overdue products at
+        that stop's address). Same access scoping as GET /schedule
+        (manager/owner/sales see all company stops; other roles see only
+        their own).
+      parameters:
+        - name: start
+          in: query
+          required: true
+          schema: { type: string, format: date }
+          description: Start date (YYYY-MM-DD), inclusive
+        - name: end
+          in: query
+          required: true
+          schema: { type: string, format: date }
+          description: End date (YYYY-MM-DD), inclusive
+        - name: tzOffsetMinutes
+          in: query
+          schema: { type: integer }
+          description: >-
+            Caller's UTC offset in minutes, using the
+            `Date.prototype.getTimezoneOffset()` sign convention. Buckets and
+            labels each stop's calendarDate in the caller's local frame
+            instead of UTC, keeping it consistent with Route Readiness (which
+            keys off the technician's own device-local rig date). Defaults to
+            0 (UTC) when omitted.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RouteCalendarDay"
+        "400":
+          description: Missing or invalid date params
+
+  /schedule/route-outlook/{inspectionId}:
+    get:
+      operationId: getRouteOutlook
+      tags: [schedule]
+      summary: >-
+        Full Route Chemical Outlook for a stop's address — every product
+        applied there within the lookback window, projected forward from its
+        most recent application to flag due / due-soon / overdue for
+        reapplication. Access rules mirror GET /schedule/property-visit/{id}:
+        manager/owner/sales see any company address; other roles must have an
+        inspection of their own at that address.
+      parameters:
+        - name: inspectionId
+          in: path
+          required: true
+          schema: { type: integer }
+          description: >-
+            Any inspection at the target address — used only to resolve the
+            address and calendar date; the outlook itself covers every
+            inspection at that address, not just this one.
+        - name: tzOffsetMinutes
+          in: query
+          schema: { type: integer }
+          description: >-
+            Caller's UTC offset in minutes (same convention as
+            /schedule/route-calendar). Defaults to 0 (UTC) when omitted.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RouteOutlookDetail"
+        "403":
+          description: Access denied — no inspection assigned to the caller at this address
         "404":
           description: Inspection not found
 
@@ -1860,6 +2047,727 @@ paths:
               schema:
                 $ref: "#/components/schemas/GeminiImageOutput"
 
+  # ── TECHNICIAN / DAILY RIG ───────────────────────────────────────────────────
+  /technician/daily-rig:
+    get:
+      operationId: getDailyRig
+      tags: [technician]
+      summary: >-
+        Fetch the authenticated technician's own route chemical assignments
+        for a date (defaults to today, server UTC clock), each enriched with
+        the full product record (including label rules).
+      parameters:
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+          description: Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyRig"
+        "401":
+          description: Unauthorized
+        "404":
+          description: No route set up for this date
+    post:
+      operationId: upsertDailyRig
+      tags: [technician]
+      summary: >-
+        Create or replace the authenticated technician's route chemical
+        assignments for a date (defaults to today, server UTC clock).
+        Upserts on (companyId, technicianId, rigDate), so retries are safe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertDailyRigInput"
+      responses:
+        "201":
+          description: Created / replaced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyRig"
+        "400":
+          description: Invalid body
+        "401":
+          description: Unauthorized
+
+  /technician/daily-rig/recent-mixes:
+    get:
+      operationId: getRecentMixes
+      tags: [technician]
+      summary: >-
+        Last-30-day treatment logs for the authenticated technician, deduped
+        by (productId, siteClassification), newest first, capped at 5 — used
+        for quick-pick suggestions in the treatment wizard.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RecentMix"
+        "401":
+          description: Unauthorized
+
+  /technician/daily-rig/lookup:
+    get:
+      operationId: lookupDailyRig
+      tags: [technician]
+      summary: >-
+        Read-only Route Readiness lookup for any technician/date pair. Used
+        by the Integrated Route Calendar so a manager (or a technician
+        looking at a future date) can see whether a stop's daily rig has been
+        set up, without the editing affordances of GET/POST
+        /technician/daily-rig (which always target the authenticated
+        technician's own current-day rig). Self-lookups are always allowed;
+        looking up another technician requires manager/owner/sales.
+      parameters:
+        - name: technicianId
+          in: query
+          required: true
+          schema: { type: string }
+          description: Clerk user ID of the technician whose daily rig to look up
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+          description: Rig date (YYYY-MM-DD), matching the technician's device-local calendar date
+      responses:
+        "200":
+          description: Rig found for this technician/date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyRigLookupResult"
+        "400":
+          description: Missing or invalid technicianId/date params
+        "403":
+          description: Access denied — manager/owner/sales only when looking up another technician
+        "404":
+          description: No route set up for this technician/date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyRigNotSetUp"
+
+  /technician/daily-rig/route-readiness:
+    get:
+      operationId: getRouteReadiness
+      tags: [technician]
+      summary: >-
+        Today's Route Readiness for one technician — compares their
+        scheduled stops for a calendar date against their truck's on-hand
+        quantities for the products declared on that date's rig, using
+        recent per-application usage history to project what today is
+        likely to consume. Proactive, TODAY-scoped signal; distinct from
+        Truck Stock Health (a longer-range trending projection) and from the
+        existing reactive restockThreshold alert. Self-lookups are always
+        allowed; looking up another technician requires manager/owner/sales.
+      parameters:
+        - name: technicianId
+          in: query
+          schema: { type: string }
+          description: Clerk user ID to look up; defaults to the authenticated caller
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+          description: Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted
+        - name: tzOffsetMinutes
+          in: query
+          schema: { type: integer }
+          description: >-
+            Caller's UTC offset in minutes (same convention as
+            /schedule/route-calendar). Defaults to 0 (UTC) when omitted.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RouteReadiness"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Access denied — manager/owner/sales only when looking up another technician
+
+  /technician/daily-rig/team-route-readiness:
+    get:
+      operationId: getTeamRouteReadiness
+      tags: [technician]
+      summary: >-
+        Today's Route Readiness computed for every technician in the
+        company, for a calendar date. Manager/owner only.
+      parameters:
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+          description: Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted
+        - name: tzOffsetMinutes
+          in: query
+          schema: { type: integer }
+          description: >-
+            Caller's UTC offset in minutes (same convention as
+            /schedule/route-calendar). Defaults to 0 (UTC) when omitted.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RouteReadiness"
+        "403":
+          description: Access denied — manager/owner only
+
+  # ── MISSION CONTROL (SUPER-ADMIN) ──────────────────────────────────────────────
+  /mission-control/me:
+    get:
+      operationId: getMissionControlMe
+      tags: [mission-control]
+      summary: Check the authenticated user's super-admin access
+      responses:
+        "200":
+          description: Access identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlMe"
+        "401":
+          description: Unauthorized
+
+  /mission-control/overview:
+    get:
+      operationId: getMissionControlOverview
+      tags: [mission-control]
+      summary: Platform KPIs and recent alerts
+      responses:
+        "200":
+          description: Platform overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlOverview"
+
+  /mission-control/companies:
+    get:
+      operationId: listMissionControlCompanies
+      tags: [mission-control]
+      summary: Search and paginate platform companies
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Paginated companies
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlCompanyPage"
+
+  /mission-control/companies/{id}:
+    get:
+      operationId: getMissionControlCompany
+      tags: [mission-control]
+      summary: Get platform company detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Company detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlCompanyDetail"
+        "404":
+          description: Company not found
+
+  /mission-control/companies/{id}/access:
+    post:
+      operationId: updateMissionControlCompanyAccess
+      tags: [mission-control]
+      summary: Suspend or enable company access with required approval
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyAccessChangeInput"
+      responses:
+        "200":
+          description: Access updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyAccessChangeResult"
+        "403":
+          description: Required approval is missing or invalid
+        "404":
+          description: Company not found
+
+  /mission-control/technicians:
+    get:
+      operationId: listMissionControlTechnicians
+      tags: [mission-control]
+      summary: Search technicians, optionally scoped to a company
+      parameters:
+        - name: companyId
+          in: query
+          schema: { type: integer }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Paginated technicians
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlTechnicianPage"
+
+  /mission-control/properties:
+    get:
+      operationId: listMissionControlProperties
+      tags: [mission-control]
+      summary: Search platform properties, optionally scoped to a company
+      description: >-
+        Returns privacy-safe property directory summaries for super-admin
+        drill-down. Customer names, notes, technician knowledge, hotspots,
+        media URLs, and other private property content are withheld.
+      parameters:
+        - name: companyId
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Paginated privacy-safe properties
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlPropertyPage"
+
+  /mission-control/properties/{id}:
+    get:
+      operationId: getMissionControlProperty
+      tags: [mission-control]
+      summary: Get a privacy-safe platform property detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Property detail with inspection IDs for drill-down
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlPropertyDetail"
+        "404":
+          description: Property not found
+
+  /mission-control/technicians/{id}:
+    get:
+      operationId: getMissionControlTechnician
+      tags: [mission-control]
+      summary: Inspect one technician and their recent inspection references
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Technician and company-scoped history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlTechnicianDetail"
+        "404":
+          description: Technician not found
+
+  /mission-control/device-sessions/{id}:
+    get:
+      operationId: getMissionControlDeviceSession
+      tags: [mission-control]
+      summary: Inspect one device session and sanitized event history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Device session and event history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlDeviceSessionDetail"
+        "404":
+          description: Device session not found
+
+  /mission-control/users/{id}/access:
+    post:
+      operationId: updateMissionControlUserAccess
+      tags: [mission-control]
+      summary: Enable or disable beta access with required approval
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserAccessChangeInput"
+      responses:
+        "200":
+          description: User access updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAccessChangeResult"
+        "403":
+          description: Required approval is missing or invalid
+        "404":
+          description: User not found
+
+  /mission-control/inspections:
+    get:
+      operationId: listMissionControlInspections
+      tags: [mission-control]
+      summary: Search inspections across the platform
+      parameters:
+        - name: companyId
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Paginated inspections
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlInspectionPage"
+
+  /mission-control/inspections/{id}:
+    get:
+      operationId: getMissionControlInspection
+      tags: [mission-control]
+      summary: Get diagnostic inspection detail and synchronization history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Inspection diagnostic detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlInspectionDetail"
+        "404":
+          description: Inspection not found
+
+  /mission-control/incidents:
+    get:
+      operationId: listMissionControlIncidents
+      tags: [mission-control]
+      summary: Filter and paginate platform incidents
+      parameters:
+        - name: severity
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: companyId
+          in: query
+          schema: { type: integer }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Paginated incidents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlIncidentPage"
+
+  /mission-control/incidents/{id}:
+    get:
+      operationId: getMissionControlIncident
+      tags: [mission-control]
+      summary: Get incident detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Incident detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlIncident"
+        "404":
+          description: Incident not found
+    patch:
+      operationId: updateMissionControlIncident
+      tags: [mission-control]
+      summary: Acknowledge, assign, or escalate an incident
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentUpdate"
+      responses:
+        "200":
+          description: Incident updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlIncident"
+        "404":
+          description: Incident not found
+
+  /mission-control/audit:
+    get:
+      operationId: listMissionControlAudit
+      tags: [mission-control]
+      summary: Paginated super-admin action history
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: actorId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Paginated audit history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlAuditPage"
+
+  /mission-control/agents:
+    get:
+      operationId: listMissionControlAgents
+      tags: [mission-control]
+      summary: List executive agents and real-task-backed Agent Zero availability
+      responses:
+        "200":
+          description: Agent identities and current availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlAgentRoster"
+
+  /mission-control/agents/tasks:
+    get:
+      operationId: listMissionControlAgentTasks
+      tags: [mission-control]
+      summary: List agent tasks
+      parameters:
+        - name: companyId
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Paginated agent tasks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlAgentTaskPage"
+    post:
+      operationId: createMissionControlAgentTask
+      tags: [mission-control]
+      summary: Create a company-scoped agent investigation task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentTaskInput"
+      responses:
+        "201":
+          description: Investigation task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlAgentTask"
+        "404":
+          description: Company not found
+
+  /mission-control/agents/tasks/{id}:
+    get:
+      operationId: getMissionControlAgentTask
+      tags: [mission-control]
+      summary: Get an agent task and its results
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Agent task detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlAgentTask"
+        "404":
+          description: Agent task not found
+
+  /mission-control/approvals:
+    get:
+      operationId: listMissionControlApprovals
+      tags: [mission-control]
+      summary: List approval requests
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Paginated approvals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlApprovalPage"
+
+  /mission-control/approvals/requests:
+    post:
+      operationId: requestMissionControlApproval
+      tags: [mission-control]
+      summary: Request a second administrator's approval for an access change
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MissionControlApprovalRequest"
+      responses:
+        "201":
+          description: Approval request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlApproval"
+        "409":
+          description: Idempotency key already used for a different request
+
+  /mission-control/approvals/{id}/decision:
+    post:
+      operationId: decideMissionControlApproval
+      tags: [mission-control]
+      summary: Approve or reject an approval request with a note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalDecisionInput"
+      responses:
+        "200":
+          description: Approval decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissionControlApproval"
+        "404":
+          description: Approval request not found
+
 components:
   schemas:
     OkResponse:
@@ -2080,6 +2988,7 @@ components:
         id:            { type: integer }
         siteAddress:   { type: string }
         clientName:    { type: ["string", "null"] }
+        unitNumber:    { type: ["string", "null"], description: "Unit or apartment number for a multi-family property" }
         technicianName: { type: string }
         technicianId:  { type: ["string", "null"] }
         status:        { type: string }
@@ -2099,6 +3008,268 @@ components:
         technicianName:  { type: string, minLength: 1 }
         technicianId:    { type: ["string", "null"] }
 
+    RouteOutlookStatus:
+      type: string
+      enum: [ok, due-soon, overdue]
+
+    RouteOutlookProduct:
+      type: object
+      required:
+        [
+          productId,
+          productName,
+          targetPest,
+          lastAppliedAt,
+          daysSinceApplication,
+          retreatmentIntervalDays,
+          nextEligibleReapplicationDate,
+          eligibleNow,
+          outlookStatus,
+          applicationsLast90Days,
+        ]
+      properties:
+        productId:      { type: integer }
+        productName:    { type: string }
+        targetPest:     { type: string }
+        lastAppliedAt:  { type: string, description: "ISO-8601 datetime of the most recent application at this address" }
+        daysSinceApplication: { type: integer }
+        retreatmentIntervalDays: { type: ["integer", "null"], description: "Label-defined minimum days before reapplication; null when the label sets no minimum" }
+        nextEligibleReapplicationDate: { type: ["string", "null"], description: "YYYY-MM-DD; null when there is no retreatment interval to project from" }
+        eligibleNow:    { type: boolean }
+        outlookStatus:  { $ref: "#/components/schemas/RouteOutlookStatus" }
+        applicationsLast90Days: { type: integer }
+
+    RouteOutlookDetail:
+      type: object
+      required: [address, calendarDate, products]
+      properties:
+        address:      { type: string }
+        calendarDate: { type: string, description: "YYYY-MM-DD" }
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteOutlookProduct"
+
+    RouteCalendarStop:
+      type: object
+      required: [id, siteAddress, technicianName, status, calendarDate, readiness, outlook]
+      properties:
+        id:            { type: integer }
+        siteAddress:   { type: string }
+        clientName:    { type: ["string", "null"] }
+        unitNumber:    { type: ["string", "null"] }
+        technicianName: { type: string }
+        technicianId:  { type: ["string", "null"] }
+        status:        { type: string }
+        severity:      { type: ["string", "null"] }
+        pestTypes:
+          type: array
+          items: { type: string }
+        calendarDate:  { type: string, description: "YYYY-MM-DD" }
+        readiness:
+          type: object
+          required: [dailyRigSetUp]
+          properties:
+            dailyRigSetUp:
+              type: ["boolean", "null"]
+              description: "null when the stop has no assigned technician"
+          description: Route Readiness — has the assigned technician set up their daily rig for this stop's calendar date?
+        outlook:
+          type: object
+          required: [overdueCount, dueSoonCount, okCount, hasOutlookData]
+          properties:
+            overdueCount:    { type: integer }
+            dueSoonCount:    { type: integer }
+            okCount:         { type: integer }
+            hasOutlookData:  { type: boolean, description: "false when no treatment history exists yet at this address" }
+          description: Rolled-up Route Chemical Outlook counts for this stop's address
+
+    RouteCalendarDay:
+      type: object
+      required: [date, stops]
+      properties:
+        date: { type: string, description: "YYYY-MM-DD" }
+        stops:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteCalendarStop"
+
+    RecentInspectionSummary:
+      type: object
+      required: [id, status, pestTypes, technicianName, calendarDate, findingsCount]
+      properties:
+        id:              { type: integer }
+        status:          { type: string }
+        severity:        { type: ["string", "null"] }
+        pestTypes:
+          type: array
+          items: { type: string }
+        technicianName:  { type: string }
+        calendarDate:    { type: string, description: "YYYY-MM-DD" }
+        findingsCount:   { type: integer }
+        completedAt:     { type: ["string", "null"] }
+
+    PropertyNoteSummary:
+      type: object
+      required: [id, note, createdAt]
+      properties:
+        id:         { type: integer }
+        note:       { type: string }
+        zone:       { type: ["string", "null"] }
+        category:   { type: ["string", "null"] }
+        authorName: { type: ["string", "null"] }
+        createdAt:  { type: string }
+
+    HistoricalFinding:
+      type: object
+      required: [category, description, frequency]
+      properties:
+        category:    { type: string }
+        description: { type: string }
+        frequency:   { type: integer }
+        severity:    { type: string, enum: [low, medium, high] }
+
+    StopHistoryPhoto:
+      type: object
+      required: [id, url, inspectionId, calendarDate, createdAt]
+      properties:
+        id:           { type: integer }
+        url:          { type: string }
+        filename:     { type: ["string", "null"] }
+        caption:      { type: ["string", "null"] }
+        inspectionId: { type: integer }
+        calendarDate: { type: string, description: "YYYY-MM-DD" }
+        createdAt:    { type: string }
+
+    PropertyProfile:
+      type: object
+      required: [address, addressKey, recentInspections, historicalPhotos, materialHistory, activeBaitStations, historicalPests, historicalFindings, notes]
+      properties:
+        address:    { type: string }
+        addressKey: { type: string }
+        recentInspections:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecentInspectionSummary"
+        historicalPhotos:
+          type: array
+          items:
+            $ref: "#/components/schemas/StopHistoryPhoto"
+        materialHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChemicalLedgerEntry"
+        activeBaitStations: { type: integer }
+        historicalPests:
+          type: array
+          items: { type: string }
+        historicalFindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoricalFinding"
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PropertyNoteSummary"
+
+    PestPacLegacyNote:
+      type: object
+      required: [id, note, category, authorName, createdAt]
+      properties:
+        id:         { type: string }
+        note:       { type: string }
+        category:   { type: ["string", "null"] }
+        authorName: { type: ["string", "null"] }
+        createdAt:  { type: ["string", "null"], format: date-time }
+
+    PestPacStopHistory:
+      type: object
+      required: [status, notes]
+      properties:
+        status:
+          type: string
+          enum: [available, disabled, not_configured, not_mapped, unavailable]
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PestPacLegacyNote"
+
+    StopHistory:
+      allOf:
+        - $ref: "#/components/schemas/PropertyProfile"
+        - type: object
+          required: [stopId, pestPacHistory]
+          properties:
+            stopId: { type: integer }
+            pestPacHistory:
+              $ref: "#/components/schemas/PestPacStopHistory"
+
+    PropertyVisitUnit:
+      type: object
+      required: [id, technicianName, status, pestTypes, findingsCount, mediaCount]
+      properties:
+        id:             { type: integer }
+        unitNumber:     { type: ["string", "null"] }
+        clientName:     { type: ["string", "null"] }
+        technicianName: { type: string }
+        technicianId:   { type: ["string", "null"] }
+        status:         { type: string }
+        severity:       { type: ["string", "null"] }
+        pestTypes:
+          type: array
+          items: { type: string }
+        notes:          { type: ["string", "null"] }
+        visitPurpose:   { type: ["string", "null"] }
+        findingsCount:  { type: integer }
+        mediaCount:     { type: integer }
+        completedAt:    { type: ["string", "null"] }
+
+    ChemicalLedgerCompliance:
+      type: object
+      required: [retreatmentIntervalDays, priorApplicationAt, daysSincePrior, isCompliant, nextEligibleReapplicationDate, eligibleNow]
+      properties:
+        retreatmentIntervalDays: { type: ["integer", "null"], description: "Label-defined minimum days before reapplication; null when the label sets no minimum" }
+        priorApplicationAt:      { type: ["string", "null"], description: "ISO-8601 datetime of the most recent PRIOR application of the same product at this address; null when there is none" }
+        daysSincePrior:          { type: ["integer", "null"] }
+        isCompliant:             { type: boolean }
+        nextEligibleReapplicationDate: { type: ["string", "null"] }
+        eligibleNow:             { type: boolean }
+
+    ChemicalLedgerEntry:
+      type: object
+      required: [id, inspectionId, productId, productName, targetPest, siteClassification, appliedAt, compliance]
+      properties:
+        id:                    { type: integer }
+        inspectionId:          { type: integer }
+        productId:             { type: integer }
+        productName:           { type: string }
+        epaRegistrationNumber: { type: ["string", "null"] }
+        targetPest:            { type: string }
+        siteClassification:    { type: string }
+        areaSqft:              { type: ["number", "null"] }
+        linearFt:              { type: ["number", "null"] }
+        totalProductOz:        { type: ["number", "null"] }
+        equipmentUsed:         { type: ["string", "null"] }
+        notes:                 { type: ["string", "null"] }
+        appliedAt:             { type: string }
+        compliance:
+          $ref: "#/components/schemas/ChemicalLedgerCompliance"
+
+    PropertyVisitDetail:
+      type: object
+      required: [address, calendarDate, units, chemicalLedger]
+      properties:
+        address:      { type: string }
+        calendarDate: { type: string, description: "YYYY-MM-DD" }
+        units:
+          type: array
+          items:
+            $ref: "#/components/schemas/PropertyVisitUnit"
+        chemicalLedger:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChemicalLedgerEntry"
+
     # ── INSPECTION SCHEMAS ──────────────────────────────────────────────────────
     Inspection:
       type: object
@@ -2107,6 +3278,7 @@ components:
         id:          { type: integer }
         siteAddress: { type: string }
         clientName:  { type: ["string", "null"] }
+        unitNumber:  { type: ["string", "null"] }
         technicianName: { type: string }
         technicianId: { type: ["string", "null"] }
         status:      { type: string }
@@ -2115,6 +3287,13 @@ components:
           items: { type: string }
         severity:    { type: ["string", "null"] }
         notes:       { type: ["string", "null"] }
+        visitPurpose:
+          type: ["string", "null"]
+          description: >-
+            Freeform reason for the visit (e.g. "Routine Inspection",
+            "Callback", "Initial Service"). Not a strict enum so it can also
+            be populated by a future enterprise-routing import. Null for
+            historical rows and older clients that predate this field.
         mediaCount:  { type: integer }
         findingsCount: { type: integer }
         media:
@@ -2149,9 +3328,11 @@ components:
       properties:
         siteAddress:    { type: string }
         clientName:     { type: string }
+        unitNumber:     { type: ["string", "null"] }
         technicianName: { type: string }
         technicianId:   { type: string }
         notes:          { type: string }
+        visitPurpose:   { type: string }
         pestTypes:
           type: array
           items: { type: string }
@@ -2172,6 +3353,8 @@ components:
           type: array
           items: { type: string }
         completedAt: { type: string }
+        unitNumber:  { type: ["string", "null"] }
+        visitPurpose: { type: ["string", "null"] }
 
     InspectionMedia:
       type: object
@@ -2189,7 +3372,9 @@ components:
         captureMetadata:
           type: ["object", "null"]
           additionalProperties: true
-        createdAt:    { type: string }
+        unitNumber:   { type: ["string", "null"] }
+        capturedAt:   { type: ["string", "null"], format: date-time }
+        createdAt:    { type: string, format: date-time }
 
     MediaInput:
       type: object
@@ -2205,6 +3390,8 @@ components:
         captureMetadata:
           type: object
           additionalProperties: true
+        unitNumber: { type: ["string", "null"] }
+        capturedAt: { type: string, format: date-time }
 
     # ── ANALYSIS SCHEMAS ────────────────────────────────────────────────────────
     AnalysisResult:
@@ -2235,6 +3422,17 @@ components:
         analyzedImagePaths:
           type: array
           items: { type: string }
+        photoOutcomes:
+          type: array
+          description: Per-photo provider outcome from the most recent analysis run.
+          items:
+            type: object
+            required: [imagePath, status]
+            properties:
+              imagePath: { type: string }
+              status:
+                type: string
+                enum: [completed, failed, deferred, rate_limited]
         photoZones:
           type: object
           additionalProperties: { type: string }
@@ -2439,7 +3637,17 @@ components:
 
     Finding:
       type: object
-      required: [id, category, description, confidence]
+      additionalProperties: false
+      required:
+        - id
+        - category
+        - description
+        - confidence
+        - severity
+        - location
+        - imageUrl
+        - treatment
+        - exclusionOpportunity
       properties:
         id:            { type: integer }
         category:      { type: string }
@@ -2450,14 +3658,48 @@ components:
         imageUrl:      { type: ["string", "null"] }
         treatment:     { type: ["string", "null"] }
         exclusionOpportunity: { type: ["boolean", "null"] }
-        evidenceQuality: { type: ["string", "null"] }
+        evidenceQuality:
+          type: ["string", "null"]
+          enum: [excellent, good, fair, null]
+        possiblePest: { type: ["string", "null"] }
         species:       { type: ["string", "null"] }
         lifeStage:     { type: ["string", "null"] }
         conduciveCondition: { type: ["string", "null"] }
         harborage:     { type: ["string", "null"] }
         moisture:      { type: ["string", "null"] }
         structuralIssue: { type: ["string", "null"] }
+        measurementEstimate:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [confidence, source]
+              properties:
+                linearFt: { type: ["number", "null"] }
+                gapWidthIn: { type: ["number", "null"] }
+                heightFt: { type: ["number", "null"] }
+                confidence: { type: number }
+                source:
+                  type: string
+                  enum: [ai_vision_estimate]
+            - type: "null"
         zone:          { type: ["string", "null"] }
+        candidates:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [species, confidence]
+            properties:
+              species: { type: string }
+              confidence: { type: number }
+        confidenceLabel:
+          type: string
+          enum: [identified, possible, unidentified]
+        reviewStatus:
+          type: string
+          enum: [pending, accepted, corrected, dismissed]
+        technicianSpecies: { type: ["string", "null"] }
+        technicianCorrectionNotes: { type: ["string", "null"] }
 
     FeedbackInput:
       type: object
@@ -2598,6 +3840,7 @@ components:
         id:                         { type: integer }
         imageUrl:                   { type: string }
         thumbnailUrl:               { type: ["string", "null"] }
+        mediaType:                  { type: string, enum: [photo, video] }
         aiPrediction:
           $ref: "#/components/schemas/AiPrediction"
         aiConfidence:               { type: ["number", "null"] }
@@ -2821,7 +4064,20 @@ components:
           oneOf:
             - type: "null"
             - $ref: "#/components/schemas/AiReportNarrative"
+        evidenceRecovery:
+          $ref: "#/components/schemas/ReportEvidenceRecovery"
         createdAt:       { type: string }
+
+    ReportEvidenceRecovery:
+      type: object
+      required: [syncedPhotoCount, needsRegeneration, latestEvidenceAt]
+      description: >-
+        Present on report-detail responses. Signals when photo media or analysis
+        finished syncing after the current narrative was generated.
+      properties:
+        syncedPhotoCount: { type: integer, minimum: 0 }
+        needsRegeneration: { type: boolean }
+        latestEvidenceAt: { type: ["string", "null"], format: date-time }
 
     AiReportNarrative:
       type: object
@@ -3866,3 +5122,756 @@ components:
       required: [error]
       properties:
         error: { type: string }
+
+    # ── TECHNICIAN / DAILY RIG SCHEMAS ───────────────────────────────────────────
+    ProductLabelRules:
+      type: object
+      required:
+        [
+          id,
+          productId,
+          approvedPestTypes,
+          approvedSiteClassifications,
+          requiredEquipmentTypes,
+          nozzleSpec,
+          pressurePsi,
+          dropletSize,
+          maxRateOzPer1000Sqft,
+          maxRateOzPerGallon,
+          mixingSteps,
+          maxTempF,
+          phytotoxicityNotes,
+          reEntryIntervalHours,
+          retreatmentIntervalDays,
+          createdAt,
+        ]
+      properties:
+        id:        { type: integer }
+        productId: { type: integer }
+        approvedPestTypes:
+          type: array
+          items: { type: string }
+        approvedSiteClassifications:
+          type: array
+          items: { type: string }
+        requiredEquipmentTypes:
+          type: array
+          items: { type: string }
+        nozzleSpec:    { type: ["string", "null"] }
+        pressurePsi:   { type: ["string", "null"] }
+        dropletSize:   { type: ["string", "null"] }
+        maxRateOzPer1000Sqft: { type: ["number", "null"] }
+        maxRateOzPerGallon:   { type: ["number", "null"] }
+        mixingSteps:
+          type: array
+          items: { type: string }
+        maxTempF: { type: ["integer", "null"] }
+        phytotoxicityNotes: { type: ["string", "null"] }
+        reEntryIntervalHours: { type: ["number", "null"] }
+        retreatmentIntervalDays: { type: ["integer", "null"], description: "Minimum whole days before this product may legally be reapplied to the same site" }
+        createdAt: { type: string }
+
+    Product:
+      type: object
+      required: [id, name, epaRegistrationNumber, productType, activeIngredients, signalWord, manufacturerName, isActive, createdAt, labelRules]
+      properties:
+        id:                    { type: integer }
+        name:                  { type: string }
+        epaRegistrationNumber: { type: ["string", "null"] }
+        productType:           { type: string, enum: [restricted-use, general-use] }
+        activeIngredients:     { type: string }
+        signalWord:            { type: ["string", "null"], enum: [DANGER, WARNING, CAUTION, NONE, null] }
+        manufacturerName:      { type: ["string", "null"] }
+        isActive:              { type: boolean }
+        createdAt:             { type: string }
+        labelRules:
+          description: "Inlined product_label_rules row; null when none has been configured for this product"
+          oneOf:
+            - $ref: "#/components/schemas/ProductLabelRules"
+            - type: "null"
+
+    RouteAssignmentWithProduct:
+      type: object
+      required: [productId, targetPest, product]
+      properties:
+        productId:  { type: integer }
+        targetPest: { type: string, description: "Canonical pest name, e.g. \"German Cockroaches\"" }
+        notes:      { type: string, description: "Optional free-text context, e.g. \"perimeter only\"" }
+        product:
+          description: "null if the product has since been deleted from the catalogue"
+          oneOf:
+            - $ref: "#/components/schemas/Product"
+            - type: "null"
+
+    DailyRigLookupResult:
+      type: object
+      required: [setUp, technicianId, rigDate, assignments, createdAt, updatedAt]
+      properties:
+        setUp:        { type: boolean, enum: [true] }
+        technicianId: { type: string }
+        rigDate:      { type: string, description: "YYYY-MM-DD" }
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteAssignmentWithProduct"
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    DailyRigNotSetUp:
+      type: object
+      required: [error, setUp]
+      properties:
+        error: { type: string }
+        setUp: { type: boolean, enum: [false] }
+
+    RouteAssignmentInput:
+      type: object
+      required: [productId, targetPest]
+      properties:
+        productId:  { type: integer }
+        targetPest: { type: string, minLength: 1, description: "Canonical pest name, e.g. \"German Cockroaches\"" }
+        notes:      { type: string, description: "Optional free-text context, e.g. \"perimeter only\"" }
+
+    UpsertDailyRigInput:
+      type: object
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteAssignmentInput"
+        date:
+          type: string
+          format: date
+          description: Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted
+
+    DailyRig:
+      type: object
+      required: [id, technicianId, rigDate, assignments, createdAt, updatedAt]
+      properties:
+        id:           { type: integer }
+        technicianId: { type: string }
+        rigDate:      { type: string, description: "YYYY-MM-DD" }
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteAssignmentWithProduct"
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    RecentMix:
+      type: object
+      required: [logId, productId, productName, productActiveIngredients, targetPest, siteClassification, appliedAt]
+      properties:
+        logId:                    { type: integer }
+        productId:                { type: integer }
+        productName:              { type: string }
+        productActiveIngredients: { type: string }
+        targetPest:               { type: string }
+        siteClassification:       { type: string }
+        areaSqft:                 { type: ["number", "null"] }
+        linearFt:                 { type: ["number", "null"] }
+        totalProductOz:           { type: ["number", "null"] }
+        equipmentUsed:            { type: ["string", "null"] }
+        appliedAt:                { type: string }
+
+    RouteReadinessProductStatus:
+      type: string
+      enum: [ready, short, insufficient-data]
+
+    RouteReadinessOverallStatus:
+      type: string
+      enum: [ready, short, not-set-up]
+
+    RouteReadinessProduct:
+      type: object
+      required: [productId, productName, targetPest, unit, quantityOnHand, avgUsagePerStop, expectedUsageToday, status]
+      properties:
+        productId:          { type: integer }
+        productName:        { type: string }
+        targetPest:         { type: string }
+        unit:               { type: string }
+        quantityOnHand:     { type: number }
+        avgUsagePerStop:    { type: ["number", "null"], description: "Average quantity used per application over the last 30 days; null when there is no history yet" }
+        expectedUsageToday: { type: ["number", "null"], description: "avgUsagePerStop * stopCount; null when avgUsagePerStop is null" }
+        status:             { $ref: "#/components/schemas/RouteReadinessProductStatus" }
+
+    RouteReadiness:
+      type: object
+      required: [technicianId, date, stopCount, rigSetUp, overallStatus, products]
+      properties:
+        technicianId:  { type: string }
+        date:          { type: string, description: "YYYY-MM-DD" }
+        stopCount:     { type: integer }
+        rigSetUp:      { type: boolean }
+        overallStatus: { $ref: "#/components/schemas/RouteReadinessOverallStatus" }
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteReadinessProduct"
+
+    MissionControlMe:
+      type: object
+      required: [userId, isSuperAdmin]
+      properties:
+        userId: { type: string }
+        isSuperAdmin: { type: boolean }
+
+    MissionControlOverview:
+      type: object
+      required: [kpis, recentAlerts, aiAnalysisHealth]
+      properties:
+        kpis:
+          $ref: "#/components/schemas/MissionControlPlatformKpis"
+        recentAlerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlAlert"
+        aiAnalysisHealth:
+          $ref: "#/components/schemas/MissionControlAIAnalysisHealth"
+
+    MissionControlAIAnalysisHealth:
+      type: object
+      required: [windowHours, completedCount, failedCount, pendingCount, latestResultAt]
+      properties:
+        windowHours: { type: integer, const: 24 }
+        completedCount: { type: integer }
+        failedCount: { type: integer }
+        pendingCount: { type: integer }
+        latestResultAt: { type: ["string", "null"], format: date-time }
+
+    MissionControlPlatformKpis:
+      type: object
+      required: [companyCount, activeCompanyCount, userCount, technicianCount, inspectionCount, openIncidentCount]
+      properties:
+        companyCount: { type: integer }
+        activeCompanyCount: { type: integer }
+        userCount: { type: integer }
+        technicianCount: { type: integer }
+        inspectionCount: { type: integer }
+        openIncidentCount: { type: integer }
+
+    MissionControlAlert:
+      type: object
+      required: [id, severity, title, message, createdAt]
+      properties:
+        id: { type: integer }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        title: { type: string }
+        message: { type: string }
+        companyId: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    MissionControlCompanyPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlCompany"
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    MissionControlCompany:
+      type: object
+      required: [id, name, accessStatus, createdAt, userCount, technicianCount, inspectionCount]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        accessStatus: { type: string, enum: [enabled, suspended] }
+        createdAt: { type: string, format: date-time }
+        userCount: { type: integer }
+        technicianCount: { type: integer }
+        inspectionCount: { type: integer }
+        lastActivityAt: { type: ["string", "null"], format: date-time }
+
+    MissionControlPropertyPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlProperty"
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    MissionControlProperty:
+      type: object
+      required: [id, companyId, companyName, siteAddress, propertyType, inspectionCount, latestInspectionId, updatedAt]
+      properties:
+        id: { type: integer, description: Property profile ID; stable drill-down identifier }
+        companyId: { type: integer }
+        companyName: { type: string }
+        siteAddress: { type: string, description: Property address for directory identification }
+        propertyType: { type: ["string", "null"] }
+        inspectionCount: { type: integer }
+        latestInspectionId: { type: ["integer", "null"] }
+        updatedAt: { type: string, format: date-time }
+
+    MissionControlPropertyDetail:
+      allOf:
+        - $ref: "#/components/schemas/MissionControlProperty"
+        - type: object
+          required: [inspections]
+          properties:
+            inspections:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissionControlPropertyInspection"
+
+    MissionControlPropertyInspection:
+      type: object
+      required: [id, status, createdAt]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    MissionControlCompanyDetail:
+      allOf:
+        - $ref: "#/components/schemas/MissionControlCompany"
+        - type: object
+          required: [owner, users, recentInspections]
+          properties:
+            owner:
+              $ref: "#/components/schemas/MissionControlCompanyOwner"
+            users:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissionControlUser"
+            recentInspections:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissionControlInspectionSummary"
+
+    MissionControlCompanyOwner:
+      type: object
+      required: [userId, name, email]
+      properties:
+        userId: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+
+    MissionControlUser:
+      type: object
+      required: [id, name, email, betaAccessEnabled]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: ["string", "null"] }
+        betaAccessEnabled: { type: boolean }
+
+    CompanyAccessChangeInput:
+      type: object
+      required: [action, approvalId]
+      properties:
+        action: { type: string, enum: [suspend, enable] }
+        approvalId: { type: integer, description: Approval authorizing this access change }
+        reason: { type: string }
+
+    CompanyAccessChangeResult:
+      type: object
+      required: [companyId, accessStatus, approvalId, changedAt]
+      properties:
+        companyId: { type: integer }
+        accessStatus: { type: string, enum: [enabled, suspended] }
+        approvalId: { type: integer }
+        changedAt: { type: string, format: date-time }
+
+    MissionControlTechnicianPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlTechnician"
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    MissionControlTechnician:
+      type: object
+      required: [id, name, companyId, companyName, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        companyId: { type: integer }
+        companyName: { type: string }
+        status: { type: string }
+        lastActiveAt: { type: ["string", "null"], format: date-time }
+
+    MissionControlTechnicianDetail:
+      allOf:
+        - $ref: "#/components/schemas/MissionControlTechnician"
+        - type: object
+          required: [inspections]
+          properties:
+            inspections:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissionControlInspectionSummary"
+
+    MissionControlDeviceSessionDetail:
+      allOf:
+        - $ref: "#/components/schemas/MissionControlDeviceSession"
+        - type: object
+          required: [inspectionId, companyId, companyName, events]
+          properties:
+            inspectionId: { type: integer }
+            companyId: { type: integer }
+            companyName: { type: string }
+            events:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissionControlSessionEvent"
+
+    MissionControlSessionEvent:
+      type: object
+      required: [type, createdAt]
+      properties:
+        type: { type: string }
+        createdAt: { type: string, format: date-time }
+        detail: { type: ["string", "null"] }
+
+    UserAccessChangeInput:
+      type: object
+      required: [action, approvalId]
+      properties:
+        action: { type: string, enum: [enable, disable] }
+        approvalId: { type: integer, description: Approval authorizing this beta-access change }
+        reason: { type: string }
+
+    UserAccessChangeResult:
+      type: object
+      required: [userId, betaAccessEnabled, approvalId, changedAt]
+      properties:
+        userId: { type: string }
+        betaAccessEnabled: { type: boolean }
+        approvalId: { type: integer }
+        changedAt: { type: string, format: date-time }
+
+    MissionControlInspectionPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlInspectionSummary"
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    MissionControlInspectionSummary:
+      type: object
+      required: [id, companyId, companyName, technicianId, status, createdAt]
+      properties:
+        id: { type: integer }
+        companyId: { type: integer }
+        companyName: { type: string }
+        technicianId: { type: ["string", "null"] }
+        technicianName: { type: ["string", "null"] }
+        status: { type: string }
+        siteAddress: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    MissionControlInspectionDetail:
+      allOf:
+        - $ref: "#/components/schemas/MissionControlInspectionSummary"
+        - type: object
+          required: [mediaCounts, analysisStatuses, syncLogs, media, deviceSessions]
+          properties:
+            mediaCounts:
+              $ref: "#/components/schemas/MissionControlMediaCounts"
+            analysisStatuses:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissionControlAnalysisStatus"
+            syncLogs:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissionControlSyncLog"
+            media:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissionControlMedia"
+            deviceSessions:
+              type: array
+              items:
+                $ref: "#/components/schemas/MissionControlDeviceSession"
+            completedAt: { type: ["string", "null"], format: date-time }
+
+    MissionControlMedia:
+      type: object
+      required: [id, mediaType]
+      properties:
+        id: { type: integer }
+        mediaType: { type: string }
+        durationSec: { type: ["number", "null"] }
+        captureSource: { type: ["string", "null"] }
+        qualityScore: { type: ["number", "null"] }
+        capturedAt: { type: ["string", "null"], format: date-time }
+
+    MissionControlDeviceSession:
+      type: object
+      required: [id, userId, createdAt, expiresAt, eventCount]
+      properties:
+        id: { type: integer }
+        userId: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        eventCount: { type: integer }
+
+    MissionControlMediaCounts:
+      type: object
+      required: [total, photos, videos, pendingAnalysis]
+      properties:
+        total: { type: integer }
+        photos: { type: integer }
+        videos: { type: integer }
+        pendingAnalysis: { type: integer }
+
+    MissionControlAnalysisStatus:
+      type: object
+      required: [mediaId, status]
+      properties:
+        mediaId: { type: integer }
+        status: { type: string }
+        error: { type: ["string", "null"] }
+        updatedAt: { type: ["string", "null"], format: date-time }
+
+    MissionControlSyncLog:
+      type: object
+      required: [id, status, message, createdAt]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        message: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    MissionControlIncidentPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlIncident"
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    MissionControlIncident:
+      type: object
+      required: [id, companyId, companyName, severity, status, title, description, createdAt]
+      properties:
+        id: { type: integer }
+        companyId: { type: integer }
+        companyName: { type: string }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        status: { type: string, enum: [open, acknowledged, investigating, resolved, dismissed] }
+        title: { type: string }
+        description: { type: string }
+        assignedTo: { type: ["string", "null"] }
+        acknowledgedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        sourceType: { type: string }
+        sourceId: { type: string }
+        inspectionId: { type: integer }
+        userId: { type: string }
+        sessionId: { type: integer }
+
+    IncidentUpdate:
+      type: object
+      properties:
+        action: { type: string, enum: [acknowledge, assign, escalate] }
+        assigneeId: { type: string }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        note: { type: string }
+
+    MissionControlAuditPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlAuditEntry"
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    MissionControlAuditEntry:
+      type: object
+      required: [id, actorId, action, targetType, targetId, createdAt]
+      properties:
+        id: { type: integer }
+        actorId: { type: string }
+        actorName: { type: ["string", "null"] }
+        action: { type: string }
+        targetType: { type: string }
+        targetId: { type: string }
+        details: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    MissionControlAgentRoster:
+      type: object
+      required: [agents, agentZero]
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlAgent"
+        agentZero:
+          $ref: "#/components/schemas/MissionControlAgentZeroAvailability"
+
+    MissionControlAgent:
+      type: object
+      required: [identity, displayName, role, status]
+      properties:
+        identity:
+          type: string
+          enum: [quinn, ada, mara, theo, nadia, iris, dario]
+        displayName:
+          type: string
+          enum: [Quinn, Ada, Mara, Theo, Nadia, Iris, Dario]
+        role: { type: string }
+        capability: { type: string }
+        status: { type: string, enum: [available, busy, unavailable] }
+
+    MissionControlAgentZeroAvailability:
+      type: object
+      required: [available, realTaskCount, basis]
+      properties:
+        available: { type: boolean, description: "Availability is true only when at least one real Agent Zero task is available." }
+        realTaskCount: { type: integer, minimum: 0, description: Number of actual Agent Zero tasks currently available }
+        basis:
+          type: string
+          enum: [real_tasks]
+          description: Availability is derived from real persisted tasks, never a fabricated default.
+        approvalRequired: { type: boolean, description: "Consequential execution requires a human approval; investigations are not executable jobs." }
+
+    MissionControlAgentTaskPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlAgentTask"
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    MissionControlAgentTask:
+      type: object
+      required: [id, companyId, companyName, prompt, status, createdBy, createdAt]
+      properties:
+        id: { type: integer }
+        companyId: { type: integer }
+        companyName: { type: string }
+        prompt: { type: string }
+        status: { type: string, enum: [queued, running, completed, failed, cancelled] }
+        createdBy: { type: string }
+        result: { type: ["string", "null"] }
+        error: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: ["string", "null"], format: date-time }
+        completedAt: { type: ["string", "null"], format: date-time }
+        delegations:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlDelegation"
+        traces:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlWorkTrace"
+
+    MissionControlDelegation:
+      type: object
+      required: [id, specialist, scope, status, createdAt]
+      properties:
+        id: { type: integer }
+        specialist: { type: string }
+        scope: { type: string }
+        status: { type: string, enum: [queued, running, completed, failed] }
+        result: { type: ["string", "null"] }
+        error: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        completedAt: { type: ["string", "null"], format: date-time }
+
+    MissionControlWorkTrace:
+      type: object
+      required: [id, actor, event, detail, createdAt]
+      properties:
+        id: { type: integer }
+        delegationId: { type: ["integer", "null"] }
+        actor: { type: string }
+        event: { type: string }
+        detail: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    AgentTaskInput:
+      type: object
+      required: [companyId, prompt]
+      properties:
+        companyId: { type: integer }
+        prompt: { type: string, minLength: 1 }
+
+    MissionControlApprovalPage:
+      type: object
+      required: [items, page, limit, total, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissionControlApproval"
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    MissionControlApproval:
+      type: object
+      required: [id, type, status, requestedBy, request, createdAt]
+      properties:
+        id: { type: integer }
+        type: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        requestedBy: { type: string }
+        request: { type: string }
+        note: { type: ["string", "null"] }
+        decidedBy: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: ["string", "null"], format: date-time }
+
+    MissionControlApprovalRequest:
+      type: object
+      required: [targetType, targetId, action, reason]
+      properties:
+        targetType: { type: string, enum: [company, user] }
+        targetId: { type: string, minLength: 1 }
+        action: { type: string, enum: [suspend, enable, beta_enable, beta_disable] }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        idempotencyKey: { type: string, maxLength: 128 }
+
+    ApprovalDecisionInput:
+      type: object
+      required: [decision, note]
+      properties:
+        decision: { type: string, enum: [approve, reject] }
+        note: { type: string, minLength: 1 }

@@ -12,6 +12,7 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import faieRouter from "./routes/faie";
+import devRouter from "./routes/dev";
 import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./lib/webhookHandlers";
 import { setupInspectionTriggers } from "./lib/inspection-triggers";
@@ -147,9 +148,40 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
+  // Glasses poll every 3 seconds while in use. Their traffic must not consume
+  // the same IP budget as inspection uploads and sync.
+  skip: (req) => req.path === "/meta-glasses" || req.path.startsWith("/meta-glasses/"),
 });
 
-app.use("/api", apiLimiter, router);
+const glassesLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1200, // three continuously polling sessions per IP, plus event traffic
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many glasses requests, please try again later." },
+  skip: (req) => !(req.path === "/meta-glasses" || req.path.startsWith("/meta-glasses/")),
+});
+
+// ── Dev/test-only routes — fixture seeding for e2e tests ─────────────────────
+// Mounted BEFORE the main /api router so they bypass the catch-all auth/company
+// middleware in the main router which intercepts /dev/* paths.
+//
+// Gating strategy — ALL three conditions must be satisfied simultaneously:
+//   1. REPLIT_DEPLOYMENT must be absent (Replit sets it in every prod deployment).
+//      This is the fail-closed environment gate: if the server is deployed,
+//      the router is never registered regardless of other env vars.
+//   2. DEV_FIXTURE_SECRET must be present. The secret is the primary runtime
+//      control; if it is missing the router never mounts.
+//   3. Inside the router, every request must present the same secret value in the
+//      x-dev-fixture-secret header (a second independent check in the handler).
+//
+// NODE_ENV is not used because the dev workflow does not set it, making an
+// explicit === "development" check always-false in practice.
+if (!process.env.REPLIT_DEPLOYMENT && process.env.DEV_FIXTURE_SECRET) {
+  app.use("/api/dev", express.json(), devRouter);
+}
+
+app.use("/api", apiLimiter, glassesLimiter, router);
 
 // ── Enterprise Bridge — register inspection lifecycle triggers ────────────────
 // Must run after all middleware and routes are registered so the event bus

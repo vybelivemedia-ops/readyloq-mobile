@@ -88,17 +88,20 @@ def metaWearablesClientToken = System.getenv("META_CLIENT_TOKEN")?.trim()
 def invalidMetaWearablesValue = { value ->
     !value || value.startsWith('$') || value.startsWith('YOUR_META_')
 }
-def isReleaseBuild = gradle.startParameter.taskNames.any {
-    it.toLowerCase().contains('release')
-}
-
-if (isReleaseBuild && (
-    invalidMetaWearablesValue(metaWearablesAppId) ||
-    invalidMetaWearablesValue(metaWearablesClientToken)
-)) {
-    throw new GradleException(
-        "META_APP_ID and META_CLIENT_TOKEN must be configured in the EAS build environment for release builds."
-    )
+// Resolve the actual task graph instead of inspecting the initial command.
+// EAS and CI wrappers can invoke a release task indirectly.
+gradle.taskGraph.whenReady { graph ->
+    def producesReleaseArtifact = graph.allTasks.any { task ->
+        task.project == project && task.name.toLowerCase().contains('release')
+    }
+    if (producesReleaseArtifact && (
+        invalidMetaWearablesValue(metaWearablesAppId) ||
+        invalidMetaWearablesValue(metaWearablesClientToken)
+    )) {
+        throw new GradleException(
+            "META_APP_ID and META_CLIENT_TOKEN must be configured in the EAS build environment for release builds."
+        )
+    }
 }
 
 android {
@@ -176,6 +179,12 @@ android {
 }
 
 dependencies {
+    // Official Meta Wearables Device Access Toolkit. Camera access is an
+    // Android-native integration; Expo Go cannot load this module.
+    implementation("com.meta.wearable:mwdat-core:0.9.0")
+    implementation("com.meta.wearable:mwdat-camera:0.9.0")
+    testImplementation("junit:junit:4.13.2")
+
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 

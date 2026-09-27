@@ -1,0 +1,1 @@
+export { Properties as default } from "@/components/mission-control/properties";

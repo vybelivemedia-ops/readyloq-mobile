@@ -16,4 +16,7 @@ export interface MediaInput {
   captureSource?: string;
   qualityScore?: number;
   captureMetadata?: MediaInputCaptureMetadata;
+  /** @nullable */
+  unitNumber?: string | null;
+  capturedAt?: Date;
 }

@@ -149,6 +149,14 @@ export default function InspectionsScreen() {
         {item.severity ? (
           <Badge label={formatStatus(item.severity)} tone={severityTone(item.severity)} />
         ) : null}
+        {/* Signature status badge — completed inspections only */}
+        {(item.status === "completed" || item.status === "complete") ? (
+          item.signedAt
+            ? <Badge label="Signed" tone="success" />
+            : item.ownerNotAvailable
+            ? <Badge label="Declined" tone="warning" />
+            : <Badge label="Unsigned" tone="default" />
+        ) : null}
       </View>
     </Card>
   );

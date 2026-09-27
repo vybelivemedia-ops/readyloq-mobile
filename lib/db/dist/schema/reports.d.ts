@@ -334,11 +334,11 @@ export declare const reportsTable: import("drizzle-orm/pg-core").PgTableWithColu
     dialect: "pg";
 }>;
 export declare const insertReportSchema: z.ZodObject<{
+    status: z.ZodOptional<z.ZodString>;
+    severity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     siteAddress: z.ZodString;
     clientName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     technicianName: z.ZodString;
-    status: z.ZodOptional<z.ZodString>;
-    severity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     inspectionId: z.ZodInt;
     findings: z.ZodOptional<z.ZodNullable<z.ZodType<Finding[], Finding[], z.core.$ZodTypeInternals<Finding[], Finding[]>>>>;
     recommendations: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;

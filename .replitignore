@@ -1,0 +1,30 @@
+# Version-control and Replit Agent state are not needed at runtime.
+.git/
+.agents/
+.local/
+
+# Workspace-local caches and development environments.
+.cache/
+.config/
+.expo/
+.pythonlibs/
+screenshots/
+
+# Production builds create their own output. Exclude the 2.3 GiB workspace
+# dependency tree, but keep the API's production-only runtime dependencies.
+node_modules/
+**/node_modules/
+!artifacts/api-server/dist/node_modules/
+!artifacts/api-server/dist/node_modules/**
+
+# Keep generated dist output in the final image; static artifacts serve it.
+**/.vite/
+**/.expo/
+**/*.tsbuildinfo
+**/src/data/.slide-thumbnails/
+
+# Local native build output is not used by the published web/API services.
+**/android/.gradle/
+**/android/app/build/
+**/ios/Pods/
+**/ios/build/

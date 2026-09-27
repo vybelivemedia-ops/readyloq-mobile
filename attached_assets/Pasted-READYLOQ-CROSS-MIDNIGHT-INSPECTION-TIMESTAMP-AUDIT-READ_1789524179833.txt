@@ -1,0 +1,126 @@
+READYLOQ — CROSS-MIDNIGHT INSPECTION TIMESTAMP AUDIT
+
+READ ONLY. DO NOT CHANGE CODE.
+
+We have a real inspection whose media spans two calendar days.
+
+The evidence timestamps visible in the Company Portal include:
+
+YESTERDAY:
+6:59 PM
+8:05 PM
+8:21 PM
+9:55 PM
+11:58 PM
+
+TODAY:
+12:01 AM
+6:34 AM
+8:34 AM
+8:34 AM
+8:34 AM
+8:34 AM
+and additional media.
+
+This proves one inspection can contain evidence captured across midnight.
+
+Audit the timestamp architecture end-to-end.
+
+1. MOBILE CAPTURE
+
+Determine which timestamp is assigned when a photo is captured.
+
+Identify:
+
+- local capture timestamp
+- upload timestamp
+- media registration timestamp
+- inspection creation timestamp
+- inspection updated timestamp
+- inspection completion timestamp
+
+2. SERVER
+
+Find the exact database fields storing:
+
+- inspection createdAt
+- inspection updatedAt
+- inspection completedAt
+- media capturedAt
+- media createdAt
+- any other relevant evidence timestamp
+
+3. COMPANY PORTAL
+
+Trace the inspection list.
+
+Determine EXACTLY which timestamp the inspection table displays.
+
+Then trace the inspection detail page and determine which timestamp it uses for media.
+
+4. TIMEZONE
+
+Determine:
+
+- timestamp storage format
+- whether timestamps are UTC
+- where timezone conversion occurs
+- what timezone the Company Portal displays
+- whether mobile and web use the same timezone interpretation
+
+Do not assume.
+
+5. CROSS-MIDNIGHT BEHAVIOR
+
+Using the actual inspection structure, explain what the portal would display for an inspection that:
+
+starts Sep 14 at 6:59 PM
+continues through midnight
+has evidence captured Sep 15 at 8:34 AM
+and is completed Sep 15 later that morning.
+
+Determine whether the inspection list would still identify it as Sep 14.
+
+6. BUSINESS SEMANTICS
+
+Determine what the current UI is actually communicating:
+
+- inspection date
+- inspection start time
+- inspection creation time
+- last activity
+- completion time
+
+Do not change the UI.
+
+7. ALSO CHECK THE 56–23 MYRTLE AVE INSPECTION
+
+We previously observed an inspection displayed in the portal as:
+
+Sep 15, 2026 at 8:40 AM
+
+while its detail page contained evidence later in the day.
+
+Determine whether 8:40 AM is:
+
+- inspection creation time
+- first evidence time
+- server creation time
+- another timestamp
+
+8. FINAL REPORT
+
+Return:
+
+A. Exact mobile timestamp source
+B. Exact server/database timestamp fields
+C. Exact Company Portal timestamp field
+D. Exact timezone conversions
+E. Cross-midnight behavior
+F. Myrtle Ave timestamp explanation
+G. Whether there is actually a bug
+H. If there is a bug, the smallest appropriate UI/data fix
+
+READ ONLY.
+
+DO NOT modify any files.

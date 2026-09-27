@@ -4,6 +4,7 @@ import {
   TAXONOMY_CATEGORY_SLUGS,
   type AiPrediction,
 } from "@workspace/db";
+import type { File } from "@google-cloud/storage";
 import { ObjectStorageService } from "./objectStorage";
 import { ZONE_SLUGS, normalizeZone } from "./zone-coverage";
 
@@ -23,6 +24,160 @@ import { ZONE_SLUGS, normalizeZone } from "./zone-coverage";
 
 const MODEL = "gpt-5.4";
 const storage = new ObjectStorageService();
+const DEFAULT_PHOTO_TIMEOUT_MS = 35_000;
+const DEFAULT_RATE_LIMIT_RETRIES = 2;
+const RATE_LIMIT_BASE_DELAY_MS = 750;
+// OpenAI vision requests carry the image as base64 in the JSON request body.
+// Keep the binary source below 20 MiB so the encoded payload remains safely
+// below provider request limits while leaving room for the prompt and response.
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+
+export interface AnalyzePhotoOptions {
+  timeoutMs?: number;
+  deadlineAt?: number;
+  rateLimitRetries?: number;
+  /** Receives the terminal per-photo provider outcome without changing the
+   * legacy nullable return value used by existing callers. */
+  onOutcome?: (status: PhotoAnalysisOutcomeStatus) => void;
+}
+
+export type PhotoAnalysisOutcomeStatus =
+  | "completed"
+  | "failed"
+  | "deferred"
+  | "rate_limited";
+
+export type PhotoAnalysisOutcome =
+  | { status: "completed"; prediction: AiPrediction }
+  | { status: Exclude<PhotoAnalysisOutcomeStatus, "completed">; prediction: null };
+
+type RetryOutcome<T> =
+  | { status: "completed"; value: T }
+  | { status: "failed" | "deferred" | "rate_limited"; value: null };
+
+async function withRateLimitRetryOutcome<T>(
+  operation: (signal: AbortSignal, remainingMs: number, deadlineAt: number) => Promise<T>,
+  options: AnalyzePhotoOptions,
+): Promise<RetryOutcome<T>> {
+  const timeoutMs = Math.max(1, options.timeoutMs ?? DEFAULT_PHOTO_TIMEOUT_MS);
+  const retries = Math.max(0, options.rateLimitRetries ?? DEFAULT_RATE_LIMIT_RETRIES);
+  const deadlineAt = options.deadlineAt ?? Date.now() + timeoutMs;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const remainingMs = Math.min(timeoutMs, deadlineAt - Date.now());
+    if (remainingMs <= 0) return { status: "deferred", value: null };
+
+    const controller = new AbortController();
+    try {
+      const value = await withDeadline(
+        operation(controller.signal, remainingMs, deadlineAt),
+        remainingMs,
+        () => controller.abort(),
+      );
+      return { status: "completed", value };
+    } catch (error) {
+      if (error instanceof PhotoAnalysisTimeoutError) {
+        return { status: "deferred", value: null };
+      }
+      if (!isRateLimitError(error)) return { status: "failed", value: null };
+      if (attempt === retries) return { status: "rate_limited", value: null };
+
+      const exponentialDelay = RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt;
+      const jitter = Math.floor(Math.random() * 250);
+      const nowMs = Date.now();
+      const requestedDelayMs = retryAfterMs(error, nowMs) ?? exponentialDelay + jitter;
+      const delayMs = Math.min(requestedDelayMs, Math.max(0, deadlineAt - nowMs));
+      await sleep(delayMs);
+    }
+  }
+  return { status: "rate_limited", value: null };
+}
+
+async function withRateLimitRetry<T>(
+  operation: (signal: AbortSignal, remainingMs: number, deadlineAt: number) => Promise<T>,
+  options: AnalyzePhotoOptions,
+): Promise<T | null> {
+  const outcome = await withRateLimitRetryOutcome(operation, options);
+  return outcome.status === "completed" ? outcome.value : null;
+}
+
+function isRateLimitError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const value = error as {
+    status?: unknown;
+    code?: unknown;
+    response?: { status?: unknown };
+  };
+  return value.status === 429 || value.response?.status === 429 || value.code === 429 || value.code === "rate_limit_exceeded";
+}
+
+function headerValue(headers: unknown, name: string): string | null {
+  if (!headers || typeof headers !== "object") return null;
+  const get = (headers as { get?: unknown }).get;
+  if (typeof get === "function") {
+    const value = get.call(headers, name);
+    return typeof value === "string" ? value : null;
+  }
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === name.toLowerCase()) {
+      if (typeof value === "string") return value;
+      if (typeof value === "number") return String(value);
+      if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+      return null;
+    }
+  }
+  return null;
+}
+
+function retryAfterMs(error: unknown, nowMs: number): number | null {
+  if (!error || typeof error !== "object") return null;
+  const value = error as {
+    headers?: unknown;
+    response?: { headers?: unknown };
+  };
+  const raw = headerValue(value.headers, "retry-after")
+    ?? headerValue(value.response?.headers, "retry-after");
+  if (raw == null) return null;
+
+  const trimmed = raw.trim();
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    const milliseconds = Number(trimmed) * 1_000;
+    return Number.isFinite(milliseconds) ? milliseconds : null;
+  }
+
+  const retryAt = Date.parse(trimmed);
+  if (!Number.isFinite(retryAt)) return null;
+  return Math.max(0, retryAt - nowMs);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+class PhotoAnalysisTimeoutError extends Error {}
+
+class PhotoTooLargeError extends Error {}
+
+async function withDeadline<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  onTimeout?: () => void,
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          onTimeout?.();
+          reject(new PhotoAnalysisTimeoutError("Photo analysis deadline exceeded"));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 export function fallbackPrediction(): AiPrediction {
   return {
@@ -44,11 +199,126 @@ export function fallbackPrediction(): AiPrediction {
   };
 }
 
-async function objectToDataUrl(objectPath: string): Promise<string> {
-  const file = await storage.getObjectEntityFile(objectPath);
-  const [buffer] = await file.download();
-  const [metadata] = await file.getMetadata();
-  const contentType = (metadata.contentType as string) || "image/jpeg";
+function assertStorageDeadline(signal: AbortSignal, deadlineAt: number): void {
+  if (signal.aborted || deadlineAt - Date.now() <= 0) {
+    throw new PhotoAnalysisTimeoutError("Photo analysis deadline exceeded");
+  }
+}
+
+function storageTimeoutMs(deadlineAt: number): number {
+  return Math.max(1, deadlineAt - Date.now());
+}
+
+async function readStorageFile(
+  file: File,
+  signal: AbortSignal,
+  deadlineAt: number,
+): Promise<{ buffer: Buffer; contentType: string }> {
+  assertStorageDeadline(signal, deadlineAt);
+  const timeoutMs = storageTimeoutMs(deadlineAt);
+
+  // The installed File typings expose no cancellable getMetadata/download
+  // operation. A bounded range read is the concrete metadata+content request:
+  // the response headers provide Content-Length before content, and destroying
+  // this stream cancels the underlying GCS request.
+  const stream = file.createReadStream({
+    start: 0,
+    // HTTP ranges are inclusive, so request one byte beyond the cap. An
+    // oversized object can then be rejected from Content-Length before data.
+    end: MAX_IMAGE_BYTES,
+    validation: false,
+  });
+  return new Promise<{ buffer: Buffer; contentType: string }>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let contentType = "image/jpeg";
+    let settled = false;
+
+    const onResponse = (response: {
+      headers?: Record<string, unknown> & {
+        get?: (name: string) => string | null;
+      };
+    }) => {
+      const rawLength = typeof response.headers?.get === "function"
+        ? response.headers.get("content-length")
+        : response.headers?.["content-length"];
+      const contentLength = Number(rawLength);
+      if (Number.isFinite(contentLength) && contentLength > MAX_IMAGE_BYTES) {
+        settleFailure(new PhotoTooLargeError("Stored image exceeds the maximum supported size"), true);
+        return;
+      }
+      const rawType = typeof response.headers?.get === "function"
+        ? response.headers.get("content-type")
+        : response.headers?.["content-type"];
+      if (typeof rawType === "string" && rawType.length > 0) contentType = rawType;
+    };
+    const onData = (chunk: Buffer) => {
+      total += chunk.length;
+      if (total > MAX_IMAGE_BYTES) {
+        settleFailure(new PhotoTooLargeError("Stored image exceeds the maximum supported size"), true);
+        return;
+      }
+      chunks.push(chunk);
+    };
+    const onError = (error: unknown) => settleFailure(error, false);
+    const onEnd = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve({ buffer: Buffer.concat(chunks, total), contentType });
+    };
+    const onClose = () => {
+      if (!settled) {
+        settleFailure(new Error("Object stream closed before completing"), false);
+      }
+    };
+    const timer = setTimeout(() => {
+      settleFailure(new PhotoAnalysisTimeoutError("Photo download deadline exceeded"), true);
+    }, timeoutMs);
+    const abort = () => {
+      settleFailure(new PhotoAnalysisTimeoutError("Photo download aborted"), true);
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+      stream.removeListener("response", onResponse);
+      stream.removeListener("data", onData);
+      stream.removeListener("error", onError);
+      stream.removeListener("end", onEnd);
+      stream.removeListener("close", onClose);
+    };
+    const settleFailure = (error: unknown, destroy: boolean) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (destroy && !stream.destroyed) stream.destroy();
+      reject(error);
+    };
+
+    signal.addEventListener("abort", abort, { once: true });
+    stream.on("response", onResponse);
+    stream.on("data", onData);
+    stream.once("error", onError);
+    stream.once("end", onEnd);
+    stream.once("close", onClose);
+  });
+}
+
+async function objectToDataUrl(
+  objectPath: string,
+  signal: AbortSignal,
+  deadlineAt: number,
+): Promise<string> {
+  assertStorageDeadline(signal, deadlineAt);
+  // Handle acquisition is validation-only and must not perform an unbounded
+  // exists() request. The bounded range read below establishes existence.
+  const file = storage.getObjectEntityFileHandle(objectPath);
+  assertStorageDeadline(signal, deadlineAt);
+  const { buffer, contentType } = await readStorageFile(file, signal, deadlineAt);
+  assertStorageDeadline(signal, deadlineAt);
+  if (buffer.length > MAX_IMAGE_BYTES) {
+    throw new PhotoTooLargeError("Downloaded image exceeds the maximum supported size");
+  }
   return `data:${contentType};base64,${buffer.toString("base64")}`;
 }
 
@@ -249,40 +519,44 @@ export async function regenerateFindingAfterTechnicianCorrection(input: {
   location: string | null;
   correctedSpecies: string;
   technicianNotes?: string | null;
-}): Promise<RegeneratedFindingContent | null> {
+}, options: AnalyzePhotoOptions = {}): Promise<RegeneratedFindingContent | null> {
   try {
-    const completion = await openai.chat.completions.create({
-      model: MODEL,
-      max_completion_tokens: 8192,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You revise a pest-control inspection finding after an on-site technician " +
-            "has corrected the pest identification. The technician's corrected species is " +
-            "authoritative. Return JSON only. Preserve only evidence supplied in the input; " +
-            "do not invent visible damage, life stages, locations, products, application " +
-            "rates, dilution, or regulatory claims. The treatment field must be concise " +
-            "integrated-pest-management guidance, never chemical instructions. When product " +
-            "use may be appropriate, direct a licensed technician to the approved site " +
-            "protocol and product label.",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            task: "Regenerate the final summary and treatment recommendation for this corrected finding.",
-            requiredResponse: {
-              description:
-                "One concise, factual sentence. Clearly identify the technician-verified species and use only supplied evidence.",
-              treatment:
-                "A concise IPM recommendation, or null when no recommendation can be supported from the supplied context.",
-            },
-            finding: input,
-          }),
-        },
-      ],
-    });
+    const completion = await withRateLimitRetry(
+      (signal, remainingMs) => openai.chat.completions.create({
+        model: MODEL,
+        max_completion_tokens: 8192,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              "You revise a pest-control inspection finding after an on-site technician " +
+              "has corrected the pest identification. The technician's corrected species is " +
+              "authoritative. Return JSON only. Preserve only evidence supplied in the input; " +
+              "do not invent visible damage, life stages, locations, products, application " +
+              "rates, dilution, or regulatory claims. The treatment field must be concise " +
+              "integrated-pest-management guidance, never chemical instructions. When product " +
+              "use may be appropriate, direct a licensed technician to the approved site " +
+              "protocol and product label.",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              task: "Regenerate the final summary and treatment recommendation for this corrected finding.",
+              requiredResponse: {
+                description:
+                  "One concise, factual sentence. Clearly identify the technician-verified species and use only supplied evidence.",
+                treatment:
+                  "A concise IPM recommendation, or null when no recommendation can be supported from the supplied context.",
+              },
+              finding: input,
+            }),
+          },
+        ],
+      }, { signal, timeout: remainingMs, maxRetries: 0 }),
+      options,
+    );
+    if (!completion) return null;
     const raw = completion.choices[0]?.message?.content;
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -311,29 +585,66 @@ export async function regenerateFindingAfterTechnicianCorrection(input: {
 export async function analyzePhoto(
   objectPath: string,
   technicianNote?: string | null,
+  options: AnalyzePhotoOptions = {},
 ): Promise<AiPrediction | null> {
+  const outcome = await analyzePhotoWithOutcome(objectPath, technicianNote, options);
   try {
-    const dataUrl = await objectToDataUrl(objectPath);
-    const completion = await openai.chat.completions.create({
-      model: MODEL,
-      max_completion_tokens: 8192,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: userPrompt(technicianNote) },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        },
-      ],
-    });
-    const raw = completion.choices[0]?.message?.content;
-    if (!raw) return null;
-    return parsePrediction(raw);
+    options.onOutcome?.(outcome.status);
   } catch {
-    return null;
+    // Outcome telemetry must never alter the legacy provider result contract.
+  }
+  return outcome.status === "completed" ? outcome.prediction : null;
+}
+
+/**
+ * Failure-aware variant used by the inspection analysis route. The legacy
+ * analyzePhoto() contract remains nullable for existing callers, while this
+ * variant preserves enough information for the API to tell a technician
+ * whether a photo failed, was deferred by a deadline, or exhausted 429 retry.
+ */
+export async function analyzePhotoWithOutcome(
+  objectPath: string,
+  technicianNote?: string | null,
+  options: AnalyzePhotoOptions = {},
+): Promise<PhotoAnalysisOutcome> {
+  try {
+    const outcome = await withRateLimitRetryOutcome(
+      async (signal, remainingMs, deadlineAt) => {
+        const dataUrl = await objectToDataUrl(objectPath, signal, deadlineAt);
+        assertStorageDeadline(signal, deadlineAt);
+        return openai.chat.completions.create({
+          model: MODEL,
+          max_completion_tokens: 8192,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: userPrompt(technicianNote) },
+                { type: "image_url", image_url: { url: dataUrl } },
+              ],
+            },
+          ],
+        }, {
+          signal,
+          timeout: remainingMs,
+          maxRetries: 0,
+        });
+      },
+      options,
+    );
+    if (outcome.status !== "completed") {
+      return { status: outcome.status, prediction: null };
+    }
+    const raw = outcome.value.choices[0]?.message?.content;
+    if (!raw) return { status: "failed", prediction: null };
+    const prediction = parsePrediction(raw);
+    return prediction
+      ? { status: "completed", prediction }
+      : { status: "failed", prediction: null };
+  } catch {
+    return { status: "failed", prediction: null };
   }
 }
 
@@ -356,24 +667,29 @@ export async function generateAiPrediction(
  */
 export async function analyzePhotoFromBase64(
   base64Jpeg: string,
+  options: AnalyzePhotoOptions = {},
 ): Promise<AiPrediction | null> {
   try {
     const dataUrl = `data:image/jpeg;base64,${base64Jpeg}`;
-    const completion = await openai.chat.completions.create({
-      model: MODEL,
-      max_completion_tokens: 8192,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: userPrompt() },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        },
-      ],
-    });
+    const completion = await withRateLimitRetry(
+      (signal, remainingMs) => openai.chat.completions.create({
+        model: MODEL,
+        max_completion_tokens: 8192,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: userPrompt() },
+              { type: "image_url", image_url: { url: dataUrl } },
+            ],
+          },
+        ],
+      }, { signal, timeout: remainingMs, maxRetries: 0 }),
+      options,
+    );
+    if (!completion) return null;
     const raw = completion.choices[0]?.message?.content;
     if (!raw) return null;
     return parsePrediction(raw);

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { z } from "zod/v4";
+import { createHash } from "node:crypto";
 import { db } from "@workspace/db";
 import { logger } from "../lib/logger";
 import {
@@ -14,63 +14,28 @@ import {
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
 import {
-  analyzePhoto,
   regenerateFindingAfterTechnicianCorrection,
 } from "../lib/intelligence-ai";
+import type { PhotoAnalysisOutcome } from "../lib/intelligence-ai";
+import { assessQueuedPhoto } from "../lib/photo-analysis-queue";
 import { runOpportunitySynthesis } from "../lib/opportunity-ai";
 import { runScorecardComputation } from "../lib/scorecard";
 import { objectPathCompanyScope, ObjectStorageService } from "../lib/objectStorage";
 import { zoomGlassesFrame } from "../lib/glasses-zoom";
+import { FindingSchema } from "@workspace/api-zod";
 
 // ---------------------------------------------------------------------------
 // Write-boundary Finding validation
 // ---------------------------------------------------------------------------
 
 /**
- * Zod schema matching the Finding interface (lib/db/src/schema/analysis.ts).
- * Applied at EVERY DB insert so malformed AI output or client submissions can
- * never enter the database. Invalid entries are stripped and logged rather
- * than rejecting the whole request — the analysis still saves with whatever
- * valid findings remain. safeParseFindings() in reports.ts remains as an
- * independent read-side safety net.
+ * The generated OpenAPI Finding schema is used at the write boundary.
+ * Client submissions are rejected explicitly before work begins. Malformed AI
+ * output and legacy persisted entries remain tolerant: they are stripped and
+ * logged so existing inspections can still be read and finalized safely.
+ * safeParseFindings() in reports.ts remains an independent read-side safety net.
  */
-const findingSchema = z.object({
-  id: z.number(),
-  category: z.string(),
-  description: z.string(),
-  confidence: z.number(),
-  severity: z.string(),
-  location: z.string().nullable(),
-  imageUrl: z.string().nullable(),
-  treatment: z.string().nullable(),
-  exclusionOpportunity: z.boolean().nullable(),
-  evidenceQuality: z.enum(["excellent", "good", "fair"]).nullable().optional(),
-  possiblePest: z.string().nullable().optional(),
-  species: z.string().nullable().optional(),
-  lifeStage: z.string().nullable().optional(),
-  conduciveCondition: z.string().nullable().optional(),
-  harborage: z.string().nullable().optional(),
-  moisture: z.string().nullable().optional(),
-  structuralIssue: z.string().nullable().optional(),
-  measurementEstimate: z
-    .object({
-      linearFt: z.number().nullable().optional(),
-      gapWidthIn: z.number().nullable().optional(),
-      heightFt: z.number().nullable().optional(),
-      confidence: z.number(),
-      source: z.literal("ai_vision_estimate"),
-    })
-    .nullable()
-    .optional(),
-  zone: z.string().nullable().optional(),
-  candidates: z
-    .array(z.object({ species: z.string(), confidence: z.number() }))
-    .optional(),
-  confidenceLabel: z.enum(["identified", "possible", "unidentified"]).optional(),
-  reviewStatus: z.enum(["pending", "accepted", "corrected", "dismissed"]).optional(),
-  technicianSpecies: z.string().nullable().optional(),
-  technicianCorrectionNotes: z.string().nullable().optional(),
-});
+const findingSchema = FindingSchema;
 
 /**
  * Validates an array of raw findings against findingSchema. Invalid entries
@@ -102,6 +67,60 @@ export function validateFindings(
   return [valid, invalidCount];
 }
 
+type FindingValidationIssue = {
+  index: number;
+  path: (string | number)[];
+  message: string;
+};
+
+/**
+ * Client-provided finding arrays are all-or-nothing. This intentionally differs
+ * from validateFindings(), which remains tolerant for AI output and legacy
+ * persisted rows.
+ */
+function validateClientFindings(
+  raw: unknown,
+  errorLabel: "Invalid findings" | "Invalid technician findings",
+): { findings: Finding[]; issues: FindingValidationIssue[] } | {
+  response: {
+    error: string;
+    code: "INVALID_FINDINGS";
+    issues: FindingValidationIssue[];
+  };
+} {
+  const issues: FindingValidationIssue[] = [];
+  if (!Array.isArray(raw)) {
+    issues.push({ index: 0, path: [], message: "Expected an array" });
+  } else {
+    raw.forEach((item, index) => {
+      const result = findingSchema.safeParse(item);
+      if (!result.success) {
+        for (const issue of result.error.issues) {
+          const issuePath = issue.path as (string | number)[];
+          if (issue.code === "unrecognized_keys" && "keys" in issue) {
+            for (const key of issue.keys) {
+              issues.push({
+                index,
+                path: [...issuePath, key],
+                message: issue.message,
+              });
+            }
+          } else {
+            issues.push({ index, path: issuePath, message: issue.message });
+          }
+        }
+      }
+    });
+  }
+  if (issues.length > 0) {
+    return { response: { error: errorLabel, code: "INVALID_FINDINGS", issues } };
+  }
+  return {
+    findings: (raw as unknown[]).map((item) => findingSchema.parse(item) as Finding),
+    issues: [],
+  };
+}
+
 const objectStorageService = new ObjectStorageService();
 import { logErrorEvent } from "../lib/error-events";
 import { computeCoverage, zonesFromFinding } from "../lib/zone-coverage";
@@ -112,6 +131,12 @@ import { normalizeAddressKey } from "../lib/property-intelligence";
 import { derivePropertyType } from "../lib/report-narrative-ai";
 
 const router = Router();
+type SharedAnalysisResponse = { status: number; body: unknown };
+const inFlightAnalyses = new Map<string, Promise<SharedAnalysisResponse>>();
+type PersistedPhotoOutcome = {
+  imagePath: string;
+  status: PhotoAnalysisOutcome["status"];
+};
 
 /**
  * #116 — Background subject crop for phone-camera evidence photos.
@@ -157,7 +182,75 @@ async function cropPhonePhotos(
  * object path used by storage + tenant-scope checks is `/objects/...`.
  */
 function toStoragePath(url: string): string {
-  return url.replace(/^\/api\/storage/, "");
+  const normalized = url.replace(/^\/api\/storage/, "").trim();
+  if (!normalized.startsWith("https://storage.googleapis.com/")) {
+    return normalized;
+  }
+
+  try {
+    const objectPath = new URL(normalized).pathname;
+    const entityPathIndex = objectPath.indexOf("/objects/");
+    return entityPathIndex >= 0 ? objectPath.slice(entityPathIndex) : objectPath;
+  } catch {
+    return normalized;
+  }
+}
+
+/**
+ * JSON.stringify preserves insertion order, which makes it unsuitable for
+ * identifying equivalent request payloads assembled by different callers.
+ * Canonicalize objects recursively while retaining array order (image order is
+ * meaningful because the first occurrence supplies the finding label).
+ */
+function stableCanonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableCanonicalize);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, stableCanonicalize(entry)]),
+    );
+  }
+  return value;
+}
+
+function analysisPayloadKey(payload: {
+  inspectionId: number;
+  images: Array<{ imageUrl: string; label?: string | null }>;
+  technicianFindings: Finding[];
+  videos: Array<{
+    url: string;
+    filename?: string | null;
+    durationSec?: number | null;
+    label?: string | null;
+  }>;
+  draft: boolean;
+}): string {
+  // Include both the submitted URL and its canonical storage path. The former
+  // is part of the response shape, while the latter is the effective media
+  // identity used for tenant/media eligibility and provider work.
+  const effectivePayload = {
+    inspectionId: payload.inspectionId,
+    images: payload.images.map((image) => ({
+      imageUrl: image?.imageUrl ?? null,
+      storagePath:
+        typeof image?.imageUrl === "string" ? toStoragePath(image.imageUrl) : null,
+      label: image?.label ?? null,
+    })),
+    technicianFindings: payload.technicianFindings,
+    videos: payload.videos.map((video) => ({
+      url: video?.url ?? null,
+      storagePath: typeof video?.url === "string" ? toStoragePath(video.url) : null,
+      filename: video?.filename ?? null,
+      durationSec: video?.durationSec ?? null,
+      label: video?.label ?? null,
+    })),
+    draft: payload.draft,
+  };
+  return createHash("sha256")
+    .update(JSON.stringify(stableCanonicalize(effectivePayload)))
+    .digest("hex");
 }
 
 function serializeResult(
@@ -169,6 +262,7 @@ function serializeResult(
     findings: row.findings ?? [],
     recommendations: row.recommendations ?? [],
     videoEvidence: row.videoEvidence ?? [],
+    photoOutcomes: row.photoOutcomes ?? [],
     photoZones: row.photoZones ?? {},
     coverage: row.coverage ?? null,
     // Live evidence tally for the AI Inspection Engine — derived on read from
@@ -344,12 +438,22 @@ router.get("/summary", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
+    const rawBody = (req.body ?? {}) as Record<string, unknown>;
+    let clientFindings: Finding[] = [];
+    if (Object.prototype.hasOwnProperty.call(rawBody, "findings")) {
+      const validation = validateClientFindings(rawBody.findings, "Invalid findings");
+      if ("response" in validation) return res.status(400).json(validation.response);
+      clientFindings = validation.findings;
+    }
     const {
       inspectionId,
-      findings = [],
       recommendations = [],
       overallConfidence,
-    } = req.body;
+    } = rawBody as {
+      inspectionId?: number;
+      recommendations?: string[];
+      overallConfidence?: number;
+    };
     if (!inspectionId) return res.status(400).json({ error: "inspectionId is required" });
 
     // Child write: the parent inspection must belong to the caller's company.
@@ -361,24 +465,13 @@ router.post("/", async (req, res) => {
       );
     if (!inspection) return res.status(404).json({ error: "Inspection not found" });
 
-    // Validate findings at the write boundary before touching the DB.
-    const [validFindings, invalidFindingCount] = validateFindings(findings, "POST /analysis");
-    if (invalidFindingCount > 0) {
-      void logErrorEvent("ai", {
-        companyId,
-        userId: req.user?.id,
-        message: `${invalidFindingCount} malformed finding(s) stripped before DB insert`,
-        context: { stage: "write_validation", endpoint: "POST /analysis" },
-      });
-    }
-
     // Confidence is stored on a 0–1 scale (matching individual finding confidence
     // and the report/analysis UI, which multiplies by 100 for display).
     const computed =
       overallConfidence ??
-      (validFindings.length > 0
-        ? validFindings.reduce((s: number, f: Finding) => s + (f.confidence ?? 0), 0) /
-          validFindings.length
+      (clientFindings.length > 0
+        ? clientFindings.reduce((s: number, f: Finding) => s + (f.confidence ?? 0), 0) /
+          clientFindings.length
         : 0);
 
     const [row] = await db
@@ -387,7 +480,7 @@ router.post("/", async (req, res) => {
         companyId,
         inspectionId,
         status: "complete",
-        findings: validFindings,
+        findings: clientFindings,
         recommendations,
         overallConfidence: computed,
       })
@@ -401,18 +494,22 @@ router.post("/", async (req, res) => {
 
 // POST /analysis/analyze — run REAL vision analysis on captured photos and store one result
 router.post("/analyze", async (req, res) => {
+  let sharedKey: string | null = null;
+  let sharedPromise: Promise<SharedAnalysisResponse> | undefined;
+  let resolveShared: ((value: SharedAnalysisResponse) => void) | undefined;
+  let rejectShared: ((reason?: unknown) => void) | undefined;
+  let sharedSettled = false;
   try {
     const companyId = getCompanyId(req);
+    const rawBody = (req.body ?? {}) as Record<string, unknown>;
     const {
       inspectionId,
       images = [],
-      technicianFindings = [],
       videos = [],
       draft = false,
-    } = req.body as {
+    } = rawBody as {
       inspectionId?: number;
       images?: Array<{ imageUrl: string; label?: string | null }>;
-      technicianFindings?: Finding[];
       videos?: Array<{
         url: string;
         filename?: string | null;
@@ -421,6 +518,63 @@ router.post("/analyze", async (req, res) => {
       }>;
       draft?: boolean;
     };
+    let technicianFindings: Finding[] = [];
+    if (Object.prototype.hasOwnProperty.call(rawBody, "technicianFindings")) {
+      const validation = validateClientFindings(
+        rawBody.technicianFindings,
+        "Invalid technician findings",
+      );
+      if ("response" in validation) return res.status(400).json(validation.response);
+      technicianFindings = validation.findings;
+    }
+    if (inspectionId) {
+      const payloadHash = analysisPayloadKey({
+        inspectionId,
+        images,
+        technicianFindings,
+        videos,
+        draft,
+      });
+      sharedKey = `${companyId}:${inspectionId}:${payloadHash}`;
+      const existing = inFlightAnalyses.get(sharedKey);
+      if (existing) {
+        const shared = await existing;
+        return res.status(shared.status).json(shared.body);
+      }
+
+      sharedPromise = new Promise<SharedAnalysisResponse>((resolve, reject) => {
+        resolveShared = (value) => {
+          sharedSettled = true;
+          resolve(value);
+        };
+        rejectShared = (reason) => {
+          sharedSettled = true;
+          reject(reason);
+        };
+      });
+      inFlightAnalyses.set(sharedKey, sharedPromise);
+      // Capture the first response body so simultaneous callers receive the
+      // exact same persisted analysis result rather than starting provider work
+      // again. This is intentionally process-local; persistence remains the
+      // analysis result row itself.
+      const originalJson = res.json.bind(res);
+      res.json = ((body: unknown) => {
+        resolveShared?.({ status: res.statusCode, body });
+        return originalJson(body);
+      }) as typeof res.json;
+      void sharedPromise.then(
+        () => {
+          if (sharedKey && inFlightAnalyses.get(sharedKey) === sharedPromise) {
+            inFlightAnalyses.delete(sharedKey);
+          }
+        },
+        () => {
+          if (sharedKey && inFlightAnalyses.get(sharedKey) === sharedPromise) {
+            inFlightAnalyses.delete(sharedKey);
+          }
+        },
+      );
+    }
     if (!inspectionId) return res.status(400).json({ error: "inspectionId is required" });
 
     // The parent inspection must belong to the caller's company.
@@ -443,7 +597,14 @@ router.post("/analyze", async (req, res) => {
           eq(inspectionMediaTable.companyId, companyId),
         ),
       );
-    const savedPaths = new Set(savedMedia.map((m) => toStoragePath(m.url)));
+    // Mobile registers captured photos as "image"; older clients and other
+    // capture paths register them as "photo". Both are persisted image evidence.
+    // A video or other media type must never be accepted as an image.
+    const savedPaths = new Set(
+      savedMedia
+        .filter((m) => m.mediaType === "photo" || m.mediaType === "image")
+        .map((m) => toStoragePath(m.url)),
+    );
     // Technician captions (notes written during or after capture) keyed by
     // storage path — passed to the vision model as additional context.
     const captionByPath = new Map<string, string>(
@@ -512,10 +673,12 @@ router.post("/analyze", async (req, res) => {
     // Run the real vision model on each company-scoped, persisted photo.
     // We NEVER fabricate a placeholder finding: a photo only becomes a finding
     // when the model returns a genuine, content-bearing assessment. Photos whose
-    // analysis FAILED (storage/model/parse error) are counted in `analysisErrors`
-    // and surfaced to the technician instead of being saved as empty findings.
+    // analysis did not complete (ordinary failure, deadline deferral, or
+    // exhausted provider throttling) is counted in `analysisErrors` and
+    // surfaced to the technician instead of being saved as empty findings.
     const aiFindings: Finding[] = [];
     const analyzedImagePaths: string[] = [];
+    const photoOutcomes: PersistedPhotoOutcome[] = [];
     const photoZones: Record<string, string> = {};
     let nextId = 1;
     let analysisErrors = 0;
@@ -524,16 +687,48 @@ router.post("/analyze", async (req, res) => {
     let newPhotosAttempted = 0;
     // #116 — collect newly-analyzed phone-camera photos with real findings for background crop.
     const cropCandidates: Array<{ storagePath: string; confidence: number; species: string | null }> = [];
-    for (const image of images.slice(0, MAX_ANALYZE_IMAGES)) {
+    type PendingPhoto = {
+      image: { imageUrl: string; label?: string | null };
+      storagePath: string;
+      technicianNote: string | null;
+    };
+    const pendingPhotos: PendingPhoto[] = [];
+    // Validate and deduplicate BEFORE applying the provider cap. Invalid
+    // entries and repeated paths therefore cannot crowd valid unique photos
+    // out of the first 40.
+    const eligibleImages: Array<{
+      image: { imageUrl: string; label?: string | null };
+      storagePath: string;
+    }> = [];
+    const eligiblePaths = new Set<string>();
+    for (const image of images) {
       if (!image?.imageUrl) continue;
       const storagePath = toStoragePath(image.imageUrl);
       // Tenant safety: object must live under the caller's company AND be a
       // persisted media row for this inspection.
       if (objectPathCompanyScope(storagePath) !== companyId) continue;
       if (!savedPaths.has(storagePath)) continue;
+      if (eligiblePaths.has(storagePath)) continue;
+      eligiblePaths.add(storagePath);
+      eligibleImages.push({ image, storagePath });
+    }
+    // Mobile retries submit only unresolved paths. In a draft live inspection,
+    // include previously assessed photos that are still registered as evidence
+    // so the newest result does not erase their findings and zone coverage.
+    // Non-draft explicit submissions retain their requested-photo semantics.
+    if (draft) {
+      for (const storagePath of previouslyAnalyzed) {
+        if (eligiblePaths.has(storagePath) || !savedPaths.has(storagePath)) continue;
+        eligiblePaths.add(storagePath);
+        eligibleImages.push({ image: { imageUrl: storagePath }, storagePath });
+      }
+    }
 
+    const newEligibleImages: typeof eligibleImages = [];
+    for (const { image, storagePath } of eligibleImages) {
       // Already assessed in a previous run: carry the verified result over.
       if (previouslyAnalyzed.has(storagePath)) {
+        photoOutcomes.push({ imagePath: storagePath, status: "completed" });
         analyzedImagePaths.push(storagePath);
         const priorZone = previousPhotoZones[storagePath];
         if (priorZone) photoZones[storagePath] = priorZone;
@@ -541,18 +736,61 @@ router.post("/analyze", async (req, res) => {
         if (prior) aiFindings.push({ ...prior, id: nextId++ });
         continue;
       }
+      newEligibleImages.push({ image, storagePath });
+    }
 
-      // New photo — count it before the analysis attempt so failures are included.
-      newPhotosAttempted++;
-
+    // The cap bounds real provider calls, not already-completed carry-over.
+    // Apply it only after eligible photos have been partitioned by cache state.
+    const cappedImages = newEligibleImages.slice(0, MAX_ANALYZE_IMAGES);
+    const overflowImages = newEligibleImages.slice(MAX_ANALYZE_IMAGES);
+    newPhotosAttempted = newEligibleImages.length;
+    for (const { image, storagePath } of cappedImages) {
       const technicianNote = captionByPath.get(storagePath) ?? null;
-      const prediction = await analyzePhoto(storagePath, technicianNote);
-      if (prediction === null) {
-        // Analysis failed for this photo — do NOT persist a placeholder finding
-        // and do NOT mark it analyzed, so the next run retries it.
+      pendingPhotos.push({ image, storagePath, technicianNote });
+    }
+
+    // Provider-safe parallelism: three workers are enough to make a 12-photo
+    // inspection substantially faster without producing a burst of 12 calls.
+    // analyzePhoto enforces each call's deadline and provider-aware 429 backoff;
+    // every worker also shares this hard whole-job deadline.
+    const ANALYSIS_CONCURRENCY = 3;
+    const ANALYSIS_JOB_TIMEOUT_MS = 120_000;
+    const PHOTO_TIMEOUT_MS = 35_000;
+    const jobDeadlineAt = Date.now() + ANALYSIS_JOB_TIMEOUT_MS;
+    const predictions = new Array<PhotoAnalysisOutcome>(pendingPhotos.length);
+    let nextPendingIndex = 0;
+    const worker = async () => {
+      while (Date.now() < jobDeadlineAt) {
+        const index = nextPendingIndex++;
+        if (index >= pendingPhotos.length) return;
+        const photo = pendingPhotos[index];
+         // A failed or stalled adapter settles only this photo. Successful
+         // siblings are still materialized and persisted in request order.
+         predictions[index] = await assessQueuedPhoto(
+           photo.storagePath, photo.technicianNote, jobDeadlineAt, PHOTO_TIMEOUT_MS,
+         );
+      }
+    };
+    await Promise.all(
+      Array.from(
+        { length: Math.min(ANALYSIS_CONCURRENCY, pendingPhotos.length) },
+        () => worker(),
+      ),
+    );
+
+    // Materialize in request order so finding IDs and persisted arrays remain
+    // deterministic even though provider calls complete out of order.
+    for (let index = 0; index < pendingPhotos.length; index++) {
+      const { image, storagePath } = pendingPhotos[index];
+      const outcome = predictions[index] ?? { status: "deferred", prediction: null };
+      photoOutcomes.push({ imagePath: storagePath, status: outcome.status });
+      if (outcome.status !== "completed") {
+        // Non-successful photos are never marked analyzed and therefore retry
+        // on a later live-inspection run. No placeholder finding is created.
         analysisErrors++;
         continue;
       }
+      const prediction = outcome.prediction;
       analyzedImagePaths.push(storagePath);
       // Record the zone BEFORE the clean-photo skip below: a clean photo still
       // covers its zone even though it never becomes a finding. `prediction.zone`
@@ -643,6 +881,14 @@ router.post("/analyze", async (req, res) => {
       }
     }
 
+    for (const { storagePath } of overflowImages) {
+      // These are valid media, but deliberately outside this request's bounded
+      // provider budget. Keep them retryable and make the aggregate status
+      // honest rather than silently dropping them.
+      photoOutcomes.push({ imagePath: storagePath, status: "deferred" });
+      analysisErrors++;
+    }
+
     // Late-flagged duplicate safety: the mobile pixel-dedupe pass runs
     // asynchronously, so a photo analyzed in a prior run can be flagged
     // `duplicateOf` AFTER that run and then dropped from this run's submitted
@@ -657,6 +903,7 @@ router.post("/analyze", async (req, res) => {
       if (!savedPaths.has(storagePath)) continue;
       if (objectPathCompanyScope(storagePath) !== companyId) continue;
       handledPaths.add(storagePath);
+      photoOutcomes.push({ imagePath: storagePath, status: "completed" });
       analyzedImagePaths.push(storagePath);
       const priorZone = previousPhotoZones[storagePath];
       if (priorZone) photoZones[storagePath] = priorZone;
@@ -664,13 +911,13 @@ router.post("/analyze", async (req, res) => {
       if (prior) aiFindings.push({ ...prior, id: nextId++ });
     }
 
-    // Surface per-photo vision failures to the Beta Center error monitor so we
-    // can spot model/storage flakiness during the closed beta (best-effort).
+    // Surface non-completed per-photo vision work to the Beta Center error
+    // monitor so we can spot model/storage flakiness during the closed beta.
     if (analysisErrors > 0) {
       void logErrorEvent("ai", {
         companyId,
         userId: req.user?.id,
-        message: `AI photo analysis failed for ${analysisErrors} photo(s)`,
+        message: `AI photo analysis did not complete for ${analysisErrors} photo(s)`,
         inspectionId,
         context: { failedPhotos: analysisErrors, stage: "vision_model" },
       });
@@ -743,17 +990,30 @@ router.post("/analyze", async (req, res) => {
     // failed. Partial failures (some succeeded) are surfaced via analysisErrors
     // alone since the count-based message is more informative in that case.
     // failureReason is null when analysis fully succeeded or partially succeeded.
+    const allNewPhotosFailed = newPhotosAttempted > 0 && analysisErrors === newPhotosAttempted;
     const failureReason: string | null =
-      newPhotosAttempted > 0 && analysisErrors === newPhotosAttempted
+      allNewPhotosFailed
         ? "Photos could not be processed by the AI analysis service. This is usually a temporary issue — retrying the inspection sync should resolve it."
         : null;
+    const completedPhotoCount = photoOutcomes.filter((photo) => photo.status === "completed").length;
+    const unsuccessfulPhotoCount = photoOutcomes.length - completedPhotoCount;
+    // A photo is complete only after a real provider assessment succeeds.
+    // Deferred and rate-limited photos remain retryable and must not appear in
+    // analyzedImagePaths. With no eligible submitted photos, preserve the
+    // historical complete status for technician-only/video-only analyses.
+    const status =
+      photoOutcomes.length === 0 || unsuccessfulPhotoCount === 0
+        ? "complete"
+        : completedPhotoCount === 0
+          ? "failed"
+          : "partial";
 
     const [row] = await db
       .insert(analysisResultsTable)
       .values({
         companyId,
         inspectionId,
-        status: "complete",
+        status,
         findings: mergedFindings,
         recommendations,
         videoEvidence,
@@ -762,6 +1022,7 @@ router.post("/analyze", async (req, res) => {
         coverage,
         overallConfidence,
         riskLevel,
+        photoOutcomes,
         // Persist the failure count so GET endpoints can surface it to the
         // summary screen without relying on the ephemeral POST response.
         analysisErrors: analysisErrors > 0 ? analysisErrors : 0,
@@ -810,6 +1071,7 @@ router.post("/analyze", async (req, res) => {
 
     return res.status(201).json({ ...serializeResult(row, memory), analysisErrors });
   } catch (err) {
+    logger.error({ err }, "[analysis] Inspection analysis request failed");
     void logErrorEvent("ai", {
       companyId: req.user?.companyId ?? 0,
       userId: req.user?.id,
@@ -817,6 +1079,14 @@ router.post("/analyze", async (req, res) => {
       context: { stage: "analyze_route" },
     });
     return res.status(500).json({ error: "Failed to analyze inspection" });
+  } finally {
+    // Normally the wrapped json() settles the shared promise. If an
+    // unexpected throw happens before any response is reached, reject it so
+    // simultaneous callers cannot wait forever; the rejection handler also
+    // removes the key from the process-local map.
+    if (sharedPromise && !sharedSettled) {
+      rejectShared?.(new Error("Inspection analysis did not produce a response"));
+    }
   }
 });
 

@@ -18,7 +18,10 @@ import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from "react-
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import { AuthedImage } from "@/components/AuthedImage";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
+import type { PhotoMeta } from "../../../lib/api-client-react/src/photo-meta";
 import { FindingCard } from "@/components/FindingCard";
+import { SvgXml } from "react-native-svg";
 import { MeasurementDevicePanel } from "@/components/MeasurementDevicePanel";
 import { setLastMeasurementReading } from "@/lib/measurement";
 import { TreatmentLogWizard } from "@/components/TreatmentLogWizard";
@@ -92,10 +95,29 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
     staleTime: 30_000,
     enabled: id > 0,
   });
-  const handleTreatmentLogged = useCallback(() => {
-    void treatmentLogsQ.refetch();
-    setShowTreatmentWizard(false);
-  }, [treatmentLogsQ]);
+  // Post-treatment truck-stock notice — set whenever TreatmentLogWizard's
+  // onLogged callback returns an updated on-hand baseline for the applied
+  // product. Dismissible and auto-clears; `low` styles it as a resupply
+  // warning instead of a plain confirmation. Mirrors new-inspection.tsx.
+  const [stockNotice, setStockNotice] = useState<{
+    productName: string;
+    quantityOnHand: number;
+    unit: string;
+    low: boolean;
+  } | null>(null);
+  useEffect(() => {
+    if (!stockNotice) return;
+    const timer = setTimeout(() => setStockNotice(null), 6000);
+    return () => clearTimeout(timer);
+  }, [stockNotice]);
+  const handleTreatmentLogged = useCallback(
+    (stock?: { productName: string; quantityOnHand: number; unit: string; low: boolean }) => {
+      void treatmentLogsQ.refetch();
+      setShowTreatmentWizard(false);
+      if (stock) setStockNotice(stock);
+    },
+    [treatmentLogsQ],
+  );
 
   const analyze = useAnalyzeInspection();
   const genReport = useGenerateReport();
@@ -135,6 +157,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   const [reviewSaving, setReviewSaving] = useState(false);
   // #110 — full-screen evidence viewer
   const [viewerPath, setViewerPath] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [viewerSaving,  setViewerSaving]  = useState(false);
   const [viewerCopying, setViewerCopying] = useState(false);
 
@@ -244,8 +267,32 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   };
 
   const inspection = inspectionQ.data;
+  // Accept both spellings that the server can emit.
+  const isCompleted =
+    inspection != null &&
+    (inspection.status === "completed" || inspection.status === "complete");
   const analysis = analysisQ.data?.[0];
   const photos = (inspection?.media ?? []).filter((m) => m.mediaType === "photo" || m.mediaType === "image");
+  const treatmentSummary = treatmentLogsQ.data?.length
+    ? treatmentLogsQ.data
+        .map((log) => `${log.product?.name ?? "Chemical application"} · ${log.siteClassification}`)
+        .join(" | ")
+    : null;
+  const photoMeta: PhotoMeta[] = photos.map((m) => {
+    const finding = (analysis?.findings ?? []).find((f) => f.imageUrl === m.url);
+    const correction = finding?.reviewStatus === "corrected" ? finding.technicianSpecies : null;
+    return {
+      id: m.id,
+      url: m.url,
+      classificationTag: correction || finding?.species || finding?.category || "Unclassified",
+      confidenceScore: finding?.confidence ?? null,
+      technicianCorrectionLabel: correction ?? null,
+      structuredDescription: finding?.description || m.caption || null,
+      chemicalLogReference: treatmentSummary,
+      unitNumber: m.unitNumber ?? inspection?.unitNumber ?? null,
+      capturedAt: m.createdAt ?? null,
+    };
+  });
 
   const runAnalysis = async () => {
     setError(null);
@@ -300,10 +347,10 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
   // A manager/owner can reopen any inspection; a technician can only reopen
   // their own (matched via the clerkUserId stored in technicianId at creation).
   const canReopen =
-    inspection?.status === "completed" &&
+    isCompleted &&
     !!user &&
     (["manager", "owner"].includes(user.role) ||
-      (user.role === "technician" && inspection.technicianId === user.clerkUserId));
+      (user.role === "technician" && inspection!.technicianId === user.clerkUserId));
 
   const handleReopen = () => {
     Alert.alert(
@@ -464,6 +511,46 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
           ) : null}
         </View>
 
+        {stockNotice ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              backgroundColor: stockNotice.low ? "rgba(202,138,4,0.92)" : "rgba(22,163,74,0.90)",
+              paddingHorizontal: 10,
+              paddingVertical: 7,
+              borderRadius: 10,
+            }}
+          >
+            <Ionicons name={stockNotice.low ? "warning-outline" : "flask-outline"} size={16} color="#fff" />
+            <Text
+              style={{
+                color: "#fff",
+                fontFamily: "Inter_600SemiBold",
+                fontSize: 12,
+                flex: 1,
+                flexShrink: 1,
+              }}
+            >
+              {stockNotice.low
+                ? `Low stock: ${stockNotice.quantityOnHand.toFixed(1)} ${stockNotice.unit} of ${stockNotice.productName} remaining on truck`
+                : `${stockNotice.quantityOnHand.toFixed(1)} ${stockNotice.unit} of ${stockNotice.productName} remaining on truck`}
+            </Text>
+            <Pressable
+              onPress={() => setStockNotice(null)}
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 6,
+                backgroundColor: "rgba(255,255,255,0.28)",
+              }}
+            >
+              <Ionicons name="close" size={14} color="#fff" />
+            </Pressable>
+          </View>
+        ) : null}
+
         {inspection.notes ? (
           <Card>
             <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 }}>
@@ -486,7 +573,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                 const zoomSubject = (m as unknown as Record<string, unknown>).zoomSubject as string | undefined;
                 return (
                   // #110 — tap any thumbnail to open full-screen viewer
-                  <Pressable key={m.id} onPress={() => setViewerPath(m.url)}>
+                  <Pressable key={m.id} onPress={() => setLightboxIndex(photos.findIndex((photo) => photo.id === m.id))} style={{ width: 104 }}>
                     <AuthedImage
                       path={m.url}
                       style={{
@@ -499,6 +586,35 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                           : lowQ ? colors.warning : "transparent",
                       }}
                     />
+                    <View
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        left: 4,
+                        maxWidth: 94,
+                        backgroundColor: "rgba(0,0,0,0.68)",
+                        borderRadius: 999,
+                        paddingHorizontal: 5,
+                        paddingVertical: 2,
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontSize: 8, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
+                        {photoMeta[photos.findIndex((photo) => photo.id === m.id)]?.classificationTag ?? "Unclassified"}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        position: "absolute",
+                        bottom: 4,
+                        left: 4,
+                        backgroundColor: "rgba(0,0,0,0.68)",
+                        borderRadius: 999,
+                        paddingHorizontal: 5,
+                        paddingVertical: 2,
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontSize: 8 }}>{m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</Text>
+                    </View>
                     {/* #105 — GLASSES chip replaces the generic source icon for meta-glasses frames */}
                     {isGlassesFrame ? (
                       <View
@@ -591,6 +707,13 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
             </View>
           </View>
         ) : null}
+
+        <PhotoLightbox
+          photos={photoMeta}
+          initialIndex={lightboxIndex ?? 0}
+          visible={lightboxIndex != null}
+          onClose={() => setLightboxIndex(null)}
+        />
 
         {/* #110 — Full-screen evidence viewer */}
         <Modal
@@ -750,7 +873,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
         />
 
         {/* Log Treatment — only for active inspections */}
-        {(inspection as unknown as Record<string, unknown>).status !== "completed" ? (
+        {!isCompleted ? (
           <Button
             title="Log Treatment"
             variant="outline"
@@ -761,7 +884,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
 
         {/* ── Integration sync status (owners only, completed inspections) ── */}
         {user?.role === "owner" &&
-          (inspection as unknown as Record<string, unknown>).status === "completed" &&
+          isCompleted &&
           integrationConfigQ.data?.configured ? (
           <Card style={{ gap: 10 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -829,6 +952,98 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
                 onPress={handleSync}
               />
             )}
+          </Card>
+        ) : null}
+
+        {/* ── Signatures ──────────────────────────────────────────────────────
+             Show a read-only signature block on all completed inspections so
+             managers can audit compliance without leaving the detail view.
+             The capture flow lives in inspection-summary/[localId].tsx.    */}
+        {isCompleted ? (
+          <Card style={{ gap: 12 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <SectionTitle title="Signatures" colors={colors} />
+              {(inspection as unknown as { signedAt?: string }).signedAt ? (
+                <Badge label="Signed" tone="success" />
+              ) : (inspection as unknown as { ownerNotAvailable?: boolean }).ownerNotAvailable ? (
+                <Badge label="Declined" tone="warning" />
+              ) : (
+                <Badge label="Unsigned" tone="default" />
+              )}
+            </View>
+            {(inspection as unknown as { signedAt?: string }).signedAt ? (
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                Signed {formatDate((inspection as unknown as { signedAt: string }).signedAt)}
+              </Text>
+            ) : null}
+            {/* Technician signature */}
+            {(inspection as unknown as { technicianSignature?: string }).technicianSignature ? (
+              <View style={{ gap: 6 }}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                  Technician
+                </Text>
+                <View
+                  style={{
+                    height: 80,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: "#fff",
+                    overflow: "hidden",
+                  }}
+                >
+                  <SvgXml
+                    xml={(inspection as unknown as { technicianSignature: string }).technicianSignature}
+                    width="100%"
+                    height="100%"
+                  />
+                </View>
+              </View>
+            ) : null}
+            {/* Owner / Tenant signature or "not available" notice */}
+            {(inspection as unknown as { ownerSignature?: string }).ownerSignature ? (
+              <View style={{ gap: 6 }}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                  Owner / Tenant
+                </Text>
+                <View
+                  style={{
+                    height: 80,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: "#fff",
+                    overflow: "hidden",
+                  }}
+                >
+                  <SvgXml
+                    xml={(inspection as unknown as { ownerSignature: string }).ownerSignature}
+                    width="100%"
+                    height="100%"
+                  />
+                </View>
+              </View>
+            ) : (inspection as unknown as { ownerNotAvailable?: boolean }).ownerNotAvailable ? (
+              <View style={{ gap: 6 }}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12 }}>
+                  Owner / Tenant
+                </Text>
+                <View
+                  style={{
+                    height: 48,
+                    borderRadius: 8,
+                    backgroundColor: colors.muted,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingHorizontal: 12,
+                  }}
+                >
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
+                    Not available — technician signed on behalf
+                  </Text>
+                </View>
+              </View>
+            ) : null}
           </Card>
         ) : null}
 

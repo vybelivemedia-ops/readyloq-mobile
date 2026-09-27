@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "python-3.11", "postgresql-16"]
+modules = ["nodejs-24", "python-3.11", "java-graalvm22.3", "postgresql-16"]
 
 [deployment]
 router = "application"
@@ -87,7 +87,7 @@ timeoutMs = 120000
 
 [nix]
 channel = "stable-25_05"
-packages = ["eas-cli", "android-tools"]
+packages = ["eas-cli", "android-tools", "glib", "nspr", "nss", "expat", "libdrm", "libxkbcommon", "mesa", "pango", "atk", "at-spi2-atk", "dbus", "cups", "alsa-lib", "pandoc", "texliveSmall"]
 
 [[ports]]
 localPort = 8081
@@ -96,3 +96,5 @@ localPort = 8081
 
 [userenv.production]
 VITE_APP_URL = "https://pest-insight-engine.replit.app"
+
+[userenv.shared]

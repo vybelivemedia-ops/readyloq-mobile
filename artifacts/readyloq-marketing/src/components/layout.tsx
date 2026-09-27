@@ -11,7 +11,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const links = [
     { href: "/features", label: "Features" },
+    { href: "/#updates", label: "Updates" },
     { href: "/solutions", label: "Solutions" },
+    { href: "/pricing", label: "Pricing" },
     { href: "/contact", label: "Contact" },
   ];
 
@@ -119,6 +121,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <ul className="space-y-3 text-sm">
                 <li><Link href="/features" className="hover:text-primary transition-colors">Features</Link></li>
                 <li><Link href="/solutions" className="hover:text-primary transition-colors">Solutions</Link></li>
+                <li><Link href="/pricing" className="hover:text-primary transition-colors">Pricing</Link></li>
                 <li><Link href="/demo" className="hover:text-primary transition-colors">Request Demo</Link></li>
                 <li><Link href="/login" className="hover:text-primary transition-colors">Log in</Link></li>
               </ul>

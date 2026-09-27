@@ -1,0 +1,1 @@
+export { Incidents as default } from "@/components/mission-control/lists";

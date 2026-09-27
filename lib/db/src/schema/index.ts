@@ -28,3 +28,6 @@ export * from "./client-portal";
 export * from "./meta-glasses";
 export * from "./portal-messages";
 export * from "./enterprise-outbox";
+export * from "./enterprise-sync";
+export * from "./chemicals";
+export * from "./mission-control";

@@ -281,6 +281,7 @@ describe("updateLocalInspection — captureMetadata is not overwritten on merge"
 describe("sync engine — captureMetadata passes through to addInspectionMedia", () => {
   it("calls addInspectionMedia with captureMetadata.laserMeasurement.metadata.warnings intact", async () => {
     const insp = makeInspection();
+    insp.unitNumber = "4B";
     // storagePath pre-set → engine skips the upload step and goes directly to
     // the POST /media registration step where captureMetadata is forwarded.
     insp.photos = [photoWithMeasurement({
@@ -296,13 +297,14 @@ describe("sync engine — captureMetadata passes through to addInspectionMedia",
 
     const [, payload] = addInspectionMediaSpy.mock.calls[0] as [
       number,
-      { captureMetadata?: Record<string, unknown> },
+      { captureMetadata?: Record<string, unknown>; unitNumber?: string | null },
     ];
 
     expect(payload.captureMetadata).toBeDefined();
     const laser = payload.captureMetadata!.laserMeasurement as typeof LASER_MEASUREMENT;
     expect(laser).toBeDefined();
     expect(laser.metadata.warnings).toEqual(WARNINGS);
+    expect(payload.unitNumber).toBe("4B");
   });
 
   it("does not strip image-level or laserMeasurement keys when building the addInspectionMedia payload", async () => {
@@ -328,5 +330,32 @@ describe("sync engine — captureMetadata passes through to addInspectionMedia",
     const laser = meta.laserMeasurement as typeof LASER_MEASUREMENT;
     expect(laser.value).toBe(3.42);
     expect(laser.metadata.confidence).toBe(0.61);
+  });
+
+  it("sends the original capturedAt unchanged after a failed and delayed retry", async () => {
+    const capturedAt = "2024-01-02T03:04:05.678Z";
+    const insp = makeInspection();
+    insp.photos = [photoWithMeasurement({
+      capturedAt,
+      storagePath: "/api/storage/companies/1/media/retried.jpg",
+    })];
+    insp.serverId = 42;
+    await saveLocalInspection(insp);
+
+    // Registration fails once, then succeeds on the retry. The persisted local
+    // photo remains the source of truth; registration time must never replace
+    // its capture time.
+    addInspectionMediaSpy.mockRejectedValueOnce(new Error("temporary network failure"));
+    await syncNow(insp.localId);
+
+    addInspectionMediaSpy.mockResolvedValueOnce({ id: 100 });
+    // Let the engine's delayed exponential-backoff retry perform the second
+    // registration attempt rather than invoking a fresh manual sync.
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(addInspectionMediaSpy).toHaveBeenCalledTimes(2);
+    expect(addInspectionMediaSpy.mock.calls[0][1]).toMatchObject({ capturedAt });
+    expect(addInspectionMediaSpy.mock.calls[1][1]).toMatchObject({ capturedAt });
+    expect((await getLocalInspection(insp.localId))?.photos[0]?.capturedAt).toBe(capturedAt);
   });
 });

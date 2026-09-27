@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/mission-control/"
+title = "ReadyLoq Mission Control"
+description = "Secure mobile-first platform operations command center for ReadyLoq super admins with global inspection and company oversight, incident investigation, governed actions and AI-assisted operational analysis."
+version = "1.0.0"
+id = "artifacts/readyloq-mission-control"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/mission-control/" ]
+localPort = 18474
+
+[services.development]
+run = "pnpm --filter @workspace/readyloq-mission-control run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/readyloq-mission-control", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/readyloq-mission-control/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18474"
+BASE_PATH = "/mission-control/"

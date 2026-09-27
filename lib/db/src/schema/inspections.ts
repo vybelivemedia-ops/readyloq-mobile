@@ -46,6 +46,15 @@ export const inspectionsTable = pgTable(
     ownerSignature: text("owner_signature"),
     ownerNotAvailable: boolean("owner_not_available").notNull().default(false),
     signedAt: timestamp("signed_at"),
+    // Unit / apartment number for multi-family properties — one inspection per
+    // unit, grouped by address. Null for single-family or commercial properties.
+    unitNumber: text("unit_number"),
+    // Free-text reason for the visit (e.g. "Routine Inspection", "Callback",
+    // "Initial Service", "Follow-up Treatment"). Kept freeform rather than a
+    // strict enum so it can also be populated later by an enterprise-routing
+    // import (PestPac/ServSuite/FieldRoutes stop types use their own wording).
+    // Null for historical rows created before this field existed.
+    visitPurpose: text("visit_purpose"),
   },
   (t) => [
     uniqueIndex("inspections_company_client_key_uq").on(t.companyId, t.clientKey),
@@ -83,7 +92,12 @@ export const inspectionMediaTable = pgTable("inspection_media", {
   zoomSubject: text("zoom_subject"),
   // Device/EXIF context (dimensions, file size, provider id, device model…).
   captureMetadata: jsonb("capture_metadata").$type<Record<string, unknown>>(),
+  // Device-authored evidence capture instant. Null on historical rows created
+  // before mobile registration began sending the original capture timestamp.
+  capturedAt: timestamp("captured_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Unit / apartment tagging — set when a photo is tagged to a specific unit.
+  unitNumber: text("unit_number"),
 });
 
 export const insertInspectionSchema = createInsertSchema(inspectionsTable).omit({ id: true, createdAt: true, mediaCount: true, findingsCount: true, aiAnalysisId: true, companyId: true });

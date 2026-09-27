@@ -57,6 +57,33 @@ ReadyLoq is a pnpm monorepo comprising:
 
 ---
 
+## Attorney Update Memorandum — August 28, 2026
+
+This memorandum updates the original technical disclosure dated August 15, 2026. It is intended to give patent counsel a current implementation snapshot and identify additional technical combinations that may warrant separate novelty and claim analysis. It does **not** amend the legal disclaimer in this document, does not establish inventorship, and does not represent that any candidate below is novel, non-obvious, patentable, or free of third-party rights.
+
+### Material implementation changes since the prior disclosure
+
+1. **Predictive restocking and adaptive logistics are now implemented.** ReadyLoq now maintains a company/technician/product inventory model with a warehouse tier above technician trucks, configurable replenishment targets and supplier lead times, and a persisted predictive recommendation workflow. The forecast combines a recency-weighted consumption rate from the inventory ledger with scheduled route demand, uses the greater projected rate, and computes a reorder point and recommended order quantity. Recommendations are recomputed after relevant treatment deductions and by a periodic scheduler; they are persisted so manager dismissal or conversion is not lost on a later read.
+
+2. **Chemical usage is reconciled to physical truck inventory.** A treatment log can deduct the amount actually applied from the technician’s compatible fluid-ounce inventory, record the actual deducted amount, append the corresponding movement to the ledger, and append a reversal when the treatment is deleted. If the requested amount exceeds available stock, the system clamps the deduction and surfaces a warning rather than silently creating negative inventory or claiming that the full requested amount was removed. Products tracked in incompatible units, such as gallons, are not incorrectly converted or deducted; applied fluid ounces remain separately labeled in technician and manager views.
+
+3. **The inventory ledger now has database-enforced immutability.** The `inventory_transactions` table is protected by a PostgreSQL `BEFORE UPDATE OR DELETE` trigger. The production application uses inserts for movement history; direct UPDATE/DELETE statements are rejected by the database. A narrowly scoped transaction-local bypass exists only for test/operations fixture cleanup and is not used by production request handlers. This changes the earlier disclosure from “append-only by application convention” to “append-only with a database-enforced mutation barrier.”
+
+4. **Prior-visit property memory now informs live inspection guidance.** Completed inspections are grouped by company and a normalized physical-property address. The system derives recurring issue categories, prior severity, prior activity, bait-station gaps, and areas not previously inspected, then turns those grounded historical signals into prioritized next actions during the current inspection. The design intentionally avoids fabricating a station number or treating a missing historical observation as a present finding; prior context is presented as a re-check prompt, not as new evidence.
+
+5. **Route and operational context is more integrated.** Schedule and daily-route APIs now expose the same scheduled inspection data used by predictive logistics and route-readiness views. The web portal uses the generated, type-checked API client for the route-calendar surface. This is supporting infrastructure for the FAIE logistics embodiment, not by itself asserted as a standalone invention.
+
+6. **Implementation and diligence evidence improved.** The Clerk authorization-bypass dependency and the other flagged dependency versions were patched; the admin bootstrap endpoint received a dedicated per-IP limiter; a database backup/restore and disaster-recovery plan was documented with a verified logical restore drill; and signature rendering has integration-test coverage. These changes strengthen the engineering record and audit posture, but should be treated as security/operational diligence evidence rather than the center of a patent claim.
+
+### Current disclosure posture
+
+- The strongest technical disclosure remains the **combined offline multimodal inspection pipeline**: transient evidence selection, domain-prompted on-device voice commands, BLE/wearable frame ingestion, resumable offline synchronization, AI finding generation, and human correction.
+- The most important newly separable combination is **ledger-grounded, schedule-aware predictive replenishment**: historical movement data is reversal-netted and normalized to the inventory unit, recent usage is weighted across the full time window, upcoming scheduled demand is added, supplier lead time and safety stock are applied, and the recommendation is persisted with manager action state.
+- A second newly separable combination is **property-memory-grounded inspection guidance**: normalized address matching within a company, prior finding/zone aggregation, missing-coverage detection, and prioritized re-inspection prompts that remain distinct from current-visit findings.
+- Patent counsel should distinguish **implemented behavior** from interfaces, planned integrations, and physical validation. In particular, the repository still does not establish physical validation of the custom BLE glasses protocol against production hardware, and the measurement-core package remains contracts-only rather than a working dimensional-measurement engine.
+
+---
+
 ## Detailed Technical Description
 
 ### 1. Repository & Monorepo Structure
@@ -852,9 +879,20 @@ graph TD
 | approvedForTraining gate | IMPLEMENTED (schema) | Column + flag; UI flow incomplete |
 | Anonymization field | IMPLEMENTED (schema) | `anonymizedAt` column |
 | Automated model retraining | NOT FOUND | No training pipeline |
+| Property address normalization | IMPLEMENTED | `lib/property-intelligence.ts`, company-scoped normalized address key |
+| Property memory / recurring issue aggregation | IMPLEMENTED | `property_memory` schema, `property-memory-writer.ts`, properties routes |
+| Prior-visit coverage guidance | IMPLEMENTED | `guidance-engine.ts`, live inspection guidance integration |
 | Company playbooks | IMPLEMENTED | `playbooks` table + CRUD API |
 | Compliance evaluator (playbook-based) | IMPLEMENTED | `ComplianceEvaluator` |
 | Regulatory chemical validation | NOT FOUND | No external product DB integration |
+| Warehouse-to-truck inventory hierarchy | IMPLEMENTED | `warehouse_inventory`, `tech_inventory`, inventory routes |
+| Inventory movement ledger | IMPLEMENTED | `inventory_transactions`, treatment/inventory routes |
+| Database-enforced ledger immutability | IMPLEMENTED | PostgreSQL mutation trigger + regression tests |
+| Treatment usage deduction and reversal | IMPLEMENTED | `treatment-logs.ts`, actual deducted amount persisted |
+| Unit-compatible deduction and clamp warning | IMPLEMENTED | Fluid-ounce compatibility guard, zero-floor clamp and user-visible warning |
+| Recency-weighted consumption forecast | IMPLEMENTED | `predictive-restocking.ts`, 45-day window / 10-day half-life |
+| Schedule-aware predictive restocking | IMPLEMENTED | Scheduled stops + average application usage + supplier lead time |
+| Persisted restock recommendation state | IMPLEMENTED | Pending/converted/dismissed recommendation persistence and scheduler |
 | Gemini vision AI integration | IMPLEMENTED | `lib/integrations-gemini-ai`, `analyzeInspection()` |
 | Report generation on completion | IMPLEMENTED | `completeInspection()` triggers server pipeline |
 | Scorecard + Opportunity Intelligence | IMPLEMENTED | Server-side on `completeInspection()` |
@@ -875,6 +913,12 @@ graph TD
 | ~2026-07 | — | `repos/platform/packages/smart-vision/` | @platform/smart-vision 16-source-file implementation |
 | ~2026-07 | — | `repos/platform/packages/meta-wearables/` | @platform/meta-wearables contracts |
 | ~2026-08-15 | `current session` | `lib/sync/background-task.ts` | expo-background-fetch OS-level sync task |
+| 2026-08-23 | `453fe8f...` | `lib/db`, inventory routes | Warehouse tier, movement ledger, replenishment targets, unit/concurrency hardening |
+| 2026-08-23 | `9e27c32...` | `predictive-restocking.ts` | Recency-weighted, schedule-aware predictive restocking with persistent recommendations |
+| 2026-08-23 | `aad603e...` | route-readiness and inventory | Per-stop route readiness and truck stock-health projections |
+| 2026-08-24 | `97b9327...` | ledger migration, admin route | Database trigger enforcement for ledger immutability; dedicated bootstrap-token limiter |
+| 2026-08-24 | `dad3142...` | `db-backup-disaster-recovery.md` | Documented provider recovery posture and verified logical restore drill |
+| 2026-08-28 | `9c54896...` | treatment/inventory routes and views | Actual treatment usage deduction, unit-safe clamp warning, and applied-usage visibility |
 
 *Note: git log was run against the workspace. Exact dates for all platform packages were not individually resolved. The earliest activity observed is July 2026. This timeline represents approximately 5–6 weeks of primary development to date.*
 
@@ -996,6 +1040,85 @@ The following are candidate technical combinations that may warrant review by IP
 
 ---
 
+### Candidate F — Ledger-Grounded, Schedule-Aware Predictive Replenishment
+
+**Technical concept**: A field-service inventory system that projects a technician’s future product need by combining reversal-netted movement-ledger history, recency-weighted consumption over a full time window, upcoming scheduled route demand, supplier lead time, and configurable safety-stock targets. The result is a dated reorder point, projected stock-breach date, and recommended order quantity persisted as an actionable recommendation.
+
+**Problem addressed**: A threshold-only alert reacts after stock becomes low and a historical average can miss an unusually busy scheduled route. The system must forecast demand without treating sparse activity as a high daily rate, while keeping the forecast in the same unit as the truck’s balance.
+
+**Actual implementation**:
+
+1. Treatment deductions and reversals are read from the immutable `inventory_transactions` ledger rather than raw treatment-log requests.
+2. Daily consumption uses exponential recency weighting (current implementation: 45-day lookback and 10-day half-life) divided by the weight of every day in the window, not only days with activity.
+3. Scheduled stops over the forecast horizon are multiplied by historical average application usage; the greater of historical and scheduled-demand rates becomes the projected rate.
+4. Supplier lead time and replenishment-target days of supply produce the reorder point and recommended order quantity.
+5. Recommendations are persisted and recomputed after relevant deductions or by a periodic scheduler; manager dismissal is retained, and conversion to an order is not silently reverted by later recomputation.
+
+**Why the combination may be distinctive**: It joins an append-only physical-movement ledger, reversal-aware and recency-normalized consumption math, forward schedule demand, supplier logistics, and persistent human action state into one technician-specific field-service control loop. This is not represented as a trained machine-learning model; it is a deterministic/statistically adjusted forecast.
+
+**Alternative implementations**: Static minimum-stock thresholds; flat moving average; demand forecast without route schedule; separate warehouse planning system; recommendations derived only at read time; unscoped company-wide inventory forecast.
+
+**Evidence**: `artifacts/api-server/src/lib/predictive-restocking.ts`, `inventory-forecasting.ts`, `predictive-restocking-scheduler.ts`, `routes/inventory.ts`, `lib/db/src/schema/chemicals.ts`, `routes/treatment-logs.ts`
+
+**Implementation status**: IMPLEMENTED
+
+**Prior-art questions**: Prior field-service systems combining schedule-aware demand projection with reversal-netted, unit-safe technician inventory ledgers and persisted manager-action recommendations? Prior use of full-window recency normalization to avoid inflating sparse consumption?
+
+---
+
+### Candidate G — Property-Memory-Grounded Inspection Guidance
+
+**Technical concept**: A repeat-inspection guidance system that normalizes free-text property addresses into a stable matching key within a company, aggregates prior inspection findings and coverage by physical zone, stores a property memory record, and injects only grounded historical gaps into the current inspection’s prioritized guidance queue.
+
+**Problem addressed**: The same physical property can be entered with punctuation, street-suffix, suite, or formatting differences. A new inspection can therefore miss recurring issues or areas that were previously active but not rechecked. Treating historical information as a current finding would create false evidence, so the system needs a separate, provenance-aware guidance channel.
+
+**Actual implementation**:
+
+1. Address normalization lowercases, removes selected punctuation, standardizes common street suffixes, drops unit designators, and produces a stable key.
+2. Matching is scoped to the authenticated company and physical-property key; the same address in another company is not used as memory.
+3. Completed inspections contribute recurring issue categories, highest observed severity, last-seen timing, bait-station gaps, and uninspected or previously active zones.
+4. The guidance engine converts those signals into prioritized actions such as re-photograph, re-check monitoring, or re-inspect.
+5. Historical signals remain distinguishable from current evidence; null or missing historical zones do not generate fabricated station identifiers or present-visit findings.
+
+**Why the combination may be distinctive**: It combines tolerant physical-location identity resolution, longitudinal inspection memory, coverage-gap derivation, provenance-preserving guidance, and live prioritization within an offline-capable field inspection workflow.
+
+**Alternative implementations**: Exact address-string matching; customer-level notes without structured findings; AI-generated memory without deterministic provenance; treating prior findings as current findings; a generic CRM history page with no live capture guidance.
+
+**Evidence**: `artifacts/api-server/src/lib/property-intelligence.ts`, `property-memory-writer.ts`, `routes/properties.ts`, `lib/guidance-engine.ts`, `lib/db/src/schema/properties.ts`, `hooks/useSmartGuidance.ts`
+
+**Implementation status**: IMPLEMENTED
+
+**Prior-art questions**: Prior inspection systems using normalized physical-property identity plus zone-level longitudinal coverage gaps to drive live technician guidance? Prior systems that explicitly prevent historical context from becoming a current evidentiary finding?
+
+---
+
+### Candidate H — Unit-Safe Treatment-to-Inventory Reconciliation with Immutable Corrections
+
+**Technical concept**: A treatment-record workflow that separates the requested/applied fluid-ounce amount from the technician’s on-hand tracking unit, deducts only when units are compatible, clamps the deduction at available stock while surfacing a warning, stores the amount actually deducted, and restores exactly that amount through an append-only reversal when the treatment is deleted or corrected.
+
+**Problem addressed**: Field-service inventory often tracks stock in units such as gallons while treatment records are entered in fluid ounces. Naive subtraction can corrupt balances, display misleading units, over-restore stock after deletion, or hide an inventory shortfall.
+
+**Actual implementation**:
+
+- Compatible `fl oz`/`oz` inventory rows are updated under the shared technician/product transaction lock.
+- Incompatible units are left unchanged rather than being silently converted.
+- The actual amount removed is stored separately from the requested treatment amount.
+- A zero-floor clamp prevents negative balances and returns a user-visible warning.
+- Deleting a treatment restores the actual deducted amount, not the original requested amount, and writes a reversal movement with an acting user and reference ID.
+- Technician and manager views show applied usage in fluid ounces while preserving the truck’s independent on-hand unit.
+
+**Why the combination may be distinctive**: The technical contribution is the combination of unit-compatibility gating, actual-effect persistence, concurrency-safe balance mutation, warning-producing clamping, and immutable reversal history in a field-service treatment workflow.
+
+**Alternative implementations**: Convert all products to one canonical unit; subtract the requested amount regardless of available stock; allow negative balances; restore the request amount on deletion; overwrite history instead of appending reversals.
+
+**Evidence**: `artifacts/api-server/src/routes/treatment-logs.ts`, `routes/inventory.ts`, `lib/inventory-forecasting.ts`, `lib/db/src/schema/chemicals.ts`, related inventory and treatment-log tests
+
+**Implementation status**: IMPLEMENTED
+
+**Prior-art questions**: Prior pest-control or field-service systems that reconcile fluid-ounce application records to differently denominated truck inventory while preserving actual-effect and reversal history? Prior systems combining unit incompatibility guards with user-visible clamp warnings?
+
+---
+
 ## Prior-Art Research Questions for IP Counsel
 
 1. Do any existing systems combine on-device Whisper inference with a domain-specific prompt for pest-control vocabulary and structured command execution against offline inspection state?
@@ -1008,6 +1131,11 @@ The following are candidate technical combinations that may warrant review by IP
 8. Are there existing multimodal field-worker systems combining wearable vision, voice command, offline persistence, and AI analysis in a single inspection workflow?
 9. What is the state of the art in smart glasses integration (BLE vs. vendor SDK) for commercial field-service inspection in pest control or adjacent industries?
 10. Are there existing implementations of rolling visual context buffers attached to voice commands in field inspection systems (providing camera context at the moment of a voice command)?
+11. Are there existing field-service replenishment systems combining reversal-netted movement ledgers, full-window recency weighting, scheduled route demand, supplier lead time, and persistent manager-action state?
+12. Are there existing inspection systems that derive zone-level historical coverage gaps from normalized physical-property identity and use them as provenance-preserving live guidance?
+13. Are there existing treatment-inventory systems that preserve requested amount, actual deducted amount, unit incompatibility, clamp warning, and immutable reversal as separate technical states?
+14. Does database-trigger enforcement of an append-only movement ledger materially distinguish the inventory embodiment from application-only audit logging?
+15. Were any of the new logistics, property-memory, or treatment-reconciliation combinations publicly disclosed, demonstrated, sold, or offered for sale before the relevant priority date?
 
 ---
 
@@ -1024,6 +1152,9 @@ The following are candidate technical combinations that may warrant review by IP
 - [ ] Confirm trade-secret eligibility of the `BILINGUAL_PEST_JARGON_PROMPT` content (if kept confidential)
 - [ ] Assess `anonymizedAt` + `approvedForTraining` dataset curation pattern against existing federated learning and dataset curation prior art
 - [ ] Identify any open-source components whose licenses (GPL, LGPL) interact with the commercial product (e.g., `whisper.rn`, `react-native-ble-plx`)
+- [ ] Analyze Candidates F–H separately from the original multimodal candidates; determine whether they should be disclosed as continuations, separate applications, or retained as trade secrets
+- [ ] Confirm the actual inventors and contribution dates for the predictive-restocking, property-memory, and treatment-inventory embodiments
+- [ ] Preserve dated source snapshots, tests, diagrams, and product demonstrations for Candidates F–H; repository implementation alone does not establish public-disclosure or priority facts
 
 ---
 
@@ -1032,4 +1163,4 @@ The following are candidate technical combinations that may warrant review by IP
 
 ---
 
-*Generated: 2026-08-15 | Source: ReadyLoq monorepo code audit | Audited by: automated code-first exploration across 9 independent subagent explorers | Document version: 1.0*
+*Updated: 2026-08-28 | Source: ReadyLoq monorepo code audit and implementation history | Document version: 2.0*

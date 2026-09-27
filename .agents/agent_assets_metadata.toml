@@ -7,6 +7,7 @@ uri = "file://attached_assets/readyloq-app-icon-512-final.png"
 type = "image"
 title = "Google Play Icon — 512×512 PNG"
 description = "Upload to: Google Play Console → App icon field. Exact requirement: 512×512 px, PNG, ≤1 MB."
+logical_id = "89ff1006-9d7d-410d-94c5-9bbc91d97a51"
 
 [[outputs]]
 id = "cFdQyq0qWPKFBkxzFugty"
@@ -14,6 +15,7 @@ uri = "file://artifacts/readyloq-app/assets/images/icon.png"
 type = "image"
 title = "Expo / Android Launcher Source — 1024×1024 PNG"
 description = "High-res master used by EAS to generate all Android mipmap densities (mdpi → xxxhdpi). Also accepted by Google Play as a feature graphic source."
+logical_id = "3874717d-06f9-4ab2-822c-3c96dbd1aee9"
 
 [[outputs]]
 id = "bI12K-IMBMZ7Asi6JCAJR"
@@ -21,6 +23,7 @@ uri = "file://attached_assets/readyloq-feature-graphic-1024x500.png"
 type = "image"
 title = "Google Play Feature Graphic — 1024×500 PNG"
 description = "Upload to: Store listing → Feature graphic. Exact spec: 1024×500 px, PNG, ≤1 MB."
+logical_id = "e343b26f-9eff-4b85-85ae-5a5de264b8e7"
 
 [[outputs]]
 id = "hiYwRORQt7cCyREcnOZ3r"
@@ -28,6 +31,7 @@ uri = "file://FAIE-Technical-Invention-Disclosure.md"
 type = "text"
 title = "FAIE Technical Invention Disclosure"
 description = "Code-first IP documentation audit of the ReadyLoq/FAIE system — 17 sections, 8 architecture figures, 45-row implementation status table, 5 candidate technical combinations, prior-art questions, and attorney review checklist."
+logical_id = "e50032d5-cde7-442d-9fa6-f6e778cc7931"
 
 [[outputs]]
 id = "mluHMqcQInVRjk4WSeNrV"
@@ -35,3 +39,12 @@ uri = "file://FAIE-Technical-Invention-Disclosure.pdf"
 type = "pdf"
 title = "FAIE Technical Invention Disclosure"
 description = "229 KB PDF — full code-first IP audit of the ReadyLoq/FAIE system, ready to save or share with counsel."
+logical_id = "ae651c4d-a0bb-4aec-8dd4-d50c33fef178"
+
+[[outputs]]
+id = "TxWXxQ7SLNU_M-NntUAr4"
+uri = "file://FAIE-Technical-Invention-Disclosure-v2.0.pdf"
+type = "pdf"
+title = "FAIE Technical Invention Disclosure — Version 2.0"
+description = "Updated August 28, 2026 attorney-facing technical invention disclosure with implementation status, new predictive logistics/property-memory embodiments, prior-art questions, and review checklist."
+logical_id = "d042db0f-3a99-413c-ad21-1d7cddd862dd"

@@ -2,7 +2,8 @@
  * Connections tab — ReadyLoq
  *
  * Pairing screen for all ReadyLoq hardware:
- *   • Meta Ray-Ban smart glasses (BLE)
+ *   • Meta AI glasses (official Android Device Access Toolkit)
+ *   • ReadyLoq-compatible custom smart glasses (BLE / Nordic UART)
  *   • Wi-Fi IP cameras (GoPro, generic MJPEG/JPEG endpoints)
  *   • BLE measurement sensors (moisture, laser, temperature, CO₂, acoustic)
  *
@@ -58,6 +59,7 @@ import {
   getWifiCameraConfig,
   clearWifiCameraConfig,
 } from "@/lib/vision/wifi-camera-provider";
+import { useMetaWearablesSession } from "@/hooks/useMetaWearablesSession";
 
 // ─── Static device catalogue (Coming Soon entries) ───────────────────────────
 
@@ -153,6 +155,7 @@ const SENSOR_CATALOGUE: SensorEntry[] = [
 export default function ConnectionsScreen() {
   const colors = useColors();
   const router = useRouter();
+  const metaWearables = useMetaWearablesSession();
 
   const [ble, setBle] = useState<SmartGlassesBleState>(() =>
     smartGlassesBle.getState(),
@@ -656,8 +659,8 @@ export default function ConnectionsScreen() {
           </Card>
         )}
 
-        {/* ── Connected device ── */}
-        <Section title="Connected" icon="radio-outline">
+        {/* ── Connected ReadyLoq custom BLE device ── */}
+        <Section title="Custom BLE glasses" icon="bluetooth-outline">
           {isConnected && ble.connectedDeviceId ? (
             <>
               {nudgeBannerVisible && nudgeDeviceId === ble.connectedDeviceId && (
@@ -672,7 +675,7 @@ export default function ConnectionsScreen() {
               )}
               <ConnectedGlassesCard
                 deviceId={ble.connectedDeviceId}
-                deviceName={ble.connectedDeviceName ?? "Meta Ray-Ban Glasses"}
+                deviceName={ble.connectedDeviceName ?? "ReadyLoq-compatible glasses"}
                 colors={colors}
                 onDisconnect={handleDisconnect}
                 calibRefreshKey={calibRefreshKey}
@@ -713,7 +716,7 @@ export default function ConnectionsScreen() {
                     textAlign: "center",
                   }}
                 >
-                  No devices connected.{"\n"}Scan above or pair a device below.
+                  No custom BLE glasses connected.{"\n"}Use Meta AI access below for consumer Meta glasses.
                 </Text>
               </View>
             </Card>
@@ -735,9 +738,8 @@ export default function ConnectionsScreen() {
           </Section>
         )}
 
-        {/* ── Available devices (known, not yet connected) ── */}
-        <Section title="Available" icon="checkmark-circle-outline">
-          {/* Meta Ray-Ban — always shown as available unless connected */}
+        {/* ── Available custom BLE hardware ── */}
+        <Section title="ReadyLoq-compatible BLE hardware" icon="checkmark-circle-outline">
           {!isConnected && (
             <GlassesAvailableCard
               colors={colors}
@@ -752,8 +754,8 @@ export default function ConnectionsScreen() {
           )}
         </Section>
 
-        {/* ── Meta Ray-Ban · Live AI cloud session ─────────────────────── */}
-        <Section title="Meta Ray-Ban · Live AI" icon="glasses-outline">
+        {/* ── Official Meta Android Device Access Toolkit ───────────────── */}
+        <Section title="Meta AI Glasses · Android" icon="glasses-outline">
           <Card style={{ gap: 12 }}>
             {/* Header row */}
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -766,61 +768,79 @@ export default function ConnectionsScreen() {
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
-                  Meta Ray-Ban Glasses
+                  {metaWearables.title}
                 </Text>
                 <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-                  Live AI via cloud session · not BLE
+                  {metaWearables.guidance}
                 </Text>
               </View>
             </View>
 
-            {/* How-to steps */}
-            <View style={{ gap: 6 }}>
-              {([
-                ["1", "Open the Meta AI app and confirm the glasses are paired and connected"],
-                ["2", "Enable Developer Mode inside the Meta AI app settings"],
-                ["3", "Start or open an inspection — a 6-character pairing code will appear at the top of the screen"],
-                ["4", "Enter that code under App Connections in the Meta AI app"],
-              ] as [string, string][]).map(([step, label]) => (
-                <View key={step} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
-                  <View style={{
-                    width: 20, height: 20, borderRadius: 10,
-                    backgroundColor: "rgba(124,58,237,0.15)",
-                    alignItems: "center", justifyContent: "center",
-                    marginTop: 1,
-                  }}>
-                    <Text style={{ color: "#7c3aed", fontFamily: "Inter_700Bold", fontSize: 10 }}>
-                      {step}
-                    </Text>
-                  </View>
-                  <Text style={{
-                    color: colors.mutedForeground,
-                    fontFamily: "Inter_400Regular",
-                    fontSize: 12,
-                    lineHeight: 17,
-                    flex: 1,
-                  }}>
-                    {label}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 }}>
+              Consumer Meta glasses use Meta AI’s approval and camera-session flow — never Bluetooth scanning here. For development builds, enable Developer Mode in Meta AI; preview and production builds require ReadyLoq’s approved Meta release channel.
+            </Text>
 
-            {/* CTA */}
-            <Pressable
-              onPress={() => router.push("/(app)/new-inspection" as Href)}
+            {metaWearables.canRegister ? (
+              <Pressable
+                onPress={() => void metaWearables.startRegistration()}
+                style={({ pressed }) => ({
+                  backgroundColor: "#7c3aed",
+                  borderRadius: 10,
+                  paddingVertical: 11,
+                  alignItems: "center",
+                  opacity: pressed ? 0.8 : 1,
+                })}
+              >
+                <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  Connect in Meta AI
+                </Text>
+              </Pressable>
+            ) : metaWearables.canRequestPermission ? (
+              <Pressable
+                onPress={() => void metaWearables.requestCameraPermission()}
+                style={({ pressed }) => ({
+                  backgroundColor: "#7c3aed",
+                  borderRadius: 10,
+                  paddingVertical: 11,
+                  alignItems: "center",
+                  opacity: pressed ? 0.8 : 1,
+                })}
+              >
+                <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  Allow camera in Meta AI
+                </Text>
+              </Pressable>
+            ) : metaWearables.canStartSession ? (
+              <Pressable
+                onPress={() => void metaWearables.startSession()}
+                style={({ pressed }) => ({
+                  backgroundColor: "#7c3aed",
+                  borderRadius: 10,
+                  paddingVertical: 11,
+                  alignItems: "center",
+                  opacity: pressed ? 0.8 : 1,
+                })}
+              >
+                <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  Start glasses session
+                </Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => void metaWearables.refresh()}
               style={({ pressed }) => ({
-                backgroundColor: "#7c3aed",
-                borderRadius: 10,
-                paddingVertical: 11,
-                alignItems: "center",
-                opacity: pressed ? 0.8 : 1,
-              })}
-            >
-              <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
-                Start Inspection
-              </Text>
-            </Pressable>
+                  backgroundColor: colors.accent,
+                  borderRadius: 10,
+                  paddingVertical: 11,
+                  alignItems: "center",
+                  opacity: pressed ? 0.8 : 1,
+                })}
+              >
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  Check access again
+                </Text>
+              </Pressable>
+            )}
           </Card>
         </Section>
 

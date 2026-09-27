@@ -24,10 +24,19 @@ export interface PlaceholderProps {
 // ─── AI findings card ────────────────────────────────────────────────────────
 
 export type AnalysisCardVariant =
-  /** Inspection not yet uploaded; the sync-pending card is shown instead. */
-  | { kind: "not-finalized" }
-  /** analysisQ still in flight. */
-  | { kind: "loading" }
+  /** Evidence is local or syncing; AI will start when registered media is available. */
+  | { kind: "ai-queued" }
+  /** The analysis query or server pipeline is actively processing. */
+  | { kind: "ai-analyzing" }
+  /** The server explicitly reported a terminal AI failure. */
+  | { kind: "ai-failed"; placeholder: PlaceholderProps }
+  /** Some evidence was analyzed, but the result is incomplete. */
+  | {
+      kind: "ai-partial";
+      findingsCount: number;
+      analysisErrors: number;
+      placeholder: PlaceholderProps;
+    }
   /**
    * HTTP-level failure: network error, 500, auth.
    * → render SectionNotGenerated with these props.
@@ -63,6 +72,8 @@ export type AnalysisCardVariant =
 
 export interface AnalysisQueryState {
   finalized: boolean;
+  /** Local checkpoints show registered evidence while the sync engine is active. */
+  analysisInProgress?: boolean;
   isError: boolean;
   isSuccess: boolean;
   /** Undefined while loading, null when the server produced no record. */
@@ -84,7 +95,11 @@ export interface AnalysisQueryState {
  * Mirrors the conditional chain at lines 320–415 of [localId].tsx.
  */
 export function resolveAnalysisCardVariant(s: AnalysisQueryState): AnalysisCardVariant {
-  if (!s.finalized) return { kind: "not-finalized" };
+  // Before server finalization, absent analysis is queued/deferred even when
+  // the device is offline and the background query itself reports an error.
+  if (!s.finalized && s.analysis == null) {
+    return s.analysisInProgress ? { kind: "ai-analyzing" } : { kind: "ai-queued" };
+  }
 
   if (s.isError) {
     return {
@@ -102,7 +117,42 @@ export function resolveAnalysisCardVariant(s: AnalysisQueryState): AnalysisCardV
     const analysis = s.analysis;
 
     if (analysis != null) {
-      if (analysis.status !== "complete") {
+      const status = analysis.status.trim().toLowerCase();
+      if (status === "pending" || status === "queued") {
+        return { kind: "ai-queued" };
+      }
+      if (status === "processing" || status === "analyzing") {
+        return { kind: "ai-analyzing" };
+      }
+      if (status === "failed" || status === "error") {
+        return {
+          kind: "ai-failed",
+          placeholder: {
+            reason:
+              analysis.failureReason ??
+              "AI analysis is incomplete. The inspection remains completed and analysis can be retried.",
+            icon: "alert-circle-outline",
+            tone: "error",
+          },
+        };
+      }
+      if (status === "partial") {
+        const findings = analysis.findings ?? [];
+        const errCount = analysis.analysisErrors ?? 0;
+        return {
+          kind: "ai-partial",
+          findingsCount: findings.length,
+          analysisErrors: errCount,
+          placeholder: {
+            reason:
+              analysis.failureReason ??
+              "AI analysis is incomplete. Some evidence could not be processed — retry is available.",
+            icon: "alert-circle-outline",
+            tone: "error",
+          },
+        };
+      }
+      if (status !== "complete") {
         const genericReason =
           "AI analysis didn't complete for this inspection. The server may have skipped it or encountered an error — no action needed.";
         return {
@@ -147,6 +197,7 @@ export function resolveAnalysisCardVariant(s: AnalysisQueryState): AnalysisCardV
     }
 
     // analysis === null → server produced no record at all
+    if (!s.finalized) return { kind: "ai-queued" };
     const hasPhotos = s.photoCount > 0;
     return {
       kind: "no-analysis-record",
@@ -165,7 +216,7 @@ export function resolveAnalysisCardVariant(s: AnalysisQueryState): AnalysisCardV
   }
 
   // isError=false, isSuccess=false → still loading
-  return { kind: "loading" };
+  return s.finalized ? { kind: "ai-analyzing" } : { kind: "ai-queued" };
 }
 
 // ─── Delivery section ────────────────────────────────────────────────────────

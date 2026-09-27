@@ -22,6 +22,11 @@ export const analysisResultsTable = pgTable("analysis_results", {
   // instead of re-sent to the model. Failed photos are NOT recorded so they
   // retry on the next run.
   analyzedImagePaths: jsonb("analyzed_image_paths").$type<string[]>().default([]),
+  // Outcome for each eligible submitted photo in the most recent analysis run.
+  // Unlike analyzedImagePaths, this retains explicit non-success outcomes so
+  // the technician can distinguish an ordinary failure from a deferred or
+  // provider-rate-limited photo without inventing a finding.
+  photoOutcomes: jsonb("photo_outcomes").$type<PhotoAnalysisOutcome[]>().default([]),
   // Per-photo zone classification (storage path -> zone slug) from the vision
   // model's scene detection. Carried forward across live re-runs like findings,
   // so clean photos (which produce no finding) still count toward zone coverage.
@@ -34,9 +39,9 @@ export const analysisResultsTable = pgTable("analysis_results", {
   riskLevel: text("risk_level"),
   technicianFeedback: text("technician_feedback"),
   feedbackStatus: text("feedback_status"),
-  // Count of photos that failed AI analysis in the most recent analyze run
-  // (storage/model/parse errors). Null = pre-migration row or no run yet;
-  // 0 = run completed with zero failures; >0 = partial failure.
+  // Count of eligible photos that did not complete AI analysis in the most
+  // recent analyze run (including failed, deferred, and rate-limited photos).
+  // Null = pre-migration row or no run yet; 0 = all photos completed.
   analysisErrors: integer("analysis_errors"),
   // Human-readable reason the analysis was skipped or failed, set by the
   // server pipeline when it cannot complete analysis (e.g. "Image resolution
@@ -310,6 +315,11 @@ export interface VideoEvidence {
   durationSec: number | null;
   label: string | null;
   frameAnalysisStatus: "pending";
+}
+
+export interface PhotoAnalysisOutcome {
+  imagePath: string;
+  status: "completed" | "failed" | "deferred" | "rate_limited";
 }
 
 export const insertAnalysisResultSchema = createInsertSchema(analysisResultsTable).omit({ id: true, createdAt: true, companyId: true });

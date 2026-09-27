@@ -47,7 +47,7 @@ export function Reports() {
                         {report.title}
                       </div>
                       <div className="text-muted-foreground mt-1 text-xs">
-                        {report.siteAddress || report.clientName || `Inspection #${report.inspectionId}`}
+                        Inspection #{report.inspectionId} · {report.siteAddress || report.clientName || 'Address unavailable'}
                       </div>
                     </td>
                     <td className="px-6 py-4">

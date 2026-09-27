@@ -1,0 +1,163 @@
+READYLOQ — PRESERVE TRUE PHOTO CAPTURE TIMESTAMPS
+
+Implement ONLY this targeted fix.
+
+The read-only timestamp audit confirmed:
+
+- Mobile already creates the authoritative EvidenceItem.capturedAt / LocalPhoto.capturedAt timestamp at capture time.
+- That timestamp is currently not sent during media registration.
+- The server therefore creates inspection_media.created_at at registration time.
+- The Company Portal currently maps media.createdAt into a property named capturedAt.
+- This is incorrect for delayed/offline uploads.
+
+GOAL:
+
+Preserve the actual device capture instant separately from server registration time.
+
+IMPLEMENT:
+
+1. DATABASE
+
+Add a nullable:
+
+inspection_media.captured_at
+
+Use the existing timestamp conventions in the project.
+
+Do NOT remove or repurpose created_at.
+
+created_at must continue to mean server media-row creation/registration time.
+
+2. API
+
+Update the inspection media registration contract to accept:
+
+capturedAt
+
+Validate it as a valid timestamp.
+
+Persist it to inspection_media.captured_at.
+
+Do not overwrite captured_at with server time.
+
+3. MOBILE
+
+When registering media, send the existing:
+
+LocalPhoto.capturedAt
+
+Do not create a new timestamp for this purpose.
+
+Do not change camera capture behavior.
+
+Do not change Evidence Pipeline architecture.
+
+Do not change offline persistence.
+
+4. PORTAL API
+
+Expose both values where appropriate:
+
+capturedAt
+createdAt
+
+Semantics must be explicit:
+
+capturedAt = actual device/evidence capture instant
+createdAt = server media registration/audit timestamp
+
+5. COMPANY PORTAL
+
+When displaying evidence capture time:
+
+prefer:
+
+capturedAt
+
+fallback to:
+
+createdAt
+
+This fallback is required for historical media created before captured_at existed.
+
+Do NOT rewrite historical created_at values.
+
+6. CROSS-MIDNIGHT DISPLAY
+
+Review the existing media timestamp display.
+
+When evidence spans multiple calendar dates, make the displayed date understandable.
+
+Do not blindly change every media tile to a larger UI.
+
+Use the smallest UI change that prevents:
+
+11:58 PM
+12:01 AM
+
+from being ambiguous.
+
+7. INSPECTION LIST
+
+DO NOT change inspection createdAt behavior in this task.
+
+The inspection list currently uses server inspection createdAt.
+
+Leave that behavior unchanged.
+
+8. TESTS
+
+Add tests proving:
+
+A. Mobile media registration sends LocalPhoto.capturedAt.
+
+B. API stores capturedAt in inspection_media.captured_at.
+
+C. created_at remains server registration time.
+
+D. Portal prefers capturedAt.
+
+E. Portal falls back to createdAt for historical media.
+
+F. Delayed upload preserves original capture time.
+
+G. Cross-midnight media displays the correct calendar date/time.
+
+H. Existing inspections without captured_at still render correctly.
+
+9. VALIDATION
+
+Run:
+
+- affected API tests
+- affected mobile tests
+- portal tests
+- TypeScript/typecheck
+- database/schema validation
+- existing relevant test suites
+
+DO NOT CHANGE:
+
+- phone camera
+- Meta glasses
+- FAIE
+- Evidence Pipeline
+- completion flow
+- AI analysis
+- offline sync architecture
+- inspection createdAt
+- server createdAt semantics
+
+At the end report:
+
+- exact files changed
+- migration/schema change
+- API contract change
+- mobile payload change
+- portal display change
+- backward compatibility behavior
+- test results
+- typecheck results
+
+This is a targeted timestamp-correctness fix.
+Do not refactor unrelated code.

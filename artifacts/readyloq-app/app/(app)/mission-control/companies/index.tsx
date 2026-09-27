@@ -1,0 +1,1 @@
+export { Companies as default } from "@/components/mission-control/lists";

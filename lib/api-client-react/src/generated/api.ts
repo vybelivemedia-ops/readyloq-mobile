@@ -20,10 +20,12 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AgentTaskInput,
   AnalysisResult,
   AnalysisSummary,
   AnalyticsDashboard,
   AnalyzeInspectionInput,
+  ApprovalDecisionInput,
   BetaFeedback,
   BrandingProfile,
   BrandingProfileInput,
@@ -31,11 +33,16 @@ import type {
   ChecklistResponse,
   ChecklistToggleResult,
   ClientErrorInput,
+  CompanyAccessChangeInput,
+  CompanyAccessChangeResult,
   CompleteInspectionResult,
   CreateInviteInput,
   CustomerSummary,
   CustomerSummaryApprove,
   CustomerSummaryUpdate,
+  DailyRig,
+  DailyRigLookupResult,
+  DailyRigNotSetUp,
   DatasetCategory,
   DatasetPage,
   Error,
@@ -51,8 +58,15 @@ import type {
   GeminiMessageInput,
   GenerateNarrativeInput,
   GetAnalyticsTrendsParams,
+  GetDailyRigParams,
+  GetPropertyProfileParams,
+  GetRouteCalendarParams,
+  GetRouteOutlookParams,
+  GetRouteReadinessParams,
   GetScheduleParams,
+  GetTeamRouteReadinessParams,
   HealthStatus,
+  IncidentUpdate,
   InfestationRisk,
   Inspection,
   InspectionInput,
@@ -78,11 +92,40 @@ import type {
   ListFeedbackParams,
   ListInspectionsParams,
   ListIntelligenceRecordsParams,
+  ListMissionControlAgentTasksParams,
+  ListMissionControlApprovalsParams,
+  ListMissionControlAuditParams,
+  ListMissionControlCompaniesParams,
+  ListMissionControlIncidentsParams,
+  ListMissionControlInspectionsParams,
+  ListMissionControlPropertiesParams,
+  ListMissionControlTechniciansParams,
   ListProposalsParams,
   ListSalesOpportunitiesParams,
   ListScorecardsParams,
+  LookupDailyRigParams,
   LookupPropertyParams,
   MediaInput,
+  MissionControlAgentRoster,
+  MissionControlAgentTask,
+  MissionControlAgentTaskPage,
+  MissionControlApproval,
+  MissionControlApprovalPage,
+  MissionControlApprovalRequest,
+  MissionControlAuditPage,
+  MissionControlCompanyDetail,
+  MissionControlCompanyPage,
+  MissionControlDeviceSessionDetail,
+  MissionControlIncident,
+  MissionControlIncidentPage,
+  MissionControlInspectionDetail,
+  MissionControlInspectionPage,
+  MissionControlMe,
+  MissionControlOverview,
+  MissionControlPropertyDetail,
+  MissionControlPropertyPage,
+  MissionControlTechnicianDetail,
+  MissionControlTechnicianPage,
   OkResponse,
   OpportunityIntelligence,
   OpportunityNote,
@@ -93,13 +136,19 @@ import type {
   PropertyLookupResult,
   PropertyNote,
   PropertyNoteInput,
+  PropertyProfile,
   PropertyProfileUpdate,
   PropertyRiskInsights,
   PropertySummary,
+  PropertyVisitDetail,
   ReassignInput,
+  RecentMix,
   Report,
   ReportInput,
   RoleBriefing,
+  RouteCalendarDay,
+  RouteOutlookDetail,
+  RouteReadiness,
   SalesOpportunity,
   SalesOpportunityDetail,
   SalesOpportunityTrends,
@@ -110,6 +159,7 @@ import type {
   SalesProposalUpdate,
   ScheduleEntry,
   ScorecardSummary,
+  StopHistory,
   SubmitFeedbackInput,
   TechnicianPerformance,
   Tester,
@@ -117,7 +167,10 @@ import type {
   ToggleAccessInput,
   ToggleChecklistInput,
   TrendDataPoint,
-  UpdateFeedbackInput
+  UpdateFeedbackInput,
+  UpsertDailyRigInput,
+  UserAccessChangeInput,
+  UserAccessChangeResult
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -287,6 +340,417 @@ export const useReassignInspection = <TError = ErrorType<void>,
       > => {
       return useMutation(getReassignInspectionMutationOptions(options));
     }
+
+export const getGetPropertyProfileUrl = (params: GetPropertyProfileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/property-profile?${stringifiedParams}` : `/api/schedule/property-profile`
+}
+
+/**
+ * @summary Pre-inspection briefing for a property address — the last 5 inspections at that address, AI-synthesised historical pests/findings from property memory, property notes (access instructions, hazards, special needs), and the active bait station count from the most recent inspection there. Access rules mirror GET /schedule/route-outlook/{inspectionId}: manager/owner/sales see any company address; other roles must have an inspection of their own at that address.
+ */
+export const getPropertyProfile = async (params: GetPropertyProfileParams, options?: RequestInit): Promise<PropertyProfile> => {
+
+  return customFetch<PropertyProfile>(getGetPropertyProfileUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPropertyProfileQueryKey = (params?: GetPropertyProfileParams,) => {
+    return [
+    `/api/schedule/property-profile`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPropertyProfileQueryOptions = <TData = Awaited<ReturnType<typeof getPropertyProfile>>, TError = ErrorType<void>>(params: GetPropertyProfileParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPropertyProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPropertyProfileQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPropertyProfile>>> = ({ signal }) => getPropertyProfile(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPropertyProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPropertyProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getPropertyProfile>>>
+export type GetPropertyProfileQueryError = ErrorType<void>
+
+
+/**
+ * @summary Pre-inspection briefing for a property address — the last 5 inspections at that address, AI-synthesised historical pests/findings from property memory, property notes (access instructions, hazards, special needs), and the active bait station count from the most recent inspection there. Access rules mirror GET /schedule/route-outlook/{inspectionId}: manager/owner/sales see any company address; other roles must have an inspection of their own at that address.
+ */
+
+export function useGetPropertyProfile<TData = Awaited<ReturnType<typeof getPropertyProfile>>, TError = ErrorType<void>>(
+ params: GetPropertyProfileParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPropertyProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPropertyProfileQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetStopHistoryUrl = (inspectionId: number,) => {
+
+
+
+
+  return `/api/schedule/stop-history/${inspectionId}`
+}
+
+/**
+ * @summary Complete pre-service history for one scheduled stop, including recent inspection summaries, photo evidence, site notes, recurring findings, and material/chemical history. Inspection-backed history is limited to completed service records before the stop's scheduled timestamp; a same-day sibling completed before that time is included, while pending and later records are excluded. When the guarded PestPac bridge is activated, the response also includes normalized legacy location notes. Technicians must be assigned to the exact stop; manager/owner/sales roles may read any stop in their company.
+ */
+export const getStopHistory = async (inspectionId: number, options?: RequestInit): Promise<StopHistory> => {
+
+  return customFetch<StopHistory>(getGetStopHistoryUrl(inspectionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStopHistoryQueryKey = (inspectionId: number,) => {
+    return [
+    `/api/schedule/stop-history/${inspectionId}`
+    ] as const;
+    }
+
+
+export const getGetStopHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getStopHistory>>, TError = ErrorType<void>>(inspectionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStopHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStopHistoryQueryKey(inspectionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStopHistory>>> = ({ signal }) => getStopHistory(inspectionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(inspectionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStopHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStopHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getStopHistory>>>
+export type GetStopHistoryQueryError = ErrorType<void>
+
+
+/**
+ * @summary Complete pre-service history for one scheduled stop, including recent inspection summaries, photo evidence, site notes, recurring findings, and material/chemical history. Inspection-backed history is limited to completed service records before the stop's scheduled timestamp; a same-day sibling completed before that time is included, while pending and later records are excluded. When the guarded PestPac bridge is activated, the response also includes normalized legacy location notes. Technicians must be assigned to the exact stop; manager/owner/sales roles may read any stop in their company.
+ */
+
+export function useGetStopHistory<TData = Awaited<ReturnType<typeof getStopHistory>>, TError = ErrorType<void>>(
+ inspectionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStopHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStopHistoryQueryOptions(inspectionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPropertyVisitUrl = (inspectionId: number,) => {
+
+
+
+
+  return `/api/schedule/property-visit/${inspectionId}`
+}
+
+/**
+ * @summary Drill-down detail for a "visit" — every inspection sharing the same company + site address + calendar date as the given inspection (covers a single-family stop and a same-day multi-unit property alike) — plus every chemical application logged across all of that visit's units, each carrying a retreatment-interval compliance check against the most recent PRIOR application of the same product at this address. Access rules mirror GET /schedule/property-profile.
+ */
+export const getPropertyVisit = async (inspectionId: number, options?: RequestInit): Promise<PropertyVisitDetail> => {
+
+  return customFetch<PropertyVisitDetail>(getGetPropertyVisitUrl(inspectionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPropertyVisitQueryKey = (inspectionId: number,) => {
+    return [
+    `/api/schedule/property-visit/${inspectionId}`
+    ] as const;
+    }
+
+
+export const getGetPropertyVisitQueryOptions = <TData = Awaited<ReturnType<typeof getPropertyVisit>>, TError = ErrorType<void>>(inspectionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPropertyVisit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPropertyVisitQueryKey(inspectionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPropertyVisit>>> = ({ signal }) => getPropertyVisit(inspectionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(inspectionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPropertyVisit>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPropertyVisitQueryResult = NonNullable<Awaited<ReturnType<typeof getPropertyVisit>>>
+export type GetPropertyVisitQueryError = ErrorType<void>
+
+
+/**
+ * @summary Drill-down detail for a "visit" — every inspection sharing the same company + site address + calendar date as the given inspection (covers a single-family stop and a same-day multi-unit property alike) — plus every chemical application logged across all of that visit's units, each carrying a retreatment-interval compliance check against the most recent PRIOR application of the same product at this address. Access rules mirror GET /schedule/property-profile.
+ */
+
+export function useGetPropertyVisit<TData = Awaited<ReturnType<typeof getPropertyVisit>>, TError = ErrorType<void>>(
+ inspectionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPropertyVisit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPropertyVisitQueryOptions(inspectionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRouteCalendarUrl = (params: GetRouteCalendarParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/route-calendar?${stringifiedParams}` : `/api/schedule/route-calendar`
+}
+
+/**
+ * @summary Integrated Route Calendar — stops for a date window grouped by calendar day, each annotated with a Route Readiness flag (has the assigned technician set up their daily rig for that date?) and a rolled-up Route Chemical Outlook count (due-soon/overdue products at that stop's address). Same access scoping as GET /schedule (manager/owner/sales see all company stops; other roles see only their own).
+ */
+export const getRouteCalendar = async (params: GetRouteCalendarParams, options?: RequestInit): Promise<RouteCalendarDay[]> => {
+
+  return customFetch<RouteCalendarDay[]>(getGetRouteCalendarUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRouteCalendarQueryKey = (params?: GetRouteCalendarParams,) => {
+    return [
+    `/api/schedule/route-calendar`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetRouteCalendarQueryOptions = <TData = Awaited<ReturnType<typeof getRouteCalendar>>, TError = ErrorType<void>>(params: GetRouteCalendarParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteCalendar>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRouteCalendarQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRouteCalendar>>> = ({ signal }) => getRouteCalendar(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRouteCalendar>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRouteCalendarQueryResult = NonNullable<Awaited<ReturnType<typeof getRouteCalendar>>>
+export type GetRouteCalendarQueryError = ErrorType<void>
+
+
+/**
+ * @summary Integrated Route Calendar — stops for a date window grouped by calendar day, each annotated with a Route Readiness flag (has the assigned technician set up their daily rig for that date?) and a rolled-up Route Chemical Outlook count (due-soon/overdue products at that stop's address). Same access scoping as GET /schedule (manager/owner/sales see all company stops; other roles see only their own).
+ */
+
+export function useGetRouteCalendar<TData = Awaited<ReturnType<typeof getRouteCalendar>>, TError = ErrorType<void>>(
+ params: GetRouteCalendarParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteCalendar>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRouteCalendarQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRouteOutlookUrl = (inspectionId: number,
+    params?: GetRouteOutlookParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/schedule/route-outlook/${inspectionId}?${stringifiedParams}` : `/api/schedule/route-outlook/${inspectionId}`
+}
+
+/**
+ * @summary Full Route Chemical Outlook for a stop's address — every product applied there within the lookback window, projected forward from its most recent application to flag due / due-soon / overdue for reapplication. Access rules mirror GET /schedule/property-visit/{id}: manager/owner/sales see any company address; other roles must have an inspection of their own at that address.
+ */
+export const getRouteOutlook = async (inspectionId: number,
+    params?: GetRouteOutlookParams, options?: RequestInit): Promise<RouteOutlookDetail> => {
+
+  return customFetch<RouteOutlookDetail>(getGetRouteOutlookUrl(inspectionId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRouteOutlookQueryKey = (inspectionId: number,
+    params?: GetRouteOutlookParams,) => {
+    return [
+    `/api/schedule/route-outlook/${inspectionId}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetRouteOutlookQueryOptions = <TData = Awaited<ReturnType<typeof getRouteOutlook>>, TError = ErrorType<void>>(inspectionId: number,
+    params?: GetRouteOutlookParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteOutlook>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRouteOutlookQueryKey(inspectionId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRouteOutlook>>> = ({ signal }) => getRouteOutlook(inspectionId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(inspectionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRouteOutlook>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRouteOutlookQueryResult = NonNullable<Awaited<ReturnType<typeof getRouteOutlook>>>
+export type GetRouteOutlookQueryError = ErrorType<void>
+
+
+/**
+ * @summary Full Route Chemical Outlook for a stop's address — every product applied there within the lookback window, projected forward from its most recent application to flag due / due-soon / overdue for reapplication. Access rules mirror GET /schedule/property-visit/{id}: manager/owner/sales see any company address; other roles must have an inspection of their own at that address.
+ */
+
+export function useGetRouteOutlook<TData = Awaited<ReturnType<typeof getRouteOutlook>>, TError = ErrorType<void>>(
+ inspectionId: number,
+    params?: GetRouteOutlookParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteOutlook>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRouteOutlookQueryOptions(inspectionId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getHealthCheckUrl = () => {
 
@@ -7410,5 +7874,2362 @@ export const useGenerateGeminiImage = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getGenerateGeminiImageMutationOptions(options));
+    }
+
+export const getGetDailyRigUrl = (params?: GetDailyRigParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/technician/daily-rig?${stringifiedParams}` : `/api/technician/daily-rig`
+}
+
+/**
+ * @summary Fetch the authenticated technician's own route chemical assignments for a date (defaults to today, server UTC clock), each enriched with the full product record (including label rules).
+ */
+export const getDailyRig = async (params?: GetDailyRigParams, options?: RequestInit): Promise<DailyRig> => {
+
+  return customFetch<DailyRig>(getGetDailyRigUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDailyRigQueryKey = (params?: GetDailyRigParams,) => {
+    return [
+    `/api/technician/daily-rig`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDailyRigQueryOptions = <TData = Awaited<ReturnType<typeof getDailyRig>>, TError = ErrorType<void>>(params?: GetDailyRigParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyRig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDailyRigQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDailyRig>>> = ({ signal }) => getDailyRig(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDailyRig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDailyRigQueryResult = NonNullable<Awaited<ReturnType<typeof getDailyRig>>>
+export type GetDailyRigQueryError = ErrorType<void>
+
+
+/**
+ * @summary Fetch the authenticated technician's own route chemical assignments for a date (defaults to today, server UTC clock), each enriched with the full product record (including label rules).
+ */
+
+export function useGetDailyRig<TData = Awaited<ReturnType<typeof getDailyRig>>, TError = ErrorType<void>>(
+ params?: GetDailyRigParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyRig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDailyRigQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpsertDailyRigUrl = () => {
+
+
+
+
+  return `/api/technician/daily-rig`
+}
+
+/**
+ * @summary Create or replace the authenticated technician's route chemical assignments for a date (defaults to today, server UTC clock). Upserts on (companyId, technicianId, rigDate), so retries are safe.
+ */
+export const upsertDailyRig = async (upsertDailyRigInput: UpsertDailyRigInput, options?: RequestInit): Promise<DailyRig> => {
+
+  return customFetch<DailyRig>(getUpsertDailyRigUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      upsertDailyRigInput,)
+  }
+);}
+
+
+
+
+export const getUpsertDailyRigMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertDailyRig>>, TError,{data: BodyType<UpsertDailyRigInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertDailyRig>>, TError,{data: BodyType<UpsertDailyRigInput>}, TContext> => {
+
+const mutationKey = ['upsertDailyRig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertDailyRig>>, {data: BodyType<UpsertDailyRigInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertDailyRig(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertDailyRigMutationResult = NonNullable<Awaited<ReturnType<typeof upsertDailyRig>>>
+    export type UpsertDailyRigMutationBody = BodyType<UpsertDailyRigInput>
+    export type UpsertDailyRigMutationError = ErrorType<void>
+
+    /**
+ * @summary Create or replace the authenticated technician's route chemical assignments for a date (defaults to today, server UTC clock). Upserts on (companyId, technicianId, rigDate), so retries are safe.
+ */
+export const useUpsertDailyRig = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertDailyRig>>, TError,{data: BodyType<UpsertDailyRigInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof upsertDailyRig>>,
+        TError,
+        {data: BodyType<UpsertDailyRigInput>},
+        TContext
+      > => {
+      return useMutation(getUpsertDailyRigMutationOptions(options));
+    }
+
+export const getGetRecentMixesUrl = () => {
+
+
+
+
+  return `/api/technician/daily-rig/recent-mixes`
+}
+
+/**
+ * @summary Last-30-day treatment logs for the authenticated technician, deduped by (productId, siteClassification), newest first, capped at 5 — used for quick-pick suggestions in the treatment wizard.
+ */
+export const getRecentMixes = async ( options?: RequestInit): Promise<RecentMix[]> => {
+
+  return customFetch<RecentMix[]>(getGetRecentMixesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRecentMixesQueryKey = () => {
+    return [
+    `/api/technician/daily-rig/recent-mixes`
+    ] as const;
+    }
+
+
+export const getGetRecentMixesQueryOptions = <TData = Awaited<ReturnType<typeof getRecentMixes>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecentMixes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRecentMixesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecentMixes>>> = ({ signal }) => getRecentMixes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecentMixes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRecentMixesQueryResult = NonNullable<Awaited<ReturnType<typeof getRecentMixes>>>
+export type GetRecentMixesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Last-30-day treatment logs for the authenticated technician, deduped by (productId, siteClassification), newest first, capped at 5 — used for quick-pick suggestions in the treatment wizard.
+ */
+
+export function useGetRecentMixes<TData = Awaited<ReturnType<typeof getRecentMixes>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecentMixes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRecentMixesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getLookupDailyRigUrl = (params: LookupDailyRigParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/technician/daily-rig/lookup?${stringifiedParams}` : `/api/technician/daily-rig/lookup`
+}
+
+/**
+ * @summary Read-only Route Readiness lookup for any technician/date pair. Used by the Integrated Route Calendar so a manager (or a technician looking at a future date) can see whether a stop's daily rig has been set up, without the editing affordances of GET/POST /technician/daily-rig (which always target the authenticated technician's own current-day rig). Self-lookups are always allowed; looking up another technician requires manager/owner/sales.
+ */
+export const lookupDailyRig = async (params: LookupDailyRigParams, options?: RequestInit): Promise<DailyRigLookupResult> => {
+
+  return customFetch<DailyRigLookupResult>(getLookupDailyRigUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getLookupDailyRigQueryKey = (params?: LookupDailyRigParams,) => {
+    return [
+    `/api/technician/daily-rig/lookup`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getLookupDailyRigQueryOptions = <TData = Awaited<ReturnType<typeof lookupDailyRig>>, TError = ErrorType<void | DailyRigNotSetUp>>(params: LookupDailyRigParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof lookupDailyRig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getLookupDailyRigQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof lookupDailyRig>>> = ({ signal }) => lookupDailyRig(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof lookupDailyRig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type LookupDailyRigQueryResult = NonNullable<Awaited<ReturnType<typeof lookupDailyRig>>>
+export type LookupDailyRigQueryError = ErrorType<void | DailyRigNotSetUp>
+
+
+/**
+ * @summary Read-only Route Readiness lookup for any technician/date pair. Used by the Integrated Route Calendar so a manager (or a technician looking at a future date) can see whether a stop's daily rig has been set up, without the editing affordances of GET/POST /technician/daily-rig (which always target the authenticated technician's own current-day rig). Self-lookups are always allowed; looking up another technician requires manager/owner/sales.
+ */
+
+export function useLookupDailyRig<TData = Awaited<ReturnType<typeof lookupDailyRig>>, TError = ErrorType<void | DailyRigNotSetUp>>(
+ params: LookupDailyRigParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof lookupDailyRig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getLookupDailyRigQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRouteReadinessUrl = (params?: GetRouteReadinessParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/technician/daily-rig/route-readiness?${stringifiedParams}` : `/api/technician/daily-rig/route-readiness`
+}
+
+/**
+ * @summary Today's Route Readiness for one technician — compares their scheduled stops for a calendar date against their truck's on-hand quantities for the products declared on that date's rig, using recent per-application usage history to project what today is likely to consume. Proactive, TODAY-scoped signal; distinct from Truck Stock Health (a longer-range trending projection) and from the existing reactive restockThreshold alert. Self-lookups are always allowed; looking up another technician requires manager/owner/sales.
+ */
+export const getRouteReadiness = async (params?: GetRouteReadinessParams, options?: RequestInit): Promise<RouteReadiness> => {
+
+  return customFetch<RouteReadiness>(getGetRouteReadinessUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRouteReadinessQueryKey = (params?: GetRouteReadinessParams,) => {
+    return [
+    `/api/technician/daily-rig/route-readiness`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetRouteReadinessQueryOptions = <TData = Awaited<ReturnType<typeof getRouteReadiness>>, TError = ErrorType<void>>(params?: GetRouteReadinessParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteReadiness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRouteReadinessQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRouteReadiness>>> = ({ signal }) => getRouteReadiness(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRouteReadiness>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRouteReadinessQueryResult = NonNullable<Awaited<ReturnType<typeof getRouteReadiness>>>
+export type GetRouteReadinessQueryError = ErrorType<void>
+
+
+/**
+ * @summary Today's Route Readiness for one technician — compares their scheduled stops for a calendar date against their truck's on-hand quantities for the products declared on that date's rig, using recent per-application usage history to project what today is likely to consume. Proactive, TODAY-scoped signal; distinct from Truck Stock Health (a longer-range trending projection) and from the existing reactive restockThreshold alert. Self-lookups are always allowed; looking up another technician requires manager/owner/sales.
+ */
+
+export function useGetRouteReadiness<TData = Awaited<ReturnType<typeof getRouteReadiness>>, TError = ErrorType<void>>(
+ params?: GetRouteReadinessParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteReadiness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRouteReadinessQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTeamRouteReadinessUrl = (params?: GetTeamRouteReadinessParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/technician/daily-rig/team-route-readiness?${stringifiedParams}` : `/api/technician/daily-rig/team-route-readiness`
+}
+
+/**
+ * @summary Today's Route Readiness computed for every technician in the company, for a calendar date. Manager/owner only.
+ */
+export const getTeamRouteReadiness = async (params?: GetTeamRouteReadinessParams, options?: RequestInit): Promise<RouteReadiness[]> => {
+
+  return customFetch<RouteReadiness[]>(getGetTeamRouteReadinessUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTeamRouteReadinessQueryKey = (params?: GetTeamRouteReadinessParams,) => {
+    return [
+    `/api/technician/daily-rig/team-route-readiness`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTeamRouteReadinessQueryOptions = <TData = Awaited<ReturnType<typeof getTeamRouteReadiness>>, TError = ErrorType<void>>(params?: GetTeamRouteReadinessParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamRouteReadiness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTeamRouteReadinessQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeamRouteReadiness>>> = ({ signal }) => getTeamRouteReadiness(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTeamRouteReadiness>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTeamRouteReadinessQueryResult = NonNullable<Awaited<ReturnType<typeof getTeamRouteReadiness>>>
+export type GetTeamRouteReadinessQueryError = ErrorType<void>
+
+
+/**
+ * @summary Today's Route Readiness computed for every technician in the company, for a calendar date. Manager/owner only.
+ */
+
+export function useGetTeamRouteReadiness<TData = Awaited<ReturnType<typeof getTeamRouteReadiness>>, TError = ErrorType<void>>(
+ params?: GetTeamRouteReadinessParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeamRouteReadiness>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTeamRouteReadinessQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMissionControlMeUrl = () => {
+
+
+
+
+  return `/api/mission-control/me`
+}
+
+/**
+ * @summary Check the authenticated user's super-admin access
+ */
+export const getMissionControlMe = async ( options?: RequestInit): Promise<MissionControlMe> => {
+
+  return customFetch<MissionControlMe>(getGetMissionControlMeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMissionControlMeQueryKey = () => {
+    return [
+    `/api/mission-control/me`
+    ] as const;
+    }
+
+
+export const getGetMissionControlMeQueryOptions = <TData = Awaited<ReturnType<typeof getMissionControlMe>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMissionControlMeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMissionControlMe>>> = ({ signal }) => getMissionControlMe({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMissionControlMe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMissionControlMeQueryResult = NonNullable<Awaited<ReturnType<typeof getMissionControlMe>>>
+export type GetMissionControlMeQueryError = ErrorType<void>
+
+
+/**
+ * @summary Check the authenticated user's super-admin access
+ */
+
+export function useGetMissionControlMe<TData = Awaited<ReturnType<typeof getMissionControlMe>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMissionControlMeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMissionControlOverviewUrl = () => {
+
+
+
+
+  return `/api/mission-control/overview`
+}
+
+/**
+ * @summary Platform KPIs and recent alerts
+ */
+export const getMissionControlOverview = async ( options?: RequestInit): Promise<MissionControlOverview> => {
+
+  return customFetch<MissionControlOverview>(getGetMissionControlOverviewUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMissionControlOverviewQueryKey = () => {
+    return [
+    `/api/mission-control/overview`
+    ] as const;
+    }
+
+
+export const getGetMissionControlOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getMissionControlOverview>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMissionControlOverviewQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMissionControlOverview>>> = ({ signal }) => getMissionControlOverview({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMissionControlOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMissionControlOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getMissionControlOverview>>>
+export type GetMissionControlOverviewQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Platform KPIs and recent alerts
+ */
+
+export function useGetMissionControlOverview<TData = Awaited<ReturnType<typeof getMissionControlOverview>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMissionControlOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMissionControlCompaniesUrl = (params?: ListMissionControlCompaniesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mission-control/companies?${stringifiedParams}` : `/api/mission-control/companies`
+}
+
+/**
+ * @summary Search and paginate platform companies
+ */
+export const listMissionControlCompanies = async (params?: ListMissionControlCompaniesParams, options?: RequestInit): Promise<MissionControlCompanyPage> => {
+
+  return customFetch<MissionControlCompanyPage>(getListMissionControlCompaniesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissionControlCompaniesQueryKey = (params?: ListMissionControlCompaniesParams,) => {
+    return [
+    `/api/mission-control/companies`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMissionControlCompaniesQueryOptions = <TData = Awaited<ReturnType<typeof listMissionControlCompanies>>, TError = ErrorType<unknown>>(params?: ListMissionControlCompaniesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlCompanies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissionControlCompaniesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissionControlCompanies>>> = ({ signal }) => listMissionControlCompanies(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissionControlCompanies>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissionControlCompaniesQueryResult = NonNullable<Awaited<ReturnType<typeof listMissionControlCompanies>>>
+export type ListMissionControlCompaniesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search and paginate platform companies
+ */
+
+export function useListMissionControlCompanies<TData = Awaited<ReturnType<typeof listMissionControlCompanies>>, TError = ErrorType<unknown>>(
+ params?: ListMissionControlCompaniesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlCompanies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissionControlCompaniesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMissionControlCompanyUrl = (id: number,) => {
+
+
+
+
+  return `/api/mission-control/companies/${id}`
+}
+
+/**
+ * @summary Get platform company detail
+ */
+export const getMissionControlCompany = async (id: number, options?: RequestInit): Promise<MissionControlCompanyDetail> => {
+
+  return customFetch<MissionControlCompanyDetail>(getGetMissionControlCompanyUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMissionControlCompanyQueryKey = (id: number,) => {
+    return [
+    `/api/mission-control/companies/${id}`
+    ] as const;
+    }
+
+
+export const getGetMissionControlCompanyQueryOptions = <TData = Awaited<ReturnType<typeof getMissionControlCompany>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlCompany>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMissionControlCompanyQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMissionControlCompany>>> = ({ signal }) => getMissionControlCompany(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMissionControlCompany>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMissionControlCompanyQueryResult = NonNullable<Awaited<ReturnType<typeof getMissionControlCompany>>>
+export type GetMissionControlCompanyQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get platform company detail
+ */
+
+export function useGetMissionControlCompany<TData = Awaited<ReturnType<typeof getMissionControlCompany>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlCompany>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMissionControlCompanyQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateMissionControlCompanyAccessUrl = (id: number,) => {
+
+
+
+
+  return `/api/mission-control/companies/${id}/access`
+}
+
+/**
+ * @summary Suspend or enable company access with required approval
+ */
+export const updateMissionControlCompanyAccess = async (id: number,
+    companyAccessChangeInput: CompanyAccessChangeInput, options?: RequestInit): Promise<CompanyAccessChangeResult> => {
+
+  return customFetch<CompanyAccessChangeResult>(getUpdateMissionControlCompanyAccessUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      companyAccessChangeInput,)
+  }
+);}
+
+
+
+
+export const getUpdateMissionControlCompanyAccessMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMissionControlCompanyAccess>>, TError,{id: number;data: BodyType<CompanyAccessChangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMissionControlCompanyAccess>>, TError,{id: number;data: BodyType<CompanyAccessChangeInput>}, TContext> => {
+
+const mutationKey = ['updateMissionControlCompanyAccess'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMissionControlCompanyAccess>>, {id: number;data: BodyType<CompanyAccessChangeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateMissionControlCompanyAccess(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMissionControlCompanyAccessMutationResult = NonNullable<Awaited<ReturnType<typeof updateMissionControlCompanyAccess>>>
+    export type UpdateMissionControlCompanyAccessMutationBody = BodyType<CompanyAccessChangeInput>
+    export type UpdateMissionControlCompanyAccessMutationError = ErrorType<void>
+
+    /**
+ * @summary Suspend or enable company access with required approval
+ */
+export const useUpdateMissionControlCompanyAccess = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMissionControlCompanyAccess>>, TError,{id: number;data: BodyType<CompanyAccessChangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMissionControlCompanyAccess>>,
+        TError,
+        {id: number;data: BodyType<CompanyAccessChangeInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateMissionControlCompanyAccessMutationOptions(options));
+    }
+
+export const getListMissionControlTechniciansUrl = (params?: ListMissionControlTechniciansParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mission-control/technicians?${stringifiedParams}` : `/api/mission-control/technicians`
+}
+
+/**
+ * @summary Search technicians, optionally scoped to a company
+ */
+export const listMissionControlTechnicians = async (params?: ListMissionControlTechniciansParams, options?: RequestInit): Promise<MissionControlTechnicianPage> => {
+
+  return customFetch<MissionControlTechnicianPage>(getListMissionControlTechniciansUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissionControlTechniciansQueryKey = (params?: ListMissionControlTechniciansParams,) => {
+    return [
+    `/api/mission-control/technicians`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMissionControlTechniciansQueryOptions = <TData = Awaited<ReturnType<typeof listMissionControlTechnicians>>, TError = ErrorType<unknown>>(params?: ListMissionControlTechniciansParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlTechnicians>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissionControlTechniciansQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissionControlTechnicians>>> = ({ signal }) => listMissionControlTechnicians(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissionControlTechnicians>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissionControlTechniciansQueryResult = NonNullable<Awaited<ReturnType<typeof listMissionControlTechnicians>>>
+export type ListMissionControlTechniciansQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search technicians, optionally scoped to a company
+ */
+
+export function useListMissionControlTechnicians<TData = Awaited<ReturnType<typeof listMissionControlTechnicians>>, TError = ErrorType<unknown>>(
+ params?: ListMissionControlTechniciansParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlTechnicians>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissionControlTechniciansQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMissionControlPropertiesUrl = (params?: ListMissionControlPropertiesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mission-control/properties?${stringifiedParams}` : `/api/mission-control/properties`
+}
+
+/**
+ * Returns privacy-safe property directory summaries for super-admin drill-down. Customer names, notes, technician knowledge, hotspots, media URLs, and other private property content are withheld.
+ * @summary Search platform properties, optionally scoped to a company
+ */
+export const listMissionControlProperties = async (params?: ListMissionControlPropertiesParams, options?: RequestInit): Promise<MissionControlPropertyPage> => {
+
+  return customFetch<MissionControlPropertyPage>(getListMissionControlPropertiesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissionControlPropertiesQueryKey = (params?: ListMissionControlPropertiesParams,) => {
+    return [
+    `/api/mission-control/properties`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMissionControlPropertiesQueryOptions = <TData = Awaited<ReturnType<typeof listMissionControlProperties>>, TError = ErrorType<unknown>>(params?: ListMissionControlPropertiesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlProperties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissionControlPropertiesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissionControlProperties>>> = ({ signal }) => listMissionControlProperties(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissionControlProperties>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissionControlPropertiesQueryResult = NonNullable<Awaited<ReturnType<typeof listMissionControlProperties>>>
+export type ListMissionControlPropertiesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search platform properties, optionally scoped to a company
+ */
+
+export function useListMissionControlProperties<TData = Awaited<ReturnType<typeof listMissionControlProperties>>, TError = ErrorType<unknown>>(
+ params?: ListMissionControlPropertiesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlProperties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissionControlPropertiesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMissionControlPropertyUrl = (id: number,) => {
+
+
+
+
+  return `/api/mission-control/properties/${id}`
+}
+
+/**
+ * @summary Get a privacy-safe platform property detail
+ */
+export const getMissionControlProperty = async (id: number, options?: RequestInit): Promise<MissionControlPropertyDetail> => {
+
+  return customFetch<MissionControlPropertyDetail>(getGetMissionControlPropertyUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMissionControlPropertyQueryKey = (id: number,) => {
+    return [
+    `/api/mission-control/properties/${id}`
+    ] as const;
+    }
+
+
+export const getGetMissionControlPropertyQueryOptions = <TData = Awaited<ReturnType<typeof getMissionControlProperty>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlProperty>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMissionControlPropertyQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMissionControlProperty>>> = ({ signal }) => getMissionControlProperty(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMissionControlProperty>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMissionControlPropertyQueryResult = NonNullable<Awaited<ReturnType<typeof getMissionControlProperty>>>
+export type GetMissionControlPropertyQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a privacy-safe platform property detail
+ */
+
+export function useGetMissionControlProperty<TData = Awaited<ReturnType<typeof getMissionControlProperty>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlProperty>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMissionControlPropertyQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMissionControlTechnicianUrl = (id: string,) => {
+
+
+
+
+  return `/api/mission-control/technicians/${id}`
+}
+
+/**
+ * @summary Inspect one technician and their recent inspection references
+ */
+export const getMissionControlTechnician = async (id: string, options?: RequestInit): Promise<MissionControlTechnicianDetail> => {
+
+  return customFetch<MissionControlTechnicianDetail>(getGetMissionControlTechnicianUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMissionControlTechnicianQueryKey = (id: string,) => {
+    return [
+    `/api/mission-control/technicians/${id}`
+    ] as const;
+    }
+
+
+export const getGetMissionControlTechnicianQueryOptions = <TData = Awaited<ReturnType<typeof getMissionControlTechnician>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlTechnician>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMissionControlTechnicianQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMissionControlTechnician>>> = ({ signal }) => getMissionControlTechnician(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMissionControlTechnician>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMissionControlTechnicianQueryResult = NonNullable<Awaited<ReturnType<typeof getMissionControlTechnician>>>
+export type GetMissionControlTechnicianQueryError = ErrorType<void>
+
+
+/**
+ * @summary Inspect one technician and their recent inspection references
+ */
+
+export function useGetMissionControlTechnician<TData = Awaited<ReturnType<typeof getMissionControlTechnician>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlTechnician>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMissionControlTechnicianQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMissionControlDeviceSessionUrl = (id: number,) => {
+
+
+
+
+  return `/api/mission-control/device-sessions/${id}`
+}
+
+/**
+ * @summary Inspect one device session and sanitized event history
+ */
+export const getMissionControlDeviceSession = async (id: number, options?: RequestInit): Promise<MissionControlDeviceSessionDetail> => {
+
+  return customFetch<MissionControlDeviceSessionDetail>(getGetMissionControlDeviceSessionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMissionControlDeviceSessionQueryKey = (id: number,) => {
+    return [
+    `/api/mission-control/device-sessions/${id}`
+    ] as const;
+    }
+
+
+export const getGetMissionControlDeviceSessionQueryOptions = <TData = Awaited<ReturnType<typeof getMissionControlDeviceSession>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlDeviceSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMissionControlDeviceSessionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMissionControlDeviceSession>>> = ({ signal }) => getMissionControlDeviceSession(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMissionControlDeviceSession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMissionControlDeviceSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getMissionControlDeviceSession>>>
+export type GetMissionControlDeviceSessionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Inspect one device session and sanitized event history
+ */
+
+export function useGetMissionControlDeviceSession<TData = Awaited<ReturnType<typeof getMissionControlDeviceSession>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlDeviceSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMissionControlDeviceSessionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateMissionControlUserAccessUrl = (id: string,) => {
+
+
+
+
+  return `/api/mission-control/users/${id}/access`
+}
+
+/**
+ * @summary Enable or disable beta access with required approval
+ */
+export const updateMissionControlUserAccess = async (id: string,
+    userAccessChangeInput: UserAccessChangeInput, options?: RequestInit): Promise<UserAccessChangeResult> => {
+
+  return customFetch<UserAccessChangeResult>(getUpdateMissionControlUserAccessUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      userAccessChangeInput,)
+  }
+);}
+
+
+
+
+export const getUpdateMissionControlUserAccessMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMissionControlUserAccess>>, TError,{id: string;data: BodyType<UserAccessChangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMissionControlUserAccess>>, TError,{id: string;data: BodyType<UserAccessChangeInput>}, TContext> => {
+
+const mutationKey = ['updateMissionControlUserAccess'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMissionControlUserAccess>>, {id: string;data: BodyType<UserAccessChangeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateMissionControlUserAccess(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMissionControlUserAccessMutationResult = NonNullable<Awaited<ReturnType<typeof updateMissionControlUserAccess>>>
+    export type UpdateMissionControlUserAccessMutationBody = BodyType<UserAccessChangeInput>
+    export type UpdateMissionControlUserAccessMutationError = ErrorType<void>
+
+    /**
+ * @summary Enable or disable beta access with required approval
+ */
+export const useUpdateMissionControlUserAccess = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMissionControlUserAccess>>, TError,{id: string;data: BodyType<UserAccessChangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMissionControlUserAccess>>,
+        TError,
+        {id: string;data: BodyType<UserAccessChangeInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateMissionControlUserAccessMutationOptions(options));
+    }
+
+export const getListMissionControlInspectionsUrl = (params?: ListMissionControlInspectionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mission-control/inspections?${stringifiedParams}` : `/api/mission-control/inspections`
+}
+
+/**
+ * @summary Search inspections across the platform
+ */
+export const listMissionControlInspections = async (params?: ListMissionControlInspectionsParams, options?: RequestInit): Promise<MissionControlInspectionPage> => {
+
+  return customFetch<MissionControlInspectionPage>(getListMissionControlInspectionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissionControlInspectionsQueryKey = (params?: ListMissionControlInspectionsParams,) => {
+    return [
+    `/api/mission-control/inspections`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMissionControlInspectionsQueryOptions = <TData = Awaited<ReturnType<typeof listMissionControlInspections>>, TError = ErrorType<unknown>>(params?: ListMissionControlInspectionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlInspections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissionControlInspectionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissionControlInspections>>> = ({ signal }) => listMissionControlInspections(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissionControlInspections>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissionControlInspectionsQueryResult = NonNullable<Awaited<ReturnType<typeof listMissionControlInspections>>>
+export type ListMissionControlInspectionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search inspections across the platform
+ */
+
+export function useListMissionControlInspections<TData = Awaited<ReturnType<typeof listMissionControlInspections>>, TError = ErrorType<unknown>>(
+ params?: ListMissionControlInspectionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlInspections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissionControlInspectionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMissionControlInspectionUrl = (id: number,) => {
+
+
+
+
+  return `/api/mission-control/inspections/${id}`
+}
+
+/**
+ * @summary Get diagnostic inspection detail and synchronization history
+ */
+export const getMissionControlInspection = async (id: number, options?: RequestInit): Promise<MissionControlInspectionDetail> => {
+
+  return customFetch<MissionControlInspectionDetail>(getGetMissionControlInspectionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMissionControlInspectionQueryKey = (id: number,) => {
+    return [
+    `/api/mission-control/inspections/${id}`
+    ] as const;
+    }
+
+
+export const getGetMissionControlInspectionQueryOptions = <TData = Awaited<ReturnType<typeof getMissionControlInspection>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlInspection>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMissionControlInspectionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMissionControlInspection>>> = ({ signal }) => getMissionControlInspection(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMissionControlInspection>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMissionControlInspectionQueryResult = NonNullable<Awaited<ReturnType<typeof getMissionControlInspection>>>
+export type GetMissionControlInspectionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get diagnostic inspection detail and synchronization history
+ */
+
+export function useGetMissionControlInspection<TData = Awaited<ReturnType<typeof getMissionControlInspection>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlInspection>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMissionControlInspectionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMissionControlIncidentsUrl = (params?: ListMissionControlIncidentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mission-control/incidents?${stringifiedParams}` : `/api/mission-control/incidents`
+}
+
+/**
+ * @summary Filter and paginate platform incidents
+ */
+export const listMissionControlIncidents = async (params?: ListMissionControlIncidentsParams, options?: RequestInit): Promise<MissionControlIncidentPage> => {
+
+  return customFetch<MissionControlIncidentPage>(getListMissionControlIncidentsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissionControlIncidentsQueryKey = (params?: ListMissionControlIncidentsParams,) => {
+    return [
+    `/api/mission-control/incidents`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMissionControlIncidentsQueryOptions = <TData = Awaited<ReturnType<typeof listMissionControlIncidents>>, TError = ErrorType<unknown>>(params?: ListMissionControlIncidentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlIncidents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissionControlIncidentsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissionControlIncidents>>> = ({ signal }) => listMissionControlIncidents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissionControlIncidents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissionControlIncidentsQueryResult = NonNullable<Awaited<ReturnType<typeof listMissionControlIncidents>>>
+export type ListMissionControlIncidentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Filter and paginate platform incidents
+ */
+
+export function useListMissionControlIncidents<TData = Awaited<ReturnType<typeof listMissionControlIncidents>>, TError = ErrorType<unknown>>(
+ params?: ListMissionControlIncidentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlIncidents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissionControlIncidentsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMissionControlIncidentUrl = (id: number,) => {
+
+
+
+
+  return `/api/mission-control/incidents/${id}`
+}
+
+/**
+ * @summary Get incident detail
+ */
+export const getMissionControlIncident = async (id: number, options?: RequestInit): Promise<MissionControlIncident> => {
+
+  return customFetch<MissionControlIncident>(getGetMissionControlIncidentUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMissionControlIncidentQueryKey = (id: number,) => {
+    return [
+    `/api/mission-control/incidents/${id}`
+    ] as const;
+    }
+
+
+export const getGetMissionControlIncidentQueryOptions = <TData = Awaited<ReturnType<typeof getMissionControlIncident>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlIncident>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMissionControlIncidentQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMissionControlIncident>>> = ({ signal }) => getMissionControlIncident(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMissionControlIncident>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMissionControlIncidentQueryResult = NonNullable<Awaited<ReturnType<typeof getMissionControlIncident>>>
+export type GetMissionControlIncidentQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get incident detail
+ */
+
+export function useGetMissionControlIncident<TData = Awaited<ReturnType<typeof getMissionControlIncident>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlIncident>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMissionControlIncidentQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateMissionControlIncidentUrl = (id: number,) => {
+
+
+
+
+  return `/api/mission-control/incidents/${id}`
+}
+
+/**
+ * @summary Acknowledge, assign, or escalate an incident
+ */
+export const updateMissionControlIncident = async (id: number,
+    incidentUpdate: IncidentUpdate, options?: RequestInit): Promise<MissionControlIncident> => {
+
+  return customFetch<MissionControlIncident>(getUpdateMissionControlIncidentUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      incidentUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateMissionControlIncidentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMissionControlIncident>>, TError,{id: number;data: BodyType<IncidentUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMissionControlIncident>>, TError,{id: number;data: BodyType<IncidentUpdate>}, TContext> => {
+
+const mutationKey = ['updateMissionControlIncident'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMissionControlIncident>>, {id: number;data: BodyType<IncidentUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateMissionControlIncident(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMissionControlIncidentMutationResult = NonNullable<Awaited<ReturnType<typeof updateMissionControlIncident>>>
+    export type UpdateMissionControlIncidentMutationBody = BodyType<IncidentUpdate>
+    export type UpdateMissionControlIncidentMutationError = ErrorType<void>
+
+    /**
+ * @summary Acknowledge, assign, or escalate an incident
+ */
+export const useUpdateMissionControlIncident = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMissionControlIncident>>, TError,{id: number;data: BodyType<IncidentUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMissionControlIncident>>,
+        TError,
+        {id: number;data: BodyType<IncidentUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateMissionControlIncidentMutationOptions(options));
+    }
+
+export const getListMissionControlAuditUrl = (params?: ListMissionControlAuditParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mission-control/audit?${stringifiedParams}` : `/api/mission-control/audit`
+}
+
+/**
+ * @summary Paginated super-admin action history
+ */
+export const listMissionControlAudit = async (params?: ListMissionControlAuditParams, options?: RequestInit): Promise<MissionControlAuditPage> => {
+
+  return customFetch<MissionControlAuditPage>(getListMissionControlAuditUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissionControlAuditQueryKey = (params?: ListMissionControlAuditParams,) => {
+    return [
+    `/api/mission-control/audit`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMissionControlAuditQueryOptions = <TData = Awaited<ReturnType<typeof listMissionControlAudit>>, TError = ErrorType<unknown>>(params?: ListMissionControlAuditParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissionControlAuditQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissionControlAudit>>> = ({ signal }) => listMissionControlAudit(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissionControlAudit>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissionControlAuditQueryResult = NonNullable<Awaited<ReturnType<typeof listMissionControlAudit>>>
+export type ListMissionControlAuditQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Paginated super-admin action history
+ */
+
+export function useListMissionControlAudit<TData = Awaited<ReturnType<typeof listMissionControlAudit>>, TError = ErrorType<unknown>>(
+ params?: ListMissionControlAuditParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissionControlAuditQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMissionControlAgentsUrl = () => {
+
+
+
+
+  return `/api/mission-control/agents`
+}
+
+/**
+ * @summary List executive agents and real-task-backed Agent Zero availability
+ */
+export const listMissionControlAgents = async ( options?: RequestInit): Promise<MissionControlAgentRoster> => {
+
+  return customFetch<MissionControlAgentRoster>(getListMissionControlAgentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissionControlAgentsQueryKey = () => {
+    return [
+    `/api/mission-control/agents`
+    ] as const;
+    }
+
+
+export const getListMissionControlAgentsQueryOptions = <TData = Awaited<ReturnType<typeof listMissionControlAgents>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlAgents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissionControlAgentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissionControlAgents>>> = ({ signal }) => listMissionControlAgents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissionControlAgents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissionControlAgentsQueryResult = NonNullable<Awaited<ReturnType<typeof listMissionControlAgents>>>
+export type ListMissionControlAgentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List executive agents and real-task-backed Agent Zero availability
+ */
+
+export function useListMissionControlAgents<TData = Awaited<ReturnType<typeof listMissionControlAgents>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlAgents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissionControlAgentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMissionControlAgentTasksUrl = (params?: ListMissionControlAgentTasksParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mission-control/agents/tasks?${stringifiedParams}` : `/api/mission-control/agents/tasks`
+}
+
+/**
+ * @summary List agent tasks
+ */
+export const listMissionControlAgentTasks = async (params?: ListMissionControlAgentTasksParams, options?: RequestInit): Promise<MissionControlAgentTaskPage> => {
+
+  return customFetch<MissionControlAgentTaskPage>(getListMissionControlAgentTasksUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissionControlAgentTasksQueryKey = (params?: ListMissionControlAgentTasksParams,) => {
+    return [
+    `/api/mission-control/agents/tasks`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMissionControlAgentTasksQueryOptions = <TData = Awaited<ReturnType<typeof listMissionControlAgentTasks>>, TError = ErrorType<unknown>>(params?: ListMissionControlAgentTasksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlAgentTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissionControlAgentTasksQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissionControlAgentTasks>>> = ({ signal }) => listMissionControlAgentTasks(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissionControlAgentTasks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissionControlAgentTasksQueryResult = NonNullable<Awaited<ReturnType<typeof listMissionControlAgentTasks>>>
+export type ListMissionControlAgentTasksQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List agent tasks
+ */
+
+export function useListMissionControlAgentTasks<TData = Awaited<ReturnType<typeof listMissionControlAgentTasks>>, TError = ErrorType<unknown>>(
+ params?: ListMissionControlAgentTasksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlAgentTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissionControlAgentTasksQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateMissionControlAgentTaskUrl = () => {
+
+
+
+
+  return `/api/mission-control/agents/tasks`
+}
+
+/**
+ * @summary Create a company-scoped agent investigation task
+ */
+export const createMissionControlAgentTask = async (agentTaskInput: AgentTaskInput, options?: RequestInit): Promise<MissionControlAgentTask> => {
+
+  return customFetch<MissionControlAgentTask>(getCreateMissionControlAgentTaskUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      agentTaskInput,)
+  }
+);}
+
+
+
+
+export const getCreateMissionControlAgentTaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMissionControlAgentTask>>, TError,{data: BodyType<AgentTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMissionControlAgentTask>>, TError,{data: BodyType<AgentTaskInput>}, TContext> => {
+
+const mutationKey = ['createMissionControlAgentTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMissionControlAgentTask>>, {data: BodyType<AgentTaskInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMissionControlAgentTask(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMissionControlAgentTaskMutationResult = NonNullable<Awaited<ReturnType<typeof createMissionControlAgentTask>>>
+    export type CreateMissionControlAgentTaskMutationBody = BodyType<AgentTaskInput>
+    export type CreateMissionControlAgentTaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a company-scoped agent investigation task
+ */
+export const useCreateMissionControlAgentTask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMissionControlAgentTask>>, TError,{data: BodyType<AgentTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMissionControlAgentTask>>,
+        TError,
+        {data: BodyType<AgentTaskInput>},
+        TContext
+      > => {
+      return useMutation(getCreateMissionControlAgentTaskMutationOptions(options));
+    }
+
+export const getGetMissionControlAgentTaskUrl = (id: number,) => {
+
+
+
+
+  return `/api/mission-control/agents/tasks/${id}`
+}
+
+/**
+ * @summary Get an agent task and its results
+ */
+export const getMissionControlAgentTask = async (id: number, options?: RequestInit): Promise<MissionControlAgentTask> => {
+
+  return customFetch<MissionControlAgentTask>(getGetMissionControlAgentTaskUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMissionControlAgentTaskQueryKey = (id: number,) => {
+    return [
+    `/api/mission-control/agents/tasks/${id}`
+    ] as const;
+    }
+
+
+export const getGetMissionControlAgentTaskQueryOptions = <TData = Awaited<ReturnType<typeof getMissionControlAgentTask>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlAgentTask>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMissionControlAgentTaskQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMissionControlAgentTask>>> = ({ signal }) => getMissionControlAgentTask(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMissionControlAgentTask>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMissionControlAgentTaskQueryResult = NonNullable<Awaited<ReturnType<typeof getMissionControlAgentTask>>>
+export type GetMissionControlAgentTaskQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get an agent task and its results
+ */
+
+export function useGetMissionControlAgentTask<TData = Awaited<ReturnType<typeof getMissionControlAgentTask>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMissionControlAgentTask>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMissionControlAgentTaskQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMissionControlApprovalsUrl = (params?: ListMissionControlApprovalsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mission-control/approvals?${stringifiedParams}` : `/api/mission-control/approvals`
+}
+
+/**
+ * @summary List approval requests
+ */
+export const listMissionControlApprovals = async (params?: ListMissionControlApprovalsParams, options?: RequestInit): Promise<MissionControlApprovalPage> => {
+
+  return customFetch<MissionControlApprovalPage>(getListMissionControlApprovalsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissionControlApprovalsQueryKey = (params?: ListMissionControlApprovalsParams,) => {
+    return [
+    `/api/mission-control/approvals`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMissionControlApprovalsQueryOptions = <TData = Awaited<ReturnType<typeof listMissionControlApprovals>>, TError = ErrorType<unknown>>(params?: ListMissionControlApprovalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissionControlApprovalsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissionControlApprovals>>> = ({ signal }) => listMissionControlApprovals(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissionControlApprovals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissionControlApprovalsQueryResult = NonNullable<Awaited<ReturnType<typeof listMissionControlApprovals>>>
+export type ListMissionControlApprovalsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List approval requests
+ */
+
+export function useListMissionControlApprovals<TData = Awaited<ReturnType<typeof listMissionControlApprovals>>, TError = ErrorType<unknown>>(
+ params?: ListMissionControlApprovalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissionControlApprovals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissionControlApprovalsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRequestMissionControlApprovalUrl = () => {
+
+
+
+
+  return `/api/mission-control/approvals/requests`
+}
+
+/**
+ * @summary Request a second administrator's approval for an access change
+ */
+export const requestMissionControlApproval = async (missionControlApprovalRequest: MissionControlApprovalRequest, options?: RequestInit): Promise<MissionControlApproval> => {
+
+  return customFetch<MissionControlApproval>(getRequestMissionControlApprovalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      missionControlApprovalRequest,)
+  }
+);}
+
+
+
+
+export const getRequestMissionControlApprovalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestMissionControlApproval>>, TError,{data: BodyType<MissionControlApprovalRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestMissionControlApproval>>, TError,{data: BodyType<MissionControlApprovalRequest>}, TContext> => {
+
+const mutationKey = ['requestMissionControlApproval'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestMissionControlApproval>>, {data: BodyType<MissionControlApprovalRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestMissionControlApproval(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestMissionControlApprovalMutationResult = NonNullable<Awaited<ReturnType<typeof requestMissionControlApproval>>>
+    export type RequestMissionControlApprovalMutationBody = BodyType<MissionControlApprovalRequest>
+    export type RequestMissionControlApprovalMutationError = ErrorType<void>
+
+    /**
+ * @summary Request a second administrator's approval for an access change
+ */
+export const useRequestMissionControlApproval = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestMissionControlApproval>>, TError,{data: BodyType<MissionControlApprovalRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestMissionControlApproval>>,
+        TError,
+        {data: BodyType<MissionControlApprovalRequest>},
+        TContext
+      > => {
+      return useMutation(getRequestMissionControlApprovalMutationOptions(options));
+    }
+
+export const getDecideMissionControlApprovalUrl = (id: number,) => {
+
+
+
+
+  return `/api/mission-control/approvals/${id}/decision`
+}
+
+/**
+ * @summary Approve or reject an approval request with a note
+ */
+export const decideMissionControlApproval = async (id: number,
+    approvalDecisionInput: ApprovalDecisionInput, options?: RequestInit): Promise<MissionControlApproval> => {
+
+  return customFetch<MissionControlApproval>(getDecideMissionControlApprovalUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      approvalDecisionInput,)
+  }
+);}
+
+
+
+
+export const getDecideMissionControlApprovalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideMissionControlApproval>>, TError,{id: number;data: BodyType<ApprovalDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decideMissionControlApproval>>, TError,{id: number;data: BodyType<ApprovalDecisionInput>}, TContext> => {
+
+const mutationKey = ['decideMissionControlApproval'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decideMissionControlApproval>>, {id: number;data: BodyType<ApprovalDecisionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  decideMissionControlApproval(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecideMissionControlApprovalMutationResult = NonNullable<Awaited<ReturnType<typeof decideMissionControlApproval>>>
+    export type DecideMissionControlApprovalMutationBody = BodyType<ApprovalDecisionInput>
+    export type DecideMissionControlApprovalMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve or reject an approval request with a note
+ */
+export const useDecideMissionControlApproval = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideMissionControlApproval>>, TError,{id: number;data: BodyType<ApprovalDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decideMissionControlApproval>>,
+        TError,
+        {id: number;data: BodyType<ApprovalDecisionInput>},
+        TContext
+      > => {
+      return useMutation(getDecideMissionControlApprovalMutationOptions(options));
     }
 

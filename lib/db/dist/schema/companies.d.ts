@@ -72,6 +72,23 @@ export declare const companiesTable: import("drizzle-orm/pg-core").PgTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        accessSuspended: import("drizzle-orm/pg-core").PgColumn<{
+            name: "access_suspended";
+            tableName: "companies";
+            dataType: "boolean";
+            columnType: "PgBoolean";
+            data: boolean;
+            driverParam: boolean;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         stripeCustomerId: import("drizzle-orm/pg-core").PgColumn<{
             name: "stripe_customer_id";
             tableName: "companies";
@@ -111,7 +128,7 @@ export declare const companiesTable: import("drizzle-orm/pg-core").PgTableWithCo
             tableName: "companies";
             dataType: "string";
             columnType: "PgText";
-            data: "solo" | "growth";
+            data: "small" | "solo" | "micro" | "growth" | "professional" | "enterprise" | "pilot";
             driverParam: string;
             notNull: false;
             hasDefault: false;
@@ -123,7 +140,7 @@ export declare const companiesTable: import("drizzle-orm/pg-core").PgTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {
-            $type: "solo" | "growth";
+            $type: "small" | "solo" | "micro" | "growth" | "professional" | "enterprise" | "pilot";
         }>;
         subscriptionStatus: import("drizzle-orm/pg-core").PgColumn<{
             name: "subscription_status";
@@ -345,6 +362,7 @@ export declare const insertCompanySchema: z.ZodObject<{
     name: z.ZodString;
     slug: z.ZodString;
     intelligenceSharingEnabled: z.ZodOptional<z.ZodBoolean>;
+    accessSuspended: z.ZodOptional<z.ZodBoolean>;
     stripeCustomerId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     stripeSubscriptionId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     subscriptionTier: z.ZodOptional<z.ZodNullable<z.ZodString>>;

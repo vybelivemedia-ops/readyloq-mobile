@@ -22,6 +22,10 @@ export interface InspectionMedia {
     qualityScore?: number | null;
     /** @nullable */
     captureMetadata?: InspectionMediaCaptureMetadata;
-    createdAt: string;
+    /** @nullable */
+    unitNumber?: string | null;
+    /** @nullable */
+    capturedAt?: Date | null;
+    createdAt: Date;
 }
 //# sourceMappingURL=inspectionMedia.d.ts.map

@@ -362,6 +362,40 @@ export declare const inspectionsTable: import("drizzle-orm/pg-core").PgTableWith
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        unitNumber: import("drizzle-orm/pg-core").PgColumn<{
+            name: "unit_number";
+            tableName: "inspections";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        visitPurpose: import("drizzle-orm/pg-core").PgColumn<{
+            name: "visit_purpose";
+            tableName: "inspections";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
     };
     dialect: "pg";
 }>;
@@ -575,6 +609,23 @@ export declare const inspectionMediaTable: import("drizzle-orm/pg-core").PgTable
         }, {}, {
             $type: Record<string, unknown>;
         }>;
+        capturedAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "captured_at";
+            tableName: "inspection_media";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "inspection_media";
@@ -592,30 +643,50 @@ export declare const inspectionMediaTable: import("drizzle-orm/pg-core").PgTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        unitNumber: import("drizzle-orm/pg-core").PgColumn<{
+            name: "unit_number";
+            tableName: "inspection_media";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
     };
     dialect: "pg";
 }>;
 export declare const insertInspectionSchema: z.ZodObject<{
+    status: z.ZodOptional<z.ZodString>;
+    severity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    completedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
     siteAddress: z.ZodString;
     clientName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     technicianName: z.ZodString;
     technicianId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    status: z.ZodOptional<z.ZodString>;
     pestTypes: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;
-    severity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     notes: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     clientKey: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     scheduledDate: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
-    completedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
     technicianSignature: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     ownerSignature: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     ownerNotAvailable: z.ZodOptional<z.ZodBoolean>;
     signedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
+    unitNumber: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    visitPurpose: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, {
     out: {};
     in: {};
 }>;
 export declare const insertInspectionMediaSchema: z.ZodObject<{
+    unitNumber: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     inspectionId: z.ZodInt;
     mediaType: z.ZodString;
     url: z.ZodString;
@@ -626,6 +697,7 @@ export declare const insertInspectionMediaSchema: z.ZodObject<{
     qualityScore: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     zoomSubject: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     captureMetadata: z.ZodOptional<z.ZodNullable<z.ZodType<Record<string, unknown>, Record<string, unknown>, z.core.$ZodTypeInternals<Record<string, unknown>, Record<string, unknown>>>>>;
+    capturedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
 }, {
     out: {};
     in: {};

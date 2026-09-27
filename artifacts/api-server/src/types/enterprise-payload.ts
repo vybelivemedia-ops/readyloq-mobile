@@ -9,7 +9,10 @@
 // ─── Production-hardened types (EnterpriseBridgeProductionService) ────────────
 
 export interface HardenedInspectionPayload {
+  /** ReadyLoq inspection ID used for the durable local outbox FK. */
   inspectionId: string;
+  /** PestPac/enterprise work-order ID when the inspection originated externally. */
+  externalWorkOrderId?: string;
   companyId: string;
   propertyId: string;
   technicianId: string;

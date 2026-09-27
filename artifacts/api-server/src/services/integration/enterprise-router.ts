@@ -21,6 +21,7 @@ import {
   analysisResultsTable,
   inspectionMediaTable,
   inspectionSyncLogsTable,
+  integrationEntityLinksTable,
   type Finding,
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
@@ -36,6 +37,7 @@ import { EnterpriseBridgeProductionService } from "./enterprise-bridge-productio
 import { sendPestPacSOAP } from "./adapters/pestPacSoapAdapter";
 import { sendServSuiteREST } from "./adapters/servsuiteAdapter";
 import { syncInspectionToExternalSystem } from "../field-integration";
+import { OutboxProcessor } from "./outbox-processor";
 
 export class EnterpriseAdapterRouter {
   /**
@@ -55,7 +57,7 @@ export class EnterpriseAdapterRouter {
     if (!config || !config.enabled) return;
 
     // Load inspection + analysis + media in parallel.
-    const [inspectionRows, analysisRows, mediaRows] = await Promise.all([
+    const [inspectionRows, analysisRows, mediaRows, externalWorkOrderRows] = await Promise.all([
       db
         .select()
         .from(inspectionsTable)
@@ -86,6 +88,18 @@ export class EnterpriseAdapterRouter {
             eq(inspectionMediaTable.companyId, companyId),
           ),
         ),
+      db
+        .select({ externalId: integrationEntityLinksTable.externalId })
+        .from(integrationEntityLinksTable)
+        .where(
+          and(
+            eq(integrationEntityLinksTable.companyId, companyId),
+            eq(integrationEntityLinksTable.provider, "pestpac"),
+            eq(integrationEntityLinksTable.entityType, "work_order"),
+            eq(integrationEntityLinksTable.localEntityId, inspectionId),
+          ),
+        )
+        .limit(1),
     ]);
 
     const inspection = inspectionRows[0];
@@ -128,7 +142,7 @@ export class EnterpriseAdapterRouter {
 
     // ── Legacy payload (FieldRoutes adapter unchanged) ────────────────────
     const legacyPayload: EnterpriseSyncPayload = {
-      ExternalWorkOrderId: String(inspection.id),
+      ExternalWorkOrderId: externalWorkOrderRows[0]?.externalId ?? String(inspection.id),
       LocationReference: {
         PropertyCode: inspection.siteAddress ?? "",
       },
@@ -167,6 +181,9 @@ export class EnterpriseAdapterRouter {
 
     const hardenedPayload: HardenedInspectionPayload = {
       inspectionId: String(inspection.id),
+      ...(externalWorkOrderRows[0]?.externalId && {
+        externalWorkOrderId: externalWorkOrderRows[0].externalId,
+      }),
       companyId: String(companyId),
       propertyId: inspection.siteAddress ?? String(inspection.id),
       technicianId: inspection.technicianId ?? String(config.accountId ?? ""),
@@ -206,7 +223,7 @@ export class EnterpriseAdapterRouter {
           config.systemType === "pestpac"
             ? "https://api.pestpac.com/v1"
             : "https://api.servsuite.com/v1";
-        const dispatchResult = await EnterpriseBridgeProductionService.dispatchToSystem(
+        const dispatchResult = await OutboxProcessor.queueAndDispatch(
           {
             targetSystem: config.systemType,
             endpointUrl: config.apiBaseUrl ?? defaultEndpoint,

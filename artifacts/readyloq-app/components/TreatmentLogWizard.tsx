@@ -41,6 +41,7 @@ import {
   type Product,
 } from "@/lib/api-client/products";
 import { getRecentMixes, type RecentMix, type RouteAssignmentWithProduct } from "@/lib/api-client/daily-route";
+import { getMyInventory, type InventoryProduct } from "@/lib/api-client/inventory";
 import { useColors } from "@/hooks/useColors";
 import { PEST_TYPES } from "@/constants/inspection";
 
@@ -89,8 +90,21 @@ interface Props {
    * chip list in Step 0.  Falls back to the global PEST_TYPES list when empty.
    */
   pestTypes: string[];
-  /** Called on successful submission so the parent can refetch treatment logs. */
-  onLogged: () => void;
+  /**
+   * Called on successful submission so the parent can refetch treatment logs.
+   * `stock` is populated whenever the server returned an `updatedInventory`
+   * baseline for the applied product — i.e. whenever the technician has a
+   * truck-stock baseline for it — so the parent can show the technician the
+   * new on-hand quantity ("7.0 fl oz of Demand CS remaining on truck") right
+   * after they submit. `low` is true when that quantity is at/below the
+   * product's manager-configured restock threshold, or below 10% of the
+   * on-hand quantity that was on the truck when the wizard opened (whichever
+   * applies) — the parent can use it to style the message as a resupply
+   * warning instead of a plain confirmation. `stock` is omitted only when the
+   * server didn't return an inventory baseline at all (e.g. no baseline set,
+   * or a non-volumetric application).
+   */
+  onLogged: (stock?: { productName: string; quantityOnHand: number; unit: string; low: boolean }) => void;
   /**
    * Technician's daily route chemical assignments (product→pest pairings).
    * When provided (non-empty), Step 0 gains a "Today's Route" tab that shows
@@ -162,6 +176,9 @@ export function TreatmentLogWizard({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // ── Truck stock snapshot (fetched on open; shown as warning in Step 3) ────
+  const [inventory, setInventory] = useState<InventoryProduct[]>([]);
+
   // ── Reset all state when modal opens ──────────────────────────────────────
   const resetAll = useCallback(() => {
     setStep(0);
@@ -187,6 +204,7 @@ export function TreatmentLogWizard({
     setStep0Tab(routeAssignments.length > 0 ? "route" : "all");
     setRecentMixes([]);
     setLoadingRecentMixes(false);
+    setInventory([]);
   }, [routeAssignments.length]);
 
   useEffect(() => {
@@ -213,6 +231,16 @@ export function TreatmentLogWizard({
       .catch(() => setRecentMixes([]))
       .finally(() => setLoadingRecentMixes(false));
   }, [visible, hasRoute]);
+
+  // ── Truck stock fetch — drives the low-stock warning in Step 3 ────────────
+  // Failures are silently swallowed: a missing or offline inventory baseline
+  // should never block the technician from recording a treatment.
+  useEffect(() => {
+    if (!visible) return;
+    getMyInventory()
+      .then(setInventory)
+      .catch(() => setInventory([]));
+  }, [visible]);
 
   // ── Checklist builder ──────────────────────────────────────────────────────
   // Rebuilds the checklist whenever a product is selected (Step 4 prep).
@@ -246,6 +274,31 @@ export function TreatmentLogWizard({
     const area = parseFloat(areaSqft);
     if (!area || !labelRules?.maxRateOzPer1000Sqft) return null;
     return parseFloat(((labelRules.maxRateOzPer1000Sqft * area) / 1000).toFixed(2));
+  })();
+
+  /**
+   * Stock warning — non-null when the entered volume would exceed the
+   * technician's declared on-hand quantity. Informational only; does not
+   * block submission (the technician may have loaded product that hasn't been
+   * baselined, or may be intentionally drawing from a shared tank).
+   */
+  const stockWarning: string | null = (() => {
+    if (!selectedProduct) return null;
+    const item = inventory.find((i) => i.productId === selectedProduct.id);
+    if (!item) return null; // No baseline declared — unknown, not a blocker
+    // Only compare when the inventory unit is in fluid ounces.  Treatment logs
+    // always record totalProductOz in fl oz; comparing against gallons, "unit"
+    // counts, or other units would produce meaningless (and misleading) results.
+    if (item.unit !== "fl oz" && item.unit !== "oz") return null;
+    const oz = parseFloat(totalProductOz);
+    if (!oz || oz <= 0) return null;
+    if (oz > item.quantityOnHand) {
+      return (
+        `Truck stock low: ${item.quantityOnHand.toFixed(1)} ${item.unit} on hand, ` +
+        `${oz.toFixed(1)} fl oz requested.`
+      );
+    }
+    return null;
   })();
 
   /** Environmental warnings that must be acknowledged in step 5. */
@@ -336,7 +389,7 @@ export function TreatmentLogWizard({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await createTreatmentLog(inspectionId, {
+      const result = await createTreatmentLog(inspectionId, {
         productId: selectedProduct.id,
         targetPest: selectedPest,
         siteClassification: selectedSite,
@@ -352,7 +405,34 @@ export function TreatmentLogWizard({
         environmentalWarningAcknowledged: envWarningAcknowledged,
         notes: applicationNotes.trim() || undefined,
       });
-      onLogged();
+
+      // ── Remaining-stock feedback ─────────────────────────────────────────
+      // Whenever the server returns an updated on-hand baseline for the
+      // applied product, hand it back to the parent so it can tell the
+      // technician what's left on the truck right now. Separately flag `low`
+      // — at/below the manager-configured restockThreshold, or below 10% of
+      // the on-hand quantity that was on the truck when the wizard opened —
+      // so the parent can style it as a resupply warning instead of a plain
+      // confirmation.
+      const updated = result.updatedInventory;
+      let stockInfo:
+        | { productName: string; quantityOnHand: number; unit: string; low: boolean }
+        | undefined;
+      if (updated) {
+        const baselineItem = inventory.find((i) => i.productId === updated.productId);
+        const threshold =
+          baselineItem?.restockThreshold ??
+          (baselineItem ? baselineItem.quantityOnHand * 0.1 : null);
+        const low = threshold != null && updated.quantityOnHand <= threshold;
+        stockInfo = {
+          productName: selectedProduct.name,
+          quantityOnHand: updated.quantityOnHand,
+          unit: updated.unit,
+          low,
+        };
+      }
+
+      onLogged(stockInfo);
       resetAll();
       onClose();
     } catch (e: unknown) {
@@ -1032,6 +1112,14 @@ export function TreatmentLogWizard({
               <Ionicons name="warning" size={14} color="#f85149" />
               <Text style={{ color: "#f85149", fontFamily: "Inter_400Regular", fontSize: 12, flex: 1 }}>
                 {rateErrorText}
+              </Text>
+            </View>
+          ) : null}
+          {stockWarning ? (
+            <View style={[s.warningBanner, { borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.08)", marginTop: 0 }]}>
+              <Ionicons name="warning" size={14} color="#f59e0b" />
+              <Text style={{ color: "#f59e0b", fontFamily: "Inter_400Regular", fontSize: 12, flex: 1 }}>
+                {stockWarning}
               </Text>
             </View>
           ) : null}

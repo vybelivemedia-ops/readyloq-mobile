@@ -17,6 +17,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -29,9 +30,18 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { listProducts, type Product } from "@/lib/api-client/products";
+import { getDailyRoute } from "@/lib/api-client/daily-route";
 import { useColors } from "@/hooks/useColors";
 import type { RouteAssignment } from "@/lib/api-client/daily-route";
 import { PEST_TYPES } from "@/constants/inspection";
+
+/** Returns yesterday's date as "YYYY-MM-DD" using the device's local clock. */
+function yesterdayDateString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 interface Props {
   visible: boolean;
@@ -68,6 +78,9 @@ export function DailyRouteSetupModal({
   // Allow free-type chemical input (for products not in catalogue)
   const [customChemical, setCustomChemical] = useState("");
 
+  // ── Copy Yesterday's Kit ────────────────────────────────────────────────────
+  const [copyingYesterday, setCopyingYesterday] = useState(false);
+
   // Reset on open
   useEffect(() => {
     if (visible) {
@@ -79,8 +92,29 @@ export function DailyRouteSetupModal({
       setCustomChemical("");
       setProductSearch("");
       setFetchError(null);
+      setCopyingYesterday(false);
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCopyYesterday = useCallback(async () => {
+    if (copyingYesterday) return;
+    setCopyingYesterday(true);
+    try {
+      const rig = await getDailyRoute(yesterdayDateString());
+      if (!rig || rig.assignments.length === 0) {
+        Alert.alert(
+          "Nothing to copy",
+          "You didn't have any chemical assignments yesterday. Add them manually below.",
+        );
+        return;
+      }
+      setAssignments(rig.assignments);
+    } catch {
+      Alert.alert("Error", "Could not load yesterday's kit. Please try again.");
+    } finally {
+      setCopyingYesterday(false);
+    }
+  }, [copyingYesterday]);
 
   // Load product catalogue
   useEffect(() => {
@@ -205,21 +239,51 @@ export function DailyRouteSetupModal({
         >
           {/* Current assignments */}
           {assignments.length === 0 && !addOpen ? (
-            <View
-              style={{
-                padding: 20,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderStyle: "dashed",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <Ionicons name="flask-outline" size={28} color={colors.mutedForeground} />
-              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>
-                No chemicals assigned yet.{"\n"}Add a product for each pest you're treating today.
-              </Text>
+            <View style={{ gap: 10 }}>
+              {/* Empty state */}
+              <View
+                style={{
+                  padding: 20,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderStyle: "dashed",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Ionicons name="flask-outline" size={28} color={colors.mutedForeground} />
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>
+                  No chemicals assigned yet.{"\n"}Add a product for each pest you're treating today.
+                </Text>
+              </View>
+
+              {/* Copy Yesterday's Kit — one-tap shortcut */}
+              <Pressable
+                onPress={() => { void handleCopyYesterday(); }}
+                disabled={copyingYesterday}
+                style={({ pressed }) => ({
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 13,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.primary + "55",
+                  backgroundColor: colors.primary + "0C",
+                  gap: 8,
+                  opacity: pressed || copyingYesterday ? 0.7 : 1,
+                })}
+              >
+                {copyingYesterday ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="copy-outline" size={16} color={colors.primary} />
+                )}
+                <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                  {copyingYesterday ? "Loading yesterday's kit…" : "Copy Yesterday's Kit"}
+                </Text>
+              </Pressable>
             </View>
           ) : null}
 

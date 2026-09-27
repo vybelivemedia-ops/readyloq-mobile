@@ -19,9 +19,11 @@ import {
   listLocalInspections,
   subscribeLocalInspections,
   updateLocalInspection,
+  canonicalStoragePath,
   type LocalInspection,
 } from "@/lib/local/inspection-store";
 import { doUpload, probeStoragePath, reserveUploadPath } from "@/lib/upload";
+import { retryDelayMs } from "./retry-policy";
 
 /**
  * Offline-first sync engine.
@@ -50,7 +52,6 @@ const state = {
   getToken: null as (() => Promise<string | null>) | null,
   syncingIds: new Set<string>(),
   running: false,
-  runQueued: false,
   debounceTimer: null as ReturnType<typeof setTimeout> | null,
   retryTimer: null as ReturnType<typeof setTimeout> | null,
   listeners: new Set<EngineListener>(),
@@ -105,6 +106,9 @@ export function getSyncingIds(): ReadonlySet<string> {
 /** Ask the engine to sync soon (debounced; safe to call constantly). */
 export function requestSync(delayMs = 1200) {
   if (!state.configured) return;
+  // Local store notifications emitted by our own checkpoint writes must not
+  // queue an immediate second pass while the first pass is still running.
+  if (state.running) return;
   if (state.debounceTimer) clearTimeout(state.debounceTimer);
   state.debounceTimer = setTimeout(() => {
     state.debounceTimer = null;
@@ -114,16 +118,18 @@ export function requestSync(delayMs = 1200) {
 
 /**
  * Sync one inspection immediately (used by explicit Complete / manual retry).
- * Shares the same single-flight lock as `syncAll` — if a pass is already
- * running (or this record is mid-sync), it queues another pass instead of
- * starting a concurrent one, so a photo can never be uploaded twice.
+ * Shares the single-flight lock with all other triggers. A busy worker leaves
+ * scheduling to its finally block rather than creating a second retry loop.
  */
 export async function syncNow(localId: string): Promise<LocalInspection | null> {
   const record = await getLocalInspection(localId);
   if (!record) return null;
   if (!hasPendingWork(record)) return record;
+  if (!isDue(record)) {
+    if (state.configured) void scheduleRetryIfNeeded();
+    return record;
+  }
   if (state.running || state.syncingIds.has(localId)) {
-    state.runQueued = true;
     return record;
   }
   state.running = true;
@@ -131,12 +137,7 @@ export async function syncNow(localId: string): Promise<LocalInspection | null> 
     return await syncOne(record).catch(() => getLocalInspection(localId));
   } finally {
     state.running = false;
-    if (state.runQueued) {
-      state.runQueued = false;
-      requestSync(0);
-    } else {
-      await scheduleRetryIfNeeded();
-    }
+    if (state.configured) await scheduleRetryIfNeeded();
   }
 }
 
@@ -153,13 +154,10 @@ function notifyEngine() {
 }
 
 async function syncAll(): Promise<void> {
-  if (state.running) {
-    state.runQueued = true;
-    return;
-  }
+  if (state.running) return;
   state.running = true;
   try {
-    const records = (await listLocalInspections()).filter(hasPendingWork);
+    const records = (await listLocalInspections()).filter((r) => hasPendingWork(r) && isDue(r));
     // Oldest first: finish earlier inspections before newer ones.
     records.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (const record of records) {
@@ -167,12 +165,7 @@ async function syncAll(): Promise<void> {
     }
   } finally {
     state.running = false;
-    if (state.runQueued) {
-      state.runQueued = false;
-      requestSync(0);
-    } else {
-      await scheduleRetryIfNeeded();
-    }
+    await scheduleRetryIfNeeded();
   }
 }
 
@@ -207,6 +200,10 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
         notes: composedNotes || undefined,
         pestTypes: rec.pestTypes.length ? rec.pestTypes : undefined,
         clientKey: rec.localId,
+        // Preserve the unit selected at booking when the mobile record is
+        // first created server-side (offline-first or unscheduled captures).
+        unitNumber: rec.unitNumber ?? null,
+        visitPurpose: rec.visitPurpose?.trim() || undefined,
       });
       await merge((r) => {
         r.serverId = created.id;
@@ -318,6 +315,9 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
         const media = await addInspectionMedia(serverId, {
           mediaType: "image",
           url: photo.storagePath,
+          // Preserve the timestamp recorded when the photo was captured.
+          // Never derive this from upload/registration time (retries may be delayed).
+          capturedAt: photo.capturedAt,
           // Vision Platform provenance — where the evidence came from and how
           // the on-device quality gate scored it.
           captureSource: photo.captureSource,
@@ -326,6 +326,9 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
           // Technician-authored note (set during or after capture). Stored as
           // caption on the server so AI analysis and reports can reference it.
           caption: photo.description ?? undefined,
+          // Every photo inherits the inspection's active unit context so a
+          // multi-family compliance export can trace evidence to an apartment.
+          unitNumber: rec.unitNumber ?? null,
         });
         await merge((r) => {
           const p = r.photos.find((x) => x.localUri === localUri);
@@ -337,22 +340,70 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     // 4. Draft AI analysis over the full uploaded set (server-side vision).
     // `draft: true` — Opportunity Intelligence and the scorecard wait for
     // the explicit completion step.
-    if (rec.photos.length > 0 && rec.analyzedCount < rec.photos.length) {
+    const acknowledgedPaths = new Set(
+      (rec.analyzedPhotoPaths ?? []).map(canonicalStoragePath),
+    );
+    if (
+      rec.photos.some(
+        (p) =>
+          p.storagePath != null &&
+          !acknowledgedPaths.has(canonicalStoragePath(p.storagePath)),
+      )
+    ) {
       const uploaded = rec.photos.filter((p) => p.storagePath);
       // Near-duplicate photos are still uploaded and kept as evidence, but
       // excluded from AI analysis to avoid redundant detections and cost.
-      // They still count toward analyzedCount so the pending-work invariant
-      // (photos.length > analyzedCount) can settle.
-      const toAnalyze = uploaded.filter((p) => !p.duplicateOf);
+      // They are acknowledged locally by exact path so the pending-work
+      // invariant can settle without sending them to the provider.
+      const toAnalyze = uploaded.filter(
+        (p) =>
+          !p.duplicateOf &&
+          p.storagePath != null &&
+          !acknowledgedPaths.has(canonicalStoragePath(p.storagePath)),
+      );
+      let analyzedPaths: string[] = [];
       if (toAnalyze.length > 0) {
-        await analyzeInspection({
+        const result = await analyzeInspection({
           inspectionId: serverId,
           images: toAnalyze.map((p) => ({ imageUrl: p.storagePath as string })),
           draft: true,
         });
+        analyzedPaths = result.analyzedImagePaths ?? [];
       }
       await merge((r) => {
-        r.analyzedCount = Math.max(r.analyzedCount, uploaded.length);
+        const currentPathsByCanonical = new Map(
+          r.photos.flatMap((p) =>
+            p.storagePath
+              ? [[canonicalStoragePath(p.storagePath), p.storagePath] as const]
+              : [],
+          ),
+        );
+        const settledPaths = new Set(
+          (r.analyzedPhotoPaths ?? []).flatMap((path) => {
+            const currentPath = currentPathsByCanonical.get(
+              canonicalStoragePath(path),
+            );
+            return currentPath ? [currentPath] : [];
+          }),
+        );
+        for (const path of analyzedPaths) {
+          const currentPath = currentPathsByCanonical.get(
+            canonicalStoragePath(path),
+          );
+          if (currentPath) settledPaths.add(currentPath);
+        }
+        for (const photo of r.photos) {
+          if (photo.duplicateOf && photo.storagePath) {
+            settledPaths.add(photo.storagePath);
+          }
+        }
+        // Failed and timed-out paths deliberately remain unsettled. The local
+        // pending-work invariant will schedule another sync, while the server
+        // reuses successful paths and only calls the provider for failures.
+        r.analyzedPhotoPaths = [...settledPaths];
+        r.analyzedCount = r.photos.filter(
+          (p) => p.storagePath != null && settledPaths.has(p.storagePath),
+        ).length;
       });
     }
 
@@ -363,22 +414,73 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     ]
       .filter(Boolean)
       .join("\n\n");
-    // Signatures are only sent when they are a non-null string.  Omitting the
-    // key entirely (rather than sending null) ensures the server's
-    // resignatureConsent guard can distinguish "not yet captured on this device"
-    // from an intentional clear, preventing a momentarily-null local state from
-    // accidentally wiping a valid signature that is already on the server.
+
+    // Snapshot the signature revision BEFORE sending so we can detect whether
+    // the user mutated signatures while the PATCH was in-flight.  If sigRev
+    // changed by the time the round-trip completes we leave signaturesSynced=false
+    // and let the next pass pick up the newer state — preventing a concurrent
+    // "tap Re-sign" from being silently dropped.
+    const sigRevAtSync = rec.sigRev ?? 0;
+    // Snapshot unit number state before the PATCH for the same race-guard
+    // reason as sigRevAtSync: if the user edits unitNumber mid-flight we
+    // leave unitNumberSynced=false so the next pass picks up the newer value.
+    const unitNumberAtSync = rec.unitNumber;
+
+    // Build the signature slice of the PATCH body.
+    //   • Non-null string  → include normally (new or updated value).
+    //   • null + explicit-clear flag → include null so the server wipes its value.
+    //     ownerSignature null also needs resignatureConsent: true to bypass the
+    //     server's accidental-clear guard.
+    //   • null without a clear flag → omit entirely (never captured; don't touch
+    //     the server's value, which may have been set by another device).
+    const sigPatch: {
+      technicianSignature?: string | null;
+      ownerSignature?: string | null;
+      ownerNotAvailable?: boolean;
+      signedAt?: string;
+      resignatureConsent?: boolean;
+    } = {
+      ownerNotAvailable: rec.ownerNotAvailable,
+      ...(rec.signedAt != null ? { signedAt: rec.signedAt } : {}),
+    };
+
+    if (typeof rec.technicianSignature === "string") {
+      sigPatch.technicianSignature = rec.technicianSignature;
+    } else if (rec.techSigClear && rec.technicianSignature === null) {
+      // Explicit clear: send null so the server wipes its copy.
+      sigPatch.technicianSignature = null;
+    }
+
+    if (typeof rec.ownerSignature === "string") {
+      sigPatch.ownerSignature = rec.ownerSignature;
+    } else if (rec.ownerSigConsent && rec.ownerSignature === null) {
+      // Explicit clear (owner re-sign or "not available"): send null + consent.
+      sigPatch.ownerSignature = null;
+      sigPatch.resignatureConsent = true;
+    }
+
     await updateInspection(serverId, {
       notes: composedNotes || undefined,
       pestTypes: rec.pestTypes.length ? rec.pestTypes : undefined,
-      ...(typeof rec.technicianSignature === "string"
-        ? { technicianSignature: rec.technicianSignature }
-        : {}),
-      ...(typeof rec.ownerSignature === "string"
-        ? { ownerSignature: rec.ownerSignature }
-        : {}),
-      ownerNotAvailable: rec.ownerNotAvailable,
-      signedAt: rec.signedAt ?? undefined,
+      // Unit number: always send the current value so the server stays in sync.
+      // Sending null explicitly clears any previously stored value.
+      unitNumber: rec.unitNumber ?? null,
+      ...sigPatch,
+    });
+
+    // Acknowledge only if the local state hasn't changed since we built the
+    // payload. A changed sigRev means a concurrent mutation won the race;
+    // keep signaturesSynced=false so the next pass sends the newer state.
+    await merge((r) => {
+      if ((r.sigRev ?? 0) === sigRevAtSync) {
+        r.signaturesSynced = true;
+        r.techSigClear = false;
+        r.ownerSigConsent = false;
+      }
+      // unitNumberSynced: acknowledge if the value hasn't changed since we sent it.
+      if (r.unitNumber === unitNumberAtSync) {
+        r.unitNumberSynced = true;
+      }
     });
 
     // 5.5. Bait station sync — each station is created once on the server
@@ -483,6 +585,12 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     await merge((r) => {
       r.syncError = null;
       r.syncAttempts = 0;
+      // Partial AI outcomes remain pending; don't immediately re-request the
+      // same unresolved photo via the store subscription or foreground events.
+      r.nextSyncAt = hasPendingWork(r)
+        ? new Date(Date.now() + 30_000).toISOString()
+        : null;
+      r.lastSyncSuccess = new Date().toISOString();
     });
     state.onSynced?.(rec);
     return rec;
@@ -492,6 +600,7 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     await merge((r) => {
       r.syncError = msg;
       r.syncAttempts += 1;
+      r.nextSyncAt = new Date(Date.now() + retryDelayMs(e, r.syncAttempts)).toISOString();
     });
     throw e;
   } finally {
@@ -516,11 +625,12 @@ export async function runBackgroundSync(
 ): Promise<boolean> {
   if (state.running) return false;
   // Inject the token getter so syncOne can authenticate.
+  const previousToken = state.getToken;
   state.getToken = getToken;
   state.running = true;
   let didWork = false;
   try {
-    const records = (await listLocalInspections()).filter(hasPendingWork);
+    const records = (await listLocalInspections()).filter((r) => hasPendingWork(r) && isDue(r));
     if (records.length === 0) return false;
     records.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (const record of records) {
@@ -529,12 +639,17 @@ export async function runBackgroundSync(
     didWork = true;
   } finally {
     state.running = false;
-    state.getToken = null;
+    state.getToken = previousToken;
+    if (state.configured) await scheduleRetryIfNeeded();
   }
   return didWork;
 }
 
-/** Exponential backoff retry while anything is pending: 10s → 20s → … → 5min. */
+function isDue(record: LocalInspection, now = Date.now()): boolean {
+  return !record.nextSyncAt || new Date(record.nextSyncAt).getTime() <= now;
+}
+
+/** Exactly one timer for the earliest durable per-inspection deadline. */
 async function scheduleRetryIfNeeded() {
   if (state.retryTimer) {
     clearTimeout(state.retryTimer);
@@ -543,8 +658,11 @@ async function scheduleRetryIfNeeded() {
   const records = await listLocalInspections();
   const pending = records.filter(hasPendingWork);
   if (pending.length === 0) return;
-  const attempts = Math.max(...pending.map((r) => r.syncAttempts), 0);
-  const delay = Math.min(10_000 * 2 ** Math.max(attempts - 1, 0), 300_000);
+  const delay = Math.max(0, Math.min(
+    ...pending.map((r) => r.nextSyncAt
+      ? (new Date(r.nextSyncAt).getTime() || 0) - Date.now()
+      : 0),
+  ));
   state.retryTimer = setTimeout(() => {
     state.retryTimer = null;
     void syncAll();

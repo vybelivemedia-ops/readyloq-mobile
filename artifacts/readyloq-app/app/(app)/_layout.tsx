@@ -1,9 +1,14 @@
 import { useAuth, useUser } from "@clerk/expo";
+import {
+  getGetMissionControlMeQueryKey,
+  setAuthTokenGetter as setGeneratedAuthTokenGetter,
+  useGetMissionControlMe,
+} from "@workspace/api-client-react";
 import { setAuthTokenGetter } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Redirect, Stack, useRouter } from "expo-router";
+import { Redirect, Stack, usePathname, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Platform, Text, View } from "react-native";
+import { Alert, AppState, Platform, Text, View } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { registerPushToken } from "@/lib/api";
@@ -30,6 +35,10 @@ import { FullScreenLoader } from "@/components/ui/Loader";
 import { useColors } from "@/hooks/useColors";
 import { CurrentUserProvider, useCurrentUser } from "@/hooks/useCurrentUser";
 import {
+  decideNativeRoute,
+  type MissionControlAccess,
+} from "@/lib/gate/mission-control-routing";
+import {
   deleteLocalInspection,
   listLocalInspections,
 } from "@/lib/local/inspection-store";
@@ -54,13 +63,33 @@ import {
 } from "@/lib/gate/offline-flow";
 
 export default function AppLayout() {
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn, userId, getToken } = useAuth();
   const queryClient = useQueryClient();
+  const previousUserId = useRef<string | null | undefined>(undefined);
 
   // Attach the Clerk bearer token to every generated API client request.
   useEffect(() => {
     setAuthTokenGetter(() => getToken());
+    setGeneratedAuthTokenGetter(() => getToken());
   }, [getToken]);
+
+  // The platform directory is cross-company data. Evict it whenever Clerk
+  // signs out or switches identities, including sign-out paths outside our
+  // centralized hook.
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn || previousUserId.current !== userId) {
+      queryClient.removeQueries({
+        predicate: (query) =>
+          query.queryKey.some(
+            (part) =>
+              typeof part === "string" &&
+              part.startsWith("/api/mission-control/"),
+          ),
+      });
+    }
+    previousUserId.current = isSignedIn ? userId : null;
+  }, [isLoaded, isSignedIn, userId, queryClient]);
 
   // Start the offline-first sync engine once authenticated. It pushes any
   // pending local inspections (from this or previous app sessions) and keeps
@@ -112,11 +141,66 @@ function Gate() {
   const router = useRouter();
   const signOut = useSignOut();
   const { user, isLoading, error, refetch } = useCurrentUser();
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn, userId } = useAuth();
   const { user: clerkUser } = useUser();
+  const pathname = usePathname();
+  const missionControl = useGetMissionControlMe({
+    query: {
+      // Include the active Clerk subject so cached authorization from a
+      // previous account can never satisfy this account's launch check.
+      queryKey: [...getGetMissionControlMeQueryKey(), userId],
+      enabled: !!isSignedIn,
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnReconnect: true,
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+  });
+  const [foregroundCheckPending, setForegroundCheckPending] = useState(false);
   const promptedResume = useRef(false);
   const { isConnected, isInternetReachable } = useNetworkStatus();
   const online = isConnected && isInternetReachable !== false;
+  const inMissionControl = pathname.startsWith("/mission-control");
+  const freshMissionControlCheck =
+    missionControl.isSuccess &&
+    !missionControl.isFetching &&
+    !foregroundCheckPending;
+  const missionControlAccess: MissionControlAccess =
+    foregroundCheckPending || missionControl.isFetching
+      ? "pending"
+      : missionControl.isError
+        ? "error"
+        : missionControl.isSuccess
+          ? missionControl.data.isSuperAdmin
+            ? "super-admin"
+            : "non-admin"
+          : "pending";
+  const isNonAdmin =
+    freshMissionControlCheck && missionControl.data.isSuperAdmin === false;
+  const routeDecision = decideNativeRoute({
+    access: missionControlAccess,
+    inMissionControl,
+    hasCompany: user?.companyId != null,
+  });
+
+  // Native apps don't get browser focus events. Recheck server authorization
+  // each time the app returns to the foreground, and hide platform screens
+  // while the check is in flight.
+  useEffect(() => {
+    let mounted = true;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active" || !isSignedIn) return;
+      setForegroundCheckPending(true);
+      void missionControl.refetch().finally(() => {
+        if (mounted) setForegroundCheckPending(false);
+      });
+    });
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, [isSignedIn, missionControl.refetch]);
 
   // ── Auto-create company on first login ──────────────────────────────────
   // When a new user has no company yet, silently derive a company name from
@@ -154,7 +238,7 @@ function Gate() {
   const derivedNameRef = useRef<string>("");
 
   useEffect(() => {
-    if (!user || user.companyId != null) return;
+    if (!user || user.companyId != null || !isNonAdmin) return;
     if (autoCreateAttempted.current || autoCreateFailed) return;
     if (!clerkUser) return;
 
@@ -177,7 +261,7 @@ function Gate() {
     derivedNameRef.current = derived;
     runAutoCreate(derived);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, clerkUser, autoCreateFailed]);
+  }, [user, clerkUser, autoCreateFailed, isNonAdmin]);
 
   // ── Retry on reconnection (profile load + auto-create) ──────────────────
   // Fires once on every offline→online transition. Handles two blocked paths:
@@ -376,6 +460,41 @@ function Gate() {
         onRetry={refetch}
         onSignOut={() => { void signOut(); }}
       />
+    );
+  }
+
+  // A platform link is only renderable after a successful, current server
+  // response. Mount a dedicated stack for Super Admins before any company
+  // onboarding or tenant-company gate; cached flags never grant access.
+  if (routeDecision === "wait") {
+    return <FullScreenLoader label="Verifying platform access…" />;
+  }
+  if (routeDecision === "access-error") {
+    return (
+      <ErrorState
+        title="Couldn't verify platform access"
+        message="Connect to the internet and try again. Platform tools stay locked until access is confirmed."
+        onRetry={() => { void missionControl.refetch(); }}
+        onSignOut={() => { void signOut(); }}
+      />
+    );
+  }
+  if (routeDecision === "redirect-platform") {
+    return <Redirect href="/mission-control" />;
+  }
+  if (routeDecision === "redirect-tenant") {
+    return <Redirect href="/(app)/(tabs)" />;
+  }
+  if (routeDecision === "platform-stack") {
+    return (
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="mission-control" />
+      </Stack>
     );
   }
 

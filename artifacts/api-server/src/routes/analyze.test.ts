@@ -49,10 +49,9 @@ vi.mock("../lib/objectStorage", async (importOriginal) => {
   return { ...actual, ObjectStorageService };
 });
 
-// Control the vision model per test. `analyzePhoto` is the failure-aware entry
-// point used by /analysis/analyze (null => failure). `generateAiPrediction` and
-// `fallbackPrediction` are exported for the intelligence-dataset contribute flow
-// and are stubbed so the full app graph imports cleanly.
+// Control the vision model per test. The route uses the legacy nullable
+// analyzePhoto contract; production reports richer outcomes through its
+// optional third-argument callback.
 const { analyzePhotoMock } = vi.hoisted(() => ({ analyzePhotoMock: vi.fn() }));
 vi.mock("../lib/intelligence-ai", () => {
   const empty = {
@@ -147,6 +146,45 @@ async function createInspectionWithPhoto(suffix: string) {
   return { inspectionId, imageUrl };
 }
 
+async function createMobileInspectionWithFourImages(suffix: string) {
+  asUser(OWNER_ID);
+  const created = await request(app)
+    .post("/api/inspections")
+    .send({ siteAddress: `${suffix} Mobile St`, technicianName: "Tech", clientName: "Client" });
+  expect(created.status).toBe(201);
+  const inspectionId = created.body.id as number;
+  const imageUrls: string[] = [];
+  for (let index = 0; index < 4; index++) {
+    const imageUrl = `/api/storage/objects/companies/${companyId}/uploads/${suffix}-${index}`;
+    const media = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "image", url: imageUrl });
+    expect(media.status).toBe(201);
+    imageUrls.push(imageUrl);
+  }
+  return { inspectionId, imageUrls };
+}
+
+async function analyzeAndCheckPersisted(
+  inspectionId: number,
+  imageUrls: string[],
+  expectedStatuses: string[],
+) {
+  asUser(OWNER_ID);
+  const response = await request(app)
+    .post("/api/analysis/analyze")
+    .send({ inspectionId, draft: true, images: imageUrls.map((imageUrl) => ({ imageUrl })) });
+  expect(response.status).toBe(201);
+  expect(response.body.photoOutcomes.map((p: { status: string }) => p.status)).toEqual(expectedStatuses);
+  const listed = await request(app).get(`/api/analysis?inspectionId=${inspectionId}`);
+  expect(listed.status).toBe(200);
+  expect(listed.body[0].id).toBe(response.body.id);
+  expect(listed.body[0].photoOutcomes).toEqual(response.body.photoOutcomes);
+  expect(listed.body[0].analyzedImagePaths).toEqual(response.body.analyzedImagePaths);
+  expect(listed.body[0].coverage).toEqual(response.body.coverage);
+  return response.body;
+}
+
 beforeAll(async () => {
   const slug = "analyze-co";
   const [existing] = await db
@@ -175,6 +213,86 @@ beforeAll(async () => {
 beforeEach(() => {
   asUser(null);
   analyzePhotoMock.mockReset();
+});
+
+describe("mobile image registration and per-photo analysis progress", () => {
+  it("analyzes all 4/4 persisted mobile images and publishes findings and zone coverage", async () => {
+    const { inspectionId, imageUrls } = await createMobileInspectionWithFourImages("four-success");
+    analyzePhotoMock.mockImplementation(async () => ({ ...pestPrediction(), zone: "kitchen_sanitation" }));
+    const result = await analyzeAndCheckPersisted(inspectionId, imageUrls, Array(4).fill("completed"));
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(4);
+    expect(result.status).toBe("complete");
+    expect(result.analyzedImagePaths).toHaveLength(4);
+    expect(result.findings).toHaveLength(4);
+    expect(result.photoZones).toHaveProperty(imageUrls[0].replace("/api/storage", ""), "kitchen_sanitation");
+    expect(result.coverage.coveredRequired.length).toBeGreaterThan(0);
+    expect(result.analysisErrors).toBe(0);
+  });
+
+  it("persists 3 successes and 1 failure without losing other findings", async () => {
+    const { inspectionId, imageUrls } = await createMobileInspectionWithFourImages("four-partial");
+    analyzePhotoMock.mockImplementation(async (path: string) =>
+      path.endsWith("-1") ? null : { ...pestPrediction(), zone: "kitchen_sanitation" },
+    );
+    const result = await analyzeAndCheckPersisted(
+      inspectionId, imageUrls, ["completed", "failed", "completed", "completed"],
+    );
+    expect(result.status).toBe("partial");
+    expect(result.analysisErrors).toBe(1);
+    expect(result.analyzedImagePaths).toHaveLength(3);
+    expect(result.findings).toHaveLength(3);
+  });
+
+  it("keeps successful findings and coverage when mobile retries only the failed path", async () => {
+    const { inspectionId, imageUrls } = await createMobileInspectionWithFourImages("four-retry");
+    analyzePhotoMock.mockImplementation(async (path: string) =>
+      path.endsWith("-1") ? null : { ...pestPrediction(), zone: "kitchen_sanitation" },
+    );
+    const first = await analyzeAndCheckPersisted(
+      inspectionId, imageUrls, ["completed", "failed", "completed", "completed"],
+    );
+    analyzePhotoMock.mockClear();
+    analyzePhotoMock.mockResolvedValue({ ...pestPrediction(), zone: "exterior_perimeter" });
+    const second = await analyzeAndCheckPersisted(
+      inspectionId, [imageUrls[1]], ["completed", "completed", "completed", "completed"],
+    );
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(1);
+    expect(second.status).toBe("complete");
+    expect(second.analyzedImagePaths).toHaveLength(4);
+    expect(second.findings).toHaveLength(4);
+    expect(second.coverage.coveredRequired.length).toBeGreaterThanOrEqual(first.coverage.coveredRequired.length);
+  });
+
+  it("persists 3 successes when one provider call times out or defers", async () => {
+    const { inspectionId, imageUrls } = await createMobileInspectionWithFourImages("four-timeout");
+    analyzePhotoMock.mockImplementation(async (path: string, _note: unknown, options: { onOutcome: (status: string) => void }) => {
+      if (path.endsWith("-2")) {
+        options.onOutcome("deferred");
+        return null;
+      }
+      return { ...pestPrediction(), zone: "kitchen_sanitation" };
+    });
+    const result = await analyzeAndCheckPersisted(
+      inspectionId, imageUrls, ["completed", "completed", "deferred", "completed"],
+    );
+    expect(result.status).toBe("partial");
+    expect(result.analysisErrors).toBe(1);
+    expect(result.analyzedImagePaths).toHaveLength(3);
+  });
+
+  it("turns a thrown provider error into one failed photo, not a failed request", async () => {
+    const { inspectionId, imageUrls } = await createMobileInspectionWithFourImages("four-provider-error");
+    analyzePhotoMock.mockImplementation(async (path: string) => {
+      if (path.endsWith("-3")) throw new Error("provider unavailable");
+      return { ...pestPrediction(), zone: "kitchen_sanitation" };
+    });
+    const result = await analyzeAndCheckPersisted(
+      inspectionId, imageUrls, ["completed", "completed", "completed", "failed"],
+    );
+    expect(result.status).toBe("partial");
+    expect(result.analysisErrors).toBe(1);
+    expect(result.analyzedImagePaths).toHaveLength(3);
+  });
 });
 
 describe("POST /analysis/analyze does not fabricate findings", () => {
@@ -605,6 +723,8 @@ describe("POST /analysis/analyze — failureReason persistence", () => {
     expect(res.status).toBe(201);
     expect(res.body.analysisErrors).toBe(1);
     expect(res.body.findings).toEqual([]);
+    expect(res.body.status).toBe("failed");
+    expect(res.body.analyzedImagePaths).toEqual([]);
     // The response must carry a non-null failureReason so the mobile
     // summary screen can surface it instead of the generic fallback.
     expect(typeof res.body.failureReason).toBe("string");
@@ -636,6 +756,8 @@ describe("POST /analysis/analyze — failureReason persistence", () => {
 
     expect(res.status).toBe(201);
     expect(res.body.analysisErrors).toBe(1);
+    expect(res.body.status).toBe("partial");
+    expect(res.body.analyzedImagePaths).toEqual([imageUrl2.replace("/api/storage", "")]);
     // Partial success → failureReason is null.
     expect(res.body.failureReason).toBeNull();
   });
@@ -651,6 +773,7 @@ describe("POST /analysis/analyze — failureReason persistence", () => {
 
     expect(res.status).toBe(201);
     expect(res.body.analysisErrors).toBe(0);
+    expect(res.body.status).toBe("complete");
     expect(res.body.failureReason).toBeNull();
   });
 
@@ -673,5 +796,309 @@ describe("POST /analysis/analyze — failureReason persistence", () => {
     expect(res2.status).toBe(201);
     expect(res2.body.analysisErrors).toBe(0);
     expect(res2.body.failureReason).toBeNull();
+  });
+});
+
+describe("POST /analysis/analyze — bounded photo concurrency", () => {
+  it("processes a photo batch concurrently without exceeding three provider calls", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("concurrency-0");
+    const imageUrls = [imageUrl];
+    asUser(OWNER_ID);
+    for (let i = 1; i < 12; i++) {
+      const url = `/api/storage/objects/companies/${companyId}/uploads/photo-concurrency-${i}`;
+      const media = await request(app)
+        .post(`/api/inspections/${inspectionId}/media`)
+        .send({ mediaType: "photo", url });
+      expect(media.status).toBe(201);
+      imageUrls.push(url);
+    }
+
+    let active = 0;
+    let maxActive = 0;
+    analyzePhotoMock.mockImplementation(async () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      active--;
+      return cleanPrediction();
+    });
+
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: imageUrls.map((url) => ({ imageUrl: url })) });
+
+    expect(res.status).toBe(201);
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(12);
+    expect(maxActive).toBe(3);
+    expect(res.body.status).toBe("complete");
+    expect(res.body.analyzedImagePaths).toHaveLength(12);
+  });
+});
+
+describe("POST /analysis/analyze — per-photo outcomes and single flight", () => {
+  async function addPhotos(inspectionId: number, firstUrl: string, count: number) {
+    const urls = [firstUrl];
+    asUser(OWNER_ID);
+    for (let i = 1; i < count; i++) {
+      const url = `/api/storage/objects/companies/${companyId}/uploads/photo-outcome-${inspectionId}-${i}`;
+      const media = await request(app)
+        .post(`/api/inspections/${inspectionId}/media`)
+        .send({ mediaType: "photo", url });
+      expect(media.status).toBe(201);
+      urls.push(url);
+    }
+    return urls;
+  }
+
+  it("returns partial for 10 completed and 2 failed photos without counting failures as analyzed", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("outcomes-mixed");
+    const imageUrls = await addPhotos(inspectionId, imageUrl, 12);
+    let call = 0;
+    analyzePhotoMock.mockImplementation(async (
+      _path: string,
+      _note: string | null,
+      options: { onOutcome?: (status: string) => void },
+    ) => {
+      call++;
+      if (call <= 10) {
+        options.onOutcome?.("completed");
+        return cleanPrediction();
+      }
+      options.onOutcome?.("failed");
+      return null;
+    });
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: imageUrls.map((url) => ({ imageUrl: url })) });
+
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe("partial");
+    expect(res.body.analysisErrors).toBe(2);
+    expect(res.body.analyzedImagePaths).toHaveLength(10);
+    expect(res.body.photoOutcomes).toHaveLength(12);
+    expect(res.body.photoOutcomes.filter((p: { status: string }) => p.status === "completed")).toHaveLength(10);
+    expect(res.body.photoOutcomes.filter((p: { status: string }) => p.status === "failed")).toHaveLength(2);
+  });
+
+  it("persists explicit rate_limited and deferred outcomes as a failed run", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("outcomes-deferred");
+    const imageUrls = await addPhotos(inspectionId, imageUrl, 2);
+    analyzePhotoMock
+      .mockImplementationOnce(async (
+        _path: string,
+        _note: string | null,
+        options: { onOutcome?: (status: string) => void },
+      ) => {
+        options.onOutcome?.("rate_limited");
+        return null;
+      })
+      .mockImplementationOnce(async (
+        _path: string,
+        _note: string | null,
+        options: { onOutcome?: (status: string) => void },
+      ) => {
+        options.onOutcome?.("deferred");
+        return null;
+      });
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: imageUrls.map((url) => ({ imageUrl: url })) });
+
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe("failed");
+    expect(res.body.analyzedImagePaths).toEqual([]);
+    expect(res.body.photoOutcomes.map((p: { status: string }) => p.status).sort()).toEqual([
+      "deferred",
+      "rate_limited",
+    ]);
+  });
+
+  it("shares provider work and the persisted result across simultaneous requests", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("single-flight");
+    analyzePhotoMock.mockImplementation(async (
+      _path: string,
+      _note: string | null,
+      options: { onOutcome?: (status: string) => void },
+    ) => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      options.onOutcome?.("completed");
+      return cleanPrediction();
+    });
+
+    asUser(OWNER_ID);
+    const [first, second] = await Promise.all([
+      request(app)
+        .post("/api/analysis/analyze")
+        .send({ inspectionId, images: [{ imageUrl }] }),
+      request(app)
+        .post("/api/analysis/analyze")
+        .send({ inspectionId, images: [{ imageUrl }] }),
+    ]);
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(1);
+    expect(second.body.id).toBe(first.body.id);
+    expect(second.body.photoOutcomes).toEqual(first.body.photoOutcomes);
+  });
+
+  it("does not share provider work for distinct payloads on one inspection", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("single-flight-distinct");
+    analyzePhotoMock.mockImplementation(async (
+      _path: string,
+      _note: string | null,
+      options: { onOutcome?: (status: string) => void },
+    ) => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      options.onOutcome?.("completed");
+      return cleanPrediction();
+    });
+
+    asUser(OWNER_ID);
+    const [first, second] = await Promise.all([
+      request(app)
+        .post("/api/analysis/analyze")
+        .send({ inspectionId, images: [{ imageUrl, label: "Kitchen" }] }),
+      request(app)
+        .post("/api/analysis/analyze")
+        .send({ inspectionId, images: [{ imageUrl, label: "Attic" }] }),
+    ]);
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(2);
+    expect(second.body.id).not.toBe(first.body.id);
+  });
+
+  it("deduplicates eligible paths and ignores invalid entries before the cap", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("cap-invalid-duplicate");
+    const imageUrls = await addPhotos(inspectionId, imageUrl, 40);
+    analyzePhotoMock.mockResolvedValue(cleanPrediction());
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({
+        inspectionId,
+        images: [
+          { imageUrl: `/api/storage/objects/companies/${companyId}/uploads/not-saved` },
+          ...Array.from({ length: 8 }, () => ({ imageUrl })),
+          ...imageUrls.map((url) => ({ imageUrl: url })),
+        ],
+      });
+
+    expect(res.status).toBe(201);
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(40);
+    expect(res.body.photoOutcomes).toHaveLength(40);
+    expect(res.body.analysisErrors).toBe(0);
+  });
+
+  it("calls the provider and records one outcome for repeated eligible paths", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("dedupe-outcome");
+    analyzePhotoMock.mockResolvedValue(cleanPrediction());
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({
+        inspectionId,
+        images: [{ imageUrl }, { imageUrl, label: "same photo" }, { imageUrl }],
+      });
+
+    expect(res.status).toBe(201);
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(1);
+    expect(res.body.photoOutcomes).toHaveLength(1);
+    expect(res.body.photoOutcomes[0].imagePath).toBe(imageUrl.replace("/api/storage", ""));
+  });
+
+  it("defers unique eligible images beyond 40 and reports a partial result", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("overflow-deferred");
+    const imageUrls = await addPhotos(inspectionId, imageUrl, 41);
+    analyzePhotoMock.mockResolvedValue(cleanPrediction());
+
+    asUser(OWNER_ID);
+    const res = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: imageUrls.map((url) => ({ imageUrl: url })) });
+
+    expect(res.status).toBe(201);
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(40);
+    expect(res.body.photoOutcomes).toHaveLength(41);
+    expect(res.body.photoOutcomes.filter((p: { status: string }) => p.status === "deferred"))
+      .toHaveLength(1);
+    expect(res.body.analysisErrors).toBe(1);
+    expect(res.body.status).toBe("partial");
+    expect(res.body.analyzedImagePaths).toHaveLength(40);
+  });
+
+  it("keeps a cached path in the overflow position completed", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("cached-overflow");
+    const imageUrls = await addPhotos(inspectionId, imageUrl, 41);
+    const cachedUrl = imageUrls[40];
+
+    analyzePhotoMock.mockResolvedValueOnce(cleanPrediction());
+    asUser(OWNER_ID);
+    const first = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: [{ imageUrl: cachedUrl }] });
+    expect(first.status).toBe(201);
+
+    analyzePhotoMock.mockReset().mockResolvedValue(cleanPrediction());
+    const second = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: imageUrls.map((url) => ({ imageUrl: url })) });
+
+    expect(second.status).toBe(201);
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(40);
+    expect(second.body.status).toBe("complete");
+    expect(second.body.analysisErrors).toBe(0);
+    expect(second.body.photoOutcomes).toHaveLength(41);
+    const cachedOutcomes = second.body.photoOutcomes.filter(
+      (photo: { imagePath: string }) => photo.imagePath === cachedUrl.replace("/api/storage", ""),
+    );
+    expect(cachedOutcomes).toHaveLength(1);
+    expect(cachedOutcomes[0].status).toBe("completed");
+    expect(cachedOutcomes.some((photo: { status: string }) => photo.status === "deferred")).toBe(false);
+  });
+
+  it("runs one new photo after 40 cached photos", async () => {
+    const { inspectionId, imageUrl } = await createInspectionWithPhoto("cached-plus-new");
+    const cachedUrls = await addPhotos(inspectionId, imageUrl, 40);
+
+    analyzePhotoMock.mockResolvedValue(cleanPrediction());
+    asUser(OWNER_ID);
+    const first = await request(app)
+      .post("/api/analysis/analyze")
+      .send({ inspectionId, images: cachedUrls.map((url) => ({ imageUrl: url })) });
+    expect(first.status).toBe(201);
+    expect(first.body.analyzedImagePaths).toHaveLength(40);
+
+    const newUrl = `/api/storage/objects/companies/${companyId}/uploads/photo-cached-plus-new-extra`;
+    const media = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "photo", url: newUrl });
+    expect(media.status).toBe(201);
+
+    analyzePhotoMock.mockReset().mockResolvedValue(cleanPrediction());
+    const second = await request(app)
+      .post("/api/analysis/analyze")
+      .send({
+        inspectionId,
+        images: [...cachedUrls, newUrl].map((url) => ({ imageUrl: url })),
+      });
+
+    expect(second.status).toBe(201);
+    expect(analyzePhotoMock).toHaveBeenCalledTimes(1);
+    expect(second.body.status).toBe("complete");
+    expect(second.body.analysisErrors).toBe(0);
+    expect(second.body.photoOutcomes).toHaveLength(41);
+    expect(second.body.photoOutcomes.filter(
+      (photo: { imagePath: string; status: string }) =>
+        photo.imagePath === newUrl.replace("/api/storage", "") && photo.status === "completed",
+    )).toHaveLength(1);
   });
 });

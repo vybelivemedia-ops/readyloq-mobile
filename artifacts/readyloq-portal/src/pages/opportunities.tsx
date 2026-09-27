@@ -3,6 +3,7 @@ import { useListSalesOpportunities, useListProposals } from '@workspace/api-clie
 import { Loader2, Filter } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDistanceToNow } from 'date-fns';
+import { RouteCalendarModule } from '@/components/RouteCalendarModule';
 
 export function Opportunities() {
   const [status, setStatus] = useState<string>('all');
@@ -37,6 +38,8 @@ export function Opportunities() {
           </Select>
         </div>
       </div>
+
+      <RouteCalendarModule />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">

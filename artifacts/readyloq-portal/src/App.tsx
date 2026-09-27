@@ -1,9 +1,11 @@
 import { type ReactNode, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider } from '@clerk/clerk-react';
+import { setBaseUrl } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { apiClientBaseUrl } from '@/config';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 
@@ -15,6 +17,7 @@ import { InspectionsList } from '@/pages/inspections/list';
 import { InspectionDetail } from '@/pages/inspections/detail';
 import { Reports } from '@/pages/reports';
 import { Team } from '@/pages/team';
+import { TechActivity } from '@/pages/tech-activity';
 import { Opportunities } from '@/pages/opportunities';
 import { Properties } from '@/pages/properties';
 import { Analytics } from '@/pages/analytics';
@@ -27,6 +30,11 @@ import { Integrations } from '@/pages/integrations';
 import { Layout } from '@/components/layout';
 
 const queryClient = new QueryClient();
+
+// Generated API hooks use root-relative paths. In development, keep those
+// requests under this artifact's base path so Vite's API proxy can route them
+// to the API server instead of the separate `/api` mobile artifact.
+setBaseUrl(apiClientBaseUrl);
 
 // Protected route wrapper — redirects via useEffect to avoid setState-during-render warnings.
 function ProtectedRoute({ component: Component, roles }: { component: any, roles?: string[] }) {
@@ -61,6 +69,11 @@ function Router() {
         <Route path="/">
           <IndexRedirect />
         </Route>
+        <Route path="/inspections/:id">
+          <Layout>
+            <ProtectedRoute component={InspectionDetail} roles={['owner', 'manager', 'sales', 'technician']} />
+          </Layout>
+        </Route>
         
         {/* Protected routes wrapped in Layout */}
         <Route path="/:rest*">
@@ -72,14 +85,14 @@ function Router() {
               <Route path="/inspections">
                 <ProtectedRoute component={InspectionsList} roles={['owner', 'manager', 'sales', 'technician']} />
               </Route>
-              <Route path="/inspections/:id">
-                <ProtectedRoute component={InspectionDetail} roles={['owner', 'manager', 'sales', 'technician']} />
-              </Route>
               <Route path="/reports">
                 <ProtectedRoute component={Reports} roles={['owner', 'manager', 'sales']} />
               </Route>
               <Route path="/team">
                 <ProtectedRoute component={Team} roles={['owner', 'manager']} />
+              </Route>
+              <Route path="/team/:userId/activity">
+                <ProtectedRoute component={TechActivity} roles={['owner', 'manager']} />
               </Route>
               <Route path="/opportunities">
                 <ProtectedRoute component={Opportunities} roles={['owner', 'sales']} />
@@ -91,7 +104,7 @@ function Router() {
                 <ProtectedRoute component={Analytics} roles={['owner', 'manager']} />
               </Route>
               <Route path="/schedule">
-                <ProtectedRoute component={Schedule} roles={['owner', 'manager']} />
+                <ProtectedRoute component={Schedule} roles={['owner', 'manager', 'sales']} />
               </Route>
               <Route path="/client-access">
                 <ProtectedRoute component={ClientAccess} roles={['owner', 'manager']} />

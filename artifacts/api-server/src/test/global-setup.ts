@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import path from "node:path";
 import pg from "pg";
 import { adminDatabaseUrl, deriveTestDatabaseUrl } from "./test-db";
+import { LEDGER_IMMUTABILITY_SQL_STATEMENTS } from "../lib/migrate-ledger-immutability";
 
 /**
  * Runs once before the test suite: creates the isolated `<db>_test` database (if
@@ -33,4 +34,18 @@ export default async function setup() {
     env: { ...process.env, DATABASE_URL: testUrl },
     stdio: "inherit",
   });
+
+  // drizzle-kit push only manages table/column/index structure — it doesn't
+  // know about triggers, so the inventory_transactions immutability trigger
+  // (see src/lib/migrate-ledger-immutability.ts) must be applied separately
+  // against the test database using the exact same SQL production runs.
+  const testClient = new pg.Client({ connectionString: testUrl });
+  await testClient.connect();
+  try {
+    for (const statement of LEDGER_IMMUTABILITY_SQL_STATEMENTS) {
+      await testClient.query(statement);
+    }
+  } finally {
+    await testClient.end();
+  }
 }

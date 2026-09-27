@@ -110,8 +110,7 @@ router.get("/subscription", ...ownerOnly, async (req: Request, res: Response) =>
 });
 
 // ── POST /billing/checkout ── create Stripe Checkout Session (Owner only) ────
-// Body: { tier: 'solo' | 'growth', period: 'monthly' | 'yearly', seats?: number }
-// seats is the number of ADDITIONAL seats beyond the owner (Growth only).
+// Body: { tier: one of the catalog plan keys, period: 'monthly' }
 router.post("/checkout", ...ownerOnly, async (req: Request, res: Response) => {
   const {
     tier,
@@ -119,17 +118,19 @@ router.post("/checkout", ...ownerOnly, async (req: Request, res: Response) => {
     seats = 0,
     email,
   } = req.body as {
-    tier?: "solo" | "growth";
-    period?: "monthly" | "yearly";
+    tier?: "solo" | "micro" | "small" | "growth" | "professional" | "enterprise" | "pilot";
+    period?: "monthly";
     seats?: number;
     email?: string;
   };
 
-  if (!tier || (tier !== "solo" && tier !== "growth")) {
+  const validTiers = ["solo", "micro", "small", "growth", "professional", "enterprise", "pilot"];
+  if (!tier || !validTiers.includes(tier)) {
     return res
       .status(400)
-      .json({ error: "tier is required and must be 'solo' or 'growth'" });
+      .json({ error: "tier is required and must be a supported monthly plan" });
   }
+  if (period !== "monthly") return res.status(400).json({ error: "Only monthly billing is supported" });
   if (!email) {
     return res.status(400).json({ error: "email is required" });
   }
@@ -145,9 +146,9 @@ router.post("/checkout", ...ownerOnly, async (req: Request, res: Response) => {
     const session = await stripeService.createCheckoutSession({
       customerId,
       tier,
-      period: period as "monthly" | "yearly",
+       period,
       companyId: company.id,
-      additionalSeats: tier === "growth" ? Math.max(0, Number(seats)) : 0,
+       additionalSeats: tier === "growth" ? Math.max(0, Number(seats)) : 0,
       successUrl: `${BILLING_RETURN_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${BILLING_RETURN_URL}/billing/cancel`,
     });

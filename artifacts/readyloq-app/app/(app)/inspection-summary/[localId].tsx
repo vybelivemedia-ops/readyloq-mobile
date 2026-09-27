@@ -88,7 +88,11 @@ export default function InspectionSummaryScreen() {
   });
   const analysisQ = useQuery({
     ...getListAnalysisResultsQueryOptions({ inspectionId: serverId ?? 0 }),
-    enabled: serverId != null && finalized,
+    enabled: serverId != null,
+    refetchInterval: (q) => {
+      const status = q.state.data?.[0]?.status?.toLowerCase();
+      return status === "complete" || status === "failed" ? false : 4000;
+    },
   });
 
   const inspection = serverId != null ? inspectionQ.data : undefined;
@@ -322,6 +326,11 @@ export default function InspectionSummaryScreen() {
         {(() => {
           const aiVariant = resolveAnalysisCardVariant({
             finalized,
+            analysisInProgress:
+              phase === "syncing" &&
+              record.photos.length > 0 &&
+              record.photos.every((photo) => photo.storagePath && photo.mediaRowId != null) &&
+              record.analyzedCount < record.photos.length,
             isError: analysisQ.isError,
             isSuccess: analysisQ.isSuccess,
             analysis: analysis ?? (analysisQ.isSuccess ? null : undefined),
@@ -329,22 +338,31 @@ export default function InspectionSummaryScreen() {
           });
 
           switch (aiVariant.kind) {
-            case "not-finalized":
+            case "ai-queued":
               return (
                 <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                   <Ionicons name="cloud-upload-outline" size={20} color={colors.mutedForeground} />
                   <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
-                    AI analysis, the service report, and insights will generate automatically once
-                    this inspection syncs.
+                    AI queued — analysis will start automatically after the evidence is synchronized.
                   </Text>
                 </Card>
               );
 
             case "query-error":
             case "pipeline-incomplete":
+            case "ai-failed":
               return (
                 <Card style={{ gap: 8 }}>
-                  <SectionTitle icon="sparkles" title="AI findings" />
+                  <SectionTitle icon="sparkles" title="AI failed" />
+                  <SectionNotGenerated {...aiVariant.placeholder} />
+                </Card>
+              );
+
+            case "ai-partial":
+              return (
+                <Card style={{ gap: 8 }}>
+                  <SectionTitle icon="sparkles" title={`AI partial · findings (${aiVariant.findingsCount})`} />
+                  {findings.slice(0, 5).map((f) => <FindingRow key={f.id} finding={f} />)}
                   <SectionNotGenerated {...aiVariant.placeholder} />
                 </Card>
               );
@@ -376,7 +394,7 @@ export default function InspectionSummaryScreen() {
             case "clean":
               return (
                 <Card style={{ gap: 8 }}>
-                  <SectionTitle icon="sparkles" title={`AI findings (${findings.length})`} />
+                  <SectionTitle icon="sparkles" title={`AI complete · findings (${findings.length})`} />
                   <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
                     No pest activity or conducive conditions detected in the evidence.
                   </Text>
@@ -387,7 +405,10 @@ export default function InspectionSummaryScreen() {
               const errCount = aiVariant.analysisErrors;
               return (
                 <Card style={{ gap: 8 }}>
-                  <SectionTitle icon="sparkles" title={`AI findings (${findings.length})`} />
+                  <SectionTitle
+                    icon="sparkles"
+                    title={`${errCount > 0 ? "AI partial" : "AI complete"} · findings (${findings.length})`}
+                  />
                   {findings.slice(0, 5).map((f) => <FindingRow key={f.id} finding={f} />)}
                   {errCount > 0 ? (
                     // Completed with some errors but still produced findings — warn without hiding.
@@ -406,13 +427,13 @@ export default function InspectionSummaryScreen() {
               );
             }
 
-            case "loading":
+            case "ai-analyzing":
             default:
               return (
                 <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
-                    Generating report, customer summary, and business insights…
+                    AI analyzing — the inspection is complete and you may leave this screen.
                   </Text>
                 </Card>
               );
@@ -620,6 +641,7 @@ export default function InspectionSummaryScreen() {
           technicianSignature={record.technicianSignature ?? null}
           ownerSignature={record.ownerSignature ?? null}
           ownerNotAvailable={record.ownerNotAvailable ?? false}
+          unitNumber={record.unitNumber ?? null}
         />
 
         <View style={{ gap: 10 }}>
@@ -725,7 +747,7 @@ function DeliverySection({
 
   // Cache the generated PDF URI so subsequent Print / Share / Email taps reuse
   // the same file instead of re-rendering from scratch.
-  const [cachedPdfUri, setCachedPdfUri] = useState<string | null>(null);
+  const [cachedPdf, setCachedPdf] = useState<{ uri: string; serverId: number | null } | null>(null);
 
   // Invalidate the cache whenever the underlying data changes so stale PDFs
   // are never delivered. We track a stable key derived from the fields that
@@ -734,18 +756,19 @@ function DeliverySection({
     () =>
       [
         record.localId,
+        record.serverId ?? "pending-sync",
         record.photos.length,
         record.photos.map((p) => p.description ?? "").join("|"),
         findings.length,
         analysisComplete ? "complete" : "pending",
       ].join("::"),
-    [record.localId, record.photos, findings.length, analysisComplete],
+    [record.localId, record.serverId, record.photos, findings.length, analysisComplete],
   );
   const prevCacheKeyRef = React.useRef(cacheKey);
   useEffect(() => {
     if (prevCacheKeyRef.current !== cacheKey) {
       prevCacheKeyRef.current = cacheKey;
-      setCachedPdfUri(null);
+      setCachedPdf(null);
     }
   }, [cacheKey]);
 
@@ -753,7 +776,7 @@ function DeliverySection({
   // is remounted with different data.
   useEffect(() => {
     return () => {
-      setCachedPdfUri(null);
+      setCachedPdf(null);
     };
   }, []);
 
@@ -801,7 +824,7 @@ function DeliverySection({
   const buildDeliveryContext = async () => {
     // Reuse the cached URI when available — avoids a second render + copy for
     // every Print / Share / Email tap after the technician has already previewed.
-    const pdfUri = cachedPdfUri ?? await (async () => {
+    const pdfUri = cachedPdf?.serverId === record.serverId ? cachedPdf.uri : await (async () => {
       const uri = await generateReportPdf({
         record,
         findings,
@@ -810,7 +833,7 @@ function DeliverySection({
         analysisComplete,
         companyName,
       });
-      setCachedPdfUri(uri);
+      setCachedPdf({ uri, serverId: record.serverId });
       return uri;
     })();
     return { pdfUri, ...buildSoftContext() };

@@ -121,6 +121,7 @@ function toRecordDTO(
     id: r.id,
     imageUrl: r.imageUrl,
     thumbnailUrl: r.thumbnailUrl,
+    mediaType: r.mediaType,
     // Contract guarantees aiPrediction is always present; a row missing it (only
     // possible if AI + fallback both failed at insert) degrades to fallback.
     aiPrediction: r.aiPrediction ?? fallbackPrediction(),
@@ -306,17 +307,21 @@ router.get("/corrections/export", requireRole("manager"), async (req, res) => {
 });
 
 // POST /intelligence-dataset/bulk-ingest — technician+ access.
-// Ingests a batch of pre-uploaded historical photos alongside human-provided
-// metadata directly into the intelligence_records training dataset, bypassing
-// AI analysis (the human IS the label source for historical archives).
+// Ingests a batch of pre-uploaded historical photos and/or videos alongside
+// human-provided metadata directly into the intelligence_records training
+// dataset, bypassing AI analysis (the human IS the label source for
+// historical archives). A batch may mix photos and videos freely — each
+// item carries its own mediaType.
 //
-// Flow the client follows for each image:
+// Flow the client follows for each item:
 //   1. POST /api/storage/uploads/request-url → { uploadURL, objectPath }
 //   2. PUT <file-binary> to uploadURL
-//   3. Collect objectPath and include in this request body.
+//   3. Collect objectPath (+ mediaType) and include in this request body.
 //
 // Each record is created with status="confirmed" (L2 — tech-verified label)
 // and aiPrediction=null (no model ran; human provided the ground truth).
+// Videos are stored and reviewable like photos, but do not run through the
+// single-frame AI vision pipeline (see intelligence-ai.ts).
 // A manager can later upgrade verificationLevel to 4/5 via the review flow.
 const BulkIngestBody = z.object({
   images: z
@@ -324,6 +329,7 @@ const BulkIngestBody = z.object({
       z.object({
         objectPath: z.string().startsWith("/objects/"),
         filename: z.string().optional(),
+        mediaType: z.enum(["photo", "video"]).optional().default("photo"),
       }),
     )
     .min(1)
@@ -366,6 +372,7 @@ router.post("/bulk-ingest", async (req, res) => {
     const values = images.map((img) => ({
       companyId,
       imageUrl: img.objectPath,
+      mediaType: img.mediaType,
       aiPrediction: null,
       aiConfidence: null,
       category: metadata.category,

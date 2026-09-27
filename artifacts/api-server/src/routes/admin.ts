@@ -8,6 +8,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { Router, type IRouter } from "express";
 import type { Request, Response, NextFunction } from "express";
+import rateLimit from "express-rate-limit";
 import { db } from "@workspace/db";
 import { usersTable, companiesTable, analysisResultsTable, type UserRole } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -57,10 +58,23 @@ const requireAdminToken = (req: Request, res: Response, next: NextFunction) => {
   return res.status(403).json({ error: "Valid admin session token required" });
 };
 
+// ── Brute-force limiter for /token-auth ─────────────────────────────────────
+// This endpoint's only credential is SUPER_ADMIN_BOOTSTRAP_TOKEN, and it's
+// reachable with no Clerk session at all — the general apiLimiter (500 req /
+// 15 min, shared with every other endpoint) is far too loose to slow down a
+// dedicated guesser. Cap attempts much tighter, keyed per-IP.
+const tokenAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many admin login attempts, please try again later." },
+});
+
 // ── POST /token-auth ──────────────────────────────────────────────────────────
 // Exchange SUPER_ADMIN_BOOTSTRAP_TOKEN for a short-lived HMAC session token.
 // No Clerk auth required — the bootstrap token IS the credential.
-router.post("/token-auth", async (req, res) => {
+router.post("/token-auth", tokenAuthLimiter, async (req, res) => {
   const envToken = process.env.SUPER_ADMIN_BOOTSTRAP_TOKEN;
   if (!envToken) {
     return res.status(503).json({ error: "Admin access not configured" });

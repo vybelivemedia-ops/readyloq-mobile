@@ -5,6 +5,7 @@ import { logger } from "../lib/logger";
 import {
   companyFieldIntegrationsTable,
   inspectionSyncLogsTable,
+  integrationConflictsTable,
   inspectionsTable,
   analysisResultsTable,
   inspectionMediaTable,
@@ -24,6 +25,11 @@ import {
 import { syncInspectionToExternalSystem, probeIntegrationCredentials } from "../services/field-integration";
 import { sendServSuiteREST } from "../services/integration/adapters/servsuiteAdapter";
 import type { EnterpriseSyncFinding, EnterpriseSyncPayload } from "../types/enterprise-payload";
+import {
+  getPestPacSyncStatus,
+  isPestPacBidirectionalSyncEnabled,
+  pollPestPacInbound,
+} from "../services/integration/pestpac-sync";
 
 /** Duplicate taps within this window (seconds) return the cached result. */
 const SYNC_COOLDOWN_SECONDS = 60;
@@ -40,8 +46,8 @@ const configInputSchema = z
     systemType: z.enum(["pestpac", "fieldroutes", "servsuite"]),
     accountId: z.string().min(1),
     apiKey: z.string().min(1),
-    // FieldRoutes requires both apiKey (authenticationKey) and apiToken
-    // (authenticationToken).  Ignored for PestPac and ServSuite.
+    // FieldRoutes uses apiToken as authenticationToken. PestPac uses it as the
+    // server-managed OAuth bearer access token for guarded location-history reads.
     apiToken: z.string().optional(),
     apiBaseUrl: z.string().url().optional(),
     enabled: z.boolean().optional(),
@@ -743,6 +749,78 @@ router.get("/sync-history", requireRole("owner"), async (req, res) => {
     return res.json({ logs });
   } catch {
     return res.status(500).json({ error: "Failed to fetch sync history" });
+  }
+});
+
+// ─── POST /api/integrations/pestpac/poll ──────────────────────────────────────
+// Starts an operator-requested inbound reconciliation. The request returns
+// immediately; routes, properties, and work orders are processed by the durable
+// queue worker and never block inspection capture/completion.
+router.post("/pestpac/poll", requireRole("owner"), async (req, res) => {
+  if (!isPestPacBidirectionalSyncEnabled()) {
+    return res.status(409).json({
+      error:
+        "PestPac bidirectional sync is awaiting confirmed production contract details.",
+      code: "PESTPAC_CONTRACT_NOT_ACTIVATED",
+    });
+  }
+  const companyId = getCompanyId(req);
+  void pollPestPacInbound(companyId).catch((err) => {
+    logger.warn(
+      { companyId, err },
+      "[integrations/pestpac/poll] background poll failed",
+    );
+  });
+  return res.status(202).json({
+    accepted: true,
+    provider: "pestpac",
+    message: "PestPac reconciliation queued",
+  });
+});
+
+router.get("/pestpac/conflicts", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const conflicts = await db
+      .select({
+        id: integrationConflictsTable.id,
+        entityType: integrationConflictsTable.entityType,
+        localEntityId: integrationConflictsTable.localEntityId,
+        externalId: integrationConflictsTable.externalId,
+        fieldName: integrationConflictsTable.fieldName,
+        localValue: integrationConflictsTable.localValue,
+        externalValue: integrationConflictsTable.externalValue,
+        status: integrationConflictsTable.status,
+        createdAt: integrationConflictsTable.createdAt,
+        resolvedAt: integrationConflictsTable.resolvedAt,
+      })
+      .from(integrationConflictsTable)
+      .where(
+        and(
+          eq(integrationConflictsTable.companyId, companyId),
+          eq(integrationConflictsTable.provider, "pestpac"),
+        ),
+      )
+      .orderBy(desc(integrationConflictsTable.createdAt))
+      .limit(100);
+    return res.json({ conflicts });
+  } catch (err) {
+    logger.error({ err }, "[integrations/pestpac/conflicts] failed");
+    return res.status(500).json({ error: "Failed to load PestPac conflicts" });
+  }
+});
+
+// ─── GET /api/integrations/pestpac/status ─────────────────────────────────────
+// Owner-facing operational health: cursor, queue states, and unresolved
+// conflict count. Credentials and raw external payloads are intentionally
+// omitted.
+router.get("/pestpac/status", requireRole("owner"), async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    return res.json(await getPestPacSyncStatus(companyId));
+  } catch (err) {
+    logger.error({ err }, "[integrations/pestpac/status] failed");
+    return res.status(500).json({ error: "Failed to load PestPac sync status" });
   }
 });
 

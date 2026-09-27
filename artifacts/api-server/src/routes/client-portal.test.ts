@@ -86,8 +86,11 @@ let companyAId: number;
 let companyBId: number;
 let inspectionAId: number;
 let inspectionBId: number;
+let restrictedInspectionAId: number;
 let reportAId: number;
 let reportBId: number;
+let mediaAId: number;
+let restrictedMediaAId: number;
 
 function asUser(id: string | null) {
   authState.userId = id;
@@ -173,6 +176,47 @@ beforeAll(async () => {
     })
     .returning();
   inspectionBId = inspB.id;
+
+  // Company A also has a separate building that PM_USER_A is not authorized
+  // to view. This proves an otherwise-valid property manager cannot use an
+  // inspection ID to fetch evidence outside their address grant.
+  const [restrictedInspection] = await db
+    .insert(inspectionsTable)
+    .values({
+      companyId: companyAId,
+      siteAddress: "99 Restricted Ave, Anytown",
+      technicianName: "Tech A",
+      clientName: "Restricted Client",
+      status: "completed",
+      pestTypes: ["ants"],
+      completedAt,
+    })
+    .returning();
+  restrictedInspectionAId = restrictedInspection.id;
+
+  const [mediaA] = await db
+    .insert(inspectionMediaTable)
+    .values({
+      companyId: companyAId,
+      inspectionId: inspectionAId,
+      mediaType: "photo",
+      url: `/objects/companies/${companyAId}/uploads/client-portal-a-photo.jpg`,
+      filename: "client-portal-a-photo.jpg",
+      caption: "Kitchen evidence",
+    })
+    .returning();
+  mediaAId = mediaA.id;
+
+  const [restrictedMedia] = await db
+    .insert(inspectionMediaTable)
+    .values({
+      companyId: companyAId,
+      inspectionId: restrictedInspectionAId,
+      mediaType: "photo",
+      url: `/objects/companies/${companyAId}/uploads/client-portal-restricted-photo.jpg`,
+    })
+    .returning();
+  restrictedMediaAId = restrictedMedia.id;
 
   // Seed an approved report for each company at the shared address.
   const [repA] = await db
@@ -280,6 +324,64 @@ describe("GET /api/client/buildings/:address/inspections — cross-company isola
     const res = await request(app)
       .get(`/api/client/buildings/${encodeURIComponent("999 Unknown St")}/inspections`);
     expect(res.status).toBe(403);
+  });
+});
+
+describe("GET /api/client/inspections/:inspectionId/media — evidence authorization", () => {
+  it("returns only authorized photo metadata and a client-scoped image URL", async () => {
+    asUser(PM_USER_A);
+    const res = await request(app)
+      .get(`/api/client/inspections/${inspectionAId}/media`)
+      .expect(200);
+
+    expect(res.body).toEqual([
+      expect.objectContaining({
+        id: mediaAId,
+        filename: "client-portal-a-photo.jpg",
+        caption: "Kitchen evidence",
+        imageUrl: `/client/inspections/${inspectionAId}/media/${mediaAId}`,
+      }),
+    ]);
+    expect(res.body[0]).not.toHaveProperty("url");
+    expect(JSON.stringify(res.body)).not.toContain("/objects/companies/");
+  });
+
+  it("does not return another company's evidence at a shared address", async () => {
+    asUser(PM_USER_B);
+    await request(app)
+      .get(`/api/client/inspections/${inspectionAId}/media`)
+      .expect(404);
+  });
+
+  it("does not return evidence from an ungranted address in the same company", async () => {
+    asUser(PM_USER_A);
+    await request(app)
+      .get(`/api/client/inspections/${restrictedInspectionAId}/media`)
+      .expect(403);
+  });
+});
+
+describe("GET /api/client/inspections/:inspectionId/media/:mediaId — evidence bytes", () => {
+  it("streams a photo only for the authorized property", async () => {
+    asUser(PM_USER_A);
+    const res = await request(app)
+      .get(`/api/client/inspections/${inspectionAId}/media/${mediaAId}`)
+      .expect(200);
+
+    expect(res.text).toBe("file-bytes");
+    expect(res.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  it("blocks a different company and an ungranted address from retrieving image bytes", async () => {
+    asUser(PM_USER_B);
+    await request(app)
+      .get(`/api/client/inspections/${inspectionAId}/media/${mediaAId}`)
+      .expect(404);
+
+    asUser(PM_USER_A);
+    await request(app)
+      .get(`/api/client/inspections/${restrictedInspectionAId}/media/${restrictedMediaAId}`)
+      .expect(403);
   });
 });
 

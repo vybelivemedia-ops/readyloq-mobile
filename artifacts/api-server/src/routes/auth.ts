@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { randomBytes } from "node:crypto";
 import { db } from "@workspace/db";
 import {
@@ -11,7 +11,7 @@ import {
   type CompanyInvite,
   type UserRole,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getAuth } from "@clerk/express";
 import { requireAuth, requireClerkAuth, requireRole, requireCompany, requireSuperAdmin } from "../middleware/require-auth";
 
@@ -20,6 +20,43 @@ const router: IRouter = Router();
 // Roles a manager/owner is allowed to grant via an invite. Owner is never
 // invitable (a company has exactly one owner: whoever created it).
 const INVITABLE_ROLES: UserRole[] = ["manager", "sales", "technician"];
+
+async function requireActiveInviteCompany(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const companyIds = new Set<number>();
+  if (req.user?.companyId != null) companyIds.add(req.user.companyId);
+
+  const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+  if (token) {
+    const [invite] = await db
+      .select({ companyId: companyInvitesTable.companyId })
+      .from(companyInvitesTable)
+      .where(eq(companyInvitesTable.token, token))
+      .limit(1);
+    if (invite) companyIds.add(invite.companyId);
+  }
+
+  if (companyIds.size === 0) {
+    next();
+    return;
+  }
+  const companies = await db
+    .select({ accessSuspended: companiesTable.accessSuspended })
+    .from(companiesTable)
+    .where(eq(companiesTable.id, [...companyIds][0]!));
+  if (companies[0]?.accessSuspended) {
+    res.status(403).json({ error: "Company access suspended", code: "company_access_suspended" });
+    return;
+  }
+  if (companyIds.size > 1) {
+    const [target] = await db.select({ accessSuspended: companiesTable.accessSuspended })
+      .from(companiesTable).where(eq(companiesTable.id, [...companyIds][1]!));
+    if (target?.accessSuspended) {
+      res.status(403).json({ error: "Company access suspended", code: "company_access_suspended" });
+      return;
+    }
+  }
+  next();
+}
 
 function slugify(name: string): string {
   const base = name
@@ -419,7 +456,7 @@ router.patch("/me/briefing-email", requireAuth, async (req, res) => {
 });
 
 // ── POST /accept-invite — join a company via token ─────────────────────────────
-router.post("/accept-invite", requireAuth, async (req, res) => {
+router.post("/accept-invite", requireAuth, requireActiveInviteCompany, async (req, res) => {
   const user = req.user!;
   if (user.companyId != null) {
     return res.status(409).json({ error: "You already belong to a company", code: "has_company" });
@@ -440,12 +477,24 @@ router.post("/accept-invite", requireAuth, async (req, res) => {
       return res.status(410).json({ error: "Invite expired", code: "invite_expired" });
     }
 
-    await db.transaction(async (tx) => {
+    const acceptance = await db.transaction(async (tx) => {
+      const [company] = await tx.select({ accessSuspended: companiesTable.accessSuspended })
+        .from(companiesTable).where(eq(companiesTable.id, invite.companyId)).for("update");
+      if (!company) return "invalid_company" as const;
+      if (company.accessSuspended) return "suspended" as const;
+
+      const [lockedUser] = await tx.select({ companyId: usersTable.companyId })
+        .from(usersTable).where(eq(usersTable.id, user.id)).for("update");
+      if (!lockedUser || lockedUser.companyId != null) return "has_company" as const;
+      const [lockedInvite] = await tx.select().from(companyInvitesTable)
+        .where(eq(companyInvitesTable.id, invite.id)).for("update");
+      if (!lockedInvite || lockedInvite.acceptedByUserId != null) return "invite_used" as const;
+      if (lockedInvite.expiresAt && lockedInvite.expiresAt.getTime() < Date.now()) return "invite_expired" as const;
+
       await tx
         .update(usersTable)
         .set({ companyId: invite.companyId, role: invite.role })
         .where(eq(usersTable.id, user.id));
-      // Guard against a race: only consume the invite if still unaccepted.
       await tx
         .update(companyInvitesTable)
         .set({ acceptedByUserId: user.id, acceptedAt: new Date() })
@@ -453,9 +502,26 @@ router.post("/accept-invite", requireAuth, async (req, res) => {
           and(
             eq(companyInvitesTable.id, invite.id),
             eq(companyInvitesTable.token, token),
+            isNull(companyInvitesTable.acceptedByUserId),
           ),
         );
+      return "accepted" as const;
     });
+    if (acceptance === "suspended") {
+      return res.status(403).json({ error: "Company access suspended", code: "company_access_suspended" });
+    }
+    if (acceptance === "has_company") {
+      return res.status(409).json({ error: "You already belong to a company", code: "has_company" });
+    }
+    if (acceptance === "invite_used") {
+      return res.status(409).json({ error: "Invite already used", code: "invite_used" });
+    }
+    if (acceptance === "invite_expired") {
+      return res.status(410).json({ error: "Invite expired", code: "invite_expired" });
+    }
+    if (acceptance !== "accepted") {
+      return res.status(404).json({ error: "Invalid invite", code: "invalid_invite" });
+    }
     req.user!.companyId = invite.companyId;
     req.user!.role = invite.role;
     return res.json({ companyId: invite.companyId, role: invite.role });

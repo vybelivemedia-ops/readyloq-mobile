@@ -196,6 +196,23 @@ export declare const treatmentLogsTable: import("drizzle-orm/pg-core").PgTableWi
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        inventoryDeductedOz: import("drizzle-orm/pg-core").PgColumn<{
+            name: "inventory_deducted_oz";
+            tableName: "treatment_logs";
+            dataType: "number";
+            columnType: "PgReal";
+            data: number;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         equipmentUsed: import("drizzle-orm/pg-core").PgColumn<{
             name: "equipment_used";
             tableName: "treatment_logs";
@@ -331,6 +348,7 @@ export declare const insertTreatmentLogSchema: z.ZodObject<{
     linearFt: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     dilutionOzPerGallon: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     totalProductOz: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    inventoryDeductedOz: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     equipmentUsed: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     checklistItems: z.ZodOptional<z.ZodNullable<z.ZodType<ChecklistItem[], ChecklistItem[], z.core.$ZodTypeInternals<ChecklistItem[], ChecklistItem[]>>>>;
     tempAtApplicationF: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
@@ -513,6 +531,23 @@ export declare const selectTreatmentLogSchema: import("drizzle-zod").BuildSchema
     }, {}, {}>;
     totalProductOz: import("drizzle-orm/pg-core").PgColumn<{
         name: "total_product_oz";
+        tableName: "treatment_logs";
+        dataType: "number";
+        columnType: "PgReal";
+        data: number;
+        driverParam: string | number;
+        notNull: false;
+        hasDefault: false;
+        isPrimaryKey: false;
+        isAutoincrement: false;
+        hasRuntimeDefault: false;
+        enumValues: undefined;
+        baseColumn: never;
+        identity: undefined;
+        generated: undefined;
+    }, {}, {}>;
+    inventoryDeductedOz: import("drizzle-orm/pg-core").PgColumn<{
+        name: "inventory_deducted_oz";
         tableName: "treatment_logs";
         dataType: "number";
         columnType: "PgReal";

@@ -9,7 +9,9 @@
 //   VITE_APP_URL  - origin of the ReadyLoq app (e.g. https://app.readyloq.com).
 //                   Empty = same origin (dev default; app is mounted at "/").
 //   VITE_API_URL  - origin of the API (e.g. https://app.readyloq.com).
-//                   Empty = same origin (dev default; API is proxied at /api).
+//                   Empty = same origin. Development uses the local Vite proxy
+//                   path below so the separate /api artifact cannot intercept
+//                   marketing requests.
 
 const stripTrailingSlash = (s: string): string => s.replace(/\/+$/, "");
 
@@ -25,7 +27,9 @@ export const APP_URL = APP_ORIGIN || "/app/";
 // pass resource paths like "/leads" without worrying about the base.
 export function apiUrl(path: string): string {
   const clean = path.startsWith("/") ? path : `/${path}`;
-  return `${API_ORIGIN}/api${clean}`;
+  if (API_ORIGIN) return `${API_ORIGIN}/api${clean}`;
+  if (import.meta.env.DEV) return `/api-server${clean}`;
+  return `/api${clean}`;
 }
 
 // Resolve a static asset that lives in /public against the site's base path.

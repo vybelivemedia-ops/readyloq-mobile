@@ -302,6 +302,10 @@ export interface InspectionMedia {
   qualityScore?: number | null;
   /** @nullable */
   captureMetadata?: InspectionMediaCaptureMetadata;
+  /** @nullable */
+  unitNumber?: string | null;
+  /** Original capture timestamp supplied by the mobile client. */
+  capturedAt?: string | null;
   createdAt: string;
 }
 
@@ -319,6 +323,8 @@ export interface Inspection {
   severity?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  visitPurpose?: string | null;
   mediaCount?: number;
   findingsCount?: number;
   media?: InspectionMedia[];
@@ -327,6 +333,16 @@ export interface Inspection {
   createdAt: string;
   /** @nullable */
   completedAt?: string | null;
+  /** On-site SVG signature captured by the technician at sign-off. @nullable */
+  technicianSignature?: string | null;
+  /** On-site SVG signature captured by the owner/tenant at sign-off. @nullable */
+  ownerSignature?: string | null;
+  /** True when the owner/tenant was absent and the technician signed on their behalf. */
+  ownerNotAvailable?: boolean;
+  /** ISO timestamp of the first captured signature. @nullable */
+  signedAt?: string | null;
+  /** Unit / apartment number for multi-family properties. @nullable */
+  unitNumber?: string | null;
 }
 
 /**
@@ -355,9 +371,12 @@ export interface CompleteInspectionResult {
 export interface InspectionInput {
   siteAddress: string;
   clientName?: string;
+  /** @nullable */
+  unitNumber?: string | null;
   technicianName: string;
   technicianId?: string;
   notes?: string;
+  visitPurpose?: string;
   pestTypes?: string[];
   /** Client-generated idempotency key (UUID). Retrying a create with the same key returns the previously created inspection (200) instead of duplicating it — required for offline-first sync retries. */
   clientKey?: string;
@@ -369,10 +388,21 @@ export interface InspectionUpdate {
   severity?: string;
   pestTypes?: string[];
   completedAt?: string;
-  technicianSignature?: string;
-  ownerSignature?: string;
+  /** String sets a new signature; null with resignatureConsent: true clears it. */
+  technicianSignature?: string | null;
+  /** String sets a new signature; null with resignatureConsent: true clears it. */
+  ownerSignature?: string | null;
   ownerNotAvailable?: boolean;
   signedAt?: string;
+  /**
+   * Must be true when ownerSignature: null is sent intentionally (re-sign or
+   * owner-not-available flow) to prevent accidentally wiping an existing value.
+   */
+  resignatureConsent?: boolean;
+  /** Unit / apartment number for multi-family properties. */
+  unitNumber?: string | null;
+  /** @nullable */
+  visitPurpose?: string | null;
 }
 
 export type MediaInputCaptureMetadata = { [key: string]: unknown };
@@ -380,12 +410,16 @@ export type MediaInputCaptureMetadata = { [key: string]: unknown };
 export interface MediaInput {
   mediaType: string;
   url: string;
+  /** Original capture timestamp supplied by the mobile client. */
+  capturedAt?: string;
   filename?: string;
   caption?: string;
   durationSec?: number;
   captureSource?: string;
   qualityScore?: number;
   captureMetadata?: MediaInputCaptureMetadata;
+  /** @nullable */
+  unitNumber?: string | null;
 }
 
 export type AnalysisResultVideoEvidenceItem = {
@@ -401,22 +435,39 @@ export type AnalysisResultVideoEvidenceItem = {
 
 export type AnalysisResultPhotoZones = {[key: string]: string};
 
+export type AnalysisResultPhotoOutcomesItemStatus = typeof AnalysisResultPhotoOutcomesItemStatus[keyof typeof AnalysisResultPhotoOutcomesItemStatus];
+
+
+export const AnalysisResultPhotoOutcomesItemStatus = {
+  completed: 'completed',
+  failed: 'failed',
+  deferred: 'deferred',
+  rate_limited: 'rate_limited',
+} as const;
+
+export type AnalysisResultPhotoOutcomesItem = {
+  imagePath: string;
+  status: AnalysisResultPhotoOutcomesItemStatus;
+};
+
 export interface Finding {
   id: number;
   category: string;
   description: string;
   confidence: number;
-  severity?: string;
+  severity: string;
   /** @nullable */
-  location?: string | null;
+  location: string | null;
   /** @nullable */
-  imageUrl?: string | null;
+  imageUrl: string | null;
   /** @nullable */
-  treatment?: string | null;
+  treatment: string | null;
   /** @nullable */
-  exclusionOpportunity?: boolean | null;
+  exclusionOpportunity: boolean | null;
   /** @nullable */
-  evidenceQuality?: string | null;
+  evidenceQuality?: 'excellent' | 'good' | 'fair' | null;
+  /** @nullable */
+  possiblePest?: string | null;
   /** @nullable */
   species?: string | null;
   /** @nullable */
@@ -429,18 +480,28 @@ export interface Finding {
   moisture?: string | null;
   /** @nullable */
   structuralIssue?: string | null;
+  measurementEstimate?: {
+    /** @nullable */
+    linearFt?: number | null;
+    /** @nullable */
+    gapWidthIn?: number | null;
+    /** @nullable */
+    heightFt?: number | null;
+    confidence: number;
+    source: 'ai_vision_estimate';
+  } | null;
   /** @nullable */
   zone?: string | null;
   candidates?: Array<{
     species: string;
     confidence: number;
   }>;
-  /** @nullable */
-  confidenceLabel?: 'identified' | 'possible' | 'unidentified' | null;
-  /** @nullable */
-  reviewStatus?: 'pending' | 'accepted' | 'corrected' | 'dismissed' | null;
+  confidenceLabel?: 'identified' | 'possible' | 'unidentified';
+  reviewStatus?: 'pending' | 'accepted' | 'corrected' | 'dismissed';
   /** @nullable */
   technicianSpecies?: string | null;
+  /** @nullable */
+  technicianCorrectionNotes?: string | null;
 }
 
 export interface CoverageZone {
@@ -576,6 +637,7 @@ export interface AnalysisResult {
   recommendations?: string[];
   videoEvidence?: AnalysisResultVideoEvidenceItem[];
   analyzedImagePaths?: string[];
+  photoOutcomes?: AnalysisResultPhotoOutcomesItem[];
   photoZones?: AnalysisResultPhotoZones;
   coverage?: CoverageSnapshot | null;
   evidence?: EvidenceSummary;
@@ -955,6 +1017,13 @@ export interface AiReportNarrative {
   customerRecommendations?: string[];
 }
 
+export interface ReportEvidenceRecovery {
+  syncedPhotoCount: number;
+  needsRegeneration: boolean;
+  /** @nullable */
+  latestEvidenceAt: string | null;
+}
+
 export interface Report {
   id: number;
   inspectionId: number;
@@ -975,6 +1044,7 @@ export interface Report {
   /** @nullable */
   pdfUrl?: string | null;
   aiNarrative?: null | AiReportNarrative;
+  evidenceRecovery?: ReportEvidenceRecovery;
   createdAt: string;
   /**
    * Estimated annual contract value from the linked sales opportunity,

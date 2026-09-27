@@ -70,6 +70,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@workspace/api-client-react": "workspace:*",
     "@platform/agent-registry": "workspace:*",
     "@platform/camera-core": "workspace:*",
     "@platform/device-core": "workspace:*",
@@ -92,6 +93,7 @@
     "expo-sharing": "~14.0.8",
     "expo-speech": "^14.0.8",
     "expo-task-manager": "14.0.9",
+    "expo-updates": "~29.0.20",
     "jpeg-js": "^0.4.4",
     "react": "19.1.0",
     "react-native": "0.81.5",

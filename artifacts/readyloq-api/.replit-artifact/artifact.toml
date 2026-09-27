@@ -10,16 +10,16 @@ name = "expo"
 version = "1.0.0"
 
 [[services]]
-ensurePreviewReachable = "/status"
+ensurePreviewReachable = "/api/healthz"
 name = "expo"
 paths = [ "/api" ]
 localPort = 23590
 
 [services.development]
-run = "pnpm --filter @workspace/readyloq-api run dev"
+run = "pnpm --filter @workspace/api-server run dev"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/api-server", "run", "build" ]
+build = [ "pnpm", "--filter", "@workspace/api-server", "run", "build:production" ]
 run = [ "pnpm", "--filter", "@workspace/api-server", "run", "start" ]
 
 [services.env]

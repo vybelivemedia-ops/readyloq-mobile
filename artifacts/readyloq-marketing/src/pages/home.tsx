@@ -4,35 +4,35 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Shield, Brain, Users, LineChart, FileText, Smartphone, Ruler } from "lucide-react";
+import { SecurityAuditWidget } from "@/components/security-audit-widget";
+import { FaieAssistant } from "@/components/faie-assistant";
+import { ProductUpdates } from "@/components/product-updates";
 import { asset, apiUrl } from "@/config";
 import { useEffect } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useLocation } from "wouter";
 import type { CurrentUser } from "@/lib/api";
 
-// Redirect super-admins straight to the admin dashboard; redirect signed-in
-// non-admins and unauthenticated visitors to /login.
+// Redirect signed-in super-admins straight to the admin dashboard. Everyone
+// else (signed-in non-admins and anonymous visitors — i.e. every real
+// prospect) sees the public marketing homepage as normal.
 function useAuthRedirect() {
   const { isLoaded, isSignedIn } = useUser();
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !isSignedIn) return;
 
-    if (isSignedIn) {
-      void (async () => {
-        try {
-          const res = await fetch(apiUrl("/me"), { credentials: "include" });
-          if (!res.ok) return;
-          const me = (await res.json()) as CurrentUser;
-          if (me.isSuperAdmin) navigate("/dashboard");
-        } catch {
-          // Show the landing page as normal on error.
-        }
-      })();
-    } else {
-      navigate("/login");
-    }
+    void (async () => {
+      try {
+        const res = await fetch(apiUrl("/me"), { credentials: "include" });
+        if (!res.ok) return;
+        const me = (await res.json()) as CurrentUser;
+        if (me.isSuperAdmin) navigate("/dashboard");
+      } catch {
+        // Show the landing page as normal on error.
+      }
+    })();
   }, [isLoaded, isSignedIn, navigate]);
 }
 
@@ -68,23 +68,24 @@ export default function Home() {
         </div>
         
         <div className="container mx-auto px-4 md:px-6 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-8 items-center max-w-6xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
+              className="text-center lg:text-left"
             >
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30 text-sm font-mono mb-8">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                 The System of Record for Field Operations
               </div>
-              <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
+              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 leading-tight">
                 Don't let your best technicians <span className="text-primary">walk away with your data.</span>
               </h1>
-              <p className="text-xl text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed">
+              <p className="text-xl text-slate-300 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
                 ReadyLoq captures property knowledge, standardizes communication, and turns field expertise into permanent institutional memory.
               </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
                 <Link href="/demo">
                   <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6 h-auto">
                     Request Demo
@@ -96,6 +97,14 @@ export default function Home() {
                   </Button>
                 </Link>
               </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+            >
+              <FaieAssistant />
             </motion.div>
           </div>
         </div>
@@ -236,6 +245,35 @@ export default function Home() {
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <ProductUpdates />
+
+      {/* Security Self-Audit */}
+      <section id="security-audit" className="py-24 bg-slate-50 border-y border-slate-200">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="text-center max-w-3xl mx-auto mb-14">
+            <h2 className="text-sm font-mono text-primary font-bold uppercase tracking-wider mb-3">
+              Security Self-Audit
+            </h2>
+            <h3 className="text-3xl md:text-4xl font-bold mb-6 text-slate-900">
+              How would your current software score?
+            </h3>
+            <p className="text-lg text-slate-600">
+              Answer three questions about your audit trails, chemical custody, and data isolation to get an
+              instant security score — and see exactly where ReadyLoq closes the gaps legacy platforms leave open.
+            </p>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <SecurityAuditWidget />
+          </motion.div>
         </div>
       </section>
 

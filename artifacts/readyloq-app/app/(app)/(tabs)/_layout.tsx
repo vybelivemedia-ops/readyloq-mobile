@@ -100,6 +100,18 @@ export default function TabsLayout() {
         }}
       />
 
+      {/* ── Schedule — technicians see their route; managers see the team ─ */}
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          title: "Schedule",
+          href: show(isTech || isManager),
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar-outline" color={color} size={size} />
+          ),
+        }}
+      />
+
       {/* ── All roles — device pairing needed in field across all roles ─── */}
       <Tabs.Screen
         name="connections"

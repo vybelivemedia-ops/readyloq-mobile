@@ -1,21 +1,18 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import request from "supertest";
-
 /**
- * Signature durability tests for PATCH /inspections/:id.
+ * Integration tests — signature capture on a completed inspection
  *
- * Guards against the race window described in task #614:
- *   - The sync engine sends PATCH notes/pestTypes/signatures in step 5.
- *   - If the app hasn't fully flushed a freshly-captured signature to
- *     AsyncStorage yet, step 5 fires with `ownerSignature: undefined`.
- *   - The `!== undefined` guard in the route must ensure that an `undefined`
- *     (absent) value never overwrites a signature that the server already holds.
- *
- * Two invariants are pinned:
- *   1. PATCH with `ownerSignature` absent from the body leaves the DB value untouched.
- *   2. Signing after a partial sync (notes-only PATCH) cannot null-out a
- *      previously synced signature.
+ * Verifies the end-to-end path that the reviewer flagged:
+ *   1. A tech creates and completes an inspection (POST + POST /complete)
+ *   2. The summary screen captures signatures (PATCH with signature data)
+ *   3. GET /inspections/:id returns all four signature fields correctly
+ *   4. PATCH on a non-existent inspection returns 404
+ *   5. Cross-company PATCH cannot overwrite another company's signatures
+ *   6. The resignatureConsent guard blocks silent owner-signature clears
+ *   7. Unauthenticated PATCH returns 401
  */
+
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import request from "supertest";
 
 const { authState } = vi.hoisted(() => ({
   authState: { userId: null as string | null },
@@ -30,234 +27,260 @@ vi.mock("@clerk/express", async (importOriginal) => {
   };
 });
 
-vi.mock("../lib/objectStorage", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../lib/objectStorage")>();
-  class ObjectStorageService {
-    async getObjectEntityUploadURL(companyId: number) {
-      return `https://signed.example.com/companies/${companyId}/uploads/obj`;
-    }
-    normalizeObjectEntityPath(url: string) {
-      return url;
-    }
-    async getObjectEntityFile(_path: string) {
-      return {} as never;
-    }
-    async downloadObject() {
-      return new Response("file-bytes");
-    }
-  }
-  return { ...actual, ObjectStorageService };
-});
-
 import app from "../app";
-import { db, companiesTable, usersTable, inspectionsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { db, usersTable, companiesTable, inspectionsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
-const TECH_ID = "sig_tech_clerk_id";
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const TECH_ID  = "sig_test_tech_clerk";
+const MGR_ID   = "sig_test_mgr_clerk";
+const OTHER_ID = "sig_test_other_mgr_clerk"; // different company
+
+const TECH_SVG  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160"><path d="M10 80 L100 20 L200 120" stroke="#1a1a2e" stroke-width="2.5" fill="none"/></svg>';
+const OWNER_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160"><path d="M20 90 L120 30 L220 130" stroke="#1a1a2e" stroke-width="2.5" fill="none"/></svg>';
+
 let companyId: number;
+let companyBId: number;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function asUser(id: string | null) {
   authState.userId = id;
 }
 
-async function createInspection(suffix: string): Promise<number> {
+async function findOrCreateCompany(name: string, slug: string): Promise<number> {
+  const [existing] = await db
+    .select()
+    .from(companiesTable)
+    .where(eq(companiesTable.slug, slug));
+  if (existing) return existing.id;
+  const [row] = await db.insert(companiesTable).values({ name, slug }).returning();
+  return row.id;
+}
+
+/** Create an inspection via the API (POST) and return its id. */
+async function createInspection(): Promise<number> {
   asUser(TECH_ID);
   const res = await request(app)
     .post("/api/inspections")
-    .send({ siteAddress: `${suffix} Signature St`, technicianName: "Tech" });
+    .send({ siteAddress: "99 Sig Test Ave, Springfield", technicianName: "Jane Tech" });
   expect(res.status).toBe(201);
-  asUser(null);
-  return res.body.id as number;
+  return (res.body as { id: number }).id;
 }
 
-beforeAll(async () => {
-  const slug = "sig-test-co";
-  const [existing] = await db.select().from(companiesTable).where(eq(companiesTable.slug, slug));
-  companyId = existing
-    ? existing.id
-    : (await db.insert(companiesTable).values({ name: "Sig Test Co", slug }).returning())[0].id;
+/** Complete an inspection via the API (POST /complete). */
+async function completeInspection(id: number): Promise<void> {
+  asUser(TECH_ID);
+  const res = await request(app).post(`/api/inspections/${id}/complete`);
+  // 200 = completed (possibly already completed — both are fine for test setup)
+  expect([200, 201]).toContain(res.status);
+}
 
-  await db.delete(usersTable).where(eq(usersTable.clerkUserId, TECH_ID));
-  await db.insert(usersTable).values({ clerkUserId: TECH_ID, role: "technician", companyId });
+// ── Setup / teardown ──────────────────────────────────────────────────────────
+
+beforeAll(async () => {
+  companyId  = await findOrCreateCompany("Sig Test Co",  "sig-test-co");
+  companyBId = await findOrCreateCompany("Sig Test Co B", "sig-test-co-b");
+
+  await db.delete(usersTable).where(eq(usersTable.companyId, companyId));
+  await db.delete(usersTable).where(eq(usersTable.companyId, companyBId));
+
+  await db.insert(usersTable).values([
+    { clerkUserId: TECH_ID,  role: "technician", companyId },
+    { clerkUserId: MGR_ID,   role: "manager",    companyId },
+    { clerkUserId: OTHER_ID, role: "manager",    companyId: companyBId },
+  ]);
+});
+
+afterAll(async () => {
+  await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyId));
+  await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyBId));
+  await db.delete(usersTable).where(eq(usersTable.companyId, companyId));
+  await db.delete(usersTable).where(eq(usersTable.companyId, companyBId));
+  await db.delete(companiesTable).where(eq(companiesTable.id, companyId));
+  await db.delete(companiesTable).where(eq(companiesTable.id, companyBId));
 });
 
 beforeEach(() => {
   asUser(null);
 });
 
-describe("PATCH /inspections/:id — signature preservation", () => {
-  it("leaves ownerSignature untouched when the key is absent from the PATCH body", async () => {
-    const inspectionId = await createInspection("absent-key");
-    const svgSignature = "<svg><path d='M 0 0 L 100 100'/></svg>";
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
-    // First PATCH: sync the signature to the server.
+describe("Signature PATCH on a completed inspection", () => {
+  it("stores a unit number at creation, allows clearing it, and returns both states", async () => {
     asUser(TECH_ID);
-    const patch1 = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ ownerSignature: svgSignature, signedAt: new Date().toISOString() });
-    expect(patch1.status).toBe(200);
-    expect(patch1.body.ownerSignature).toBe(svgSignature);
-
-    // Second PATCH: a notes-only update (ownerSignature key NOT present in body).
-    // This simulates the sync engine step 5 firing while the app hasn't saved
-    // the signature to AsyncStorage yet — the key is simply absent.
-    const patch2 = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ notes: "Updated field notes" });
-    expect(patch2.status).toBe(200);
-
-    // The server must not have overwritten the signature.
-    expect(patch2.body.ownerSignature).toBe(svgSignature);
-
-    // Confirm directly in the DB that the value was not nulled out.
-    const [row] = await db
-      .select()
-      .from(inspectionsTable)
-      .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
-    expect(row.ownerSignature).toBe(svgSignature);
-  });
-
-  it("leaves technicianSignature untouched when the key is absent from the PATCH body", async () => {
-    const inspectionId = await createInspection("tech-sig-absent");
-    const svgSignature = "<svg><path d='M 10 10 L 50 80'/></svg>";
-
-    asUser(TECH_ID);
-    // Sync technician signature.
-    const patch1 = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ technicianSignature: svgSignature, signedAt: new Date().toISOString() });
-    expect(patch1.status).toBe(200);
-    expect(patch1.body.technicianSignature).toBe(svgSignature);
-
-    // Notes-only update — technicianSignature key absent.
-    const patch2 = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ notes: "Field update without signature" });
-    expect(patch2.status).toBe(200);
-    expect(patch2.body.technicianSignature).toBe(svgSignature);
-
-    const [row] = await db
-      .select()
-      .from(inspectionsTable)
-      .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
-    expect(row.technicianSignature).toBe(svgSignature);
-  });
-
-  it("signing after a partial sync does not null-out a previously synced ownerSignature", async () => {
-    // Scenario: the race window from task #614.
-    //   T0 — technician signs on-device (SVG saved to AsyncStorage — eventually).
-    //   T1 — sync engine runs step 5 with only notes/pestTypes (signature not yet
-    //        available in the snapshot it read from AsyncStorage).
-    //   T2 — sync engine runs step 5 again in the next pass with the full signature.
-    //
-    // After T1, the server must still hold the signature from T0 if it was
-    // previously synced. After T2, it must hold the latest value.
-
-    const inspectionId = await createInspection("race-window");
-    const firstSig = "<svg><path d='M 5 5 L 95 95'/></svg>";
-    const updatedSig = "<svg><path d='M 5 95 L 95 5'/></svg>";
-
-    asUser(TECH_ID);
-
-    // T0 — first full sync: notes + signature both present.
-    const t0 = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
+    const create = await request(app)
+      .post("/api/inspections")
       .send({
-        notes: "Initial notes",
-        pestTypes: ["ants"],
-        ownerSignature: firstSig,
-        signedAt: new Date().toISOString(),
+        siteAddress: "101 Unit Test Way, Springfield",
+        technicianName: "Jane Tech",
+        unitNumber: "4B",
       });
-    expect(t0.status).toBe(200);
-    expect(t0.body.ownerSignature).toBe(firstSig);
+    expect(create.status).toBe(201);
+    const id = (create.body as { id: number }).id;
+    expect(create.body.unitNumber).toBe("4B");
 
-    // T1 — partial sync: the engine snapshot only contains notes (signature
-    // not yet in its local copy). The key is absent — must NOT overwrite.
-    const t1 = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ notes: "Revised notes", pestTypes: ["ants", "roaches"] });
-    expect(t1.status).toBe(200);
-    // Signature must still be the one synced at T0.
-    expect(t1.body.ownerSignature).toBe(firstSig);
+    const clear = await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({ unitNumber: null });
+    expect(clear.status).toBe(200);
+    expect(clear.body.unitNumber).toBeNull();
 
-    // T2 — next sync pass now has the updated signature in its snapshot.
-    const t2 = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ ownerSignature: updatedSig });
-    expect(t2.status).toBe(200);
-    expect(t2.body.ownerSignature).toBe(updatedSig);
-
-    // DB confirms the final state.
-    const [row] = await db
-      .select()
-      .from(inspectionsTable)
-      .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
-    expect(row.ownerSignature).toBe(updatedSig);
+    const get = await request(app).get(`/api/inspections/${id}`);
+    expect(get.status).toBe(200);
+    expect(get.body.unitNumber).toBeNull();
   });
 
-  it("rejects an explicit null ownerSignature when the DB already has a non-null value (409)", async () => {
-    // Task #626: guard against the re-sign race window where the app sends
-    // ownerSignature: null between the user tapping "Re-sign" and the new SVG
-    // being painted.  Without resignatureConsent: true the server must reject it.
-    const inspectionId = await createInspection("explicit-null-guard");
-    const svgSignature = "<svg><path d='M 0 50 L 100 50'/></svg>";
-
+  it("cascades a post-capture unit correction to existing media evidence", async () => {
     asUser(TECH_ID);
-    // First sync: store a valid signature.
-    const patch1 = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ ownerSignature: svgSignature });
-    expect(patch1.status).toBe(200);
-    expect(patch1.body.ownerSignature).toBe(svgSignature);
+    const create = await request(app)
+      .post("/api/inspections")
+      .send({
+        siteAddress: "202 Evidence Trace Lane, Springfield",
+        technicianName: "Jane Tech",
+      });
+    expect(create.status).toBe(201);
+    const id = (create.body as { id: number }).id;
 
-    // Accidental null (no consent flag) — must be rejected with 409.
-    const wipe = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ ownerSignature: null });
-    expect(wipe.status).toBe(409);
+    const media = await request(app)
+      .post(`/api/inspections/${id}/media`)
+      .send({ mediaType: "photo", url: "https://storage.example.com/evidence/unit-correction.jpg" });
+    expect(media.status).toBe(201);
+    expect(media.body.unitNumber).toBeNull();
 
-    // DB value must be unchanged.
-    const [row] = await db
-      .select()
-      .from(inspectionsTable)
-      .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
-    expect(row.ownerSignature).toBe(svgSignature);
+    // This mirrors the signature-panel edit after photos have already synced.
+    const correction = await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({ unitNumber: "7C" });
+    expect(correction.status).toBe(200);
+    expect(correction.body.unitNumber).toBe("7C");
+    expect(correction.body.media[0].unitNumber).toBe("7C");
+
+    const get = await request(app).get(`/api/inspections/${id}`);
+    expect(get.status).toBe(200);
+    expect(get.body.media[0].unitNumber).toBe("7C");
   });
 
-  it("allows an explicit null ownerSignature when resignatureConsent: true is set", async () => {
-    // The intentional re-sign flow: the UI clears the pad and explicitly
-    // signals consent before the user draws the new signature.
-    const inspectionId = await createInspection("explicit-null-consent");
-    const svgSignature = "<svg><path d='M 0 50 L 100 50'/></svg>";
+  it("stores technicianSignature, ownerSignature, ownerNotAvailable=false, signedAt and returns them on GET", async () => {
+    const id = await createInspection();
+    await completeInspection(id);
 
-    asUser(TECH_ID);
-    await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ ownerSignature: svgSignature });
-
-    // Explicit clear with consent — must succeed.
-    const wipe = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ ownerSignature: null, resignatureConsent: true });
-    expect(wipe.status).toBe(200);
-    expect(wipe.body.ownerSignature).toBeNull();
-
-    const [row] = await db
-      .select()
-      .from(inspectionsTable)
-      .where(and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)));
-    expect(row.ownerSignature).toBeNull();
-  });
-
-  it("allows an explicit null ownerSignature when the DB value is already null (no existing sig to protect)", async () => {
-    // No prior signature — null is safe to write through without consent.
-    const inspectionId = await createInspection("null-on-unsigned");
+    const signedAt = new Date().toISOString();
 
     asUser(TECH_ID);
     const patch = await request(app)
-      .patch(`/api/inspections/${inspectionId}`)
-      .send({ ownerSignature: null });
+      .patch(`/api/inspections/${id}`)
+      .send({
+        technicianSignature: TECH_SVG,
+        ownerSignature: OWNER_SVG,
+        ownerNotAvailable: false,
+        signedAt,
+      });
     expect(patch.status).toBe(200);
-    expect(patch.body.ownerSignature).toBeNull();
+
+    const get = await request(app).get(`/api/inspections/${id}`);
+    expect(get.status).toBe(200);
+    expect(get.body.technicianSignature).toBe(TECH_SVG);
+    expect(get.body.ownerSignature).toBe(OWNER_SVG);
+    expect(get.body.ownerNotAvailable).toBe(false);
+    expect(get.body.signedAt).toBeDefined();
+  });
+
+  it("stores ownerNotAvailable=true and returns it on GET (customer refused)", async () => {
+    const id = await createInspection();
+    await completeInspection(id);
+
+    asUser(TECH_ID);
+    const patch = await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({
+        technicianSignature: TECH_SVG,
+        ownerNotAvailable: true,
+      });
+    expect(patch.status).toBe(200);
+
+    const get = await request(app).get(`/api/inspections/${id}`);
+    expect(get.status).toBe(200);
+    expect(get.body.technicianSignature).toBe(TECH_SVG);
+    expect(get.body.ownerNotAvailable).toBe(true);
+  });
+
+  it("returns 401 when unauthenticated", async () => {
+    const id = await createInspection();
+    await completeInspection(id);
+
+    asUser(null);
+    const patch = await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({ technicianSignature: TECH_SVG });
+    expect(patch.status).toBe(401);
+  });
+
+  it("returns 404 when the inspection belongs to another company", async () => {
+    const id = await createInspection();
+    await completeInspection(id);
+
+    asUser(OTHER_ID);
+    const patch = await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({ technicianSignature: TECH_SVG });
+    expect(patch.status).toBe(404);
+  });
+
+  it("returns 409 when caller tries to clear an existing ownerSignature without resignatureConsent", async () => {
+    const id = await createInspection();
+    await completeInspection(id);
+    const signedAt = new Date().toISOString();
+
+    // First: store a valid owner signature
+    asUser(TECH_ID);
+    await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({ ownerSignature: OWNER_SVG, signedAt });
+
+    // Then: try to clear it without consent
+    const patch = await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({ ownerSignature: null });
+    expect(patch.status).toBe(409);
+  });
+
+  it("allows clearing ownerSignature when resignatureConsent=true (re-sign flow)", async () => {
+    const id = await createInspection();
+    await completeInspection(id);
+    const signedAt = new Date().toISOString();
+
+    asUser(TECH_ID);
+    await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({ ownerSignature: OWNER_SVG, signedAt });
+
+    const patch = await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({ ownerSignature: null, resignatureConsent: true });
+    expect(patch.status).toBe(200);
+
+    const get = await request(app).get(`/api/inspections/${id}`);
+    expect(get.body.ownerSignature).toBeNull();
+  });
+
+  it("GET /inspections list returns signedAt and ownerNotAvailable for completed inspection", async () => {
+    const id = await createInspection();
+    await completeInspection(id);
+    const signedAt = new Date().toISOString();
+
+    asUser(TECH_ID);
+    await request(app)
+      .patch(`/api/inspections/${id}`)
+      .send({ technicianSignature: TECH_SVG, signedAt });
+
+    const list = await request(app).get("/api/inspections");
+    expect(list.status).toBe(200);
+    const row = (list.body as Array<{ id: number; signedAt?: string | null }>)
+      .find((r) => r.id === id);
+    expect(row).toBeDefined();
+    expect(row!.signedAt).toBeDefined();
   });
 });

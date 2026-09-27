@@ -11,6 +11,7 @@
  */
 
 import { Router } from "express";
+import { Readable } from "stream";
 import { db } from "@workspace/db";
 import {
   clientPortalAccessTable,
@@ -26,8 +27,15 @@ import { z } from "zod";
 import { requireCompany, requireRole } from "../middleware/require-auth";
 import { buildServerReportHtml, buildFindingImageMap } from "../lib/report-html-server";
 import { messageBus } from "../lib/message-bus";
+import {
+  ObjectNotFoundError,
+  ObjectStorageService,
+  objectPathCompanyScope,
+} from "../lib/objectStorage";
 
 const router = Router();
+const objectStorageService = new ObjectStorageService();
+const clientPhotoMediaTypes = ["photo", "image"];
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
@@ -165,6 +173,176 @@ router.get("/buildings/:address/inspections", async (req, res) => {
       ownerSigned: ownerSignature !== null,
     })),
   );
+});
+
+// ─── GET /client/inspections/:inspectionId/media ─────────────────────────────
+// Lists photo metadata for an authorized inspection. Storage paths are never
+// exposed to clients; each item receives a client-scoped image URL that checks
+// access again before it streams the bytes.
+
+router.get("/inspections/:inspectionId/media", async (req, res) => {
+  const access = await getClientAccess(req);
+  if (!access) return res.status(401).json({ error: "No client portal access" });
+
+  const inspectionId = Number(req.params.inspectionId);
+  if (!Number.isInteger(inspectionId) || inspectionId <= 0) {
+    return res.status(400).json({ error: "Invalid inspection id" });
+  }
+
+  const [inspection] = await db
+    .select({
+      id: inspectionsTable.id,
+      siteAddress: inspectionsTable.siteAddress,
+    })
+    .from(inspectionsTable)
+    .where(
+      and(
+        eq(inspectionsTable.id, inspectionId),
+        eq(inspectionsTable.companyId, access.companyId),
+      ),
+    );
+
+  // Keep cross-company inspection IDs indistinguishable from missing IDs.
+  if (!inspection) return res.status(404).json({ error: "Inspection not found" });
+  if (!access.siteAddresses.includes(inspection.siteAddress)) {
+    return res.status(403).json({ error: "Access denied to this building" });
+  }
+
+  const mediaRows = await db
+    .select({
+      id: inspectionMediaTable.id,
+      mediaType: inspectionMediaTable.mediaType,
+      filename: inspectionMediaTable.filename,
+      caption: inspectionMediaTable.caption,
+      captureSource: inspectionMediaTable.captureSource,
+      qualityScore: inspectionMediaTable.qualityScore,
+      zoomSubject: inspectionMediaTable.zoomSubject,
+      createdAt: inspectionMediaTable.createdAt,
+    })
+    .from(inspectionMediaTable)
+    .where(
+      and(
+        eq(inspectionMediaTable.inspectionId, inspection.id),
+        eq(inspectionMediaTable.companyId, access.companyId),
+        inArray(inspectionMediaTable.mediaType, clientPhotoMediaTypes),
+      ),
+    )
+    .orderBy(asc(inspectionMediaTable.createdAt));
+
+  return res.json(
+    mediaRows.map((media) => ({
+      id: media.id,
+      mediaType: media.mediaType,
+      filename: media.filename,
+      caption: media.caption,
+      captureSource: media.captureSource,
+      qualityScore: media.qualityScore,
+      zoomSubject: media.zoomSubject,
+      capturedAt: media.createdAt.toISOString(),
+      imageUrl: `/client/inspections/${inspection.id}/media/${media.id}`,
+    })),
+  );
+});
+
+// ─── GET /client/inspections/:inspectionId/media/:mediaId ───────────────────
+// Streams a single evidence image after re-authorizing the inspection and
+// building. This is intentionally separate from /storage/objects, which is
+// restricted to internal company users rather than external property managers.
+
+router.get("/inspections/:inspectionId/media/:mediaId", async (req, res): Promise<void> => {
+  const access = await getClientAccess(req);
+  if (!access) {
+    res.status(401).json({ error: "No client portal access" });
+    return;
+  }
+
+  const inspectionId = Number(req.params.inspectionId);
+  const mediaId = Number(req.params.mediaId);
+  if (
+    !Number.isInteger(inspectionId) ||
+    inspectionId <= 0 ||
+    !Number.isInteger(mediaId) ||
+    mediaId <= 0
+  ) {
+    res.status(400).json({ error: "Invalid evidence id" });
+    return;
+  }
+
+  const [inspection] = await db
+    .select({
+      id: inspectionsTable.id,
+      siteAddress: inspectionsTable.siteAddress,
+    })
+    .from(inspectionsTable)
+    .where(
+      and(
+        eq(inspectionsTable.id, inspectionId),
+        eq(inspectionsTable.companyId, access.companyId),
+      ),
+    );
+
+  if (!inspection) {
+    res.status(404).json({ error: "Evidence not found" });
+    return;
+  }
+  if (!access.siteAddresses.includes(inspection.siteAddress)) {
+    res.status(403).json({ error: "Access denied to this building" });
+    return;
+  }
+
+  const [media] = await db
+    .select({ url: inspectionMediaTable.url })
+    .from(inspectionMediaTable)
+    .where(
+      and(
+        eq(inspectionMediaTable.id, mediaId),
+        eq(inspectionMediaTable.inspectionId, inspection.id),
+        eq(inspectionMediaTable.companyId, access.companyId),
+        inArray(inspectionMediaTable.mediaType, clientPhotoMediaTypes),
+      ),
+    );
+
+  if (!media) {
+    res.status(404).json({ error: "Evidence not found" });
+    return;
+  }
+
+  // Old clients sometimes persisted a display path (/api/storage/objects/…).
+  // Normalize both display and canonical storage forms before verifying tenant
+  // ownership and reading the private object.
+  const storagePath = objectStorageService
+    .normalizeObjectEntityPath(media.url)
+    .replace(/^\/api\/storage/, "");
+  if (objectPathCompanyScope(storagePath) !== access.companyId) {
+    res.status(404).json({ error: "Evidence not found" });
+    return;
+  }
+
+  try {
+    const objectFile = await objectStorageService.getObjectEntityFile(storagePath);
+    const response = await objectStorageService.downloadObject(objectFile);
+
+    res.status(response.status);
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    // Authorization can be revoked at any time, so a browser must re-check
+    // the client-scoped route before every evidence view.
+    res.setHeader("Cache-Control", "private, no-store");
+
+    if (response.body) {
+      Readable.fromWeb(response.body as ReadableStream<Uint8Array>).pipe(res);
+    } else {
+      res.end();
+    }
+    return;
+  } catch (error) {
+    if (error instanceof ObjectNotFoundError) {
+      res.status(404).json({ error: "Evidence not found" });
+      return;
+    }
+    req.log.error({ err: error }, "Error serving client evidence");
+    res.status(500).json({ error: "Failed to load evidence" });
+    return;
+  }
 });
 
 // ─── GET /client/buildings/:address/reports ───────────────────────────────────

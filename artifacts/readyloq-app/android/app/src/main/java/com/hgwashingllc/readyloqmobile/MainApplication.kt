@@ -12,6 +12,7 @@ import com.facebook.react.ReactHost
 import com.facebook.react.common.ReleaseLevel
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint
 import com.facebook.react.defaults.DefaultReactNativeHost
+import com.meta.wearable.dat.core.Wearables
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
@@ -23,8 +24,10 @@ class MainApplication : Application(), ReactApplication {
       object : DefaultReactNativeHost(this) {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
-              // Packages that cannot be autolinked yet can be added manually here, for example:
-              // add(MyReactNativePackage())
+              // DAT is an Android-only local bridge, so Expo autolinking does
+              // not discover it. Consumer Meta glasses use this official SDK,
+              // not the custom ReadyLoq BLE protocol.
+              add(MetaWearablesPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
@@ -48,6 +51,9 @@ class MainApplication : Application(), ReactApplication {
     }
     loadReactNative(this)
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
+    Wearables.initialize(this).onFailure { error, _ ->
+      android.util.Log.w("ReadyLoq", "Meta Wearables initialization failed: ${error.description}")
+    }
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {

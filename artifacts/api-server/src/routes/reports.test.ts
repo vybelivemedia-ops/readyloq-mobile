@@ -274,6 +274,56 @@ describe("empty-findings shape guarantee", () => {
 // ─── Narrative generation — empty findings ────────────────────────────────────
 
 describe("generate-narrative — empty findings", () => {
+  it("offers recovery after photos sync late and clears it after regeneration", async () => {
+    asUser(OWNER_ID);
+    const createRes = await request(app)
+      .post("/api/reports")
+      .send({
+        inspectionId,
+        title: "Late-photo recovery test",
+        includeAiFindings: false,
+      });
+    expect(createRes.status).toBe(201);
+    const reportId: number = createRes.body.id;
+
+    await db
+      .update(reportsTable)
+      .set({ aiNarrative: STUB_NARRATIVE })
+      .where(eq(reportsTable.id, reportId));
+    await db.insert(inspectionMediaTable).values({
+      companyId,
+      inspectionId,
+      mediaType: "photo",
+      url: "/objects/late-synced-photo.jpg",
+      filename: "late-synced-photo.jpg",
+      createdAt: new Date("2026-09-14T12:00:00.000Z"),
+    });
+
+    const beforeRedo = await request(app).get(`/api/reports/${reportId}`);
+    expect(beforeRedo.status).toBe(200);
+    expect(beforeRedo.body.evidenceRecovery).toEqual({
+      syncedPhotoCount: 1,
+      needsRegeneration: true,
+      latestEvidenceAt: "2026-09-14T12:00:00.000Z",
+    });
+
+    vi.mocked(reportNarrativeAi.generateReportNarrative).mockResolvedValueOnce({
+      ...STUB_NARRATIVE,
+      generatedAt: "2100-01-01T00:00:00.000Z",
+    });
+    const redo = await request(app)
+      .post(`/api/reports/${reportId}/generate-narrative`)
+      .send({ refreshFindings: true });
+    expect(redo.status).toBe(200);
+
+    const afterRedo = await request(app).get(`/api/reports/${reportId}`);
+    expect(afterRedo.status).toBe(200);
+    expect(afterRedo.body.evidenceRecovery).toMatchObject({
+      syncedPhotoCount: 1,
+      needsRegeneration: false,
+    });
+  });
+
   it("returns 200, persists aiNarrative object, and calls generator with findings: []", async () => {
     // Reset call history so we can assert on this specific invocation
     vi.mocked(reportNarrativeAi.generateReportNarrative).mockClear();

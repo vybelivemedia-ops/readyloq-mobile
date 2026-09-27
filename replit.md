@@ -157,6 +157,7 @@ Required env: `DATABASE_URL` (Postgres), `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_
 
 ## Gotchas
 
+- **API client convention:** `readyloq-app`'s schedule/products/treatment-log/daily-rig features intentionally stay on hand-written `lib/api-client/*.ts` fetchers, never the frozen `lib/api-client/generated/` fork (see `.agents/memory/mobile-generated-api-client-fork.md`). `readyloq-portal`'s equivalent hooks (`src/hooks/use-schedule.ts`) DO use `@workspace/api-client-react`'s generated functions internally, wrapped in local hooks so query keys/behavior stay stable — follow whichever pattern already exists in the file you're editing.
 - `readyloq-mobile/` is a decoy — the real app is `artifacts/readyloq-app`.
 - `expo-file-system` legacy imports must use `expo-file-system/legacy` for `documentDirectory`.
 - Metro `watchFolders` excludes `.pnpm` to avoid ENOSPC on large dependency trees.

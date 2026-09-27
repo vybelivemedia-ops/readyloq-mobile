@@ -2,10 +2,15 @@ import {
   useGetInspection,
   useGetInspectionScorecard,
   useGetCustomerSummaryForInspection,
+  useListAnalysisResults,
   getGetInspectionQueryKey,
+  getListAnalysisResultsQueryKey,
   getGetInspectionScorecardQueryKey,
   getGetCustomerSummaryForInspectionQueryKey,
 } from '@workspace/api-client-react';
+import type { PhotoMeta } from '@/lib/photo-meta';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'wouter';
 import { Loader2, ArrowLeft, Bug, MapPin, Calendar, User, ShieldAlert, PenLine, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -18,9 +23,17 @@ import {
   SYSTEM_LABELS,
 } from '@/hooks/use-integrations';
 import { Button } from '@/components/ui/button';
+import { PhotoLightbox } from '@/components/PhotoLightbox';
+import { apiUrl, mediaUrl } from '@/config';
+import { formatMediaTileTimestamp, getMediaTimestamp } from '@/lib/media-time';
+
+function formatDateTime(value: string | null | undefined, pattern: string, fallback = 'Not recorded'): string {
+  const date = new Date(value ?? '');
+  return Number.isNaN(date.getTime()) ? fallback : format(date, pattern);
+}
 
 // Concrete inspection shape — includes all fields the API returns plus the
-// new signature columns that are not yet in the generated client types.
+// new columns that are not yet in the generated client types.
 interface InspectionWithSignatures {
   id: number;
   siteAddress: string;
@@ -37,6 +50,18 @@ interface InspectionWithSignatures {
   ownerSignature?: string | null;
   ownerNotAvailable?: boolean;
   signedAt?: string | null;
+  /** Unit / apartment number for multi-family properties. */
+  unitNumber?: string | null;
+  media?: Array<{
+    id: number;
+    mediaType: string;
+    url: string;
+    caption?: string | null;
+    captureMetadata?: Record<string, unknown> | null;
+    unitNumber?: string | null;
+    createdAt: string;
+    capturedAt?: string | null;
+  }>;
 }
 
 function SignatureBlock({
@@ -118,7 +143,7 @@ function IntegrationSyncCard({ inspectionId, inspectionStatus }: { inspectionId:
               </span>
             )}
             <span className="text-xs text-muted-foreground">
-              {format(new Date(lastSync.syncedAt), "MMM d, yyyy 'at' h:mm a")}
+              {formatDateTime(lastSync.syncedAt, "MMM d, yyyy 'at' h:mm a")}
             </span>
             {!lastSync.success && lastSync.errorMessage && (
               <p className="w-full text-xs text-muted-foreground truncate">{lastSync.errorMessage}</p>
@@ -148,21 +173,78 @@ function IntegrationSyncCard({ inspectionId, inspectionStatus }: { inspectionId:
 export function InspectionDetail() {
   const { me } = useAuth();
   const params = useParams();
-  const id = Number(params.id);
+  const rawId = params.id ?? '';
+  const id = /^\d+$/.test(rawId) ? Number(rawId) : 0;
+  const hasValidId = Number.isSafeInteger(id) && id > 0;
 
   const { data: _inspection, isLoading: isLoadingInsp } = useGetInspection(id, {
-    query: { queryKey: getGetInspectionQueryKey(id), enabled: !!id },
+    query: { queryKey: getGetInspectionQueryKey(id), enabled: hasValidId },
+  });
+  const { data: freshInspection } = useQuery<InspectionWithSignatures>({
+    queryKey: ['inspection-gallery-media', id],
+    enabled: hasValidId,
+    queryFn: async () => {
+      const response = await fetch(apiUrl(`/inspections/${id}`), { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to load inspection media');
+      return response.json() as Promise<InspectionWithSignatures>;
+    },
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const inspection = _inspection as unknown as InspectionWithSignatures | undefined;
+  const inspection = (freshInspection ?? _inspection) as InspectionWithSignatures | undefined;
   const { data: scorecard, isLoading: isLoadingScore } = useGetInspectionScorecard(id, {
-    query: { queryKey: getGetInspectionScorecardQueryKey(id), enabled: !!id },
+    query: { queryKey: getGetInspectionScorecardQueryKey(id), enabled: hasValidId },
   });
   const { data: summary, isLoading: isLoadingSum } = useGetCustomerSummaryForInspection(id, {
-    query: { queryKey: getGetCustomerSummaryForInspectionQueryKey(id), enabled: !!id },
+    query: { queryKey: getGetCustomerSummaryForInspectionQueryKey(id), enabled: hasValidId },
   });
+  const { data: analyses } = useListAnalysisResults(
+    { inspectionId: id },
+    { query: { queryKey: getListAnalysisResultsQueryKey({ inspectionId: id }), enabled: hasValidId } },
+  );
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const photoMeta = useMemo<PhotoMeta[]>(() => {
+    const findings = analyses?.[0]?.findings ?? [];
+    return (inspection?.media ?? [])
+      .filter((media) => !['video', 'audio', 'voice'].includes(media.mediaType))
+      .map((media) => {
+        const finding = findings.find((candidate) => candidate.imageUrl === media.url);
+        const metadata = media.captureMetadata ?? {};
+        const reviewFinding = finding as (typeof finding & {
+          reviewStatus?: string | null;
+          technicianSpecies?: string | null;
+        }) | undefined;
+        const correction = reviewFinding?.reviewStatus === 'corrected' ? reviewFinding.technicianSpecies : null;
+        const metadataTag = typeof metadata.classification === 'string' ? metadata.classification : null;
+        return {
+          id: media.id,
+          url: media.url,
+          classificationTag: correction ?? finding?.species ?? finding?.category ?? metadataTag ?? 'Unclassified',
+          confidenceScore: finding?.confidence ?? null,
+          technicianCorrectionLabel: correction ?? null,
+          structuredDescription: finding?.description ?? media.caption ?? null,
+          chemicalLogReference: finding?.treatment ?? null,
+          unitNumber: media.unitNumber ?? inspection?.unitNumber ?? null,
+          capturedAt: getMediaTimestamp(media.capturedAt, media.createdAt),
+        };
+      });
+  }, [analyses, inspection]);
+  const mediaTimestamps = useMemo(() => photoMeta.map((photo) => photo.capturedAt), [photoMeta]);
 
-  const isLoading = isLoadingInsp || isLoadingScore || isLoadingSum;
+  // Evidence must remain reviewable even when optional scorecard or customer
+  // summary jobs are still pending (or unavailable for a legacy inspection).
+  // Only the inspection record itself gates the page shell.
+  const isLoading = isLoadingInsp;
+
+  if (!hasValidId) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <p>Inspection link is invalid or incomplete.</p>
+        <Link href="/inspections" className="mt-3 inline-flex text-sm text-primary hover:underline">
+          Back to Inspections
+        </Link>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -175,6 +257,7 @@ export function InspectionDetail() {
   if (!inspection) {
     return <div className="p-8 text-center text-muted-foreground">Inspection not found.</div>;
   }
+  const inspectionStatus = inspection.status || 'in_progress';
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-8">
@@ -185,20 +268,23 @@ export function InspectionDetail() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{inspection.siteAddress}</h1>
+            {inspection.unitNumber && (
+              <p className="text-sm font-semibold text-primary/80 mt-0.5">Unit {inspection.unitNumber}</p>
+            )}
             {inspection.clientName && <p className="text-lg text-muted-foreground mt-1">{inspection.clientName}</p>}
           </div>
           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium capitalize ${
-            inspection.status === 'completed' ? 'bg-green-500/10 text-green-500' :
-            inspection.status === 'in_progress' ? 'bg-blue-500/10 text-blue-500' :
+            inspectionStatus === 'completed' ? 'bg-green-500/10 text-green-500' :
+            inspectionStatus === 'in_progress' ? 'bg-blue-500/10 text-blue-500' :
             'bg-muted text-muted-foreground'
           }`}>
-            {inspection.status.replace('_', ' ')}
+            {inspectionStatus.replace('_', ' ')}
           </span>
         </div>
       </div>
 
       {me?.effectiveRole === 'owner' && (
-        <IntegrationSyncCard inspectionId={inspection.id} inspectionStatus={inspection.status} />
+        <IntegrationSyncCard inspectionId={inspection.id} inspectionStatus={inspectionStatus} />
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -213,7 +299,7 @@ export function InspectionDetail() {
           <div className="p-2 bg-primary/10 text-primary rounded-lg"><Calendar className="w-5 h-5" /></div>
           <div>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Date</p>
-            <p className="font-semibold mt-0.5 text-sm">{format(new Date(inspection.createdAt), "MMM d, yyyy 'at' h:mm a")}</p>
+            <p className="font-semibold mt-0.5 text-sm">{formatDateTime(inspection.createdAt, "MMM d, yyyy 'at' h:mm a")}</p>
           </div>
         </div>
         <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3 shadow-sm">
@@ -240,7 +326,7 @@ export function InspectionDetail() {
             <h2 className="text-base font-semibold">Signatures</h2>
             {inspection.signedAt && (
               <span className="ml-auto text-xs text-muted-foreground">
-                Signed {format(new Date(inspection.signedAt), "MMM d, yyyy 'at' h:mm a")}
+                Signed {formatDateTime(inspection.signedAt, "MMM d, yyyy 'at' h:mm a")}
               </span>
             )}
           </div>
@@ -282,12 +368,38 @@ export function InspectionDetail() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold mb-4">Media ({inspection.mediaCount ?? 0})</h2>
+            <h2 className="text-xl font-bold mb-4">Media ({photoMeta.length})</h2>
             <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-              <p className="text-muted-foreground text-sm">
-                {inspection.mediaCount ? 'Media assets captured. Use the mobile app to review photos.' : 'No media captured for this inspection.'}
-              </p>
+              {photoMeta.length ? (
+                <div className="grid grid-cols-3 gap-3 xl:grid-cols-4">
+                  {photoMeta.map((photo, index) => (
+                    <button
+                      type="button"
+                      key={photo.id}
+                      onClick={() => setLightboxIndex(index)}
+                      className="group relative aspect-square overflow-hidden rounded-lg bg-muted text-left focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      aria-label={`Open ${photo.classificationTag} photo`}
+                    >
+                      <img src={mediaUrl(photo.url)} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
+                      <span className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">
+                        {photo.classificationTag}
+                      </span>
+                      <span className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">
+                        {formatMediaTileTimestamp(photo.capturedAt, mediaTimestamps)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">No media captured for this inspection.</p>
+              )}
             </div>
+            <PhotoLightbox
+              photos={photoMeta}
+              index={lightboxIndex}
+              onOpenChange={(open) => { if (!open) setLightboxIndex(null); }}
+              onNavigate={setLightboxIndex}
+            />
           </section>
         </div>
 
@@ -317,7 +429,7 @@ export function InspectionDetail() {
 
                   <div className="p-4 space-y-3 border-b border-border">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Components</p>
-                    {(Object.entries(scorecard.components) as [string, number][]).map(([key, val]) => (
+                    {(Object.entries(scorecard.components ?? {}) as [string, number][]).map(([key, val]) => (
                       <div key={key}>
                         <div className="flex justify-between items-center mb-1">
                           <p className="text-xs font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
@@ -333,13 +445,13 @@ export function InspectionDetail() {
                     ))}
                   </div>
 
-                  {scorecard.missedOpportunities.length > 0 && (
+                  {(scorecard.missedOpportunities ?? []).length > 0 && (
                     <div className="p-4">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                        Missed Opportunities ({scorecard.missedOpportunities.length})
+                          Missed Opportunities ({scorecard.missedOpportunities?.length ?? 0})
                       </p>
                       <ul className="space-y-2">
-                        {scorecard.missedOpportunities.map((opp, i) => (
+                        {(scorecard.missedOpportunities ?? []).map((opp, i) => (
                           <li key={i} className="flex gap-2 text-sm">
                             <ShieldAlert className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
                             <span className="text-muted-foreground">

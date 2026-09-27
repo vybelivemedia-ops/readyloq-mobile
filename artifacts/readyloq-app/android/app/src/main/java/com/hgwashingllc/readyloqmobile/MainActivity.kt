@@ -3,6 +3,9 @@ import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
 import android.os.Bundle
+import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.types.Permission
+import com.meta.wearable.dat.core.types.PermissionStatus
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -12,6 +15,36 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
+  private var metaPermissionCallback: ((Boolean, String?) -> Unit)? = null
+  private val metaCameraPermissionLauncher =
+    registerForActivityResult(Wearables.RequestPermissionContract()) { result ->
+      result
+        .onSuccess { status ->
+          metaPermissionCallback?.invoke(
+            status == PermissionStatus.Granted,
+            if (status == PermissionStatus.Granted) null else "Camera access was denied in Meta AI.",
+          )
+          metaPermissionCallback = null
+        }
+        .onFailure { error, _ ->
+          metaPermissionCallback?.invoke(false, error.description)
+          metaPermissionCallback = null
+        }
+    }
+
+  /**
+   * Called by the local DAT bridge. The launcher must belong to this activity:
+   * Meta AI handles camera access through its Activity Result contract.
+   */
+  fun requestMetaWearablesCameraPermission(callback: (Boolean, String?) -> Unit) {
+    if (metaPermissionCallback != null) {
+      callback(false, "A Meta AI permission request is already open.")
+      return
+    }
+    metaPermissionCallback = callback
+    metaCameraPermissionLauncher.launch(Permission.CAMERA)
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.

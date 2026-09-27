@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureClerkNativeRedirectUrls } from "./lib/clerk-redirect-urls";
 import { ensureProductsSeed } from "@workspace/db";
+import { ensureDevFixtures } from "./seed/dev-fixtures";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./lib/stripeClient";
 import { backfillOpportunityValues } from "./lib/backfill-opportunity-values";
@@ -11,8 +12,19 @@ import { migrateSyncLogs } from "./lib/migrate-sync-logs";
 import { migrateBriefingEmailColumn } from "./lib/migrate-briefing-email";
 import { migrateAnalysisErrors } from "./lib/migrate-analysis-errors";
 import { migrateAnalysisFailureReason } from "./lib/migrate-analysis-failure-reason";
+import { migrateAnalysisPhotoOutcomes } from "./lib/migrate-analysis-photo-outcomes";
 import { migrateScheduleIndex } from "./lib/migrate-schedule-index";
+import { migrateInventoryTables } from "./lib/migrate-inventory";
+import { migrateWarehouseTables } from "./lib/migrate-warehouse";
+import { migrateLedgerImmutability } from "./lib/migrate-ledger-immutability";
+import { migrateInspectionUnitNumbers } from "./lib/migrate-inspection-unit-numbers";
+import { migratePredictiveRestocking } from "./lib/migrate-predictive-restocking";
+import { migrateEnterpriseSync } from "./lib/migrate-enterprise-sync";
+import { migrateMissionControl } from "./lib/migrate-mission-control";
+import { startMissionControlAgentWorker } from "./lib/mission-control-worker";
 import { startBriefingScheduler } from "./lib/briefing-scheduler";
+import { startPredictiveRestockScheduler } from "./lib/predictive-restocking-scheduler";
+import { startEnterpriseSyncScheduler } from "./lib/enterprise-sync-scheduler";
 
 const rawPort = process.env["PORT"];
 
@@ -37,7 +49,27 @@ async function startup() {
   await migrateBriefingEmailColumn();
   await migrateAnalysisErrors();
   await migrateAnalysisFailureReason();
+  await migrateAnalysisPhotoOutcomes();
   await migrateScheduleIndex();
+  await migrateInventoryTables();
+  await migrateWarehouseTables();
+  await migrateLedgerImmutability();
+  await migrateInspectionUnitNumbers();
+  await migratePredictiveRestocking();
+  await migrateEnterpriseSync();
+  await migrateMissionControl();
+  startMissionControlAgentWorker();
+
+  // ── Development fixture seed (blocking) ──────────────────────────────────────
+  // Runs BEFORE the HTTP listener binds so the fixture company exists the moment
+  // the server accepts requests (no race between startup seed and first test call).
+  // Gated on REPLIT_DEPLOYMENT (absent in dev) AND DEV_FIXTURE_SECRET (present
+  // only when e2e tests are configured) — both must hold for the seed to run.
+  if (!process.env.REPLIT_DEPLOYMENT && process.env.DEV_FIXTURE_SECRET) {
+    await ensureDevFixtures().catch((err) => {
+      logger.warn({ err }, "Dev fixture seed failed — e2e role tests may need manual setup");
+    });
+  }
 
   app.listen(port, (err) => {
     if (err) {
@@ -71,6 +103,16 @@ async function startup() {
 
     // Start the daily 07:00 UTC briefing email scheduler.
     startBriefingScheduler();
+
+    // Start the periodic predictive-restock recompute job (Task #918) — the
+    // adaptive forecast is also recomputed event-triggered (right after each
+    // treatment-log deduction), but a periodic sweep keeps technician/product
+    // pairs with no recent deduction activity (e.g. driven purely by a newly
+    // scheduled route) from going stale. GET /manager/predictive-restocks
+    // itself is a pure read so a dismissed recommendation doesn't reappear
+    // mid-session just from the manager refreshing the page.
+    startPredictiveRestockScheduler();
+    startEnterpriseSyncScheduler();
 
     // Fire-and-forget: register native OAuth redirect URLs with Clerk so
     // Google sign-in works in the standalone mobile app (production

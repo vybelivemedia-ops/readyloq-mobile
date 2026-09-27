@@ -103,6 +103,7 @@ interface MetaGlassesSessionState {
 
 const POLL_INTERVAL_MS = 3_000;        // poll every 3 s
 const INACTIVITY_MS   = 2 * 60 * 1_000; // warn after 2 min silence
+const RECONNECT_INTERVAL_MS = 30_000;  // don't create sessions every poll on persistent 404s
 
 export function useMetaGlassesSession({
   inspectionId,
@@ -110,6 +111,8 @@ export function useMetaGlassesSession({
   onFinding,
 }: UseMetaGlassesSessionOptions): MetaGlassesSessionState {
   const { getToken } = useAuth();
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [code, setCode]           = useState<string | null>(null);
@@ -124,6 +127,7 @@ export function useMetaGlassesSession({
   const lastSeenRef      = useRef<number>(0);
   // Last time any event arrived — used for #106 inactivity detection.
   const lastEventTimeRef = useRef<number>(0);
+  const lastReconnectAttemptRef = useRef<number>(-Infinity);
   // Stable ref so the polling closure always calls the latest onFinding.
   const onFindingRef     = useRef(onFinding);
   onFindingRef.current   = onFinding;
@@ -136,11 +140,31 @@ export function useMetaGlassesSession({
   // Always-current copy of inspectionId for use inside async poll closure.
   const inspectionIdRef  = useRef(inspectionId);
   inspectionIdRef.current = inspectionId;
+  const activeRef = useRef(active);
+  activeRef.current = active;
   // #111 — set of delivered event IDs; prevents re-delivery if cursor races.
   const seenEventIdsRef  = useRef(new Set<string>());
   // Incrementing counter: bumping this forces the registration effect to
   // re-run even when active/inspectionId/getToken haven't changed (retry).
   const [retryCount, setRetryCount] = useState(0);
+
+  // Meta is an optional provider. Turning it off must immediately stop polling,
+  // clear the inspection-scoped cloud session, and make telemetry a no-op.
+  useEffect(() => {
+    if (active && inspectionId) return;
+    registeredForRef.current = null;
+    setSessionId(null);
+    setCode(null);
+    setEventCount(0);
+    setIsActive(false);
+    setIsInactive(false);
+    setStatus(null);
+    setCodeJustChanged(false);
+    lastSeenRef.current = 0;
+    lastEventTimeRef.current = 0;
+    lastReconnectAttemptRef.current = -Infinity;
+    seenEventIdsRef.current.clear();
+  }, [active, inspectionId]);
 
   // ── Session registration ───────────────────────────────────────────────────
   useEffect(() => {
@@ -148,23 +172,44 @@ export function useMetaGlassesSession({
     if (registeredForRef.current === inspectionId) return; // already succeeded
     if (registeringRef.current) return;                    // POST in-flight
 
+    // An inspection change owns a new session. Never leave the previous
+    // inspection's polling/session state active while registering the next one.
+    if (
+      registeredForRef.current !== null &&
+      registeredForRef.current !== inspectionId
+    ) {
+      registeredForRef.current = null;
+      setSessionId(null);
+      setCode(null);
+      setEventCount(0);
+      setIsActive(false);
+      setIsInactive(false);
+      setStatus(null);
+      lastSeenRef.current = 0;
+      lastEventTimeRef.current = 0;
+      lastReconnectAttemptRef.current = -Infinity;
+      seenEventIdsRef.current.clear();
+    }
+
     let cancelled = false;
     registeringRef.current = true;
 
     (async () => {
       try {
-        const token = await getToken();
+        const token = await getTokenRef.current();
+        if (
+          cancelled &&
+          (!activeRef.current || inspectionIdRef.current !== inspectionId)
+        ) return;
         const res = await fetch(`${API_BASE}/api/meta-glasses/session`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ inspectionId }),
         });
-        if (cancelled) return;
+        if (!activeRef.current || inspectionIdRef.current !== inspectionId) return;
         if (!res.ok) {
-          // Surface a visible error so the user knows registration failed.
-          // registeredForRef is NOT set — the next retrySession() call retries.
           setStatus(
-            `Glasses session failed (${res.status}) — check Meta app is open & paired`,
+            `Meta glasses unavailable (${res.status}). Phone camera remains active.`,
           );
           return;
         }
@@ -180,57 +225,85 @@ export function useMetaGlassesSession({
         lastSeenRef.current      = Date.now();
         lastEventTimeRef.current = Date.now();
       } catch {
-        if (!cancelled) {
-          setStatus("Glasses session failed — check network and Meta app connection");
+        if (
+          !cancelled &&
+          activeRef.current &&
+          inspectionIdRef.current === inspectionId
+        ) {
+          setStatus("Meta glasses unavailable. Phone camera remains active.");
         }
         // registeredForRef NOT set; next retrySession() call retries.
       } finally {
-        if (!cancelled) registeringRef.current = false;
+        registeringRef.current = false;
+        // If this effect was replaced while the same inspection is still opted
+        // in, re-evaluate once after the in-flight request settles. This avoids
+        // starting a duplicate request while preserving an explicit reconnect.
+        if (
+          cancelled &&
+          activeRef.current &&
+          inspectionIdRef.current !== null &&
+          registeredForRef.current !== inspectionIdRef.current
+        ) {
+          setRetryCount((c) => c + 1);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
-      registeringRef.current = false;
     };
-  // retryCount is intentionally included: incrementing it forces a retry
-  // without requiring active/inspectionId/getToken to change.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, inspectionId, getToken, retryCount]);
+  // retryCount is intentionally included: incrementing it forces an explicit
+  // retry. getToken is read from a ref so auth-hook identity changes cannot
+  // create duplicate Meta sessions during ordinary inspection re-renders.
+  }, [active, inspectionId, retryCount]);
 
   // ── Polling ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!active || !sessionId) return;
 
     let timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+    const scheduleNext = () => {
+      if (!cancelled && activeRef.current) {
+        timer = setTimeout(poll, POLL_INTERVAL_MS);
+      }
+    };
 
     const poll = async () => {
       try {
-        const token = await getToken();
+        const token = await getTokenRef.current();
+        if (cancelled || !activeRef.current) return;
         const since = lastSeenRef.current;
         const res = await fetch(
           `${API_BASE}/api/meta-glasses/events/${sessionId}?since=${since}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
+        if (cancelled || !activeRef.current) return;
 
         // ── #104 — Session lost (API restart): re-register inline ─────────
         if (res.status === 404) {
           setStatus("Reconnecting glasses…");
           setIsInactive(false);
           const iid = inspectionIdRef.current;
-          if (iid) {
+          if (iid && activeRef.current && Date.now() - lastReconnectAttemptRef.current >= RECONNECT_INTERVAL_MS) {
+            lastReconnectAttemptRef.current = Date.now();
             try {
-              const t2  = await getToken();
+              const t2  = await getTokenRef.current();
+              if (cancelled || !activeRef.current) return;
               const reg = await fetch(`${API_BASE}/api/meta-glasses/session`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${t2}` },
                 body: JSON.stringify({ inspectionId: iid }),
               });
+              if (cancelled || !activeRef.current) return;
               if (reg.ok) {
                 const d = (await reg.json()) as { sessionId: string; code: string };
+                if (cancelled || !activeRef.current) return;
                 setCode(d.code);
                 setCodeJustChanged(true);
-                setTimeout(() => setCodeJustChanged(false), 10_000);
+                setTimeout(() => {
+                  if (activeRef.current) setCodeJustChanged(false);
+                }, 10_000);
                 setStatus("Glasses reconnected · update code");
                 lastSeenRef.current      = Date.now();
                 lastEventTimeRef.current = Date.now();
@@ -241,16 +314,17 @@ export function useMetaGlassesSession({
               }
             } catch { /* will retry on next tick */ }
           }
-          timer = setTimeout(poll, POLL_INTERVAL_MS);
+          scheduleNext();
           return;
         }
 
         if (!res.ok) {
-          timer = setTimeout(poll, POLL_INTERVAL_MS);
+          scheduleNext();
           return;
         }
 
         const data = (await res.json()) as { events: GlassesEvent[]; serverTime: number };
+        if (cancelled || !activeRef.current) return;
 
         if (data.events.length > 0) {
           // #111 — skip events already delivered (guards against poll-cursor race).
@@ -275,7 +349,9 @@ export function useMetaGlassesSession({
               onFindingRef.current(event);
             }
 
-            setTimeout(() => setStatus("Glasses active"), 4_000);
+            setTimeout(() => {
+              if (activeRef.current) setStatus("Glasses active");
+            }, 4_000);
           }
         }
 
@@ -291,12 +367,15 @@ export function useMetaGlassesSession({
         // Polling failures are silent — network may be flaky in the field.
       }
 
-      timer = setTimeout(poll, POLL_INTERVAL_MS);
+      scheduleNext();
     };
 
     timer = setTimeout(poll, POLL_INTERVAL_MS);
-    return () => clearTimeout(timer);
-  }, [active, sessionId, getToken]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [active, sessionId]);
 
   // ── Cleanup on inspection change ──────────────────────────────────────────
   useEffect(() => {
@@ -309,6 +388,7 @@ export function useMetaGlassesSession({
       setEventCount(0);
       lastSeenRef.current      = 0;
       lastEventTimeRef.current = 0;
+      lastReconnectAttemptRef.current = -Infinity;
       registeredForRef.current = null;
       seenEventIdsRef.current.clear();
     }
@@ -327,12 +407,13 @@ export function useMetaGlassesSession({
   const postTelemetryEvent = useCallback(
     (payload: { type: string; deviceId?: string | null; reason?: string; count?: number }) => {
       const sid = sessionIdRef.current;
-      if (!sid) return; // no active session — silently discard
+      if (!sid || !activeRef.current) return; // no active session — silently discard
 
       // Fire-and-forget: network failures are acceptable for telemetry.
       void (async () => {
         try {
-          const token = await getToken();
+          const token = await getTokenRef.current();
+          if (!activeRef.current || sessionIdRef.current !== sid) return;
           await fetch(`${API_BASE}/api/meta-glasses/events/${sid}`, {
             method: "POST",
             headers: {
@@ -346,13 +427,12 @@ export function useMetaGlassesSession({
         }
       })();
     },
-    [getToken], // getToken is stable from Clerk; sessionId is read via ref
+    [],
   );
 
   const retrySession = useCallback(() => {
     // Clear success flag so the registration effect re-runs on next render.
     registeredForRef.current = null;
-    registeringRef.current   = false;
     setStatus(null);
     setRetryCount((c) => c + 1);
   }, []);

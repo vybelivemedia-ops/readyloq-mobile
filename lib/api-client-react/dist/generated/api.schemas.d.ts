@@ -243,6 +243,11 @@ export interface ScheduleEntry {
     siteAddress: string;
     /** @nullable */
     clientName?: string | null;
+    /**
+       * Unit or apartment number for a multi-family property
+       * @nullable
+       */
+    unitNumber?: string | null;
     technicianName: string;
     /** @nullable */
     technicianId?: string | null;
@@ -272,6 +277,239 @@ export interface ReassignInput {
     /** @nullable */
     technicianId?: string | null;
 }
+export type RouteOutlookStatus = typeof RouteOutlookStatus[keyof typeof RouteOutlookStatus];
+export declare const RouteOutlookStatus: {
+    readonly ok: "ok";
+    readonly 'due-soon': "due-soon";
+    readonly overdue: "overdue";
+};
+export interface RouteOutlookProduct {
+    productId: number;
+    productName: string;
+    targetPest: string;
+    /** ISO-8601 datetime of the most recent application at this address */
+    lastAppliedAt: string;
+    daysSinceApplication: number;
+    /**
+       * Label-defined minimum days before reapplication; null when the label sets no minimum
+       * @nullable
+       */
+    retreatmentIntervalDays: number | null;
+    /**
+       * YYYY-MM-DD; null when there is no retreatment interval to project from
+       * @nullable
+       */
+    nextEligibleReapplicationDate: string | null;
+    eligibleNow: boolean;
+    outlookStatus: RouteOutlookStatus;
+    applicationsLast90Days: number;
+}
+export interface RouteOutlookDetail {
+    address: string;
+    /** YYYY-MM-DD */
+    calendarDate: string;
+    products: RouteOutlookProduct[];
+}
+/**
+ * Route Readiness — has the assigned technician set up their daily rig for this stop's calendar date?
+ */
+export type RouteCalendarStopReadiness = {
+    /**
+       * null when the stop has no assigned technician
+       * @nullable
+       */
+    dailyRigSetUp: boolean | null;
+};
+/**
+ * Rolled-up Route Chemical Outlook counts for this stop's address
+ */
+export type RouteCalendarStopOutlook = {
+    overdueCount: number;
+    dueSoonCount: number;
+    okCount: number;
+    /** false when no treatment history exists yet at this address */
+    hasOutlookData: boolean;
+};
+export interface RouteCalendarStop {
+    id: number;
+    siteAddress: string;
+    /** @nullable */
+    clientName?: string | null;
+    /** @nullable */
+    unitNumber?: string | null;
+    technicianName: string;
+    /** @nullable */
+    technicianId?: string | null;
+    status: string;
+    /** @nullable */
+    severity?: string | null;
+    pestTypes?: string[];
+    /** YYYY-MM-DD */
+    calendarDate: string;
+    /** Route Readiness — has the assigned technician set up their daily rig for this stop's calendar date? */
+    readiness: RouteCalendarStopReadiness;
+    /** Rolled-up Route Chemical Outlook counts for this stop's address */
+    outlook: RouteCalendarStopOutlook;
+}
+export interface RouteCalendarDay {
+    /** YYYY-MM-DD */
+    date: string;
+    stops: RouteCalendarStop[];
+}
+export interface RecentInspectionSummary {
+    id: number;
+    status: string;
+    /** @nullable */
+    severity?: string | null;
+    pestTypes: string[];
+    technicianName: string;
+    /** YYYY-MM-DD */
+    calendarDate: string;
+    findingsCount: number;
+    /** @nullable */
+    completedAt?: string | null;
+}
+export interface PropertyNoteSummary {
+    id: number;
+    note: string;
+    /** @nullable */
+    zone?: string | null;
+    /** @nullable */
+    category?: string | null;
+    /** @nullable */
+    authorName?: string | null;
+    createdAt: string;
+}
+export type HistoricalFindingSeverity = typeof HistoricalFindingSeverity[keyof typeof HistoricalFindingSeverity];
+export declare const HistoricalFindingSeverity: {
+    readonly low: "low";
+    readonly medium: "medium";
+    readonly high: "high";
+};
+export interface HistoricalFinding {
+    category: string;
+    description: string;
+    frequency: number;
+    severity?: HistoricalFindingSeverity;
+}
+export interface StopHistoryPhoto {
+    id: number;
+    url: string;
+    /** @nullable */
+    filename?: string | null;
+    /** @nullable */
+    caption?: string | null;
+    inspectionId: number;
+    /** YYYY-MM-DD */
+    calendarDate: string;
+    createdAt: string;
+}
+export interface ChemicalLedgerCompliance {
+    /**
+       * Label-defined minimum days before reapplication; null when the label sets no minimum
+       * @nullable
+       */
+    retreatmentIntervalDays: number | null;
+    /**
+       * ISO-8601 datetime of the most recent PRIOR application of the same product at this address; null when there is none
+       * @nullable
+       */
+    priorApplicationAt: string | null;
+    /** @nullable */
+    daysSincePrior: number | null;
+    isCompliant: boolean;
+    /** @nullable */
+    nextEligibleReapplicationDate: string | null;
+    eligibleNow: boolean;
+}
+export interface ChemicalLedgerEntry {
+    id: number;
+    inspectionId: number;
+    productId: number;
+    productName: string;
+    /** @nullable */
+    epaRegistrationNumber?: string | null;
+    targetPest: string;
+    siteClassification: string;
+    /** @nullable */
+    areaSqft?: number | null;
+    /** @nullable */
+    linearFt?: number | null;
+    /** @nullable */
+    totalProductOz?: number | null;
+    /** @nullable */
+    equipmentUsed?: string | null;
+    /** @nullable */
+    notes?: string | null;
+    appliedAt: string;
+    compliance: ChemicalLedgerCompliance;
+}
+export interface PropertyProfile {
+    address: string;
+    addressKey: string;
+    recentInspections: RecentInspectionSummary[];
+    historicalPhotos: StopHistoryPhoto[];
+    materialHistory: ChemicalLedgerEntry[];
+    activeBaitStations: number;
+    historicalPests: string[];
+    historicalFindings: HistoricalFinding[];
+    notes: PropertyNoteSummary[];
+}
+export interface PestPacLegacyNote {
+    id: string;
+    note: string;
+    /** @nullable */
+    category: string | null;
+    /** @nullable */
+    authorName: string | null;
+    /** @nullable */
+    createdAt: string | null;
+}
+export type PestPacStopHistoryStatus = typeof PestPacStopHistoryStatus[keyof typeof PestPacStopHistoryStatus];
+export declare const PestPacStopHistoryStatus: {
+    readonly available: "available";
+    readonly disabled: "disabled";
+    readonly not_configured: "not_configured";
+    readonly not_mapped: "not_mapped";
+    readonly unavailable: "unavailable";
+};
+export interface PestPacStopHistory {
+    status: PestPacStopHistoryStatus;
+    notes: PestPacLegacyNote[];
+}
+export type StopHistory = PropertyProfile & {
+    stopId: number;
+    pestPacHistory: PestPacStopHistory;
+};
+export interface PropertyVisitUnit {
+    id: number;
+    /** @nullable */
+    unitNumber?: string | null;
+    /** @nullable */
+    clientName?: string | null;
+    technicianName: string;
+    /** @nullable */
+    technicianId?: string | null;
+    status: string;
+    /** @nullable */
+    severity?: string | null;
+    pestTypes: string[];
+    /** @nullable */
+    notes?: string | null;
+    /** @nullable */
+    visitPurpose?: string | null;
+    findingsCount: number;
+    mediaCount: number;
+    /** @nullable */
+    completedAt?: string | null;
+}
+export interface PropertyVisitDetail {
+    address: string;
+    /** YYYY-MM-DD */
+    calendarDate: string;
+    units: PropertyVisitUnit[];
+    chemicalLedger: ChemicalLedgerEntry[];
+}
 /**
  * @nullable
  */
@@ -294,6 +532,10 @@ export interface InspectionMedia {
     qualityScore?: number | null;
     /** @nullable */
     captureMetadata?: InspectionMediaCaptureMetadata;
+    /** @nullable */
+    unitNumber?: string | null;
+    /** @nullable */
+    capturedAt?: string | null;
     createdAt: string;
 }
 export interface Inspection {
@@ -301,6 +543,8 @@ export interface Inspection {
     siteAddress: string;
     /** @nullable */
     clientName?: string | null;
+    /** @nullable */
+    unitNumber?: string | null;
     technicianName: string;
     /** @nullable */
     technicianId?: string | null;
@@ -310,6 +554,11 @@ export interface Inspection {
     severity?: string | null;
     /** @nullable */
     notes?: string | null;
+    /**
+       * Freeform reason for the visit (e.g. "Routine Inspection", "Callback", "Initial Service"). Not a strict enum so it can also be populated by a future enterprise-routing import. Null for historical rows and older clients that predate this field.
+       * @nullable
+       */
+    visitPurpose?: string | null;
     mediaCount?: number;
     findingsCount?: number;
     media?: InspectionMedia[];
@@ -341,9 +590,12 @@ export interface CompleteInspectionResult {
 export interface InspectionInput {
     siteAddress: string;
     clientName?: string;
+    /** @nullable */
+    unitNumber?: string | null;
     technicianName: string;
     technicianId?: string;
     notes?: string;
+    visitPurpose?: string;
     pestTypes?: string[];
     /** Client-generated idempotency key (UUID). Retrying a create with the same key returns the previously created inspection (200) instead of duplicating it — required for offline-first sync retries. */
     clientKey?: string;
@@ -354,6 +606,10 @@ export interface InspectionUpdate {
     severity?: string;
     pestTypes?: string[];
     completedAt?: string;
+    /** @nullable */
+    unitNumber?: string | null;
+    /** @nullable */
+    visitPurpose?: string | null;
 }
 export type MediaInputCaptureMetadata = {
     [key: string]: unknown;
@@ -367,6 +623,9 @@ export interface MediaInput {
     captureSource?: string;
     qualityScore?: number;
     captureMetadata?: MediaInputCaptureMetadata;
+    /** @nullable */
+    unitNumber?: string | null;
+    capturedAt?: string;
 }
 export type AnalysisResultVideoEvidenceItem = {
     url: string;
@@ -378,25 +637,74 @@ export type AnalysisResultVideoEvidenceItem = {
     label?: string | null;
     frameAnalysisStatus: string;
 };
+export type AnalysisResultPhotoOutcomesItemStatus = typeof AnalysisResultPhotoOutcomesItemStatus[keyof typeof AnalysisResultPhotoOutcomesItemStatus];
+export declare const AnalysisResultPhotoOutcomesItemStatus: {
+    readonly completed: "completed";
+    readonly failed: "failed";
+    readonly deferred: "deferred";
+    readonly rate_limited: "rate_limited";
+};
+export type AnalysisResultPhotoOutcomesItem = {
+    imagePath: string;
+    status: AnalysisResultPhotoOutcomesItemStatus;
+};
 export type AnalysisResultPhotoZones = {
     [key: string]: string;
+};
+/**
+ * @nullable
+ */
+export type FindingEvidenceQuality = typeof FindingEvidenceQuality[keyof typeof FindingEvidenceQuality] | null;
+export declare const FindingEvidenceQuality: {
+    readonly excellent: "excellent";
+    readonly good: "good";
+    readonly fair: "fair";
+};
+export type FindingConfidenceLabel = typeof FindingConfidenceLabel[keyof typeof FindingConfidenceLabel];
+export declare const FindingConfidenceLabel: {
+    readonly identified: "identified";
+    readonly possible: "possible";
+    readonly unidentified: "unidentified";
+};
+export type FindingReviewStatus = typeof FindingReviewStatus[keyof typeof FindingReviewStatus];
+export declare const FindingReviewStatus: {
+    readonly pending: "pending";
+    readonly accepted: "accepted";
+    readonly corrected: "corrected";
+    readonly dismissed: "dismissed";
+};
+export type FindingMeasurementEstimate = {
+    /** @nullable */
+    linearFt?: number | null;
+    /** @nullable */
+    gapWidthIn?: number | null;
+    /** @nullable */
+    heightFt?: number | null;
+    confidence: number;
+    source: 'ai_vision_estimate';
+} | null;
+export type FindingCandidatesItem = {
+    species: string;
+    confidence: number;
 };
 export interface Finding {
     id: number;
     category: string;
     description: string;
     confidence: number;
-    severity?: string;
+    severity: string;
     /** @nullable */
-    location?: string | null;
+    location: string | null;
     /** @nullable */
-    imageUrl?: string | null;
+    imageUrl: string | null;
     /** @nullable */
-    treatment?: string | null;
+    treatment: string | null;
     /** @nullable */
-    exclusionOpportunity?: boolean | null;
+    exclusionOpportunity: boolean | null;
     /** @nullable */
-    evidenceQuality?: string | null;
+    evidenceQuality?: FindingEvidenceQuality;
+    /** @nullable */
+    possiblePest?: string | null;
     /** @nullable */
     species?: string | null;
     /** @nullable */
@@ -409,8 +717,16 @@ export interface Finding {
     moisture?: string | null;
     /** @nullable */
     structuralIssue?: string | null;
+    measurementEstimate?: FindingMeasurementEstimate;
     /** @nullable */
     zone?: string | null;
+    candidates?: FindingCandidatesItem[];
+    confidenceLabel?: FindingConfidenceLabel;
+    reviewStatus?: FindingReviewStatus;
+    /** @nullable */
+    technicianSpecies?: string | null;
+    /** @nullable */
+    technicianCorrectionNotes?: string | null;
 }
 export interface CoverageZone {
     slug: string;
@@ -529,6 +845,8 @@ export interface AnalysisResult {
     recommendations?: string[];
     videoEvidence?: AnalysisResultVideoEvidenceItem[];
     analyzedImagePaths?: string[];
+    /** Per-photo provider outcome from the most recent analysis run. */
+    photoOutcomes?: AnalysisResultPhotoOutcomesItem[];
     photoZones?: AnalysisResultPhotoZones;
     coverage?: CoverageSnapshot | null;
     evidence?: EvidenceSummary;
@@ -646,11 +964,17 @@ export interface IntelligenceTag {
     tag: string;
     source: string;
 }
+export type IntelligenceRecordMediaType = typeof IntelligenceRecordMediaType[keyof typeof IntelligenceRecordMediaType];
+export declare const IntelligenceRecordMediaType: {
+    readonly photo: "photo";
+    readonly video: "video";
+};
 export interface IntelligenceRecord {
     id: number;
     imageUrl: string;
     /** @nullable */
     thumbnailUrl?: string | null;
+    mediaType?: IntelligenceRecordMediaType;
     aiPrediction: AiPrediction;
     /** @nullable */
     aiConfidence?: number | null;
@@ -809,6 +1133,8 @@ export interface IntelligenceReviewInput {
     treatmentOutcome?: IntelligenceReviewInputTreatmentOutcome;
     /** @minimum 0 */
     daysUntilFollowup?: number;
+    /** Pass true to override a prior rejection. Required when re-approving a rejected record. */
+    force?: boolean;
 }
 export interface IntelligenceCategoryStat {
     slug: string;
@@ -863,6 +1189,16 @@ export interface AiReportNarrative {
     conduciveConditions?: string;
     customerRecommendations?: string[];
 }
+/**
+ * Present on report-detail responses. Signals when photo media or analysis finished syncing after the current narrative was generated.
+ */
+export interface ReportEvidenceRecovery {
+    /** @minimum 0 */
+    syncedPhotoCount: number;
+    needsRegeneration: boolean;
+    /** @nullable */
+    latestEvidenceAt: string | null;
+}
 export interface Report {
     id: number;
     inspectionId: number;
@@ -883,6 +1219,7 @@ export interface Report {
     /** @nullable */
     pdfUrl?: string | null;
     aiNarrative?: null | AiReportNarrative;
+    evidenceRecovery?: ReportEvidenceRecovery;
     createdAt: string;
 }
 export interface GenerateNarrativeInput {
@@ -1751,6 +2088,686 @@ export interface GeminiImageOutput {
 export interface GeminiError {
     error: string;
 }
+export interface ProductLabelRules {
+    id: number;
+    productId: number;
+    approvedPestTypes: string[];
+    approvedSiteClassifications: string[];
+    requiredEquipmentTypes: string[];
+    /** @nullable */
+    nozzleSpec: string | null;
+    /** @nullable */
+    pressurePsi: string | null;
+    /** @nullable */
+    dropletSize: string | null;
+    /** @nullable */
+    maxRateOzPer1000Sqft: number | null;
+    /** @nullable */
+    maxRateOzPerGallon: number | null;
+    mixingSteps: string[];
+    /** @nullable */
+    maxTempF: number | null;
+    /** @nullable */
+    phytotoxicityNotes: string | null;
+    /** @nullable */
+    reEntryIntervalHours: number | null;
+    /**
+       * Minimum whole days before this product may legally be reapplied to the same site
+       * @nullable
+       */
+    retreatmentIntervalDays: number | null;
+    createdAt: string;
+}
+export type ProductProductType = typeof ProductProductType[keyof typeof ProductProductType];
+export declare const ProductProductType: {
+    readonly 'restricted-use': "restricted-use";
+    readonly 'general-use': "general-use";
+};
+/**
+ * @nullable
+ */
+export type ProductSignalWord = typeof ProductSignalWord[keyof typeof ProductSignalWord] | null;
+export declare const ProductSignalWord: {
+    readonly DANGER: "DANGER";
+    readonly WARNING: "WARNING";
+    readonly CAUTION: "CAUTION";
+    readonly NONE: "NONE";
+};
+export interface Product {
+    id: number;
+    name: string;
+    /** @nullable */
+    epaRegistrationNumber: string | null;
+    productType: ProductProductType;
+    activeIngredients: string;
+    /** @nullable */
+    signalWord: ProductSignalWord;
+    /** @nullable */
+    manufacturerName: string | null;
+    isActive: boolean;
+    createdAt: string;
+    /** Inlined product_label_rules row; null when none has been configured for this product */
+    labelRules: ProductLabelRules | null;
+}
+export interface RouteAssignmentWithProduct {
+    productId: number;
+    /** Canonical pest name, e.g. "German Cockroaches" */
+    targetPest: string;
+    /** Optional free-text context, e.g. "perimeter only" */
+    notes?: string;
+    /** null if the product has since been deleted from the catalogue */
+    product: Product | null;
+}
+export interface DailyRigLookupResult {
+    setUp: true;
+    technicianId: string;
+    /** YYYY-MM-DD */
+    rigDate: string;
+    assignments: RouteAssignmentWithProduct[];
+    createdAt: string;
+    updatedAt: string;
+}
+export interface DailyRigNotSetUp {
+    error: string;
+    setUp: false;
+}
+export interface RouteAssignmentInput {
+    productId: number;
+    /**
+       * Canonical pest name, e.g. "German Cockroaches"
+       * @minLength 1
+       */
+    targetPest: string;
+    /** Optional free-text context, e.g. "perimeter only" */
+    notes?: string;
+}
+export interface UpsertDailyRigInput {
+    assignments: RouteAssignmentInput[];
+    /** Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted */
+    date?: string;
+}
+export interface DailyRig {
+    id: number;
+    technicianId: string;
+    /** YYYY-MM-DD */
+    rigDate: string;
+    assignments: RouteAssignmentWithProduct[];
+    createdAt: string;
+    updatedAt: string;
+}
+export interface RecentMix {
+    logId: number;
+    productId: number;
+    productName: string;
+    productActiveIngredients: string;
+    targetPest: string;
+    siteClassification: string;
+    /** @nullable */
+    areaSqft?: number | null;
+    /** @nullable */
+    linearFt?: number | null;
+    /** @nullable */
+    totalProductOz?: number | null;
+    /** @nullable */
+    equipmentUsed?: string | null;
+    appliedAt: string;
+}
+export type RouteReadinessProductStatus = typeof RouteReadinessProductStatus[keyof typeof RouteReadinessProductStatus];
+export declare const RouteReadinessProductStatus: {
+    readonly ready: "ready";
+    readonly short: "short";
+    readonly 'insufficient-data': "insufficient-data";
+};
+export type RouteReadinessOverallStatus = typeof RouteReadinessOverallStatus[keyof typeof RouteReadinessOverallStatus];
+export declare const RouteReadinessOverallStatus: {
+    readonly ready: "ready";
+    readonly short: "short";
+    readonly 'not-set-up': "not-set-up";
+};
+export interface RouteReadinessProduct {
+    productId: number;
+    productName: string;
+    targetPest: string;
+    unit: string;
+    quantityOnHand: number;
+    /**
+       * Average quantity used per application over the last 30 days; null when there is no history yet
+       * @nullable
+       */
+    avgUsagePerStop: number | null;
+    /**
+       * avgUsagePerStop * stopCount; null when avgUsagePerStop is null
+       * @nullable
+       */
+    expectedUsageToday: number | null;
+    status: RouteReadinessProductStatus;
+}
+export interface RouteReadiness {
+    technicianId: string;
+    /** YYYY-MM-DD */
+    date: string;
+    stopCount: number;
+    rigSetUp: boolean;
+    overallStatus: RouteReadinessOverallStatus;
+    products: RouteReadinessProduct[];
+}
+export interface MissionControlMe {
+    userId: string;
+    isSuperAdmin: boolean;
+}
+export interface MissionControlPlatformKpis {
+    companyCount: number;
+    activeCompanyCount: number;
+    userCount: number;
+    technicianCount: number;
+    inspectionCount: number;
+    openIncidentCount: number;
+}
+export type MissionControlAlertSeverity = typeof MissionControlAlertSeverity[keyof typeof MissionControlAlertSeverity];
+export declare const MissionControlAlertSeverity: {
+    readonly low: "low";
+    readonly medium: "medium";
+    readonly high: "high";
+    readonly critical: "critical";
+};
+export interface MissionControlAlert {
+    id: number;
+    severity: MissionControlAlertSeverity;
+    title: string;
+    message: string;
+    /** @nullable */
+    companyId?: number | null;
+    createdAt: string;
+}
+export interface MissionControlAIAnalysisHealth {
+    windowHours: 24;
+    completedCount: number;
+    failedCount: number;
+    pendingCount: number;
+    /** @nullable */
+    latestResultAt: string | null;
+}
+export interface MissionControlOverview {
+    kpis: MissionControlPlatformKpis;
+    recentAlerts: MissionControlAlert[];
+    aiAnalysisHealth: MissionControlAIAnalysisHealth;
+}
+export type MissionControlCompanyAccessStatus = typeof MissionControlCompanyAccessStatus[keyof typeof MissionControlCompanyAccessStatus];
+export declare const MissionControlCompanyAccessStatus: {
+    readonly enabled: "enabled";
+    readonly suspended: "suspended";
+};
+export interface MissionControlCompany {
+    id: number;
+    name: string;
+    accessStatus: MissionControlCompanyAccessStatus;
+    createdAt: string;
+    userCount: number;
+    technicianCount: number;
+    inspectionCount: number;
+    /** @nullable */
+    lastActivityAt?: string | null;
+}
+export interface MissionControlCompanyPage {
+    items: MissionControlCompany[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+export interface MissionControlProperty {
+    /** Property profile ID; stable drill-down identifier */
+    id: number;
+    companyId: number;
+    companyName: string;
+    /** Property address for directory identification */
+    siteAddress: string;
+    /** @nullable */
+    propertyType: string | null;
+    inspectionCount: number;
+    /** @nullable */
+    latestInspectionId: number | null;
+    updatedAt: string;
+}
+export interface MissionControlPropertyPage {
+    items: MissionControlProperty[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+export interface MissionControlPropertyInspection {
+    id: number;
+    status: string;
+    createdAt: string;
+}
+export type MissionControlPropertyDetail = MissionControlProperty & {
+    inspections: MissionControlPropertyInspection[];
+};
+export interface MissionControlCompanyOwner {
+    userId: string;
+    name: string;
+    email: string;
+}
+export interface MissionControlUser {
+    id: string;
+    name: string;
+    email: string;
+    /** @nullable */
+    role?: string | null;
+    betaAccessEnabled: boolean;
+}
+export interface MissionControlInspectionSummary {
+    id: number;
+    companyId: number;
+    companyName: string;
+    /** @nullable */
+    technicianId: string | null;
+    /** @nullable */
+    technicianName?: string | null;
+    status: string;
+    /** @nullable */
+    siteAddress?: string | null;
+    createdAt: string;
+}
+export type MissionControlCompanyDetail = MissionControlCompany & {
+    owner: MissionControlCompanyOwner;
+    users: MissionControlUser[];
+    recentInspections: MissionControlInspectionSummary[];
+};
+export type CompanyAccessChangeInputAction = typeof CompanyAccessChangeInputAction[keyof typeof CompanyAccessChangeInputAction];
+export declare const CompanyAccessChangeInputAction: {
+    readonly suspend: "suspend";
+    readonly enable: "enable";
+};
+export interface CompanyAccessChangeInput {
+    action: CompanyAccessChangeInputAction;
+    /** Approval authorizing this access change */
+    approvalId: number;
+    reason?: string;
+}
+export type CompanyAccessChangeResultAccessStatus = typeof CompanyAccessChangeResultAccessStatus[keyof typeof CompanyAccessChangeResultAccessStatus];
+export declare const CompanyAccessChangeResultAccessStatus: {
+    readonly enabled: "enabled";
+    readonly suspended: "suspended";
+};
+export interface CompanyAccessChangeResult {
+    companyId: number;
+    accessStatus: CompanyAccessChangeResultAccessStatus;
+    approvalId: number;
+    changedAt: string;
+}
+export interface MissionControlTechnician {
+    id: string;
+    name: string;
+    companyId: number;
+    companyName: string;
+    status: string;
+    /** @nullable */
+    lastActiveAt?: string | null;
+}
+export interface MissionControlTechnicianPage {
+    items: MissionControlTechnician[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+export type MissionControlTechnicianDetail = MissionControlTechnician & {
+    inspections: MissionControlInspectionSummary[];
+};
+export interface MissionControlDeviceSession {
+    id: number;
+    /** @nullable */
+    userId: string | null;
+    createdAt: string;
+    expiresAt: string;
+    eventCount: number;
+}
+export interface MissionControlSessionEvent {
+    type: string;
+    createdAt: string;
+    /** @nullable */
+    detail?: string | null;
+}
+export type MissionControlDeviceSessionDetail = MissionControlDeviceSession & {
+    inspectionId: number;
+    companyId: number;
+    companyName: string;
+    events: MissionControlSessionEvent[];
+};
+export type UserAccessChangeInputAction = typeof UserAccessChangeInputAction[keyof typeof UserAccessChangeInputAction];
+export declare const UserAccessChangeInputAction: {
+    readonly enable: "enable";
+    readonly disable: "disable";
+};
+export interface UserAccessChangeInput {
+    action: UserAccessChangeInputAction;
+    /** Approval authorizing this beta-access change */
+    approvalId: number;
+    reason?: string;
+}
+export interface UserAccessChangeResult {
+    userId: string;
+    betaAccessEnabled: boolean;
+    approvalId: number;
+    changedAt: string;
+}
+export interface MissionControlInspectionPage {
+    items: MissionControlInspectionSummary[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+export interface MissionControlMediaCounts {
+    total: number;
+    photos: number;
+    videos: number;
+    pendingAnalysis: number;
+}
+export interface MissionControlAnalysisStatus {
+    mediaId: number;
+    status: string;
+    /** @nullable */
+    error?: string | null;
+    /** @nullable */
+    updatedAt?: string | null;
+}
+export interface MissionControlSyncLog {
+    id: number;
+    status: string;
+    message: string;
+    createdAt: string;
+}
+export interface MissionControlMedia {
+    id: number;
+    mediaType: string;
+    /** @nullable */
+    durationSec?: number | null;
+    /** @nullable */
+    captureSource?: string | null;
+    /** @nullable */
+    qualityScore?: number | null;
+    /** @nullable */
+    capturedAt?: string | null;
+}
+export type MissionControlInspectionDetail = MissionControlInspectionSummary & ({
+    mediaCounts: MissionControlMediaCounts;
+    analysisStatuses: MissionControlAnalysisStatus[];
+    syncLogs: MissionControlSyncLog[];
+    media: MissionControlMedia[];
+    deviceSessions: MissionControlDeviceSession[];
+    /** @nullable */
+    completedAt?: string | null;
+});
+export type MissionControlIncidentSeverity = typeof MissionControlIncidentSeverity[keyof typeof MissionControlIncidentSeverity];
+export declare const MissionControlIncidentSeverity: {
+    readonly low: "low";
+    readonly medium: "medium";
+    readonly high: "high";
+    readonly critical: "critical";
+};
+export type MissionControlIncidentStatus = typeof MissionControlIncidentStatus[keyof typeof MissionControlIncidentStatus];
+export declare const MissionControlIncidentStatus: {
+    readonly open: "open";
+    readonly acknowledged: "acknowledged";
+    readonly investigating: "investigating";
+    readonly resolved: "resolved";
+    readonly dismissed: "dismissed";
+};
+export interface MissionControlIncident {
+    id: number;
+    companyId: number;
+    companyName: string;
+    severity: MissionControlIncidentSeverity;
+    status: MissionControlIncidentStatus;
+    title: string;
+    description: string;
+    /** @nullable */
+    assignedTo?: string | null;
+    /** @nullable */
+    acknowledgedAt?: string | null;
+    createdAt: string;
+    updatedAt?: string;
+    sourceType?: string;
+    sourceId?: string;
+    inspectionId?: number;
+    userId?: string;
+    sessionId?: number;
+}
+export interface MissionControlIncidentPage {
+    items: MissionControlIncident[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+export type IncidentUpdateAction = typeof IncidentUpdateAction[keyof typeof IncidentUpdateAction];
+export declare const IncidentUpdateAction: {
+    readonly acknowledge: "acknowledge";
+    readonly assign: "assign";
+    readonly escalate: "escalate";
+};
+export type IncidentUpdateSeverity = typeof IncidentUpdateSeverity[keyof typeof IncidentUpdateSeverity];
+export declare const IncidentUpdateSeverity: {
+    readonly low: "low";
+    readonly medium: "medium";
+    readonly high: "high";
+    readonly critical: "critical";
+};
+export interface IncidentUpdate {
+    action?: IncidentUpdateAction;
+    assigneeId?: string;
+    severity?: IncidentUpdateSeverity;
+    note?: string;
+}
+export interface MissionControlAuditEntry {
+    id: number;
+    actorId: string;
+    /** @nullable */
+    actorName?: string | null;
+    action: string;
+    targetType: string;
+    targetId: string;
+    /** @nullable */
+    details?: string | null;
+    createdAt: string;
+}
+export interface MissionControlAuditPage {
+    items: MissionControlAuditEntry[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+export type MissionControlAgentIdentity = typeof MissionControlAgentIdentity[keyof typeof MissionControlAgentIdentity];
+export declare const MissionControlAgentIdentity: {
+    readonly quinn: "quinn";
+    readonly ada: "ada";
+    readonly mara: "mara";
+    readonly theo: "theo";
+    readonly nadia: "nadia";
+    readonly iris: "iris";
+    readonly dario: "dario";
+};
+export type MissionControlAgentDisplayName = typeof MissionControlAgentDisplayName[keyof typeof MissionControlAgentDisplayName];
+export declare const MissionControlAgentDisplayName: {
+    readonly Quinn: "Quinn";
+    readonly Ada: "Ada";
+    readonly Mara: "Mara";
+    readonly Theo: "Theo";
+    readonly Nadia: "Nadia";
+    readonly Iris: "Iris";
+    readonly Dario: "Dario";
+};
+export type MissionControlAgentStatus = typeof MissionControlAgentStatus[keyof typeof MissionControlAgentStatus];
+export declare const MissionControlAgentStatus: {
+    readonly available: "available";
+    readonly busy: "busy";
+    readonly unavailable: "unavailable";
+};
+export interface MissionControlAgent {
+    identity: MissionControlAgentIdentity;
+    displayName: MissionControlAgentDisplayName;
+    role: string;
+    capability?: string;
+    status: MissionControlAgentStatus;
+}
+/**
+ * Availability is derived from real persisted tasks, never a fabricated default.
+ */
+export type MissionControlAgentZeroAvailabilityBasis = typeof MissionControlAgentZeroAvailabilityBasis[keyof typeof MissionControlAgentZeroAvailabilityBasis];
+export declare const MissionControlAgentZeroAvailabilityBasis: {
+    readonly real_tasks: "real_tasks";
+};
+export interface MissionControlAgentZeroAvailability {
+    /** Availability is true only when at least one real Agent Zero task is available. */
+    available: boolean;
+    /**
+       * Number of actual Agent Zero tasks currently available
+       * @minimum 0
+       */
+    realTaskCount: number;
+    /** Availability is derived from real persisted tasks, never a fabricated default. */
+    basis: MissionControlAgentZeroAvailabilityBasis;
+    /** Consequential execution requires a human approval; investigations are not executable jobs. */
+    approvalRequired?: boolean;
+}
+export interface MissionControlAgentRoster {
+    agents: MissionControlAgent[];
+    agentZero: MissionControlAgentZeroAvailability;
+}
+export type MissionControlAgentTaskStatus = typeof MissionControlAgentTaskStatus[keyof typeof MissionControlAgentTaskStatus];
+export declare const MissionControlAgentTaskStatus: {
+    readonly queued: "queued";
+    readonly running: "running";
+    readonly completed: "completed";
+    readonly failed: "failed";
+    readonly cancelled: "cancelled";
+};
+export type MissionControlDelegationStatus = typeof MissionControlDelegationStatus[keyof typeof MissionControlDelegationStatus];
+export declare const MissionControlDelegationStatus: {
+    readonly queued: "queued";
+    readonly running: "running";
+    readonly completed: "completed";
+    readonly failed: "failed";
+};
+export interface MissionControlDelegation {
+    id: number;
+    specialist: string;
+    scope: string;
+    status: MissionControlDelegationStatus;
+    /** @nullable */
+    result?: string | null;
+    /** @nullable */
+    error?: string | null;
+    createdAt: string;
+    /** @nullable */
+    completedAt?: string | null;
+}
+export interface MissionControlWorkTrace {
+    id: number;
+    /** @nullable */
+    delegationId?: number | null;
+    actor: string;
+    event: string;
+    detail: string;
+    createdAt: string;
+}
+export interface MissionControlAgentTask {
+    id: number;
+    companyId: number;
+    companyName: string;
+    prompt: string;
+    status: MissionControlAgentTaskStatus;
+    createdBy: string;
+    /** @nullable */
+    result?: string | null;
+    /** @nullable */
+    error?: string | null;
+    createdAt: string;
+    /** @nullable */
+    startedAt?: string | null;
+    /** @nullable */
+    completedAt?: string | null;
+    delegations?: MissionControlDelegation[];
+    traces?: MissionControlWorkTrace[];
+}
+export interface MissionControlAgentTaskPage {
+    items: MissionControlAgentTask[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+export interface AgentTaskInput {
+    companyId: number;
+    /** @minLength 1 */
+    prompt: string;
+}
+export type MissionControlApprovalStatus = typeof MissionControlApprovalStatus[keyof typeof MissionControlApprovalStatus];
+export declare const MissionControlApprovalStatus: {
+    readonly pending: "pending";
+    readonly approved: "approved";
+    readonly rejected: "rejected";
+};
+export interface MissionControlApproval {
+    id: number;
+    type: string;
+    status: MissionControlApprovalStatus;
+    requestedBy: string;
+    request: string;
+    /** @nullable */
+    note?: string | null;
+    /** @nullable */
+    decidedBy?: string | null;
+    createdAt: string;
+    /** @nullable */
+    decidedAt?: string | null;
+}
+export interface MissionControlApprovalPage {
+    items: MissionControlApproval[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+export type MissionControlApprovalRequestTargetType = typeof MissionControlApprovalRequestTargetType[keyof typeof MissionControlApprovalRequestTargetType];
+export declare const MissionControlApprovalRequestTargetType: {
+    readonly company: "company";
+    readonly user: "user";
+};
+export type MissionControlApprovalRequestAction = typeof MissionControlApprovalRequestAction[keyof typeof MissionControlApprovalRequestAction];
+export declare const MissionControlApprovalRequestAction: {
+    readonly suspend: "suspend";
+    readonly enable: "enable";
+    readonly beta_enable: "beta_enable";
+    readonly beta_disable: "beta_disable";
+};
+export interface MissionControlApprovalRequest {
+    targetType: MissionControlApprovalRequestTargetType;
+    /** @minLength 1 */
+    targetId: string;
+    action: MissionControlApprovalRequestAction;
+    /**
+       * @minLength 1
+       * @maxLength 1000
+       */
+    reason: string;
+    /** @maxLength 128 */
+    idempotencyKey?: string;
+}
+export type ApprovalDecisionInputDecision = typeof ApprovalDecisionInputDecision[keyof typeof ApprovalDecisionInputDecision];
+export declare const ApprovalDecisionInputDecision: {
+    readonly approve: "approve";
+    readonly reject: "reject";
+};
+export interface ApprovalDecisionInput {
+    decision: ApprovalDecisionInputDecision;
+    /** @minLength 1 */
+    note: string;
+}
 export type GetScheduleParams = {
     /**
      * Start date (YYYY-MM-DD), inclusive
@@ -1760,6 +2777,32 @@ export type GetScheduleParams = {
      * End date (YYYY-MM-DD), inclusive
      */
     end: string;
+};
+export type GetPropertyProfileParams = {
+    /**
+     * Exact site address to look up (matches inspections.siteAddress)
+     */
+    address: string;
+};
+export type GetRouteCalendarParams = {
+    /**
+     * Start date (YYYY-MM-DD), inclusive
+     */
+    start: string;
+    /**
+     * End date (YYYY-MM-DD), inclusive
+     */
+    end: string;
+    /**
+     * Caller's UTC offset in minutes, using the `Date.prototype.getTimezoneOffset()` sign convention. Buckets and labels each stop's calendarDate in the caller's local frame instead of UTC, keeping it consistent with Route Readiness (which keys off the technician's own device-local rig date). Defaults to 0 (UTC) when omitted.
+     */
+    tzOffsetMinutes?: number;
+};
+export type GetRouteOutlookParams = {
+    /**
+     * Caller's UTC offset in minutes (same convention as /schedule/route-calendar). Defaults to 0 (UTC) when omitted.
+     */
+    tzOffsetMinutes?: number;
 };
 export type ListInspectionsParams = {
     status?: string;
@@ -1837,5 +2880,144 @@ export type ListScorecardsParams = {
 };
 export type ListProposalsParams = {
     status?: string;
+};
+export type GetDailyRigParams = {
+    /**
+     * Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted
+     */
+    date?: string;
+};
+export type LookupDailyRigParams = {
+    /**
+     * Clerk user ID of the technician whose daily rig to look up
+     */
+    technicianId: string;
+    /**
+     * Rig date (YYYY-MM-DD), matching the technician's device-local calendar date
+     */
+    date: string;
+};
+export type GetRouteReadinessParams = {
+    /**
+     * Clerk user ID to look up; defaults to the authenticated caller
+     */
+    technicianId?: string;
+    /**
+     * Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted
+     */
+    date?: string;
+    /**
+     * Caller's UTC offset in minutes (same convention as /schedule/route-calendar). Defaults to 0 (UTC) when omitted.
+     */
+    tzOffsetMinutes?: number;
+};
+export type GetTeamRouteReadinessParams = {
+    /**
+     * Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted
+     */
+    date?: string;
+    /**
+     * Caller's UTC offset in minutes (same convention as /schedule/route-calendar). Defaults to 0 (UTC) when omitted.
+     */
+    tzOffsetMinutes?: number;
+};
+export type ListMissionControlCompaniesParams = {
+    /**
+     * @minimum 1
+     */
+    page?: number;
+    /**
+     * @minimum 1
+     */
+    limit?: number;
+    search?: string;
+};
+export type ListMissionControlTechniciansParams = {
+    companyId?: number;
+    search?: string;
+    /**
+     * @minimum 1
+     */
+    page?: number;
+    /**
+     * @minimum 1
+     */
+    limit?: number;
+};
+export type ListMissionControlPropertiesParams = {
+    /**
+     * @minimum 1
+     */
+    companyId?: number;
+    search?: string;
+    /**
+     * @minimum 1
+     */
+    page?: number;
+    /**
+     * @minimum 1
+     */
+    limit?: number;
+};
+export type ListMissionControlInspectionsParams = {
+    companyId?: number;
+    status?: string;
+    search?: string;
+    /**
+     * @minimum 1
+     */
+    page?: number;
+    /**
+     * @minimum 1
+     */
+    limit?: number;
+};
+export type ListMissionControlIncidentsParams = {
+    severity?: string;
+    status?: string;
+    companyId?: number;
+    /**
+     * @minimum 1
+     */
+    page?: number;
+    /**
+     * @minimum 1
+     */
+    limit?: number;
+};
+export type ListMissionControlAuditParams = {
+    /**
+     * @minimum 1
+     */
+    page?: number;
+    /**
+     * @minimum 1
+     */
+    limit?: number;
+    action?: string;
+    actorId?: string;
+};
+export type ListMissionControlAgentTasksParams = {
+    companyId?: number;
+    status?: string;
+    /**
+     * @minimum 1
+     */
+    page?: number;
+    /**
+     * @minimum 1
+     */
+    limit?: number;
+};
+export type ListMissionControlApprovalsParams = {
+    status?: string;
+    /**
+     * @minimum 1
+     */
+    page?: number;
+    /**
+     * @minimum 1
+     */
+    limit?: number;
 };
 //# sourceMappingURL=api.schemas.d.ts.map

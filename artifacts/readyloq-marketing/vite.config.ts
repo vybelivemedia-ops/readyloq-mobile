@@ -74,6 +74,14 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      // The shared preview router reserves /api for the separate API artifact.
+      // Keep marketing API calls on a distinct dev-only prefix, then rewrite
+      // them back to the API server's canonical /api path.
+      "/api-server": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/api-server/, "/api"),
+      },
     },
   },
   preview: {

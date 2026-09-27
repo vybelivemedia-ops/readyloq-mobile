@@ -81,6 +81,9 @@ function ReassignModal({
             {entry.clientName && (
               <p className="text-xs text-muted-foreground mt-0.5">{entry.clientName}</p>
             )}
+            {entry.unitNumber && (
+              <p className="text-xs text-teal-700 mt-0.5">Unit / Apt {entry.unitNumber}</p>
+            )}
           </div>
 
           {/* Status badge */}
@@ -164,6 +167,7 @@ interface BookForm {
   clientName: string;
   technicianName: string;
   scheduledDate: string;
+  unitNumber: string;
 }
 
 function NewInspectionSheet({
@@ -189,6 +193,7 @@ function NewInspectionSheet({
     clientName: '',
     technicianName: initialTech ?? technicians[0] ?? '',
     scheduledDate: initialDate ?? toYMD(new Date()),
+    unitNumber: '',
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -203,6 +208,7 @@ function NewInspectionSheet({
       clientName: '',
       technicianName: technicians[0] ?? '',
       scheduledDate: toYMD(new Date()),
+      unitNumber: '',
     });
     setError(null);
     onClose();
@@ -224,6 +230,7 @@ function NewInspectionSheet({
         // inspection row carries a stable identity from creation.
         ...(typeof resolvedId === 'string' ? { technicianId: resolvedId } : {}),
         scheduledDate: form.scheduledDate ? `${form.scheduledDate}T00:00:00.000Z` : undefined,
+        unitNumber: form.unitNumber.trim() || undefined,
       });
       const bookedDate = form.scheduledDate;
       handleClose();
@@ -282,6 +289,20 @@ function NewInspectionSheet({
                 value={form.clientName}
                 onChange={(e) => set('clientName', e.target.value)}
                 placeholder="Acme Corp (optional)"
+                className={inputCls}
+              />
+            </div>
+
+            {/* Unit / Apt # — multi-family properties */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+                Unit / Apt #
+              </label>
+              <input
+                type="text"
+                value={form.unitNumber}
+                onChange={(e) => set('unitNumber', e.target.value)}
+                placeholder="e.g. 4B, 12, 301 (optional)"
                 className={inputCls}
               />
             </div>
@@ -428,6 +449,9 @@ function InspectionCard({
       </p>
       {entry.clientName && (
         <p className="text-[10px] text-muted-foreground truncate">{entry.clientName}</p>
+      )}
+      {entry.unitNumber && (
+        <p className="text-[10px] text-teal-700 font-medium truncate">Unit / Apt {entry.unitNumber}</p>
       )}
     </div>
   );

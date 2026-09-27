@@ -49,7 +49,7 @@ vi.mock("../lib/objectStorage", async (importOriginal) => {
 });
 
 import app from "../app";
-import { db, companiesTable, usersTable } from "@workspace/db";
+import { db, companiesTable, usersTable, inspectionMediaTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const TECH_ID = "media_type_test_clerk_id";
@@ -117,6 +117,15 @@ describe("POST /inspections/:id/media — mediaType validation", () => {
     expect(res.body.mediaType).toBe("image");
   });
 
+  it("persists an explicit unit number with the media row", async () => {
+    asUser(TECH_ID);
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "image", url: uniqueUrl("unit"), unitNumber: "4B" });
+    expect(res.status).toBe(201);
+    expect(res.body.unitNumber).toBe("4B");
+  });
+
   it('accepts mediaType "video"', async () => {
     asUser(TECH_ID);
     const res = await request(app)
@@ -167,5 +176,87 @@ describe("POST /inspections/:id/media — mediaType validation", () => {
       .post(`/api/inspections/${inspectionId}/media`)
       .send({ mediaType: "photo" });
     expect(res.status).toBe(400);
+  });
+
+  it("persists capturedAt separately from the server-generated createdAt", async () => {
+    asUser(TECH_ID);
+    const capturedAt = "2020-01-02T03:04:05.000Z";
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "photo", url: uniqueUrl("captured-at"), capturedAt });
+
+    expect(res.status).toBe(201);
+    expect(res.body.capturedAt).toBe(capturedAt);
+    expect(res.body.createdAt).toMatch(/Z$/);
+    expect(res.body.createdAt).not.toBe(capturedAt);
+    expect(new Date(res.body.createdAt).getTime()).toBeGreaterThan(new Date(capturedAt).getTime());
+
+    const [stored] = await db
+      .select()
+      .from(inspectionMediaTable)
+      .where(eq(inspectionMediaTable.id, res.body.id));
+    expect(stored.capturedAt?.toISOString()).toBe(capturedAt);
+
+    const detail = await request(app).get(`/api/inspections/${inspectionId}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.media.find((m: { id: number }) => m.id === res.body.id)).toMatchObject({
+      capturedAt,
+      createdAt: res.body.createdAt,
+    });
+  });
+
+  it("keeps capturedAt nullable for legacy media registrations", async () => {
+    asUser(TECH_ID);
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "photo", url: uniqueUrl("legacy-no-captured-at") });
+
+    expect(res.status).toBe(201);
+    expect(res.body.capturedAt).toBeNull();
+    expect(res.body.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+    expect(Number.isNaN(new Date(res.body.createdAt).getTime())).toBe(false);
+
+    const [stored] = await db
+      .select()
+      .from(inspectionMediaTable)
+      .where(eq(inspectionMediaTable.id, res.body.id));
+    expect(stored.capturedAt).toBeNull();
+    expect(stored.createdAt.toISOString()).toBe(res.body.createdAt);
+  });
+
+  it("rejects an invalid capturedAt before registering media", async () => {
+    asUser(TECH_ID);
+    const url = uniqueUrl("invalid-captured-at");
+    const before = await db
+      .select()
+      .from(inspectionMediaTable)
+      .where(eq(inspectionMediaTable.inspectionId, inspectionId));
+    const res = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "photo", url, capturedAt: "not-a-timestamp" });
+
+    expect(res.status).toBe(400);
+    const after = await db
+      .select()
+      .from(inspectionMediaTable)
+      .where(eq(inspectionMediaTable.inspectionId, inspectionId));
+    expect(after).toHaveLength(before.length);
+  });
+
+  it("returns the original capturedAt and createdAt for duplicate registration", async () => {
+    asUser(TECH_ID);
+    const url = uniqueUrl("duplicate-captured-at");
+    const first = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "photo", url, capturedAt: "2021-02-03T04:05:06.000Z" });
+    const duplicate = await request(app)
+      .post(`/api/inspections/${inspectionId}/media`)
+      .send({ mediaType: "photo", url, capturedAt: "2022-03-04T05:06:07.000Z" });
+
+    expect(first.status).toBe(201);
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.body.id).toBe(first.body.id);
+    expect(duplicate.body.capturedAt).toBe(first.body.capturedAt);
+    expect(duplicate.body.createdAt).toBe(first.body.createdAt);
   });
 });

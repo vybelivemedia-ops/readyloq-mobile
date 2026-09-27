@@ -214,6 +214,36 @@ describe("beta error monitoring", () => {
     expect(res.body.events.some((e: { category: string }) => e.category === "auth")).toBe(true);
   });
 
+  it("counts a server-logged inventory warning event in the summary (Task #862 clamp warning)", async () => {
+    // The inventory category is never client-submittable through POST
+    // /beta/errors (see the zod enum below) — it's only ever written
+    // server-side via logErrorEvent("inventory", ...) when a treatment-log
+    // deduction clamps at 0. Insert directly to simulate that write path.
+    await db.insert(errorEventsTable).values({
+      companyId: companyAId,
+      category: "inventory",
+      message: "Technician reported applying 15 fl oz of Test Product but only 10 fl oz was on hand; balance clamped to 0.",
+      context: { route: "treatment-logs", reason: "insufficient_truck_stock" },
+      source: "server",
+    });
+
+    asUser(MGR_A_ID);
+    const res = await request(app).get("/api/beta/errors");
+    expect(res.status).toBe(200);
+    // Every ErrorCategory must have a numeric (never undefined/NaN) count.
+    expect(res.body.summary).toMatchObject({
+      upload: expect.any(Number),
+      ai: expect.any(Number),
+      report: expect.any(Number),
+      auth: expect.any(Number),
+      notification: expect.any(Number),
+      inventory: expect.any(Number),
+      total: expect.any(Number),
+    });
+    expect(res.body.summary.inventory).toBeGreaterThan(0);
+    expect(res.body.events.some((e: { category: string }) => e.category === "inventory")).toBe(true);
+  });
+
   it("records client-reported errors and scopes them per company", async () => {
     asUser(TECH_A_ID);
     const report = await request(app)

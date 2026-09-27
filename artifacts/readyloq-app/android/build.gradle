@@ -22,6 +22,15 @@ allprojects {
     google()
     mavenCentral()
     maven { url 'https://www.jitpack.io' }
+    // Meta's private GitHub Packages repository must be declared here because
+    // this project-level repository block takes precedence over settings.gradle.
+    maven {
+      url 'https://maven.pkg.github.com/facebook/meta-wearables-dat-android'
+      credentials {
+        username = System.getenv('GITHUB_PACKAGES_USERNAME') ?: System.getenv('GITHUB_ACTOR') ?: 'x-access-token'
+        password = System.getenv('GITHUB_PACKAGES_TOKEN') ?: System.getenv('GITHUB_TOKEN') ?: ''
+      }
+    }
   }
 }
 

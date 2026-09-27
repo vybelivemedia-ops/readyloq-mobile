@@ -8,9 +8,12 @@
 export interface InspectionInput {
     siteAddress: string;
     clientName?: string;
+    /** @nullable */
+    unitNumber?: string | null;
     technicianName: string;
     technicianId?: string;
     notes?: string;
+    visitPurpose?: string;
     pestTypes?: string[];
     /** Client-generated idempotency key (UUID). Retrying a create with the same key returns the previously created inspection (200) instead of duplicating it — required for offline-first sync retries. */
     clientKey?: string;

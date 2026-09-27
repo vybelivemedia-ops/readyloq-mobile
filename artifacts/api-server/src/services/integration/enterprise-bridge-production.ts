@@ -161,7 +161,7 @@ export class EnterpriseBridgeProductionService {
 
     return {
       CompanyId: data.companyId,
-      ExternalWorkOrderId: data.inspectionId,
+      ExternalWorkOrderId: data.externalWorkOrderId ?? data.inspectionId,
       LocationReference: {
         PropertyCode: data.propertyId,
       },

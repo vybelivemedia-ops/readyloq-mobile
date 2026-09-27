@@ -62,8 +62,7 @@ describe("resolveAnalysisCardVariant — query-error branch (task spec #1)", () 
   it("does NOT return 'query-error' when the inspection is not yet finalized", () => {
     const result = resolveAnalysisCardVariant({ ...base, finalized: false });
     expect(result.kind).not.toBe("query-error");
-    // Finalized guard fires first — error state must never show for un-uploaded inspections.
-    expect(result.kind).toBe("not-finalized");
+    expect(result.kind).toBe("ai-queued");
   });
 
   it("does NOT return 'query-error' when isError is false and analysis is available", () => {
@@ -77,7 +76,7 @@ describe("resolveAnalysisCardVariant — query-error branch (task spec #1)", () 
   });
 });
 
-describe("resolveAnalysisCardVariant — pipeline-incomplete branch", () => {
+describe("resolveAnalysisCardVariant — independent AI states", () => {
   const base: AnalysisQueryState = {
     finalized: true,
     isError: false,
@@ -86,14 +85,14 @@ describe("resolveAnalysisCardVariant — pipeline-incomplete branch", () => {
     photoCount: 3,
   };
 
-  it("returns 'pipeline-incomplete' when analysis.status is not 'complete'", () => {
-    expect(resolveAnalysisCardVariant(base).kind).toBe("pipeline-incomplete");
+  it("returns 'ai-failed' for an explicit failed status", () => {
+    expect(resolveAnalysisCardVariant(base).kind).toBe("ai-failed");
   });
 
   it("carries the generic placeholder text when failureReason is absent", () => {
     const variant = resolveAnalysisCardVariant(base);
-    if (variant.kind === "pipeline-incomplete") {
-      expect(variant.placeholder.reason).toMatch(/AI analysis didn't complete/);
+    if (variant.kind === "ai-failed") {
+      expect(variant.placeholder.reason).toMatch(/AI analysis is incomplete/);
       expect(variant.placeholder.icon).toBe("alert-circle-outline");
       expect(variant.placeholder.tone).toBe("error");
     }
@@ -104,8 +103,8 @@ describe("resolveAnalysisCardVariant — pipeline-incomplete branch", () => {
       ...base,
       analysis: { status: "failed", findings: [], failureReason: "Image resolution too low" },
     });
-    expect(variant.kind).toBe("pipeline-incomplete");
-    if (variant.kind === "pipeline-incomplete") {
+    expect(variant.kind).toBe("ai-failed");
+    if (variant.kind === "ai-failed") {
       expect(variant.placeholder.reason).toBe("Image resolution too low");
     }
   });
@@ -115,9 +114,9 @@ describe("resolveAnalysisCardVariant — pipeline-incomplete branch", () => {
       ...base,
       analysis: { status: "failed", findings: [], failureReason: null },
     });
-    expect(variant.kind).toBe("pipeline-incomplete");
-    if (variant.kind === "pipeline-incomplete") {
-      expect(variant.placeholder.reason).toMatch(/AI analysis didn't complete/);
+    expect(variant.kind).toBe("ai-failed");
+    if (variant.kind === "ai-failed") {
+      expect(variant.placeholder.reason).toMatch(/AI analysis is incomplete/);
     }
   });
 
@@ -133,13 +132,42 @@ describe("resolveAnalysisCardVariant — pipeline-incomplete branch", () => {
     }
   });
 
-  it("returns 'pipeline-incomplete' for any non-complete status string", () => {
-    for (const status of ["failed", "processing", "error", "skipped", ""]) {
+  it("distinguishes queued, analyzing, partial, complete, and failed", () => {
+    const expected = new Map([
+      ["queued", "ai-queued"],
+      ["pending", "ai-queued"],
+      ["analyzing", "ai-analyzing"],
+      ["processing", "ai-analyzing"],
+      ["partial", "ai-partial"],
+      ["failed", "ai-failed"],
+      ["error", "ai-failed"],
+    ]);
+    for (const [status, kind] of expected) {
+      const result = resolveAnalysisCardVariant({
+        ...base,
+        analysis: { status, analysisErrors: status === "partial" ? 1 : 0, findings: [] },
+      });
+      expect(result.kind).toBe(kind);
+    }
+  });
+
+  it("fails closed for unknown non-complete statuses", () => {
+    for (const status of ["skipped", ""]) {
       const result = resolveAnalysisCardVariant({
         ...base,
         analysis: { status, findings: [] },
       });
       expect(result.kind).toBe("pipeline-incomplete");
+    }
+  });
+
+  it("never represents queued, analyzing, partial, or failed AI as clean", () => {
+    for (const status of ["queued", "analyzing", "partial", "failed"]) {
+      const result = resolveAnalysisCardVariant({
+        ...base,
+        analysis: { status, analysisErrors: status === "partial" ? 1 : 0, findings: [] },
+      });
+      expect(result.kind).not.toBe("clean");
     }
   });
 
@@ -325,8 +353,8 @@ describe("resolveAnalysisCardVariant — no-analysis-record branch", () => {
   });
 });
 
-describe("resolveAnalysisCardVariant — not-finalized and loading branches", () => {
-  it("returns 'not-finalized' when finalized is false, regardless of query state", () => {
+describe("resolveAnalysisCardVariant — queued and analyzing branches", () => {
+  it("returns 'ai-queued' when finalized is false and no analysis exists", () => {
     expect(
       resolveAnalysisCardVariant({
         finalized: false,
@@ -335,10 +363,10 @@ describe("resolveAnalysisCardVariant — not-finalized and loading branches", ()
         analysis: undefined,
         photoCount: 5,
       }).kind,
-    ).toBe("not-finalized");
+    ).toBe("ai-queued");
   });
 
-  it("'not-finalized' wins even when isError is true (guard fires before error check)", () => {
+  it("'ai-queued' wins over a query error while evidence is still syncing", () => {
     const result = resolveAnalysisCardVariant({
       finalized: false,
       isError: true,
@@ -346,11 +374,23 @@ describe("resolveAnalysisCardVariant — not-finalized and loading branches", ()
       analysis: undefined,
       photoCount: 0,
     });
-    expect(result.kind).toBe("not-finalized");
+    expect(result.kind).toBe("ai-queued");
     expect(result.kind).not.toBe("query-error");
   });
 
-  it("returns 'loading' when finalized and neither error nor success", () => {
+  it("returns 'ai-analyzing' when registered evidence is actively processing", () => {
+    const result = resolveAnalysisCardVariant({
+      finalized: false,
+      analysisInProgress: true,
+      isError: false,
+      isSuccess: true,
+      analysis: null,
+      photoCount: 3,
+    });
+    expect(result.kind).toBe("ai-analyzing");
+  });
+
+  it("returns 'ai-analyzing' when finalized and neither error nor success", () => {
     const result = resolveAnalysisCardVariant({
       finalized: true,
       isError: false,
@@ -358,7 +398,7 @@ describe("resolveAnalysisCardVariant — not-finalized and loading branches", ()
       analysis: undefined,
       photoCount: 3,
     });
-    expect(result.kind).toBe("loading");
+    expect(result.kind).toBe("ai-analyzing");
   });
 });
 

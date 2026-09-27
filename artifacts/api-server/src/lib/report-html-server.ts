@@ -6,6 +6,7 @@ type Inspection = typeof inspectionsTable.$inferSelect;
 
 interface Finding {
   category?: string;
+  species?: string | null;
   description?: string;
   severity?: string;
   location?: string;
@@ -18,6 +19,9 @@ interface Finding {
 interface MediaRecord {
   url: string;
   captureMetadata?: Record<string, unknown> | null;
+  caption?: string | null;
+  unitNumber?: string | null;
+  createdAt?: Date | string | null;
 }
 
 /** Sub-object stored inside captureMetadata.laserMeasurement */
@@ -350,6 +354,35 @@ export function buildServerReportHtml(
       )
     : "";
 
+  const photoEvidenceHtml =
+    media.length === 0
+      ? ""
+      : section(
+          "Photo Evidence",
+          `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+            ${media
+              .map((photo, index) => {
+                const finding = findings.find((item) => item.imageUrl === photo.url);
+                const classification = finding?.species || finding?.category || "Unclassified";
+                const unit = photo.unitNumber || inspection.unitNumber || null;
+                const image = imageDataMap.get(photo.url);
+                const capturedAt = photo.createdAt
+                  ? new Date(photo.createdAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+                  : null;
+                return `<figure style="margin:0;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff">
+                  ${image
+                    ? `<img src="${image}" alt="${esc(classification)} evidence photo" style="width:100%;height:180px;object-fit:cover;display:block;background:#f1f5f9" />`
+                    : `<div style="height:180px;background:#f1f5f9;color:#6b7280;display:flex;align-items:center;justify-content:center;font-size:12px">Photo unavailable</div>`}
+                  <figcaption style="padding:9px 10px;font-size:11px;color:#374151">
+                    <strong>${esc(classification)}</strong>${unit ? ` · Unit ${esc(unit)}` : ""}${capturedAt ? ` · ${esc(capturedAt)}` : ""}
+                    ${photo.caption ? `<div style="margin-top:4px;color:#6b7280">${esc(photo.caption)}</div>` : ""}
+                  </figcaption>
+                </figure>`;
+              })
+              .join("")}
+          </div>`,
+        );
+
   const pestTypes = ((inspection.pestTypes ?? []) as string[]).join(", ");
 
   // ── Signature section ──────────────────────────────────────────────────────
@@ -444,9 +477,11 @@ export function buildServerReportHtml(
       "Inspection Details",
       `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
         ${[
+           ["Inspection ID", `#${inspection.id}`],
           ["Date", report.inspectionDate],
           ["Technician", report.technicianName],
           ["Client", report.clientName],
+          ["Unit / Apt #", inspection.unitNumber || null],
           ["Pest Types", pestTypes || null],
         ]
           .filter(([, v]) => v)
@@ -466,6 +501,7 @@ export function buildServerReportHtml(
     ${exclHtml}
     ${narrativeHtml}
     ${treatmentHtml}
+    ${photoEvidenceHtml}
     ${sigHtml}
 
     <!-- Footer -->

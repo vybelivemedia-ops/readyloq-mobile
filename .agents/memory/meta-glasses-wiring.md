@@ -9,6 +9,11 @@ description: How the Ray-Ban Meta glasses integrate into the ReadyLoq inspection
 - **Webhook URL**: includes `?session=<uuid>` so Meta routes to the right session without a new DB table.
 - **Mobile polling**: `GET /api/meta-glasses/events/:sessionId?since=<ms>` every 3s (no SSE — Hermes lacks EventSource).
 - **Session store**: in-memory `Map<string, ActiveSession>` with 24h TTL + 15-min prune interval (no DB table needed).
+- **Optional-provider rule**: a persisted inspection ID never activates Meta by itself. Cloud registration/polling requires explicit per-inspection enablement; disabling Meta clears the session while the phone camera remains primary.
+
+**Why:** Automatically activating Meta for every persisted phone-camera inspection consumed the shared API budget and surfaced irrelevant glasses failures.
+
+**How to apply:** Gate every Meta session, polling, and telemetry path on explicit wearable activation. Keep native phone capture available before, during, and after wearable disconnects.
 
 ## Key files
 - `artifacts/api-server/src/routes/meta-glasses.ts` — HMAC-verified webhook, voice command parser, audio→Whisper, image→OpenAI vision, event buffer, session + events routes
@@ -40,3 +45,19 @@ Real-time voice + image capture without phone-in-hand. Glasses push events via M
 **Why:** A successful EAS build can silently omit config-plugin-only native changes when an existing Android project is used.
 
 **How to apply:** Any new Android native integration should update the native manifest/Gradle directly (and retain a plugin only for future clean prebuilds), then validate the packaged APK rather than only its source configuration.
+
+## Meta SDK dependency availability
+- Do not assume Meta Wearables Android artifacts are published to Google Maven, Maven Central, JitPack, or Sonatype snapshots. Confirm Meta's official repository and currently supported coordinates before adding them to a release build.
+- Meta's GitHub Packages repository requires a nonempty Basic-auth username plus a token with `read:packages`. Preview/EAS uses the dedicated classic-PAT package secret; GitHub Actions may use its actor plus `GITHUB_TOKEN`. Do not fall back to the project's general `GH_TOKEN`, whose repository/workflow scopes do not grant package access.
+
+**Why:** A preview build passed JavaScript, type, test, R8, Metro, and EAS pre-build checks but failed in Gradle because the declared Meta Wearables artifacts could not be resolved from any configured repository.
+
+**How to apply:** Before another remote build, verify the SDK distribution instructions and repository access locally or with a dependency-resolution-only Gradle check. A 302 from GitHub Packages followed by a 200 from its signed file host is successful authenticated access; do not spend a build merely to test whether the artifacts exist.
+
+## EAS verification evidence
+- EAS build log files are Brotli-compressed NDJSON even though their object names end in `.txt`; download them with content decompression enabled before parsing each line's `msg`.
+- Normal Gradle output may not print individual authenticated package downloads. Treat a successful native compile plus Meta DAT classes/native libraries in the APK as resolution evidence, and separately decode the APK's binary manifest for metadata and callback structure.
+
+**Why:** Plain log downloads look like corrupt binary data, and relying only on source declarations or string matches can falsely claim that a release APK contains a structurally valid callback.
+
+**How to apply:** For release verification, combine the successful `assembleRelease` result, absence of Meta resolution errors, packaged DAT code/native libraries, and decoded binary-manifest attributes.

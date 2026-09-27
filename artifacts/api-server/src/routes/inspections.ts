@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { inspectionsTable, inspectionMediaTable, reportsTable } from "@workspace/db";
 import { eq, and, desc, ne } from "drizzle-orm";
+import { z } from "zod/v4";
 import { getCompanyId } from "../lib/tenant";
 import {
   ensureReportForInspection,
@@ -10,6 +11,17 @@ import {
 import { logErrorEvent } from "../lib/error-events";
 
 const router = Router();
+const capturedAtSchema = z.iso.datetime({ offset: true });
+
+// Keep media timestamps consistent across every inspection response. Drizzle
+// returns timestamp columns as Date instances, while the API contract is ISO.
+function serializeMedia(media: typeof inspectionMediaTable.$inferSelect) {
+  return {
+    ...media,
+    createdAt: media.createdAt.toISOString(),
+    capturedAt: media.capturedAt?.toISOString() ?? null,
+  };
+}
 
 // GET /inspections
 router.get("/", async (req, res) => {
@@ -39,7 +51,7 @@ router.get("/", async (req, res) => {
         return {
           ...insp,
           pestTypes: insp.pestTypes ?? [],
-          media,
+          media: media.map(serializeMedia),
           createdAt: insp.createdAt.toISOString(),
           completedAt: insp.completedAt?.toISOString() ?? null,
         };
@@ -55,8 +67,18 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
-    const { siteAddress, clientName, technicianName, technicianId, notes, pestTypes, clientKey, scheduledDate } =
-      req.body;
+    const {
+      siteAddress,
+      clientName,
+      technicianName,
+      technicianId,
+      notes,
+      pestTypes,
+      clientKey,
+      scheduledDate,
+      unitNumber,
+      visitPurpose,
+    } = req.body;
     if (!siteAddress || !technicianName) {
       return res.status(400).json({ error: "siteAddress and technicianName are required" });
     }
@@ -107,6 +129,9 @@ router.post("/", async (req, res) => {
         status: "pending",
         clientKey: key,
         scheduledDate: parsedScheduledDate,
+        unitNumber: typeof unitNumber === "string" && unitNumber.trim() ? unitNumber.trim() : null,
+        visitPurpose:
+          typeof visitPurpose === "string" && visitPurpose.trim() ? visitPurpose.trim() : null,
       })
       .onConflictDoNothing({
         target: [inspectionsTable.companyId, inspectionsTable.clientKey],
@@ -168,7 +193,7 @@ router.get("/:id", async (req, res) => {
     return res.json({
       ...row,
       pestTypes: row.pestTypes ?? [],
-      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+      media: media.map(serializeMedia),
       createdAt: row.createdAt.toISOString(),
       completedAt: row.completedAt?.toISOString() ?? null,
     });
@@ -196,6 +221,8 @@ router.patch("/:id", async (req, res) => {
       // is already stored.  Without it, an explicit null is rejected with 409 so
       // a momentarily-null re-sign flow cannot accidentally wipe the DB value.
       resignatureConsent,
+      unitNumber,
+      visitPurpose,
     } = req.body;
 
     // Guard: an explicit null ownerSignature must not silently overwrite a
@@ -226,6 +253,8 @@ router.patch("/:id", async (req, res) => {
     if (ownerSignature !== undefined) updateData.ownerSignature = ownerSignature;
     if (ownerNotAvailable !== undefined) updateData.ownerNotAvailable = ownerNotAvailable;
     if (signedAt !== undefined) updateData.signedAt = new Date(signedAt);
+    if (unitNumber !== undefined) updateData.unitNumber = typeof unitNumber === "string" && unitNumber.trim() ? unitNumber.trim() : null;
+    if (visitPurpose !== undefined) updateData.visitPurpose = typeof visitPurpose === "string" && visitPurpose.trim() ? visitPurpose.trim() : null;
     if (Object.keys(updateData).length === 0) {
       const [current] = await db
         .select()
@@ -244,7 +273,7 @@ router.patch("/:id", async (req, res) => {
       return res.json({
         ...current,
         pestTypes: current.pestTypes ?? [],
-        media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        media: media.map(serializeMedia),
         createdAt: current.createdAt.toISOString(),
         completedAt: current.completedAt?.toISOString() ?? null,
       });
@@ -255,6 +284,22 @@ router.patch("/:id", async (req, res) => {
       .where(and(eq(inspectionsTable.id, id), eq(inspectionsTable.companyId, companyId)))
       .returning();
     if (!row) return res.status(404).json({ error: "Not found" });
+    // The inspection is the source of truth for evidence attribution. When a
+    // technician corrects a unit during sign-off, carry that exact value to
+    // every media row already captured for this inspection. The tenant and
+    // parent-id predicates keep the cascade strictly inside the caller's
+    // company, and an explicit null intentionally clears stale media labels.
+    if (unitNumber !== undefined) {
+      await db
+        .update(inspectionMediaTable)
+        .set({ unitNumber: row.unitNumber })
+        .where(
+          and(
+            eq(inspectionMediaTable.companyId, companyId),
+            eq(inspectionMediaTable.inspectionId, id),
+          ),
+        );
+    }
     const media = await db
       .select()
       .from(inspectionMediaTable)
@@ -267,7 +312,7 @@ router.patch("/:id", async (req, res) => {
     return res.json({
       ...row,
       pestTypes: row.pestTypes ?? [],
-      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+      media: media.map(serializeMedia),
       createdAt: row.createdAt.toISOString(),
       completedAt: row.completedAt?.toISOString() ?? null,
     });
@@ -307,7 +352,7 @@ router.post("/:id/complete", async (req, res) => {
       return {
         ...row,
         pestTypes: row.pestTypes ?? [],
-        media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        media: media.map(serializeMedia),
         createdAt: row.createdAt.toISOString(),
         completedAt: row.completedAt?.toISOString() ?? null,
       };
@@ -439,7 +484,7 @@ router.post("/:id/reopen", async (req, res) => {
       return res.json({
         ...inspection,
         pestTypes: inspection.pestTypes ?? [],
-        media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+        media: media.map(serializeMedia),
         createdAt: inspection.createdAt.toISOString(),
         completedAt: null,
         alreadyOpen: true,
@@ -465,7 +510,7 @@ router.post("/:id/reopen", async (req, res) => {
     return res.json({
       ...updated,
       pestTypes: updated.pestTypes ?? [],
-      media: media.map((m) => ({ ...m, createdAt: m.createdAt.toISOString() })),
+      media: media.map(serializeMedia),
       createdAt: updated.createdAt.toISOString(),
       completedAt: null,
       alreadyOpen: false,
@@ -494,9 +539,30 @@ router.post("/:id/media", async (req, res) => {
   try {
     const companyId = getCompanyId(req);
     const inspectionId = parseInt(req.params.id);
-    const { mediaType, url, filename, caption, durationSec, captureSource, qualityScore, captureMetadata } = req.body;
+    const {
+      mediaType,
+      url,
+      filename,
+      caption,
+      durationSec,
+      captureSource,
+      qualityScore,
+      captureMetadata,
+      unitNumber,
+      capturedAt,
+    } = req.body;
     if (!mediaType || !url)
       return res.status(400).json({ error: "mediaType and url are required" });
+    // A supplied capture timestamp must be a real timestamp. Validate before
+    // looking up or writing any rows so malformed client data cannot reach DB.
+    let parsedCapturedAt: Date | null = null;
+    if (capturedAt !== undefined) {
+      const parsed = capturedAtSchema.safeParse(capturedAt);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid capturedAt — expected a timestamp" });
+      }
+      parsedCapturedAt = new Date(parsed.data);
+    }
     const VALID_MEDIA_TYPES = ["photo", "image", "video", "document", "audio", "voice"] as const;
     if (!VALID_MEDIA_TYPES.includes(mediaType)) {
       return res.status(400).json({
@@ -527,7 +593,7 @@ router.post("/:id/media", async (req, res) => {
       )
       .limit(1);
     if (existing) {
-      return res.status(200).json({ ...existing, createdAt: existing.createdAt.toISOString() });
+      return res.status(200).json(serializeMedia(existing));
     }
     const [row] = await db
       .insert(inspectionMediaTable)
@@ -549,6 +615,11 @@ router.post("/:id/media", async (req, res) => {
           captureMetadata && typeof captureMetadata === "object" && !Array.isArray(captureMetadata)
             ? (captureMetadata as Record<string, unknown>)
             : null,
+        capturedAt: parsedCapturedAt,
+        unitNumber:
+          typeof unitNumber === "string" && unitNumber.trim()
+            ? unitNumber.trim()
+            : inspection.unitNumber ?? null,
       })
       .returning();
     // update media count (scoped to the caller's company)
@@ -567,7 +638,7 @@ router.post("/:id/media", async (req, res) => {
       .where(
         and(eq(inspectionsTable.id, inspectionId), eq(inspectionsTable.companyId, companyId)),
       );
-    return res.status(201).json({ ...row, createdAt: row.createdAt.toISOString() });
+    return res.status(201).json(serializeMedia(row));
   } catch (err) {
     return res.status(500).json({ error: "Failed to add media" });
   }

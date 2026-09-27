@@ -409,6 +409,23 @@ export declare const productLabelRulesTable: import("drizzle-orm/pg-core").PgTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        retreatmentIntervalDays: import("drizzle-orm/pg-core").PgColumn<{
+            name: "retreatment_interval_days";
+            tableName: "product_label_rules";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "product_label_rules";
@@ -610,6 +627,7 @@ export declare const insertLabelRulesSchema: z.ZodObject<{
     maxTempF: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     phytotoxicityNotes: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     reEntryIntervalHours: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    retreatmentIntervalDays: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
 }, {
     out: {};
     in: {};
@@ -849,6 +867,23 @@ export declare const selectLabelRulesSchema: import("drizzle-zod").BuildSchema<"
         tableName: "product_label_rules";
         dataType: "number";
         columnType: "PgReal";
+        data: number;
+        driverParam: string | number;
+        notNull: false;
+        hasDefault: false;
+        isPrimaryKey: false;
+        isAutoincrement: false;
+        hasRuntimeDefault: false;
+        enumValues: undefined;
+        baseColumn: never;
+        identity: undefined;
+        generated: undefined;
+    }, {}, {}>;
+    retreatmentIntervalDays: import("drizzle-orm/pg-core").PgColumn<{
+        name: "retreatment_interval_days";
+        tableName: "product_label_rules";
+        dataType: "number";
+        columnType: "PgInteger";
         data: number;
         driverParam: string | number;
         notNull: false;
@@ -1124,6 +1159,23 @@ export declare const productWithRulesSchema: z.ZodObject<{
             tableName: "product_label_rules";
             dataType: "number";
             columnType: "PgReal";
+            data: number;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        retreatmentIntervalDays: import("drizzle-orm/pg-core").PgColumn<{
+            name: "retreatment_interval_days";
+            tableName: "product_label_rules";
+            dataType: "number";
+            columnType: "PgInteger";
             data: number;
             driverParam: string | number;
             notNull: false;

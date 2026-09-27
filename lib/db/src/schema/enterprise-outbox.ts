@@ -21,12 +21,15 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { companiesTable } from "./companies";
 import { inspectionsTable } from "./inspections";
 
 export type OutboxStatus =
   | "QUEUED"
+  | "PROCESSING"
   | "DELIVERED"
   | "RETRYABLE_FAILURE"
   | "PERMANENT_FAILURE"
@@ -56,6 +59,8 @@ export const enterpriseOutboxTable = pgTable(
     inspectionId: integer("inspection_id")
       .notNull()
       .references(() => inspectionsTable.id, { onDelete: "cascade" }),
+    /** Stable key used to deduplicate concurrent finalization events. */
+    idempotencyKey: text("idempotency_key"),
     /**
      * Full HardenedInspectionPayload serialised for replay without re-fetching
      * from the DB.  Treated as opaque JSON — do not query individual fields.
@@ -71,6 +76,11 @@ export const enterpriseOutboxTable = pgTable(
     lastErrorMessage: text("last_error_message"),
     /** Number of dispatch attempts (0 = queued but not yet attempted). */
     retryCount: integer("retry_count").notNull().default(0),
+    /** Earliest time a retry worker may claim the row. */
+    nextAttemptAt: timestamp("next_attempt_at"),
+    /** Worker lease fields; a stale lease may be reclaimed after a timeout. */
+    lockedAt: timestamp("locked_at"),
+    lockedBy: text("locked_by"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     /** Timestamp of the most recent dispatch attempt. */
     lastAttemptAt: timestamp("last_attempt_at"),
@@ -80,6 +90,9 @@ export const enterpriseOutboxTable = pgTable(
     index("enterprise_outbox_inspection_idx").on(t.inspectionId),
     // Lets the retry worker efficiently find rows that need re-processing.
     index("enterprise_outbox_status_created_idx").on(t.status, t.createdAt),
+    uniqueIndex("enterprise_outbox_idempotency_uidx")
+      .on(t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} IS NOT NULL`),
   ],
 );
 

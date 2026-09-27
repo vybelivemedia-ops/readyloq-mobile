@@ -21,6 +21,8 @@ import {
   Animated,
   AppState,
   BackHandler,
+  FlatList,
+  InteractionManager,
   Modal,
   Pressable,
   ScrollView,
@@ -39,8 +41,10 @@ import { VoiceMicButton } from "@/components/VoiceMicButton";
 import { useVoiceField } from "@/hooks/useVoiceField";
 import { type LocalBaitStation } from "@/lib/local/inspection-store";
 import { AuthedImage } from "@/components/AuthedImage";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { WifiCameraModal } from "@/components/WifiCameraModal";
 import { TreatmentLogWizard } from "@/components/TreatmentLogWizard";
+import { DailyRouteSetupModal } from "@/components/DailyRouteSetupModal";
 import { useDailyRoute } from "@/hooks/useDailyRoute";
 import { verifyEquipmentUsage } from "@/lib/audio/intelligence/EquipmentVerifier";
 import { DeviceHealthStrip } from "@/components/DeviceHealthStrip";
@@ -51,6 +55,7 @@ import { NativeCameraHealthBadge } from "@/components/NativeCameraHealthBadge";
 import { useAllDevicesHealthCheck } from "@/hooks/useAllDevicesHealthCheck";
 import { useSmartGuidance } from "@/hooks/useSmartGuidance";
 import { useMetaGlassesSession, type GlassesEvent } from "@/hooks/useMetaGlassesSession";
+import { useMetaWearablesSession } from "@/hooks/useMetaWearablesSession";
 import { useSmartGlassesBleFrames } from "@/hooks/useSmartGlassesBleFrames";
 import { getBleBadgeStyle, shouldShowBleBadge } from "@/lib/ble/badge-display";
 import { smartGlassesBle } from "@/lib/ble";
@@ -64,7 +69,7 @@ import { TextField } from "@/components/ui/TextField";
 import { useColors } from "@/hooks/useColors";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useWindowSizeClass } from "@/hooks/useWindowSizeClass";
-import { PEST_TYPES, PROPERTY_TYPES } from "@/constants/inspection";
+import { PEST_TYPES, PROPERTY_TYPES, VISIT_PURPOSES } from "@/constants/inspection";
 import {
   ApiError,
   fetchPlaybookCompliance,
@@ -102,6 +107,8 @@ import {
   updateLocalInspection,
   type LocalInspection,
 } from "@/lib/local/inspection-store";
+import { createInspectionIngestQueue } from "@/lib/local/inspection-ingest-queue";
+import { completeTechnicianWorkflow } from "@/lib/inspection/technician-completion";
 import { requestSync, syncNow } from "@/lib/sync/engine";
 import {
   assessEvidence,
@@ -129,7 +136,12 @@ const OFFLINE_NOTICE =
   "You're offline — everything is saved on this device and will sync automatically when you're back online.";
 
 type Step = "setup" | "capture" | "review";
-type Photo = { uri: string };
+type Photo = {
+  /** Stable across the cache-URI → durable-URI swap to avoid image remounts. */
+  id: string;
+  uri: string;
+  capturedAt?: string;
+};
 
 // Manual  — standard typed-form capture (no voice features)
 // Voice   — offline Whisper dictation, no network required
@@ -152,20 +164,34 @@ export default function NewInspectionScreen() {
   const queryClient = useQueryClient();
   const { user: clerkUser } = useUser();
   const { getToken } = useAuth();
-  const params = useLocalSearchParams<{ resume?: string }>();
+  const params = useLocalSearchParams<{
+    resume?: string;
+    /** Pre-filled site address from the Schedule tab stop card. */
+    address?: string;
+    /** Pre-filled client name from the Schedule tab stop card. */
+    client?: string;
+    /** Pre-filled unit / apartment number from the Schedule tab stop card. */
+    unit?: string;
+  }>();
 
   const generateReport = useGenerateReport();
   const generateNarrative = useGenerateReportNarrative();
 
   const [step, setStep] = useState<Step>("setup");
   const [mode, setMode] = useState<InspectionMode>("voice");
-  const [siteAddress, setSiteAddress] = useState("");
-  const [clientName, setClientName] = useState("");
+  const [siteAddress, setSiteAddress] = useState(params.address ?? "");
+  const [clientName, setClientName] = useState(params.client ?? "");
   const [technicianName, setTechnicianName] = useState(clerkUser?.fullName ?? "");
   const [propertyType, setPropertyType] = useState<string>(PROPERTY_TYPES[0]);
+  const [visitPurpose, setVisitPurpose] = useState<string | null>(null);
   const [pestTypes, setPestTypes] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  /** Unit / apt # read from the local record — shown as a badge in the capture header. */
+  const [displayUnitNumber, setDisplayUnitNumber] = useState<string | null>(
+    params.unit?.trim() || null,
+  );
   /** True when resuming a previously completed inspection — edits are locked. */
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -413,6 +439,18 @@ export default function NewInspectionScreen() {
   // Advisory warning from the on-device quality gate — auto-clears; never
   // blocks capture (poor evidence of a real problem beats no evidence).
   const [qualityNotice, setQualityNotice] = useState<string | null>(null);
+  // Post-treatment truck-stock notice — set from TreatmentLogWizard's
+  // onLogged callback whenever the server returned an updated on-hand
+  // baseline for the just-applied product. Dismissible and auto-clears;
+  // lets the technician decide on the spot whether they can treat the next
+  // stop or need to resupply before continuing. `low` styles it as a
+  // resupply warning instead of a plain confirmation.
+  const [stockNotice, setStockNotice] = useState<{
+    productName: string;
+    quantityOnHand: number;
+    unit: string;
+    low: boolean;
+  } | null>(null);
   // Vision Platform providers: every evidence source (live camera, imported
   // GoPro/glasses footage, future streams) funnels through the same
   // EvidenceItem contract into the same persist → sync → analyze pipeline.
@@ -464,6 +502,24 @@ export default function NewInspectionScreen() {
   const [faieStatus, setFaieStatus] = useState<string | null>(null);
   const [faiePendingConfirm, setFaiePendingConfirm] = useState<StructuredInspectionEvent | null>(null);
   const sessionManagerRef = useRef<AudioSessionManager | null>(null);
+  const faieStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showFaieStatus = useCallback(
+    (message: string | null, durationMs?: number, nextMessage: string | null = "Listening…") => {
+      if (faieStatusTimerRef.current) {
+        clearTimeout(faieStatusTimerRef.current);
+        faieStatusTimerRef.current = null;
+      }
+      setFaieStatus(message);
+      if (durationMs != null) {
+        faieStatusTimerRef.current = setTimeout(() => {
+          faieStatusTimerRef.current = null;
+          setFaieStatus(nextMessage);
+        }, durationMs);
+      }
+    },
+    [],
+  );
 
   // ── FAIE frame-buffer state ────────────────────────────────────────────────
   // A rolling background snapshot captured every 1 500 ms while the FAIE
@@ -473,17 +529,24 @@ export default function NewInspectionScreen() {
   //
   // The FrameBuffer instance is created once on mount.  takePicture reads
   // cameraRef at call time so no stale-closure issues arise.
+  const cameraCaptureQueueRef = useRef(createInspectionIngestQueue());
   const frameBufferRef = useRef<FrameBuffer>(
     createFrameBuffer({
       takePicture: async () => {
         // NOTE: cameraRef is populated by the CameraView component after mount.
         // Reading it inside this callback (not at createFrameBuffer time) avoids
         // a stale-closure problem.
-        const pic = await (cameraRef as React.RefObject<CameraView | null>).current?.takePictureAsync({
-          quality: 0.1,
-          skipProcessing: true,
+        if (captureLockedRef.current) return null;
+        return cameraCaptureQueueRef.current.enqueue(async () => {
+          // Re-check after waiting: a technician shutter always gets priority
+          // over a rolling context frame that has not started yet.
+          if (captureLockedRef.current) return null;
+          const pic = await (cameraRef as React.RefObject<CameraView | null>).current?.takePictureAsync({
+            quality: 0.1,
+            skipProcessing: true,
+          });
+          return pic?.uri ?? null;
         });
-        return pic?.uri ?? null;
       },
       deleteFile: FileSystem.deleteAsync,
     }),
@@ -543,7 +606,28 @@ export default function NewInspectionScreen() {
 
   // ── Chemical treatment log wizard ─────────────────────────────────────────
   const [showTreatmentWizard, setShowTreatmentWizard] = useState(false);
-  const { assignmentsWithProducts } = useDailyRoute();
+  const {
+    assignmentsWithProducts,
+    isSetupToday,
+    showSetupModal: showMorningKitModal,
+    openSetupModal: openMorningKitModal,
+    closeSetupModal: closeMorningKitModal,
+    saveRoute: saveMorningKit,
+  } = useDailyRoute();
+
+  // ── Morning kit auto-prompt ───────────────────────────────────────────────
+  // When the tech opens a new inspection and hasn't declared today's chemical
+  // kit yet, automatically open the DailyRouteSetupModal after a short delay
+  // (so the camera preview finishes loading first). A ref ensures we only
+  // prompt once per screen mount, even if isSetupToday briefly flickers.
+  const kitAutoPromptedRef = useRef(false);
+  useEffect(() => {
+    if (!isSetupToday && !kitAutoPromptedRef.current) {
+      kitAutoPromptedRef.current = true;
+      const timer = setTimeout(() => openMorningKitModal(), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [isSetupToday, openMorningKitModal]);
 
   // ── Offline status (T003) ─────────────────────────────────────────────────
   const { isConnected } = useNetworkStatus();
@@ -580,6 +664,7 @@ export default function NewInspectionScreen() {
       // takePictureAsync calls self-delete their output, clears the interval,
       // and fires a best-effort delete of the last buffered frame.
       frameBufferRef.current.stop();
+      if (faieStatusTimerRef.current) clearTimeout(faieStatusTimerRef.current);
       stopDictationRef.current?.();
       stopDictationRef.current = null;
       void sessionManagerRef.current?.cancelSession();
@@ -665,10 +750,10 @@ export default function NewInspectionScreen() {
       do {
       // Stamp the session start time so the session manager can timestamp events.
       sessionManagerRef.current.setVisionContext({ timestamp: Date.now() });
-      await sessionManagerRef.current.startSession(({ event, action }) => {
+      await sessionManagerRef.current.startSession(({ event, action, contextOnly }) => {
         // Flash the camera overlay and update the banner icon whenever the
         // session manager successfully attached a room snapshot to this event.
-        if (event.imageUri) {
+        if (contextOnly) {
           setLastEventHadFrame(true);
           frameCaptureAnim.setValue(0.5);
           Animated.timing(frameCaptureAnim, {
@@ -676,33 +761,30 @@ export default function NewInspectionScreen() {
             duration: 400,
             useNativeDriver: true,
           }).start();
-        } else {
-          setLastEventHadFrame(false);
+          return;
         }
+        setLastEventHadFrame(false);
         switch (action) {
           case ConfidenceAction.AUTO_COMMIT: {
             // 1. Voice-triggered photo capture ("snap", "take a photo", "capture")
             if (event.capturePhoto) {
               void takePhoto();
-              setFaieStatus("Capturing photo…");
+              showFaieStatus("Capturing photo…", 2500);
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setTimeout(() => setFaieStatus("Listening…"), 2500);
               break;
             }
 
             // 2. Explicit field routing via prefix ("client name is…", "site address is…")
             if (event.targetField === "clientName" && event.fieldValue) {
               setClientName(event.fieldValue);
-              setFaieStatus(`Client: "${event.fieldValue}"`);
+              showFaieStatus(`Client: "${event.fieldValue}"`, 2500);
               Speech.speak("Client name set", { rate: 1.1 });
-              setTimeout(() => setFaieStatus("Listening…"), 2500);
               break;
             }
             if (event.targetField === "siteAddress" && event.fieldValue) {
               setSiteAddress(event.fieldValue);
-              setFaieStatus(`Site: "${event.fieldValue}"`);
+              showFaieStatus(`Site: "${event.fieldValue}"`, 2500);
               Speech.speak("Site address set", { rate: 1.1 });
-              setTimeout(() => setFaieStatus("Listening…"), 2500);
               break;
             }
 
@@ -710,12 +792,11 @@ export default function NewInspectionScreen() {
             if (event.equipment) {
               const activePest = pestTypes[pestTypes.length - 1] ?? null;
               const result = verifyEquipmentUsage(event.equipment, activePest, assignmentsWithProducts);
-              setFaieStatus(result.message);
+              showFaieStatus(result.message, 4000);
               if (result.needsAttention) {
                 void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               }
               Speech.speak(result.message, { rate: 1.05 });
-              setTimeout(() => setFaieStatus("Listening…"), 4000);
               break;
             }
 
@@ -733,10 +814,9 @@ export default function NewInspectionScreen() {
                 notes: event.severity ? `Severity: ${event.severity}` : undefined,
               });
               const summary = `Bait: ${event.product ?? "station"} @ ${where}`;
-              setFaieStatus(summary);
+              showFaieStatus(summary, 3000);
               void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Speech.speak(`Logged ${event.product ?? "bait station"}`, { rate: 1.1 });
-              setTimeout(() => setFaieStatus("Listening…"), 3000);
               break;
             }
 
@@ -757,8 +837,7 @@ export default function NewInspectionScreen() {
               const severityTag = event.severity ? ` [${event.severity}]` : "";
               const line = `${formatEvent(event)}${severityTag}`;
               setNotes((prev) => (prev.trim() ? `${prev.trim()}\n${line}` : line));
-              setFaieStatus(`Logged: ${line}`);
-              setTimeout(() => setFaieStatus("Listening…"), 3000);
+              showFaieStatus(`Logged: ${line}`, 3000);
             }
             break;
           }
@@ -769,33 +848,29 @@ export default function NewInspectionScreen() {
             if (event.equipment) {
               const activePest = pestTypes[pestTypes.length - 1] ?? null;
               const result = verifyEquipmentUsage(event.equipment, activePest, assignmentsWithProducts);
-              setFaieStatus(`${result.message} ~`);
+              showFaieStatus(`${result.message} ~`, 4000);
               if (result.needsAttention) {
                 void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               }
               Speech.speak(result.message, { rate: 1.05 });
-              setTimeout(() => setFaieStatus("Listening…"), 4000);
               break;
             }
             if (event.capturePhoto) {
               void takePhoto();
-              setFaieStatus("Capturing photo…");
+              showFaieStatus("Capturing photo…", 2500);
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setTimeout(() => setFaieStatus("Listening…"), 2500);
               break;
             }
             if (event.targetField === "clientName" && event.fieldValue) {
               setClientName(event.fieldValue);
-              setFaieStatus(`Client: "${event.fieldValue}" ~`);
+              showFaieStatus(`Client: "${event.fieldValue}" ~`, 2500);
               Speech.speak("Client name set", { rate: 1.1 });
-              setTimeout(() => setFaieStatus("Listening…"), 2500);
               break;
             }
             if (event.targetField === "siteAddress" && event.fieldValue) {
               setSiteAddress(event.fieldValue);
-              setFaieStatus(`Site: "${event.fieldValue}" ~`);
+              showFaieStatus(`Site: "${event.fieldValue}" ~`, 2500);
               Speech.speak("Site address set", { rate: 1.1 });
-              setTimeout(() => setFaieStatus("Listening…"), 2500);
               break;
             }
             if (
@@ -809,9 +884,8 @@ export default function NewInspectionScreen() {
                 status: "active",
                 notes: event.severity ? `Severity: ${event.severity}` : undefined,
               });
-              setFaieStatus(`Bait ~: ${event.product ?? "station"} @ ${where}`);
+              showFaieStatus(`Bait ~: ${event.product ?? "station"} @ ${where}`, 3000);
               void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              setTimeout(() => setFaieStatus("Listening…"), 3000);
               break;
             }
             {
@@ -828,14 +902,12 @@ export default function NewInspectionScreen() {
               const severityTag = event.severity ? ` [${event.severity}]` : "";
               const line = `${formatEvent(event)}${severityTag}`;
               setNotes((prev) => (prev.trim() ? `${prev.trim()}\n${line}` : line));
-              setFaieStatus(`Auto-logged ~: ${line}`);
-              setTimeout(() => setFaieStatus("Listening…"), 3000);
+              showFaieStatus(`Auto-logged ~: ${line}`, 3000);
             }
             break;
           }
           case ConfidenceAction.ASK_AGAIN:
-            setFaieStatus("Didn't catch that — please repeat.");
-            setTimeout(() => setFaieStatus("Listening…"), 2500);
+            showFaieStatus("Didn't catch that — please repeat.", 2500);
             break;
         }
       }, {
@@ -917,11 +989,17 @@ export default function NewInspectionScreen() {
   // photos are uploaded once and never re-uploaded or re-analyzed at submit.
   const [wsInspectionId, setWsInspectionId] = useState<number | null>(null);
   const [wsAnalyzing, setWsAnalyzing] = useState(false);
+  // An unsuccessful photo remains retryable by sync, but must not trigger the
+  // same live analysis batch every 2.5 seconds when no new evidence arrived.
+  const lastWorkspaceAnalysisPhotoCount = useRef(0);
 
   // ── #74 — Glasses-capture findings buffer ──────────────────────────────────
   // Persisted across the full inspection session. Each entry is a GlassesEvent
   // with a server-persisted frame (mediaId set) and/or a structured AI finding.
   const [glassesFindings, setGlassesFindings] = useState<GlassesEvent[]>([]);
+  // Meta cloud relay is opt-in per inspection. A persisted inspection ID alone
+  // must never create a Meta session or start polling.
+  const [metaCloudEnabled, setMetaCloudEnabled] = useState(false);
   // #110 — full-screen viewer for glasses-captured frames
   const [glassesViewerPath, setGlassesViewerPath] = useState<string | null>(null);
 
@@ -986,12 +1064,11 @@ export default function NewInspectionScreen() {
   }));
 
   // ── Meta glasses session (Ray-Ban Live AI hands-free integration) ──────────
-  // Registers a session with the API when an inspection is persisted so the
-  // tech's glasses can forward voice + camera events in real-time. The 6-char
-  // code is shown in the glasses strip below so the tech can pair the glasses.
+  // Registers only after the technician explicitly enables the optional Meta
+  // cloud relay. Phone-camera inspections never create or poll a Meta session.
   const glassesSession = useMetaGlassesSession({
     inspectionId: wsInspectionId,
-    active: wsInspectionId != null,
+    active: wsInspectionId != null && metaCloudEnabled,
     onFinding: useCallback(
       (event: GlassesEvent) => {
         // Persist frame findings in state so the detections panel stays up.
@@ -1002,12 +1079,9 @@ export default function NewInspectionScreen() {
           );
         }
         // Brief FAIE toast for immediate haptic feedback.
-        setFaieStatus(`🕶 ${event.text}`);
-        setTimeout(() => setFaieStatus(null), 4_000);
+        showFaieStatus(`🕶 ${event.text}`, 4_000, null);
       },
-      // setFaieStatus and setGlassesFindings are stable React setState refs.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      [],
+      [showFaieStatus],
     ),
   });
 
@@ -1023,14 +1097,16 @@ export default function NewInspectionScreen() {
     // Routing through ingestEvidence ensures persistPhoto durably copies the
     // frame to documentDirectory before the cache source is removed.
     onFrame: async (uri: string) => {
-      await ingestEvidence([{
+      const persisted = await ingestEvidence([{
         id: `ble_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
         uri,
         source: "smart_glasses" as const,
         capturedAt: new Date().toISOString(),
       }]);
-      setFaieStatus("🕶 BLE frame captured");
-      setTimeout(() => setFaieStatus(null), 3_000);
+      if (!persisted) {
+        throw new Error("BLE glasses photo was not saved to this inspection.");
+      }
+      showFaieStatus("🕶 BLE frame captured", 3_000, null);
     },
     // Post BLE frame-drop telemetry to the active meta-glasses session so the
     // engineering team can identify faulty hardware in the portal BLE Health page.
@@ -1046,6 +1122,30 @@ export default function NewInspectionScreen() {
     },
   });
 
+  // ── Official Android Meta glasses capture ─────────────────────────────────
+  // DAT emits only a real, local image file after Meta AI approves the camera
+  // permission and its stream completes a capture. It goes through the exact
+  // same local-first evidence intake as phone, Wi-Fi, and custom BLE sources.
+  const metaWearables = useMetaWearablesSession({
+    onCapture: async (capture) => {
+      const persisted = await ingestEvidence([{
+        id: `meta_dat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        uri: capture.uri,
+        source: "smart_glasses" as const,
+        capturedAt: capture.capturedAt,
+        metadata: {
+          captureTransport: "meta_wearables_device_access_toolkit",
+          nativeCaptureSource: capture.source,
+          mimeType: capture.mimeType,
+        },
+      }]);
+      if (!persisted) {
+        throw new Error("Meta glasses photo was not saved to this inspection.");
+      }
+      showFaieStatus("Meta glasses photo added to inspection", 3_000, null);
+    },
+  });
+
   // #106 — Haptic alert the moment glasses first go silent (isInactive flips true).
   // The amber strip already changes colour; the vibration grabs attention without
   // requiring the technician to glance at the screen.
@@ -1057,6 +1157,18 @@ export default function NewInspectionScreen() {
   const [wsError, setWsError] = useState<string | null>(null);
   const [uploadedCount, setUploadedCount] = useState(0);
   const analyzedCount = useRef(0);
+  const wsAnalysisRunningRef = useRef(false);
+  const ingestQueueRef = useRef(createInspectionIngestQueue());
+  const intakeClosedRef = useRef(false);
+  const [pendingIngestCount, setPendingIngestCount] = useState(0);
+  const deferredPixelItemsRef = useRef<Array<{ localUri: string; item: EvidenceItem }>>([]);
+  const deferredPixelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (deferredPixelTimerRef.current) clearTimeout(deferredPixelTimerRef.current);
+    };
+  }, []);
 
   // RLQ-008: tick incremented by useFocusEffect to re-read allFindingsReviewed on resume.
   const [reviewTick, setReviewTick] = useState(0);
@@ -1089,14 +1201,16 @@ export default function NewInspectionScreen() {
         setClientName(rec.clientName);
         setTechnicianName(rec.technicianName || (clerkUser?.fullName ?? ""));
         setPropertyType(rec.propertyType || PROPERTY_TYPES[0]);
+        setVisitPurpose(rec.visitPurpose ?? null);
         setPestTypes(rec.pestTypes);
         setNotes(rec.notes);
-        setPhotos(rec.photos.map((p) => ({ uri: p.localUri })));
+        setPhotos(rec.photos.map((p) => ({ id: p.localUri, uri: p.localUri, capturedAt: p.capturedAt })));
         setUploadedCount(rec.photos.filter((p) => p.storagePath).length);
         analyzedCount.current = rec.analyzedCount;
         if (rec.serverId != null) setWsInspectionId(rec.serverId);
         if (rec.baitStations?.length) setBaitStations(rec.baitStations);
         if (rec.completed) setIsCompleted(true);
+        setDisplayUnitNumber(rec.unitNumber ?? null);
         setStep(rec.photos.length > 0 ? "capture" : "setup");
       }
       setHydrated(true);
@@ -1111,7 +1225,7 @@ export default function NewInspectionScreen() {
     const t = setTimeout(() => void persistDraft(), 600);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [siteAddress, clientName, technicianName, propertyType, pestTypes, notes]);
+  }, [siteAddress, clientName, technicianName, propertyType, visitPurpose, pestTypes, notes]);
 
   // RLQ-008: re-read allFindingsReviewed when the screen gains focus (e.g. after
   // returning from the findings-review screen).
@@ -1123,6 +1237,7 @@ export default function NewInspectionScreen() {
         const fresh = await getLocalInspection(rec.localId);
         if (fresh) recordRef.current = fresh;
         setReviewTick((t) => t + 1);
+        setDisplayUnitNumber(fresh?.unitNumber ?? null);
       })();
     }, []),
   );
@@ -1136,6 +1251,7 @@ export default function NewInspectionScreen() {
       r.clientName = clientName;
       r.technicianName = technicianName;
       r.propertyType = propertyType;
+      r.visitPurpose = visitPurpose;
       r.pestTypes = pestTypes;
       r.notes = notes;
     });
@@ -1157,8 +1273,10 @@ export default function NewInspectionScreen() {
         clientName,
         technicianName,
         propertyType,
+        visitPurpose,
         pestTypes,
         notes,
+        unitNumber: displayUnitNumber,
       });
       await saveLocalInspection(recordRef.current);
     }
@@ -1312,103 +1430,115 @@ export default function NewInspectionScreen() {
   //      chain and only tracks `recordRef`; it does NOT call `setPhotos` again
   //      so concurrent-capture optimistic entries are never clobbered.
   //   4. Pixel analysis — runs deferred, well off the capture path.
-  const ingestEvidence = async (items: EvidenceItem[]) => {
+  const ingestEvidence = (items: EvidenceItem[]): Promise<boolean> => {
     const rec = recordRef.current;
-    if (!rec || items.length === 0) return;
-    const warnings: string[] = [];
-    const added: { localUri: string; item: EvidenceItem }[] = [];
+    if (!rec || items.length === 0 || intakeClosedRef.current) return Promise.resolve(false);
 
-    try {
-      for (const item of items) {
-        const cacheUri = item.uri;
+    // Optimistic UI remains outside the persistence queue: every source appears
+    // instantly even when an earlier photo is still copying to durable storage.
+    const batchCacheUris = new Set(items.map((item) => item.uri));
+    setPhotos((prev) => [
+      ...prev,
+      ...items.map((item) => ({ id: item.uri, uri: item.uri, capturedAt: item.capturedAt })),
+    ]);
+    setPendingIngestCount((count) => count + items.length);
 
-        // ── Step 1: optimistic thumbnail (instant, no I/O) ──────────────────
-        setPhotos((prev) => [...prev, { uri: cacheUri }]);
+    const persistBatch = async (): Promise<boolean> => {
+      const warnings: string[] = [];
+      const added: { localUri: string; item: EvidenceItem }[] = [];
+      const uncommittedDurableUris = new Set<string>();
+      try {
+        for (const item of items) {
+          const cacheUri = item.uri;
+          const durableUri = await persistPhoto(rec.localId, cacheUri);
+          uncommittedDurableUris.add(durableUri);
+          const quality = assessEvidence(item);
+          if (!quality.acceptable && quality.reasons.length > 0) warnings.push(quality.reasons[0]);
 
-        // ── Step 2: copy out of cache → durable directory ───────────────────
-        const durableUri = await persistPhoto(rec.localId, cacheUri);
-        const quality = assessEvidence(item);
-        if (!quality.acceptable && quality.reasons.length > 0) warnings.push(quality.reasons[0]);
-
-        // Swap the optimistic cache URI for the durable one.  Functional updater
-        // is safe even when another capture added its own cache entry in the gap.
-        setPhotos((prev) =>
-          prev.map((p) => (p.uri === cacheUri ? { uri: durableUri } : p)),
-        );
-
-        // ── Step 3: persist record to AsyncStorage ──────────────────────────
-        const updated = await updateLocalInspection(rec.localId, (r) => {
-          r.photos.push({
-            localUri: durableUri,
-            capturedAt: item.capturedAt,
-            captureSource: item.source,
-            qualityScore: quality.score,
-            captureMetadata: (() => {
-              // Consume any fresh laser reading stamped before this capture.
-              // The reading is cleared from the bridge so it attaches to exactly
-              // one photo rather than being reused for subsequent captures.
-              const laser = consumeLastMeasurementReading();
-              return {
-                ...item.metadata,
-                width: item.width,
-                height: item.height,
-                fileSize: item.fileSize,
-                ...(laser ? {
-                  laserMeasurement: {
-                    kind: laser.kind,
-                    value: laser.value,
-                    unit: laser.unit,
-                    capturedAt: laser.capturedAt,
-                    // Preserve the full stamped payload so burst-measurement
-                    // results (height/area/confidence/method) survive into the
-                    // finding record instead of collapsing to width-only.
-                    ...(laser.deviceId ? { deviceId: laser.deviceId } : {}),
-                    ...(laser.signalQuality != null ? { signalQuality: laser.signalQuality } : {}),
-                    ...(laser.metadata ? { metadata: laser.metadata } : {}),
-                  },
-                } : {}),
-              };
-            })(),
+          const updated = await updateLocalInspection(rec.localId, (r) => {
+            r.photos.push({
+              localUri: durableUri,
+              capturedAt: item.capturedAt,
+              captureSource: item.source,
+              qualityScore: quality.score,
+              captureMetadata: (() => {
+                const laser = consumeLastMeasurementReading();
+                return {
+                  ...item.metadata,
+                  width: item.width,
+                  height: item.height,
+                  fileSize: item.fileSize,
+                  ...(laser ? {
+                    laserMeasurement: {
+                      kind: laser.kind,
+                      value: laser.value,
+                      unit: laser.unit,
+                      capturedAt: laser.capturedAt,
+                      ...(laser.deviceId ? { deviceId: laser.deviceId } : {}),
+                      ...(laser.signalQuality != null ? { signalQuality: laser.signalQuality } : {}),
+                      ...(laser.metadata ? { metadata: laser.metadata } : {}),
+                    },
+                  } : {}),
+                };
+              })(),
+            });
           });
-        });
-        // Keep recordRef in sync; do NOT call setPhotos here — the targeted swap
-        // above already reflects the correct URI, and a full rebuild would drop
-        // optimistic entries from concurrent captures still in-flight.
-        if (updated) recordRef.current = updated;
+          if (!updated) {
+            throw new Error("This inspection is no longer available to save the photo.");
+          }
+          recordRef.current = updated;
+          uncommittedDurableUris.delete(durableUri);
+          setPhotos((prev) =>
+            prev.map((p) => (p.uri === cacheUri ? { ...p, uri: durableUri } : p)),
+          );
+          added.push({ localUri: durableUri, item });
 
-        added.push({ localUri: durableUri, item });
+          void ingestAllUploadedPhotos({
+            photoUri: durableUri,
+            companyId: clerkUser?.id ?? "",
+            technicianId: clerkUser?.id ?? "",
+            source: "technician_field_upload",
+          });
+        }
 
-        // Fire FAIE global training ingest in the background — non-blocking.
-        void ingestAllUploadedPhotos({
-          photoUri: durableUri,
-          companyId: clerkUser?.id ?? "",
-          technicianId: clerkUser?.id ?? "",
-          source: "technician_field_upload",
-        });
+        setQualityNotice(warnings[0] ?? null);
+        setWsError(null);
+        // Pixel decoding is advisory and CPU-heavy. Batch it until the camera
+        // has been quiet for five seconds so rapid multi-shot capture never
+        // competes with grayscale decoding, hashing, or another store write.
+        deferredPixelItemsRef.current.push(...added);
+        if (deferredPixelTimerRef.current) clearTimeout(deferredPixelTimerRef.current);
+        deferredPixelTimerRef.current = setTimeout(() => {
+          deferredPixelTimerRef.current = null;
+          const deferred = deferredPixelItemsRef.current.splice(0);
+          if (deferred.length === 0) return;
+          InteractionManager.runAfterInteractions(() => {
+            void analyzeEvidencePixels(rec.localId, deferred);
+          });
+        }, 5_000);
+        return true;
+      } catch (err) {
+        const msg =
+          err instanceof Error && err.message
+            ? err.message
+            : "Couldn't save photo to device storage. Check available storage space and try again.";
+        setError(msg);
+        console.error("[ingestEvidence]", err);
+        for (const uri of uncommittedDurableUris) {
+          void FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+        }
+        // Remove only unresolved optimistic entries from this batch. Durable
+        // photos and optimistic entries owned by other queued batches survive.
+        setPhotos((prev) => prev.filter((p) => !batchCacheUris.has(p.uri)));
+        return false;
+      } finally {
+        setPendingIngestCount((count) => Math.max(0, count - items.length));
       }
+    };
 
-      setQualityNotice(warnings.length > 0 ? warnings[0] : null);
-      // A fresh capture re-arms auto-run analysis after a prior failure.
-      setWsError(null);
-      // Deferred pass: decode pixels OFF the capture path to compute a perceptual
-      // hash (duplicate detection) and a Laplacian sharpness score.
-      void analyzeEvidencePixels(rec.localId, added);
-    } catch (err) {
-      // Local storage failure (disk full, file-system error) — the photo could
-      // not be durably saved.  Surface a clear message so the technician knows
-      // to free space; never let this become a silent black screen.
-      const msg =
-        err instanceof Error && err.message
-          ? err.message
-          : "Couldn't save photo to device storage. Check available storage space and try again.";
-      setError(msg);
-      console.error("[ingestEvidence]", err);
-      // Roll back any optimistic thumbnails whose durable copy failed.
-      if (added.length < items.length) {
-        const savedUris = new Set(added.map((a) => a.localUri));
-        setPhotos((prev) => prev.filter((p) => savedUris.has(p.uri) || added.some((a) => a.localUri === p.uri)));
-      }
-    }
+    // One durable writer per inspection. This prevents rapid camera, BLE, DAT,
+    // and import captures from contending on file and AsyncStorage queues.
+    return ingestQueueRef.current.enqueue(persistBatch);
   };
 
   // Sequential (one decode at a time, to bound memory) background pixel pass:
@@ -1457,7 +1587,9 @@ export default function NewInspectionScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       setCapturing(true);
-      const items = await cameraProvider.capture();
+      const items = await cameraCaptureQueueRef.current.enqueue(() =>
+        cameraProvider.capture(),
+      );
       // ── Release the camera lock as soon as we have the captured URIs. ──────
       // File copy and AsyncStorage write continue in the background so the
       // shutter is ready for the next shot in ~200 ms instead of ~8 s.
@@ -1467,9 +1599,9 @@ export default function NewInspectionScreen() {
       setCapturing(false);
       setError("Couldn't capture photo. Please try again.");
     } finally {
-      // 600 ms cooldown — discards any queued taps that arrived during the
-      // capture pipeline without blocking the next intentional tap longer than needed.
-      setTimeout(() => { captureLockedRef.current = false; }, 600);
+      // A short debounce discards accidental double taps while allowing a
+      // deliberate multi-shot sequence as soon as the native camera is ready.
+      setTimeout(() => { captureLockedRef.current = false; }, 250);
     }
   };
 
@@ -1495,6 +1627,13 @@ export default function NewInspectionScreen() {
     return () => clearTimeout(timer);
   }, [qualityNotice]);
 
+  // Truck-stock notice auto-clears after 6s, same as other transient banners.
+  useEffect(() => {
+    if (!stockNotice) return;
+    const timer = setTimeout(() => setStockNotice(null), 6000);
+    return () => clearTimeout(timer);
+  }, [stockNotice]);
+
   // Remove a not-yet-uploaded photo from both screen state and the record.
   const removePhoto = async (index: number) => {
     const rec = recordRef.current;
@@ -1513,7 +1652,7 @@ export default function NewInspectionScreen() {
     });
     if (updated) {
       recordRef.current = updated;
-      setPhotos(updated.photos.map((p) => ({ uri: p.localUri })));
+      setPhotos(updated.photos.map((p) => ({ id: p.localUri, uri: p.localUri, capturedAt: p.capturedAt })));
     }
   };
 
@@ -1523,11 +1662,19 @@ export default function NewInspectionScreen() {
   // it left off. Offline, this is a no-op with a friendly notice — photos are
   // already safe on the device.
   const runWorkspaceAnalysis = async () => {
-    const rec = recordRef.current;
-    if (wsAnalyzing || !rec || rec.photos.length === 0) return;
+    if (wsAnalysisRunningRef.current) return;
+    wsAnalysisRunningRef.current = true;
     setWsError(null);
     setWsAnalyzing(true);
     try {
+      // Never sync/analyze an optimistic URI that has not reached durable
+      // storage and the local inspection record yet.
+      await ingestQueueRef.current.drain();
+      const rec = recordRef.current;
+      if (!rec || rec.photos.length === 0) return;
+      lastWorkspaceAnalysisPhotoCount.current = Math.max(
+        lastWorkspaceAnalysisPhotoCount.current, rec.photos.length,
+      );
       await persistDraft();
       const updated = await syncNow(rec.localId);
       if (updated) {
@@ -1535,7 +1682,13 @@ export default function NewInspectionScreen() {
         if (updated.serverId != null) setWsInspectionId(updated.serverId);
         setUploadedCount(updated.photos.filter((p) => p.storagePath).length);
         analyzedCount.current = updated.analyzedCount;
-        await queryClient.invalidateQueries();
+        if (updated.serverId != null) {
+          await queryClient.invalidateQueries({
+            queryKey: getListAnalysisResultsQueryOptions({
+              inspectionId: updated.serverId,
+            }).queryKey,
+          });
+        }
         // New verified detections exist — rebuild the live report in the
         // background while the technician keeps capturing.
         if (updated.serverId != null) void buildLiveReport(updated.serverId);
@@ -1549,6 +1702,7 @@ export default function NewInspectionScreen() {
             : (e as Error).message,
       );
     } finally {
+      wsAnalysisRunningRef.current = false;
       setWsAnalyzing(false);
     }
   };
@@ -1561,14 +1715,24 @@ export default function NewInspectionScreen() {
   // manual "Run analysis" button clears the error and re-arms it, so a
   // persistent failure never becomes an infinite retry loop.
   useEffect(() => {
-    if (step !== "capture" || submitting || wsAnalyzing || wsError) return;
-    if (photos.length === 0 || photos.length <= analyzedCount.current) return;
+    if (
+      step !== "capture" ||
+      submitting ||
+      wsAnalyzing ||
+      wsError ||
+      pendingIngestCount > 0
+    ) return;
+    if (
+      photos.length === 0 ||
+      photos.length <= analyzedCount.current ||
+      photos.length <= lastWorkspaceAnalysisPhotoCount.current
+    ) return;
     const timer = setTimeout(() => {
       void runWorkspaceAnalysis();
     }, 2500);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, submitting, wsAnalyzing, wsError, photos.length]);
+  }, [step, submitting, wsAnalyzing, wsError, photos.length, pendingIngestCount]);
 
   // Builds (or rebuilds) the live service report from the latest verified
   // data. Creates the report once, then regenerates its AI narrative with a
@@ -1605,7 +1769,6 @@ export default function NewInspectionScreen() {
         });
         setWsReport(updated);
       } while (wsReportStale.current);
-      await queryClient.invalidateQueries();
     } catch (e) {
       setWsReportError(
         isOfflineError(e)
@@ -1621,42 +1784,49 @@ export default function NewInspectionScreen() {
   };
 
   // Complete Inspection — the explicit end of the capture lifecycle.
-  // Marks the local record complete (durable even if the app dies right
-  // after), then attempts an immediate sync: create → upload photos → draft
-  // analysis → server-side completion (report, narrative, summary,
-  // opportunities, scorecard). Offline, completion still succeeds locally
-  // and the engine finishes the push automatically when connectivity
-  // returns — the summary screen shows live sync status either way.
+  // Marks the local record complete (durable even if the app dies right after)
+  // and navigates once that local write is safe. The existing sync engine then
+  // continues upload, registration, AI, and finalization independently.
   const completeNow = async () => {
     const rec = recordRef.current;
     if (!rec || submitting) return;
     setError(null);
     setSubmitting(true);
+    intakeClosedRef.current = true;
     setProgress("Saving inspection…");
     try {
-      const updated = await updateLocalInspection(rec.localId, (r) => {
-        r.siteAddress = siteAddress;
-        r.clientName = clientName;
-        r.technicianName = technicianName;
-        r.propertyType = propertyType;
-        r.pestTypes = pestTypes;
-        r.notes = notes;
-        r.completed = true;
-        r.completedAt = new Date().toISOString();
+      await completeTechnicianWorkflow({
+        // A technician can tap Complete immediately after the shutter. Drain
+        // the durable queue so the last optimistic photo cannot be omitted.
+        drainPendingIngestion: () => ingestQueueRef.current.drain(),
+        persistLocalCompletion: async () => {
+          const current = recordRef.current ?? rec;
+          const updated = await updateLocalInspection(current.localId, (r) => {
+            r.siteAddress = siteAddress;
+            r.clientName = clientName;
+            r.technicianName = technicianName;
+            r.propertyType = propertyType;
+            r.pestTypes = pestTypes;
+            r.notes = notes;
+            r.completed = true;
+            r.completedAt = new Date().toISOString();
+          });
+          if (updated) recordRef.current = updated;
+          return updated?.localId ?? current.localId;
+        },
+        navigateToSummary: (localId) => {
+          router.replace(`/inspection-summary/${localId}` as Href);
+        },
+        continueSyncInBackground: (localId) => {
+          // Keep the existing upload/registration/AI/finalization pipeline,
+          // but do not include it in the technician's completion await chain.
+          void syncNow(localId)
+            .then(() => queryClient.invalidateQueries())
+            .catch(() => requestSync(0));
+        },
       });
-      if (updated) recordRef.current = updated;
-
-      setProgress("Syncing evidence & running AI analysis…");
-      try {
-        await syncNow(rec.localId);
-      } catch {
-        // Offline or server hiccup — the record is safe on-device and the
-        // sync engine retries automatically. Completion is NOT blocked.
-        requestSync(0);
-      }
-      await queryClient.invalidateQueries();
-      router.replace(`/inspection-summary/${rec.localId}` as Href);
     } catch (e) {
+      intakeClosedRef.current = false;
       setError(e instanceof ApiError ? e.message : (e as Error).message);
       setSubmitting(false);
     }
@@ -1691,6 +1861,18 @@ export default function NewInspectionScreen() {
       </Screen>
     );
   }
+
+  const capturePhotoMeta = photos.map((photo, index) => ({
+    id: photo.id,
+    url: photo.uri,
+    classificationTag: "Unclassified",
+    confidenceScore: null,
+    technicianCorrectionLabel: null,
+    structuredDescription: null,
+    chemicalLogReference: null,
+    unitNumber: displayUnitNumber,
+    capturedAt: photo.capturedAt ?? null,
+  }));
 
   // ─── Capture step (full camera) ─────────────────────────────────────────────
   if (step === "capture") {
@@ -1732,15 +1914,35 @@ export default function NewInspectionScreen() {
 
     const thumbs =
       photos.length > 0 ? (
-        <ScrollView
+        <FlatList
           horizontal
+          data={photos}
+          keyExtractor={(photo) => photo.id}
+          extraData={uploadedCount}
+          initialNumToRender={7}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          removeClippedSubviews
           showsHorizontalScrollIndicator={false}
           style={isPhoneLandscape ? { position: "absolute", bottom: 16, left: 0, right: 116 } : undefined}
           contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
-        >
-          {photos.map((p, i) => (
-            <View key={`${p.uri}-${i}`}>
-              <Image source={{ uri: p.uri }} style={{ width: 56, height: 56, borderRadius: 8 }} />
+          renderItem={({ item: p, index: i }) => (
+            <View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open photo ${i + 1}`}
+                onPress={() => setLightboxIndex(i)}
+              >
+                <Image source={{ uri: p.uri }} style={{ width: 56, height: 56, borderRadius: 8 }} />
+                <View style={{ position: "absolute", top: 3, left: 3, backgroundColor: "rgba(0,0,0,0.65)", borderRadius: 999, paddingHorizontal: 4, paddingVertical: 1 }}>
+                  <Text style={{ color: "#fff", fontSize: 7, fontFamily: "Inter_700Bold" }}>NEW</Text>
+                </View>
+                {p.capturedAt ? (
+                  <View style={{ position: "absolute", bottom: 3, left: 3, backgroundColor: "rgba(0,0,0,0.65)", borderRadius: 999, paddingHorizontal: 4, paddingVertical: 1 }}>
+                    <Text style={{ color: "#fff", fontSize: 7 }}>{new Date(p.capturedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
               {i >= uploadedCount ? (
                 <Pressable
                   onPress={() => void removePhoto(i)}
@@ -1760,8 +1962,8 @@ export default function NewInspectionScreen() {
                 </Pressable>
               ) : null}
             </View>
-          ))}
-        </ScrollView>
+          )}
+        />
       ) : null;
 
     const captureButton = (
@@ -2125,14 +2327,16 @@ export default function NewInspectionScreen() {
       ? "rgba(202,138,4,0.92)"
       : "rgba(124,58,237,0.88)";
 
-    // Error strip — shown when registration failed so the user knows and can retry.
+    // Optional-provider notice. A Meta failure never represents an inspection
+    // failure because the phone camera remains the primary capture provider.
     const glassesErrorStrip =
+      metaCloudEnabled &&
       !glassesSession.isActive &&
       wsInspectionId != null &&
       glassesSession.status !== null ? (
         <View
           style={{
-            backgroundColor: "rgba(185,28,28,0.90)",
+            backgroundColor: "rgba(124,58,237,0.88)",
             paddingHorizontal: 12,
             paddingVertical: 8,
             borderRadius: 10,
@@ -2167,6 +2371,55 @@ export default function NewInspectionScreen() {
           >
             <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
               Retry
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setMetaCloudEnabled(false)}
+            style={{
+              backgroundColor: "rgba(255,255,255,0.12)",
+              borderRadius: 6,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+            }}
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+              Use phone
+            </Text>
+          </Pressable>
+        </View>
+      ) : null;
+
+    const metaCloudSetupStrip =
+      wsInspectionId != null && !metaCloudEnabled ? (
+        <View
+          style={{
+            backgroundColor: "rgba(15,23,42,0.78)",
+            paddingHorizontal: 12,
+            paddingVertical: 7,
+            borderRadius: 10,
+            maxWidth: 440,
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.12)",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Ionicons name="phone-portrait-outline" size={15} color="#fff" />
+          <Text style={{ color: "#fff", fontFamily: "Inter_500Medium", fontSize: 12, flex: 1 }}>
+            Phone camera active · Meta glasses optional
+          </Text>
+          <Pressable
+            onPress={() => setMetaCloudEnabled(true)}
+            style={{
+              backgroundColor: "rgba(255,255,255,0.16)",
+              borderRadius: 6,
+              paddingHorizontal: 9,
+              paddingVertical: 4,
+            }}
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+              Use Meta
             </Text>
           </Pressable>
         </View>
@@ -2213,6 +2466,19 @@ export default function NewInspectionScreen() {
               </Text>
             </View>
           )}
+          <Pressable
+            onPress={() => setMetaCloudEnabled(false)}
+            style={{
+              backgroundColor: "rgba(255,255,255,0.16)",
+              borderRadius: 6,
+              paddingHorizontal: 7,
+              paddingVertical: 2,
+            }}
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 10 }}>
+              Phone
+            </Text>
+          </Pressable>
         </View>
         {/* Connection-mode badge row — BLE direct vs cloud relay */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -2302,7 +2568,61 @@ export default function NewInspectionScreen() {
           </View>
         ) : null}
       </View>
-    ) : null);
+    ) : metaCloudSetupStrip);
+
+    // Official native Meta path. This is intentionally separate from the
+    // cloud/webhook strip and the ReadyLoq custom BLE badges above: consumer
+    // Meta glasses use DAT and Meta AI approval, not GATT pairing.
+    const nativeMetaGlassesStrip = metaWearables.nativeModulePresent ? (
+      <View
+        style={{
+          backgroundColor: metaWearables.canCapture ? "rgba(22,163,74,0.90)" : "rgba(124,58,237,0.88)",
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 10,
+          maxWidth: 440,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.2)",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <Ionicons name="glasses-outline" size={15} color="#fff" />
+        <View style={{ flex: 1, gap: 1 }}>
+          <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+            {metaWearables.title}
+          </Text>
+          <Text style={{ color: "rgba(255,255,255,0.82)", fontFamily: "Inter_400Regular", fontSize: 10 }}>
+            {metaWearables.canCapture
+              ? "Official Meta Android session · photo goes directly into this inspection"
+              : metaWearables.guidance}
+          </Text>
+        </View>
+        {metaWearables.canCapture ? (
+          <Pressable
+            onPress={() => void metaWearables.capturePhoto()}
+            style={{ backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 }}
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11 }}>Capture</Text>
+          </Pressable>
+        ) : metaWearables.canStartSession ? (
+          <Pressable
+            onPress={() => void metaWearables.startSession()}
+            style={{ backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 }}
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11 }}>Connect</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => router.push("/(app)/(tabs)/connections" as Href)}
+            style={{ backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 }}
+          >
+            <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 11 }}>Set up</Text>
+          </Pressable>
+        )}
+      </View>
+    ) : null;
 
     // Compact BLE-only badge — shown when glasses are BLE-connected but no
     // cloud session is active yet.  Gives the technician confirmation that the
@@ -2510,6 +2830,47 @@ export default function NewInspectionScreen() {
       </View>
     ) : null;
 
+    const stockBanner = stockNotice ? (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          backgroundColor: stockNotice.low ? "rgba(202,138,4,0.92)" : "rgba(22,163,74,0.90)",
+          paddingHorizontal: 10,
+          paddingVertical: 7,
+          borderRadius: 10,
+          maxWidth: 440,
+        }}
+      >
+        <Ionicons name={stockNotice.low ? "warning-outline" : "flask-outline"} size={16} color="#fff" />
+        <Text
+          style={{
+            color: "#fff",
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 12,
+            flex: 1,
+            flexShrink: 1,
+          }}
+        >
+          {stockNotice.low
+            ? `Low stock: ${stockNotice.quantityOnHand.toFixed(1)} ${stockNotice.unit} of ${stockNotice.productName} remaining on truck`
+            : `${stockNotice.quantityOnHand.toFixed(1)} ${stockNotice.unit} of ${stockNotice.productName} remaining on truck`}
+        </Text>
+        <Pressable
+          onPress={() => setStockNotice(null)}
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 6,
+            backgroundColor: "rgba(255,255,255,0.28)",
+          }}
+        >
+          <Ionicons name="close" size={14} color="#fff" />
+        </Pressable>
+      </View>
+    ) : null;
+
     const zoomChips = (
       <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
         {ZOOM_LEVELS.map((z) => {
@@ -2617,17 +2978,33 @@ export default function NewInspectionScreen() {
                 >
                   <Ionicons name="chevron-back" size={24} color="#fff" />
                 </Pressable>
-                <View
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.45)",
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 999,
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold" }}>
-                    {photos.length} captured
-                  </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  {displayUnitNumber ? (
+                    <View
+                      style={{
+                        backgroundColor: "rgba(20,184,166,0.75)",
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 999,
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                        Unit {displayUnitNumber}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <View
+                    style={{
+                      backgroundColor: "rgba(0,0,0,0.45)",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold" }}>
+                      {photos.length} captured
+                    </Text>
+                  </View>
                 </View>
               </View>
 
@@ -2643,9 +3020,11 @@ export default function NewInspectionScreen() {
                 )}
                 {refClipBanner}
                 {qualityBanner}
+                {stockBanner}
                 {faieBanner}
                 {glassesViewerModal}
                 {glassesStrip}
+                {nativeMetaGlassesStrip}
                 {bleBadgeOnly}
                 {glassesFindingsPanel}
                 {zoomChips}
@@ -2820,6 +3199,20 @@ export default function NewInspectionScreen() {
                 <Ionicons name="chevron-back" size={24} color="#fff" />
               </Pressable>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                {displayUnitNumber ? (
+                  <View
+                    style={{
+                      backgroundColor: "rgba(20,184,166,0.75)",
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                      Unit {displayUnitNumber}
+                    </Text>
+                  </View>
+                ) : null}
                 <View
                   style={{
                     backgroundColor: "rgba(0,0,0,0.5)",
@@ -2917,8 +3310,10 @@ export default function NewInspectionScreen() {
             >
               {refClipBanner}
               {qualityBanner}
+              {stockBanner}
               {faieBanner}
               {glassesStrip}
+              {nativeMetaGlassesStrip}
               {bleBadgeOnly}
               {glassesFindingsPanel}
               {zoomChips}
@@ -2946,11 +3341,17 @@ export default function NewInspectionScreen() {
             {qualityBanner ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{qualityBanner}</View>
             ) : null}
+            {stockBanner ? (
+              <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{stockBanner}</View>
+            ) : null}
             {faieBanner ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{faieBanner}</View>
             ) : null}
             {glassesStrip ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{glassesStrip}</View>
+            ) : null}
+            {nativeMetaGlassesStrip ? (
+              <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{nativeMetaGlassesStrip}</View>
             ) : null}
             {bleBadgeOnly ? (
               <View style={{ alignItems: "center", paddingHorizontal: 16 }}>{bleBadgeOnly}</View>
@@ -3045,11 +3446,29 @@ export default function NewInspectionScreen() {
             inspectionId={wsInspectionId}
             pestTypes={pestTypes}
             routeAssignments={assignmentsWithProducts}
-            onLogged={() => {
+            onLogged={(stock) => {
               setShowTreatmentWizard(false);
+              if (stock) setStockNotice(stock);
             }}
           />
         )}
+
+        {/* Morning kit declaration modal — opens automatically when the tech
+            hasn't set their chemical assignments for the day, or manually via
+            the treatment log wizard's "Today's Route" tab. */}
+        <DailyRouteSetupModal
+          visible={showMorningKitModal}
+          initialAssignments={assignmentsWithProducts.map((a) => ({
+            productId: a.productId,
+            targetPest: a.targetPest,
+            notes: a.notes,
+          }))}
+          onClose={closeMorningKitModal}
+          onSave={(assignments) => {
+            void saveMorningKit(assignments);
+            closeMorningKitModal();
+          }}
+        />
 
         {/* Compact/medium overlay — Co-Pilot mode shows as a bottom sheet that
             sits over the bottom 42% of the camera; AI Insights takes full screen.
@@ -3240,6 +3659,12 @@ export default function NewInspectionScreen() {
             (and captures touches before) the top bar, control bars, and rails
             in both portrait and landscape. */}
         {measureOverlay}
+        <PhotoLightbox
+          photos={capturePhotoMeta}
+          initialIndex={lightboxIndex ?? 0}
+          visible={lightboxIndex != null}
+          onClose={() => setLightboxIndex(null)}
+        />
       </View>
     );
   }
@@ -3290,13 +3715,25 @@ export default function NewInspectionScreen() {
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               {photos.map((p, i) => (
-                <Image
-                  key={`${p.uri}-${i}`}
-                  source={{ uri: p.uri }}
-                  style={{ width: 88, height: 88, borderRadius: 10 }}
-                />
+                <Pressable key={p.id} onPress={() => setLightboxIndex(i)} style={{ width: 88, height: 88 }}>
+                  <Image source={{ uri: p.uri }} style={{ width: 88, height: 88, borderRadius: 10 }} />
+                  <View style={{ position: "absolute", top: 4, left: 4, backgroundColor: "rgba(0,0,0,0.68)", borderRadius: 999, paddingHorizontal: 5, paddingVertical: 2 }}>
+                    <Text style={{ color: "#fff", fontSize: 8, fontFamily: "Inter_700Bold" }}>Unclassified</Text>
+                  </View>
+                  {p.capturedAt ? (
+                    <View style={{ position: "absolute", bottom: 4, left: 4, backgroundColor: "rgba(0,0,0,0.68)", borderRadius: 999, paddingHorizontal: 5, paddingVertical: 2 }}>
+                      <Text style={{ color: "#fff", fontSize: 8 }}>{new Date(p.capturedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</Text>
+                    </View>
+                  ) : null}
+                </Pressable>
               ))}
             </View>
+            <PhotoLightbox
+              photos={capturePhotoMeta}
+              initialIndex={lightboxIndex ?? 0}
+              visible={lightboxIndex != null}
+              onClose={() => setLightboxIndex(null)}
+            />
           </View>
 
           {/* AI findings review — optional, never blocks completion */}
@@ -3648,6 +4085,17 @@ export default function NewInspectionScreen() {
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {PROPERTY_TYPES.map((p) => (
               <Pill key={p} label={p} active={propertyType === p} onPress={() => setPropertyType(p)} colors={colors} />
+            ))}
+          </View>
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <Text style={{ color: colors.foreground, fontFamily: "Inter_500Medium", fontSize: 14 }}>
+            Purpose of visit
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {VISIT_PURPOSES.map((p) => (
+              <Pill key={p} label={p} active={visitPurpose === p} onPress={() => setVisitPurpose(visitPurpose === p ? null : p)} colors={colors} />
             ))}
           </View>
         </View>

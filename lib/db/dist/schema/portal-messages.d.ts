@@ -156,10 +156,10 @@ export declare const portalMessagesTable: import("drizzle-orm/pg-core").PgTableW
 }>;
 export declare const insertPortalMessageSchema: z.ZodObject<{
     siteAddress: z.ZodString;
+    message: z.ZodString;
     senderType: z.ZodString;
     senderClerkId: z.ZodString;
     senderName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    message: z.ZodString;
 }, {
     out: {};
     in: {};

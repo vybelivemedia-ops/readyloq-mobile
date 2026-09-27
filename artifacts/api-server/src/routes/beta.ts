@@ -9,6 +9,7 @@ import {
   inspectionsTable,
   type BetaFeedback,
   type ErrorEvent,
+  type ErrorCategory,
 } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { getCompanyId } from "../lib/tenant";
@@ -254,8 +255,21 @@ router.get("/errors", requireRole("manager"), async (req, res) => {
       .where(eq(errorEventsTable.companyId, companyId))
       .orderBy(desc(errorEventsTable.id))
       .limit(200);
-    const summary = { upload: 0, ai: 0, report: 0, auth: 0, notification: 0, total: rows.length };
-    for (const r of rows) summary[r.category] += 1;
+    // Record<ErrorCategory, number> keeps this exhaustive — adding a new
+    // ErrorCategory value without a corresponding key here is now a
+    // compile-time error instead of a silent `summary[cat] += 1` on
+    // `undefined` (which serializes as `null` and corrupts the manager's
+    // error-monitor totals).
+    const categoryCounts: Record<ErrorCategory, number> = {
+      upload: 0,
+      ai: 0,
+      report: 0,
+      auth: 0,
+      notification: 0,
+      inventory: 0,
+    };
+    for (const r of rows) categoryCounts[r.category] += 1;
+    const summary = { ...categoryCounts, total: rows.length };
     return res.json({ summary, events: rows.map(serializeErrorEvent) });
   } catch {
     return res.status(500).json({ error: "Failed to list error events" });

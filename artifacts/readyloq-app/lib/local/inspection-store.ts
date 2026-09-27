@@ -123,13 +123,21 @@ export type LocalInspection = {
   completedAt: string | null;
   /** POST /inspections/:id/complete acknowledged by the server. */
   serverCompleted: boolean;
-  /** Number of photos included in the last draft analysis run. */
+  /** Number of current photos acknowledged for AI analysis (legacy UI field). */
   analyzedCount: number;
+  /**
+   * Exact uploaded storage paths acknowledged by AI analysis. This is the
+   * durable sync cursor; unlike analyzedCount it remains correct when photos
+   * are added, removed, or reordered between retries.
+   */
+  analyzedPhotoPaths: string[];
   /** Live report id, if one was built during capture. */
   reportId: number | null;
 
   syncError: string | null;
   syncAttempts: number;
+  /** Durable earliest retry time, shared by foreground/background after restart. */
+  nextSyncAt?: string | null;
   /** ISO timestamp of last successful server sync (any step). */
   lastSyncSuccess: string | null;
   /**
@@ -150,6 +158,28 @@ export type LocalInspection = {
     technicianSpecies?: string;
   }>;
   /**
+   * Unit / apartment number for multi-family properties.
+   * Set at booking time (from the portal) or by the technician in the
+   * signature panel. Null for single-family or commercial properties.
+   */
+  unitNumber: string | null;
+  /**
+   * True once the current unitNumber has been PATCHed to the server.
+   * Set false by InspectionSignaturePanel when the technician edits the unit
+   * number so the sync engine re-queues the record even after serverCompleted.
+   * Defaults to true via parseRecord so old records are not unnecessarily
+   * re-synced.
+   */
+  unitNumberSynced: boolean;
+  /**
+   * Freeform reason for the visit (e.g. "Routine Inspection", "Callback"),
+   * picked by the technician when booking. Sent once at creation time — like
+   * notes/pestTypes/clientName, it has no separate "synced" flag. Null when
+   * not set (older records, or the technician skipped the picker).
+   */
+  visitPurpose: string | null;
+
+  /**
    * On-site signature data (SVG strings captured by InspectionSignaturePanel).
    * ownerNotAvailable is set when the owner/tenant was absent and the
    * technician signed on their behalf. signedAt records the first signature.
@@ -158,6 +188,34 @@ export type LocalInspection = {
   ownerSignature: string | null;
   ownerNotAvailable: boolean;
   signedAt: string | null;
+  /**
+   * Monotonically incrementing counter bumped by InspectionSignaturePanel on
+   * every local mutation.  The sync engine captures this value before sending
+   * the PATCH; it only clears signaturesSynced when the counter still matches
+   * after the round-trip, preventing a concurrent mutation from being silently
+   * lost in a race between "PATCH in-flight" and "user taps Re-sign".
+   */
+  sigRev: number;
+  /**
+   * Set true when the technician explicitly clears their own signature so the
+   * sync engine knows to send technicianSignature: null (rather than omitting
+   * the field, which would leave the server's value untouched).
+   */
+  techSigClear: boolean;
+  /**
+   * Set true when the owner signature is intentionally nulled — either by
+   * clearSignature("owner") or markOwnerNotAvailable — so the sync engine
+   * sends ownerSignature: null + resignatureConsent: true.  Without this flag
+   * the engine omits null fields to avoid accidentally wiping server data.
+   */
+  ownerSigConsent: boolean;
+  /**
+   * True once all current signature data has been PATCHed to the server.
+   * Set false by InspectionSignaturePanel on every local mutation so the
+   * sync engine re-queues the record even after serverCompleted = true.
+   * Defaults to true via parseRecord so old records are not re-synced.
+   */
+  signaturesSynced: boolean;
 
   /**
    * ISO timestamp of the last time this inspection's report was successfully
@@ -198,6 +256,16 @@ const recordKey = (localId: string) => `${RECORD_PREFIX}${localId}`;
 const photosDir = (localId: string) =>
   `${FileSystem.documentDirectory}inspections/${localId}/photos/`;
 
+/**
+ * Canonical identity used only for comparing storage paths across API
+ * boundaries. Mobile URLs include `/api/storage`; analysis responses omit it.
+ */
+export function canonicalStoragePath(path: string): string {
+  return path.startsWith("/api/storage/")
+    ? path.slice("/api/storage".length)
+    : path;
+}
+
 // ─── Change notifications (drives sync-status UI + engine wakeups) ──────────
 
 type Listener = () => void;
@@ -224,7 +292,8 @@ export function newLocalInspection(
   fields: Pick<
     LocalInspection,
     "siteAddress" | "clientName" | "technicianName" | "propertyType" | "pestTypes" | "notes"
-  >,
+  > &
+    Partial<Pick<LocalInspection, "unitNumber" | "visitPurpose">>,
 ): LocalInspection {
   const now = new Date().toISOString();
   return {
@@ -234,24 +303,35 @@ export function newLocalInspection(
     createdAt: now,
     updatedAt: now,
     ...fields,
+    visitPurpose: fields.visitPurpose ?? null,
     photos: [],
     baitStations: [],
     completed: false,
     completedAt: null,
     serverCompleted: false,
     analyzedCount: 0,
+    analyzedPhotoPaths: [],
     reportId: null,
     syncError: null,
     syncAttempts: 0,
+    nextSyncAt: null,
     lastSyncSuccess: null,
     allFindingsReviewed: false,
     pendingCorrections: [],
     lastDeliveredAt: null,
     pendingDeliveries: [],
+    unitNumber: fields.unitNumber ?? null,
+    // New record: nothing to sync yet.
+    unitNumberSynced: true,
     technicianSignature: null,
     ownerSignature: null,
     ownerNotAvailable: false,
     signedAt: null,
+    sigRev: 0,
+    techSigClear: false,
+    ownerSigConsent: false,
+    // New record: no signatures yet, nothing to sync.
+    signaturesSynced: true,
   };
 }
 
@@ -378,10 +458,26 @@ export function syncPhase(record: LocalInspection, syncingIds: ReadonlySet<strin
 export function hasPendingWork(record: LocalInspection): boolean {
   if (record.serverId == null) return true;
   if (record.photos.some((p) => !p.storagePath || p.mediaRowId == null)) return true;
-  if (record.photos.length > record.analyzedCount) return true;
+  const acknowledgedPaths = new Set(
+    (record.analyzedPhotoPaths ?? []).map(canonicalStoragePath),
+  );
+  if (
+    record.photos.some(
+      (p) =>
+        p.storagePath != null &&
+        !acknowledgedPaths.has(canonicalStoragePath(p.storagePath)),
+    )
+  ) {
+    return true;
+  }
   // #95 — pending finding corrections queued while offline
   if ((record.pendingCorrections ?? []).length > 0) return true;
   if (record.completed && !record.serverCompleted) return true;
+  // Signatures captured after the initial sync (e.g. at the summary screen)
+  // must be pushed even when serverCompleted is already true.
+  if (record.signaturesSynced === false) return true;
+  // Unit number edited in the signature panel after the initial sync.
+  if (record.unitNumberSynced === false) return true;
   // Pending deliveries that support background auto-retry (server-push channels)
   // keep the record in the sync scheduler so reconnection triggers the retry.
   // Interactive-only channels (email, share, print) are NOT counted here —
@@ -433,6 +529,7 @@ export function parseRecord(raw: string): LocalInspection | null {
     const rec = JSON.parse(raw) as LocalInspection;
     if (rec?.schemaVersion !== 1 || typeof rec.localId !== "string") return null;
     rec.lastSyncSuccess ??= null;
+    rec.nextSyncAt ??= null;
     rec.allFindingsReviewed ??= false;
     rec.pendingCorrections ??= [];
     rec.baitStations ??= [];
@@ -442,6 +539,28 @@ export function parseRecord(raw: string): LocalInspection | null {
     rec.ownerSignature ??= null;
     rec.ownerNotAvailable ??= false;
     rec.signedAt ??= null;
+    // sigRev: 0 on old records — any new mutation will bump it above 0.
+    rec.sigRev ??= 0;
+    // Default false: no explicit clear pending on old records.
+    rec.techSigClear ??= false;
+    rec.ownerSigConsent ??= false;
+    // Default true so pre-existing completed records are not unnecessarily
+    // re-synced. Only explicitly set to false by InspectionSignaturePanel.
+    rec.signaturesSynced ??= true;
+    // Unit number: default null and synced on old records.
+    rec.unitNumber ??= null;
+    rec.unitNumberSynced ??= true;
+    // Counts cannot be mapped safely back to paths after a photo list was
+    // edited or reordered. Legacy records therefore restart path
+    // acknowledgement from an empty set. The server deduplicates already
+    // successful analysis, making this conservative migration safe.
+    if (!Array.isArray(rec.analyzedPhotoPaths)) {
+      rec.analyzedPhotoPaths = [];
+    } else {
+      rec.analyzedPhotoPaths = rec.analyzedPhotoPaths.filter(
+        (path): path is string => typeof path === "string",
+      );
+    }
     // Reset any `uploading: true` flags that survived a crash.
     // The sync engine sets `uploading: true` + `pendingStoragePath` in the same
     // atomic merge BEFORE the PUT bytes are sent, then promotes `pendingStoragePath`

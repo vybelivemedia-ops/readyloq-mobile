@@ -27,6 +27,17 @@ function makeInspection(overrides: Record<string, unknown> = {}) {
   } as Parameters<typeof buildServerReportHtml>[1];
 }
 
+describe("buildServerReportHtml — inspection ID", () => {
+  it("prints the inspection's ID, not the report's ID", () => {
+    const html = buildServerReportHtml(
+      makeReport({ id: 111, inspectionId: 110 }),
+      makeInspection({ id: 110 }),
+    );
+    expect(html).toContain("Inspection ID");
+    expect(html).toContain("#110");
+  });
+});
+
 describe("buildServerReportHtml — signature section", () => {
   it("omits the Signatures section when no signatures are present", () => {
     const html = buildServerReportHtml(makeReport(), makeInspection());

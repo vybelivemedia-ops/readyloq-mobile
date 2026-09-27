@@ -179,9 +179,9 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
   const generate = async () => {
     setError(null);
     try {
-      await genNarrative.mutateAsync({ id });
-      await queryClient.invalidateQueries();
-      reportQ.refetch();
+      await genNarrative.mutateAsync({ id, data: { refreshFindings: true } });
+      await queryClient.invalidateQueries({ queryKey: getGetReportQueryOptions(id).queryKey });
+      await reportQ.refetch();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : (e as Error).message);
     }
@@ -196,6 +196,7 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
     );
   } else {
     const narrative = report.aiNarrative ?? undefined;
+    const needsEvidenceRedo = report.evidenceRecovery?.needsRegeneration === true;
     body = (
       <ScrollView
         contentContainerStyle={{
@@ -252,11 +253,40 @@ export function ReportDetail({ id, embedded = false }: ReportDetailProps) {
           ) : (
             <Card style={{ gap: 12 }}>
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" }}>
-                Generate a professional, structured narrative from this report's findings and evidence.
+                {needsEvidenceRedo
+                  ? `${report.evidenceRecovery?.syncedPhotoCount ?? 0} synced photo${report.evidenceRecovery?.syncedPhotoCount === 1 ? "" : "s"} are now ready. Redo the report so FAIE can include the recovered evidence.`
+                  : "Generate a professional, structured narrative from this report's findings and evidence."}
               </Text>
-              <Button title="Generate AI narrative" icon="sparkles" loading={genNarrative.isPending} onPress={generate} />
+              <Button
+                title={needsEvidenceRedo ? "Redo report with synced photos" : "Generate AI narrative"}
+                icon={needsEvidenceRedo ? "refresh" : "sparkles"}
+                loading={genNarrative.isPending}
+                onPress={generate}
+              />
             </Card>
           )}
+
+          {narrative && needsEvidenceRedo ? (
+            <View testID="report-evidence-recovery">
+              <Card style={{ gap: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="cloud-done-outline" size={18} color={colors.primary} />
+                  <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 15, flex: 1 }}>
+                    Synced evidence is ready
+                  </Text>
+                </View>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19 }}>
+                  Photos or findings finished syncing after this report was generated. Redo it to include the latest evidence.
+                </Text>
+                <Button
+                  title="Redo report with synced photos"
+                  icon="refresh"
+                  loading={genNarrative.isPending}
+                  onPress={generate}
+                />
+              </Card>
+            </View>
+          ) : null}
 
           {narrative ? (
             <Button

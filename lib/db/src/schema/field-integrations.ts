@@ -25,8 +25,8 @@ export const companyFieldIntegrationsTable = pgTable(
     // API key or bearer token for the external system.
     // Never serialised into any API response.
     apiKey: text("api_key").notNull(),
-    // Secondary token required by FieldRoutes (authenticationToken).
-    // Null for PestPac and ServSuite which use a single key.
+    // Secondary token: FieldRoutes authenticationToken or PestPac OAuth bearer
+    // access token for guarded location-history reads. Null for ServSuite.
     apiToken: text("api_token"),
     // Optional base URL override — useful for on-prem / sandbox environments.
     apiBaseUrl: text("api_base_url"),

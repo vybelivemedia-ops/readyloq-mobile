@@ -268,6 +268,35 @@ describe("createFrameBuffer — in-flight capture after stop() self-deletes", ()
     expect(deleteSpy).toHaveBeenCalledWith("file:///tmp/orphan.jpg", { idempotent: true });
     expect(buf.getLastUri()).toBeNull();
   });
+
+  it("does not adopt an old capture after stop followed by a new start", async () => {
+    let resolveOld!: (uri: string) => void;
+    const takeSpy = vi.fn().mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        resolveOld = resolve;
+      }),
+    );
+    const deleteSpy = makeDeleteSpy();
+    const buf = createFrameBuffer({
+      takePicture: asTakePicture(takeSpy),
+      deleteFile: asDeleteFile(deleteSpy),
+    });
+
+    buf.start();
+    vi.advanceTimersByTime(FRAME_BUFFER_INTERVAL_MS);
+    buf.stop();
+    buf.start();
+    resolveOld("file:///tmp/old-session.jpg");
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(buf.getLastUri()).toBeNull();
+    expect(deleteSpy).toHaveBeenCalledWith("file:///tmp/old-session.jpg", {
+      idempotent: true,
+    });
+    buf.stop();
+  });
 });
 
 // ─── Baseline: successful deletes work correctly ──────────────────────────────
@@ -327,6 +356,71 @@ describe("createFrameBuffer — baseline: successful deletes", () => {
     // If two intervals were running, takePicture would be called twice
     expect(takeSpy).toHaveBeenCalledTimes(1);
 
+    buf.stop();
+  });
+
+  it("skips interval ticks while a rolling capture is still in flight", async () => {
+    let resolveFirst!: (uri: string) => void;
+    const first = new Promise<string>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const takeSpy = vi
+      .fn()
+      .mockReturnValueOnce(first)
+      .mockResolvedValue("file:///tmp/frame-next.jpg");
+    const buf = createFrameBuffer({
+      takePicture: asTakePicture(takeSpy),
+      deleteFile: asDeleteFile(makeDeleteSpy()),
+    });
+    buf.start();
+
+    await vi.advanceTimersByTimeAsync(FRAME_BUFFER_INTERVAL_MS * 3);
+    expect(takeSpy).toHaveBeenCalledTimes(1);
+
+    resolveFirst("file:///tmp/frame-first.jpg");
+    await Promise.resolve();
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(FRAME_BUFFER_INTERVAL_MS);
+    expect(takeSpy).toHaveBeenCalledTimes(2);
+    buf.stop();
+  });
+
+  it("returns the buffered frame without starting another camera request", async () => {
+    const takeSpy = makeTakePicture([
+      "file:///tmp/frame-buffered.jpg",
+      "file:///tmp/frame-should-not-run.jpg",
+    ]);
+    const buf = createFrameBuffer({
+      takePicture: asTakePicture(takeSpy),
+      deleteFile: asDeleteFile(makeDeleteSpy()),
+    });
+    buf.start();
+    await vi.advanceTimersByTimeAsync(FRAME_BUFFER_INTERVAL_MS);
+
+    await expect(buf.getFrame()).resolves.toBe("file:///tmp/frame-buffered.jpg");
+    expect(takeSpy).toHaveBeenCalledTimes(1);
+    buf.stop();
+  });
+
+  it("reuses an in-flight rolling capture when no buffered frame exists", async () => {
+    let resolvePicture!: (uri: string) => void;
+    const takeSpy = vi.fn().mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolvePicture = resolve;
+      }),
+    );
+    const buf = createFrameBuffer({
+      takePicture: asTakePicture(takeSpy),
+      deleteFile: asDeleteFile(makeDeleteSpy()),
+    });
+    buf.start();
+    vi.advanceTimersByTime(FRAME_BUFFER_INTERVAL_MS);
+
+    const frame = buf.getFrame();
+    expect(takeSpy).toHaveBeenCalledTimes(1);
+    resolvePicture("file:///tmp/frame-shared.jpg");
+    await expect(frame).resolves.toBe("file:///tmp/frame-shared.jpg");
+    expect(takeSpy).toHaveBeenCalledTimes(1);
     buf.stop();
   });
 });

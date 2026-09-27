@@ -10,9 +10,8 @@ import { eq, sql } from "drizzle-orm";
  * ReadyLoq billing model: one Stripe customer per Company.
  * The Owner pays; the subscription covers the whole team.
  *
- * Plans:
- *   Solo Operator — flat $69/mo or $690/yr
- *   Growth Team   — $129/mo base + $39/mo per additional seat
+ * The current catalog is monthly, fixed-price, and versioned in Stripe
+ * metadata. Legacy subscriptions remain readable for grandfathered customers.
  */
 export class StripeStorage {
   // ── Stripe schema queries (read-only) ──────────────────────────────────────
@@ -31,16 +30,7 @@ export class StripeStorage {
     return result.rows;
   }
 
-  /**
-   * Returns all active products with their active prices.
-   * Products are enriched with plan metadata so the app can display
-   * correct feature lists without an extra API call.
-   */
-  /**
-   * Returns v2 ReadyLoq plans only (identified by the `billing_model` metadata
-   * key set during seeding). Old v1 products (Solo $49, Team $149, Enterprise
-   * $299) never had this key and are excluded even if still present in the DB.
-   */
+  /** Returns only active products and prices from the current catalog. */
   async listProductsWithPrices(_active = true) {
     const result = await db.execute(
       sql`
@@ -59,7 +49,8 @@ export class StripeStorage {
         FROM stripe.products p
         LEFT JOIN stripe.prices pr
           ON pr.product = p.id AND pr.active = true
-        WHERE p.metadata->>'billing_model' IS NOT NULL
+         WHERE p.active = true
+           AND p.metadata->>'catalog_version' = 'readyloq_2026_09'
         ORDER BY p.name, pr.unit_amount
       `,
     );
@@ -105,6 +96,18 @@ export class StripeStorage {
     return result.rows[0] ?? null;
   }
 
+  /** Any locally synced subscription that has not reached a terminal state. */
+  async hasCurrentSubscriptionForCustomer(customerId: string): Promise<boolean> {
+    const result = await db.execute(sql`
+      SELECT 1
+      FROM stripe.subscriptions
+      WHERE customer = ${customerId}
+        AND status NOT IN ('canceled', 'incomplete_expired')
+      LIMIT 1
+    `);
+    return result.rows.length > 0;
+  }
+
   // ── Companies table (application Stripe references) ───────────────────────
 
   async getCompany(companyId: number) {
@@ -136,13 +139,13 @@ export class StripeStorage {
     stripeInfo: {
       stripeCustomerId?: string;
       stripeSubscriptionId?: string;
-      subscriptionTier?: "solo" | "growth" | null;
+      subscriptionTier?: "solo" | "micro" | "small" | "growth" | "professional" | "enterprise" | "pilot" | null;
       subscriptionStatus?: string | null;
     },
   ) {
     const [updated] = await db
       .update(companiesTable)
-      .set(stripeInfo)
+      .set(stripeInfo as typeof companiesTable.$inferInsert)
       .where(eq(companiesTable.id, companyId))
       .returning();
     return updated;

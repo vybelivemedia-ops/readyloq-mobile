@@ -3,8 +3,9 @@ import { getUncachableStripeClient } from "./stripeClient";
 import { stripeStorage } from "./stripeStorage";
 import type { Company } from "@workspace/db";
 
-export type SubscriptionTier = "solo" | "growth";
-export type BillingPeriod = "monthly" | "yearly";
+export type SubscriptionTier = "solo" | "micro" | "small" | "growth" | "professional" | "enterprise" | "pilot";
+export type BillingPeriod = "monthly";
+export const READYLOQ_CATALOG_VERSION = "readyloq_2026_09";
 
 /** Shape returned by getLicenseStatus — consumed by the app on login */
 export interface LicenseStatus {
@@ -24,9 +25,8 @@ export interface LicenseStatus {
  * Billing model: one Stripe customer per Company (B2B).
  * The Owner creates the checkout; the subscription covers the whole team.
  *
- * Plans:
- *   solo   — flat $69/mo or $690/yr
- *   growth — $129/mo base + $39/mo per additional seat
+ * Current plans are fixed-price monthly tiers. Existing growth subscriptions
+ * remain grandfathered and are not modified by new checkout flows.
  */
 export class StripeService {
   // ── Customer management ───────────────────────────────────────────────────
@@ -56,32 +56,25 @@ export class StripeService {
   // ── Pricing helpers ───────────────────────────────────────────────────────
 
   /**
-   * Finds the active price IDs for a given plan and billing period.
-   * Queries the stripe.prices table (already synced by stripe-replit-sync).
-   * Returns { basePriceId, perSeatPriceId? }.
+   * Finds the active current-catalog price for a monthly plan.
    */
   async resolvePriceIds(
     tier: SubscriptionTier,
     period: BillingPeriod,
   ): Promise<{ basePriceId: string; perSeatPriceId?: string }> {
-    const interval = period === "monthly" ? "month" : "year";
+    if (period !== "monthly") throw new Error("ReadyLoq billing is monthly only");
     const rows = await stripeStorage.listProductsWithPrices();
 
-    const planKey = tier === "solo" ? "solo" : "growth";
+    const planKey = tier;
     const prices = rows.filter(
       (r) =>
-        (r.price_metadata as Record<string, string>)?.plan === planKey &&
-        (r.recurring as { interval?: string } | null)?.interval === interval,
+        (r.price_metadata as Record<string, string>)?.catalog_version === READYLOQ_CATALOG_VERSION &&
+        (r.price_metadata as Record<string, string>)?.plan_key === planKey &&
+        (r.price_metadata as Record<string, string>)?.billing_period === "month" &&
+        (r.recurring as { interval?: string } | null)?.interval === "month",
     );
 
-    const base = prices.find(
-      (r) =>
-        (r.price_metadata as Record<string, string>)?.plan_type === "flat" ||
-        (r.price_metadata as Record<string, string>)?.plan_type === "base",
-    );
-    const perSeat = prices.find(
-      (r) => (r.price_metadata as Record<string, string>)?.plan_type === "per_seat",
-    );
+    const base = prices[0];
 
     if (!base) {
       throw new Error(
@@ -92,8 +85,15 @@ export class StripeService {
 
     return {
       basePriceId: base.price_id as string,
-      perSeatPriceId: perSeat?.price_id as string | undefined,
+      perSeatPriceId: undefined,
     };
+  }
+
+  async hasCurrentSubscription(customerId: string): Promise<boolean> {
+    if (await stripeStorage.hasCurrentSubscriptionForCustomer(customerId)) return true;
+    const stripe = await getUncachableStripeClient();
+    const subscriptions = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
+    return subscriptions.data.some((sub) => !["canceled", "incomplete_expired"].includes(sub.status));
   }
 
   // ── Checkout ──────────────────────────────────────────────────────────────
@@ -101,20 +101,28 @@ export class StripeService {
   /**
    * Creates a Stripe Checkout Session.
    *
-   * Solo:   single line item (flat price, quantity 1).
-   * Growth: two line items — base (qty 1) + per_seat (qty = additionalSeats).
-   *         additionalSeats defaults to 0 (owner-only); Owner upgrades later.
+   * New tiers use one fixed-price line item. The legacy seat argument remains
+   * accepted so grandfathered Growth management callers do not break.
    */
   async createCheckoutSession(opts: {
     customerId: string;
     tier: SubscriptionTier;
     period: BillingPeriod;
     companyId: number;
-    additionalSeats?: number;   // Growth only; default 0
+    additionalSeats?: number;   // Retained only for grandfathered Growth callers
     successUrl: string;
     cancelUrl: string;
   }): Promise<Stripe.Checkout.Session> {
     const stripe = await getUncachableStripeClient();
+    const company = await stripeStorage.getCompany(opts.companyId);
+    if (company?.stripeSubscriptionId &&
+        company.subscriptionStatus &&
+        !["canceled", "incomplete_expired"].includes(company.subscriptionStatus)) {
+      throw new Error("A current subscription already exists for this company");
+    }
+    if (await this.hasCurrentSubscription(opts.customerId)) {
+      throw new Error("A current subscription already exists for this customer");
+    }
     const { basePriceId, perSeatPriceId } = await this.resolvePriceIds(
       opts.tier,
       opts.period,
@@ -139,12 +147,16 @@ export class StripeService {
       metadata: {
         companyId: String(opts.companyId),
         tier: opts.tier,
+        plan_key: opts.tier,
+        catalog_version: READYLOQ_CATALOG_VERSION,
         additionalSeats: String(additionalSeats),
       },
       subscription_data: {
         metadata: {
           companyId: String(opts.companyId),
           tier: opts.tier,
+          plan_key: opts.tier,
+          catalog_version: READYLOQ_CATALOG_VERSION,
         },
       },
       // Allow promo codes on the checkout page
@@ -152,7 +164,7 @@ export class StripeService {
     });
   }
 
-  // ── Seat management (Growth Team only) ───────────────────────────────────
+  // ── Legacy seat management (grandfathered Growth only) ───────────────────
 
   /**
    * Updates the per-seat quantity on an active Growth Team subscription.
