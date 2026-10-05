@@ -4,7 +4,7 @@ import { Buffer } from "node:buffer";
 import { getOpenAIClient } from "../client";
 
 // Lazy — only throws when actually called
-const openai = new Proxy({} as OpenAI, {
+export const openai = new Proxy({} as OpenAI, {
   get(_target, prop) {
     return (getOpenAIClient() as any)[prop];
   },

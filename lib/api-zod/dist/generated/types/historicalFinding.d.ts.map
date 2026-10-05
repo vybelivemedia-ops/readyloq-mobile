@@ -1,0 +1,1 @@
+{"version":3,"file":"historicalFinding.d.ts","sourceRoot":"","sources":["../../../src/generated/types/historicalFinding.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,yBAAyB,EAAE,MAAM,6BAA6B,CAAC;AAE7E,MAAM,WAAW,iBAAiB;IAChC,QAAQ,EAAE,MAAM,CAAC;IACjB,WAAW,EAAE,MAAM,CAAC;IACpB,SAAS,EAAE,MAAM,CAAC;IAClB,QAAQ,CAAC,EAAE,yBAAyB,CAAC;CACtC"}

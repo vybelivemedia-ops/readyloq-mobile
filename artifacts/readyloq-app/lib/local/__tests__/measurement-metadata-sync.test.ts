@@ -74,10 +74,12 @@ vi.mock("@/lib/api-client/corrections", () => ({
 // Upload utilities — not exercised in these tests (storagePath is pre-set),
 // but imported by engine.ts so they must resolve.
 vi.mock("@/lib/upload", () => ({
-  reserveUploadPath: vi.fn().mockResolvedValue({
-    uploadURL:   "https://storage.example.com/upload",
-    storagePath: "/api/storage/companies/1/media/photo.jpg",
-  }),
+  reserveUploadPath: vi.fn().mockImplementation(async (_token, _inspectionId, _key, _name, uri) => ({
+    uploadURL: "https://storage.example.com/upload",
+    storagePath: `/api/storage/companies/1/media/${String(uri).split("/").pop()}`,
+    uploadIntentId: 99,
+    expectedSize: 123,
+  })),
   doUpload:         vi.fn().mockResolvedValue(undefined),
   probeStoragePath: vi.fn().mockResolvedValue(false),
 }));
@@ -90,6 +92,7 @@ import {
   getLocalInspection,
   updateLocalInspection,
   parseRecord,
+  setLocalInspectionOwner,
   type LocalPhoto,
 } from "../inspection-store";
 
@@ -98,7 +101,11 @@ import { configureSyncEngine, syncNow } from "../../sync/engine";
 // ── Engine configuration (idempotent; runs once at module level) ──────────────
 // configureSyncEngine sets state.configured = true on first call and is a
 // no-op on subsequent calls, so it is safe to call here before any test.
-configureSyncEngine({ getToken: async () => "test-token" });
+setLocalInspectionOwner("measurement-sync-test-owner");
+configureSyncEngine({
+  getToken: async () => "test-token",
+  ownerId: "measurement-sync-test-owner",
+});
 
 // ── Shared test data ──────────────────────────────────────────────────────────
 
@@ -130,6 +137,9 @@ function photoWithMeasurement(overrides: Partial<LocalPhoto> = {}): LocalPhoto {
   return {
     localUri:    "file:///documents/inspections/test/photos/stamped.jpg",
     capturedAt:  "2026-08-17T12:00:00.000Z",
+    privacySanitized: true,
+    uploadIntentKey: "measurement-test-upload-intent",
+    uploadIntentId: 99,
     captureMetadata: {
       // image-level metadata written unconditionally by new-inspection.tsx
       width:    1920,
@@ -157,6 +167,7 @@ function makeInspection() {
 
 beforeEach(() => {
   _store.clear();
+  setLocalInspectionOwner("measurement-sync-test-owner");
   _uuid = 0;
   addInspectionMediaSpy.mockClear();
   addInspectionMediaSpy.mockResolvedValue({ id: 99 });
@@ -281,6 +292,7 @@ describe("updateLocalInspection — captureMetadata is not overwritten on merge"
 describe("sync engine — captureMetadata passes through to addInspectionMedia", () => {
   it("calls addInspectionMedia with captureMetadata.laserMeasurement.metadata.warnings intact", async () => {
     const insp = makeInspection();
+    insp.unitNumber = "4B";
     // storagePath pre-set → engine skips the upload step and goes directly to
     // the POST /media registration step where captureMetadata is forwarded.
     insp.photos = [photoWithMeasurement({
@@ -296,18 +308,20 @@ describe("sync engine — captureMetadata passes through to addInspectionMedia",
 
     const [, payload] = addInspectionMediaSpy.mock.calls[0] as [
       number,
-      { captureMetadata?: Record<string, unknown> },
+      { captureMetadata?: Record<string, unknown>; unitNumber?: string | null },
     ];
 
     expect(payload.captureMetadata).toBeDefined();
     const laser = payload.captureMetadata!.laserMeasurement as typeof LASER_MEASUREMENT;
     expect(laser).toBeDefined();
     expect(laser.metadata.warnings).toEqual(WARNINGS);
+    expect(payload.unitNumber).toBe("4B");
   });
 
   it("does not strip image-level or laserMeasurement keys when building the addInspectionMedia payload", async () => {
     const insp = makeInspection();
     insp.photos = [photoWithMeasurement({
+      localUri: "file:///documents/inspections/test/photos/stamped2.jpg",
       storagePath: "/api/storage/companies/1/media/stamped2.jpg",
     })];
     insp.serverId = 42;
@@ -328,5 +342,33 @@ describe("sync engine — captureMetadata passes through to addInspectionMedia",
     const laser = meta.laserMeasurement as typeof LASER_MEASUREMENT;
     expect(laser.value).toBe(3.42);
     expect(laser.metadata.confidence).toBe(0.61);
+  });
+
+  it("sends the original capturedAt unchanged after a failed and delayed retry", async () => {
+    const capturedAt = "2024-01-02T03:04:05.678Z";
+    const insp = makeInspection();
+    insp.photos = [photoWithMeasurement({
+      localUri: "file:///documents/inspections/test/photos/retried.jpg",
+      capturedAt,
+      storagePath: "/api/storage/companies/1/media/retried.jpg",
+    })];
+    insp.serverId = 42;
+    await saveLocalInspection(insp);
+
+    // Registration fails once, then succeeds on the retry. The persisted local
+    // photo remains the source of truth; registration time must never replace
+    // its capture time.
+    addInspectionMediaSpy.mockRejectedValueOnce(new Error("temporary network failure"));
+    await syncNow(insp.localId);
+
+    addInspectionMediaSpy.mockResolvedValueOnce({ id: 100 });
+    // Let the engine's delayed exponential-backoff retry perform the second
+    // registration attempt rather than invoking a fresh manual sync.
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(addInspectionMediaSpy).toHaveBeenCalledTimes(2);
+    expect(addInspectionMediaSpy.mock.calls[0][1]).toMatchObject({ capturedAt });
+    expect(addInspectionMediaSpy.mock.calls[1][1]).toMatchObject({ capturedAt });
+    expect((await getLocalInspection(insp.localId))?.photos[0]?.capturedAt).toBe(capturedAt);
   });
 });

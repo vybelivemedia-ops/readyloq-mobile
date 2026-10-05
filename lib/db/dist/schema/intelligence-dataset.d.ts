@@ -30,6 +30,7 @@ export declare const INTELLIGENCE_TAXONOMY: TaxonomyGroup[];
 export declare const TAXONOMY_CATEGORY_SLUGS: string[];
 export type IntelligenceStatus = "pending" | "confirmed" | "approved" | "rejected" | "skipped";
 export type IntelligenceSeverity = "low" | "moderate" | "high" | "critical";
+export type IntelligenceMediaType = "photo" | "video";
 export type TreatmentOutcome = "resolved" | "improved" | "unchanged" | "worsened" | "pending" | "not_applicable";
 export type AiPrediction = {
     category: string | null;
@@ -134,6 +135,25 @@ export declare const intelligenceRecordsTable: import("drizzle-orm/pg-core").PgT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
+        mediaType: import("drizzle-orm/pg-core").PgColumn<{
+            name: "media_type";
+            tableName: "intelligence_records";
+            dataType: "string";
+            columnType: "PgText";
+            data: IntelligenceMediaType;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: IntelligenceMediaType;
+        }>;
         aiPrediction: import("drizzle-orm/pg-core").PgColumn<{
             name: "ai_prediction";
             tableName: "intelligence_records";
@@ -997,7 +1017,7 @@ export declare const intelligenceTrainingExportsTable: import("drizzle-orm/pg-co
             tableName: "intelligence_training_exports";
             dataType: "string";
             columnType: "PgText";
-            data: "pending" | "ready" | "failed";
+            data: "pending" | "failed" | "ready";
             driverParam: string;
             notNull: true;
             hasDefault: true;
@@ -1009,7 +1029,7 @@ export declare const intelligenceTrainingExportsTable: import("drizzle-orm/pg-co
             identity: undefined;
             generated: undefined;
         }, {}, {
-            $type: "pending" | "ready" | "failed";
+            $type: "pending" | "failed" | "ready";
         }>;
         recordCount: import("drizzle-orm/pg-core").PgColumn<{
             name: "record_count";
@@ -1129,6 +1149,10 @@ export declare const intelligenceSeverityEnum: z.ZodEnum<{
     high: "high";
     moderate: "moderate";
     critical: "critical";
+}>;
+export declare const intelligenceMediaTypeEnum: z.ZodEnum<{
+    photo: "photo";
+    video: "video";
 }>;
 export declare const treatmentOutcomeEnum: z.ZodEnum<{
     pending: "pending";

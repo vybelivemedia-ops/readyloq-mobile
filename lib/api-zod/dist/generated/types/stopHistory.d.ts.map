@@ -1,0 +1,1 @@
+{"version":3,"file":"stopHistory.d.ts","sourceRoot":"","sources":["../../../src/generated/types/stopHistory.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,kBAAkB,EAAE,MAAM,sBAAsB,CAAC;AAC/D,OAAO,KAAK,EAAE,eAAe,EAAE,MAAM,mBAAmB,CAAC;AAEzD,MAAM,MAAM,WAAW,GAAG,eAAe,GAAG;IAC1C,MAAM,EAAE,MAAM,CAAC;IACf,cAAc,EAAE,kBAAkB,CAAC;CACpC,CAAC"}

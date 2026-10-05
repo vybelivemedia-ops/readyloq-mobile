@@ -223,6 +223,72 @@ describe("WifiCameraProvider.checkHealth()", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3b. WifiCameraProvider.getStatus() — reachable vs. actually connected
+//     (task #909: a chip must never read "healthy" for a camera that is only
+//     reachable on the network but was never connect()-ed / was disconnect()-ed).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("WifiCameraProvider.getStatus()", () => {
+  beforeEach(() => {
+    clearWifiCameraConfig();
+    _asyncStore.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("reports connection state 'error' when the camera is not reachable at all", async () => {
+    configureWifiCamera({ baseUrl: "http://192.168.99.1" });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network request failed")));
+
+    const provider = createWifiCameraProvider();
+    const status = await provider.getStatus();
+
+    expect(status.operational).toBe("error");
+    expect(status.connection.state).toBe("error");
+  });
+
+  it("does NOT report connection state 'connected' when reachable but never connect()-ed", async () => {
+    configureWifiCamera({ baseUrl: "http://10.0.0.1" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    const provider = createWifiCameraProvider();
+    const status = await provider.getStatus();
+
+    // Reachable, but the provider was never connect()-ed — this must not be
+    // reported as an active "connected" state, or DeviceHealthStrip renders
+    // a false-healthy green dot for a camera that isn't actually in use.
+    expect(status.operational).toBe("unavailable");
+    expect(status.connection.state).not.toBe("connected");
+    expect(status.connection.connectedAt).toBeUndefined();
+  });
+
+  it("reports connection state 'connected' only after connect() succeeds", async () => {
+    configureWifiCamera({ baseUrl: "http://10.0.0.1" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    const provider = createWifiCameraProvider();
+    await provider.connect();
+    const status = await provider.getStatus();
+
+    expect(status.operational).toBe("idle");
+    expect(status.connection.state).toBe("connected");
+    expect(status.connection.connectedAt).toBeTruthy();
+  });
+
+  it("drops back to reachable-but-not-connected after disconnect()", async () => {
+    configureWifiCamera({ baseUrl: "http://10.0.0.1" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    const provider = createWifiCameraProvider();
+    await provider.connect();
+    await provider.disconnect();
+    const status = await provider.getStatus();
+
+    expect(status.connection.state).not.toBe("connected");
+    expect(status.operational).toBe("unavailable");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 4. DeviceRegistry.checkAllHealth()
 // ─────────────────────────────────────────────────────────────────────────────
 

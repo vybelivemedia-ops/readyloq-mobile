@@ -33,8 +33,8 @@ export const FUTURE_PROVIDER_DEFINITIONS: CaptureProviderDefinition[] = [
   {
     id: "smart-glasses",
     source: "smart_glasses",
-    name: "Meta Ray-Ban glasses",
-    description: "Hands-free capture; frames arrive via BLE → auto-snapshot pipeline.",
+    name: "Custom BLE glasses",
+    description: "ReadyLoq GATT frame transport; separate from official Meta DAT camera access.",
     capabilities: {
       mode: "async_push",
       transport: "ble",

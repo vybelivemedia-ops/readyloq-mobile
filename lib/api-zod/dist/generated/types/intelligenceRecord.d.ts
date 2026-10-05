@@ -6,12 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AiPrediction } from './aiPrediction';
+import type { IntelligenceRecordMediaType } from './intelligenceRecordMediaType';
 import type { IntelligenceTag } from './intelligenceTag';
 export interface IntelligenceRecord {
     id: number;
     imageUrl: string;
     /** @nullable */
     thumbnailUrl?: string | null;
+    mediaType?: IntelligenceRecordMediaType;
     aiPrediction: AiPrediction;
     /** @nullable */
     aiConfidence?: number | null;

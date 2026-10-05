@@ -26,6 +26,15 @@ export function useSignOut() {
     await clearUserCache();
     // Evict the in-memory React Query entry for the same reason.
     queryClient.removeQueries({ queryKey: ["current-user"] });
+    // Platform data is cross-company and must never survive an identity change.
+    queryClient.removeQueries({
+      predicate: (query) =>
+        query.queryKey.some(
+          (part) =>
+            typeof part === "string" &&
+            part.startsWith("/api/mission-control/"),
+        ),
+    });
     // Revoke the Clerk session.
     await signOut();
   };

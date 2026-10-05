@@ -155,7 +155,7 @@ export function createNativeCameraProvider(
       // of shutter lag on full-resolution sensors.  The hardware encoder
       // produces equivalent quality at native speed (~150–300 ms).  The quality
       // parameter has no effect when skipProcessing is true so it is omitted.
-      const pic = await camera.takePictureAsync({ skipProcessing: true });
+      const pic = await camera.takePictureAsync({ skipProcessing: true, exif: true });
       if (!pic?.uri) return [];
       return [
         {
@@ -165,7 +165,24 @@ export function createNativeCameraProvider(
           capturedAt: new Date().toISOString(),
           width: pic.width,
           height: pic.height,
-          metadata: { providerId: "native-camera" },
+          metadata: {
+            providerId: "native-camera",
+            // Preserve focal/pixel calibration when the source JPEG's EXIF is
+            // stripped at intake. Never copy the full EXIF object (it can
+            // include GPS coordinates).
+            FocalLenIn35mmFilm:
+              typeof pic.exif?.FocalLenIn35mmFilm === "number"
+                ? pic.exif.FocalLenIn35mmFilm
+                : undefined,
+            PixelXDimension:
+              typeof pic.exif?.PixelXDimension === "number"
+                ? pic.exif.PixelXDimension
+                : undefined,
+            PixelYDimension:
+              typeof pic.exif?.PixelYDimension === "number"
+                ? pic.exif.PixelYDimension
+                : undefined,
+          },
         },
       ];
     },

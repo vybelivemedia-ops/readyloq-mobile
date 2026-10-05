@@ -10,7 +10,7 @@
  *     usb-camera, wifi-camera, wearable-camera
  *
  * CURRENT STATUS:
- *   Meta Ray-Ban smart glasses: AVAILABLE — availability flipped to true.
+ *   Meta AI glasses: Android Device Access Toolkit integration (DAT).
  *   Pipeline bindings declared in SmartGlassesCapabilities:
  *     audioPipeline: "faie"        → FAIE voice inspection pipeline
  *     snapshotRoutine: "auto_snapshot" → rolling frame-buffer auto-capture
@@ -34,7 +34,7 @@
  *
  * INTEGRATION ROADMAP (from ReadyLoq roadmap comments):
  *   Phase Next:
- *     - Meta Ray-Ban smart glasses → react-native-ble-plx BLE notify stream
+ *     - ReadyLoq-compatible custom smart glasses → BLE notify stream
  *     - USB camera trigger (USB-OTG) → react-native-usb adapter
  *     - WiFi IP camera → WebSocket / RTSP bridge
  *   Phase Future:
@@ -128,7 +128,7 @@ export interface WearableRegistry extends DeviceDiscovery {
   listRegistered(): WearableProvider[];
 }
 
-// ─── Smart Glasses (Meta Ray-Ban) — async_push / BLE ────────────────────────
+// ─── ReadyLoq-compatible custom smart glasses — async_push / BLE ────────────
 
 /**
  * Extended capabilities for smart-glasses providers.
@@ -153,6 +153,10 @@ export interface SmartGlassesCapabilities extends CaptureCapabilities {
 }
 
 /**
+ * This is the ReadyLoq custom GATT / Nordic UART device path. It is NOT
+ * consumer Meta AI glasses; those use META_LIVE_AI_CAPABILITIES below and the
+ * official Android Device Access Toolkit.
+ *
  * Target SDK: react-native-ble-plx
  * Transport:  BLE notify characteristic → JPEG frame chunks reassembled on RN
  * Mode:       async_push — glasses trigger a photo on hardware button press;
@@ -294,7 +298,7 @@ export const META_LIVE_AI_SOURCE: CaptureSource = "smart_glasses";
  */
 export class MetaLiveAIProvider {
   readonly meta: WearableProviderMeta = {
-    hardwareModel: "Meta Ray-Ban (Live AI webhook)",
+     hardwareModel: "Meta AI glasses (cloud/webhook fallback)",
     firmwareVersion: undefined,
     batteryLevel: undefined,
     connectionAddress: undefined,
@@ -364,7 +368,7 @@ export const FUTURE_WEARABLE_PROVIDERS: Array<{
 }> = [
   {
     id: "smart-glasses",
-    label: "Smart Glasses (Meta Ray-Ban)",
+     label: "ReadyLoq-compatible smart glasses (custom BLE)",
     source: "smart_glasses",
     capabilities: SMART_GLASSES_CAPABILITIES,
     availability: { available: true },

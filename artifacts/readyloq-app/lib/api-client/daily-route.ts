@@ -4,6 +4,11 @@
  * Replaces the previous "rig inventory" model with explicit product-to-pest
  * pairings for the day's route. Example: Suspend SC → German Cockroaches.
  *
+ * DELIBERATELY hand-written, not generated — see the matching note at the top
+ * of `./schedule.ts`. This app's `lib/api-client/generated/` fork is not wired
+ * up for daily-rig endpoints; the hand-written fetchers below are the
+ * intended long-term pattern for this feature area, not a stopgap.
+ *
  * Endpoints:
  *  POST /technician/daily-rig          — create / replace today's assignments
  *  GET  /technician/daily-rig          — fetch today's assignments with full product data
@@ -104,4 +109,92 @@ export async function getDailyRoute(date?: string): Promise<DailyRoute | null> {
  */
 export async function getRecentMixes(): Promise<RecentMix[]> {
   return customFetch<RecentMix[]>(`/api/technician/daily-rig/recent-mixes`);
+}
+
+// ─── Read-only Route Readiness lookup (any technician/date) ────────────────
+
+export interface DailyRouteLookupResult {
+  setUp: boolean;
+  technicianId: string;
+  rigDate: string;
+  assignments: RouteAssignmentWithProduct[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Read-only lookup of a Route Readiness (daily rig) status for ANY
+ * technician/date pair — used by the Integrated Route Calendar so a manager,
+ * or a technician looking at a future date, can see readiness without the
+ * editing affordances of `getDailyRoute`/`upsertDailyRoute` (which always
+ * target the authenticated technician's own current-day rig).
+ * Returns `{ setUp: false }` when no rig exists for that date (404), and
+ * throws on a genuine access-denied (403) from looking up another
+ * technician while not a manager/owner.
+ */
+export async function lookupDailyRoute(
+  technicianId: string,
+  date: string,
+): Promise<DailyRouteLookupResult | { setUp: false }> {
+  try {
+    return await customFetch<DailyRouteLookupResult>(
+      `/api/technician/daily-rig/lookup?technicianId=${encodeURIComponent(technicianId)}&date=${encodeURIComponent(date)}`,
+    );
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("404")) return { setUp: false };
+    throw e;
+  }
+}
+
+// ─── Today's Route Readiness ─────────────────────────────────────────────────
+//
+// Compares today's scheduled stops against on-hand truck quantities for the
+// products declared on today's rig. A proactive "will I run out TODAY"
+// signal — distinct from Truck Stock Health (see inventory.ts), which is a
+// longer-range trending projection independent of today's schedule.
+
+export type RouteReadinessProductStatus = "ready" | "short" | "insufficient-data";
+export type RouteReadinessOverallStatus = "ready" | "short" | "not-set-up";
+
+export interface RouteReadinessProduct {
+  productId: number;
+  productName: string;
+  targetPest: string;
+  unit: string;
+  quantityOnHand: number;
+  avgUsagePerStop: number | null;
+  expectedUsageToday: number | null;
+  status: RouteReadinessProductStatus;
+}
+
+export interface RouteReadiness {
+  technicianId: string;
+  date: string;
+  stopCount: number;
+  rigSetUp: boolean;
+  overallStatus: RouteReadinessOverallStatus;
+  products: RouteReadinessProduct[];
+}
+
+/** Fetches Today's Route Readiness for the authenticated technician (or, for a
+ *  manager/owner/sales viewer, for `technicianId` when provided). */
+export async function getRouteReadiness(params?: {
+  technicianId?: string;
+  date?: string;
+}): Promise<RouteReadiness> {
+  const date = params?.date ?? todayDateString();
+  const tzOffsetMinutes = new Date().getTimezoneOffset();
+  const search = new URLSearchParams({ date, tzOffsetMinutes: String(tzOffsetMinutes) });
+  if (params?.technicianId) search.set("technicianId", params.technicianId);
+  return customFetch<RouteReadiness>(`/api/technician/daily-rig/route-readiness?${search.toString()}`);
+}
+
+/** Manager/owner: Today's Route Readiness for every technician on the team. */
+export async function getTeamRouteReadiness(date?: string): Promise<RouteReadiness[]> {
+  const tzOffsetMinutes = new Date().getTimezoneOffset();
+  const search = new URLSearchParams({
+    date: date ?? todayDateString(),
+    tzOffsetMinutes: String(tzOffsetMinutes),
+  });
+  return customFetch<RouteReadiness[]>(`/api/technician/daily-rig/team-route-readiness?${search.toString()}`);
 }

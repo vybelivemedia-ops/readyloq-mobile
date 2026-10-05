@@ -11,6 +11,19 @@ export const PROPERTY_TYPES = [
   "Hospitality",
 ] as const;
 
+/**
+ * Freeform reason for the visit, offered as quick-pick chips at booking time.
+ * Stored as plain text (not a strict enum) so a future enterprise-routing
+ * import can also populate it from a legacy "stop type" field.
+ */
+export const VISIT_PURPOSES = [
+  "Routine Inspection",
+  "Initial Service",
+  "Callback",
+  "Follow-up",
+  "Other",
+] as const;
+
 export const PEST_TYPES = [
   "Rodents",
   "Cockroaches",

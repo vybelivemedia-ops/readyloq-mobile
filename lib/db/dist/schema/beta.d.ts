@@ -253,7 +253,7 @@ export declare const betaFeedbackTable: import("drizzle-orm/pg-core").PgTableWit
     };
     dialect: "pg";
 }>;
-export type ErrorCategory = "upload" | "ai" | "report" | "auth" | "notification";
+export type ErrorCategory = "upload" | "ai" | "report" | "auth" | "notification" | "inventory";
 export declare const errorEventsTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "error_events";
     schema: undefined;
@@ -563,13 +563,13 @@ export declare const betaChecklistStateTable: import("drizzle-orm/pg-core").PgTa
 }>;
 export declare const insertBetaFeedbackSchema: z.ZodObject<{
     companyId: z.ZodInt;
+    type: z.ZodString;
     status: z.ZodOptional<z.ZodString>;
     severity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     inspectionId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     title: z.ZodString;
     description: z.ZodString;
     userId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
-    type: z.ZodString;
     analysisId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     reportId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     context: z.ZodOptional<z.ZodNullable<z.ZodType<import("drizzle-zod").Json, unknown, z.core.$ZodTypeInternals<import("drizzle-zod").Json, unknown>>>>;

@@ -1,0 +1,1 @@
+export { GlobalSearch as default } from "@/components/mission-control/search";

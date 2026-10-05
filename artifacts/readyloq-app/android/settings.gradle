@@ -22,6 +22,26 @@ plugins {
   id("expo-autolinking-settings")
 }
 
+dependencyResolutionManagement {
+  repositories {
+    google()
+    mavenCentral()
+    // Meta's official Wearables Device Access Toolkit repository. Meta
+    // publishes these artifacts as private GitHub Packages, so authentication
+    // is required even for the public SDK coordinates.
+    maven {
+      url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
+      credentials {
+        // GITHUB_PACKAGES_TOKEN is the repository-specific classic PAT used
+        // by preview builds. GitHub Actions may instead supply GITHUB_TOKEN
+        // and GITHUB_ACTOR. Never put credentials in source or eas.json.
+        username = System.getenv("GITHUB_PACKAGES_USERNAME") ?: System.getenv("GITHUB_ACTOR") ?: "x-access-token"
+        password = System.getenv("GITHUB_PACKAGES_TOKEN") ?: System.getenv("GITHUB_TOKEN") ?: ""
+      }
+    }
+  }
+}
+
 extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   if (System.getenv('EXPO_USE_COMMUNITY_AUTOLINKING') == '1') {
     ex.autolinkLibrariesFromCommand()

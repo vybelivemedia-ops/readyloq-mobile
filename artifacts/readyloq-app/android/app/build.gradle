@@ -86,19 +86,34 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 def metaWearablesAppId = System.getenv("META_APP_ID")?.trim()
 def metaWearablesClientToken = System.getenv("META_CLIENT_TOKEN")?.trim()
 def invalidMetaWearablesValue = { value ->
-    !value || value.startsWith('$') || value.startsWith('YOUR_META_')
+    !value || value == '0' || value.startsWith('$') || value.startsWith('YOUR_META_')
 }
-def isReleaseBuild = gradle.startParameter.taskNames.any {
-    it.toLowerCase().contains('release')
-}
-
-if (isReleaseBuild && (
-    invalidMetaWearablesValue(metaWearablesAppId) ||
-    invalidMetaWearablesValue(metaWearablesClientToken)
-)) {
-    throw new GradleException(
-        "META_APP_ID and META_CLIENT_TOKEN must be configured in the EAS build environment for release builds."
-    )
+// Resolve the actual task graph instead of inspecting the initial command.
+// EAS and CI wrappers can invoke a release task indirectly.
+gradle.taskGraph.whenReady { graph ->
+    def producesReleaseArtifact = graph.allTasks.any { task ->
+        task.project == project && task.name.toLowerCase().contains('release')
+    }
+        if (producesReleaseArtifact) {
+            def releaseSigning = android.signingConfigs.release
+            if (!releaseSigning.storeFile ||
+                !releaseSigning.storePassword ||
+                !releaseSigning.keyAlias ||
+                !releaseSigning.keyPassword) {
+                throw new GradleException(
+                    "Android release builds require a complete release keystore configuration. " +
+                    "Configure EAS-managed Android credentials or private MYAPP_UPLOAD_* Gradle properties."
+                )
+            }
+        }
+    if (producesReleaseArtifact && (
+        invalidMetaWearablesValue(metaWearablesAppId) ||
+        invalidMetaWearablesValue(metaWearablesClientToken)
+    )) {
+        throw new GradleException(
+            "META_APP_ID and META_CLIENT_TOKEN must be configured in the EAS build environment for release builds."
+        )
+    }
 }
 
 android {
@@ -112,11 +127,13 @@ android {
         applicationId 'com.hgwashingllc.readyloqmobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 219
+        versionCode 221
         versionName "1.0.0"
 
-        resValue "string", "meta_wearables_application_id", metaWearablesAppId ?: ""
-        resValue "string", "meta_wearables_client_token", metaWearablesClientToken ?: ""
+        // Official DAT Developer Mode uses 0 placeholders when app attestation
+        // is not configured. The release-task guard above rejects placeholders.
+        resValue "string", "meta_wearables_application_id", metaWearablesAppId ?: "0"
+        resValue "string", "meta_wearables_client_token", metaWearablesClientToken ?: "0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -127,15 +144,27 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // EAS injects the managed release keystore into this signing config
+            // through its generated eas-build.gradle integration. For direct
+            // Gradle release builds, credentials may be supplied as private
+            // Gradle properties; never fall back to the debug keystore.
+            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+                storeFile file(project.property('MYAPP_UPLOAD_STORE_FILE'))
+                storePassword project.findProperty('MYAPP_UPLOAD_STORE_PASSWORD')
+                keyAlias project.findProperty('MYAPP_UPLOAD_KEY_ALIAS')
+                keyPassword project.findProperty('MYAPP_UPLOAD_KEY_PASSWORD')
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // A missing release credential must fail the release build; signing
+            // with the publicly-known debug key is never an acceptable fallback.
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -176,6 +205,12 @@ android {
 }
 
 dependencies {
+    // Official Meta Wearables Device Access Toolkit. Camera access is an
+    // Android-native integration; Expo Go cannot load this module.
+    implementation("com.meta.wearable:mwdat-core:0.9.0")
+    implementation("com.meta.wearable:mwdat-camera:0.9.0")
+    testImplementation("junit:junit:4.13.2")
+
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 

@@ -2,7 +2,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { getGeminiClient } from "../client";
 
 // Lazy proxy — only throws when a method is actually called
-const ai = new Proxy({} as GoogleGenAI, {
+export const ai = new Proxy({} as GoogleGenAI, {
   get(_target, prop) {
     return (getGeminiClient() as any)[prop];
   },

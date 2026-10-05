@@ -26,7 +26,6 @@ import * as BackgroundFetch from "expo-background-fetch";
 import * as SecureStore from "expo-secure-store";
 import * as TaskManager from "expo-task-manager";
 
-import { hasPendingWork, listLocalInspections } from "@/lib/local/inspection-store";
 import { runBackgroundSync } from "@/lib/sync/engine";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -35,6 +34,7 @@ export const BACKGROUND_SYNC_TASK = "readyloq-background-sync";
 
 /** SecureStore key for the cached Clerk JWT. */
 const TOKEN_KEY = "readyloq_bg_token";
+let credentialWriteChain: Promise<void> = Promise.resolve();
 
 /** Requested minimum interval between background fetches (seconds). */
 const FETCH_INTERVAL_SECONDS = 15 * 60; // 15 min — OS may enforce a longer minimum
@@ -46,9 +46,19 @@ const FETCH_INTERVAL_SECONDS = 15 * 60; // 15 min — OS may enforce a longer mi
  * Call this from the authenticated layout whenever a new token is obtained.
  * The token is stored in the device keychain (encrypted at rest).
  */
-export async function cacheTokenForBackground(token: string): Promise<void> {
+export async function cacheTokenForBackground(
+  token: string,
+  ownerId: string,
+  companyId: number | null,
+): Promise<void> {
   try {
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
+    // Keep token and owner in a single key so a crash cannot pair one account's
+    // credentials with another account's ownership marker.
+    const write = credentialWriteChain.then(() =>
+      SecureStore.setItemAsync(TOKEN_KEY, JSON.stringify({ token, ownerId, companyId })),
+    );
+    credentialWriteChain = write.catch(() => undefined);
+    await write;
   } catch {
     // Non-fatal: foreground sync still works; background task will use the
     // previously cached token or skip if nothing is stored.
@@ -58,7 +68,9 @@ export async function cacheTokenForBackground(token: string): Promise<void> {
 /** Remove the cached token (e.g. on sign-out). */
 export async function clearCachedBackgroundToken(): Promise<void> {
   try {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    const clear = credentialWriteChain.then(() => SecureStore.deleteItemAsync(TOKEN_KEY));
+    credentialWriteChain = clear.catch(() => undefined);
+    await clear;
   } catch {
     // Already absent — safe to ignore.
   }
@@ -70,23 +82,39 @@ export async function clearCachedBackgroundToken(): Promise<void> {
 
 TaskManager.defineTask(BACKGROUND_SYNC_TASK, async () => {
   try {
-    // Quick short-circuit: avoid waking the sync engine if there's nothing to do.
-    const all = await listLocalInspections();
-    const pending = all.filter(hasPendingWork);
-    if (pending.length === 0) {
+    // A token is only safe to use alongside the owner it was cached for.
+    const cached = await SecureStore.getItemAsync(TOKEN_KEY);
+    let credentials: {
+      token?: unknown;
+      ownerId?: unknown;
+      companyId?: unknown;
+    } | null = null;
+    try {
+      credentials = cached
+        ? JSON.parse(cached) as { token?: unknown; ownerId?: unknown; companyId?: unknown }
+        : null;
+    } catch {
+      // A previous unscoped raw-token cache is deliberately not reused.
+    }
+    const cachedToken = typeof credentials?.token === "string" ? credentials.token : null;
+    const cachedOwnerId = typeof credentials?.ownerId === "string" ? credentials.ownerId : null;
+    const hasCompanyScope = credentials != null &&
+      Object.prototype.hasOwnProperty.call(credentials, "companyId") &&
+      (credentials.companyId === null ||
+        (typeof credentials.companyId === "number" && Number.isFinite(credentials.companyId)));
+    const cachedCompanyId = typeof credentials?.companyId === "number"
+      ? credentials.companyId
+      : null;
+    if (!cachedToken || !cachedOwnerId || !hasCompanyScope) {
       return BackgroundFetch.BackgroundFetchResult.NoData;
     }
-
-    // Retrieve the cached token. If absent (user never signed in on this
-    // device, or signed out), bail out — we cannot authenticate.
-    const cachedToken = await SecureStore.getItemAsync(TOKEN_KEY);
-    if (!cachedToken) {
-      return BackgroundFetch.BackgroundFetchResult.NoData;
-    }
-
     // Run one full sync pass using the cached token. The engine handles
     // upload retries internally; a single failed photo never aborts the rest.
-    const didWork = await runBackgroundSync(async () => cachedToken);
+    const didWork = await runBackgroundSync(
+      async () => cachedToken,
+      cachedOwnerId,
+      cachedCompanyId,
+    );
 
     return didWork
       ? BackgroundFetch.BackgroundFetchResult.NewData

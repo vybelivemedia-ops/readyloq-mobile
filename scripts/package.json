@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "stripe:seed": "tsx ./src/seed-products.ts",
+    "stripe:audit": "tsx ./src/audit-stripe-catalog.ts",
+    "stripe:archive-old": "tsx ./src/archive-old-stripe-prices.ts",
+    "stripe:verify": "tsx ./src/verify-stripe-test-flow.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

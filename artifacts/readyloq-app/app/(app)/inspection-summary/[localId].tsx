@@ -88,7 +88,11 @@ export default function InspectionSummaryScreen() {
   });
   const analysisQ = useQuery({
     ...getListAnalysisResultsQueryOptions({ inspectionId: serverId ?? 0 }),
-    enabled: serverId != null && finalized,
+    enabled: serverId != null,
+    refetchInterval: (q) => {
+      const status = q.state.data?.[0]?.status?.toLowerCase();
+      return status === "complete" || status === "failed" ? false : 4000;
+    },
   });
 
   const inspection = serverId != null ? inspectionQ.data : undefined;
@@ -322,6 +326,11 @@ export default function InspectionSummaryScreen() {
         {(() => {
           const aiVariant = resolveAnalysisCardVariant({
             finalized,
+            analysisInProgress:
+              phase === "syncing" &&
+              record.photos.length > 0 &&
+              record.photos.every((photo) => photo.storagePath && photo.mediaRowId != null) &&
+              record.analyzedCount < record.photos.length,
             isError: analysisQ.isError,
             isSuccess: analysisQ.isSuccess,
             analysis: analysis ?? (analysisQ.isSuccess ? null : undefined),
@@ -329,22 +338,31 @@ export default function InspectionSummaryScreen() {
           });
 
           switch (aiVariant.kind) {
-            case "not-finalized":
+            case "ai-queued":
               return (
                 <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                   <Ionicons name="cloud-upload-outline" size={20} color={colors.mutedForeground} />
                   <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
-                    AI analysis, the service report, and insights will generate automatically once
-                    this inspection syncs.
+                    AI queued — analysis will start automatically after the evidence is synchronized.
                   </Text>
                 </Card>
               );
 
             case "query-error":
             case "pipeline-incomplete":
+            case "ai-failed":
               return (
                 <Card style={{ gap: 8 }}>
-                  <SectionTitle icon="sparkles" title="AI findings" />
+                  <SectionTitle icon="sparkles" title="AI failed" />
+                  <SectionNotGenerated {...aiVariant.placeholder} />
+                </Card>
+              );
+
+            case "ai-partial":
+              return (
+                <Card style={{ gap: 8 }}>
+                  <SectionTitle icon="sparkles" title={`AI partial · findings (${aiVariant.findingsCount})`} />
+                  {findings.slice(0, 5).map((f) => <FindingRow key={f.id} finding={f} />)}
                   <SectionNotGenerated {...aiVariant.placeholder} />
                 </Card>
               );
@@ -376,7 +394,7 @@ export default function InspectionSummaryScreen() {
             case "clean":
               return (
                 <Card style={{ gap: 8 }}>
-                  <SectionTitle icon="sparkles" title={`AI findings (${findings.length})`} />
+                  <SectionTitle icon="sparkles" title={`AI complete · findings (${findings.length})`} />
                   <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
                     No pest activity or conducive conditions detected in the evidence.
                   </Text>
@@ -387,7 +405,10 @@ export default function InspectionSummaryScreen() {
               const errCount = aiVariant.analysisErrors;
               return (
                 <Card style={{ gap: 8 }}>
-                  <SectionTitle icon="sparkles" title={`AI findings (${findings.length})`} />
+                  <SectionTitle
+                    icon="sparkles"
+                    title={`${errCount > 0 ? "AI partial" : "AI complete"} · findings (${findings.length})`}
+                  />
                   {findings.slice(0, 5).map((f) => <FindingRow key={f.id} finding={f} />)}
                   {errCount > 0 ? (
                     // Completed with some errors but still produced findings — warn without hiding.
@@ -406,13 +427,13 @@ export default function InspectionSummaryScreen() {
               );
             }
 
-            case "loading":
+            case "ai-analyzing":
             default:
               return (
                 <Card style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, flex: 1 }}>
-                    Generating report, customer summary, and business insights…
+                    AI analyzing — the inspection is complete and you may leave this screen.
                   </Text>
                 </Card>
               );
@@ -560,7 +581,7 @@ export default function InspectionSummaryScreen() {
           findings={findings}
           recommendations={analysis?.recommendations ?? []}
           riskLevel={analysis?.riskLevel ?? null}
-          analysisComplete={finalized && analysis !== undefined}
+          analysisComplete={finalized && analysis?.status?.toLowerCase() === "complete"}
           companyName={user?.company?.name ?? null}
           customerSummaryUrl={customerSummaryUrl}
           photosReady={loaded}
@@ -620,6 +641,7 @@ export default function InspectionSummaryScreen() {
           technicianSignature={record.technicianSignature ?? null}
           ownerSignature={record.ownerSignature ?? null}
           ownerNotAvailable={record.ownerNotAvailable ?? false}
+          unitNumber={record.unitNumber ?? null}
         />
 
         <View style={{ gap: 10 }}>
@@ -723,40 +745,6 @@ function DeliverySection({
   const [methodsLoaded, setMethodsLoaded] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Cache the generated PDF URI so subsequent Print / Share / Email taps reuse
-  // the same file instead of re-rendering from scratch.
-  const [cachedPdfUri, setCachedPdfUri] = useState<string | null>(null);
-
-  // Invalidate the cache whenever the underlying data changes so stale PDFs
-  // are never delivered. We track a stable key derived from the fields that
-  // affect PDF content: photo count + descriptions + findings count + analysis.
-  const cacheKey = useMemo(
-    () =>
-      [
-        record.localId,
-        record.photos.length,
-        record.photos.map((p) => p.description ?? "").join("|"),
-        findings.length,
-        analysisComplete ? "complete" : "pending",
-      ].join("::"),
-    [record.localId, record.photos, findings.length, analysisComplete],
-  );
-  const prevCacheKeyRef = React.useRef(cacheKey);
-  useEffect(() => {
-    if (prevCacheKeyRef.current !== cacheKey) {
-      prevCacheKeyRef.current = cacheKey;
-      setCachedPdfUri(null);
-    }
-  }, [cacheKey]);
-
-  // Also clear on unmount so a stale URI is never picked up if the component
-  // is remounted with different data.
-  useEffect(() => {
-    return () => {
-      setCachedPdfUri(null);
-    };
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     void getAvailableDeliveryMethods().then((m) => {
@@ -799,20 +787,17 @@ function DeliverySection({
   });
 
   const buildDeliveryContext = async () => {
-    // Reuse the cached URI when available — avoids a second render + copy for
-    // every Print / Share / Email tap after the technician has already previewed.
-    const pdfUri = cachedPdfUri ?? await (async () => {
-      const uri = await generateReportPdf({
-        record,
-        findings,
-        recommendations,
-        riskLevel,
-        analysisComplete,
-        companyName,
-      });
-      setCachedPdfUri(uri);
-      return uri;
-    })();
+    // Build from the current inspection state on every delivery. A partial
+    // cache key can otherwise reuse a PDF after notes, findings, or photo
+    // details change without changing their counts.
+    const pdfUri = await generateReportPdf({
+      record,
+      findings,
+      recommendations,
+      riskLevel,
+      analysisComplete,
+      companyName,
+    });
     return { pdfUri, ...buildSoftContext() };
   };
 
@@ -826,7 +811,7 @@ function DeliverySection({
    *   method's entry from `pendingDeliveries` (used when retrying a queued send).
    */
   const deliver = async (method: DeliveryMethod, clearFromQueue = false) => {
-    if (busyId || !photosReady) return;
+    if (busyId || !photosReady || !analysisComplete) return;
     setBusyId(method.id);
     try {
       const ctx = await buildDeliveryContext();
@@ -884,8 +869,8 @@ function DeliverySection({
         </Text>
       ) : !analysisComplete ? (
         <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
-          The PDF includes all photos now; AI findings are added automatically once syncing
-          and analysis finish.
+          Report delivery will be available after syncing and AI analysis finish.
+          You can leave this screen while the inspection completes in the background.
         </Text>
       ) : null}
 
@@ -937,7 +922,7 @@ function DeliverySection({
                 </Text>
                 {retryMethod ? (
                   <Pressable
-                    disabled={busyId != null || !photosReady}
+                    disabled={busyId != null || !photosReady || !analysisComplete}
                     onPress={() => void deliver(retryMethod, true)}
                     style={{
                       paddingHorizontal: 12,
@@ -1001,7 +986,7 @@ function DeliverySection({
       {/* Preview button — full-width, primary style, shown above delivery buttons */}
       {previewMethod ? (() => {
         const busy = busyId === previewMethod.id;
-        const disabled = busyId != null || !photosReady;
+        const disabled = busyId != null || !photosReady || !analysisComplete;
         return (
           <Pressable
             disabled={disabled}
@@ -1035,7 +1020,7 @@ function DeliverySection({
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {deliveryMethods.map((m) => {
             const busy = busyId === m.id;
-            const disabled = busyId != null || !photosReady;
+            const disabled = busyId != null || !photosReady || !analysisComplete;
             return (
               <Pressable
                 key={m.id}

@@ -18,7 +18,13 @@
  * No photos are added to the records so the FileSystem stub is never hit.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-crypto", () => ({ randomUUID: () => "report-test-id" }));
+vi.mock("expo-image-manipulator", () => ({
+  manipulateAsync: vi.fn(),
+  SaveFormat: { JPEG: "jpeg" },
+}));
 
 // ── Import module under test ──────────────────────────────────────────────────
 // vitest.config.ts aliases expo-file-system/legacy → __mocks__/expo-file-system-legacy.ts
@@ -36,6 +42,7 @@ function makeRecord(overrides: Partial<LocalInspection> = {}): LocalInspection {
   const now = new Date().toISOString();
   return {
     schemaVersion: 1,
+    ownerUserId: null,
     localId: "test-local-id",
     serverId: null,
     createdAt: now,
@@ -44,6 +51,7 @@ function makeRecord(overrides: Partial<LocalInspection> = {}): LocalInspection {
     clientName: "Test Client",
     technicianName: "Jane Tech",
     propertyType: "residential",
+    visitPurpose: null,
     pestTypes: ["rodent"],
     notes: "",
     photos: [], // no photos → FileSystem.readAsStringAsync never called
@@ -52,6 +60,7 @@ function makeRecord(overrides: Partial<LocalInspection> = {}): LocalInspection {
     completedAt: now,
     serverCompleted: true,
     analyzedCount: 0,
+    analyzedPhotoPaths: [],
     reportId: null,
     syncError: null,
     syncAttempts: 0,
@@ -60,10 +69,16 @@ function makeRecord(overrides: Partial<LocalInspection> = {}): LocalInspection {
     pendingCorrections: [],
     lastDeliveredAt: null,
     pendingDeliveries: [],
+    unitNumber: null,
+    unitNumberSynced: true,
     technicianSignature: null,
     ownerSignature: null,
     ownerNotAvailable: false,
     signedAt: null,
+    sigRev: 0,
+    techSigClear: false,
+    ownerSigConsent: false,
+    signaturesSynced: true,
     ...overrides,
   };
 }
@@ -78,6 +93,33 @@ function makeReportData(recordOverrides: Partial<LocalInspection> = {}): ReportD
     companyName: "Test Co",
   };
 }
+
+describe("buildReportHtml — inspection ID", () => {
+  it("prints the server inspection ID in the report", async () => {
+    const html = await buildReportHtml(makeReportData({ serverId: 110 }));
+    expect(html).toContain('<div class="k">Inspection ID</div><div class="v">#110</div>');
+  });
+
+  it("does not invent a numeric ID for an offline inspection", async () => {
+    const html = await buildReportHtml(makeReportData());
+    expect(html).toContain('<div class="k">Inspection ID</div><div class="v">Pending sync</div>');
+  });
+});
+
+describe("buildReportHtml — unit number", () => {
+  it("includes the unit number in inspection details when set", async () => {
+    const html = await buildReportHtml(makeReportData({ unitNumber: "4B" }));
+
+    expect(html).toContain("Unit / Apt #");
+    expect(html).toContain("4B");
+  });
+
+  it("does not include an empty unit row when no unit number is set", async () => {
+    const html = await buildReportHtml(makeReportData());
+
+    expect(html).not.toContain("Unit / Apt #");
+  });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Owner marked Not Available

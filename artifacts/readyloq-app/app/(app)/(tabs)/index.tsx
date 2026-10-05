@@ -27,6 +27,7 @@ import { dismissPushFailure, type CurrentUser } from "@/lib/api";
 import { runDismissPushFailure } from "@/lib/dashboard/push-failure-banner";
 
 import { MissionControlDashboard } from "@/components/MissionControlDashboard";
+import { IntegratedRouteCalendar } from "@/components/IntegratedRouteCalendar";
 import { RoleBriefingView } from "@/components/briefing/RoleBriefingView";
 import { Card } from "@/components/ui/Card";
 import { Screen } from "@/components/ui/Screen";
@@ -232,7 +233,7 @@ function UploadTrainingPhotosCard({
   return (
     <Pressable
       onPress={() => router.push("/dataset/bulk-upload" as Href)}
-      accessibilityLabel="Upload training photos"
+      accessibilityLabel="Upload training photos and videos"
       accessibilityRole="button"
       style={({ pressed }) => ({
         flexDirection: "row",
@@ -266,7 +267,7 @@ function UploadTrainingPhotosCard({
             fontSize: 15,
           }}
         >
-          Upload Training Photos
+          Upload Training Photos & Videos
         </Text>
         <Text
           style={{
@@ -276,7 +277,7 @@ function UploadTrainingPhotosCard({
             marginTop: 2,
           }}
         >
-          Snap pest or condition photos in spare time · improves AI accuracy
+          Add pest or condition photos & videos in spare time · improves AI accuracy
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
@@ -805,6 +806,11 @@ export default function DashboardScreen() {
             <Ionicons name="chevron-forward" size={22} color="#000" />
           </Pressable>
 
+          {/* Solo owners double as field techs — surface the upload nudge here too.
+              Multi-operator owners run the business, not the camera, so they don't
+              see this. */}
+          {isSoloOperator ? <UploadTrainingPhotosCard router={router} /> : null}
+
           {/* ── Quick actions ─────────────────────────────────────────────── */}
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Pressable
@@ -1091,6 +1097,11 @@ export default function DashboardScreen() {
 
         {/* ── Upload Training Photos — visible to all roles ───────────────── */}
         <UploadTrainingPhotosCard router={router} />
+
+        {/* ── Integrated Route Calendar — technician / sales / manager ────── */}
+        {isTech || isSales || isManager ? (
+          <IntegratedRouteCalendar router={router} showTechnicianNames={isManager} />
+        ) : null}
 
         {/* ── Owner KPI strip ─────────────────────────────────────────────── */}
         {isOwner && ownerKpis.length > 0 ? (

@@ -1,4 +1,5 @@
 import { z } from "zod/v4";
+import type { AiPrediction } from "./intelligence-dataset";
 export declare const analysisResultsTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "analysis_results";
     schema: undefined;
@@ -147,6 +148,25 @@ export declare const analysisResultsTable: import("drizzle-orm/pg-core").PgTable
         }, {}, {
             $type: string[];
         }>;
+        photoOutcomes: import("drizzle-orm/pg-core").PgColumn<{
+            name: "photo_outcomes";
+            tableName: "analysis_results";
+            dataType: "json";
+            columnType: "PgJsonb";
+            data: PhotoAnalysisOutcome[];
+            driverParam: unknown;
+            notNull: false;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: PhotoAnalysisOutcome[];
+        }>;
         photoZones: import("drizzle-orm/pg-core").PgColumn<{
             name: "photo_zones";
             tableName: "analysis_results";
@@ -290,6 +310,269 @@ export declare const analysisResultsTable: import("drizzle-orm/pg-core").PgTable
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "analysis_results";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+    };
+    dialect: "pg";
+}>;
+/**
+ * Durable per-media provider guard. A row survives request/process restarts so
+ * ambiguous failures cannot reset the provider attempt budget.
+ */
+export declare const analysisProviderAttemptsTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
+    name: "analysis_provider_attempts";
+    schema: undefined;
+    columns: {
+        companyId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "company_id";
+            tableName: "analysis_provider_attempts";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        inspectionId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "inspection_id";
+            tableName: "analysis_provider_attempts";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        mediaPath: import("drizzle-orm/pg-core").PgColumn<{
+            name: "media_path";
+            tableName: "analysis_provider_attempts";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        attemptCount: import("drizzle-orm/pg-core").PgColumn<{
+            name: "attempt_count";
+            tableName: "analysis_provider_attempts";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        state: import("drizzle-orm/pg-core").PgColumn<{
+            name: "state";
+            tableName: "analysis_provider_attempts";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        leaseUntil: import("drizzle-orm/pg-core").PgColumn<{
+            name: "lease_until";
+            tableName: "analysis_provider_attempts";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        leaseToken: import("drizzle-orm/pg-core").PgColumn<{
+            name: "lease_token";
+            tableName: "analysis_provider_attempts";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        providerResult: import("drizzle-orm/pg-core").PgColumn<{
+            name: "provider_result";
+            tableName: "analysis_provider_attempts";
+            dataType: "json";
+            columnType: "PgJsonb";
+            data: AiPrediction;
+            driverParam: unknown;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {
+            $type: AiPrediction;
+        }>;
+        updatedAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "updated_at";
+            tableName: "analysis_provider_attempts";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+    };
+    dialect: "pg";
+}>;
+/**
+ * Durable UTC-day provider-call reservations. scopeId 0 is the single platform
+ * budget; positive scope ids are company budgets. A row freezes the configured
+ * limit on the first reservation of that day so workers agree after a restart.
+ */
+export declare const analysisProviderDailyBudgetsTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
+    name: "analysis_provider_daily_budgets";
+    schema: undefined;
+    columns: {
+        scopeId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "scope_id";
+            tableName: "analysis_provider_daily_budgets";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        budgetDate: import("drizzle-orm/pg-core").PgColumn<{
+            name: "budget_date";
+            tableName: "analysis_provider_daily_budgets";
+            dataType: "string";
+            columnType: "PgDateString";
+            data: string;
+            driverParam: string;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        consumedCalls: import("drizzle-orm/pg-core").PgColumn<{
+            name: "consumed_calls";
+            tableName: "analysis_provider_daily_budgets";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: true;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        dailyLimit: import("drizzle-orm/pg-core").PgColumn<{
+            name: "daily_limit";
+            tableName: "analysis_provider_daily_budgets";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: true;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        createdAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "created_at";
+            tableName: "analysis_provider_daily_budgets";
             dataType: "date";
             columnType: "PgTimestamp";
             data: Date;
@@ -525,13 +808,18 @@ export interface VideoEvidence {
     label: string | null;
     frameAnalysisStatus: "pending";
 }
+export interface PhotoAnalysisOutcome {
+    imagePath: string;
+    status: "completed" | "failed" | "deferred" | "rate_limited";
+}
 export declare const insertAnalysisResultSchema: z.ZodObject<{
-    status: z.ZodOptional<z.ZodString>;
     inspectionId: z.ZodInt;
+    status: z.ZodOptional<z.ZodString>;
     findings: z.ZodOptional<z.ZodNullable<z.ZodType<Finding[], Finding[], z.core.$ZodTypeInternals<Finding[], Finding[]>>>>;
     recommendations: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;
     videoEvidence: z.ZodOptional<z.ZodNullable<z.ZodType<VideoEvidence[], VideoEvidence[], z.core.$ZodTypeInternals<VideoEvidence[], VideoEvidence[]>>>>;
     analyzedImagePaths: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;
+    photoOutcomes: z.ZodOptional<z.ZodNullable<z.ZodType<PhotoAnalysisOutcome[], PhotoAnalysisOutcome[], z.core.$ZodTypeInternals<PhotoAnalysisOutcome[], PhotoAnalysisOutcome[]>>>>;
     photoZones: z.ZodOptional<z.ZodNullable<z.ZodType<Record<string, string>, Record<string, string>, z.core.$ZodTypeInternals<Record<string, string>, Record<string, string>>>>>;
     coverage: z.ZodOptional<z.ZodNullable<z.ZodType<import("drizzle-zod").Json, unknown, z.core.$ZodTypeInternals<import("drizzle-zod").Json, unknown>>>>;
     overallConfidence: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;

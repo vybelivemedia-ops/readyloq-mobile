@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
+import { createSanitizedPhotoCopy } from "@/lib/privacy/image-sanitizer";
 
 // Lazily resolved so the delivery registry module is not imported at module
 // initialisation time (avoids issues with module load order in the RN bundler).
@@ -35,11 +36,29 @@ export type LocalBaitStation = {
   id: string;
   label: string;
   locationType?: string;
+  latitude?: string;
+  longitude?: string;
   status: "active" | "missing" | "damaged" | "removed";
   notes?: string;
   lastCheckedAt?: string;
   /** Server row id once synced via POST /inspections/:id/bait-stations. */
   serverId?: number;
+  /** Persisted client idempotency key for a crash-safe create retry. */
+  clientKey?: string;
+  /** Immutable first-POST body; retries replay it even after local edits. */
+  createPayload?: LocalBaitStationCreatePayload;
+  /** False until the latest local station state is acknowledged by the server. */
+  synced?: boolean;
+};
+
+export type LocalBaitStationCreatePayload = {
+  label: string;
+  locationType?: string;
+  latitude?: string;
+  longitude?: string;
+  status: LocalBaitStation["status"];
+  notes?: string;
+  lastCheckedAt?: string;
 };
 
 export type LocalPhoto = {
@@ -58,8 +77,10 @@ export type LocalPhoto = {
   perceptualHash?: string;
   /** localUri of an earlier near-identical photo when this is a likely dup. */
   duplicateOf?: string;
-  /** Provider/EXIF context, passed through to the server verbatim. */
+  /** Provider and non-location EXIF/calibration context. */
   captureMetadata?: Record<string, unknown>;
+  /** True only after an orientation-preserving, metadata-free JPEG copy exists. */
+  privacySanitized?: boolean;
   /**
    * Technician-authored description for this photo — added manually when AI
    * has not yet run or when the tech wants to add specific context that the
@@ -88,6 +109,10 @@ export type LocalPhoto = {
    * anchor that prevents double-uploading the same bytes.
    */
   pendingStoragePath?: string;
+  /** Stable key used to recover the server reservation after an ambiguous response. */
+  uploadIntentKey?: string;
+  /** Authenticated server reservation bound to this photo and inspection. */
+  uploadIntentId?: number;
 };
 
 export type LocalSyncPhase =
@@ -98,6 +123,16 @@ export type LocalSyncPhase =
 
 export type LocalInspection = {
   schemaVersion: 1;
+  /**
+   * Clerk subject that owns this offline record. Missing/null values are legacy
+   * records and are deliberately not claimed automatically by the next login.
+   */
+  ownerUserId: string | null;
+  /**
+   * Active tenant at capture time. Missing means a legacy company-unscoped
+   * record; explicit null is a valid no-company scope (e.g. Super Admin).
+   */
+  companyId?: number | null;
   /** UUID — also sent as the server `clientKey` for idempotent creation. */
   localId: string;
   serverId: number | null;
@@ -123,13 +158,21 @@ export type LocalInspection = {
   completedAt: string | null;
   /** POST /inspections/:id/complete acknowledged by the server. */
   serverCompleted: boolean;
-  /** Number of photos included in the last draft analysis run. */
+  /** Number of current photos acknowledged for AI analysis (legacy UI field). */
   analyzedCount: number;
+  /**
+   * Exact uploaded storage paths acknowledged by AI analysis. This is the
+   * durable sync cursor; unlike analyzedCount it remains correct when photos
+   * are added, removed, or reordered between retries.
+   */
+  analyzedPhotoPaths: string[];
   /** Live report id, if one was built during capture. */
   reportId: number | null;
 
   syncError: string | null;
   syncAttempts: number;
+  /** Durable earliest retry time, shared by foreground/background after restart. */
+  nextSyncAt?: string | null;
   /** ISO timestamp of last successful server sync (any step). */
   lastSyncSuccess: string | null;
   /**
@@ -150,6 +193,28 @@ export type LocalInspection = {
     technicianSpecies?: string;
   }>;
   /**
+   * Unit / apartment number for multi-family properties.
+   * Set at booking time (from the portal) or by the technician in the
+   * signature panel. Null for single-family or commercial properties.
+   */
+  unitNumber: string | null;
+  /**
+   * True once the current unitNumber has been PATCHed to the server.
+   * Set false by InspectionSignaturePanel when the technician edits the unit
+   * number so the sync engine re-queues the record even after serverCompleted.
+   * Defaults to true via parseRecord so old records are not unnecessarily
+   * re-synced.
+   */
+  unitNumberSynced: boolean;
+  /**
+   * Freeform reason for the visit (e.g. "Routine Inspection", "Callback"),
+   * picked by the technician when booking. Sent once at creation time — like
+   * notes/pestTypes/clientName, it has no separate "synced" flag. Null when
+   * not set (older records, or the technician skipped the picker).
+   */
+  visitPurpose: string | null;
+
+  /**
    * On-site signature data (SVG strings captured by InspectionSignaturePanel).
    * ownerNotAvailable is set when the owner/tenant was absent and the
    * technician signed on their behalf. signedAt records the first signature.
@@ -158,6 +223,34 @@ export type LocalInspection = {
   ownerSignature: string | null;
   ownerNotAvailable: boolean;
   signedAt: string | null;
+  /**
+   * Monotonically incrementing counter bumped by InspectionSignaturePanel on
+   * every local mutation.  The sync engine captures this value before sending
+   * the PATCH; it only clears signaturesSynced when the counter still matches
+   * after the round-trip, preventing a concurrent mutation from being silently
+   * lost in a race between "PATCH in-flight" and "user taps Re-sign".
+   */
+  sigRev: number;
+  /**
+   * Set true when the technician explicitly clears their own signature so the
+   * sync engine knows to send technicianSignature: null (rather than omitting
+   * the field, which would leave the server's value untouched).
+   */
+  techSigClear: boolean;
+  /**
+   * Set true when the owner signature is intentionally nulled — either by
+   * clearSignature("owner") or markOwnerNotAvailable — so the sync engine
+   * sends ownerSignature: null + resignatureConsent: true.  Without this flag
+   * the engine omits null fields to avoid accidentally wiping server data.
+   */
+  ownerSigConsent: boolean;
+  /**
+   * True once all current signature data has been PATCHed to the server.
+   * Set false by InspectionSignaturePanel on every local mutation so the
+   * sync engine re-queues the record even after serverCompleted = true.
+   * Defaults to true via parseRecord so old records are not re-synced.
+   */
+  signaturesSynced: boolean;
 
   /**
    * ISO timestamp of the last time this inspection's report was successfully
@@ -194,9 +287,44 @@ const INDEX_KEY = "readyloq.local-inspections.index.v1";
 const RECORD_PREFIX = "readyloq.local-inspection.v1.";
 
 const recordKey = (localId: string) => `${RECORD_PREFIX}${localId}`;
+let activeOwnerUserId: string | null = null;
+let activeCompanyId: number | null = null;
+
+/** Bind local reads/writes to the authenticated subject and active tenant. */
+export function setLocalInspectionScope(
+  userId: string | null,
+  companyId: number | null,
+): void {
+  activeOwnerUserId = userId;
+  activeCompanyId = companyId;
+  notify();
+}
+
+/** Compatibility helper for unscoped unit fixtures; production uses tenant scope. */
+export function setLocalInspectionOwner(userId: string | null): void {
+  setLocalInspectionScope(userId, null);
+}
+
+export function getLocalInspectionOwner(): string | null {
+  return activeOwnerUserId;
+}
+
+export function getLocalInspectionCompanyId(): number | null {
+  return activeCompanyId;
+}
 
 const photosDir = (localId: string) =>
   `${FileSystem.documentDirectory}inspections/${localId}/photos/`;
+
+/**
+ * Canonical identity used only for comparing storage paths across API
+ * boundaries. Mobile URLs include `/api/storage`; analysis responses omit it.
+ */
+export function canonicalStoragePath(path: string): string {
+  return path.startsWith("/api/storage/")
+    ? path.slice("/api/storage".length)
+    : path;
+}
 
 // ─── Change notifications (drives sync-status UI + engine wakeups) ──────────
 
@@ -224,40 +352,84 @@ export function newLocalInspection(
   fields: Pick<
     LocalInspection,
     "siteAddress" | "clientName" | "technicianName" | "propertyType" | "pestTypes" | "notes"
-  >,
+  > &
+    Partial<Pick<LocalInspection, "unitNumber" | "visitPurpose">>,
 ): LocalInspection {
   const now = new Date().toISOString();
   return {
     schemaVersion: 1,
+    ownerUserId: activeOwnerUserId,
+    ...(activeOwnerUserId ? { companyId: activeCompanyId } : {}),
     localId: Crypto.randomUUID(),
     serverId: null,
     createdAt: now,
     updatedAt: now,
     ...fields,
+    visitPurpose: fields.visitPurpose ?? null,
     photos: [],
     baitStations: [],
     completed: false,
     completedAt: null,
     serverCompleted: false,
     analyzedCount: 0,
+    analyzedPhotoPaths: [],
     reportId: null,
     syncError: null,
     syncAttempts: 0,
+    nextSyncAt: null,
     lastSyncSuccess: null,
     allFindingsReviewed: false,
     pendingCorrections: [],
     lastDeliveredAt: null,
     pendingDeliveries: [],
+    unitNumber: fields.unitNumber ?? null,
+    // New record: nothing to sync yet.
+    unitNumberSynced: true,
     technicianSignature: null,
     ownerSignature: null,
     ownerNotAvailable: false,
     signedAt: null,
+    sigRev: 0,
+    techSigClear: false,
+    ownerSigConsent: false,
+    // New record: no signatures yet, nothing to sync.
+    signaturesSynced: true,
   };
 }
 
 export async function saveLocalInspection(record: LocalInspection): Promise<void> {
+  const ownerUserId = activeOwnerUserId;
+  if (!ownerUserId) {
+    throw new Error("Cannot save an offline inspection without an authenticated owner");
+  }
+  const key = recordKey(record.localId);
+  const existingRaw = await AsyncStorage.getItem(key);
+  if (existingRaw) {
+    const existing = parseRecord(existingRaw);
+    if (
+      !existing ||
+      existing.ownerUserId !== ownerUserId ||
+      existing.companyId === undefined ||
+      existing.companyId !== activeCompanyId
+    ) {
+      throw new Error("Cannot modify an offline inspection owned by another or unknown account/company");
+    }
+  } else {
+    // Only a genuinely new record may acquire an owner. Never adopt a record
+    // found through a stale object after its stored copy was removed.
+    record.ownerUserId = ownerUserId;
+    record.companyId = activeCompanyId;
+  }
+  if (
+    record.ownerUserId !== ownerUserId ||
+    record.companyId === undefined ||
+    record.companyId !== activeCompanyId ||
+    activeOwnerUserId !== ownerUserId
+  ) {
+    throw new Error("Offline inspection owner/company changed before save");
+  }
   record.updatedAt = new Date().toISOString();
-  await AsyncStorage.setItem(recordKey(record.localId), JSON.stringify(record));
+  await AsyncStorage.setItem(key, JSON.stringify(record));
   const index = await readIndex();
   if (!index.includes(record.localId)) {
     index.push(record.localId);
@@ -267,9 +439,18 @@ export async function saveLocalInspection(record: LocalInspection): Promise<void
 }
 
 export async function getLocalInspection(localId: string): Promise<LocalInspection | null> {
+  const ownerUserId = activeOwnerUserId;
+  const companyId = activeCompanyId;
+  if (!ownerUserId) return null;
   const raw = await AsyncStorage.getItem(recordKey(localId));
+  if (activeOwnerUserId !== ownerUserId || activeCompanyId !== companyId) return null;
   if (!raw) return null;
-  return parseRecord(raw);
+  const record = parseRecord(raw);
+  return record?.ownerUserId === ownerUserId &&
+    record.companyId !== undefined &&
+    record.companyId === companyId
+    ? record
+    : null;
 }
 
 // All read-modify-write cycles are serialized through this chain so
@@ -289,7 +470,34 @@ export function updateLocalInspection(
   const task = async (): Promise<LocalInspection | null> => {
     const record = await getLocalInspection(localId);
     if (!record) return null;
+    const previousStations = new Map(
+      (record.baitStations ?? []).map((station) => [
+        station.id,
+        JSON.stringify([
+          station.label,
+          station.locationType,
+          station.latitude,
+          station.longitude,
+          station.status,
+          station.notes,
+          station.lastCheckedAt,
+        ]),
+      ]),
+    );
     mutate(record);
+    for (const station of record.baitStations ?? []) {
+      const previousState = previousStations.get(station.id);
+      const currentState = JSON.stringify([
+        station.label,
+        station.locationType,
+        station.latitude,
+        station.longitude,
+        station.status,
+        station.notes,
+        station.lastCheckedAt,
+      ]);
+      if (previousState !== currentState) station.synced = false;
+    }
     await saveLocalInspection(record);
     return record;
   };
@@ -318,14 +526,22 @@ export function updatePhotoDescription(
 }
 
 export async function listLocalInspections(): Promise<LocalInspection[]> {
+  const ownerUserId = activeOwnerUserId;
+  const companyId = activeCompanyId;
+  if (!ownerUserId) return [];
   const index = await readIndex();
   if (index.length === 0) return [];
   const pairs = await AsyncStorage.multiGet(index.map(recordKey));
+  if (activeOwnerUserId !== ownerUserId || activeCompanyId !== companyId) return [];
   const records: LocalInspection[] = [];
   for (const [, raw] of pairs) {
     if (!raw) continue;
     const rec = parseRecord(raw);
-    if (rec) records.push(rec);
+    if (
+      rec?.ownerUserId === ownerUserId &&
+      rec.companyId !== undefined &&
+      rec.companyId === companyId
+    ) records.push(rec);
   }
   records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return records;
@@ -333,6 +549,10 @@ export async function listLocalInspections(): Promise<LocalInspection[]> {
 
 /** Delete the record, its index entry, and every photo file. */
 export async function deleteLocalInspection(localId: string): Promise<void> {
+  const ownerUserId = activeOwnerUserId;
+  const companyId = activeCompanyId;
+  if (!ownerUserId || !(await getLocalInspection(localId))) return;
+  if (activeOwnerUserId !== ownerUserId || activeCompanyId !== companyId) return;
   try {
     await FileSystem.deleteAsync(`${FileSystem.documentDirectory}inspections/${localId}`, {
       idempotent: true,
@@ -340,6 +560,7 @@ export async function deleteLocalInspection(localId: string): Promise<void> {
   } catch {
     // File cleanup is best-effort; the record removal below is what matters.
   }
+  if (activeOwnerUserId !== ownerUserId || activeCompanyId !== companyId) return;
   await AsyncStorage.removeItem(recordKey(localId));
   const index = await readIndex();
   const next = index.filter((id) => id !== localId);
@@ -350,17 +571,15 @@ export async function deleteLocalInspection(localId: string): Promise<void> {
 }
 
 /**
- * Copy a freshly captured photo out of the camera cache into this
- * inspection's durable directory. Returns the durable file:// URI.
- * MUST be called at capture time — cache URIs do not survive restarts.
+ * Re-encode a freshly captured photo without image metadata directly into this
+ * inspection's durable directory. Raw camera/import bytes are never persisted
+ * as the retry source. MUST be called at capture time.
  */
 export async function persistPhoto(localId: string, cacheUri: string): Promise<string> {
   const dir = photosDir(localId);
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {});
-  const ext = cacheUri.includes(".") ? cacheUri.slice(cacheUri.lastIndexOf(".")) : ".jpg";
-  const dest = `${dir}${Date.now()}-${Crypto.randomUUID().slice(0, 8)}${ext}`;
-  await FileSystem.copyAsync({ from: cacheUri, to: dest });
-  return dest;
+  const dest = `${dir}${Date.now()}-${Crypto.randomUUID().slice(0, 8)}.jpg`;
+  return createSanitizedPhotoCopy(cacheUri, dest);
 }
 
 /**
@@ -378,10 +597,27 @@ export function syncPhase(record: LocalInspection, syncingIds: ReadonlySet<strin
 export function hasPendingWork(record: LocalInspection): boolean {
   if (record.serverId == null) return true;
   if (record.photos.some((p) => !p.storagePath || p.mediaRowId == null)) return true;
-  if (record.photos.length > record.analyzedCount) return true;
+  const acknowledgedPaths = new Set(
+    (record.analyzedPhotoPaths ?? []).map(canonicalStoragePath),
+  );
+  if (
+    record.photos.some(
+      (p) =>
+        p.storagePath != null &&
+        !acknowledgedPaths.has(canonicalStoragePath(p.storagePath)),
+    )
+  ) {
+    return true;
+  }
   // #95 — pending finding corrections queued while offline
   if ((record.pendingCorrections ?? []).length > 0) return true;
+  if ((record.baitStations ?? []).some((station) => station.synced === false)) return true;
   if (record.completed && !record.serverCompleted) return true;
+  // Signatures captured after the initial sync (e.g. at the summary screen)
+  // must be pushed even when serverCompleted is already true.
+  if (record.signaturesSynced === false) return true;
+  // Unit number edited in the signature panel after the initial sync.
+  if (record.unitNumberSynced === false) return true;
   // Pending deliveries that support background auto-retry (server-push channels)
   // keep the record in the sync scheduler so reconnection triggers the retry.
   // Interactive-only channels (email, share, print) are NOT counted here —
@@ -432,16 +668,54 @@ export function parseRecord(raw: string): LocalInspection | null {
   try {
     const rec = JSON.parse(raw) as LocalInspection;
     if (rec?.schemaVersion !== 1 || typeof rec.localId !== "string") return null;
+    // Do not infer ownership from the currently signed-in account. This keeps
+    // pre-ownership records inaccessible until an explicit recovery workflow exists.
+    rec.ownerUserId = typeof rec.ownerUserId === "string" ? rec.ownerUserId : null;
+    if (
+      rec.companyId !== undefined &&
+      rec.companyId !== null &&
+      (typeof rec.companyId !== "number" || !Number.isFinite(rec.companyId))
+    ) {
+      rec.companyId = undefined;
+    }
     rec.lastSyncSuccess ??= null;
+    rec.nextSyncAt ??= null;
     rec.allFindingsReviewed ??= false;
     rec.pendingCorrections ??= [];
     rec.baitStations ??= [];
+    for (const station of rec.baitStations) {
+      // Legacy stations with a server row were already acknowledged; stations
+      // without one remain pending so interrupted creates are retried.
+      station.synced ??= station.serverId != null;
+    }
     rec.lastDeliveredAt ??= null;
     rec.pendingDeliveries ??= [];
     rec.technicianSignature ??= null;
     rec.ownerSignature ??= null;
     rec.ownerNotAvailable ??= false;
     rec.signedAt ??= null;
+    // sigRev: 0 on old records — any new mutation will bump it above 0.
+    rec.sigRev ??= 0;
+    // Default false: no explicit clear pending on old records.
+    rec.techSigClear ??= false;
+    rec.ownerSigConsent ??= false;
+    // Default true so pre-existing completed records are not unnecessarily
+    // re-synced. Only explicitly set to false by InspectionSignaturePanel.
+    rec.signaturesSynced ??= true;
+    // Unit number: default null and synced on old records.
+    rec.unitNumber ??= null;
+    rec.unitNumberSynced ??= true;
+    // Counts cannot be mapped safely back to paths after a photo list was
+    // edited or reordered. Legacy records therefore restart path
+    // acknowledgement from an empty set. The server deduplicates already
+    // successful analysis, making this conservative migration safe.
+    if (!Array.isArray(rec.analyzedPhotoPaths)) {
+      rec.analyzedPhotoPaths = [];
+    } else {
+      rec.analyzedPhotoPaths = rec.analyzedPhotoPaths.filter(
+        (path): path is string => typeof path === "string",
+      );
+    }
     // Reset any `uploading: true` flags that survived a crash.
     // The sync engine sets `uploading: true` + `pendingStoragePath` in the same
     // atomic merge BEFORE the PUT bytes are sent, then promotes `pendingStoragePath`

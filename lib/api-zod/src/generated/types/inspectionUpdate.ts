@@ -12,4 +12,8 @@ export interface InspectionUpdate {
   severity?: string;
   pestTypes?: string[];
   completedAt?: string;
+  /** @nullable */
+  unitNumber?: string | null;
+  /** @nullable */
+  visitPurpose?: string | null;
 }

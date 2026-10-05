@@ -22,8 +22,9 @@ export const usersTable = pgTable("users", {
   lastSeenAt: timestamp("last_seen_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   // ── Platform Admin ──────────────────────────────────────────────────────────
-  // Cross-tenant super admin flag. Grants access to /api/admin/* endpoints
-  // and the role-switcher utility. Granted via POST /api/admin/bootstrap.
+  // Cross-tenant Super Admin flag. Grants access to governed platform routes
+  // and the role-switcher utility; grants/revocations require governed,
+  // server-side Mission Control approval/bootstrap.
   isSuperAdmin: boolean("is_super_admin").notNull().default(false),
   // Ephemeral role override for testing / impersonation. When set, requireRole
   // uses this value instead of `role` so the super admin can verify technician,

@@ -151,6 +151,12 @@ export type IntelligenceStatus =
 
 export type IntelligenceSeverity = "low" | "moderate" | "high" | "critical";
 
+// Training media kind. Defaults to "photo" for backward compatibility with
+// every record ingested before video support existed. Drives how clients
+// render the record (still <img> vs. <video> player) and how the AI pipeline
+// treats it (only photos run through single-frame vision analysis today).
+export type IntelligenceMediaType = "photo" | "video";
+
 export type TreatmentOutcome =
   | "resolved"
   | "improved"
@@ -211,9 +217,12 @@ export const intelligenceRecordsTable = pgTable(
       .notNull()
       .references(() => companiesTable.id),
 
-    // Image (object-storage path, scoped to the company)
+    // Media (object-storage path, scoped to the company). imageUrl holds the
+    // canonical object path for either a photo or a video — the column name
+    // predates video support and is kept to avoid a disruptive rename.
     imageUrl: text("image_url").notNull(),
     thumbnailUrl: text("thumbnail_url"),
+    mediaType: text("media_type").$type<IntelligenceMediaType>().notNull().default("photo"),
 
     // AI suggestion (immutable training signal)
     aiPrediction: jsonb("ai_prediction").$type<AiPrediction | null>(),
@@ -366,6 +375,7 @@ export const intelligenceSeverityEnum = z.enum([
   "high",
   "critical",
 ]);
+export const intelligenceMediaTypeEnum = z.enum(["photo", "video"]);
 export const treatmentOutcomeEnum = z.enum([
   "resolved",
   "improved",

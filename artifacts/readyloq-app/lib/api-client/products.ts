@@ -23,6 +23,9 @@ export interface ProductLabelRules {
   maxTempF: number | null;
   phytotoxicityNotes: string | null;
   reEntryIntervalHours: number | null;
+  /** Minimum whole days before this product may legally be reapplied to the
+   *  same site. Null when the label sets no such minimum. */
+  retreatmentIntervalDays: number | null;
   createdAt: string;
 }
 
@@ -113,6 +116,16 @@ export interface TreatmentLog {
     productType: string;
     activeIngredients: string;
     epaRegistrationNumber: string | null;
+  } | null;
+  /**
+   * Truck stock remaining after this application was deducted. Null when the
+   * technician has no inventory baseline for the selected product, or when
+   * totalProductOz was not provided (non-volumetric applications).
+   */
+  updatedInventory?: {
+    productId: number;
+    quantityOnHand: number;
+    unit: string;
   } | null;
 }
 

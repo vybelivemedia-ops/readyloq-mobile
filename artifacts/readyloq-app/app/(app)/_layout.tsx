@@ -1,9 +1,14 @@
 import { useAuth, useUser } from "@clerk/expo";
+import {
+  getGetMissionControlMeQueryKey,
+  setAuthTokenGetter as setGeneratedAuthTokenGetter,
+  useGetMissionControlMe,
+} from "@workspace/api-client-react";
 import { setAuthTokenGetter } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Redirect, Stack, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
-import { Alert, Platform, Text, View } from "react-native";
+import { Redirect, Stack, usePathname, useRouter } from "expo-router";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Alert, AppState, Platform, Text, View } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { registerPushToken } from "@/lib/api";
@@ -30,11 +35,15 @@ import { FullScreenLoader } from "@/components/ui/Loader";
 import { useColors } from "@/hooks/useColors";
 import { CurrentUserProvider, useCurrentUser } from "@/hooks/useCurrentUser";
 import {
+  decideNativeRoute,
+  missionControlAccessForGate,
+} from "@/lib/gate/mission-control-routing";
+import {
   deleteLocalInspection,
   listLocalInspections,
 } from "@/lib/local/inspection-store";
 import { useSignOut } from "@/hooks/useSignOut";
-import { configureSyncEngine } from "@/lib/sync/engine";
+import { configureSyncEngine, deactivateSyncEngine } from "@/lib/sync/engine";
 import {
   cacheTokenForBackground,
   clearCachedBackgroundToken,
@@ -54,48 +63,33 @@ import {
 } from "@/lib/gate/offline-flow";
 
 export default function AppLayout() {
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn, userId, getToken } = useAuth();
   const queryClient = useQueryClient();
+  const previousUserId = useRef<string | null | undefined>(undefined);
 
   // Attach the Clerk bearer token to every generated API client request.
   useEffect(() => {
     setAuthTokenGetter(() => getToken());
+    setGeneratedAuthTokenGetter(() => getToken());
   }, [getToken]);
 
-  // Start the offline-first sync engine once authenticated. It pushes any
-  // pending local inspections (from this or previous app sessions) and keeps
-  // server queries fresh after each successful sync.
+  // The platform directory is cross-company data. Evict it whenever Clerk
+  // signs out or switches identities, including sign-out paths outside our
+  // centralized hook.
   useEffect(() => {
-    if (!isSignedIn) return;
-
-    // Wrap getToken so every fresh token is also cached in SecureStore for the
-    // OS background-fetch task (which runs in a separate JS context with no
-    // access to the live Clerk session).
-    const getTokenWithCache = async () => {
-      const token = await getToken();
-      if (token) void cacheTokenForBackground(token);
-      return token;
-    };
-
-    configureSyncEngine({
-      getToken: getTokenWithCache,
-      onSynced: () => {
-        void queryClient.invalidateQueries();
-      },
-    });
-
-    // Register the OS background-fetch task. Safe to call on every mount —
-    // expo-background-fetch is idempotent and simply updates the interval if
-    // the task is already registered.
-    void registerBackgroundSync();
-
-    return () => {
-      // On sign-out, remove the task and wipe the cached token so a future
-      // user on the same device can't trigger a sync with stale credentials.
-      void unregisterBackgroundSync();
-      void clearCachedBackgroundToken();
-    };
-  }, [isSignedIn, getToken, queryClient]);
+    if (!isLoaded) return;
+    if (!isSignedIn || previousUserId.current !== userId) {
+      queryClient.removeQueries({
+        predicate: (query) =>
+          query.queryKey.some(
+            (part) =>
+              typeof part === "string" &&
+              part.startsWith("/api/mission-control/"),
+          ),
+      });
+    }
+    previousUserId.current = isSignedIn ? userId : null;
+  }, [isLoaded, isSignedIn, userId, queryClient]);
 
   if (!isLoaded) return <FullScreenLoader />;
   if (!isSignedIn) return <Redirect href="/sign-in" />;
@@ -110,13 +104,136 @@ export default function AppLayout() {
 function Gate() {
   const colors = useColors();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const [activeLocalScopeKey, setActiveLocalScopeKey] = useState<string | null>(null);
   const signOut = useSignOut();
-  const { user, isLoading, error, refetch } = useCurrentUser();
-  const { getToken } = useAuth();
+  const { user, isLoading, isServerVerified, error, refetch } = useCurrentUser();
+  const { getToken, isSignedIn, userId } = useAuth();
   const { user: clerkUser } = useUser();
+  const pathname = usePathname();
+  const companyScopeReady =
+    !!isSignedIn &&
+    !!userId &&
+    isServerVerified &&
+    !isLoading &&
+    !error &&
+    !!user &&
+    user.clerkUserId === userId;
+  const targetLocalScopeKey = companyScopeReady && user && userId
+    ? `${userId}:company:${user.companyId === null ? "none" : user.companyId}`
+    : null;
+
+  // The server profile's companyId is the active tenant source (Clerk subject
+  // alone is insufficient for users who move between companies). A null
+  // companyId is an explicit scope, including Super Admin's platform context.
+  useLayoutEffect(() => {
+    if (!companyScopeReady || !userId || !user) {
+      deactivateSyncEngine();
+      void unregisterBackgroundSync();
+      void clearCachedBackgroundToken();
+      return;
+    }
+
+    const companyId = user.companyId;
+    const scopeKey = `${userId}:company:${companyId === null ? "none" : companyId}`;
+    let effectIsCurrent = true;
+    const getTokenWithCache = async () => {
+      const token = await getToken();
+      if (token && effectIsCurrent) {
+        await cacheTokenForBackground(token, userId, companyId);
+      }
+      return token;
+    };
+
+    configureSyncEngine({
+      getToken: getTokenWithCache,
+      ownerId: userId,
+      companyId,
+      onSynced: () => {
+        void queryClient.invalidateQueries();
+      },
+    });
+    setActiveLocalScopeKey(scopeKey);
+    // Seed the owner+company-bound credential even if the pending inspection
+    // has no photos (the sync engine otherwise may not request this token).
+    void getTokenWithCache().catch((e: unknown) => {
+      console.warn("[BackgroundSync] token cache refresh failed:", e);
+    });
+    void registerBackgroundSync();
+
+    return () => {
+      effectIsCurrent = false;
+      setActiveLocalScopeKey(null);
+      deactivateSyncEngine();
+      void unregisterBackgroundSync();
+      void clearCachedBackgroundToken();
+    };
+  }, [
+    companyScopeReady,
+    user?.clerkUserId,
+    user?.companyId,
+    userId,
+    getToken,
+    queryClient,
+  ]);
+  const missionControl = useGetMissionControlMe({
+    query: {
+      // Include the active Clerk subject so cached authorization from a
+      // previous account can never satisfy this account's launch check.
+      queryKey: [...getGetMissionControlMeQueryKey(), userId],
+      enabled: !!isSignedIn,
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnReconnect: true,
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+  });
+  const [foregroundCheckPending, setForegroundCheckPending] = useState(false);
   const promptedResume = useRef(false);
   const { isConnected, isInternetReachable } = useNetworkStatus();
   const online = isConnected && isInternetReachable !== false;
+  const inMissionControl = pathname.startsWith("/mission-control");
+  const missionControlAccess = missionControlAccessForGate({
+    foregroundCheckPending,
+    isFetching: missionControl.isFetching,
+    isError: missionControl.isError,
+    error: missionControl.error,
+    isSuccess: missionControl.isSuccess,
+    isSuperAdmin: missionControl.data?.isSuperAdmin,
+  });
+  const isNonAdmin =
+    missionControlAccess === "non-admin" &&
+    !missionControl.isFetching &&
+    !foregroundCheckPending;
+  const routeDecision = decideNativeRoute({
+    access: missionControlAccess,
+    inMissionControl,
+    hasCompany: user?.companyId != null,
+  });
+
+  // Native apps don't get browser focus events. Recheck server authorization
+  // each time the app returns to the foreground, and hide platform screens
+  // while the check is in flight.
+  useEffect(() => {
+    let mounted = true;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active" || !isSignedIn) return;
+      setForegroundCheckPending(true);
+      // Revalidate the current tenant as well as platform authorization. A
+      // same-subject company change must revoke the previous local scope. Keep
+      // the last verified scope for warm offline resumes; a cold start still
+      // requires validation because its in-memory validation was lost.
+      if (online) refetch();
+      void missionControl.refetch().finally(() => {
+        if (mounted) setForegroundCheckPending(false);
+      });
+    });
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, [isSignedIn, missionControl.refetch, online, refetch]);
 
   // ── Auto-create company on first login ──────────────────────────────────
   // When a new user has no company yet, silently derive a company name from
@@ -154,7 +271,7 @@ function Gate() {
   const derivedNameRef = useRef<string>("");
 
   useEffect(() => {
-    if (!user || user.companyId != null) return;
+    if (!isServerVerified || !user || user.companyId != null || !isNonAdmin) return;
     if (autoCreateAttempted.current || autoCreateFailed) return;
     if (!clerkUser) return;
 
@@ -177,7 +294,7 @@ function Gate() {
     derivedNameRef.current = derived;
     runAutoCreate(derived);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, clerkUser, autoCreateFailed]);
+  }, [isServerVerified, user, clerkUser, autoCreateFailed, isNonAdmin]);
 
   // ── Retry on reconnection (profile load + auto-create) ──────────────────
   // Fires once on every offline→online transition. Handles two blocked paths:
@@ -202,6 +319,7 @@ function Gate() {
       refetch();
       return;
     }
+    if (!isServerVerified) return;
 
     // Case 2: profile loaded but auto-create failed due to a network error.
     if (
@@ -217,11 +335,17 @@ function Gate() {
       runAutoCreate(derivedNameRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online]);
+  }, [online, isServerVerified]);
 
   // Resume prompt: if the app was killed mid-inspection, the draft survives
   // in local storage. Offer to pick up exactly where the technician left off.
-  const ready = !isLoading && !error && !!user && user.companyId != null;
+  const ready =
+    isServerVerified &&
+    activeLocalScopeKey === targetLocalScopeKey &&
+    !isLoading &&
+    !error &&
+    !!user &&
+    user.companyId != null;
 
   // Warm up the speech model as soon as the workspace loads — well before any
   // inspection starts. The ~75 MB ggml-tiny model is downloaded once and cached
@@ -378,6 +502,48 @@ function Gate() {
       />
     );
   }
+  if (!isServerVerified) {
+    return <FullScreenLoader label="Confirming your workspace…" />;
+  }
+  if (activeLocalScopeKey !== targetLocalScopeKey) {
+    return <FullScreenLoader label="Preparing your workspace…" />;
+  }
+
+  // A platform link is only renderable after a successful, current server
+  // response. Mount a dedicated stack for Super Admins before any company
+  // onboarding or tenant-company gate; cached flags never grant access.
+  if (routeDecision === "wait") {
+    return <FullScreenLoader label="Verifying platform access…" />;
+  }
+  if (routeDecision === "access-error") {
+    return (
+      <ErrorState
+        title="Couldn't verify platform access"
+        message="Connect to the internet and try again. Platform tools stay locked until access is confirmed."
+        onRetry={() => { void missionControl.refetch(); }}
+        onSignOut={() => { void signOut(); }}
+      />
+    );
+  }
+  if (routeDecision === "redirect-platform") {
+    return <Redirect href="/mission-control" />;
+  }
+  if (routeDecision === "redirect-tenant") {
+    return <Redirect href="/(app)/(tabs)" />;
+  }
+  if (routeDecision === "platform-stack") {
+    return (
+      <Stack
+        key={`${userId}:company:${user.companyId === null ? "none" : user.companyId}`}
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="mission-control" />
+      </Stack>
+    );
+  }
 
   if (user.role === "technician" && user.betaAccess === false) {
     return <BetaPaused />;
@@ -399,6 +565,7 @@ function Gate() {
 
   return (
     <Stack
+      key={`${userId}:company:${user.companyId === null ? "none" : user.companyId}`}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },

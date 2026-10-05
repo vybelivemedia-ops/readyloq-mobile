@@ -15,7 +15,6 @@ const path = require("path");
 
 const STATIC_ROOT = path.resolve(__dirname, "..", "static-build");
 const TEMPLATE_PATH = path.resolve(__dirname, "templates", "landing-page.html");
-const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -45,26 +44,6 @@ function getAppName() {
   }
 }
 
-function serveManifest(platform, res) {
-  const manifestPath = path.join(STATIC_ROOT, platform, "manifest.json");
-
-  if (!fs.existsSync(manifestPath)) {
-    res.writeHead(404, { "content-type": "application/json" });
-    res.end(
-      JSON.stringify({ error: `Manifest not found for platform: ${platform}` }),
-    );
-    return;
-  }
-
-  const manifest = fs.readFileSync(manifestPath, "utf-8");
-  res.writeHead(200, {
-    "content-type": "application/json",
-    "expo-protocol-version": "1",
-    "expo-sfv-version": "0",
-  });
-  res.end(manifest);
-}
-
 function serveLandingPage(req, res, landingPageTemplate, appName) {
   const forwardedProto = req.headers["x-forwarded-proto"];
   const protocol = forwardedProto || "https";
@@ -81,55 +60,120 @@ function serveLandingPage(req, res, landingPageTemplate, appName) {
   res.end(html);
 }
 
-function serveStaticFile(urlPath, res) {
-  const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, "");
-  const filePath = path.join(STATIC_ROOT, safePath);
+function createServer(options = {}) {
+  const staticRoot = fs.realpathSync(options.staticRoot || STATIC_ROOT);
+  const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
+  const landingPageTemplate =
+    options.landingPageTemplate ??
+    fs.readFileSync(options.templatePath || TEMPLATE_PATH, "utf-8");
+  const appName = options.appName || getAppName();
 
-  if (!filePath.startsWith(STATIC_ROOT)) {
-    res.writeHead(403);
-    res.end("Forbidden");
-    return;
+  function resolveStaticFile(urlPath) {
+    let decodedPath;
+    try {
+      decodedPath = decodeURIComponent(urlPath);
+    } catch {
+      return { status: 400 };
+    }
+
+    // Backslashes are path separators on Windows, but ordinary characters on
+    // POSIX. Reject them consistently so traversal cannot vary by platform.
+    if (decodedPath.includes("\\") || decodedPath.includes("\0")) {
+      return { status: 403 };
+    }
+
+    const relativePath = decodedPath.replace(/^\/+/, "");
+    const candidatePath = path.resolve(staticRoot, relativePath);
+    if (
+      candidatePath !== staticRoot &&
+      !candidatePath.startsWith(staticRoot + path.sep)
+    ) {
+      return { status: 403 };
+    }
+
+    let realPath;
+    try {
+      realPath = fs.realpathSync(candidatePath);
+    } catch {
+      return { status: 404 };
+    }
+    if (realPath !== staticRoot && !realPath.startsWith(staticRoot + path.sep)) {
+      return { status: 403 };
+    }
+
+    try {
+      if (fs.statSync(realPath).isDirectory()) {
+        return { status: 404 };
+      }
+    } catch {
+      return { status: 404 };
+    }
+    return { path: realPath };
   }
 
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    res.writeHead(404);
-    res.end("Not Found");
-    return;
+  function serveStaticFile(urlPath, res) {
+    const resolved = resolveStaticFile(urlPath);
+    if (!resolved.path) {
+      res.writeHead(resolved.status);
+      res.end(resolved.status === 403 ? "Forbidden" : "Not Found");
+      return;
+    }
+
+    const ext = path.extname(resolved.path).toLowerCase();
+    const contentType = MIME_TYPES[ext] || "application/octet-stream";
+    const content = fs.readFileSync(resolved.path);
+    res.writeHead(200, { "content-type": contentType });
+    res.end(content);
   }
 
-  const ext = path.extname(filePath).toLowerCase();
-  const contentType = MIME_TYPES[ext] || "application/octet-stream";
-  const content = fs.readFileSync(filePath);
-  res.writeHead(200, { "content-type": contentType });
-  res.end(content);
+  function serveManifest(platform, res) {
+    const resolved = resolveStaticFile(`${platform}/manifest.json`);
+    if (!resolved.path) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({ error: `Manifest not found for platform: ${platform}` }),
+      );
+      return;
+    }
+
+    const manifest = fs.readFileSync(resolved.path, "utf-8");
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "expo-protocol-version": "1",
+      "expo-sfv-version": "0",
+    });
+    res.end(manifest);
+  }
+
+  return http.createServer((req, res) => {
+    const url = new URL(req.url || "/", `http://${req.headers.host}`);
+    let pathname = url.pathname;
+
+    if (basePath && pathname.startsWith(basePath)) {
+      pathname = pathname.slice(basePath.length) || "/";
+    }
+
+    if (pathname === "/" || pathname === "/manifest") {
+      const platform = req.headers["expo-platform"];
+      if (platform === "ios" || platform === "android") {
+        return serveManifest(platform, res);
+      }
+
+      if (pathname === "/") {
+        return serveLandingPage(req, res, landingPageTemplate, appName);
+      }
+    }
+
+    serveStaticFile(pathname, res);
+  });
 }
 
-const landingPageTemplate = fs.readFileSync(TEMPLATE_PATH, "utf-8");
-const appName = getAppName();
+module.exports = { createServer };
 
-const server = http.createServer((req, res) => {
-  const url = new URL(req.url || "/", `http://${req.headers.host}`);
-  let pathname = url.pathname;
-
-  if (basePath && pathname.startsWith(basePath)) {
-    pathname = pathname.slice(basePath.length) || "/";
-  }
-
-  if (pathname === "/" || pathname === "/manifest") {
-    const platform = req.headers["expo-platform"];
-    if (platform === "ios" || platform === "android") {
-      return serveManifest(platform, res);
-    }
-
-    if (pathname === "/") {
-      return serveLandingPage(req, res, landingPageTemplate, appName);
-    }
-  }
-
-  serveStaticFile(pathname, res);
-});
-
-const port = parseInt(process.env.PORT || "3000", 10);
-server.listen(port, "0.0.0.0", () => {
-  console.log(`Serving static Expo build on port ${port}`);
-});
+if (require.main === module) {
+  const server = createServer();
+  const port = parseInt(process.env.PORT || "3000", 10);
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`Serving static Expo build on port ${port}`);
+  });
+}

@@ -186,6 +186,14 @@ export function createMediaImportProvider(): MediaImportProvider {
             shotAt,
             deviceMake: typeof exif?.Make === "string" ? exif.Make : undefined,
             deviceModel: typeof exif?.Model === "string" ? exif.Model : undefined,
+            // Retain the non-location EXIF calibration fields needed for
+            // measurement after the JPEG's embedded metadata is removed.
+            FocalLenIn35mmFilm:
+              typeof exif?.FocalLenIn35mmFilm === "number" ? exif.FocalLenIn35mmFilm : undefined,
+            PixelXDimension:
+              typeof exif?.PixelXDimension === "number" ? exif.PixelXDimension : undefined,
+            PixelYDimension:
+              typeof exif?.PixelYDimension === "number" ? exif.PixelYDimension : undefined,
           },
         };
       });

@@ -2,6 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import type { Finding } from "@/lib/api-client";
 import type { LocalInspection } from "@/lib/local/inspection-store";
+import { createSanitizedPhotoCopy } from "@/lib/privacy/image-sanitizer";
 
 /**
  * Builds the printable inspection report as a self-contained HTML document.
@@ -43,14 +44,18 @@ function fmt(value: string | null | undefined): string {
   );
 }
 
-async function photoDataUri(localUri: string): Promise<string | null> {
+async function photoDataUri(localUri: string): Promise<string> {
+  let sanitizedUri: string | undefined;
   try {
-    const base64 = await FileSystem.readAsStringAsync(localUri, {
+    sanitizedUri = await createSanitizedPhotoCopy(localUri);
+    const base64 = await FileSystem.readAsStringAsync(sanitizedUri, {
       encoding: FileSystem.EncodingType.Base64,
     });
     return `data:image/jpeg;base64,${base64}`;
   } catch {
-    return null; // Photo file missing — render placeholder rather than fail.
+    throw new Error("Report generation failed: a captured photo could not be loaded.");
+  } finally {
+    if (sanitizedUri) await FileSystem.deleteAsync(sanitizedUri, { idempotent: true }).catch(() => {});
   }
 }
 
@@ -120,7 +125,6 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
   ).length;
 
   const photoUris = await Promise.all(goodPhotos.map((p) => photoDataUri(p.localUri)));
-
   // Findings keyed to photos by storage path (the AI reports imageUrl =
   // storage path of the analyzed photo). Uses reportFindings so dismissed
   // findings never appear under any photo's caption.
@@ -237,6 +241,10 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
     .map((photo, i) => {
       const uri = photoUris[i];
       const photoFindings = findingsForPhoto(i);
+      const classification = photoFindings[0]?.technicianSpecies
+        ?? photoFindings[0]?.species
+        ?? photoFindings[0]?.category
+        ?? "Unclassified";
       const srcLabel = captureSourceLabel(photo.captureSource);
       const timeStr = photo.capturedAt
         ? new Date(photo.capturedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
@@ -244,14 +252,12 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
       const isNonDefault = photo.captureSource && photo.captureSource !== "phone_camera";
       return `
         <div class="photo-block">
-          ${
-            uri
-              ? `<img src="${uri}" alt="${esc(srcLabel)} ${i + 1}" />`
-              : `<div class="photo-missing">${esc(srcLabel)} ${i + 1} unavailable</div>`
-          }
+          <img src="${uri}" alt="${esc(srcLabel)} ${i + 1}" />
           <div class="photo-caption">
             <div class="cap-row">
               <strong>${esc(srcLabel)} ${i + 1}</strong>
+              <span class="cap-src">${fmt(classification)}</span>
+              ${record.unitNumber ? `<span class="cap-src">Unit ${esc(record.unitNumber)}</span>` : ""}
               ${timeStr ? `<span class="cap-time">${timeStr}</span>` : ""}
               ${isNonDefault ? `<span class="cap-src">${esc(srcLabel)}</span>` : ""}
             </div>
@@ -321,7 +327,9 @@ export async function buildReportHtml(data: ReportData): Promise<string> {
   </header>
 
   <div class="meta-grid">
+    <div><div class="k">Inspection ID</div><div class="v">${record.serverId != null ? `#${record.serverId}` : "Pending sync"}</div></div>
     <div><div class="k">Client</div><div class="v">${esc(record.clientName || "—")}</div></div>
+    ${record.unitNumber ? `<div><div class="k">Unit / Apt #</div><div class="v">${esc(record.unitNumber)}</div></div>` : ""}
     <div><div class="k">Technician</div><div class="v">${esc(record.technicianName || "—")}</div></div>
     <div><div class="k">Completed</div><div class="v">${dateStr} at ${timeStr}</div></div>
     <div><div class="k">Photos</div><div class="v">${goodPhotos.length}${skippedCount > 0 ? ` <span style="color:#94a3b8;font-weight:400;font-size:11px">(${skippedCount} low-quality excluded)</span>` : ""}</div></div>

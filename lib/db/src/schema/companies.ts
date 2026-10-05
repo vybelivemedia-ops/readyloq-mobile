@@ -18,12 +18,17 @@ export const companiesTable = pgTable(
     intelligenceSharingEnabled: boolean("intelligence_sharing_enabled")
       .notNull()
       .default(false),
+    // Platform-level access control. Suspended tenants are denied by the
+    // authenticated request middleware before tenant routes are reached.
+    accessSuspended: boolean("access_suspended").notNull().default(false),
     // Stripe billing — per-company subscription (Owner pays for the whole team).
     stripeCustomerId: text("stripe_customer_id"),
     stripeSubscriptionId: text("stripe_subscription_id"),
     // Cached from Stripe webhooks — avoids live API round-trips on each request.
-    // 'solo' = Solo Operator tier; 'growth' = Growth Team tier; null = no plan.
-    subscriptionTier: text("subscription_tier").$type<"solo" | "growth">(),
+    // Current catalog tier; legacy growth subscriptions remain grandfathered.
+    subscriptionTier: text("subscription_tier").$type<
+      "solo" | "micro" | "small" | "growth" | "professional" | "enterprise" | "pilot"
+    >(),
     // Mirrors Stripe subscription.status: 'active' | 'trialing' | 'past_due' |
     // 'canceled' | 'incomplete' | 'unpaid'. null = no subscription.
     subscriptionStatus: text("subscription_status"),

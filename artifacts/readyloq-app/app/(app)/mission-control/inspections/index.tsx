@@ -1,0 +1,1 @@
+export { Inspections as default } from "@/components/mission-control/lists";

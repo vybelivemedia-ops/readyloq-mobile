@@ -23,6 +23,7 @@ export declare const GetScheduleResponseItem: zod.ZodObject<{
     id: zod.ZodNumber;
     siteAddress: zod.ZodString;
     clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     technicianName: zod.ZodString;
     technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     status: zod.ZodString;
@@ -40,6 +41,7 @@ export declare const GetScheduleResponseItem: zod.ZodObject<{
     calendarDate: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
@@ -53,6 +55,7 @@ export declare const GetScheduleResponseItem: zod.ZodObject<{
     calendarDate: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
@@ -63,6 +66,7 @@ export declare const GetScheduleResponse: zod.ZodArray<zod.ZodObject<{
     id: zod.ZodNumber;
     siteAddress: zod.ZodString;
     clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     technicianName: zod.ZodString;
     technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     status: zod.ZodString;
@@ -80,6 +84,7 @@ export declare const GetScheduleResponse: zod.ZodArray<zod.ZodObject<{
     calendarDate: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
@@ -93,6 +98,7 @@ export declare const GetScheduleResponse: zod.ZodArray<zod.ZodObject<{
     calendarDate: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
@@ -126,6 +132,7 @@ export declare const ReassignInspectionResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     siteAddress: zod.ZodString;
     clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     technicianName: zod.ZodString;
     technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     status: zod.ZodString;
@@ -143,6 +150,7 @@ export declare const ReassignInspectionResponse: zod.ZodObject<{
     calendarDate: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
@@ -156,11 +164,1267 @@ export declare const ReassignInspectionResponse: zod.ZodObject<{
     calendarDate: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     scheduledDate?: string | null | undefined;
     completedAt?: string | null | undefined;
+}>;
+/**
+ * @summary Pre-inspection briefing for a property address — the last 5 inspections at that address, AI-synthesised historical pests/findings from property memory, property notes (access instructions, hazards, special needs), and the active bait station count from the most recent inspection there. Access rules mirror GET /schedule/route-outlook/{inspectionId}: manager/owner/sales see any company address; other roles must have an inspection of their own at that address.
+ */
+export declare const GetPropertyProfileQueryParams: zod.ZodObject<{
+    address: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    address: string;
+}, {
+    address: string;
+}>;
+export declare const GetPropertyProfileResponse: zod.ZodObject<{
+    address: zod.ZodString;
+    addressKey: zod.ZodString;
+    recentInspections: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        status: zod.ZodString;
+        severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        pestTypes: zod.ZodArray<zod.ZodString, "many">;
+        technicianName: zod.ZodString;
+        calendarDate: zod.ZodString;
+        findingsCount: zod.ZodNumber;
+        completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        calendarDate: string;
+        findingsCount: number;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+    }, {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        calendarDate: string;
+        findingsCount: number;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+    }>, "many">;
+    historicalPhotos: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        url: zod.ZodString;
+        filename: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        caption: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        inspectionId: zod.ZodNumber;
+        calendarDate: zod.ZodString;
+        createdAt: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        calendarDate: string;
+        createdAt: string;
+        url: string;
+        inspectionId: number;
+        filename?: string | null | undefined;
+        caption?: string | null | undefined;
+    }, {
+        id: number;
+        calendarDate: string;
+        createdAt: string;
+        url: string;
+        inspectionId: number;
+        filename?: string | null | undefined;
+        caption?: string | null | undefined;
+    }>, "many">;
+    materialHistory: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        inspectionId: zod.ZodNumber;
+        productId: zod.ZodNumber;
+        productName: zod.ZodString;
+        epaRegistrationNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        targetPest: zod.ZodString;
+        siteClassification: zod.ZodString;
+        areaSqft: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        totalProductOz: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        equipmentUsed: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        appliedAt: zod.ZodString;
+        compliance: zod.ZodObject<{
+            retreatmentIntervalDays: zod.ZodNullable<zod.ZodNumber>;
+            priorApplicationAt: zod.ZodNullable<zod.ZodString>;
+            daysSincePrior: zod.ZodNullable<zod.ZodNumber>;
+            isCompliant: zod.ZodBoolean;
+            nextEligibleReapplicationDate: zod.ZodNullable<zod.ZodString>;
+            eligibleNow: zod.ZodBoolean;
+        }, "strip", zod.ZodTypeAny, {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        }, {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        }>;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }, {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }>, "many">;
+    activeBaitStations: zod.ZodNumber;
+    historicalPests: zod.ZodArray<zod.ZodString, "many">;
+    historicalFindings: zod.ZodArray<zod.ZodObject<{
+        category: zod.ZodString;
+        description: zod.ZodString;
+        frequency: zod.ZodNumber;
+        severity: zod.ZodOptional<zod.ZodEnum<["low", "medium", "high"]>>;
+    }, "strip", zod.ZodTypeAny, {
+        category: string;
+        description: string;
+        frequency: number;
+        severity?: "low" | "medium" | "high" | undefined;
+    }, {
+        category: string;
+        description: string;
+        frequency: number;
+        severity?: "low" | "medium" | "high" | undefined;
+    }>, "many">;
+    notes: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        note: zod.ZodString;
+        zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        category: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        authorName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        createdAt: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        createdAt: string;
+        note: string;
+        category?: string | null | undefined;
+        zone?: string | null | undefined;
+        authorName?: string | null | undefined;
+    }, {
+        id: number;
+        createdAt: string;
+        note: string;
+        category?: string | null | undefined;
+        zone?: string | null | undefined;
+        authorName?: string | null | undefined;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    address: string;
+    addressKey: string;
+    recentInspections: {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        calendarDate: string;
+        findingsCount: number;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+    }[];
+    historicalPhotos: {
+        id: number;
+        calendarDate: string;
+        createdAt: string;
+        url: string;
+        inspectionId: number;
+        filename?: string | null | undefined;
+        caption?: string | null | undefined;
+    }[];
+    materialHistory: {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }[];
+    notes: {
+        id: number;
+        createdAt: string;
+        note: string;
+        category?: string | null | undefined;
+        zone?: string | null | undefined;
+        authorName?: string | null | undefined;
+    }[];
+    activeBaitStations: number;
+    historicalPests: string[];
+    historicalFindings: {
+        category: string;
+        description: string;
+        frequency: number;
+        severity?: "low" | "medium" | "high" | undefined;
+    }[];
+}, {
+    address: string;
+    addressKey: string;
+    recentInspections: {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        calendarDate: string;
+        findingsCount: number;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+    }[];
+    historicalPhotos: {
+        id: number;
+        calendarDate: string;
+        createdAt: string;
+        url: string;
+        inspectionId: number;
+        filename?: string | null | undefined;
+        caption?: string | null | undefined;
+    }[];
+    materialHistory: {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }[];
+    notes: {
+        id: number;
+        createdAt: string;
+        note: string;
+        category?: string | null | undefined;
+        zone?: string | null | undefined;
+        authorName?: string | null | undefined;
+    }[];
+    activeBaitStations: number;
+    historicalPests: string[];
+    historicalFindings: {
+        category: string;
+        description: string;
+        frequency: number;
+        severity?: "low" | "medium" | "high" | undefined;
+    }[];
+}>;
+/**
+ * @summary Complete pre-service history for one scheduled stop, including recent inspection summaries, photo evidence, site notes, recurring findings, and material/chemical history. Inspection-backed history is limited to completed service records before the stop's scheduled timestamp; a same-day sibling completed before that time is included, while pending and later records are excluded. When the guarded PestPac bridge is activated, the response also includes normalized legacy location notes. Technicians must be assigned to the exact stop; manager/owner/sales roles may read any stop in their company.
+ */
+export declare const GetStopHistoryParams: zod.ZodObject<{
+    inspectionId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
+}, {
+    inspectionId: number;
+}>;
+export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
+    address: zod.ZodString;
+    addressKey: zod.ZodString;
+    recentInspections: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        status: zod.ZodString;
+        severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        pestTypes: zod.ZodArray<zod.ZodString, "many">;
+        technicianName: zod.ZodString;
+        calendarDate: zod.ZodString;
+        findingsCount: zod.ZodNumber;
+        completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        calendarDate: string;
+        findingsCount: number;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+    }, {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        calendarDate: string;
+        findingsCount: number;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+    }>, "many">;
+    historicalPhotos: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        url: zod.ZodString;
+        filename: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        caption: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        inspectionId: zod.ZodNumber;
+        calendarDate: zod.ZodString;
+        createdAt: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        calendarDate: string;
+        createdAt: string;
+        url: string;
+        inspectionId: number;
+        filename?: string | null | undefined;
+        caption?: string | null | undefined;
+    }, {
+        id: number;
+        calendarDate: string;
+        createdAt: string;
+        url: string;
+        inspectionId: number;
+        filename?: string | null | undefined;
+        caption?: string | null | undefined;
+    }>, "many">;
+    materialHistory: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        inspectionId: zod.ZodNumber;
+        productId: zod.ZodNumber;
+        productName: zod.ZodString;
+        epaRegistrationNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        targetPest: zod.ZodString;
+        siteClassification: zod.ZodString;
+        areaSqft: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        totalProductOz: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        equipmentUsed: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        appliedAt: zod.ZodString;
+        compliance: zod.ZodObject<{
+            retreatmentIntervalDays: zod.ZodNullable<zod.ZodNumber>;
+            priorApplicationAt: zod.ZodNullable<zod.ZodString>;
+            daysSincePrior: zod.ZodNullable<zod.ZodNumber>;
+            isCompliant: zod.ZodBoolean;
+            nextEligibleReapplicationDate: zod.ZodNullable<zod.ZodString>;
+            eligibleNow: zod.ZodBoolean;
+        }, "strip", zod.ZodTypeAny, {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        }, {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        }>;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }, {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }>, "many">;
+    activeBaitStations: zod.ZodNumber;
+    historicalPests: zod.ZodArray<zod.ZodString, "many">;
+    historicalFindings: zod.ZodArray<zod.ZodObject<{
+        category: zod.ZodString;
+        description: zod.ZodString;
+        frequency: zod.ZodNumber;
+        severity: zod.ZodOptional<zod.ZodEnum<["low", "medium", "high"]>>;
+    }, "strip", zod.ZodTypeAny, {
+        category: string;
+        description: string;
+        frequency: number;
+        severity?: "low" | "medium" | "high" | undefined;
+    }, {
+        category: string;
+        description: string;
+        frequency: number;
+        severity?: "low" | "medium" | "high" | undefined;
+    }>, "many">;
+    notes: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        note: zod.ZodString;
+        zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        category: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        authorName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        createdAt: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        createdAt: string;
+        note: string;
+        category?: string | null | undefined;
+        zone?: string | null | undefined;
+        authorName?: string | null | undefined;
+    }, {
+        id: number;
+        createdAt: string;
+        note: string;
+        category?: string | null | undefined;
+        zone?: string | null | undefined;
+        authorName?: string | null | undefined;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    address: string;
+    addressKey: string;
+    recentInspections: {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        calendarDate: string;
+        findingsCount: number;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+    }[];
+    historicalPhotos: {
+        id: number;
+        calendarDate: string;
+        createdAt: string;
+        url: string;
+        inspectionId: number;
+        filename?: string | null | undefined;
+        caption?: string | null | undefined;
+    }[];
+    materialHistory: {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }[];
+    notes: {
+        id: number;
+        createdAt: string;
+        note: string;
+        category?: string | null | undefined;
+        zone?: string | null | undefined;
+        authorName?: string | null | undefined;
+    }[];
+    activeBaitStations: number;
+    historicalPests: string[];
+    historicalFindings: {
+        category: string;
+        description: string;
+        frequency: number;
+        severity?: "low" | "medium" | "high" | undefined;
+    }[];
+}, {
+    address: string;
+    addressKey: string;
+    recentInspections: {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        calendarDate: string;
+        findingsCount: number;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+    }[];
+    historicalPhotos: {
+        id: number;
+        calendarDate: string;
+        createdAt: string;
+        url: string;
+        inspectionId: number;
+        filename?: string | null | undefined;
+        caption?: string | null | undefined;
+    }[];
+    materialHistory: {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }[];
+    notes: {
+        id: number;
+        createdAt: string;
+        note: string;
+        category?: string | null | undefined;
+        zone?: string | null | undefined;
+        authorName?: string | null | undefined;
+    }[];
+    activeBaitStations: number;
+    historicalPests: string[];
+    historicalFindings: {
+        category: string;
+        description: string;
+        frequency: number;
+        severity?: "low" | "medium" | "high" | undefined;
+    }[];
+}>, zod.ZodObject<{
+    stopId: zod.ZodNumber;
+    pestPacHistory: zod.ZodObject<{
+        status: zod.ZodEnum<["available", "disabled", "not_configured", "not_mapped", "unavailable"]>;
+        notes: zod.ZodArray<zod.ZodObject<{
+            id: zod.ZodString;
+            note: zod.ZodString;
+            category: zod.ZodNullable<zod.ZodString>;
+            authorName: zod.ZodNullable<zod.ZodString>;
+            createdAt: zod.ZodNullable<zod.ZodDate>;
+        }, "strip", zod.ZodTypeAny, {
+            id: string;
+            createdAt: Date | null;
+            category: string | null;
+            note: string;
+            authorName: string | null;
+        }, {
+            id: string;
+            createdAt: Date | null;
+            category: string | null;
+            note: string;
+            authorName: string | null;
+        }>, "many">;
+    }, "strip", zod.ZodTypeAny, {
+        status: "available" | "disabled" | "not_configured" | "not_mapped" | "unavailable";
+        notes: {
+            id: string;
+            createdAt: Date | null;
+            category: string | null;
+            note: string;
+            authorName: string | null;
+        }[];
+    }, {
+        status: "available" | "disabled" | "not_configured" | "not_mapped" | "unavailable";
+        notes: {
+            id: string;
+            createdAt: Date | null;
+            category: string | null;
+            note: string;
+            authorName: string | null;
+        }[];
+    }>;
+}, "strip", zod.ZodTypeAny, {
+    stopId: number;
+    pestPacHistory: {
+        status: "available" | "disabled" | "not_configured" | "not_mapped" | "unavailable";
+        notes: {
+            id: string;
+            createdAt: Date | null;
+            category: string | null;
+            note: string;
+            authorName: string | null;
+        }[];
+    };
+}, {
+    stopId: number;
+    pestPacHistory: {
+        status: "available" | "disabled" | "not_configured" | "not_mapped" | "unavailable";
+        notes: {
+            id: string;
+            createdAt: Date | null;
+            category: string | null;
+            note: string;
+            authorName: string | null;
+        }[];
+    };
+}>>;
+/**
+ * @summary Drill-down detail for a "visit" — every inspection sharing the same company + site address + calendar date as the given inspection (covers a single-family stop and a same-day multi-unit property alike) — plus every chemical application logged across all of that visit's units, each carrying a retreatment-interval compliance check against the most recent PRIOR application of the same product at this address. Access rules mirror GET /schedule/property-profile.
+ */
+export declare const GetPropertyVisitParams: zod.ZodObject<{
+    inspectionId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
+}, {
+    inspectionId: number;
+}>;
+export declare const GetPropertyVisitResponse: zod.ZodObject<{
+    address: zod.ZodString;
+    calendarDate: zod.ZodString;
+    units: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianName: zod.ZodString;
+        technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        status: zod.ZodString;
+        severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        pestTypes: zod.ZodArray<zod.ZodString, "many">;
+        notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        visitPurpose: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        findingsCount: zod.ZodNumber;
+        mediaCount: zod.ZodNumber;
+        completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        findingsCount: number;
+        mediaCount: number;
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+        notes?: string | null | undefined;
+        visitPurpose?: string | null | undefined;
+    }, {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        findingsCount: number;
+        mediaCount: number;
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+        notes?: string | null | undefined;
+        visitPurpose?: string | null | undefined;
+    }>, "many">;
+    chemicalLedger: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        inspectionId: zod.ZodNumber;
+        productId: zod.ZodNumber;
+        productName: zod.ZodString;
+        epaRegistrationNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        targetPest: zod.ZodString;
+        siteClassification: zod.ZodString;
+        areaSqft: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        totalProductOz: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        equipmentUsed: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        appliedAt: zod.ZodString;
+        compliance: zod.ZodObject<{
+            retreatmentIntervalDays: zod.ZodNullable<zod.ZodNumber>;
+            priorApplicationAt: zod.ZodNullable<zod.ZodString>;
+            daysSincePrior: zod.ZodNullable<zod.ZodNumber>;
+            isCompliant: zod.ZodBoolean;
+            nextEligibleReapplicationDate: zod.ZodNullable<zod.ZodString>;
+            eligibleNow: zod.ZodBoolean;
+        }, "strip", zod.ZodTypeAny, {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        }, {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        }>;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }, {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    calendarDate: string;
+    address: string;
+    units: {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        findingsCount: number;
+        mediaCount: number;
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+        notes?: string | null | undefined;
+        visitPurpose?: string | null | undefined;
+    }[];
+    chemicalLedger: {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }[];
+}, {
+    calendarDate: string;
+    address: string;
+    units: {
+        status: string;
+        id: number;
+        technicianName: string;
+        pestTypes: string[];
+        findingsCount: number;
+        mediaCount: number;
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        completedAt?: string | null | undefined;
+        notes?: string | null | undefined;
+        visitPurpose?: string | null | undefined;
+    }[];
+    chemicalLedger: {
+        id: number;
+        inspectionId: number;
+        productId: number;
+        productName: string;
+        targetPest: string;
+        siteClassification: string;
+        appliedAt: string;
+        compliance: {
+            retreatmentIntervalDays: number | null;
+            priorApplicationAt: string | null;
+            daysSincePrior: number | null;
+            isCompliant: boolean;
+            nextEligibleReapplicationDate: string | null;
+            eligibleNow: boolean;
+        };
+        epaRegistrationNumber?: string | null | undefined;
+        areaSqft?: number | null | undefined;
+        linearFt?: number | null | undefined;
+        totalProductOz?: number | null | undefined;
+        equipmentUsed?: string | null | undefined;
+        notes?: string | null | undefined;
+    }[];
+}>;
+/**
+ * @summary Integrated Route Calendar — stops for a date window grouped by calendar day, each annotated with a Route Readiness flag (has the assigned technician set up their daily rig for that date?) and a rolled-up Route Chemical Outlook count (due-soon/overdue products at that stop's address). Same access scoping as GET /schedule (manager/owner/sales see all company stops; other roles see only their own).
+ */
+export declare const GetRouteCalendarQueryParams: zod.ZodObject<{
+    start: zod.ZodDate;
+    end: zod.ZodDate;
+    tzOffsetMinutes: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    start: Date;
+    end: Date;
+    tzOffsetMinutes?: number | undefined;
+}, {
+    start: Date;
+    end: Date;
+    tzOffsetMinutes?: number | undefined;
+}>;
+export declare const GetRouteCalendarResponseItem: zod.ZodObject<{
+    date: zod.ZodString;
+    stops: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        siteAddress: zod.ZodString;
+        clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianName: zod.ZodString;
+        technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        status: zod.ZodString;
+        severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        pestTypes: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
+        calendarDate: zod.ZodString;
+        readiness: zod.ZodObject<{
+            dailyRigSetUp: zod.ZodNullable<zod.ZodBoolean>;
+        }, "strip", zod.ZodTypeAny, {
+            dailyRigSetUp: boolean | null;
+        }, {
+            dailyRigSetUp: boolean | null;
+        }>;
+        outlook: zod.ZodObject<{
+            overdueCount: zod.ZodNumber;
+            dueSoonCount: zod.ZodNumber;
+            okCount: zod.ZodNumber;
+            hasOutlookData: zod.ZodBoolean;
+        }, "strip", zod.ZodTypeAny, {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        }, {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        }>;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: number;
+        siteAddress: string;
+        technicianName: string;
+        calendarDate: string;
+        readiness: {
+            dailyRigSetUp: boolean | null;
+        };
+        outlook: {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        };
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        pestTypes?: string[] | undefined;
+    }, {
+        status: string;
+        id: number;
+        siteAddress: string;
+        technicianName: string;
+        calendarDate: string;
+        readiness: {
+            dailyRigSetUp: boolean | null;
+        };
+        outlook: {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        };
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        pestTypes?: string[] | undefined;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    date: string;
+    stops: {
+        status: string;
+        id: number;
+        siteAddress: string;
+        technicianName: string;
+        calendarDate: string;
+        readiness: {
+            dailyRigSetUp: boolean | null;
+        };
+        outlook: {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        };
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        pestTypes?: string[] | undefined;
+    }[];
+}, {
+    date: string;
+    stops: {
+        status: string;
+        id: number;
+        siteAddress: string;
+        technicianName: string;
+        calendarDate: string;
+        readiness: {
+            dailyRigSetUp: boolean | null;
+        };
+        outlook: {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        };
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        pestTypes?: string[] | undefined;
+    }[];
+}>;
+export declare const GetRouteCalendarResponse: zod.ZodArray<zod.ZodObject<{
+    date: zod.ZodString;
+    stops: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        siteAddress: zod.ZodString;
+        clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianName: zod.ZodString;
+        technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        status: zod.ZodString;
+        severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        pestTypes: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
+        calendarDate: zod.ZodString;
+        readiness: zod.ZodObject<{
+            dailyRigSetUp: zod.ZodNullable<zod.ZodBoolean>;
+        }, "strip", zod.ZodTypeAny, {
+            dailyRigSetUp: boolean | null;
+        }, {
+            dailyRigSetUp: boolean | null;
+        }>;
+        outlook: zod.ZodObject<{
+            overdueCount: zod.ZodNumber;
+            dueSoonCount: zod.ZodNumber;
+            okCount: zod.ZodNumber;
+            hasOutlookData: zod.ZodBoolean;
+        }, "strip", zod.ZodTypeAny, {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        }, {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        }>;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: number;
+        siteAddress: string;
+        technicianName: string;
+        calendarDate: string;
+        readiness: {
+            dailyRigSetUp: boolean | null;
+        };
+        outlook: {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        };
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        pestTypes?: string[] | undefined;
+    }, {
+        status: string;
+        id: number;
+        siteAddress: string;
+        technicianName: string;
+        calendarDate: string;
+        readiness: {
+            dailyRigSetUp: boolean | null;
+        };
+        outlook: {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        };
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        pestTypes?: string[] | undefined;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    date: string;
+    stops: {
+        status: string;
+        id: number;
+        siteAddress: string;
+        technicianName: string;
+        calendarDate: string;
+        readiness: {
+            dailyRigSetUp: boolean | null;
+        };
+        outlook: {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        };
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        pestTypes?: string[] | undefined;
+    }[];
+}, {
+    date: string;
+    stops: {
+        status: string;
+        id: number;
+        siteAddress: string;
+        technicianName: string;
+        calendarDate: string;
+        readiness: {
+            dailyRigSetUp: boolean | null;
+        };
+        outlook: {
+            overdueCount: number;
+            dueSoonCount: number;
+            okCount: number;
+            hasOutlookData: boolean;
+        };
+        clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
+        technicianId?: string | null | undefined;
+        severity?: string | null | undefined;
+        pestTypes?: string[] | undefined;
+    }[];
+}>, "many">;
+/**
+ * @summary Full Route Chemical Outlook for a stop's address — every product applied there within the lookback window, projected forward from its most recent application to flag due / due-soon / overdue for reapplication. Access rules mirror GET /schedule/property-visit/{id}: manager/owner/sales see any company address; other roles must have an inspection of their own at that address.
+ */
+export declare const GetRouteOutlookParams: zod.ZodObject<{
+    inspectionId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
+}, {
+    inspectionId: number;
+}>;
+export declare const GetRouteOutlookQueryParams: zod.ZodObject<{
+    tzOffsetMinutes: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    tzOffsetMinutes?: number | undefined;
+}, {
+    tzOffsetMinutes?: number | undefined;
+}>;
+export declare const GetRouteOutlookResponse: zod.ZodObject<{
+    address: zod.ZodString;
+    calendarDate: zod.ZodString;
+    products: zod.ZodArray<zod.ZodObject<{
+        productId: zod.ZodNumber;
+        productName: zod.ZodString;
+        targetPest: zod.ZodString;
+        lastAppliedAt: zod.ZodString;
+        daysSinceApplication: zod.ZodNumber;
+        retreatmentIntervalDays: zod.ZodNullable<zod.ZodNumber>;
+        nextEligibleReapplicationDate: zod.ZodNullable<zod.ZodString>;
+        eligibleNow: zod.ZodBoolean;
+        outlookStatus: zod.ZodEnum<["ok", "due-soon", "overdue"]>;
+        applicationsLast90Days: zod.ZodNumber;
+    }, "strip", zod.ZodTypeAny, {
+        productId: number;
+        productName: string;
+        targetPest: string;
+        retreatmentIntervalDays: number | null;
+        nextEligibleReapplicationDate: string | null;
+        eligibleNow: boolean;
+        lastAppliedAt: string;
+        daysSinceApplication: number;
+        outlookStatus: "ok" | "due-soon" | "overdue";
+        applicationsLast90Days: number;
+    }, {
+        productId: number;
+        productName: string;
+        targetPest: string;
+        retreatmentIntervalDays: number | null;
+        nextEligibleReapplicationDate: string | null;
+        eligibleNow: boolean;
+        lastAppliedAt: string;
+        daysSinceApplication: number;
+        outlookStatus: "ok" | "due-soon" | "overdue";
+        applicationsLast90Days: number;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    calendarDate: string;
+    address: string;
+    products: {
+        productId: number;
+        productName: string;
+        targetPest: string;
+        retreatmentIntervalDays: number | null;
+        nextEligibleReapplicationDate: string | null;
+        eligibleNow: boolean;
+        lastAppliedAt: string;
+        daysSinceApplication: number;
+        outlookStatus: "ok" | "due-soon" | "overdue";
+        applicationsLast90Days: number;
+    }[];
+}, {
+    calendarDate: string;
+    address: string;
+    products: {
+        productId: number;
+        productName: string;
+        targetPest: string;
+        retreatmentIntervalDays: number | null;
+        nextEligibleReapplicationDate: string | null;
+        eligibleNow: boolean;
+        lastAppliedAt: string;
+        daysSinceApplication: number;
+        outlookStatus: "ok" | "due-soon" | "overdue";
+        applicationsLast90Days: number;
+    }[];
 }>;
 /**
  * @summary Health check
@@ -189,12 +1453,14 @@ export declare const ListInspectionsResponseItem: zod.ZodObject<{
     id: zod.ZodNumber;
     siteAddress: zod.ZodString;
     clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     technicianName: zod.ZodString;
     technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     status: zod.ZodString;
     pestTypes: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    visitPurpose: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     mediaCount: zod.ZodOptional<zod.ZodNumber>;
     findingsCount: zod.ZodOptional<zod.ZodNumber>;
     media: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -208,31 +1474,37 @@ export declare const ListInspectionsResponseItem: zod.ZodObject<{
         captureSource: zod.ZodOptional<zod.ZodString>;
         qualityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
         captureMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodRecord<zod.ZodString, zod.ZodUnknown>>>;
-        createdAt: zod.ZodString;
+        unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        createdAt: zod.ZodDate;
     }, "strip", zod.ZodTypeAny, {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }, {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }>, "many">>;
     aiAnalysisId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
     createdAt: zod.ZodString;
@@ -244,25 +1516,29 @@ export declare const ListInspectionsResponseItem: zod.ZodObject<{
     technicianName: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
-    notes?: string | null | undefined;
-    mediaCount?: number | undefined;
     findingsCount?: number | undefined;
+    notes?: string | null | undefined;
+    visitPurpose?: string | null | undefined;
+    mediaCount?: number | undefined;
     media?: {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }[] | undefined;
     aiAnalysisId?: number | null | undefined;
 }, {
@@ -272,25 +1548,29 @@ export declare const ListInspectionsResponseItem: zod.ZodObject<{
     technicianName: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
-    notes?: string | null | undefined;
-    mediaCount?: number | undefined;
     findingsCount?: number | undefined;
+    notes?: string | null | undefined;
+    visitPurpose?: string | null | undefined;
+    mediaCount?: number | undefined;
     media?: {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }[] | undefined;
     aiAnalysisId?: number | null | undefined;
 }>;
@@ -298,12 +1578,14 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
     id: zod.ZodNumber;
     siteAddress: zod.ZodString;
     clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     technicianName: zod.ZodString;
     technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     status: zod.ZodString;
     pestTypes: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    visitPurpose: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     mediaCount: zod.ZodOptional<zod.ZodNumber>;
     findingsCount: zod.ZodOptional<zod.ZodNumber>;
     media: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -317,31 +1599,37 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
         captureSource: zod.ZodOptional<zod.ZodString>;
         qualityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
         captureMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodRecord<zod.ZodString, zod.ZodUnknown>>>;
-        createdAt: zod.ZodString;
+        unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        createdAt: zod.ZodDate;
     }, "strip", zod.ZodTypeAny, {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }, {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }>, "many">>;
     aiAnalysisId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
     createdAt: zod.ZodString;
@@ -353,25 +1641,29 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
     technicianName: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
-    notes?: string | null | undefined;
-    mediaCount?: number | undefined;
     findingsCount?: number | undefined;
+    notes?: string | null | undefined;
+    visitPurpose?: string | null | undefined;
+    mediaCount?: number | undefined;
     media?: {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }[] | undefined;
     aiAnalysisId?: number | null | undefined;
 }, {
@@ -381,25 +1673,29 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
     technicianName: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
-    notes?: string | null | undefined;
-    mediaCount?: number | undefined;
     findingsCount?: number | undefined;
+    notes?: string | null | undefined;
+    visitPurpose?: string | null | undefined;
+    mediaCount?: number | undefined;
     media?: {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }[] | undefined;
     aiAnalysisId?: number | null | undefined;
 }>, "many">;
@@ -409,26 +1705,32 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
 export declare const CreateInspectionBody: zod.ZodObject<{
     siteAddress: zod.ZodString;
     clientName: zod.ZodOptional<zod.ZodString>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     technicianName: zod.ZodString;
     technicianId: zod.ZodOptional<zod.ZodString>;
     notes: zod.ZodOptional<zod.ZodString>;
+    visitPurpose: zod.ZodOptional<zod.ZodString>;
     pestTypes: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     clientKey: zod.ZodOptional<zod.ZodString>;
 }, "strip", zod.ZodTypeAny, {
     siteAddress: string;
     technicianName: string;
     clientName?: string | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | undefined;
     pestTypes?: string[] | undefined;
     notes?: string | undefined;
+    visitPurpose?: string | undefined;
     clientKey?: string | undefined;
 }, {
     siteAddress: string;
     technicianName: string;
     clientName?: string | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | undefined;
     pestTypes?: string[] | undefined;
     notes?: string | undefined;
+    visitPurpose?: string | undefined;
     clientKey?: string | undefined;
 }>;
 /**
@@ -445,12 +1747,14 @@ export declare const GetInspectionResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     siteAddress: zod.ZodString;
     clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     technicianName: zod.ZodString;
     technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     status: zod.ZodString;
     pestTypes: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    visitPurpose: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     mediaCount: zod.ZodOptional<zod.ZodNumber>;
     findingsCount: zod.ZodOptional<zod.ZodNumber>;
     media: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -464,31 +1768,37 @@ export declare const GetInspectionResponse: zod.ZodObject<{
         captureSource: zod.ZodOptional<zod.ZodString>;
         qualityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
         captureMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodRecord<zod.ZodString, zod.ZodUnknown>>>;
-        createdAt: zod.ZodString;
+        unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        createdAt: zod.ZodDate;
     }, "strip", zod.ZodTypeAny, {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }, {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }>, "many">>;
     aiAnalysisId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
     createdAt: zod.ZodString;
@@ -500,25 +1810,29 @@ export declare const GetInspectionResponse: zod.ZodObject<{
     technicianName: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
-    notes?: string | null | undefined;
-    mediaCount?: number | undefined;
     findingsCount?: number | undefined;
+    notes?: string | null | undefined;
+    visitPurpose?: string | null | undefined;
+    mediaCount?: number | undefined;
     media?: {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }[] | undefined;
     aiAnalysisId?: number | null | undefined;
 }, {
@@ -528,25 +1842,29 @@ export declare const GetInspectionResponse: zod.ZodObject<{
     technicianName: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
-    notes?: string | null | undefined;
-    mediaCount?: number | undefined;
     findingsCount?: number | undefined;
+    notes?: string | null | undefined;
+    visitPurpose?: string | null | undefined;
+    mediaCount?: number | undefined;
     media?: {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }[] | undefined;
     aiAnalysisId?: number | null | undefined;
 }>;
@@ -566,29 +1884,37 @@ export declare const UpdateInspectionBody: zod.ZodObject<{
     severity: zod.ZodOptional<zod.ZodString>;
     pestTypes: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     completedAt: zod.ZodOptional<zod.ZodString>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    visitPurpose: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
     status?: string | undefined;
+    unitNumber?: string | null | undefined;
     severity?: string | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | undefined;
     notes?: string | undefined;
+    visitPurpose?: string | null | undefined;
 }, {
     status?: string | undefined;
+    unitNumber?: string | null | undefined;
     severity?: string | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | undefined;
     notes?: string | undefined;
+    visitPurpose?: string | null | undefined;
 }>;
 export declare const UpdateInspectionResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     siteAddress: zod.ZodString;
     clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     technicianName: zod.ZodString;
     technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     status: zod.ZodString;
     pestTypes: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    visitPurpose: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     mediaCount: zod.ZodOptional<zod.ZodNumber>;
     findingsCount: zod.ZodOptional<zod.ZodNumber>;
     media: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -602,31 +1928,37 @@ export declare const UpdateInspectionResponse: zod.ZodObject<{
         captureSource: zod.ZodOptional<zod.ZodString>;
         qualityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
         captureMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodRecord<zod.ZodString, zod.ZodUnknown>>>;
-        createdAt: zod.ZodString;
+        unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        createdAt: zod.ZodDate;
     }, "strip", zod.ZodTypeAny, {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }, {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }>, "many">>;
     aiAnalysisId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
     createdAt: zod.ZodString;
@@ -638,25 +1970,29 @@ export declare const UpdateInspectionResponse: zod.ZodObject<{
     technicianName: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
-    notes?: string | null | undefined;
-    mediaCount?: number | undefined;
     findingsCount?: number | undefined;
+    notes?: string | null | undefined;
+    visitPurpose?: string | null | undefined;
+    mediaCount?: number | undefined;
     media?: {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }[] | undefined;
     aiAnalysisId?: number | null | undefined;
 }, {
@@ -666,25 +2002,29 @@ export declare const UpdateInspectionResponse: zod.ZodObject<{
     technicianName: string;
     createdAt: string;
     clientName?: string | null | undefined;
+    unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
     severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
-    notes?: string | null | undefined;
-    mediaCount?: number | undefined;
     findingsCount?: number | undefined;
+    notes?: string | null | undefined;
+    visitPurpose?: string | null | undefined;
+    mediaCount?: number | undefined;
     media?: {
         id: number;
-        createdAt: string;
+        createdAt: Date;
+        url: string;
         inspectionId: number;
         mediaType: string;
-        url: string;
+        unitNumber?: string | null | undefined;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
         durationSec?: number | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
+        capturedAt?: Date | null | undefined;
     }[] | undefined;
     aiAnalysisId?: number | null | undefined;
 }>;
@@ -714,12 +2054,14 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         id: zod.ZodNumber;
         siteAddress: zod.ZodString;
         clientName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianName: zod.ZodString;
         technicianId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         status: zod.ZodString;
         pestTypes: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
         severity: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        visitPurpose: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         mediaCount: zod.ZodOptional<zod.ZodNumber>;
         findingsCount: zod.ZodOptional<zod.ZodNumber>;
         media: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -733,31 +2075,37 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
             captureSource: zod.ZodOptional<zod.ZodString>;
             qualityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
             captureMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodRecord<zod.ZodString, zod.ZodUnknown>>>;
-            createdAt: zod.ZodString;
+            unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+            capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+            createdAt: zod.ZodDate;
         }, "strip", zod.ZodTypeAny, {
             id: number;
-            createdAt: string;
+            createdAt: Date;
+            url: string;
             inspectionId: number;
             mediaType: string;
-            url: string;
+            unitNumber?: string | null | undefined;
             filename?: string | null | undefined;
             caption?: string | null | undefined;
             durationSec?: number | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
+            capturedAt?: Date | null | undefined;
         }, {
             id: number;
-            createdAt: string;
+            createdAt: Date;
+            url: string;
             inspectionId: number;
             mediaType: string;
-            url: string;
+            unitNumber?: string | null | undefined;
             filename?: string | null | undefined;
             caption?: string | null | undefined;
             durationSec?: number | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
+            capturedAt?: Date | null | undefined;
         }>, "many">>;
         aiAnalysisId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
         createdAt: zod.ZodString;
@@ -769,25 +2117,29 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         technicianName: string;
         createdAt: string;
         clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
         severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
         completedAt?: string | null | undefined;
-        notes?: string | null | undefined;
-        mediaCount?: number | undefined;
         findingsCount?: number | undefined;
+        notes?: string | null | undefined;
+        visitPurpose?: string | null | undefined;
+        mediaCount?: number | undefined;
         media?: {
             id: number;
-            createdAt: string;
+            createdAt: Date;
+            url: string;
             inspectionId: number;
             mediaType: string;
-            url: string;
+            unitNumber?: string | null | undefined;
             filename?: string | null | undefined;
             caption?: string | null | undefined;
             durationSec?: number | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
+            capturedAt?: Date | null | undefined;
         }[] | undefined;
         aiAnalysisId?: number | null | undefined;
     }, {
@@ -797,25 +2149,29 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         technicianName: string;
         createdAt: string;
         clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
         severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
         completedAt?: string | null | undefined;
-        notes?: string | null | undefined;
-        mediaCount?: number | undefined;
         findingsCount?: number | undefined;
+        notes?: string | null | undefined;
+        visitPurpose?: string | null | undefined;
+        mediaCount?: number | undefined;
         media?: {
             id: number;
-            createdAt: string;
+            createdAt: Date;
+            url: string;
             inspectionId: number;
             mediaType: string;
-            url: string;
+            unitNumber?: string | null | undefined;
             filename?: string | null | undefined;
             caption?: string | null | undefined;
             durationSec?: number | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
+            capturedAt?: Date | null | undefined;
         }[] | undefined;
         aiAnalysisId?: number | null | undefined;
     }>;
@@ -830,25 +2186,29 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         technicianName: string;
         createdAt: string;
         clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
         severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
         completedAt?: string | null | undefined;
-        notes?: string | null | undefined;
-        mediaCount?: number | undefined;
         findingsCount?: number | undefined;
+        notes?: string | null | undefined;
+        visitPurpose?: string | null | undefined;
+        mediaCount?: number | undefined;
         media?: {
             id: number;
-            createdAt: string;
+            createdAt: Date;
+            url: string;
             inspectionId: number;
             mediaType: string;
-            url: string;
+            unitNumber?: string | null | undefined;
             filename?: string | null | undefined;
             caption?: string | null | undefined;
             durationSec?: number | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
+            capturedAt?: Date | null | undefined;
         }[] | undefined;
         aiAnalysisId?: number | null | undefined;
     };
@@ -863,25 +2223,29 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         technicianName: string;
         createdAt: string;
         clientName?: string | null | undefined;
+        unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
         severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
         completedAt?: string | null | undefined;
-        notes?: string | null | undefined;
-        mediaCount?: number | undefined;
         findingsCount?: number | undefined;
+        notes?: string | null | undefined;
+        visitPurpose?: string | null | undefined;
+        mediaCount?: number | undefined;
         media?: {
             id: number;
-            createdAt: string;
+            createdAt: Date;
+            url: string;
             inspectionId: number;
             mediaType: string;
-            url: string;
+            unitNumber?: string | null | undefined;
             filename?: string | null | undefined;
             caption?: string | null | undefined;
             durationSec?: number | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
+            capturedAt?: Date | null | undefined;
         }[] | undefined;
         aiAnalysisId?: number | null | undefined;
     };
@@ -908,24 +2272,73 @@ export declare const AddInspectionMediaBody: zod.ZodObject<{
     captureSource: zod.ZodOptional<zod.ZodString>;
     qualityScore: zod.ZodOptional<zod.ZodNumber>;
     captureMetadata: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodUnknown>>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    capturedAt: zod.ZodOptional<zod.ZodDate>;
 }, "strip", zod.ZodTypeAny, {
-    mediaType: string;
     url: string;
+    mediaType: string;
+    unitNumber?: string | null | undefined;
     filename?: string | undefined;
     caption?: string | undefined;
     durationSec?: number | undefined;
     captureSource?: string | undefined;
     qualityScore?: number | undefined;
     captureMetadata?: Record<string, unknown> | undefined;
+    capturedAt?: Date | undefined;
 }, {
-    mediaType: string;
     url: string;
+    mediaType: string;
+    unitNumber?: string | null | undefined;
     filename?: string | undefined;
     caption?: string | undefined;
     durationSec?: number | undefined;
     captureSource?: string | undefined;
     qualityScore?: number | undefined;
     captureMetadata?: Record<string, unknown> | undefined;
+    capturedAt?: Date | undefined;
+}>;
+export declare const AddInspectionMediaResponse: zod.ZodObject<{
+    id: zod.ZodNumber;
+    inspectionId: zod.ZodNumber;
+    mediaType: zod.ZodString;
+    url: zod.ZodString;
+    filename: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    caption: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    durationSec: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    captureSource: zod.ZodOptional<zod.ZodString>;
+    qualityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    captureMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodRecord<zod.ZodString, zod.ZodUnknown>>>;
+    unitNumber: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    createdAt: Date;
+    url: string;
+    inspectionId: number;
+    mediaType: string;
+    unitNumber?: string | null | undefined;
+    filename?: string | null | undefined;
+    caption?: string | null | undefined;
+    durationSec?: number | null | undefined;
+    captureSource?: string | undefined;
+    qualityScore?: number | null | undefined;
+    captureMetadata?: Record<string, unknown> | null | undefined;
+    capturedAt?: Date | null | undefined;
+}, {
+    id: number;
+    createdAt: Date;
+    url: string;
+    inspectionId: number;
+    mediaType: string;
+    unitNumber?: string | null | undefined;
+    filename?: string | null | undefined;
+    caption?: string | null | undefined;
+    durationSec?: number | null | undefined;
+    captureSource?: string | undefined;
+    qualityScore?: number | null | undefined;
+    captureMetadata?: Record<string, unknown> | null | undefined;
+    capturedAt?: Date | null | undefined;
 }>;
 /**
  * @summary List AI analysis results
@@ -946,55 +2359,121 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         category: zod.ZodString;
         description: zod.ZodString;
         confidence: zod.ZodNumber;
-        severity: zod.ZodOptional<zod.ZodString>;
-        location: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        imageUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        treatment: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        exclusionOpportunity: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+        imageUrl: zod.ZodNullable<zod.ZodString>;
+        treatment: zod.ZodNullable<zod.ZodString>;
+        exclusionOpportunity: zod.ZodNullable<zod.ZodBoolean>;
+        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"excellent">, zod.ZodLiteral<"good">, zod.ZodLiteral<"fair">, zod.ZodLiteral<null>]>>>;
+        possiblePest: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         species: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         lifeStage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         conduciveCondition: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         harborage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         moisture: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         structuralIssue: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        measurementEstimate: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
+            linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            gapWidthIn: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            heightFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            confidence: zod.ZodNumber;
+            source: zod.ZodEnum<["ai_vision_estimate"]>;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }>, zod.ZodNull]>>;
         zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        candidates: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            species: zod.ZodString;
+            confidence: zod.ZodNumber;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            species: string;
+        }, {
+            confidence: number;
+            species: string;
+        }>, "many">>;
+        confidenceLabel: zod.ZodOptional<zod.ZodEnum<["identified", "possible", "unidentified"]>>;
+        reviewStatus: zod.ZodOptional<zod.ZodEnum<["pending", "accepted", "corrected", "dismissed"]>>;
+        technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }>, "many">>;
     recommendations: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     videoEvidence: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -1017,6 +2496,16 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         label?: string | null | undefined;
     }>, "many">>;
     analyzedImagePaths: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
+    photoOutcomes: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        imagePath: zod.ZodString;
+        status: zod.ZodEnum<["completed", "failed", "deferred", "rate_limited"]>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }, {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }>, "many">>;
     photoZones: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodString>>;
     coverage: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
         propertyType: zod.ZodString;
@@ -1457,22 +2946,38 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
     inspectionId: number;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     videoEvidence?: {
@@ -1483,6 +2988,10 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
+    photoOutcomes?: {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }[] | undefined;
     photoZones?: Record<string, string> | undefined;
     coverage?: {
         propertyType: string;
@@ -1594,22 +3103,38 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
     inspectionId: number;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     videoEvidence?: {
@@ -1620,6 +3145,10 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
+    photoOutcomes?: {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }[] | undefined;
     photoZones?: Record<string, string> | undefined;
     coverage?: {
         propertyType: string;
@@ -1734,55 +3263,121 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         category: zod.ZodString;
         description: zod.ZodString;
         confidence: zod.ZodNumber;
-        severity: zod.ZodOptional<zod.ZodString>;
-        location: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        imageUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        treatment: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        exclusionOpportunity: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+        imageUrl: zod.ZodNullable<zod.ZodString>;
+        treatment: zod.ZodNullable<zod.ZodString>;
+        exclusionOpportunity: zod.ZodNullable<zod.ZodBoolean>;
+        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"excellent">, zod.ZodLiteral<"good">, zod.ZodLiteral<"fair">, zod.ZodLiteral<null>]>>>;
+        possiblePest: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         species: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         lifeStage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         conduciveCondition: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         harborage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         moisture: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         structuralIssue: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        measurementEstimate: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
+            linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            gapWidthIn: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            heightFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            confidence: zod.ZodNumber;
+            source: zod.ZodEnum<["ai_vision_estimate"]>;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }>, zod.ZodNull]>>;
         zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        candidates: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            species: zod.ZodString;
+            confidence: zod.ZodNumber;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            species: string;
+        }, {
+            confidence: number;
+            species: string;
+        }>, "many">>;
+        confidenceLabel: zod.ZodOptional<zod.ZodEnum<["identified", "possible", "unidentified"]>>;
+        reviewStatus: zod.ZodOptional<zod.ZodEnum<["pending", "accepted", "corrected", "dismissed"]>>;
+        technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }>, "many">>;
     recommendations: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     videoEvidence: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -1805,6 +3400,16 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         label?: string | null | undefined;
     }>, "many">>;
     analyzedImagePaths: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
+    photoOutcomes: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        imagePath: zod.ZodString;
+        status: zod.ZodEnum<["completed", "failed", "deferred", "rate_limited"]>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }, {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }>, "many">>;
     photoZones: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodString>>;
     coverage: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
         propertyType: zod.ZodString;
@@ -2245,22 +3850,38 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
     inspectionId: number;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     videoEvidence?: {
@@ -2271,6 +3892,10 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
+    photoOutcomes?: {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }[] | undefined;
     photoZones?: Record<string, string> | undefined;
     coverage?: {
         propertyType: string;
@@ -2382,22 +4007,38 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
     inspectionId: number;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     videoEvidence?: {
@@ -2408,6 +4049,10 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
+    photoOutcomes?: {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }[] | undefined;
     photoZones?: Record<string, string> | undefined;
     coverage?: {
         propertyType: string;
@@ -2533,55 +4178,121 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
         category: zod.ZodString;
         description: zod.ZodString;
         confidence: zod.ZodNumber;
-        severity: zod.ZodOptional<zod.ZodString>;
-        location: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        imageUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        treatment: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        exclusionOpportunity: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+        imageUrl: zod.ZodNullable<zod.ZodString>;
+        treatment: zod.ZodNullable<zod.ZodString>;
+        exclusionOpportunity: zod.ZodNullable<zod.ZodBoolean>;
+        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"excellent">, zod.ZodLiteral<"good">, zod.ZodLiteral<"fair">, zod.ZodLiteral<null>]>>>;
+        possiblePest: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         species: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         lifeStage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         conduciveCondition: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         harborage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         moisture: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         structuralIssue: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        measurementEstimate: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
+            linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            gapWidthIn: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            heightFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            confidence: zod.ZodNumber;
+            source: zod.ZodEnum<["ai_vision_estimate"]>;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }>, zod.ZodNull]>>;
         zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        candidates: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            species: zod.ZodString;
+            confidence: zod.ZodNumber;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            species: string;
+        }, {
+            confidence: number;
+            species: string;
+        }>, "many">>;
+        confidenceLabel: zod.ZodOptional<zod.ZodEnum<["identified", "possible", "unidentified"]>>;
+        reviewStatus: zod.ZodOptional<zod.ZodEnum<["pending", "accepted", "corrected", "dismissed"]>>;
+        technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }>, "many">>;
     videos: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
         url: zod.ZodString;
@@ -2608,22 +4319,38 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
     }[] | undefined;
     technicianFindings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     videos?: {
         url: string;
@@ -2640,22 +4367,38 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
     }[] | undefined;
     technicianFindings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     videos?: {
         url: string;
@@ -2684,55 +4427,121 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         category: zod.ZodString;
         description: zod.ZodString;
         confidence: zod.ZodNumber;
-        severity: zod.ZodOptional<zod.ZodString>;
-        location: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        imageUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        treatment: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        exclusionOpportunity: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+        imageUrl: zod.ZodNullable<zod.ZodString>;
+        treatment: zod.ZodNullable<zod.ZodString>;
+        exclusionOpportunity: zod.ZodNullable<zod.ZodBoolean>;
+        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"excellent">, zod.ZodLiteral<"good">, zod.ZodLiteral<"fair">, zod.ZodLiteral<null>]>>>;
+        possiblePest: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         species: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         lifeStage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         conduciveCondition: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         harborage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         moisture: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         structuralIssue: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        measurementEstimate: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
+            linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            gapWidthIn: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            heightFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            confidence: zod.ZodNumber;
+            source: zod.ZodEnum<["ai_vision_estimate"]>;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }>, zod.ZodNull]>>;
         zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        candidates: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            species: zod.ZodString;
+            confidence: zod.ZodNumber;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            species: string;
+        }, {
+            confidence: number;
+            species: string;
+        }>, "many">>;
+        confidenceLabel: zod.ZodOptional<zod.ZodEnum<["identified", "possible", "unidentified"]>>;
+        reviewStatus: zod.ZodOptional<zod.ZodEnum<["pending", "accepted", "corrected", "dismissed"]>>;
+        technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }>, "many">>;
     recommendations: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     videoEvidence: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -2755,6 +4564,16 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         label?: string | null | undefined;
     }>, "many">>;
     analyzedImagePaths: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
+    photoOutcomes: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        imagePath: zod.ZodString;
+        status: zod.ZodEnum<["completed", "failed", "deferred", "rate_limited"]>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }, {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }>, "many">>;
     photoZones: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodString>>;
     coverage: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
         propertyType: zod.ZodString;
@@ -3195,22 +5014,38 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
     inspectionId: number;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     videoEvidence?: {
@@ -3221,6 +5056,10 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
+    photoOutcomes?: {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }[] | undefined;
     photoZones?: Record<string, string> | undefined;
     coverage?: {
         propertyType: string;
@@ -3332,22 +5171,38 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
     inspectionId: number;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     videoEvidence?: {
@@ -3358,6 +5213,10 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
+    photoOutcomes?: {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }[] | undefined;
     photoZones?: Record<string, string> | undefined;
     coverage?: {
         propertyType: string;
@@ -3492,55 +5351,121 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         category: zod.ZodString;
         description: zod.ZodString;
         confidence: zod.ZodNumber;
-        severity: zod.ZodOptional<zod.ZodString>;
-        location: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        imageUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        treatment: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        exclusionOpportunity: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+        imageUrl: zod.ZodNullable<zod.ZodString>;
+        treatment: zod.ZodNullable<zod.ZodString>;
+        exclusionOpportunity: zod.ZodNullable<zod.ZodBoolean>;
+        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"excellent">, zod.ZodLiteral<"good">, zod.ZodLiteral<"fair">, zod.ZodLiteral<null>]>>>;
+        possiblePest: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         species: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         lifeStage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         conduciveCondition: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         harborage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         moisture: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         structuralIssue: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        measurementEstimate: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
+            linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            gapWidthIn: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            heightFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            confidence: zod.ZodNumber;
+            source: zod.ZodEnum<["ai_vision_estimate"]>;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }>, zod.ZodNull]>>;
         zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        candidates: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            species: zod.ZodString;
+            confidence: zod.ZodNumber;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            species: string;
+        }, {
+            confidence: number;
+            species: string;
+        }>, "many">>;
+        confidenceLabel: zod.ZodOptional<zod.ZodEnum<["identified", "possible", "unidentified"]>>;
+        reviewStatus: zod.ZodOptional<zod.ZodEnum<["pending", "accepted", "corrected", "dismissed"]>>;
+        technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }>, "many">>;
     recommendations: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     videoEvidence: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -3563,6 +5488,16 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         label?: string | null | undefined;
     }>, "many">>;
     analyzedImagePaths: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
+    photoOutcomes: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        imagePath: zod.ZodString;
+        status: zod.ZodEnum<["completed", "failed", "deferred", "rate_limited"]>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }, {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }>, "many">>;
     photoZones: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodString>>;
     coverage: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
         propertyType: zod.ZodString;
@@ -4003,22 +5938,38 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
     inspectionId: number;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     videoEvidence?: {
@@ -4029,6 +5980,10 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
+    photoOutcomes?: {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }[] | undefined;
     photoZones?: Record<string, string> | undefined;
     coverage?: {
         propertyType: string;
@@ -4140,22 +6095,38 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
     inspectionId: number;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     videoEvidence?: {
@@ -4166,6 +6137,10 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
+    photoOutcomes?: {
+        status: "completed" | "failed" | "deferred" | "rate_limited";
+        imagePath: string;
+    }[] | undefined;
     photoZones?: Record<string, string> | undefined;
     coverage?: {
         propertyType: string;
@@ -4750,6 +6725,7 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         id: zod.ZodNumber;
         imageUrl: zod.ZodString;
         thumbnailUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        mediaType: zod.ZodOptional<zod.ZodEnum<["photo", "video"]>>;
         aiPrediction: zod.ZodObject<{
             category: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
             subcategory: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -4764,8 +6740,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
             confidence: number;
             tags: string[];
             category?: string | null | undefined;
-            subcategory?: string | null | undefined;
             possiblePest?: string | null | undefined;
+            subcategory?: string | null | undefined;
             possibleConduciveCondition?: string | null | undefined;
             possibleEntryPoint?: string | null | undefined;
             suggestedCorrectiveAction?: string | null | undefined;
@@ -4774,8 +6750,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
             confidence: number;
             tags: string[];
             category?: string | null | undefined;
-            subcategory?: string | null | undefined;
             possiblePest?: string | null | undefined;
+            subcategory?: string | null | undefined;
             possibleConduciveCondition?: string | null | undefined;
             possibleEntryPoint?: string | null | undefined;
             suggestedCorrectiveAction?: string | null | undefined;
@@ -4805,11 +6781,11 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
             tag: zod.ZodString;
             source: zod.ZodString;
         }, "strip", zod.ZodTypeAny, {
-            tag: string;
             source: string;
+            tag: string;
         }, {
-            tag: string;
             source: string;
+            tag: string;
         }>, "many">;
         confirmVotes: zod.ZodNumber;
         disputeVotes: zod.ZodNumber;
@@ -4824,8 +6800,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         createdAt: string;
         imageUrl: string;
         tags: {
-            tag: string;
             source: string;
+            tag: string;
         }[];
         approvedForTraining: boolean;
         verificationLevel: number;
@@ -4833,8 +6809,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
             confidence: number;
             tags: string[];
             category?: string | null | undefined;
-            subcategory?: string | null | undefined;
             possiblePest?: string | null | undefined;
+            subcategory?: string | null | undefined;
             possibleConduciveCondition?: string | null | undefined;
             possibleEntryPoint?: string | null | undefined;
             suggestedCorrectiveAction?: string | null | undefined;
@@ -4847,9 +6823,10 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         severity?: string | null | undefined;
         notes?: string | null | undefined;
         category?: string | null | undefined;
+        mediaType?: "photo" | "video" | undefined;
+        possiblePest?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         subcategory?: string | null | undefined;
-        possiblePest?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         aiConfidence?: number | null | undefined;
@@ -4870,8 +6847,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         createdAt: string;
         imageUrl: string;
         tags: {
-            tag: string;
             source: string;
+            tag: string;
         }[];
         approvedForTraining: boolean;
         verificationLevel: number;
@@ -4879,8 +6856,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
             confidence: number;
             tags: string[];
             category?: string | null | undefined;
-            subcategory?: string | null | undefined;
             possiblePest?: string | null | undefined;
+            subcategory?: string | null | undefined;
             possibleConduciveCondition?: string | null | undefined;
             possibleEntryPoint?: string | null | undefined;
             suggestedCorrectiveAction?: string | null | undefined;
@@ -4893,9 +6870,10 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         severity?: string | null | undefined;
         notes?: string | null | undefined;
         category?: string | null | undefined;
+        mediaType?: "photo" | "video" | undefined;
+        possiblePest?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         subcategory?: string | null | undefined;
-        possiblePest?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         aiConfidence?: number | null | undefined;
@@ -4922,8 +6900,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         createdAt: string;
         imageUrl: string;
         tags: {
-            tag: string;
             source: string;
+            tag: string;
         }[];
         approvedForTraining: boolean;
         verificationLevel: number;
@@ -4931,8 +6909,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
             confidence: number;
             tags: string[];
             category?: string | null | undefined;
-            subcategory?: string | null | undefined;
             possiblePest?: string | null | undefined;
+            subcategory?: string | null | undefined;
             possibleConduciveCondition?: string | null | undefined;
             possibleEntryPoint?: string | null | undefined;
             suggestedCorrectiveAction?: string | null | undefined;
@@ -4945,9 +6923,10 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         severity?: string | null | undefined;
         notes?: string | null | undefined;
         category?: string | null | undefined;
+        mediaType?: "photo" | "video" | undefined;
+        possiblePest?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         subcategory?: string | null | undefined;
-        possiblePest?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         aiConfidence?: number | null | undefined;
@@ -4973,8 +6952,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         createdAt: string;
         imageUrl: string;
         tags: {
-            tag: string;
             source: string;
+            tag: string;
         }[];
         approvedForTraining: boolean;
         verificationLevel: number;
@@ -4982,8 +6961,8 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
             confidence: number;
             tags: string[];
             category?: string | null | undefined;
-            subcategory?: string | null | undefined;
             possiblePest?: string | null | undefined;
+            subcategory?: string | null | undefined;
             possibleConduciveCondition?: string | null | undefined;
             possibleEntryPoint?: string | null | undefined;
             suggestedCorrectiveAction?: string | null | undefined;
@@ -4996,9 +6975,10 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         severity?: string | null | undefined;
         notes?: string | null | undefined;
         category?: string | null | undefined;
+        mediaType?: "photo" | "video" | undefined;
+        possiblePest?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         subcategory?: string | null | undefined;
-        possiblePest?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         aiConfidence?: number | null | undefined;
@@ -5044,6 +7024,7 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     imageUrl: zod.ZodString;
     thumbnailUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    mediaType: zod.ZodOptional<zod.ZodEnum<["photo", "video"]>>;
     aiPrediction: zod.ZodObject<{
         category: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         subcategory: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -5058,8 +7039,8 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5068,8 +7049,8 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5099,11 +7080,11 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
         tag: zod.ZodString;
         source: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        tag: string;
         source: string;
+        tag: string;
     }, {
-        tag: string;
         source: string;
+        tag: string;
     }>, "many">;
     confirmVotes: zod.ZodNumber;
     disputeVotes: zod.ZodNumber;
@@ -5118,8 +7099,8 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5127,8 +7108,8 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5141,9 +7122,10 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -5164,8 +7146,8 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5173,8 +7155,8 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5187,9 +7169,10 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -5232,37 +7215,38 @@ export declare const ConfirmIntelligenceRecordBody: zod.ZodObject<{
     tags: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
 }, "strip", zod.ZodTypeAny, {
     category: string;
-    severity?: "low" | "moderate" | "high" | "critical" | undefined;
+    severity?: "low" | "high" | "moderate" | "critical" | undefined;
     notes?: string | undefined;
+    possiblePest?: string | undefined;
     tags?: string[] | undefined;
     subcategory?: string | undefined;
-    possiblePest?: string | undefined;
     possibleConduciveCondition?: string | undefined;
     possibleEntryPoint?: string | undefined;
     correctiveAction?: string | undefined;
     whatIsShown?: string | undefined;
     whyItMatters?: string | undefined;
-    treatmentOutcome?: "resolved" | "improved" | "unchanged" | "worsened" | "pending" | "not_applicable" | undefined;
+    treatmentOutcome?: "pending" | "resolved" | "improved" | "unchanged" | "worsened" | "not_applicable" | undefined;
     daysUntilFollowup?: number | undefined;
 }, {
     category: string;
-    severity?: "low" | "moderate" | "high" | "critical" | undefined;
+    severity?: "low" | "high" | "moderate" | "critical" | undefined;
     notes?: string | undefined;
+    possiblePest?: string | undefined;
     tags?: string[] | undefined;
     subcategory?: string | undefined;
-    possiblePest?: string | undefined;
     possibleConduciveCondition?: string | undefined;
     possibleEntryPoint?: string | undefined;
     correctiveAction?: string | undefined;
     whatIsShown?: string | undefined;
     whyItMatters?: string | undefined;
-    treatmentOutcome?: "resolved" | "improved" | "unchanged" | "worsened" | "pending" | "not_applicable" | undefined;
+    treatmentOutcome?: "pending" | "resolved" | "improved" | "unchanged" | "worsened" | "not_applicable" | undefined;
     daysUntilFollowup?: number | undefined;
 }>;
 export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     imageUrl: zod.ZodString;
     thumbnailUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    mediaType: zod.ZodOptional<zod.ZodEnum<["photo", "video"]>>;
     aiPrediction: zod.ZodObject<{
         category: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         subcategory: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -5277,8 +7261,8 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5287,8 +7271,8 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5318,11 +7302,11 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
         tag: zod.ZodString;
         source: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        tag: string;
         source: string;
+        tag: string;
     }, {
-        tag: string;
         source: string;
+        tag: string;
     }>, "many">;
     confirmVotes: zod.ZodNumber;
     disputeVotes: zod.ZodNumber;
@@ -5337,8 +7321,8 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5346,8 +7330,8 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5360,9 +7344,10 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -5383,8 +7368,8 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5392,8 +7377,8 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5406,9 +7391,10 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -5438,6 +7424,7 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     imageUrl: zod.ZodString;
     thumbnailUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    mediaType: zod.ZodOptional<zod.ZodEnum<["photo", "video"]>>;
     aiPrediction: zod.ZodObject<{
         category: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         subcategory: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -5452,8 +7439,8 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5462,8 +7449,8 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5493,11 +7480,11 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
         tag: zod.ZodString;
         source: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        tag: string;
         source: string;
+        tag: string;
     }, {
-        tag: string;
         source: string;
+        tag: string;
     }>, "many">;
     confirmVotes: zod.ZodNumber;
     disputeVotes: zod.ZodNumber;
@@ -5512,8 +7499,8 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5521,8 +7508,8 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5535,9 +7522,10 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -5558,8 +7546,8 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5567,8 +7555,8 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5581,9 +7569,10 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -5620,6 +7609,7 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     imageUrl: zod.ZodString;
     thumbnailUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    mediaType: zod.ZodOptional<zod.ZodEnum<["photo", "video"]>>;
     aiPrediction: zod.ZodObject<{
         category: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         subcategory: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -5634,8 +7624,8 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5644,8 +7634,8 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5675,11 +7665,11 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
         tag: zod.ZodString;
         source: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        tag: string;
         source: string;
+        tag: string;
     }, {
-        tag: string;
         source: string;
+        tag: string;
     }>, "many">;
     confirmVotes: zod.ZodNumber;
     disputeVotes: zod.ZodNumber;
@@ -5694,8 +7684,8 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5703,8 +7693,8 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5717,9 +7707,10 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -5740,8 +7731,8 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5749,8 +7740,8 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5763,9 +7754,10 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -5810,33 +7802,33 @@ export declare const ReviewIntelligenceRecordBody: zod.ZodObject<{
     force: zod.ZodOptional<zod.ZodBoolean>;
 }, "strip", zod.ZodTypeAny, {
     action: "approve" | "reject" | "edit" | "expert_verify";
-    severity?: "low" | "moderate" | "high" | "critical" | undefined;
+    severity?: "low" | "high" | "moderate" | "critical" | undefined;
     notes?: string | undefined;
     category?: string | undefined;
-    subcategory?: string | undefined;
     possiblePest?: string | undefined;
+    subcategory?: string | undefined;
     possibleConduciveCondition?: string | undefined;
     possibleEntryPoint?: string | undefined;
     correctiveAction?: string | undefined;
     whatIsShown?: string | undefined;
     whyItMatters?: string | undefined;
-    treatmentOutcome?: "resolved" | "improved" | "unchanged" | "worsened" | "pending" | "not_applicable" | undefined;
+    treatmentOutcome?: "pending" | "resolved" | "improved" | "unchanged" | "worsened" | "not_applicable" | undefined;
     daysUntilFollowup?: number | undefined;
     comment?: string | undefined;
     force?: boolean | undefined;
 }, {
     action: "approve" | "reject" | "edit" | "expert_verify";
-    severity?: "low" | "moderate" | "high" | "critical" | undefined;
+    severity?: "low" | "high" | "moderate" | "critical" | undefined;
     notes?: string | undefined;
     category?: string | undefined;
-    subcategory?: string | undefined;
     possiblePest?: string | undefined;
+    subcategory?: string | undefined;
     possibleConduciveCondition?: string | undefined;
     possibleEntryPoint?: string | undefined;
     correctiveAction?: string | undefined;
     whatIsShown?: string | undefined;
     whyItMatters?: string | undefined;
-    treatmentOutcome?: "resolved" | "improved" | "unchanged" | "worsened" | "pending" | "not_applicable" | undefined;
+    treatmentOutcome?: "pending" | "resolved" | "improved" | "unchanged" | "worsened" | "not_applicable" | undefined;
     daysUntilFollowup?: number | undefined;
     comment?: string | undefined;
     force?: boolean | undefined;
@@ -5845,6 +7837,7 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     imageUrl: zod.ZodString;
     thumbnailUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    mediaType: zod.ZodOptional<zod.ZodEnum<["photo", "video"]>>;
     aiPrediction: zod.ZodObject<{
         category: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         subcategory: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -5859,8 +7852,8 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5869,8 +7862,8 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5900,11 +7893,11 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
         tag: zod.ZodString;
         source: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        tag: string;
         source: string;
+        tag: string;
     }, {
-        tag: string;
         source: string;
+        tag: string;
     }>, "many">;
     confirmVotes: zod.ZodNumber;
     disputeVotes: zod.ZodNumber;
@@ -5919,8 +7912,8 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5928,8 +7921,8 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5942,9 +7935,10 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -5965,8 +7959,8 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     createdAt: string;
     imageUrl: string;
     tags: {
-        tag: string;
         source: string;
+        tag: string;
     }[];
     approvedForTraining: boolean;
     verificationLevel: number;
@@ -5974,8 +7968,8 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
         confidence: number;
         tags: string[];
         category?: string | null | undefined;
-        subcategory?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
         possibleEntryPoint?: string | null | undefined;
         suggestedCorrectiveAction?: string | null | undefined;
@@ -5988,9 +7982,10 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     notes?: string | null | undefined;
     category?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    possiblePest?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
-    possiblePest?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
     possibleEntryPoint?: string | null | undefined;
     aiConfidence?: number | null | undefined;
@@ -6009,6 +8004,7 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
 /**
  * @summary List generated reports
  */
+export declare const listReportsResponseEvidenceRecoverySyncedPhotoCountMin = 0;
 export declare const ListReportsResponseItem: zod.ZodObject<{
     id: zod.ZodNumber;
     inspectionId: zod.ZodNumber;
@@ -6021,55 +8017,121 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
         category: zod.ZodString;
         description: zod.ZodString;
         confidence: zod.ZodNumber;
-        severity: zod.ZodOptional<zod.ZodString>;
-        location: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        imageUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        treatment: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        exclusionOpportunity: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+        imageUrl: zod.ZodNullable<zod.ZodString>;
+        treatment: zod.ZodNullable<zod.ZodString>;
+        exclusionOpportunity: zod.ZodNullable<zod.ZodBoolean>;
+        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"excellent">, zod.ZodLiteral<"good">, zod.ZodLiteral<"fair">, zod.ZodLiteral<null>]>>>;
+        possiblePest: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         species: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         lifeStage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         conduciveCondition: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         harborage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         moisture: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         structuralIssue: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        measurementEstimate: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
+            linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            gapWidthIn: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            heightFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            confidence: zod.ZodNumber;
+            source: zod.ZodEnum<["ai_vision_estimate"]>;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }>, zod.ZodNull]>>;
         zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        candidates: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            species: zod.ZodString;
+            confidence: zod.ZodNumber;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            species: string;
+        }, {
+            confidence: number;
+            species: string;
+        }>, "many">>;
+        confidenceLabel: zod.ZodOptional<zod.ZodEnum<["identified", "possible", "unidentified"]>>;
+        reviewStatus: zod.ZodOptional<zod.ZodEnum<["pending", "accepted", "corrected", "dismissed"]>>;
+        technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }>, "many">>;
     recommendations: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     treatmentNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -6130,6 +8192,19 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     }>]>>;
+    evidenceRecovery: zod.ZodOptional<zod.ZodObject<{
+        syncedPhotoCount: zod.ZodNumber;
+        needsRegeneration: zod.ZodBoolean;
+        latestEvidenceAt: zod.ZodNullable<zod.ZodDate>;
+    }, "strip", zod.ZodTypeAny, {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    }, {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    }>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     status: string;
@@ -6143,22 +8218,38 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
     severity?: string | null | undefined;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     treatmentNotes?: string | null | undefined;
@@ -6183,6 +8274,11 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     } | null | undefined;
+    evidenceRecovery?: {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    } | undefined;
 }, {
     status: string;
     id: number;
@@ -6195,22 +8291,38 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
     severity?: string | null | undefined;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     treatmentNotes?: string | null | undefined;
@@ -6235,6 +8347,11 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     } | null | undefined;
+    evidenceRecovery?: {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    } | undefined;
 }>;
 export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
     id: zod.ZodNumber;
@@ -6248,55 +8365,121 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
         category: zod.ZodString;
         description: zod.ZodString;
         confidence: zod.ZodNumber;
-        severity: zod.ZodOptional<zod.ZodString>;
-        location: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        imageUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        treatment: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        exclusionOpportunity: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+        imageUrl: zod.ZodNullable<zod.ZodString>;
+        treatment: zod.ZodNullable<zod.ZodString>;
+        exclusionOpportunity: zod.ZodNullable<zod.ZodBoolean>;
+        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"excellent">, zod.ZodLiteral<"good">, zod.ZodLiteral<"fair">, zod.ZodLiteral<null>]>>>;
+        possiblePest: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         species: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         lifeStage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         conduciveCondition: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         harborage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         moisture: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         structuralIssue: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        measurementEstimate: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
+            linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            gapWidthIn: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            heightFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            confidence: zod.ZodNumber;
+            source: zod.ZodEnum<["ai_vision_estimate"]>;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }>, zod.ZodNull]>>;
         zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        candidates: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            species: zod.ZodString;
+            confidence: zod.ZodNumber;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            species: string;
+        }, {
+            confidence: number;
+            species: string;
+        }>, "many">>;
+        confidenceLabel: zod.ZodOptional<zod.ZodEnum<["identified", "possible", "unidentified"]>>;
+        reviewStatus: zod.ZodOptional<zod.ZodEnum<["pending", "accepted", "corrected", "dismissed"]>>;
+        technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }>, "many">>;
     recommendations: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     treatmentNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -6357,6 +8540,19 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     }>]>>;
+    evidenceRecovery: zod.ZodOptional<zod.ZodObject<{
+        syncedPhotoCount: zod.ZodNumber;
+        needsRegeneration: zod.ZodBoolean;
+        latestEvidenceAt: zod.ZodNullable<zod.ZodDate>;
+    }, "strip", zod.ZodTypeAny, {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    }, {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    }>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     status: string;
@@ -6370,22 +8566,38 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
     severity?: string | null | undefined;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     treatmentNotes?: string | null | undefined;
@@ -6410,6 +8622,11 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     } | null | undefined;
+    evidenceRecovery?: {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    } | undefined;
 }, {
     status: string;
     id: number;
@@ -6422,22 +8639,38 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
     severity?: string | null | undefined;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     treatmentNotes?: string | null | undefined;
@@ -6462,6 +8695,11 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     } | null | undefined;
+    evidenceRecovery?: {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    } | undefined;
 }>, "many">;
 /**
  * @summary Generate a new report
@@ -6495,6 +8733,7 @@ export declare const GetReportParams: zod.ZodObject<{
 }, {
     id: number;
 }>;
+export declare const getReportResponseEvidenceRecoverySyncedPhotoCountMin = 0;
 export declare const GetReportResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     inspectionId: zod.ZodNumber;
@@ -6507,55 +8746,121 @@ export declare const GetReportResponse: zod.ZodObject<{
         category: zod.ZodString;
         description: zod.ZodString;
         confidence: zod.ZodNumber;
-        severity: zod.ZodOptional<zod.ZodString>;
-        location: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        imageUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        treatment: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        exclusionOpportunity: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+        imageUrl: zod.ZodNullable<zod.ZodString>;
+        treatment: zod.ZodNullable<zod.ZodString>;
+        exclusionOpportunity: zod.ZodNullable<zod.ZodBoolean>;
+        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"excellent">, zod.ZodLiteral<"good">, zod.ZodLiteral<"fair">, zod.ZodLiteral<null>]>>>;
+        possiblePest: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         species: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         lifeStage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         conduciveCondition: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         harborage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         moisture: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         structuralIssue: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        measurementEstimate: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
+            linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            gapWidthIn: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            heightFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            confidence: zod.ZodNumber;
+            source: zod.ZodEnum<["ai_vision_estimate"]>;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }>, zod.ZodNull]>>;
         zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        candidates: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            species: zod.ZodString;
+            confidence: zod.ZodNumber;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            species: string;
+        }, {
+            confidence: number;
+            species: string;
+        }>, "many">>;
+        confidenceLabel: zod.ZodOptional<zod.ZodEnum<["identified", "possible", "unidentified"]>>;
+        reviewStatus: zod.ZodOptional<zod.ZodEnum<["pending", "accepted", "corrected", "dismissed"]>>;
+        technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }>, "many">>;
     recommendations: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     treatmentNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -6616,6 +8921,19 @@ export declare const GetReportResponse: zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     }>]>>;
+    evidenceRecovery: zod.ZodOptional<zod.ZodObject<{
+        syncedPhotoCount: zod.ZodNumber;
+        needsRegeneration: zod.ZodBoolean;
+        latestEvidenceAt: zod.ZodNullable<zod.ZodDate>;
+    }, "strip", zod.ZodTypeAny, {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    }, {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    }>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     status: string;
@@ -6629,22 +8947,38 @@ export declare const GetReportResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     treatmentNotes?: string | null | undefined;
@@ -6669,6 +9003,11 @@ export declare const GetReportResponse: zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     } | null | undefined;
+    evidenceRecovery?: {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    } | undefined;
 }, {
     status: string;
     id: number;
@@ -6681,22 +9020,38 @@ export declare const GetReportResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     treatmentNotes?: string | null | undefined;
@@ -6721,6 +9076,11 @@ export declare const GetReportResponse: zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     } | null | undefined;
+    evidenceRecovery?: {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    } | undefined;
 }>;
 /**
  * @summary Delete report
@@ -6749,6 +9109,7 @@ export declare const GenerateReportNarrativeBody: zod.ZodObject<{
 }, {
     refreshFindings?: boolean | undefined;
 }>;
+export declare const generateReportNarrativeResponseEvidenceRecoverySyncedPhotoCountMin = 0;
 export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
     id: zod.ZodNumber;
     inspectionId: zod.ZodNumber;
@@ -6761,55 +9122,121 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
         category: zod.ZodString;
         description: zod.ZodString;
         confidence: zod.ZodNumber;
-        severity: zod.ZodOptional<zod.ZodString>;
-        location: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        imageUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        treatment: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-        exclusionOpportunity: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+        imageUrl: zod.ZodNullable<zod.ZodString>;
+        treatment: zod.ZodNullable<zod.ZodString>;
+        exclusionOpportunity: zod.ZodNullable<zod.ZodBoolean>;
+        evidenceQuality: zod.ZodOptional<zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"excellent">, zod.ZodLiteral<"good">, zod.ZodLiteral<"fair">, zod.ZodLiteral<null>]>>>;
+        possiblePest: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         species: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         lifeStage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         conduciveCondition: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         harborage: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         moisture: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         structuralIssue: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        measurementEstimate: zod.ZodOptional<zod.ZodUnion<[zod.ZodObject<{
+            linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            gapWidthIn: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            heightFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            confidence: zod.ZodNumber;
+            source: zod.ZodEnum<["ai_vision_estimate"]>;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }, {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        }>, zod.ZodNull]>>;
         zone: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        candidates: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            species: zod.ZodString;
+            confidence: zod.ZodNumber;
+        }, "strip", zod.ZodTypeAny, {
+            confidence: number;
+            species: string;
+        }, {
+            confidence: number;
+            species: string;
+        }>, "many">>;
+        confidenceLabel: zod.ZodOptional<zod.ZodEnum<["identified", "possible", "unidentified"]>>;
+        reviewStatus: zod.ZodOptional<zod.ZodEnum<["pending", "accepted", "corrected", "dismissed"]>>;
+        technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }, {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }>, "many">>;
     recommendations: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     treatmentNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -6870,6 +9297,19 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     }>]>>;
+    evidenceRecovery: zod.ZodOptional<zod.ZodObject<{
+        syncedPhotoCount: zod.ZodNumber;
+        needsRegeneration: zod.ZodBoolean;
+        latestEvidenceAt: zod.ZodNullable<zod.ZodDate>;
+    }, "strip", zod.ZodTypeAny, {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    }, {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    }>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     status: string;
@@ -6883,22 +9323,38 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     treatmentNotes?: string | null | undefined;
@@ -6923,6 +9379,11 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     } | null | undefined;
+    evidenceRecovery?: {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    } | undefined;
 }, {
     status: string;
     id: number;
@@ -6935,22 +9396,38 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
     severity?: string | null | undefined;
     findings?: {
         id: number;
+        severity: string;
         category: string;
         description: string;
         confidence: number;
-        severity?: string | undefined;
-        location?: string | null | undefined;
-        imageUrl?: string | null | undefined;
-        treatment?: string | null | undefined;
-        exclusionOpportunity?: boolean | null | undefined;
-        evidenceQuality?: string | null | undefined;
+        location: string | null;
+        imageUrl: string | null;
+        treatment: string | null;
+        exclusionOpportunity: boolean | null;
+        zone?: string | null | undefined;
+        evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
+        possiblePest?: string | null | undefined;
         species?: string | null | undefined;
         lifeStage?: string | null | undefined;
         conduciveCondition?: string | null | undefined;
         harborage?: string | null | undefined;
         moisture?: string | null | undefined;
         structuralIssue?: string | null | undefined;
-        zone?: string | null | undefined;
+        measurementEstimate?: {
+            confidence: number;
+            source: "ai_vision_estimate";
+            linearFt?: number | null | undefined;
+            gapWidthIn?: number | null | undefined;
+            heightFt?: number | null | undefined;
+        } | null | undefined;
+        candidates?: {
+            confidence: number;
+            species: string;
+        }[] | undefined;
+        confidenceLabel?: "identified" | "possible" | "unidentified" | undefined;
+        reviewStatus?: "pending" | "accepted" | "corrected" | "dismissed" | undefined;
+        technicianSpecies?: string | null | undefined;
+        technicianCorrectionNotes?: string | null | undefined;
     }[] | undefined;
     recommendations?: string[] | undefined;
     treatmentNotes?: string | null | undefined;
@@ -6975,6 +9452,11 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
         conduciveConditions?: string | undefined;
         customerRecommendations?: string[] | undefined;
     } | null | undefined;
+    evidenceRecovery?: {
+        syncedPhotoCount: number;
+        needsRegeneration: boolean;
+        latestEvidenceAt: Date | null;
+    } | undefined;
 }>;
 /**
  * @summary Get full analytics dashboard data
@@ -8695,9 +11177,9 @@ export declare const ListPropertiesResponseItem: zod.ZodObject<{
     hasProfile: zod.ZodBoolean;
 }, "strip", zod.ZodTypeAny, {
     siteAddress: string;
+    addressKey: string;
     propertyType: string;
     inspectionCount: number;
-    addressKey: string;
     hotspotCount: number;
     noteCount: number;
     openIssueCount: number;
@@ -8706,9 +11188,9 @@ export declare const ListPropertiesResponseItem: zod.ZodObject<{
     lastVisit?: string | null | undefined;
 }, {
     siteAddress: string;
+    addressKey: string;
     propertyType: string;
     inspectionCount: number;
-    addressKey: string;
     hotspotCount: number;
     noteCount: number;
     openIssueCount: number;
@@ -8729,9 +11211,9 @@ export declare const ListPropertiesResponse: zod.ZodArray<zod.ZodObject<{
     hasProfile: zod.ZodBoolean;
 }, "strip", zod.ZodTypeAny, {
     siteAddress: string;
+    addressKey: string;
     propertyType: string;
     inspectionCount: number;
-    addressKey: string;
     hotspotCount: number;
     noteCount: number;
     openIssueCount: number;
@@ -8740,9 +11222,9 @@ export declare const ListPropertiesResponse: zod.ZodArray<zod.ZodObject<{
     lastVisit?: string | null | undefined;
 }, {
     siteAddress: string;
+    addressKey: string;
     propertyType: string;
     inspectionCount: number;
-    addressKey: string;
     hotspotCount: number;
     noteCount: number;
     openIssueCount: number;
@@ -8775,11 +11257,11 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             description: zod.ZodString;
             severity: zod.ZodEnum<["low", "medium", "high"]>;
         }, "strip", zod.ZodTypeAny, {
-            severity: "low" | "high" | "medium";
+            severity: "low" | "medium" | "high";
             description: string;
             zone: string;
         }, {
-            severity: "low" | "high" | "medium";
+            severity: "low" | "medium" | "high";
             description: string;
             zone: string;
         }>, "many">;
@@ -8808,13 +11290,13 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             inspectionId: zod.ZodNumber;
             createdAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         }, "strip", zod.ZodTypeAny, {
-            inspectionId: number;
             url: string;
+            inspectionId: number;
             createdAt?: string | null | undefined;
             caption?: string | null | undefined;
         }, {
-            inspectionId: number;
             url: string;
+            inspectionId: number;
             createdAt?: string | null | undefined;
             caption?: string | null | undefined;
         }>, "many">;
@@ -8870,6 +11352,13 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         }>, "many">;
     }, "strip", zod.ZodTypeAny, {
         siteAddress: string;
+        addressKey: string;
+        historicalPhotos: {
+            url: string;
+            inspectionId: number;
+            createdAt?: string | null | undefined;
+            caption?: string | null | undefined;
+        }[];
         notes: {
             id: number;
             createdAt: string;
@@ -8880,10 +11369,9 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             authorName?: string | null | undefined;
         }[];
         propertyType: string;
-        addressKey: string;
         hasProfile: boolean;
         hotspots: {
-            severity: "low" | "high" | "medium";
+            severity: "low" | "medium" | "high";
             description: string;
             zone: string;
         }[];
@@ -8893,12 +11381,6 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
-        }[];
-        historicalPhotos: {
-            inspectionId: number;
-            url: string;
-            createdAt?: string | null | undefined;
-            caption?: string | null | undefined;
         }[];
         visitHistory: {
             status: string;
@@ -8914,6 +11396,13 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         technicianKnowledge?: string | null | undefined;
     }, {
         siteAddress: string;
+        addressKey: string;
+        historicalPhotos: {
+            url: string;
+            inspectionId: number;
+            createdAt?: string | null | undefined;
+            caption?: string | null | undefined;
+        }[];
         notes: {
             id: number;
             createdAt: string;
@@ -8924,10 +11413,9 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             authorName?: string | null | undefined;
         }[];
         propertyType: string;
-        addressKey: string;
         hasProfile: boolean;
         hotspots: {
-            severity: "low" | "high" | "medium";
+            severity: "low" | "medium" | "high";
             description: string;
             zone: string;
         }[];
@@ -8937,12 +11425,6 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
-        }[];
-        historicalPhotos: {
-            inspectionId: number;
-            url: string;
-            createdAt?: string | null | undefined;
-            caption?: string | null | undefined;
         }[];
         visitHistory: {
             status: string;
@@ -8970,9 +11452,9 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         hasProfile: zod.ZodBoolean;
     }, "strip", zod.ZodTypeAny, {
         siteAddress: string;
+        addressKey: string;
         propertyType: string;
         inspectionCount: number;
-        addressKey: string;
         hotspotCount: number;
         noteCount: number;
         openIssueCount: number;
@@ -8981,9 +11463,9 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         lastVisit?: string | null | undefined;
     }, {
         siteAddress: string;
+        addressKey: string;
         propertyType: string;
         inspectionCount: number;
-        addressKey: string;
         hotspotCount: number;
         noteCount: number;
         openIssueCount: number;
@@ -8995,9 +11477,9 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
     matchStatus: string;
     suggestions: {
         siteAddress: string;
+        addressKey: string;
         propertyType: string;
         inspectionCount: number;
-        addressKey: string;
         hotspotCount: number;
         noteCount: number;
         openIssueCount: number;
@@ -9007,6 +11489,13 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
     }[];
     feed?: {
         siteAddress: string;
+        addressKey: string;
+        historicalPhotos: {
+            url: string;
+            inspectionId: number;
+            createdAt?: string | null | undefined;
+            caption?: string | null | undefined;
+        }[];
         notes: {
             id: number;
             createdAt: string;
@@ -9017,10 +11506,9 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             authorName?: string | null | undefined;
         }[];
         propertyType: string;
-        addressKey: string;
         hasProfile: boolean;
         hotspots: {
-            severity: "low" | "high" | "medium";
+            severity: "low" | "medium" | "high";
             description: string;
             zone: string;
         }[];
@@ -9030,12 +11518,6 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
-        }[];
-        historicalPhotos: {
-            inspectionId: number;
-            url: string;
-            createdAt?: string | null | undefined;
-            caption?: string | null | undefined;
         }[];
         visitHistory: {
             status: string;
@@ -9054,9 +11536,9 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
     matchStatus: string;
     suggestions: {
         siteAddress: string;
+        addressKey: string;
         propertyType: string;
         inspectionCount: number;
-        addressKey: string;
         hotspotCount: number;
         noteCount: number;
         openIssueCount: number;
@@ -9066,6 +11548,13 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
     }[];
     feed?: {
         siteAddress: string;
+        addressKey: string;
+        historicalPhotos: {
+            url: string;
+            inspectionId: number;
+            createdAt?: string | null | undefined;
+            caption?: string | null | undefined;
+        }[];
         notes: {
             id: number;
             createdAt: string;
@@ -9076,10 +11565,9 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             authorName?: string | null | undefined;
         }[];
         propertyType: string;
-        addressKey: string;
         hasProfile: boolean;
         hotspots: {
-            severity: "low" | "high" | "medium";
+            severity: "low" | "medium" | "high";
             description: string;
             zone: string;
         }[];
@@ -9089,12 +11577,6 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
-        }[];
-        historicalPhotos: {
-            inspectionId: number;
-            url: string;
-            createdAt?: string | null | undefined;
-            caption?: string | null | undefined;
         }[];
         visitHistory: {
             status: string;
@@ -9133,11 +11615,11 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         description: zod.ZodString;
         severity: zod.ZodEnum<["low", "medium", "high"]>;
     }, "strip", zod.ZodTypeAny, {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }, {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }>, "many">;
@@ -9166,13 +11648,13 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         inspectionId: zod.ZodNumber;
         createdAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
-        inspectionId: number;
         url: string;
+        inspectionId: number;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }, {
-        inspectionId: number;
         url: string;
+        inspectionId: number;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }>, "many">;
@@ -9228,6 +11710,13 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
     siteAddress: string;
+    addressKey: string;
+    historicalPhotos: {
+        url: string;
+        inspectionId: number;
+        createdAt?: string | null | undefined;
+        caption?: string | null | undefined;
+    }[];
     notes: {
         id: number;
         createdAt: string;
@@ -9238,10 +11727,9 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         authorName?: string | null | undefined;
     }[];
     propertyType: string;
-    addressKey: string;
     hasProfile: boolean;
     hotspots: {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }[];
@@ -9251,12 +11739,6 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
-    }[];
-    historicalPhotos: {
-        inspectionId: number;
-        url: string;
-        createdAt?: string | null | undefined;
-        caption?: string | null | undefined;
     }[];
     visitHistory: {
         status: string;
@@ -9272,6 +11754,13 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
     technicianKnowledge?: string | null | undefined;
 }, {
     siteAddress: string;
+    addressKey: string;
+    historicalPhotos: {
+        url: string;
+        inspectionId: number;
+        createdAt?: string | null | undefined;
+        caption?: string | null | undefined;
+    }[];
     notes: {
         id: number;
         createdAt: string;
@@ -9282,10 +11771,9 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         authorName?: string | null | undefined;
     }[];
     propertyType: string;
-    addressKey: string;
     hasProfile: boolean;
     hotspots: {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }[];
@@ -9295,12 +11783,6 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
-    }[];
-    historicalPhotos: {
-        inspectionId: number;
-        url: string;
-        createdAt?: string | null | undefined;
-        caption?: string | null | undefined;
     }[];
     visitHistory: {
         status: string;
@@ -9335,11 +11817,11 @@ export declare const UpdatePropertyProfileBody: zod.ZodObject<{
         description: zod.ZodString;
         severity: zod.ZodEnum<["low", "medium", "high"]>;
     }, "strip", zod.ZodTypeAny, {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }, {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }>, "many">>;
@@ -9349,7 +11831,7 @@ export declare const UpdatePropertyProfileBody: zod.ZodObject<{
     propertyType?: string | undefined;
     technicianKnowledge?: string | undefined;
     hotspots?: {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }[] | undefined;
@@ -9359,7 +11841,7 @@ export declare const UpdatePropertyProfileBody: zod.ZodObject<{
     propertyType?: string | undefined;
     technicianKnowledge?: string | undefined;
     hotspots?: {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }[] | undefined;
@@ -9377,11 +11859,11 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         description: zod.ZodString;
         severity: zod.ZodEnum<["low", "medium", "high"]>;
     }, "strip", zod.ZodTypeAny, {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }, {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }>, "many">;
@@ -9410,13 +11892,13 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         inspectionId: zod.ZodNumber;
         createdAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
-        inspectionId: number;
         url: string;
+        inspectionId: number;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }, {
-        inspectionId: number;
         url: string;
+        inspectionId: number;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }>, "many">;
@@ -9472,6 +11954,13 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
     siteAddress: string;
+    addressKey: string;
+    historicalPhotos: {
+        url: string;
+        inspectionId: number;
+        createdAt?: string | null | undefined;
+        caption?: string | null | undefined;
+    }[];
     notes: {
         id: number;
         createdAt: string;
@@ -9482,10 +11971,9 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         authorName?: string | null | undefined;
     }[];
     propertyType: string;
-    addressKey: string;
     hasProfile: boolean;
     hotspots: {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }[];
@@ -9495,12 +11983,6 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
-    }[];
-    historicalPhotos: {
-        inspectionId: number;
-        url: string;
-        createdAt?: string | null | undefined;
-        caption?: string | null | undefined;
     }[];
     visitHistory: {
         status: string;
@@ -9516,6 +11998,13 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
     technicianKnowledge?: string | null | undefined;
 }, {
     siteAddress: string;
+    addressKey: string;
+    historicalPhotos: {
+        url: string;
+        inspectionId: number;
+        createdAt?: string | null | undefined;
+        caption?: string | null | undefined;
+    }[];
     notes: {
         id: number;
         createdAt: string;
@@ -9526,10 +12015,9 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         authorName?: string | null | undefined;
     }[];
     propertyType: string;
-    addressKey: string;
     hasProfile: boolean;
     hotspots: {
-        severity: "low" | "high" | "medium";
+        severity: "low" | "medium" | "high";
         description: string;
         zone: string;
     }[];
@@ -9539,12 +12027,6 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
-    }[];
-    historicalPhotos: {
-        inspectionId: number;
-        url: string;
-        createdAt?: string | null | undefined;
-        caption?: string | null | undefined;
     }[];
     visitHistory: {
         status: string;
@@ -9642,7 +12124,7 @@ export declare const SubmitFeedbackBody: zod.ZodObject<{
     type: "bug" | "feature" | "ai_accuracy";
     description: string;
     title: string;
-    severity?: "low" | "high" | "medium" | undefined;
+    severity?: "low" | "medium" | "high" | undefined;
     inspectionId?: number | undefined;
     reportId?: number | undefined;
     analysisId?: number | undefined;
@@ -9650,7 +12132,7 @@ export declare const SubmitFeedbackBody: zod.ZodObject<{
     type: "bug" | "feature" | "ai_accuracy";
     description: string;
     title: string;
-    severity?: "low" | "high" | "medium" | undefined;
+    severity?: "low" | "medium" | "high" | undefined;
     inspectionId?: number | undefined;
     reportId?: number | undefined;
     analysisId?: number | undefined;
@@ -9763,10 +12245,10 @@ export declare const UpdateFeedbackBody: zod.ZodObject<{
     severity: zod.ZodOptional<zod.ZodEnum<["low", "medium", "high"]>>;
 }, "strip", zod.ZodTypeAny, {
     status?: "resolved" | "open" | "triaged" | undefined;
-    severity?: "low" | "high" | "medium" | undefined;
+    severity?: "low" | "medium" | "high" | undefined;
 }, {
     status?: "resolved" | "open" | "triaged" | undefined;
-    severity?: "low" | "high" | "medium" | undefined;
+    severity?: "low" | "medium" | "high" | undefined;
 }>;
 export declare const UpdateFeedbackResponse: zod.ZodObject<{
     id: zod.ZodNumber;
@@ -9952,6 +12434,7 @@ export declare const GetChecklistResponse: zod.ZodObject<{
     completed: zod.ZodNumber;
     total: zod.ZodNumber;
 }, "strip", zod.ZodTypeAny, {
+    completed: number;
     total: number;
     items: {
         category: string;
@@ -9961,8 +12444,8 @@ export declare const GetChecklistResponse: zod.ZodObject<{
         detail?: string | null | undefined;
         doneAt?: string | null | undefined;
     }[];
-    completed: number;
 }, {
+    completed: number;
     total: number;
     items: {
         category: string;
@@ -9972,7 +12455,6 @@ export declare const GetChecklistResponse: zod.ZodObject<{
         detail?: string | null | undefined;
         doneAt?: string | null | undefined;
     }[];
-    completed: number;
 }>;
 /**
  * @summary Toggle a checklist item (manager+)
@@ -10205,7 +12687,7 @@ export declare const ListSalesOpportunitiesResponseItem: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
-    status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+    status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
     createdAt: string;
     inspectionId: number;
@@ -10219,13 +12701,13 @@ export declare const ListSalesOpportunitiesResponseItem: zod.ZodObject<{
     fingerprint: string;
     evidenceFindingIds: number[];
     evidenceImagePaths: string[];
-    estimatedValueTier: "low" | "high" | "medium";
+    estimatedValueTier: "low" | "medium" | "high";
     assignedToUserId: number | null;
     priority?: number | undefined;
-    riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+    riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }, {
-    status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+    status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
     createdAt: string;
     inspectionId: number;
@@ -10239,10 +12721,10 @@ export declare const ListSalesOpportunitiesResponseItem: zod.ZodObject<{
     fingerprint: string;
     evidenceFindingIds: number[];
     evidenceImagePaths: string[];
-    estimatedValueTier: "low" | "high" | "medium";
+    estimatedValueTier: "low" | "medium" | "high";
     assignedToUserId: number | null;
     priority?: number | undefined;
-    riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+    riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }>;
 export declare const ListSalesOpportunitiesResponse: zod.ZodArray<zod.ZodObject<{
@@ -10266,7 +12748,7 @@ export declare const ListSalesOpportunitiesResponse: zod.ZodArray<zod.ZodObject<
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
-    status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+    status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
     createdAt: string;
     inspectionId: number;
@@ -10280,13 +12762,13 @@ export declare const ListSalesOpportunitiesResponse: zod.ZodArray<zod.ZodObject<
     fingerprint: string;
     evidenceFindingIds: number[];
     evidenceImagePaths: string[];
-    estimatedValueTier: "low" | "high" | "medium";
+    estimatedValueTier: "low" | "medium" | "high";
     assignedToUserId: number | null;
     priority?: number | undefined;
-    riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+    riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }, {
-    status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+    status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
     createdAt: string;
     inspectionId: number;
@@ -10300,10 +12782,10 @@ export declare const ListSalesOpportunitiesResponse: zod.ZodArray<zod.ZodObject<
     fingerprint: string;
     evidenceFindingIds: number[];
     evidenceImagePaths: string[];
-    estimatedValueTier: "low" | "high" | "medium";
+    estimatedValueTier: "low" | "medium" | "high";
     assignedToUserId: number | null;
     priority?: number | undefined;
-    riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+    riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }>, "many">;
 /**
@@ -10437,7 +12919,7 @@ export declare const GetSalesOpportunityResponse: zod.ZodIntersection<zod.ZodObj
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
-    status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+    status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
     createdAt: string;
     inspectionId: number;
@@ -10451,13 +12933,13 @@ export declare const GetSalesOpportunityResponse: zod.ZodIntersection<zod.ZodObj
     fingerprint: string;
     evidenceFindingIds: number[];
     evidenceImagePaths: string[];
-    estimatedValueTier: "low" | "high" | "medium";
+    estimatedValueTier: "low" | "medium" | "high";
     assignedToUserId: number | null;
     priority?: number | undefined;
-    riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+    riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }, {
-    status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+    status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
     createdAt: string;
     inspectionId: number;
@@ -10471,10 +12953,10 @@ export declare const GetSalesOpportunityResponse: zod.ZodIntersection<zod.ZodObj
     fingerprint: string;
     evidenceFindingIds: number[];
     evidenceImagePaths: string[];
-    estimatedValueTier: "low" | "high" | "medium";
+    estimatedValueTier: "low" | "medium" | "high";
     assignedToUserId: number | null;
     priority?: number | undefined;
-    riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+    riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }>, zod.ZodObject<{
     events: zod.ZodArray<zod.ZodObject<{
@@ -10533,11 +13015,11 @@ export declare const UpdateSalesOpportunityBody: zod.ZodObject<{
     assignedToUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
     estimatedAnnualValue: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
 }, "strip", zod.ZodTypeAny, {
-    status?: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost" | undefined;
+    status?: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost" | undefined;
     estimatedAnnualValue?: number | null | undefined;
     assignedToUserId?: number | null | undefined;
 }, {
-    status?: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost" | undefined;
+    status?: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost" | undefined;
     estimatedAnnualValue?: number | null | undefined;
     assignedToUserId?: number | null | undefined;
 }>;
@@ -10562,7 +13044,7 @@ export declare const UpdateSalesOpportunityResponse: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
-    status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+    status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
     createdAt: string;
     inspectionId: number;
@@ -10576,13 +13058,13 @@ export declare const UpdateSalesOpportunityResponse: zod.ZodObject<{
     fingerprint: string;
     evidenceFindingIds: number[];
     evidenceImagePaths: string[];
-    estimatedValueTier: "low" | "high" | "medium";
+    estimatedValueTier: "low" | "medium" | "high";
     assignedToUserId: number | null;
     priority?: number | undefined;
-    riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+    riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }, {
-    status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+    status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
     createdAt: string;
     inspectionId: number;
@@ -10596,10 +13078,10 @@ export declare const UpdateSalesOpportunityResponse: zod.ZodObject<{
     fingerprint: string;
     evidenceFindingIds: number[];
     evidenceImagePaths: string[];
-    estimatedValueTier: "low" | "high" | "medium";
+    estimatedValueTier: "low" | "medium" | "high";
     assignedToUserId: number | null;
     priority?: number | undefined;
-    riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+    riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }>;
 /**
@@ -10740,7 +13222,7 @@ export declare const ListScorecardsResponseItem: zod.ZodIntersection<zod.ZodObje
     findingsCount: number;
     inspectionId: number;
     qualityScore: number;
-    riskLevel: "low" | "high" | "critical" | "medium";
+    riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
     riskScore: number;
     companyId: number;
@@ -10764,7 +13246,7 @@ export declare const ListScorecardsResponseItem: zod.ZodIntersection<zod.ZodObje
     findingsCount: number;
     inspectionId: number;
     qualityScore: number;
-    riskLevel: "low" | "high" | "critical" | "medium";
+    riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
     riskScore: number;
     companyId: number;
@@ -10842,7 +13324,7 @@ export declare const ListScorecardsResponse: zod.ZodArray<zod.ZodIntersection<zo
     findingsCount: number;
     inspectionId: number;
     qualityScore: number;
-    riskLevel: "low" | "high" | "critical" | "medium";
+    riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
     riskScore: number;
     companyId: number;
@@ -10866,7 +13348,7 @@ export declare const ListScorecardsResponse: zod.ZodArray<zod.ZodIntersection<zo
     findingsCount: number;
     inspectionId: number;
     qualityScore: number;
-    riskLevel: "low" | "high" | "critical" | "medium";
+    riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
     riskScore: number;
     companyId: number;
@@ -11040,7 +13522,7 @@ export declare const GetInspectionScorecardResponse: zod.ZodObject<{
     findingsCount: number;
     inspectionId: number;
     qualityScore: number;
-    riskLevel: "low" | "high" | "critical" | "medium";
+    riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
     riskScore: number;
     companyId: number;
@@ -11064,7 +13546,7 @@ export declare const GetInspectionScorecardResponse: zod.ZodObject<{
     findingsCount: number;
     inspectionId: number;
     qualityScore: number;
-    riskLevel: "low" | "high" | "critical" | "medium";
+    riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
     riskScore: number;
     companyId: number;
@@ -11355,7 +13837,7 @@ export declare const ListProposalsResponseItem: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
-    status: "draft" | "sent" | "accepted" | "declined";
+    status: "accepted" | "draft" | "sent" | "declined";
     id: number;
     createdAt: string;
     notes: string | null;
@@ -11367,7 +13849,7 @@ export declare const ListProposalsResponseItem: zod.ZodObject<{
     opportunityIds: number[];
     intro: string | null;
 }, {
-    status: "draft" | "sent" | "accepted" | "declined";
+    status: "accepted" | "draft" | "sent" | "declined";
     id: number;
     createdAt: string;
     notes: string | null;
@@ -11392,7 +13874,7 @@ export declare const ListProposalsResponse: zod.ZodArray<zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
-    status: "draft" | "sent" | "accepted" | "declined";
+    status: "accepted" | "draft" | "sent" | "declined";
     id: number;
     createdAt: string;
     notes: string | null;
@@ -11404,7 +13886,7 @@ export declare const ListProposalsResponse: zod.ZodArray<zod.ZodObject<{
     opportunityIds: number[];
     intro: string | null;
 }, {
-    status: "draft" | "sent" | "accepted" | "declined";
+    status: "accepted" | "draft" | "sent" | "declined";
     id: number;
     createdAt: string;
     notes: string | null;
@@ -11461,7 +13943,7 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
-    status: "draft" | "sent" | "accepted" | "declined";
+    status: "accepted" | "draft" | "sent" | "declined";
     id: number;
     createdAt: string;
     notes: string | null;
@@ -11473,7 +13955,7 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
     opportunityIds: number[];
     intro: string | null;
 }, {
-    status: "draft" | "sent" | "accepted" | "declined";
+    status: "accepted" | "draft" | "sent" | "declined";
     id: number;
     createdAt: string;
     notes: string | null;
@@ -11506,7 +13988,7 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
         createdAt: zod.ZodString;
         updatedAt: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+        status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
         id: number;
         createdAt: string;
         inspectionId: number;
@@ -11520,13 +14002,13 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
         fingerprint: string;
         evidenceFindingIds: number[];
         evidenceImagePaths: string[];
-        estimatedValueTier: "low" | "high" | "medium";
+        estimatedValueTier: "low" | "medium" | "high";
         assignedToUserId: number | null;
         priority?: number | undefined;
-        riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+        riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
         estimatedAnnualValue?: number | null | undefined;
     }, {
-        status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+        status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
         id: number;
         createdAt: string;
         inspectionId: number;
@@ -11540,15 +14022,15 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
         fingerprint: string;
         evidenceFindingIds: number[];
         evidenceImagePaths: string[];
-        estimatedValueTier: "low" | "high" | "medium";
+        estimatedValueTier: "low" | "medium" | "high";
         assignedToUserId: number | null;
         priority?: number | undefined;
-        riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+        riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
         estimatedAnnualValue?: number | null | undefined;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
     opportunities: {
-        status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+        status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
         id: number;
         createdAt: string;
         inspectionId: number;
@@ -11562,15 +14044,15 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
         fingerprint: string;
         evidenceFindingIds: number[];
         evidenceImagePaths: string[];
-        estimatedValueTier: "low" | "high" | "medium";
+        estimatedValueTier: "low" | "medium" | "high";
         assignedToUserId: number | null;
         priority?: number | undefined;
-        riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+        riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
         estimatedAnnualValue?: number | null | undefined;
     }[];
 }, {
     opportunities: {
-        status: "new" | "reviewed" | "quoted" | "won" | "dismissed" | "lost";
+        status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
         id: number;
         createdAt: string;
         inspectionId: number;
@@ -11584,10 +14066,10 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
         fingerprint: string;
         evidenceFindingIds: number[];
         evidenceImagePaths: string[];
-        estimatedValueTier: "low" | "high" | "medium";
+        estimatedValueTier: "low" | "medium" | "high";
         assignedToUserId: number | null;
         priority?: number | undefined;
-        riskLevel?: "low" | "high" | "critical" | "medium" | null | undefined;
+        riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
         estimatedAnnualValue?: number | null | undefined;
     }[];
 }>>;
@@ -11608,13 +14090,13 @@ export declare const UpdateProposalBody: zod.ZodObject<{
     status: zod.ZodOptional<zod.ZodEnum<["draft", "sent", "accepted", "declined"]>>;
     opportunityIds: zod.ZodOptional<zod.ZodArray<zod.ZodNumber, "many">>;
 }, "strip", zod.ZodTypeAny, {
-    status?: "draft" | "sent" | "accepted" | "declined" | undefined;
+    status?: "accepted" | "draft" | "sent" | "declined" | undefined;
     notes?: string | null | undefined;
     title?: string | undefined;
     opportunityIds?: number[] | undefined;
     intro?: string | null | undefined;
 }, {
-    status?: "draft" | "sent" | "accepted" | "declined" | undefined;
+    status?: "accepted" | "draft" | "sent" | "declined" | undefined;
     notes?: string | null | undefined;
     title?: string | undefined;
     opportunityIds?: number[] | undefined;
@@ -11633,7 +14115,7 @@ export declare const UpdateProposalResponse: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
-    status: "draft" | "sent" | "accepted" | "declined";
+    status: "accepted" | "draft" | "sent" | "declined";
     id: number;
     createdAt: string;
     notes: string | null;
@@ -11645,7 +14127,7 @@ export declare const UpdateProposalResponse: zod.ZodObject<{
     opportunityIds: number[];
     intro: string | null;
 }, {
-    status: "draft" | "sent" | "accepted" | "declined";
+    status: "accepted" | "draft" | "sent" | "declined";
     id: number;
     createdAt: string;
     notes: string | null;
@@ -11720,10 +14202,6 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             lastVisitedAt?: string | null | undefined;
         }>, "many">;
     }, "strip", zod.ZodTypeAny, {
-        totalInspections: number;
-        completedInspections: number;
-        openInspections: number;
-        completedThisWeek: number;
         recentInspections: {
             status: string;
             id: number;
@@ -11731,6 +14209,10 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             createdAt: string;
             findingsCount: number;
         }[];
+        totalInspections: number;
+        completedInspections: number;
+        openInspections: number;
+        completedThisWeek: number;
         siteHistory: {
             siteAddress: string;
             pestTypes: string[];
@@ -11740,10 +14222,6 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             lastVisitedAt?: string | null | undefined;
         }[];
     }, {
-        totalInspections: number;
-        completedInspections: number;
-        openInspections: number;
-        completedThisWeek: number;
         recentInspections: {
             status: string;
             id: number;
@@ -11751,6 +14229,10 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             createdAt: string;
             findingsCount: number;
         }[];
+        totalInspections: number;
+        completedInspections: number;
+        openInspections: number;
+        completedThisWeek: number;
         siteHistory: {
             siteAddress: string;
             pestTypes: string[];
@@ -11769,18 +14251,18 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             lost: zod.ZodNumber;
             dismissed: zod.ZodNumber;
         }, "strip", zod.ZodTypeAny, {
+            dismissed: number;
             new: number;
             reviewed: number;
             quoted: number;
             won: number;
-            dismissed: number;
             lost: number;
         }, {
+            dismissed: number;
             new: number;
             reviewed: number;
             quoted: number;
             won: number;
-            dismissed: number;
             lost: number;
         }>;
         openCount: zod.ZodNumber;
@@ -11826,23 +14308,23 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             accepted: zod.ZodNumber;
             declined: zod.ZodNumber;
         }, "strip", zod.ZodTypeAny, {
+            accepted: number;
             draft: number;
             sent: number;
-            accepted: number;
             declined: number;
         }, {
+            accepted: number;
             draft: number;
             sent: number;
-            accepted: number;
             declined: number;
         }>;
     }, "strip", zod.ZodTypeAny, {
         pipeline: {
+            dismissed: number;
             new: number;
             reviewed: number;
             quoted: number;
             won: number;
-            dismissed: number;
             lost: number;
         };
         openCount: number;
@@ -11861,18 +14343,18 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             riskLevel?: string | null | undefined;
         }[];
         proposals: {
+            accepted: number;
             draft: number;
             sent: number;
-            accepted: number;
             declined: number;
         };
     }, {
         pipeline: {
+            dismissed: number;
             new: number;
             reviewed: number;
             quoted: number;
             won: number;
-            dismissed: number;
             lost: number;
         };
         openCount: number;
@@ -11891,9 +14373,9 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             riskLevel?: string | null | undefined;
         }[];
         proposals: {
+            accepted: number;
             draft: number;
             sent: number;
-            accepted: number;
             declined: number;
         };
     }>>;
@@ -12133,10 +14615,6 @@ export declare const GetBriefingResponse: zod.ZodObject<{
         }[];
     } | undefined;
     technician?: {
-        totalInspections: number;
-        completedInspections: number;
-        openInspections: number;
-        completedThisWeek: number;
         recentInspections: {
             status: string;
             id: number;
@@ -12144,6 +14622,10 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             createdAt: string;
             findingsCount: number;
         }[];
+        totalInspections: number;
+        completedInspections: number;
+        openInspections: number;
+        completedThisWeek: number;
         siteHistory: {
             siteAddress: string;
             pestTypes: string[];
@@ -12155,11 +14637,11 @@ export declare const GetBriefingResponse: zod.ZodObject<{
     } | undefined;
     sales?: {
         pipeline: {
+            dismissed: number;
             new: number;
             reviewed: number;
             quoted: number;
             won: number;
-            dismissed: number;
             lost: number;
         };
         openCount: number;
@@ -12178,9 +14660,9 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             riskLevel?: string | null | undefined;
         }[];
         proposals: {
+            accepted: number;
             draft: number;
             sent: number;
-            accepted: number;
             declined: number;
         };
     } | undefined;
@@ -12232,10 +14714,6 @@ export declare const GetBriefingResponse: zod.ZodObject<{
         }[];
     } | undefined;
     technician?: {
-        totalInspections: number;
-        completedInspections: number;
-        openInspections: number;
-        completedThisWeek: number;
         recentInspections: {
             status: string;
             id: number;
@@ -12243,6 +14721,10 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             createdAt: string;
             findingsCount: number;
         }[];
+        totalInspections: number;
+        completedInspections: number;
+        openInspections: number;
+        completedThisWeek: number;
         siteHistory: {
             siteAddress: string;
             pestTypes: string[];
@@ -12254,11 +14736,11 @@ export declare const GetBriefingResponse: zod.ZodObject<{
     } | undefined;
     sales?: {
         pipeline: {
+            dismissed: number;
             new: number;
             reviewed: number;
             quoted: number;
             won: number;
-            dismissed: number;
             lost: number;
         };
         openCount: number;
@@ -12277,9 +14759,9 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             riskLevel?: string | null | undefined;
         }[];
         proposals: {
+            accepted: number;
             draft: number;
             sent: number;
-            accepted: number;
             declined: number;
         };
     } | undefined;
@@ -12489,5 +14971,4066 @@ export declare const GenerateGeminiImageResponse: zod.ZodObject<{
 }, {
     b64_json: string;
     mimeType: string;
+}>;
+/**
+ * @summary Fetch the authenticated technician's own route chemical assignments for a date (defaults to today, server UTC clock), each enriched with the full product record (including label rules).
+ */
+export declare const GetDailyRigQueryParams: zod.ZodObject<{
+    date: zod.ZodOptional<zod.ZodDate>;
+}, "strip", zod.ZodTypeAny, {
+    date?: Date | undefined;
+}, {
+    date?: Date | undefined;
+}>;
+export declare const GetDailyRigResponse: zod.ZodObject<{
+    id: zod.ZodNumber;
+    technicianId: zod.ZodString;
+    rigDate: zod.ZodString;
+    assignments: zod.ZodArray<zod.ZodObject<{
+        productId: zod.ZodNumber;
+        targetPest: zod.ZodString;
+        notes: zod.ZodOptional<zod.ZodString>;
+        product: zod.ZodUnion<[zod.ZodObject<{
+            id: zod.ZodNumber;
+            name: zod.ZodString;
+            epaRegistrationNumber: zod.ZodNullable<zod.ZodString>;
+            productType: zod.ZodEnum<["restricted-use", "general-use"]>;
+            activeIngredients: zod.ZodString;
+            signalWord: zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"DANGER">, zod.ZodLiteral<"WARNING">, zod.ZodLiteral<"CAUTION">, zod.ZodLiteral<"NONE">, zod.ZodLiteral<null>]>>;
+            manufacturerName: zod.ZodNullable<zod.ZodString>;
+            isActive: zod.ZodBoolean;
+            createdAt: zod.ZodString;
+            labelRules: zod.ZodUnion<[zod.ZodObject<{
+                id: zod.ZodNumber;
+                productId: zod.ZodNumber;
+                approvedPestTypes: zod.ZodArray<zod.ZodString, "many">;
+                approvedSiteClassifications: zod.ZodArray<zod.ZodString, "many">;
+                requiredEquipmentTypes: zod.ZodArray<zod.ZodString, "many">;
+                nozzleSpec: zod.ZodNullable<zod.ZodString>;
+                pressurePsi: zod.ZodNullable<zod.ZodString>;
+                dropletSize: zod.ZodNullable<zod.ZodString>;
+                maxRateOzPer1000Sqft: zod.ZodNullable<zod.ZodNumber>;
+                maxRateOzPerGallon: zod.ZodNullable<zod.ZodNumber>;
+                mixingSteps: zod.ZodArray<zod.ZodString, "many">;
+                maxTempF: zod.ZodNullable<zod.ZodNumber>;
+                phytotoxicityNotes: zod.ZodNullable<zod.ZodString>;
+                reEntryIntervalHours: zod.ZodNullable<zod.ZodNumber>;
+                retreatmentIntervalDays: zod.ZodNullable<zod.ZodNumber>;
+                createdAt: zod.ZodString;
+            }, "strip", zod.ZodTypeAny, {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            }, {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            }>, zod.ZodNull]>;
+        }, "strip", zod.ZodTypeAny, {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        }, {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        }>, zod.ZodNull]>;
+    }, "strip", zod.ZodTypeAny, {
+        productId: number;
+        targetPest: string;
+        product: {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        } | null;
+        notes?: string | undefined;
+    }, {
+        productId: number;
+        targetPest: string;
+        product: {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        } | null;
+        notes?: string | undefined;
+    }>, "many">;
+    createdAt: zod.ZodString;
+    updatedAt: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    technicianId: string;
+    createdAt: string;
+    updatedAt: string;
+    rigDate: string;
+    assignments: {
+        productId: number;
+        targetPest: string;
+        product: {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        } | null;
+        notes?: string | undefined;
+    }[];
+}, {
+    id: number;
+    technicianId: string;
+    createdAt: string;
+    updatedAt: string;
+    rigDate: string;
+    assignments: {
+        productId: number;
+        targetPest: string;
+        product: {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        } | null;
+        notes?: string | undefined;
+    }[];
+}>;
+/**
+ * @summary Create or replace the authenticated technician's route chemical assignments for a date (defaults to today, server UTC clock). Upserts on (companyId, technicianId, rigDate), so retries are safe.
+ */
+export declare const UpsertDailyRigBody: zod.ZodObject<{
+    assignments: zod.ZodArray<zod.ZodObject<{
+        productId: zod.ZodNumber;
+        targetPest: zod.ZodString;
+        notes: zod.ZodOptional<zod.ZodString>;
+    }, "strip", zod.ZodTypeAny, {
+        productId: number;
+        targetPest: string;
+        notes?: string | undefined;
+    }, {
+        productId: number;
+        targetPest: string;
+        notes?: string | undefined;
+    }>, "many">;
+    date: zod.ZodOptional<zod.ZodDate>;
+}, "strip", zod.ZodTypeAny, {
+    assignments: {
+        productId: number;
+        targetPest: string;
+        notes?: string | undefined;
+    }[];
+    date?: Date | undefined;
+}, {
+    assignments: {
+        productId: number;
+        targetPest: string;
+        notes?: string | undefined;
+    }[];
+    date?: Date | undefined;
+}>;
+/**
+ * @summary Last-30-day treatment logs for the authenticated technician, deduped by (productId, siteClassification), newest first, capped at 5 — used for quick-pick suggestions in the treatment wizard.
+ */
+export declare const GetRecentMixesResponseItem: zod.ZodObject<{
+    logId: zod.ZodNumber;
+    productId: zod.ZodNumber;
+    productName: zod.ZodString;
+    productActiveIngredients: zod.ZodString;
+    targetPest: zod.ZodString;
+    siteClassification: zod.ZodString;
+    areaSqft: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    totalProductOz: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    equipmentUsed: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    appliedAt: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    productId: number;
+    productName: string;
+    targetPest: string;
+    siteClassification: string;
+    appliedAt: string;
+    logId: number;
+    productActiveIngredients: string;
+    areaSqft?: number | null | undefined;
+    linearFt?: number | null | undefined;
+    totalProductOz?: number | null | undefined;
+    equipmentUsed?: string | null | undefined;
+}, {
+    productId: number;
+    productName: string;
+    targetPest: string;
+    siteClassification: string;
+    appliedAt: string;
+    logId: number;
+    productActiveIngredients: string;
+    areaSqft?: number | null | undefined;
+    linearFt?: number | null | undefined;
+    totalProductOz?: number | null | undefined;
+    equipmentUsed?: string | null | undefined;
+}>;
+export declare const GetRecentMixesResponse: zod.ZodArray<zod.ZodObject<{
+    logId: zod.ZodNumber;
+    productId: zod.ZodNumber;
+    productName: zod.ZodString;
+    productActiveIngredients: zod.ZodString;
+    targetPest: zod.ZodString;
+    siteClassification: zod.ZodString;
+    areaSqft: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    linearFt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    totalProductOz: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    equipmentUsed: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    appliedAt: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    productId: number;
+    productName: string;
+    targetPest: string;
+    siteClassification: string;
+    appliedAt: string;
+    logId: number;
+    productActiveIngredients: string;
+    areaSqft?: number | null | undefined;
+    linearFt?: number | null | undefined;
+    totalProductOz?: number | null | undefined;
+    equipmentUsed?: string | null | undefined;
+}, {
+    productId: number;
+    productName: string;
+    targetPest: string;
+    siteClassification: string;
+    appliedAt: string;
+    logId: number;
+    productActiveIngredients: string;
+    areaSqft?: number | null | undefined;
+    linearFt?: number | null | undefined;
+    totalProductOz?: number | null | undefined;
+    equipmentUsed?: string | null | undefined;
+}>, "many">;
+/**
+ * @summary Read-only Route Readiness lookup for any technician/date pair. Used by the Integrated Route Calendar so a manager (or a technician looking at a future date) can see whether a stop's daily rig has been set up, without the editing affordances of GET/POST /technician/daily-rig (which always target the authenticated technician's own current-day rig). Self-lookups are always allowed; looking up another technician requires manager/owner/sales.
+ */
+export declare const LookupDailyRigQueryParams: zod.ZodObject<{
+    technicianId: zod.ZodString;
+    date: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    technicianId: string;
+    date: Date;
+}, {
+    technicianId: string;
+    date: Date;
+}>;
+export declare const LookupDailyRigResponse: zod.ZodObject<{
+    setUp: zod.ZodLiteral<true>;
+    technicianId: zod.ZodString;
+    rigDate: zod.ZodString;
+    assignments: zod.ZodArray<zod.ZodObject<{
+        productId: zod.ZodNumber;
+        targetPest: zod.ZodString;
+        notes: zod.ZodOptional<zod.ZodString>;
+        product: zod.ZodUnion<[zod.ZodObject<{
+            id: zod.ZodNumber;
+            name: zod.ZodString;
+            epaRegistrationNumber: zod.ZodNullable<zod.ZodString>;
+            productType: zod.ZodEnum<["restricted-use", "general-use"]>;
+            activeIngredients: zod.ZodString;
+            signalWord: zod.ZodNullable<zod.ZodUnion<[zod.ZodLiteral<"DANGER">, zod.ZodLiteral<"WARNING">, zod.ZodLiteral<"CAUTION">, zod.ZodLiteral<"NONE">, zod.ZodLiteral<null>]>>;
+            manufacturerName: zod.ZodNullable<zod.ZodString>;
+            isActive: zod.ZodBoolean;
+            createdAt: zod.ZodString;
+            labelRules: zod.ZodUnion<[zod.ZodObject<{
+                id: zod.ZodNumber;
+                productId: zod.ZodNumber;
+                approvedPestTypes: zod.ZodArray<zod.ZodString, "many">;
+                approvedSiteClassifications: zod.ZodArray<zod.ZodString, "many">;
+                requiredEquipmentTypes: zod.ZodArray<zod.ZodString, "many">;
+                nozzleSpec: zod.ZodNullable<zod.ZodString>;
+                pressurePsi: zod.ZodNullable<zod.ZodString>;
+                dropletSize: zod.ZodNullable<zod.ZodString>;
+                maxRateOzPer1000Sqft: zod.ZodNullable<zod.ZodNumber>;
+                maxRateOzPerGallon: zod.ZodNullable<zod.ZodNumber>;
+                mixingSteps: zod.ZodArray<zod.ZodString, "many">;
+                maxTempF: zod.ZodNullable<zod.ZodNumber>;
+                phytotoxicityNotes: zod.ZodNullable<zod.ZodString>;
+                reEntryIntervalHours: zod.ZodNullable<zod.ZodNumber>;
+                retreatmentIntervalDays: zod.ZodNullable<zod.ZodNumber>;
+                createdAt: zod.ZodString;
+            }, "strip", zod.ZodTypeAny, {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            }, {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            }>, zod.ZodNull]>;
+        }, "strip", zod.ZodTypeAny, {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        }, {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        }>, zod.ZodNull]>;
+    }, "strip", zod.ZodTypeAny, {
+        productId: number;
+        targetPest: string;
+        product: {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        } | null;
+        notes?: string | undefined;
+    }, {
+        productId: number;
+        targetPest: string;
+        product: {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        } | null;
+        notes?: string | undefined;
+    }>, "many">;
+    createdAt: zod.ZodString;
+    updatedAt: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    technicianId: string;
+    createdAt: string;
+    updatedAt: string;
+    rigDate: string;
+    assignments: {
+        productId: number;
+        targetPest: string;
+        product: {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        } | null;
+        notes?: string | undefined;
+    }[];
+    setUp: true;
+}, {
+    technicianId: string;
+    createdAt: string;
+    updatedAt: string;
+    rigDate: string;
+    assignments: {
+        productId: number;
+        targetPest: string;
+        product: {
+            id: number;
+            createdAt: string;
+            epaRegistrationNumber: string | null;
+            name: string;
+            isActive: boolean;
+            productType: "restricted-use" | "general-use";
+            activeIngredients: string;
+            signalWord: "DANGER" | "WARNING" | "CAUTION" | "NONE" | null;
+            manufacturerName: string | null;
+            labelRules: {
+                id: number;
+                createdAt: string;
+                productId: number;
+                retreatmentIntervalDays: number | null;
+                approvedPestTypes: string[];
+                approvedSiteClassifications: string[];
+                requiredEquipmentTypes: string[];
+                nozzleSpec: string | null;
+                pressurePsi: string | null;
+                dropletSize: string | null;
+                maxRateOzPer1000Sqft: number | null;
+                maxRateOzPerGallon: number | null;
+                mixingSteps: string[];
+                maxTempF: number | null;
+                phytotoxicityNotes: string | null;
+                reEntryIntervalHours: number | null;
+            } | null;
+        } | null;
+        notes?: string | undefined;
+    }[];
+    setUp: true;
+}>;
+/**
+ * @summary Today's Route Readiness for one technician — compares their scheduled stops for a calendar date against their truck's on-hand quantities for the products declared on that date's rig, using recent per-application usage history to project what today is likely to consume. Proactive, TODAY-scoped signal; distinct from Truck Stock Health (a longer-range trending projection) and from the existing reactive restockThreshold alert. Self-lookups are always allowed; looking up another technician requires manager/owner/sales.
+ */
+export declare const GetRouteReadinessQueryParams: zod.ZodObject<{
+    technicianId: zod.ZodOptional<zod.ZodString>;
+    date: zod.ZodOptional<zod.ZodDate>;
+    tzOffsetMinutes: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    technicianId?: string | undefined;
+    date?: Date | undefined;
+    tzOffsetMinutes?: number | undefined;
+}, {
+    technicianId?: string | undefined;
+    date?: Date | undefined;
+    tzOffsetMinutes?: number | undefined;
+}>;
+export declare const GetRouteReadinessResponse: zod.ZodObject<{
+    technicianId: zod.ZodString;
+    date: zod.ZodString;
+    stopCount: zod.ZodNumber;
+    rigSetUp: zod.ZodBoolean;
+    overallStatus: zod.ZodEnum<["ready", "short", "not-set-up"]>;
+    products: zod.ZodArray<zod.ZodObject<{
+        productId: zod.ZodNumber;
+        productName: zod.ZodString;
+        targetPest: zod.ZodString;
+        unit: zod.ZodString;
+        quantityOnHand: zod.ZodNumber;
+        avgUsagePerStop: zod.ZodNullable<zod.ZodNumber>;
+        expectedUsageToday: zod.ZodNullable<zod.ZodNumber>;
+        status: zod.ZodEnum<["ready", "short", "insufficient-data"]>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }, {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    technicianId: string;
+    date: string;
+    products: {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }[];
+    stopCount: number;
+    rigSetUp: boolean;
+    overallStatus: "ready" | "short" | "not-set-up";
+}, {
+    technicianId: string;
+    date: string;
+    products: {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }[];
+    stopCount: number;
+    rigSetUp: boolean;
+    overallStatus: "ready" | "short" | "not-set-up";
+}>;
+/**
+ * @summary Today's Route Readiness computed for every technician in the company, for a calendar date. Manager/owner only.
+ */
+export declare const GetTeamRouteReadinessQueryParams: zod.ZodObject<{
+    date: zod.ZodOptional<zod.ZodDate>;
+    tzOffsetMinutes: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    date?: Date | undefined;
+    tzOffsetMinutes?: number | undefined;
+}, {
+    date?: Date | undefined;
+    tzOffsetMinutes?: number | undefined;
+}>;
+export declare const GetTeamRouteReadinessResponseItem: zod.ZodObject<{
+    technicianId: zod.ZodString;
+    date: zod.ZodString;
+    stopCount: zod.ZodNumber;
+    rigSetUp: zod.ZodBoolean;
+    overallStatus: zod.ZodEnum<["ready", "short", "not-set-up"]>;
+    products: zod.ZodArray<zod.ZodObject<{
+        productId: zod.ZodNumber;
+        productName: zod.ZodString;
+        targetPest: zod.ZodString;
+        unit: zod.ZodString;
+        quantityOnHand: zod.ZodNumber;
+        avgUsagePerStop: zod.ZodNullable<zod.ZodNumber>;
+        expectedUsageToday: zod.ZodNullable<zod.ZodNumber>;
+        status: zod.ZodEnum<["ready", "short", "insufficient-data"]>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }, {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    technicianId: string;
+    date: string;
+    products: {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }[];
+    stopCount: number;
+    rigSetUp: boolean;
+    overallStatus: "ready" | "short" | "not-set-up";
+}, {
+    technicianId: string;
+    date: string;
+    products: {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }[];
+    stopCount: number;
+    rigSetUp: boolean;
+    overallStatus: "ready" | "short" | "not-set-up";
+}>;
+export declare const GetTeamRouteReadinessResponse: zod.ZodArray<zod.ZodObject<{
+    technicianId: zod.ZodString;
+    date: zod.ZodString;
+    stopCount: zod.ZodNumber;
+    rigSetUp: zod.ZodBoolean;
+    overallStatus: zod.ZodEnum<["ready", "short", "not-set-up"]>;
+    products: zod.ZodArray<zod.ZodObject<{
+        productId: zod.ZodNumber;
+        productName: zod.ZodString;
+        targetPest: zod.ZodString;
+        unit: zod.ZodString;
+        quantityOnHand: zod.ZodNumber;
+        avgUsagePerStop: zod.ZodNullable<zod.ZodNumber>;
+        expectedUsageToday: zod.ZodNullable<zod.ZodNumber>;
+        status: zod.ZodEnum<["ready", "short", "insufficient-data"]>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }, {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    technicianId: string;
+    date: string;
+    products: {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }[];
+    stopCount: number;
+    rigSetUp: boolean;
+    overallStatus: "ready" | "short" | "not-set-up";
+}, {
+    technicianId: string;
+    date: string;
+    products: {
+        status: "ready" | "short" | "insufficient-data";
+        productId: number;
+        productName: string;
+        targetPest: string;
+        unit: string;
+        quantityOnHand: number;
+        avgUsagePerStop: number | null;
+        expectedUsageToday: number | null;
+    }[];
+    stopCount: number;
+    rigSetUp: boolean;
+    overallStatus: "ready" | "short" | "not-set-up";
+}>, "many">;
+/**
+ * @summary Check whether the authenticated user is a super admin
+ */
+export declare const GetMissionControlMeResponse: zod.ZodObject<{
+    userId: zod.ZodString;
+    isSuperAdmin: zod.ZodBoolean;
+}, "strip", zod.ZodTypeAny, {
+    userId: string;
+    isSuperAdmin: boolean;
+}, {
+    userId: string;
+    isSuperAdmin: boolean;
+}>;
+/**
+ * Operational KPI counts use the same eligibility cohorts as their matching paginated directory filters. Incident counts are source incident records, including acknowledged and investigating records where the active-incident cohort is used.
+ * @summary Real platform-wide operational counts and recent alerts
+ */
+export declare const GetMissionControlOverviewResponse: zod.ZodObject<{
+    kpis: zod.ZodObject<{
+        companyCount: zod.ZodNumber;
+        activeCompanyCount: zod.ZodNumber;
+        userCount: zod.ZodNumber;
+        technicianCount: zod.ZodNumber;
+        activeTechnicianCount: zod.ZodNumber;
+        inspectionCount: zod.ZodNumber;
+        inspectionsTodayCount: zod.ZodNumber;
+        inspectionsProcessingCount: zod.ZodNumber;
+        inspectionsCompletedCount: zod.ZodNumber;
+        failedSyncCount: zod.ZodNumber;
+        failedAnalysisCount: zod.ZodNumber;
+        pendingAnalysisCount: zod.ZodNumber;
+        openIncidentCount: zod.ZodNumber;
+        unacknowledgedAlertCount: zod.ZodNumber;
+        problemDeviceSessionCount: zod.ZodNumber;
+        pendingApprovalCount: zod.ZodNumber;
+    }, "strip", zod.ZodTypeAny, {
+        inspectionCount: number;
+        companyCount: number;
+        activeCompanyCount: number;
+        userCount: number;
+        technicianCount: number;
+        activeTechnicianCount: number;
+        inspectionsTodayCount: number;
+        inspectionsProcessingCount: number;
+        inspectionsCompletedCount: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        openIncidentCount: number;
+        unacknowledgedAlertCount: number;
+        problemDeviceSessionCount: number;
+        pendingApprovalCount: number;
+    }, {
+        inspectionCount: number;
+        companyCount: number;
+        activeCompanyCount: number;
+        userCount: number;
+        technicianCount: number;
+        activeTechnicianCount: number;
+        inspectionsTodayCount: number;
+        inspectionsProcessingCount: number;
+        inspectionsCompletedCount: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        openIncidentCount: number;
+        unacknowledgedAlertCount: number;
+        problemDeviceSessionCount: number;
+        pendingApprovalCount: number;
+    }>;
+    recentAlerts: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        severity: zod.ZodEnum<["low", "medium", "high", "critical"]>;
+        title: zod.ZodString;
+        message: zod.ZodString;
+        companyId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        message: string;
+        id: number;
+        severity: "low" | "medium" | "high" | "critical";
+        createdAt: Date;
+        title: string;
+        companyId?: number | null | undefined;
+    }, {
+        message: string;
+        id: number;
+        severity: "low" | "medium" | "high" | "critical";
+        createdAt: Date;
+        title: string;
+        companyId?: number | null | undefined;
+    }>, "many">;
+    aiAnalysisHealth: zod.ZodObject<{
+        windowHours: zod.ZodNumber;
+        completedCount: zod.ZodNumber;
+        failedCount: zod.ZodNumber;
+        pendingCount: zod.ZodNumber;
+        latestResultAt: zod.ZodNullable<zod.ZodDate>;
+    }, "strip", zod.ZodTypeAny, {
+        windowHours: number;
+        completedCount: number;
+        failedCount: number;
+        pendingCount: number;
+        latestResultAt: Date | null;
+    }, {
+        windowHours: number;
+        completedCount: number;
+        failedCount: number;
+        pendingCount: number;
+        latestResultAt: Date | null;
+    }>;
+}, "strip", zod.ZodTypeAny, {
+    kpis: {
+        inspectionCount: number;
+        companyCount: number;
+        activeCompanyCount: number;
+        userCount: number;
+        technicianCount: number;
+        activeTechnicianCount: number;
+        inspectionsTodayCount: number;
+        inspectionsProcessingCount: number;
+        inspectionsCompletedCount: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        openIncidentCount: number;
+        unacknowledgedAlertCount: number;
+        problemDeviceSessionCount: number;
+        pendingApprovalCount: number;
+    };
+    recentAlerts: {
+        message: string;
+        id: number;
+        severity: "low" | "medium" | "high" | "critical";
+        createdAt: Date;
+        title: string;
+        companyId?: number | null | undefined;
+    }[];
+    aiAnalysisHealth: {
+        windowHours: number;
+        completedCount: number;
+        failedCount: number;
+        pendingCount: number;
+        latestResultAt: Date | null;
+    };
+}, {
+    kpis: {
+        inspectionCount: number;
+        companyCount: number;
+        activeCompanyCount: number;
+        userCount: number;
+        technicianCount: number;
+        activeTechnicianCount: number;
+        inspectionsTodayCount: number;
+        inspectionsProcessingCount: number;
+        inspectionsCompletedCount: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        openIncidentCount: number;
+        unacknowledgedAlertCount: number;
+        problemDeviceSessionCount: number;
+        pendingApprovalCount: number;
+    };
+    recentAlerts: {
+        message: string;
+        id: number;
+        severity: "low" | "medium" | "high" | "critical";
+        createdAt: Date;
+        title: string;
+        companyId?: number | null | undefined;
+    }[];
+    aiAnalysisHealth: {
+        windowHours: number;
+        completedCount: number;
+        failedCount: number;
+        pendingCount: number;
+        latestResultAt: Date | null;
+    };
+}>;
+/**
+ * @summary Search platform records available to super-admins
+ */
+export declare const searchMissionControlQueryQMin = 2;
+export declare const searchMissionControlQueryQMax = 120;
+export declare const SearchMissionControlQueryParams: zod.ZodObject<{
+    q: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    q: string;
+}, {
+    q: string;
+}>;
+export declare const SearchMissionControlResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+        kind: zod.ZodEnum<["company", "technician", "property", "inspection", "evidence", "incident"]>;
+        id: zod.ZodString;
+        title: zod.ZodString;
+        subtitle: zod.ZodNullable<zod.ZodString>;
+        companyId: zod.ZodNullable<zod.ZodNumber>;
+        inspectionId: zod.ZodNullable<zod.ZodNumber>;
+    }, "strip", zod.ZodTypeAny, {
+        id: string;
+        inspectionId: number | null;
+        title: string;
+        companyId: number | null;
+        kind: "inspection" | "evidence" | "technician" | "company" | "property" | "incident";
+        subtitle: string | null;
+    }, {
+        id: string;
+        inspectionId: number | null;
+        title: string;
+        companyId: number | null;
+        kind: "inspection" | "evidence" | "technician" | "company" | "property" | "incident";
+        subtitle: string | null;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    items: {
+        id: string;
+        inspectionId: number | null;
+        title: string;
+        companyId: number | null;
+        kind: "inspection" | "evidence" | "technician" | "company" | "property" | "incident";
+        subtitle: string | null;
+    }[];
+}, {
+    items: {
+        id: string;
+        inspectionId: number | null;
+        title: string;
+        companyId: number | null;
+        kind: "inspection" | "evidence" | "technician" | "company" | "property" | "incident";
+        subtitle: string | null;
+    }[];
+}>;
+/**
+ * @summary Search and paginate platform companies
+ */
+export declare const ListMissionControlCompaniesQueryParams: zod.ZodObject<{
+    page: zod.ZodOptional<zod.ZodNumber>;
+    limit: zod.ZodOptional<zod.ZodNumber>;
+    search: zod.ZodOptional<zod.ZodString>;
+    accessStatus: zod.ZodOptional<zod.ZodEnum<["enabled", "suspended"]>>;
+}, "strip", zod.ZodTypeAny, {
+    search?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    accessStatus?: "enabled" | "suspended" | undefined;
+}, {
+    search?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    accessStatus?: "enabled" | "suspended" | undefined;
+}>;
+export declare const ListMissionControlCompaniesResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodIntersection<zod.ZodObject<{
+        id: zod.ZodNumber;
+        name: zod.ZodString;
+        accessStatus: zod.ZodEnum<["enabled", "suspended"]>;
+        createdAt: zod.ZodDate;
+        userCount: zod.ZodNumber;
+        technicianCount: zod.ZodNumber;
+        inspectionCount: zod.ZodNumber;
+        lastActivityAt: zod.ZodNullable<zod.ZodDate>;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        createdAt: Date;
+        name: string;
+        inspectionCount: number;
+        userCount: number;
+        technicianCount: number;
+        accessStatus: "enabled" | "suspended";
+        lastActivityAt: Date | null;
+    }, {
+        id: number;
+        createdAt: Date;
+        name: string;
+        inspectionCount: number;
+        userCount: number;
+        technicianCount: number;
+        accessStatus: "enabled" | "suspended";
+        lastActivityAt: Date | null;
+    }>, zod.ZodObject<{
+        inspectionsTodayCount: zod.ZodNumber;
+        inspectionsProcessingCount: zod.ZodNumber;
+        inspectionsCompletedCount: zod.ZodNumber;
+        failedSyncCount: zod.ZodNumber;
+        failedAnalysisCount: zod.ZodNumber;
+        pendingAnalysisCount: zod.ZodNumber;
+        openIncidentCount: zod.ZodNumber;
+    }, "strip", zod.ZodTypeAny, {
+        inspectionsTodayCount: number;
+        inspectionsProcessingCount: number;
+        inspectionsCompletedCount: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        openIncidentCount: number;
+    }, {
+        inspectionsTodayCount: number;
+        inspectionsProcessingCount: number;
+        inspectionsCompletedCount: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        openIncidentCount: number;
+    }>>, "many">;
+    page: zod.ZodNumber;
+    limit: zod.ZodNumber;
+    total: zod.ZodNumber;
+    totalPages: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    total: number;
+    items: ({
+        id: number;
+        createdAt: Date;
+        name: string;
+        inspectionCount: number;
+        userCount: number;
+        technicianCount: number;
+        accessStatus: "enabled" | "suspended";
+        lastActivityAt: Date | null;
+    } & {
+        inspectionsTodayCount: number;
+        inspectionsProcessingCount: number;
+        inspectionsCompletedCount: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        openIncidentCount: number;
+    })[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}, {
+    total: number;
+    items: ({
+        id: number;
+        createdAt: Date;
+        name: string;
+        inspectionCount: number;
+        userCount: number;
+        technicianCount: number;
+        accessStatus: "enabled" | "suspended";
+        lastActivityAt: Date | null;
+    } & {
+        inspectionsTodayCount: number;
+        inspectionsProcessingCount: number;
+        inspectionsCompletedCount: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        openIncidentCount: number;
+    })[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}>;
+/**
+ * @summary Get platform company detail
+ */
+export declare const GetMissionControlCompanyParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const GetMissionControlCompanyResponse: zod.ZodIntersection<zod.ZodIntersection<zod.ZodObject<{
+    id: zod.ZodNumber;
+    name: zod.ZodString;
+    accessStatus: zod.ZodEnum<["enabled", "suspended"]>;
+    createdAt: zod.ZodDate;
+    userCount: zod.ZodNumber;
+    technicianCount: zod.ZodNumber;
+    inspectionCount: zod.ZodNumber;
+    lastActivityAt: zod.ZodNullable<zod.ZodDate>;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    createdAt: Date;
+    name: string;
+    inspectionCount: number;
+    userCount: number;
+    technicianCount: number;
+    accessStatus: "enabled" | "suspended";
+    lastActivityAt: Date | null;
+}, {
+    id: number;
+    createdAt: Date;
+    name: string;
+    inspectionCount: number;
+    userCount: number;
+    technicianCount: number;
+    accessStatus: "enabled" | "suspended";
+    lastActivityAt: Date | null;
+}>, zod.ZodObject<{
+    inspectionsTodayCount: zod.ZodNumber;
+    inspectionsProcessingCount: zod.ZodNumber;
+    inspectionsCompletedCount: zod.ZodNumber;
+    failedSyncCount: zod.ZodNumber;
+    failedAnalysisCount: zod.ZodNumber;
+    pendingAnalysisCount: zod.ZodNumber;
+    openIncidentCount: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    inspectionsTodayCount: number;
+    inspectionsProcessingCount: number;
+    inspectionsCompletedCount: number;
+    failedSyncCount: number;
+    failedAnalysisCount: number;
+    pendingAnalysisCount: number;
+    openIncidentCount: number;
+}, {
+    inspectionsTodayCount: number;
+    inspectionsProcessingCount: number;
+    inspectionsCompletedCount: number;
+    failedSyncCount: number;
+    failedAnalysisCount: number;
+    pendingAnalysisCount: number;
+    openIncidentCount: number;
+}>>, zod.ZodObject<{
+    owner: zod.ZodUnion<[zod.ZodObject<{
+        userId: zod.ZodString;
+        name: zod.ZodNullable<zod.ZodString>;
+        email: zod.ZodNullable<zod.ZodString>;
+    }, "strip", zod.ZodTypeAny, {
+        email: string | null;
+        name: string | null;
+        userId: string;
+    }, {
+        email: string | null;
+        name: string | null;
+        userId: string;
+    }>, zod.ZodNull]>;
+    users: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodString;
+        name: zod.ZodNullable<zod.ZodString>;
+        email: zod.ZodNullable<zod.ZodString>;
+        role: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        betaAccessEnabled: zod.ZodBoolean;
+    }, "strip", zod.ZodTypeAny, {
+        id: string;
+        email: string | null;
+        name: string | null;
+        betaAccessEnabled: boolean;
+        role?: string | null | undefined;
+    }, {
+        id: string;
+        email: string | null;
+        name: string | null;
+        betaAccessEnabled: boolean;
+        role?: string | null | undefined;
+    }>, "many">;
+    recentInspections: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        companyId: zod.ZodNumber;
+        companyName: zod.ZodString;
+        technicianId: zod.ZodNullable<zod.ZodString>;
+        technicianName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        status: zod.ZodString;
+        siteAddress: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }, {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    recentInspections: {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }[];
+    owner: {
+        email: string | null;
+        name: string | null;
+        userId: string;
+    } | null;
+    users: {
+        id: string;
+        email: string | null;
+        name: string | null;
+        betaAccessEnabled: boolean;
+        role?: string | null | undefined;
+    }[];
+}, {
+    recentInspections: {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }[];
+    owner: {
+        email: string | null;
+        name: string | null;
+        userId: string;
+    } | null;
+    users: {
+        id: string;
+        email: string | null;
+        name: string | null;
+        betaAccessEnabled: boolean;
+        role?: string | null | undefined;
+    }[];
+}>>;
+/**
+ * @summary Suspend or enable company access with required approval
+ */
+export declare const UpdateMissionControlCompanyAccessParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const UpdateMissionControlCompanyAccessBody: zod.ZodObject<{
+    action: zod.ZodEnum<["suspend", "enable"]>;
+    approvalId: zod.ZodNumber;
+    reason: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    action: "suspend" | "enable";
+    approvalId: number;
+    reason?: string | undefined;
+}, {
+    action: "suspend" | "enable";
+    approvalId: number;
+    reason?: string | undefined;
+}>;
+export declare const UpdateMissionControlCompanyAccessResponse: zod.ZodObject<{
+    companyId: zod.ZodNumber;
+    accessStatus: zod.ZodEnum<["enabled", "suspended"]>;
+    approvalId: zod.ZodNumber;
+    changedAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    companyId: number;
+    accessStatus: "enabled" | "suspended";
+    approvalId: number;
+    changedAt: Date;
+}, {
+    companyId: number;
+    accessStatus: "enabled" | "suspended";
+    approvalId: number;
+    changedAt: Date;
+}>;
+/**
+ * @summary Search technicians, optionally scoped to a company
+ */
+export declare const ListMissionControlTechniciansQueryParams: zod.ZodObject<{
+    companyId: zod.ZodOptional<zod.ZodNumber>;
+    companyAccess: zod.ZodOptional<zod.ZodEnum<["enabled", "suspended"]>>;
+    search: zod.ZodOptional<zod.ZodString>;
+    page: zod.ZodOptional<zod.ZodNumber>;
+    limit: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    search?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+    companyAccess?: "enabled" | "suspended" | undefined;
+}, {
+    search?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+    companyAccess?: "enabled" | "suspended" | undefined;
+}>;
+export declare const ListMissionControlTechniciansResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodString;
+        name: zod.ZodNullable<zod.ZodString>;
+        companyId: zod.ZodNumber;
+        companyName: zod.ZodString;
+        status: zod.ZodString;
+        lastActiveAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        inspectionCount: zod.ZodNumber;
+        failedSyncCount: zod.ZodNumber;
+        failedAnalysisCount: zod.ZodNumber;
+        pendingAnalysisCount: zod.ZodNumber;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: string;
+        name: string | null;
+        inspectionCount: number;
+        companyName: string;
+        companyId: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        lastActiveAt?: Date | null | undefined;
+    }, {
+        status: string;
+        id: string;
+        name: string | null;
+        inspectionCount: number;
+        companyName: string;
+        companyId: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        lastActiveAt?: Date | null | undefined;
+    }>, "many">;
+    page: zod.ZodNumber;
+    limit: zod.ZodNumber;
+    total: zod.ZodNumber;
+    totalPages: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    total: number;
+    items: {
+        status: string;
+        id: string;
+        name: string | null;
+        inspectionCount: number;
+        companyName: string;
+        companyId: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        lastActiveAt?: Date | null | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}, {
+    total: number;
+    items: {
+        status: string;
+        id: string;
+        name: string | null;
+        inspectionCount: number;
+        companyName: string;
+        companyId: number;
+        failedSyncCount: number;
+        failedAnalysisCount: number;
+        pendingAnalysisCount: number;
+        lastActiveAt?: Date | null | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}>;
+/**
+ * Returns privacy-safe property directory summaries for super-admin drill-down. Customer names, notes, technician knowledge, hotspots, media URLs, and other private property content are withheld.
+ * @summary Search platform properties, optionally scoped to a company
+ */
+export declare const ListMissionControlPropertiesQueryParams: zod.ZodObject<{
+    companyId: zod.ZodOptional<zod.ZodNumber>;
+    search: zod.ZodOptional<zod.ZodString>;
+    page: zod.ZodOptional<zod.ZodNumber>;
+    limit: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    search?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+}, {
+    search?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+}>;
+export declare const ListMissionControlPropertiesResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        companyId: zod.ZodNumber;
+        companyName: zod.ZodString;
+        siteAddress: zod.ZodString;
+        propertyType: zod.ZodNullable<zod.ZodString>;
+        inspectionCount: zod.ZodNumber;
+        latestInspectionId: zod.ZodNullable<zod.ZodNumber>;
+        updatedAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        siteAddress: string;
+        propertyType: string | null;
+        updatedAt: Date;
+        inspectionCount: number;
+        companyName: string;
+        companyId: number;
+        latestInspectionId: number | null;
+    }, {
+        id: number;
+        siteAddress: string;
+        propertyType: string | null;
+        updatedAt: Date;
+        inspectionCount: number;
+        companyName: string;
+        companyId: number;
+        latestInspectionId: number | null;
+    }>, "many">;
+    page: zod.ZodNumber;
+    limit: zod.ZodNumber;
+    total: zod.ZodNumber;
+    totalPages: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    total: number;
+    items: {
+        id: number;
+        siteAddress: string;
+        propertyType: string | null;
+        updatedAt: Date;
+        inspectionCount: number;
+        companyName: string;
+        companyId: number;
+        latestInspectionId: number | null;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}, {
+    total: number;
+    items: {
+        id: number;
+        siteAddress: string;
+        propertyType: string | null;
+        updatedAt: Date;
+        inspectionCount: number;
+        companyName: string;
+        companyId: number;
+        latestInspectionId: number | null;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}>;
+/**
+ * @summary Get a privacy-safe platform property detail
+ */
+export declare const GetMissionControlPropertyParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const GetMissionControlPropertyResponse: zod.ZodIntersection<zod.ZodObject<{
+    id: zod.ZodNumber;
+    companyId: zod.ZodNumber;
+    companyName: zod.ZodString;
+    siteAddress: zod.ZodString;
+    propertyType: zod.ZodNullable<zod.ZodString>;
+    inspectionCount: zod.ZodNumber;
+    latestInspectionId: zod.ZodNullable<zod.ZodNumber>;
+    updatedAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    siteAddress: string;
+    propertyType: string | null;
+    updatedAt: Date;
+    inspectionCount: number;
+    companyName: string;
+    companyId: number;
+    latestInspectionId: number | null;
+}, {
+    id: number;
+    siteAddress: string;
+    propertyType: string | null;
+    updatedAt: Date;
+    inspectionCount: number;
+    companyName: string;
+    companyId: number;
+    latestInspectionId: number | null;
+}>, zod.ZodObject<{
+    inspections: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        status: zod.ZodString;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: number;
+        createdAt: Date;
+    }, {
+        status: string;
+        id: number;
+        createdAt: Date;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    inspections: {
+        status: string;
+        id: number;
+        createdAt: Date;
+    }[];
+}, {
+    inspections: {
+        status: string;
+        id: number;
+        createdAt: Date;
+    }[];
+}>>;
+/**
+ * @summary Inspect one technician and their recent inspection references
+ */
+export declare const GetMissionControlTechnicianParams: zod.ZodObject<{
+    id: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    id: string;
+}, {
+    id: string;
+}>;
+export declare const GetMissionControlTechnicianResponse: zod.ZodIntersection<zod.ZodObject<{
+    id: zod.ZodString;
+    name: zod.ZodNullable<zod.ZodString>;
+    companyId: zod.ZodNumber;
+    companyName: zod.ZodString;
+    status: zod.ZodString;
+    lastActiveAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    inspectionCount: zod.ZodNumber;
+    failedSyncCount: zod.ZodNumber;
+    failedAnalysisCount: zod.ZodNumber;
+    pendingAnalysisCount: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    status: string;
+    id: string;
+    name: string | null;
+    inspectionCount: number;
+    companyName: string;
+    companyId: number;
+    failedSyncCount: number;
+    failedAnalysisCount: number;
+    pendingAnalysisCount: number;
+    lastActiveAt?: Date | null | undefined;
+}, {
+    status: string;
+    id: string;
+    name: string | null;
+    inspectionCount: number;
+    companyName: string;
+    companyId: number;
+    failedSyncCount: number;
+    failedAnalysisCount: number;
+    pendingAnalysisCount: number;
+    lastActiveAt?: Date | null | undefined;
+}>, zod.ZodObject<{
+    inspections: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        companyId: zod.ZodNumber;
+        companyName: zod.ZodString;
+        technicianId: zod.ZodNullable<zod.ZodString>;
+        technicianName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        status: zod.ZodString;
+        siteAddress: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }, {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }>, "many">;
+    deviceSessions: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        userId: zod.ZodNullable<zod.ZodString>;
+        createdAt: zod.ZodDate;
+        expiresAt: zod.ZodDate;
+        eventCount: zod.ZodNumber;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        createdAt: Date;
+        userId: string | null;
+        expiresAt: Date;
+        eventCount: number;
+    }, {
+        id: number;
+        createdAt: Date;
+        userId: string | null;
+        expiresAt: Date;
+        eventCount: number;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    inspections: {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }[];
+    deviceSessions: {
+        id: number;
+        createdAt: Date;
+        userId: string | null;
+        expiresAt: Date;
+        eventCount: number;
+    }[];
+}, {
+    inspections: {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }[];
+    deviceSessions: {
+        id: number;
+        createdAt: Date;
+        userId: string | null;
+        expiresAt: Date;
+        eventCount: number;
+    }[];
+}>>;
+/**
+ * @summary Inspect one device session and sanitized event history
+ */
+export declare const GetMissionControlDeviceSessionParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const GetMissionControlDeviceSessionResponse: zod.ZodIntersection<zod.ZodObject<{
+    id: zod.ZodNumber;
+    userId: zod.ZodNullable<zod.ZodString>;
+    createdAt: zod.ZodDate;
+    expiresAt: zod.ZodDate;
+    eventCount: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    createdAt: Date;
+    userId: string | null;
+    expiresAt: Date;
+    eventCount: number;
+}, {
+    id: number;
+    createdAt: Date;
+    userId: string | null;
+    expiresAt: Date;
+    eventCount: number;
+}>, zod.ZodObject<{
+    inspectionId: zod.ZodNumber;
+    companyId: zod.ZodNumber;
+    companyName: zod.ZodString;
+    events: zod.ZodArray<zod.ZodObject<{
+        type: zod.ZodString;
+        createdAt: zod.ZodDate;
+        detail: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, "strip", zod.ZodTypeAny, {
+        type: string;
+        createdAt: Date;
+        detail?: string | null | undefined;
+    }, {
+        type: string;
+        createdAt: Date;
+        detail?: string | null | undefined;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
+    companyName: string;
+    events: {
+        type: string;
+        createdAt: Date;
+        detail?: string | null | undefined;
+    }[];
+    companyId: number;
+}, {
+    inspectionId: number;
+    companyName: string;
+    events: {
+        type: string;
+        createdAt: Date;
+        detail?: string | null | undefined;
+    }[];
+    companyId: number;
+}>>;
+/**
+ * @summary Enable or disable beta access with required approval
+ */
+export declare const UpdateMissionControlUserAccessParams: zod.ZodObject<{
+    id: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    id: string;
+}, {
+    id: string;
+}>;
+export declare const UpdateMissionControlUserAccessBody: zod.ZodObject<{
+    action: zod.ZodEnum<["enable", "disable"]>;
+    approvalId: zod.ZodNumber;
+    reason: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    action: "enable" | "disable";
+    approvalId: number;
+    reason?: string | undefined;
+}, {
+    action: "enable" | "disable";
+    approvalId: number;
+    reason?: string | undefined;
+}>;
+export declare const UpdateMissionControlUserAccessResponse: zod.ZodObject<{
+    userId: zod.ZodString;
+    betaAccessEnabled: zod.ZodBoolean;
+    approvalId: zod.ZodNumber;
+    changedAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    userId: string;
+    betaAccessEnabled: boolean;
+    approvalId: number;
+    changedAt: Date;
+}, {
+    userId: string;
+    betaAccessEnabled: boolean;
+    approvalId: number;
+    changedAt: Date;
+}>;
+/**
+ * @summary Search inspections across the platform
+ */
+export declare const ListMissionControlInspectionsQueryParams: zod.ZodObject<{
+    companyId: zod.ZodOptional<zod.ZodNumber>;
+    technicianId: zod.ZodOptional<zod.ZodString>;
+    createdToday: zod.ZodOptional<zod.ZodEnum<["true", "false"]>>;
+    status: zod.ZodOptional<zod.ZodString>;
+    search: zod.ZodOptional<zod.ZodString>;
+    syncStatus: zod.ZodOptional<zod.ZodEnum<["failed", "success"]>>;
+    analysisStatus: zod.ZodOptional<zod.ZodEnum<["failed", "pending", "complete"]>>;
+    page: zod.ZodOptional<zod.ZodNumber>;
+    limit: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    status?: string | undefined;
+    technicianId?: string | undefined;
+    search?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+    createdToday?: "true" | "false" | undefined;
+    syncStatus?: "failed" | "success" | undefined;
+    analysisStatus?: "pending" | "failed" | "complete" | undefined;
+}, {
+    status?: string | undefined;
+    technicianId?: string | undefined;
+    search?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+    createdToday?: "true" | "false" | undefined;
+    syncStatus?: "failed" | "success" | undefined;
+    analysisStatus?: "pending" | "failed" | "complete" | undefined;
+}>;
+export declare const ListMissionControlInspectionsResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        companyId: zod.ZodNumber;
+        companyName: zod.ZodString;
+        technicianId: zod.ZodNullable<zod.ZodString>;
+        technicianName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        status: zod.ZodString;
+        siteAddress: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }, {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }>, "many">;
+    page: zod.ZodNumber;
+    limit: zod.ZodNumber;
+    total: zod.ZodNumber;
+    totalPages: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    total: number;
+    items: {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}, {
+    total: number;
+    items: {
+        status: string;
+        id: number;
+        technicianId: string | null;
+        createdAt: Date;
+        companyName: string;
+        companyId: number;
+        siteAddress?: string | null | undefined;
+        technicianName?: string | null | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}>;
+/**
+ * @summary Get diagnostic inspection detail and synchronization history
+ */
+export declare const GetMissionControlInspectionParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const GetMissionControlInspectionResponse: zod.ZodIntersection<zod.ZodObject<{
+    id: zod.ZodNumber;
+    companyId: zod.ZodNumber;
+    companyName: zod.ZodString;
+    technicianId: zod.ZodNullable<zod.ZodString>;
+    technicianName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    status: zod.ZodString;
+    siteAddress: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    status: string;
+    id: number;
+    technicianId: string | null;
+    createdAt: Date;
+    companyName: string;
+    companyId: number;
+    siteAddress?: string | null | undefined;
+    technicianName?: string | null | undefined;
+}, {
+    status: string;
+    id: number;
+    technicianId: string | null;
+    createdAt: Date;
+    companyName: string;
+    companyId: number;
+    siteAddress?: string | null | undefined;
+    technicianName?: string | null | undefined;
+}>, zod.ZodObject<{
+    mediaCounts: zod.ZodObject<{
+        total: zod.ZodNumber;
+        photos: zod.ZodNumber;
+        videos: zod.ZodNumber;
+        pendingAnalysis: zod.ZodNumber;
+    }, "strip", zod.ZodTypeAny, {
+        total: number;
+        videos: number;
+        photos: number;
+        pendingAnalysis: number;
+    }, {
+        total: number;
+        videos: number;
+        photos: number;
+        pendingAnalysis: number;
+    }>;
+    analysisStatuses: zod.ZodArray<zod.ZodObject<{
+        mediaId: zod.ZodNumber;
+        status: zod.ZodEnum<["completed", "failed", "deferred", "rate_limited", "pending", "partial"]>;
+        error: zod.ZodNullable<zod.ZodString>;
+        updatedAt: zod.ZodNullable<zod.ZodDate>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "pending" | "completed" | "failed" | "deferred" | "rate_limited" | "partial";
+        updatedAt: Date | null;
+        mediaId: number;
+        error: string | null;
+    }, {
+        status: "pending" | "completed" | "failed" | "deferred" | "rate_limited" | "partial";
+        updatedAt: Date | null;
+        mediaId: number;
+        error: string | null;
+    }>, "many">;
+    syncLogs: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        status: zod.ZodString;
+        message: zod.ZodString;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        message: string;
+        status: string;
+        id: number;
+        createdAt: Date;
+    }, {
+        message: string;
+        status: string;
+        id: number;
+        createdAt: Date;
+    }>, "many">;
+    media: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        mediaType: zod.ZodString;
+        durationSec: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        captureSource: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        qualityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        mediaType: string;
+        durationSec?: number | null | undefined;
+        captureSource?: string | null | undefined;
+        qualityScore?: number | null | undefined;
+        capturedAt?: Date | null | undefined;
+    }, {
+        id: number;
+        mediaType: string;
+        durationSec?: number | null | undefined;
+        captureSource?: string | null | undefined;
+        qualityScore?: number | null | undefined;
+        capturedAt?: Date | null | undefined;
+    }>, "many">;
+    deviceSessions: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        userId: zod.ZodNullable<zod.ZodString>;
+        createdAt: zod.ZodDate;
+        expiresAt: zod.ZodDate;
+        eventCount: zod.ZodNumber;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        createdAt: Date;
+        userId: string | null;
+        expiresAt: Date;
+        eventCount: number;
+    }, {
+        id: number;
+        createdAt: Date;
+        userId: string | null;
+        expiresAt: Date;
+        eventCount: number;
+    }>, "many">;
+    completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    propertyId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    requiredZones: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        slug: zod.ZodString;
+        label: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        label: string;
+        slug: string;
+    }, {
+        label: string;
+        slug: string;
+    }>, "many">>;
+    capturedZones: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        slug: zod.ZodString;
+        label: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        label: string;
+        slug: string;
+    }, {
+        label: string;
+        slug: string;
+    }>, "many">>;
+    reportStatus: zod.ZodOptional<zod.ZodEnum<["available", "unavailable"]>>;
+}, "strip", zod.ZodTypeAny, {
+    media: {
+        id: number;
+        mediaType: string;
+        durationSec?: number | null | undefined;
+        captureSource?: string | null | undefined;
+        qualityScore?: number | null | undefined;
+        capturedAt?: Date | null | undefined;
+    }[];
+    deviceSessions: {
+        id: number;
+        createdAt: Date;
+        userId: string | null;
+        expiresAt: Date;
+        eventCount: number;
+    }[];
+    mediaCounts: {
+        total: number;
+        videos: number;
+        photos: number;
+        pendingAnalysis: number;
+    };
+    analysisStatuses: {
+        status: "pending" | "completed" | "failed" | "deferred" | "rate_limited" | "partial";
+        updatedAt: Date | null;
+        mediaId: number;
+        error: string | null;
+    }[];
+    syncLogs: {
+        message: string;
+        status: string;
+        id: number;
+        createdAt: Date;
+    }[];
+    completedAt?: Date | null | undefined;
+    requiredZones?: {
+        label: string;
+        slug: string;
+    }[] | undefined;
+    propertyId?: number | null | undefined;
+    capturedZones?: {
+        label: string;
+        slug: string;
+    }[] | undefined;
+    reportStatus?: "available" | "unavailable" | undefined;
+}, {
+    media: {
+        id: number;
+        mediaType: string;
+        durationSec?: number | null | undefined;
+        captureSource?: string | null | undefined;
+        qualityScore?: number | null | undefined;
+        capturedAt?: Date | null | undefined;
+    }[];
+    deviceSessions: {
+        id: number;
+        createdAt: Date;
+        userId: string | null;
+        expiresAt: Date;
+        eventCount: number;
+    }[];
+    mediaCounts: {
+        total: number;
+        videos: number;
+        photos: number;
+        pendingAnalysis: number;
+    };
+    analysisStatuses: {
+        status: "pending" | "completed" | "failed" | "deferred" | "rate_limited" | "partial";
+        updatedAt: Date | null;
+        mediaId: number;
+        error: string | null;
+    }[];
+    syncLogs: {
+        message: string;
+        status: string;
+        id: number;
+        createdAt: Date;
+    }[];
+    completedAt?: Date | null | undefined;
+    requiredZones?: {
+        label: string;
+        slug: string;
+    }[] | undefined;
+    propertyId?: number | null | undefined;
+    capturedZones?: {
+        label: string;
+        slug: string;
+    }[] | undefined;
+    reportStatus?: "available" | "unavailable" | undefined;
+}>>;
+/**
+ * New clients should persist clientKey before sending for crash-safe idempotency. The key is unique within the authenticated company and inspection. A matching retry returns the original station (200); reusing a key with a different create payload returns 409. Legacy clients may omit clientKey and receive a normal 201 create response, but retries without a key are not guaranteed to replay the original row.
+ * @summary Create a bait station
+ */
+export declare const CreateBaitStationParams: zod.ZodObject<{
+    inspectionId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
+}, {
+    inspectionId: number;
+}>;
+export declare const createBaitStationBodyClientKeyMax = 200;
+export declare const createBaitStationBodyLabelMax = 100;
+export declare const createBaitStationBodyStatusDefault = "active";
+export declare const CreateBaitStationBody: zod.ZodObject<{
+    clientKey: zod.ZodOptional<zod.ZodString>;
+    label: zod.ZodString;
+    locationType: zod.ZodOptional<zod.ZodString>;
+    latitude: zod.ZodOptional<zod.ZodString>;
+    longitude: zod.ZodOptional<zod.ZodString>;
+    status: zod.ZodDefault<zod.ZodEnum<["active", "missing", "damaged", "removed"]>>;
+    notes: zod.ZodOptional<zod.ZodString>;
+    lastCheckedAt: zod.ZodOptional<zod.ZodDate>;
+}, "strip", zod.ZodTypeAny, {
+    status: "active" | "missing" | "damaged" | "removed";
+    label: string;
+    notes?: string | undefined;
+    clientKey?: string | undefined;
+    locationType?: string | undefined;
+    latitude?: string | undefined;
+    longitude?: string | undefined;
+    lastCheckedAt?: Date | undefined;
+}, {
+    label: string;
+    status?: "active" | "missing" | "damaged" | "removed" | undefined;
+    notes?: string | undefined;
+    clientKey?: string | undefined;
+    locationType?: string | undefined;
+    latitude?: string | undefined;
+    longitude?: string | undefined;
+    lastCheckedAt?: Date | undefined;
+}>;
+export declare const CreateBaitStationResponse: zod.ZodObject<{
+    id: zod.ZodNumber;
+    companyId: zod.ZodNumber;
+    inspectionId: zod.ZodNumber;
+    label: zod.ZodString;
+    locationType: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    latitude: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    longitude: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    status: zod.ZodEnum<["active", "missing", "damaged", "removed"]>;
+    notes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    lastCheckedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    status: "active" | "missing" | "damaged" | "removed";
+    id: number;
+    createdAt: Date;
+    inspectionId: number;
+    label: string;
+    companyId: number;
+    notes?: string | null | undefined;
+    locationType?: string | null | undefined;
+    latitude?: string | null | undefined;
+    longitude?: string | null | undefined;
+    lastCheckedAt?: Date | null | undefined;
+}, {
+    status: "active" | "missing" | "damaged" | "removed";
+    id: number;
+    createdAt: Date;
+    inspectionId: number;
+    label: string;
+    companyId: number;
+    notes?: string | null | undefined;
+    locationType?: string | null | undefined;
+    latitude?: string | null | undefined;
+    longitude?: string | null | undefined;
+    lastCheckedAt?: Date | null | undefined;
+}>;
+/**
+ * @summary List privacy-safe evidence metadata for an inspection
+ */
+export declare const ListMissionControlInspectionEvidenceParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const listMissionControlInspectionEvidenceResponseItemsItemQualityScoreMin = 0;
+export declare const listMissionControlInspectionEvidenceResponseItemsItemQualityScoreMax = 100;
+export declare const ListMissionControlInspectionEvidenceResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        inspectionId: zod.ZodNumber;
+        companyId: zod.ZodNumber;
+        mediaType: zod.ZodEnum<["photo", "video", "voice"]>;
+        filename: zod.ZodNullable<zod.ZodString>;
+        captureSource: zod.ZodString;
+        capturedAt: zod.ZodNullable<zod.ZodDate>;
+        createdAt: zod.ZodDate;
+        qualityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        processingStatus: zod.ZodEnum<["pending", "completed", "partial", "failed", "timed_out", "deferred"]>;
+        analysisStatus: zod.ZodEnum<["pending", "completed", "partial", "failed", "timed_out", "deferred", "unsupported"]>;
+        zone: zod.ZodNullable<zod.ZodString>;
+        findings: zod.ZodArray<zod.ZodObject<{
+            id: zod.ZodNumber;
+            category: zod.ZodString;
+            description: zod.ZodString;
+            confidence: zod.ZodNumber;
+            severity: zod.ZodString;
+            location: zod.ZodNullable<zod.ZodString>;
+        }, "strip", zod.ZodTypeAny, {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }, {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }>, "many">;
+        error: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        provider: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        model: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        createdAt: Date;
+        filename: string | null;
+        inspectionId: number;
+        zone: string | null;
+        mediaType: "photo" | "video" | "voice";
+        captureSource: string;
+        capturedAt: Date | null;
+        findings: {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }[];
+        companyId: number;
+        analysisStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "unsupported";
+        processingStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out";
+        qualityScore?: number | null | undefined;
+        model?: string | null | undefined;
+        error?: string | null | undefined;
+        provider?: string | null | undefined;
+    }, {
+        id: number;
+        createdAt: Date;
+        filename: string | null;
+        inspectionId: number;
+        zone: string | null;
+        mediaType: "photo" | "video" | "voice";
+        captureSource: string;
+        capturedAt: Date | null;
+        findings: {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }[];
+        companyId: number;
+        analysisStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "unsupported";
+        processingStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out";
+        qualityScore?: number | null | undefined;
+        model?: string | null | undefined;
+        error?: string | null | undefined;
+        provider?: string | null | undefined;
+    }>, "many">;
+    total: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    total: number;
+    items: {
+        id: number;
+        createdAt: Date;
+        filename: string | null;
+        inspectionId: number;
+        zone: string | null;
+        mediaType: "photo" | "video" | "voice";
+        captureSource: string;
+        capturedAt: Date | null;
+        findings: {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }[];
+        companyId: number;
+        analysisStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "unsupported";
+        processingStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out";
+        qualityScore?: number | null | undefined;
+        model?: string | null | undefined;
+        error?: string | null | undefined;
+        provider?: string | null | undefined;
+    }[];
+}, {
+    total: number;
+    items: {
+        id: number;
+        createdAt: Date;
+        filename: string | null;
+        inspectionId: number;
+        zone: string | null;
+        mediaType: "photo" | "video" | "voice";
+        captureSource: string;
+        capturedAt: Date | null;
+        findings: {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }[];
+        companyId: number;
+        analysisStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "unsupported";
+        processingStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out";
+        qualityScore?: number | null | undefined;
+        model?: string | null | undefined;
+        error?: string | null | undefined;
+        provider?: string | null | undefined;
+    }[];
+}>;
+/**
+ * @summary Get an evidence item with actual analysis findings, if present
+ */
+export declare const GetMissionControlInspectionEvidenceParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+    evidenceId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    evidenceId: number;
+}, {
+    id: number;
+    evidenceId: number;
+}>;
+export declare const getMissionControlInspectionEvidenceResponseOneQualityScoreMin = 0;
+export declare const getMissionControlInspectionEvidenceResponseOneQualityScoreMax = 100;
+export declare const GetMissionControlInspectionEvidenceResponse: zod.ZodObject<{
+    id: zod.ZodNumber;
+    inspectionId: zod.ZodNumber;
+    companyId: zod.ZodNumber;
+    mediaType: zod.ZodEnum<["photo", "video", "voice"]>;
+    filename: zod.ZodNullable<zod.ZodString>;
+    captureSource: zod.ZodString;
+    capturedAt: zod.ZodNullable<zod.ZodDate>;
+    createdAt: zod.ZodDate;
+    qualityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    processingStatus: zod.ZodEnum<["pending", "completed", "partial", "failed", "timed_out", "deferred"]>;
+    analysisStatus: zod.ZodEnum<["pending", "completed", "partial", "failed", "timed_out", "deferred", "unsupported"]>;
+    zone: zod.ZodNullable<zod.ZodString>;
+    findings: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        category: zod.ZodString;
+        description: zod.ZodString;
+        confidence: zod.ZodNumber;
+        severity: zod.ZodString;
+        location: zod.ZodNullable<zod.ZodString>;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        severity: string;
+        category: string;
+        description: string;
+        confidence: number;
+        location: string | null;
+    }, {
+        id: number;
+        severity: string;
+        category: string;
+        description: string;
+        confidence: number;
+        location: string | null;
+    }>, "many">;
+    error: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    provider: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    model: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+    createdAt: Date;
+    filename: string | null;
+    inspectionId: number;
+    zone: string | null;
+    mediaType: "photo" | "video" | "voice";
+    captureSource: string;
+    capturedAt: Date | null;
+    findings: {
+        id: number;
+        severity: string;
+        category: string;
+        description: string;
+        confidence: number;
+        location: string | null;
+    }[];
+    companyId: number;
+    analysisStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "unsupported";
+    processingStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out";
+    qualityScore?: number | null | undefined;
+    model?: string | null | undefined;
+    error?: string | null | undefined;
+    provider?: string | null | undefined;
+}, {
+    id: number;
+    createdAt: Date;
+    filename: string | null;
+    inspectionId: number;
+    zone: string | null;
+    mediaType: "photo" | "video" | "voice";
+    captureSource: string;
+    capturedAt: Date | null;
+    findings: {
+        id: number;
+        severity: string;
+        category: string;
+        description: string;
+        confidence: number;
+        location: string | null;
+    }[];
+    companyId: number;
+    analysisStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "unsupported";
+    processingStatus: "pending" | "completed" | "failed" | "deferred" | "partial" | "timed_out";
+    qualityScore?: number | null | undefined;
+    model?: string | null | undefined;
+    error?: string | null | undefined;
+    provider?: string | null | undefined;
+}>;
+/**
+ * @summary Read persisted AI processing runs, findings, coverage, and errors
+ */
+export declare const GetMissionControlInspectionAnalysisParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const GetMissionControlInspectionAnalysisResponse: zod.ZodObject<{
+    inspectionId: zod.ZodNumber;
+    state: zod.ZodEnum<["queued", "processing", "completed", "partial", "failed", "timed_out", "deferred", "unavailable"]>;
+    latestAnalysisId: zod.ZodNullable<zod.ZodNumber>;
+    provider: zod.ZodNullable<zod.ZodString>;
+    model: zod.ZodNullable<zod.ZodString>;
+    runs: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        state: zod.ZodEnum<["queued", "processing", "completed", "partial", "failed", "timed_out", "deferred", "unavailable"]>;
+        recordedAt: zod.ZodDate;
+        error: zod.ZodNullable<zod.ZodString>;
+        findings: zod.ZodArray<zod.ZodObject<{
+            id: zod.ZodNumber;
+            category: zod.ZodString;
+            description: zod.ZodString;
+            confidence: zod.ZodNumber;
+            severity: zod.ZodString;
+            location: zod.ZodNullable<zod.ZodString>;
+        }, "strip", zod.ZodTypeAny, {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }, {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }>, "many">;
+        requiredZones: zod.ZodArray<zod.ZodObject<{
+            slug: zod.ZodString;
+            label: zod.ZodString;
+        }, "strip", zod.ZodTypeAny, {
+            label: string;
+            slug: string;
+        }, {
+            label: string;
+            slug: string;
+        }>, "many">;
+        coveredZones: zod.ZodArray<zod.ZodObject<{
+            slug: zod.ZodString;
+            label: zod.ZodString;
+        }, "strip", zod.ZodTypeAny, {
+            label: string;
+            slug: string;
+        }, {
+            label: string;
+            slug: string;
+        }>, "many">;
+        uncoveredZones: zod.ZodArray<zod.ZodObject<{
+            slug: zod.ZodString;
+            label: zod.ZodString;
+        }, "strip", zod.ZodTypeAny, {
+            label: string;
+            slug: string;
+        }, {
+            label: string;
+            slug: string;
+        }>, "many">;
+        analysisErrors: zod.ZodNullable<zod.ZodNumber>;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        findings: {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }[];
+        requiredZones: {
+            label: string;
+            slug: string;
+        }[];
+        analysisErrors: number | null;
+        error: string | null;
+        state: "unavailable" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "queued" | "processing";
+        recordedAt: Date;
+        coveredZones: {
+            label: string;
+            slug: string;
+        }[];
+        uncoveredZones: {
+            label: string;
+            slug: string;
+        }[];
+    }, {
+        id: number;
+        findings: {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }[];
+        requiredZones: {
+            label: string;
+            slug: string;
+        }[];
+        analysisErrors: number | null;
+        error: string | null;
+        state: "unavailable" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "queued" | "processing";
+        recordedAt: Date;
+        coveredZones: {
+            label: string;
+            slug: string;
+        }[];
+        uncoveredZones: {
+            label: string;
+            slug: string;
+        }[];
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
+    model: string | null;
+    provider: string | null;
+    state: "unavailable" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "queued" | "processing";
+    latestAnalysisId: number | null;
+    runs: {
+        id: number;
+        findings: {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }[];
+        requiredZones: {
+            label: string;
+            slug: string;
+        }[];
+        analysisErrors: number | null;
+        error: string | null;
+        state: "unavailable" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "queued" | "processing";
+        recordedAt: Date;
+        coveredZones: {
+            label: string;
+            slug: string;
+        }[];
+        uncoveredZones: {
+            label: string;
+            slug: string;
+        }[];
+    }[];
+}, {
+    inspectionId: number;
+    model: string | null;
+    provider: string | null;
+    state: "unavailable" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "queued" | "processing";
+    latestAnalysisId: number | null;
+    runs: {
+        id: number;
+        findings: {
+            id: number;
+            severity: string;
+            category: string;
+            description: string;
+            confidence: number;
+            location: string | null;
+        }[];
+        requiredZones: {
+            label: string;
+            slug: string;
+        }[];
+        analysisErrors: number | null;
+        error: string | null;
+        state: "unavailable" | "completed" | "failed" | "deferred" | "partial" | "timed_out" | "queued" | "processing";
+        recordedAt: Date;
+        coveredZones: {
+            label: string;
+            slug: string;
+        }[];
+        uncoveredZones: {
+            label: string;
+            slug: string;
+        }[];
+    }[];
+}>;
+/**
+ * @summary Read provenance-aware inspection events and current-state snapshots
+ */
+export declare const GetMissionControlInspectionTimelineParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const GetMissionControlInspectionTimelineResponse: zod.ZodObject<{
+    inspectionId: zod.ZodNumber;
+    items: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodString;
+        type: zod.ZodEnum<["inspection", "evidence", "analysis", "sync", "device_session", "incident", "incident_action", "event"]>;
+        eventType: zod.ZodString;
+        status: zod.ZodNullable<zod.ZodString>;
+        occurredAt: zod.ZodNullable<zod.ZodDate>;
+        recordedAt: zod.ZodNullable<zod.ZodDate>;
+        observedAt: zod.ZodNullable<zod.ZodDate>;
+        provenance: zod.ZodEnum<["persisted_historical_event", "current_state_derived", "newly_generated_event"]>;
+        sourceType: zod.ZodString;
+        sourceId: zod.ZodString;
+        companyId: zod.ZodNumber;
+        inspectionId: zod.ZodNumber;
+        relatedId: zod.ZodNullable<zod.ZodNumber>;
+        detail: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        type: "inspection" | "evidence" | "incident" | "analysis" | "sync" | "device_session" | "incident_action" | "event";
+        status: string | null;
+        id: string;
+        inspectionId: number;
+        detail: string;
+        companyId: number;
+        recordedAt: Date | null;
+        eventType: string;
+        occurredAt: Date | null;
+        observedAt: Date | null;
+        provenance: "persisted_historical_event" | "current_state_derived" | "newly_generated_event";
+        sourceType: string;
+        sourceId: string;
+        relatedId: number | null;
+    }, {
+        type: "inspection" | "evidence" | "incident" | "analysis" | "sync" | "device_session" | "incident_action" | "event";
+        status: string | null;
+        id: string;
+        inspectionId: number;
+        detail: string;
+        companyId: number;
+        recordedAt: Date | null;
+        eventType: string;
+        occurredAt: Date | null;
+        observedAt: Date | null;
+        provenance: "persisted_historical_event" | "current_state_derived" | "newly_generated_event";
+        sourceType: string;
+        sourceId: string;
+        relatedId: number | null;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
+    items: {
+        type: "inspection" | "evidence" | "incident" | "analysis" | "sync" | "device_session" | "incident_action" | "event";
+        status: string | null;
+        id: string;
+        inspectionId: number;
+        detail: string;
+        companyId: number;
+        recordedAt: Date | null;
+        eventType: string;
+        occurredAt: Date | null;
+        observedAt: Date | null;
+        provenance: "persisted_historical_event" | "current_state_derived" | "newly_generated_event";
+        sourceType: string;
+        sourceId: string;
+        relatedId: number | null;
+    }[];
+}, {
+    inspectionId: number;
+    items: {
+        type: "inspection" | "evidence" | "incident" | "analysis" | "sync" | "device_session" | "incident_action" | "event";
+        status: string | null;
+        id: string;
+        inspectionId: number;
+        detail: string;
+        companyId: number;
+        recordedAt: Date | null;
+        eventType: string;
+        occurredAt: Date | null;
+        observedAt: Date | null;
+        provenance: "persisted_historical_event" | "current_state_derived" | "newly_generated_event";
+        sourceType: string;
+        sourceId: string;
+        relatedId: number | null;
+    }[];
+}>;
+/**
+ * @summary Filter and paginate platform incidents
+ */
+export declare const ListMissionControlIncidentsQueryParams: zod.ZodObject<{
+    severity: zod.ZodOptional<zod.ZodString>;
+    status: zod.ZodOptional<zod.ZodString>;
+    companyId: zod.ZodOptional<zod.ZodNumber>;
+    activeOnly: zod.ZodOptional<zod.ZodEnum<["true", "false"]>>;
+    hasSession: zod.ZodOptional<zod.ZodEnum<["true", "false"]>>;
+    sourceType: zod.ZodOptional<zod.ZodEnum<["error_event", "sync_log", "analysis"]>>;
+    page: zod.ZodOptional<zod.ZodNumber>;
+    limit: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    status?: string | undefined;
+    severity?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+    sourceType?: "analysis" | "error_event" | "sync_log" | undefined;
+    activeOnly?: "true" | "false" | undefined;
+    hasSession?: "true" | "false" | undefined;
+}, {
+    status?: string | undefined;
+    severity?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+    sourceType?: "analysis" | "error_event" | "sync_log" | undefined;
+    activeOnly?: "true" | "false" | undefined;
+    hasSession?: "true" | "false" | undefined;
+}>;
+export declare const ListMissionControlIncidentsResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        companyId: zod.ZodNumber;
+        companyName: zod.ZodString;
+        severity: zod.ZodEnum<["low", "medium", "high", "critical"]>;
+        status: zod.ZodEnum<["open", "acknowledged", "investigating", "resolved", "dismissed"]>;
+        title: zod.ZodString;
+        description: zod.ZodString;
+        assignedTo: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        acknowledgedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        createdAt: zod.ZodDate;
+        updatedAt: zod.ZodOptional<zod.ZodDate>;
+        sourceType: zod.ZodOptional<zod.ZodString>;
+        sourceId: zod.ZodOptional<zod.ZodString>;
+        inspectionId: zod.ZodOptional<zod.ZodNumber>;
+        userId: zod.ZodOptional<zod.ZodString>;
+        sessionId: zod.ZodOptional<zod.ZodNumber>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
+        id: number;
+        severity: "low" | "medium" | "high" | "critical";
+        createdAt: Date;
+        description: string;
+        title: string;
+        companyName: string;
+        companyId: number;
+        inspectionId?: number | undefined;
+        userId?: string | undefined;
+        updatedAt?: Date | undefined;
+        sourceType?: string | undefined;
+        sourceId?: string | undefined;
+        assignedTo?: string | null | undefined;
+        acknowledgedAt?: Date | null | undefined;
+        sessionId?: number | undefined;
+    }, {
+        status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
+        id: number;
+        severity: "low" | "medium" | "high" | "critical";
+        createdAt: Date;
+        description: string;
+        title: string;
+        companyName: string;
+        companyId: number;
+        inspectionId?: number | undefined;
+        userId?: string | undefined;
+        updatedAt?: Date | undefined;
+        sourceType?: string | undefined;
+        sourceId?: string | undefined;
+        assignedTo?: string | null | undefined;
+        acknowledgedAt?: Date | null | undefined;
+        sessionId?: number | undefined;
+    }>, "many">;
+    page: zod.ZodNumber;
+    limit: zod.ZodNumber;
+    total: zod.ZodNumber;
+    totalPages: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    total: number;
+    items: {
+        status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
+        id: number;
+        severity: "low" | "medium" | "high" | "critical";
+        createdAt: Date;
+        description: string;
+        title: string;
+        companyName: string;
+        companyId: number;
+        inspectionId?: number | undefined;
+        userId?: string | undefined;
+        updatedAt?: Date | undefined;
+        sourceType?: string | undefined;
+        sourceId?: string | undefined;
+        assignedTo?: string | null | undefined;
+        acknowledgedAt?: Date | null | undefined;
+        sessionId?: number | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}, {
+    total: number;
+    items: {
+        status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
+        id: number;
+        severity: "low" | "medium" | "high" | "critical";
+        createdAt: Date;
+        description: string;
+        title: string;
+        companyName: string;
+        companyId: number;
+        inspectionId?: number | undefined;
+        userId?: string | undefined;
+        updatedAt?: Date | undefined;
+        sourceType?: string | undefined;
+        sourceId?: string | undefined;
+        assignedTo?: string | null | undefined;
+        acknowledgedAt?: Date | null | undefined;
+        sessionId?: number | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}>;
+/**
+ * @summary Get incident detail
+ */
+export declare const GetMissionControlIncidentParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const GetMissionControlIncidentResponse: zod.ZodObject<{
+    id: zod.ZodNumber;
+    companyId: zod.ZodNumber;
+    companyName: zod.ZodString;
+    severity: zod.ZodEnum<["low", "medium", "high", "critical"]>;
+    status: zod.ZodEnum<["open", "acknowledged", "investigating", "resolved", "dismissed"]>;
+    title: zod.ZodString;
+    description: zod.ZodString;
+    assignedTo: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    acknowledgedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    createdAt: zod.ZodDate;
+    updatedAt: zod.ZodOptional<zod.ZodDate>;
+    sourceType: zod.ZodOptional<zod.ZodString>;
+    sourceId: zod.ZodOptional<zod.ZodString>;
+    inspectionId: zod.ZodOptional<zod.ZodNumber>;
+    userId: zod.ZodOptional<zod.ZodString>;
+    sessionId: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
+    id: number;
+    severity: "low" | "medium" | "high" | "critical";
+    createdAt: Date;
+    description: string;
+    title: string;
+    companyName: string;
+    companyId: number;
+    inspectionId?: number | undefined;
+    userId?: string | undefined;
+    updatedAt?: Date | undefined;
+    sourceType?: string | undefined;
+    sourceId?: string | undefined;
+    assignedTo?: string | null | undefined;
+    acknowledgedAt?: Date | null | undefined;
+    sessionId?: number | undefined;
+}, {
+    status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
+    id: number;
+    severity: "low" | "medium" | "high" | "critical";
+    createdAt: Date;
+    description: string;
+    title: string;
+    companyName: string;
+    companyId: number;
+    inspectionId?: number | undefined;
+    userId?: string | undefined;
+    updatedAt?: Date | undefined;
+    sourceType?: string | undefined;
+    sourceId?: string | undefined;
+    assignedTo?: string | null | undefined;
+    acknowledgedAt?: Date | null | undefined;
+    sessionId?: number | undefined;
+}>;
+/**
+ * @summary Acknowledge, assign, or escalate an incident
+ */
+export declare const UpdateMissionControlIncidentParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const updateMissionControlIncidentBodyAssigneeIdMax = 128;
+export declare const updateMissionControlIncidentBodyNoteMax = 1000;
+export declare const UpdateMissionControlIncidentBody: zod.ZodObject<{
+    action: zod.ZodEnum<["acknowledge", "assign", "claim", "resolve", "escalate"]>;
+    assigneeId: zod.ZodOptional<zod.ZodString>;
+    severity: zod.ZodOptional<zod.ZodEnum<["low", "medium", "high", "critical"]>>;
+    note: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    action: "acknowledge" | "assign" | "claim" | "resolve" | "escalate";
+    severity?: "low" | "medium" | "high" | "critical" | undefined;
+    note?: string | undefined;
+    assigneeId?: string | undefined;
+}, {
+    action: "acknowledge" | "assign" | "claim" | "resolve" | "escalate";
+    severity?: "low" | "medium" | "high" | "critical" | undefined;
+    note?: string | undefined;
+    assigneeId?: string | undefined;
+}>;
+export declare const UpdateMissionControlIncidentResponse: zod.ZodObject<{
+    id: zod.ZodNumber;
+    companyId: zod.ZodNumber;
+    companyName: zod.ZodString;
+    severity: zod.ZodEnum<["low", "medium", "high", "critical"]>;
+    status: zod.ZodEnum<["open", "acknowledged", "investigating", "resolved", "dismissed"]>;
+    title: zod.ZodString;
+    description: zod.ZodString;
+    assignedTo: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    acknowledgedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    createdAt: zod.ZodDate;
+    updatedAt: zod.ZodOptional<zod.ZodDate>;
+    sourceType: zod.ZodOptional<zod.ZodString>;
+    sourceId: zod.ZodOptional<zod.ZodString>;
+    inspectionId: zod.ZodOptional<zod.ZodNumber>;
+    userId: zod.ZodOptional<zod.ZodString>;
+    sessionId: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
+    id: number;
+    severity: "low" | "medium" | "high" | "critical";
+    createdAt: Date;
+    description: string;
+    title: string;
+    companyName: string;
+    companyId: number;
+    inspectionId?: number | undefined;
+    userId?: string | undefined;
+    updatedAt?: Date | undefined;
+    sourceType?: string | undefined;
+    sourceId?: string | undefined;
+    assignedTo?: string | null | undefined;
+    acknowledgedAt?: Date | null | undefined;
+    sessionId?: number | undefined;
+}, {
+    status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
+    id: number;
+    severity: "low" | "medium" | "high" | "critical";
+    createdAt: Date;
+    description: string;
+    title: string;
+    companyName: string;
+    companyId: number;
+    inspectionId?: number | undefined;
+    userId?: string | undefined;
+    updatedAt?: Date | undefined;
+    sourceType?: string | undefined;
+    sourceId?: string | undefined;
+    assignedTo?: string | null | undefined;
+    acknowledgedAt?: Date | null | undefined;
+    sessionId?: number | undefined;
+}>;
+/**
+ * @summary Paginated super-admin action history
+ */
+export declare const ListMissionControlAuditQueryParams: zod.ZodObject<{
+    page: zod.ZodOptional<zod.ZodNumber>;
+    limit: zod.ZodOptional<zod.ZodNumber>;
+    action: zod.ZodOptional<zod.ZodString>;
+    actorId: zod.ZodOptional<zod.ZodString>;
+    targetType: zod.ZodOptional<zod.ZodString>;
+    targetId: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    page?: number | undefined;
+    limit?: number | undefined;
+    action?: string | undefined;
+    actorId?: string | undefined;
+    targetType?: string | undefined;
+    targetId?: string | undefined;
+}, {
+    page?: number | undefined;
+    limit?: number | undefined;
+    action?: string | undefined;
+    actorId?: string | undefined;
+    targetType?: string | undefined;
+    targetId?: string | undefined;
+}>;
+export declare const ListMissionControlAuditResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        actorId: zod.ZodString;
+        actorName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        action: zod.ZodString;
+        targetType: zod.ZodString;
+        targetId: zod.ZodString;
+        details: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        createdAt: Date;
+        action: string;
+        actorId: string;
+        targetType: string;
+        targetId: string;
+        actorName?: string | null | undefined;
+        details?: string | null | undefined;
+    }, {
+        id: number;
+        createdAt: Date;
+        action: string;
+        actorId: string;
+        targetType: string;
+        targetId: string;
+        actorName?: string | null | undefined;
+        details?: string | null | undefined;
+    }>, "many">;
+    page: zod.ZodNumber;
+    limit: zod.ZodNumber;
+    total: zod.ZodNumber;
+    totalPages: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    total: number;
+    items: {
+        id: number;
+        createdAt: Date;
+        action: string;
+        actorId: string;
+        targetType: string;
+        targetId: string;
+        actorName?: string | null | undefined;
+        details?: string | null | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}, {
+    total: number;
+    items: {
+        id: number;
+        createdAt: Date;
+        action: string;
+        actorId: string;
+        targetType: string;
+        targetId: string;
+        actorName?: string | null | undefined;
+        details?: string | null | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}>;
+/**
+ * @summary List executive agents and real-task-backed Agent Zero availability
+ */
+export declare const listMissionControlAgentsResponseAgentZeroRealTaskCountMin = 0;
+export declare const ListMissionControlAgentsResponse: zod.ZodObject<{
+    agents: zod.ZodArray<zod.ZodObject<{
+        identity: zod.ZodEnum<["quinn", "ada", "mara", "theo", "nadia", "iris", "dario"]>;
+        displayName: zod.ZodEnum<["Quinn", "Ada", "Mara", "Theo", "Nadia", "Iris", "Dario"]>;
+        role: zod.ZodString;
+        capability: zod.ZodOptional<zod.ZodString>;
+        status: zod.ZodEnum<["available", "busy", "unavailable"]>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "available" | "unavailable" | "busy";
+        role: string;
+        identity: "quinn" | "ada" | "mara" | "theo" | "nadia" | "iris" | "dario";
+        displayName: "Quinn" | "Ada" | "Mara" | "Theo" | "Nadia" | "Iris" | "Dario";
+        capability?: string | undefined;
+    }, {
+        status: "available" | "unavailable" | "busy";
+        role: string;
+        identity: "quinn" | "ada" | "mara" | "theo" | "nadia" | "iris" | "dario";
+        displayName: "Quinn" | "Ada" | "Mara" | "Theo" | "Nadia" | "Iris" | "Dario";
+        capability?: string | undefined;
+    }>, "many">;
+    agentZero: zod.ZodObject<{
+        available: zod.ZodBoolean;
+        realTaskCount: zod.ZodNumber;
+        basis: zod.ZodEnum<["real_tasks"]>;
+        approvalRequired: zod.ZodOptional<zod.ZodBoolean>;
+    }, "strip", zod.ZodTypeAny, {
+        available: boolean;
+        realTaskCount: number;
+        basis: "real_tasks";
+        approvalRequired?: boolean | undefined;
+    }, {
+        available: boolean;
+        realTaskCount: number;
+        basis: "real_tasks";
+        approvalRequired?: boolean | undefined;
+    }>;
+}, "strip", zod.ZodTypeAny, {
+    agents: {
+        status: "available" | "unavailable" | "busy";
+        role: string;
+        identity: "quinn" | "ada" | "mara" | "theo" | "nadia" | "iris" | "dario";
+        displayName: "Quinn" | "Ada" | "Mara" | "Theo" | "Nadia" | "Iris" | "Dario";
+        capability?: string | undefined;
+    }[];
+    agentZero: {
+        available: boolean;
+        realTaskCount: number;
+        basis: "real_tasks";
+        approvalRequired?: boolean | undefined;
+    };
+}, {
+    agents: {
+        status: "available" | "unavailable" | "busy";
+        role: string;
+        identity: "quinn" | "ada" | "mara" | "theo" | "nadia" | "iris" | "dario";
+        displayName: "Quinn" | "Ada" | "Mara" | "Theo" | "Nadia" | "Iris" | "Dario";
+        capability?: string | undefined;
+    }[];
+    agentZero: {
+        available: boolean;
+        realTaskCount: number;
+        basis: "real_tasks";
+        approvalRequired?: boolean | undefined;
+    };
+}>;
+/**
+ * @summary List agent tasks
+ */
+export declare const ListMissionControlAgentTasksQueryParams: zod.ZodObject<{
+    companyId: zod.ZodOptional<zod.ZodNumber>;
+    status: zod.ZodOptional<zod.ZodString>;
+    page: zod.ZodOptional<zod.ZodNumber>;
+    limit: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    status?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+}, {
+    status?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+    companyId?: number | undefined;
+}>;
+export declare const ListMissionControlAgentTasksResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        companyId: zod.ZodNumber;
+        companyName: zod.ZodString;
+        prompt: zod.ZodString;
+        status: zod.ZodEnum<["queued", "running", "completed", "failed", "cancelled"]>;
+        createdBy: zod.ZodString;
+        result: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        error: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        createdAt: zod.ZodDate;
+        startedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        delegations: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            id: zod.ZodNumber;
+            specialist: zod.ZodString;
+            scope: zod.ZodString;
+            status: zod.ZodEnum<["queued", "running", "completed", "failed"]>;
+            result: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+            error: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+            createdAt: zod.ZodDate;
+            completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        }, "strip", zod.ZodTypeAny, {
+            status: "completed" | "failed" | "queued" | "running";
+            id: number;
+            createdAt: Date;
+            specialist: string;
+            scope: string;
+            completedAt?: Date | null | undefined;
+            error?: string | null | undefined;
+            result?: string | null | undefined;
+        }, {
+            status: "completed" | "failed" | "queued" | "running";
+            id: number;
+            createdAt: Date;
+            specialist: string;
+            scope: string;
+            completedAt?: Date | null | undefined;
+            error?: string | null | undefined;
+            result?: string | null | undefined;
+        }>, "many">>;
+        traces: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+            id: zod.ZodNumber;
+            delegationId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+            actor: zod.ZodString;
+            event: zod.ZodString;
+            detail: zod.ZodString;
+            createdAt: zod.ZodDate;
+        }, "strip", zod.ZodTypeAny, {
+            id: number;
+            createdAt: Date;
+            detail: string;
+            event: string;
+            actor: string;
+            delegationId?: number | null | undefined;
+        }, {
+            id: number;
+            createdAt: Date;
+            detail: string;
+            event: string;
+            actor: string;
+            delegationId?: number | null | undefined;
+        }>, "many">>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "completed" | "failed" | "queued" | "running" | "cancelled";
+        id: number;
+        createdAt: Date;
+        createdBy: string;
+        companyName: string;
+        companyId: number;
+        prompt: string;
+        completedAt?: Date | null | undefined;
+        error?: string | null | undefined;
+        result?: string | null | undefined;
+        startedAt?: Date | null | undefined;
+        delegations?: {
+            status: "completed" | "failed" | "queued" | "running";
+            id: number;
+            createdAt: Date;
+            specialist: string;
+            scope: string;
+            completedAt?: Date | null | undefined;
+            error?: string | null | undefined;
+            result?: string | null | undefined;
+        }[] | undefined;
+        traces?: {
+            id: number;
+            createdAt: Date;
+            detail: string;
+            event: string;
+            actor: string;
+            delegationId?: number | null | undefined;
+        }[] | undefined;
+    }, {
+        status: "completed" | "failed" | "queued" | "running" | "cancelled";
+        id: number;
+        createdAt: Date;
+        createdBy: string;
+        companyName: string;
+        companyId: number;
+        prompt: string;
+        completedAt?: Date | null | undefined;
+        error?: string | null | undefined;
+        result?: string | null | undefined;
+        startedAt?: Date | null | undefined;
+        delegations?: {
+            status: "completed" | "failed" | "queued" | "running";
+            id: number;
+            createdAt: Date;
+            specialist: string;
+            scope: string;
+            completedAt?: Date | null | undefined;
+            error?: string | null | undefined;
+            result?: string | null | undefined;
+        }[] | undefined;
+        traces?: {
+            id: number;
+            createdAt: Date;
+            detail: string;
+            event: string;
+            actor: string;
+            delegationId?: number | null | undefined;
+        }[] | undefined;
+    }>, "many">;
+    page: zod.ZodNumber;
+    limit: zod.ZodNumber;
+    total: zod.ZodNumber;
+    totalPages: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    total: number;
+    items: {
+        status: "completed" | "failed" | "queued" | "running" | "cancelled";
+        id: number;
+        createdAt: Date;
+        createdBy: string;
+        companyName: string;
+        companyId: number;
+        prompt: string;
+        completedAt?: Date | null | undefined;
+        error?: string | null | undefined;
+        result?: string | null | undefined;
+        startedAt?: Date | null | undefined;
+        delegations?: {
+            status: "completed" | "failed" | "queued" | "running";
+            id: number;
+            createdAt: Date;
+            specialist: string;
+            scope: string;
+            completedAt?: Date | null | undefined;
+            error?: string | null | undefined;
+            result?: string | null | undefined;
+        }[] | undefined;
+        traces?: {
+            id: number;
+            createdAt: Date;
+            detail: string;
+            event: string;
+            actor: string;
+            delegationId?: number | null | undefined;
+        }[] | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}, {
+    total: number;
+    items: {
+        status: "completed" | "failed" | "queued" | "running" | "cancelled";
+        id: number;
+        createdAt: Date;
+        createdBy: string;
+        companyName: string;
+        companyId: number;
+        prompt: string;
+        completedAt?: Date | null | undefined;
+        error?: string | null | undefined;
+        result?: string | null | undefined;
+        startedAt?: Date | null | undefined;
+        delegations?: {
+            status: "completed" | "failed" | "queued" | "running";
+            id: number;
+            createdAt: Date;
+            specialist: string;
+            scope: string;
+            completedAt?: Date | null | undefined;
+            error?: string | null | undefined;
+            result?: string | null | undefined;
+        }[] | undefined;
+        traces?: {
+            id: number;
+            createdAt: Date;
+            detail: string;
+            event: string;
+            actor: string;
+            delegationId?: number | null | undefined;
+        }[] | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}>;
+/**
+ * @summary Create a company-scoped agent investigation task
+ */
+export declare const CreateMissionControlAgentTaskBody: zod.ZodObject<{
+    companyId: zod.ZodNumber;
+    prompt: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    companyId: number;
+    prompt: string;
+}, {
+    companyId: number;
+    prompt: string;
+}>;
+/**
+ * @summary Get an agent task and its results
+ */
+export declare const GetMissionControlAgentTaskParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const GetMissionControlAgentTaskResponse: zod.ZodObject<{
+    id: zod.ZodNumber;
+    companyId: zod.ZodNumber;
+    companyName: zod.ZodString;
+    prompt: zod.ZodString;
+    status: zod.ZodEnum<["queued", "running", "completed", "failed", "cancelled"]>;
+    createdBy: zod.ZodString;
+    result: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    error: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    createdAt: zod.ZodDate;
+    startedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    delegations: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        specialist: zod.ZodString;
+        scope: zod.ZodString;
+        status: zod.ZodEnum<["queued", "running", "completed", "failed"]>;
+        result: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        error: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        createdAt: zod.ZodDate;
+        completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    }, "strip", zod.ZodTypeAny, {
+        status: "completed" | "failed" | "queued" | "running";
+        id: number;
+        createdAt: Date;
+        specialist: string;
+        scope: string;
+        completedAt?: Date | null | undefined;
+        error?: string | null | undefined;
+        result?: string | null | undefined;
+    }, {
+        status: "completed" | "failed" | "queued" | "running";
+        id: number;
+        createdAt: Date;
+        specialist: string;
+        scope: string;
+        completedAt?: Date | null | undefined;
+        error?: string | null | undefined;
+        result?: string | null | undefined;
+    }>, "many">>;
+    traces: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        delegationId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+        actor: zod.ZodString;
+        event: zod.ZodString;
+        detail: zod.ZodString;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        id: number;
+        createdAt: Date;
+        detail: string;
+        event: string;
+        actor: string;
+        delegationId?: number | null | undefined;
+    }, {
+        id: number;
+        createdAt: Date;
+        detail: string;
+        event: string;
+        actor: string;
+        delegationId?: number | null | undefined;
+    }>, "many">>;
+}, "strip", zod.ZodTypeAny, {
+    status: "completed" | "failed" | "queued" | "running" | "cancelled";
+    id: number;
+    createdAt: Date;
+    createdBy: string;
+    companyName: string;
+    companyId: number;
+    prompt: string;
+    completedAt?: Date | null | undefined;
+    error?: string | null | undefined;
+    result?: string | null | undefined;
+    startedAt?: Date | null | undefined;
+    delegations?: {
+        status: "completed" | "failed" | "queued" | "running";
+        id: number;
+        createdAt: Date;
+        specialist: string;
+        scope: string;
+        completedAt?: Date | null | undefined;
+        error?: string | null | undefined;
+        result?: string | null | undefined;
+    }[] | undefined;
+    traces?: {
+        id: number;
+        createdAt: Date;
+        detail: string;
+        event: string;
+        actor: string;
+        delegationId?: number | null | undefined;
+    }[] | undefined;
+}, {
+    status: "completed" | "failed" | "queued" | "running" | "cancelled";
+    id: number;
+    createdAt: Date;
+    createdBy: string;
+    companyName: string;
+    companyId: number;
+    prompt: string;
+    completedAt?: Date | null | undefined;
+    error?: string | null | undefined;
+    result?: string | null | undefined;
+    startedAt?: Date | null | undefined;
+    delegations?: {
+        status: "completed" | "failed" | "queued" | "running";
+        id: number;
+        createdAt: Date;
+        specialist: string;
+        scope: string;
+        completedAt?: Date | null | undefined;
+        error?: string | null | undefined;
+        result?: string | null | undefined;
+    }[] | undefined;
+    traces?: {
+        id: number;
+        createdAt: Date;
+        detail: string;
+        event: string;
+        actor: string;
+        delegationId?: number | null | undefined;
+    }[] | undefined;
+}>;
+/**
+ * @summary List approval requests
+ */
+export declare const ListMissionControlApprovalsQueryParams: zod.ZodObject<{
+    status: zod.ZodOptional<zod.ZodString>;
+    page: zod.ZodOptional<zod.ZodNumber>;
+    limit: zod.ZodOptional<zod.ZodNumber>;
+}, "strip", zod.ZodTypeAny, {
+    status?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+}, {
+    status?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+}>;
+export declare const ListMissionControlApprovalsResponse: zod.ZodObject<{
+    items: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodNumber;
+        type: zod.ZodString;
+        status: zod.ZodEnum<["pending", "approved", "rejected"]>;
+        requestedBy: zod.ZodString;
+        request: zod.ZodString;
+        note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        decidedBy: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+        createdAt: zod.ZodDate;
+        decidedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+        targetType: zod.ZodEnum<["company", "user"]>;
+        targetId: zod.ZodString;
+        action: zod.ZodString;
+        reason: zod.ZodOptional<zod.ZodString>;
+        grantAuditId: zod.ZodOptional<zod.ZodNumber>;
+        verifiedEmail: zod.ZodOptional<zod.ZodString>;
+    }, "strip", zod.ZodTypeAny, {
+        type: string;
+        status: "pending" | "approved" | "rejected";
+        id: number;
+        createdAt: Date;
+        action: string;
+        targetType: "company" | "user";
+        targetId: string;
+        requestedBy: string;
+        request: string;
+        note?: string | null | undefined;
+        reason?: string | undefined;
+        decidedBy?: string | null | undefined;
+        decidedAt?: Date | null | undefined;
+        grantAuditId?: number | undefined;
+        verifiedEmail?: string | undefined;
+    }, {
+        type: string;
+        status: "pending" | "approved" | "rejected";
+        id: number;
+        createdAt: Date;
+        action: string;
+        targetType: "company" | "user";
+        targetId: string;
+        requestedBy: string;
+        request: string;
+        note?: string | null | undefined;
+        reason?: string | undefined;
+        decidedBy?: string | null | undefined;
+        decidedAt?: Date | null | undefined;
+        grantAuditId?: number | undefined;
+        verifiedEmail?: string | undefined;
+    }>, "many">;
+    page: zod.ZodNumber;
+    limit: zod.ZodNumber;
+    total: zod.ZodNumber;
+    totalPages: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    total: number;
+    items: {
+        type: string;
+        status: "pending" | "approved" | "rejected";
+        id: number;
+        createdAt: Date;
+        action: string;
+        targetType: "company" | "user";
+        targetId: string;
+        requestedBy: string;
+        request: string;
+        note?: string | null | undefined;
+        reason?: string | undefined;
+        decidedBy?: string | null | undefined;
+        decidedAt?: Date | null | undefined;
+        grantAuditId?: number | undefined;
+        verifiedEmail?: string | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}, {
+    total: number;
+    items: {
+        type: string;
+        status: "pending" | "approved" | "rejected";
+        id: number;
+        createdAt: Date;
+        action: string;
+        targetType: "company" | "user";
+        targetId: string;
+        requestedBy: string;
+        request: string;
+        note?: string | null | undefined;
+        reason?: string | undefined;
+        decidedBy?: string | null | undefined;
+        decidedAt?: Date | null | undefined;
+        grantAuditId?: number | undefined;
+        verifiedEmail?: string | undefined;
+    }[];
+    page: number;
+    limit: number;
+    totalPages: number;
+}>;
+/**
+ * @summary Resolve a verified primary email to an existing application user
+ */
+export declare const ResolveMissionControlSuperAdminTargetQueryParams: zod.ZodObject<{
+    email: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    email: string;
+}, {
+    email: string;
+}>;
+export declare const ResolveMissionControlSuperAdminTargetResponse: zod.ZodObject<{
+    clerkUserId: zod.ZodString;
+    appUserId: zod.ZodNumber;
+    isSuperAdmin: zod.ZodBoolean;
+    companyId: zod.ZodNullable<zod.ZodNumber>;
+    verifiedEmail: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    clerkUserId: string;
+    companyId: number | null;
+    isSuperAdmin: boolean;
+    verifiedEmail: string;
+    appUserId: number;
+}, {
+    clerkUserId: string;
+    companyId: number | null;
+    isSuperAdmin: boolean;
+    verifiedEmail: string;
+    appUserId: number;
+}>;
+/**
+ * Requires the authenticated sole Super Admin whose Clerk subject is pinned in server configuration. Does not create a user or change access.
+ * @summary Preview the one-time, explicitly authorized second-Super-Admin bootstrap target
+ */
+export declare const PreviewMissionControlSuperAdminBootstrapResponse: zod.ZodObject<{
+    clerkUserId: zod.ZodString;
+    appUserId: zod.ZodNumber;
+    verifiedEmail: zod.ZodString;
+    isSuperAdmin: zod.ZodBoolean;
+    companyId: zod.ZodNullable<zod.ZodNumber>;
+    bootstrapOperationId: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    clerkUserId: string;
+    companyId: number | null;
+    isSuperAdmin: boolean;
+    verifiedEmail: string;
+    appUserId: number;
+    bootstrapOperationId: string;
+}, {
+    clerkUserId: string;
+    companyId: number | null;
+    isSuperAdmin: boolean;
+    verifiedEmail: string;
+    appUserId: number;
+    bootstrapOperationId: string;
+}>;
+/**
+ * Requires an authenticated Clerk bearer session from the configured sole Super Admin, a fresh server-side Production Clerk resolution, and exact target confirmation. Exact retries return the prior audit ID without a new grant. Never used for subsequent grants.
+ * @summary Atomically grant the pinned second Super Admin once and append an immutable audit event
+ */
+export declare const executeMissionControlSuperAdminBootstrapBodyReasonMax = 1000;
+export declare const ExecuteMissionControlSuperAdminBootstrapBody: zod.ZodObject<{
+    requestId: zod.ZodString;
+    reason: zod.ZodString;
+    confirmation: zod.ZodObject<{
+        verifiedEmail: zod.ZodString;
+        clerkUserId: zod.ZodString;
+        appUserId: zod.ZodNumber;
+    }, "strip", zod.ZodTypeAny, {
+        clerkUserId: string;
+        verifiedEmail: string;
+        appUserId: number;
+    }, {
+        clerkUserId: string;
+        verifiedEmail: string;
+        appUserId: number;
+    }>;
+}, "strip", zod.ZodTypeAny, {
+    reason: string;
+    requestId: string;
+    confirmation: {
+        clerkUserId: string;
+        verifiedEmail: string;
+        appUserId: number;
+    };
+}, {
+    reason: string;
+    requestId: string;
+    confirmation: {
+        clerkUserId: string;
+        verifiedEmail: string;
+        appUserId: number;
+    };
+}>;
+export declare const ExecuteMissionControlSuperAdminBootstrapResponse: zod.ZodObject<{
+    auditId: zod.ZodNumber;
+    operationId: zod.ZodString;
+    requestId: zod.ZodString;
+    bootstrapOperationId: zod.ZodString;
+    replayed: zod.ZodBoolean;
+    targetClerkId: zod.ZodOptional<zod.ZodString>;
+    targetUserId: zod.ZodOptional<zod.ZodNumber>;
+    previousIsSuperAdmin: zod.ZodOptional<zod.ZodBoolean>;
+    isSuperAdmin: zod.ZodOptional<zod.ZodBoolean>;
+    createdAt: zod.ZodOptional<zod.ZodDate>;
+}, "strip", zod.ZodTypeAny, {
+    bootstrapOperationId: string;
+    requestId: string;
+    auditId: number;
+    operationId: string;
+    replayed: boolean;
+    createdAt?: Date | undefined;
+    isSuperAdmin?: boolean | undefined;
+    targetClerkId?: string | undefined;
+    targetUserId?: number | undefined;
+    previousIsSuperAdmin?: boolean | undefined;
+}, {
+    bootstrapOperationId: string;
+    requestId: string;
+    auditId: number;
+    operationId: string;
+    replayed: boolean;
+    createdAt?: Date | undefined;
+    isSuperAdmin?: boolean | undefined;
+    targetClerkId?: string | undefined;
+    targetUserId?: number | undefined;
+    previousIsSuperAdmin?: boolean | undefined;
+}>;
+/**
+ * @summary Request a second administrator's approval for an access change
+ */
+export declare const requestMissionControlApprovalBodyReasonMax = 1000;
+export declare const requestMissionControlApprovalBodyIdempotencyKeyMax = 128;
+export declare const RequestMissionControlApprovalBody: zod.ZodObject<{
+    targetType: zod.ZodEnum<["company", "user"]>;
+    targetId: zod.ZodString;
+    action: zod.ZodEnum<["suspend", "enable", "beta_enable", "beta_disable", "super_admin_enable", "super_admin_disable"]>;
+    reason: zod.ZodString;
+    idempotencyKey: zod.ZodOptional<zod.ZodString>;
+    verifiedEmail: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    reason: string;
+    action: "suspend" | "enable" | "beta_enable" | "beta_disable" | "super_admin_enable" | "super_admin_disable";
+    targetType: "company" | "user";
+    targetId: string;
+    verifiedEmail?: string | undefined;
+    idempotencyKey?: string | undefined;
+}, {
+    reason: string;
+    action: "suspend" | "enable" | "beta_enable" | "beta_disable" | "super_admin_enable" | "super_admin_disable";
+    targetType: "company" | "user";
+    targetId: string;
+    verifiedEmail?: string | undefined;
+    idempotencyKey?: string | undefined;
+}>;
+/**
+ * @summary Approve or reject an approval request with a note
+ */
+export declare const DecideMissionControlApprovalParams: zod.ZodObject<{
+    id: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    id: number;
+}, {
+    id: number;
+}>;
+export declare const DecideMissionControlApprovalBody: zod.ZodObject<{
+    decision: zod.ZodEnum<["approve", "reject"]>;
+    note: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    note: string;
+    decision: "approve" | "reject";
+}, {
+    note: string;
+    decision: "approve" | "reject";
+}>;
+export declare const DecideMissionControlApprovalResponse: zod.ZodObject<{
+    id: zod.ZodNumber;
+    type: zod.ZodString;
+    status: zod.ZodEnum<["pending", "approved", "rejected"]>;
+    requestedBy: zod.ZodString;
+    request: zod.ZodString;
+    note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    decidedBy: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    createdAt: zod.ZodDate;
+    decidedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
+    targetType: zod.ZodEnum<["company", "user"]>;
+    targetId: zod.ZodString;
+    action: zod.ZodString;
+    reason: zod.ZodOptional<zod.ZodString>;
+    grantAuditId: zod.ZodOptional<zod.ZodNumber>;
+    verifiedEmail: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    type: string;
+    status: "pending" | "approved" | "rejected";
+    id: number;
+    createdAt: Date;
+    action: string;
+    targetType: "company" | "user";
+    targetId: string;
+    requestedBy: string;
+    request: string;
+    note?: string | null | undefined;
+    reason?: string | undefined;
+    decidedBy?: string | null | undefined;
+    decidedAt?: Date | null | undefined;
+    grantAuditId?: number | undefined;
+    verifiedEmail?: string | undefined;
+}, {
+    type: string;
+    status: "pending" | "approved" | "rejected";
+    id: number;
+    createdAt: Date;
+    action: string;
+    targetType: "company" | "user";
+    targetId: string;
+    requestedBy: string;
+    request: string;
+    note?: string | null | undefined;
+    reason?: string | undefined;
+    decidedBy?: string | null | undefined;
+    decidedAt?: Date | null | undefined;
+    grantAuditId?: number | undefined;
+    verifiedEmail?: string | undefined;
 }>;
 //# sourceMappingURL=api.d.ts.map

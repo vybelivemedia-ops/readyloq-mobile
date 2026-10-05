@@ -12,13 +12,36 @@
  * Auth is intentionally omitted — these endpoints accept unsigned ingest payloads.
  */
 
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Crypto from "expo-crypto";
 import { API_BASE } from "@/lib/api";
+import { createSanitizedPhotoCopy } from "@/lib/privacy/image-sanitizer";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 async function readBase64(uri: string): Promise<string> {
-  return FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+  let downloadedUri: string | undefined;
+  let sanitizedUri: string | undefined;
+  try {
+    let localUri = uri;
+    if (!/^(file|content):\/\//i.test(uri)) {
+      const remoteUri = /^https?:\/\//i.test(uri) ? uri : `${API_BASE}${uri}`;
+      if (!/^https?:\/\//i.test(remoteUri)) {
+        throw new Error("Cannot sanitize an image without a resolvable source URL.");
+      }
+      downloadedUri = `${FileSystem.cacheDirectory}faie-source-${Crypto.randomUUID()}`;
+      const download = await FileSystem.downloadAsync(remoteUri, downloadedUri);
+      if (download.status < 200 || download.status >= 300) {
+        throw new Error(`Image download for FAIE sanitization failed (${download.status}).`);
+      }
+      localUri = download.uri;
+    }
+    sanitizedUri = await createSanitizedPhotoCopy(localUri);
+    return await FileSystem.readAsStringAsync(sanitizedUri, { encoding: "base64" });
+  } finally {
+    if (downloadedUri) await FileSystem.deleteAsync(downloadedUri, { idempotent: true }).catch(() => {});
+    if (sanitizedUri) await FileSystem.deleteAsync(sanitizedUri, { idempotent: true }).catch(() => {});
+  }
 }
 
 async function postFaie(path: string, body: object): Promise<void> {

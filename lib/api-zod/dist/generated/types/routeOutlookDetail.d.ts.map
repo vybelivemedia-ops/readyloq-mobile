@@ -1,0 +1,1 @@
+{"version":3,"file":"routeOutlookDetail.d.ts","sourceRoot":"","sources":["../../../src/generated/types/routeOutlookDetail.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,mBAAmB,EAAE,MAAM,uBAAuB,CAAC;AAEjE,MAAM,WAAW,kBAAkB;IACjC,OAAO,EAAE,MAAM,CAAC;IAChB,iBAAiB;IACjB,YAAY,EAAE,MAAM,CAAC;IACrB,QAAQ,EAAE,mBAAmB,EAAE,CAAC;CACjC"}

@@ -527,10 +527,10 @@ export declare const insertPropertyProfileSchema: z.ZodObject<{
     in: {};
 }>;
 export declare const insertPropertyNoteSchema: z.ZodObject<{
-    addressKey: z.ZodString;
     note: z.ZodString;
-    zone: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     category: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    addressKey: z.ZodString;
+    zone: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     authorName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, {
     out: {};

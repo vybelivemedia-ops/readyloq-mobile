@@ -1,4 +1,5 @@
 export * from "./inspections";
+export * from "./upload-intents";
 export * from "./analysis";
 export * from "./callbacks";
 export * from "./dataset";
@@ -28,4 +29,7 @@ export * from "./client-portal";
 export * from "./meta-glasses";
 export * from "./portal-messages";
 export * from "./enterprise-outbox";
+export * from "./enterprise-sync";
+export * from "./chemicals";
+export * from "./mission-control";
 //# sourceMappingURL=index.d.ts.map

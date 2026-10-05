@@ -1,8 +1,19 @@
-import { pgTable, serial, integer, text, real, jsonb, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  serial,
+  integer,
+  text,
+  real,
+  date,
+  jsonb,
+  timestamp,
+  primaryKey,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { inspectionsTable } from "./inspections";
 import { companiesTable } from "./companies";
+import type { AiPrediction } from "./intelligence-dataset";
 
 export const analysisResultsTable = pgTable("analysis_results", {
   id: serial("id").primaryKey(),
@@ -22,6 +33,11 @@ export const analysisResultsTable = pgTable("analysis_results", {
   // instead of re-sent to the model. Failed photos are NOT recorded so they
   // retry on the next run.
   analyzedImagePaths: jsonb("analyzed_image_paths").$type<string[]>().default([]),
+  // Outcome for each eligible submitted photo in the most recent analysis run.
+  // Unlike analyzedImagePaths, this retains explicit non-success outcomes so
+  // the technician can distinguish an ordinary failure from a deferred or
+  // provider-rate-limited photo without inventing a finding.
+  photoOutcomes: jsonb("photo_outcomes").$type<PhotoAnalysisOutcome[]>().default([]),
   // Per-photo zone classification (storage path -> zone slug) from the vision
   // model's scene detection. Carried forward across live re-runs like findings,
   // so clean photos (which produce no finding) still count toward zone coverage.
@@ -34,9 +50,9 @@ export const analysisResultsTable = pgTable("analysis_results", {
   riskLevel: text("risk_level"),
   technicianFeedback: text("technician_feedback"),
   feedbackStatus: text("feedback_status"),
-  // Count of photos that failed AI analysis in the most recent analyze run
-  // (storage/model/parse errors). Null = pre-migration row or no run yet;
-  // 0 = run completed with zero failures; >0 = partial failure.
+  // Count of eligible photos that did not complete AI analysis in the most
+  // recent analyze run (including failed, deferred, and rate-limited photos).
+  // Null = pre-migration row or no run yet; 0 = all photos completed.
   analysisErrors: integer("analysis_errors"),
   // Human-readable reason the analysis was skipped or failed, set by the
   // server pipeline when it cannot complete analysis (e.g. "Image resolution
@@ -45,6 +61,51 @@ export const analysisResultsTable = pgTable("analysis_results", {
   failureReason: text("failure_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+/**
+ * Durable per-media provider guard. A row survives request/process restarts so
+ * ambiguous failures cannot reset the provider attempt budget.
+ */
+export const analysisProviderAttemptsTable = pgTable(
+  "analysis_provider_attempts",
+  {
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companiesTable.id, { onDelete: "cascade" }),
+    inspectionId: integer("inspection_id")
+      .notNull()
+      .references(() => inspectionsTable.id, { onDelete: "cascade" }),
+    mediaPath: text("media_path").notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    state: text("state").notNull().default("failed"),
+    leaseUntil: timestamp("lease_until"),
+    leaseToken: text("lease_token"),
+    providerResult: jsonb("provider_result").$type<AiPrediction>(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.companyId, table.inspectionId, table.mediaPath] }),
+  }),
+);
+
+/**
+ * Durable UTC-day provider-call reservations. scopeId 0 is the single platform
+ * budget; positive scope ids are company budgets. A row freezes the configured
+ * limit on the first reservation of that day so workers agree after a restart.
+ */
+export const analysisProviderDailyBudgetsTable = pgTable(
+  "analysis_provider_daily_budgets",
+  {
+    scopeId: integer("scope_id").notNull(),
+    budgetDate: date("budget_date", { mode: "string" }).notNull(),
+    consumedCalls: integer("consumed_calls").notNull().default(0),
+    dailyLimit: integer("daily_limit").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.scopeId, table.budgetDate] }),
+  }),
+);
 
 export interface Finding {
   id: number;
@@ -310,6 +371,11 @@ export interface VideoEvidence {
   durationSec: number | null;
   label: string | null;
   frameAnalysisStatus: "pending";
+}
+
+export interface PhotoAnalysisOutcome {
+  imagePath: string;
+  status: "completed" | "failed" | "deferred" | "rate_limited";
 }
 
 export const insertAnalysisResultSchema = createInsertSchema(analysisResultsTable).omit({ id: true, createdAt: true, companyId: true });

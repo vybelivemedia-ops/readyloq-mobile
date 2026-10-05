@@ -10,10 +10,15 @@
  *     usb-camera, wifi-camera, wearable-camera
  *
  * CURRENT STATUS:
- *   All providers in this package are STUBS — they appear in the ReadyLoq
- *   provider registry as "future" availability. None are connected to real
- *   hardware SDKs yet. The stubs exist to validate the provider interface and
- *   to let the UI list upcoming supported devices.
+ *   Meta AI glasses: Android Device Access Toolkit integration (DAT).
+ *   Pipeline bindings declared in SmartGlassesCapabilities:
+ *     audioPipeline: "faie"        → FAIE voice inspection pipeline
+ *     snapshotRoutine: "auto_snapshot" → rolling frame-buffer auto-capture
+ *
+ *   All other providers in this package are STUBS — they appear in the
+ *   ReadyLoq provider registry as "future" availability. None are connected
+ *   to real hardware SDKs yet. The stubs exist to validate the provider
+ *   interface and to let the UI list upcoming supported devices.
  *
  *   VYBE LIVE has no wearables code at all — it uses Agora for streaming
  *   which runs on the device camera. Meta wearables could eventually be used
@@ -29,7 +34,7 @@
  *
  * INTEGRATION ROADMAP (from ReadyLoq roadmap comments):
  *   Phase Next:
- *     - Meta Ray-Ban smart glasses → react-native-ble-plx BLE notify stream
+ *     - ReadyLoq-compatible custom smart glasses → BLE notify stream
  *     - USB camera trigger (USB-OTG) → react-native-usb adapter
  *     - WiFi IP camera → WebSocket / RTSP bridge
  *   Phase Future:
@@ -101,7 +106,30 @@ export interface WearableRegistry extends DeviceDiscovery {
     listRegistered(): WearableProvider[];
 }
 /**
- * STUB — not yet connected to real hardware.
+ * Extended capabilities for smart-glasses providers.
+ *
+ * Adds two pipeline-binding fields on top of CaptureCapabilities so that the
+ * inspection screen knows exactly where to route the two BLE data streams:
+ *
+ *   audioPipeline    — the BLE audio stream feeds the FAIE (Field AI Inspection
+ *                      Engine) voice pipeline for real-time voice-command
+ *                      recognition and hands-free evidence dispatch.
+ *
+ *   snapshotRoutine  — BLE camera frames (async_push) are handed to the
+ *                      auto-snapshot routine (rolling frame-buffer in
+ *                      new-inspection.tsx) which slots them into `imageUri` on
+ *                      the current FAIE voice event.
+ */
+export interface SmartGlassesCapabilities extends CaptureCapabilities {
+    /** Key of the voice pipeline that consumes BLE audio frames. */
+    readonly audioPipeline: "faie";
+    /** Key of the snapshot routine that consumes BLE camera frames. */
+    readonly snapshotRoutine: "auto_snapshot";
+}
+/**
+ * This is the ReadyLoq custom GATT / Nordic UART device path. It is NOT
+ * consumer Meta AI glasses; those use META_LIVE_AI_CAPABILITIES below and the
+ * official Android Device Access Toolkit.
  *
  * Target SDK: react-native-ble-plx
  * Transport:  BLE notify characteristic → JPEG frame chunks reassembled on RN
@@ -112,7 +140,7 @@ export interface WearableRegistry extends DeviceDiscovery {
  *
  * DeviceCapabilities: categories: ["wearable", "camera"], transports: ["ble"]
  */
-export declare const SMART_GLASSES_CAPABILITIES: CaptureCapabilities;
+export declare const SMART_GLASSES_CAPABILITIES: SmartGlassesCapabilities;
 export declare const SMART_GLASSES_SOURCE: CaptureSource;
 /**
  * STUB — not yet connected to real hardware.
@@ -152,6 +180,71 @@ export declare const WIFI_CAMERA_SOURCE: CaptureSource;
  */
 export declare const WEARABLE_CAMERA_CAPABILITIES: CaptureCapabilities;
 export declare const WEARABLE_CAMERA_SOURCE: CaptureSource;
+/**
+ * Meta Live AI provider — server-side webhook transport.
+ *
+ * Unlike the BLE smart-glasses entry above (which streams raw camera frames
+ * via react-native-ble-plx), this provider routes through Meta's Live AI
+ * infrastructure: the glasses transcribe speech on-device, then POST the
+ * text and an optional camera JPEG to the ReadyLoq webhook endpoint.
+ *
+ * Transport: "wifi" (webhook over cellular/WiFi internet — closest DeviceTransport
+ * analog; no local BLE involved).
+ * Mode: async_push — the glasses push events when the tech speaks or taps.
+ *
+ * Session pairing:
+ *   1. Mobile app calls POST /api/meta-glasses/session → { sessionId, code }
+ *   2. Tech enters the 6-char code in the Meta Glasses companion app.
+ *   3. Glasses POST to https://<domain>/api/meta-glasses/webhook?session=<id>
+ *   4. Mobile polls GET /api/meta-glasses/events/:sessionId for findings.
+ *
+ * Canonical: artifacts/api-server/src/routes/meta-glasses.ts
+ *            artifacts/readyloq-app/hooks/useMetaGlassesSession.ts
+ */
+export declare const META_LIVE_AI_CAPABILITIES: CaptureCapabilities;
+export declare const META_LIVE_AI_SOURCE: CaptureSource;
+/**
+ * MetaLiveAIProvider — stub implementing WearableProvider for the webhook
+ * transport path.  The concrete implementation lives in
+ * `useMetaGlassesSession` (mobile hook) and `meta-glasses.ts` (API route).
+ * This class exists to satisfy the WearableRegistry type contract and to
+ * document the provider interface for future native-SDK migration.
+ */
+/**
+ * NOTE: Stub — does not formally `implements WearableProvider` to avoid
+ * requiring all DeviceProvider abstract method signatures in a stub.
+ * Cast to WearableProvider where registry compliance is needed.
+ */
+export declare class MetaLiveAIProvider {
+    readonly meta: WearableProviderMeta;
+    readonly captureCapabilities: CaptureCapabilities;
+    readonly source: CaptureSource;
+    get isConnected(): boolean;
+    connect(): Promise<void>;
+    disconnect(): Promise<void>;
+    getStatus(): Promise<{
+        operational: "unavailable";
+        connection: {
+            state: "disconnected";
+            transport: "wifi";
+        };
+        lastSeenAt: string;
+    }>;
+    checkHealth(): Promise<{
+        status: "unknown";
+        message: string;
+        checkedAt: string;
+    }>;
+    getPermissions(): {
+        granted: boolean;
+        required: string[];
+        request(): Promise<boolean>;
+    };
+    initialize(): Promise<void>;
+    teardown(): Promise<void>;
+    on(): () => void;
+    emit(): void;
+}
 /**
  * Registry of all planned wearable providers with their availability status.
  * Mirrors FUTURE_PROVIDER_DEFINITIONS from readyloq-mobile — the UI uses this

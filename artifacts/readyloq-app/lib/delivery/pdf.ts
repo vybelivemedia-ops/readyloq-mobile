@@ -6,6 +6,38 @@ import { buildReportHtml, type ReportData } from "./report-html";
 const REPORT_PREFIX = "readyloq-report-";
 const REPORT_SUFFIX = ".pdf";
 const STALE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const MIN_REPORT_PDF_BYTES = 1024;
+let reportFileSequence = 0;
+
+/**
+ * Expo Print can return a syntactically valid but empty PDF when its WebView
+ * renders a blank page. Validate both the file boundary and basic page content
+ * before allowing the URI to reach any delivery channel.
+ */
+async function assertUsablePdf(uri: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(uri);
+  if (!info.exists || !("size" in info) || info.size < MIN_REPORT_PDF_BYTES) {
+    throw new Error("Report PDF generation failed: the PDF is empty or incomplete. Please try again.");
+  }
+
+  const pdf = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+  const eof = pdf.lastIndexOf("%%EOF");
+  if (
+    !pdf.startsWith("%PDF-") ||
+    !/\/Type\s*\/Page\b/.test(pdf) ||
+    !/\/Contents\b/.test(pdf) ||
+    !/\bstream\b/.test(pdf) ||
+    !/\bendstream\b/.test(pdf) ||
+    !/\bxref\b|\/Type\s*\/XRef\b/.test(pdf) ||
+    !/startxref\s+\d+/.test(pdf) ||
+    eof < 0 ||
+    pdf.slice(eof + "%%EOF".length).trim().length > 0
+  ) {
+    throw new Error("Report PDF generation failed: the PDF is truncated or has no rendered page content. Please try again.");
+  }
+}
 
 /**
  * Best-effort cleanup: deletes any readyloq-report-*.pdf files in
@@ -70,9 +102,18 @@ export async function generateReportPdf(data: ReportData): Promise<string> {
   // Copy out of the volatile print cache into the app's durable documents
   // directory. Email clients, SMS apps, and AirDrop read from here after iOS/
   // Android have already pruned the temp cache that printToFileAsync uses.
-  const filename = `${REPORT_PREFIX}${Date.now()}${REPORT_SUFFIX}`;
+  const filename = `${REPORT_PREFIX}${Date.now()}-${++reportFileSequence}${REPORT_SUFFIX}`;
   const docUri = `${FileSystem.documentDirectory}${filename}`;
-  await FileSystem.copyAsync({ from: cacheUri, to: docUri });
+  try {
+    await FileSystem.copyAsync({ from: cacheUri, to: docUri });
+    await assertUsablePdf(docUri);
+  } catch (err) {
+    await FileSystem.deleteAsync(docUri, { idempotent: true }).catch(() => {});
+    throw err;
+  } finally {
+    // The durable copy is the only report URI retained for delivery.
+    await FileSystem.deleteAsync(cacheUri, { idempotent: true }).catch(() => {});
+  }
 
   return docUri;
 }

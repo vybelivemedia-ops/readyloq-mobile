@@ -56,7 +56,10 @@ import {
   newLocalInspection,
   parseRecord,
   saveLocalInspection,
+  setLocalInspectionOwner,
 } from "../inspection-store";
+
+setLocalInspectionOwner("pending-delivery-test-owner");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

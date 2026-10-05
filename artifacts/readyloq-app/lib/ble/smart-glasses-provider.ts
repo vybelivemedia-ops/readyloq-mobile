@@ -51,7 +51,7 @@ export class SmartGlassesProvider {
     const { connectedDeviceName, pairedDeviceName } = smartGlassesBle.getState();
     return {
       hardwareModel:
-        connectedDeviceName ?? pairedDeviceName ?? "Meta Ray-Ban Glasses",
+        connectedDeviceName ?? pairedDeviceName ?? "Custom BLE Glasses",
       connectionAddress:
         smartGlassesBle.getState().connectedDeviceId ?? undefined,
       firmwareVersion: undefined, // not exposed by current GATT profile

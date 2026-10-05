@@ -20,6 +20,7 @@ export const GetScheduleResponseItem = zod.object({
   "id": zod.number(),
   "siteAddress": zod.string(),
   "clientName": zod.string().nullish(),
+  "unitNumber": zod.string().nullish().describe('Unit or apartment number for a multi-family property'),
   "technicianName": zod.string(),
   "technicianId": zod.string().nullish(),
   "status": zod.string(),
@@ -53,6 +54,7 @@ export const ReassignInspectionResponse = zod.object({
   "id": zod.number(),
   "siteAddress": zod.string(),
   "clientName": zod.string().nullish(),
+  "unitNumber": zod.string().nullish().describe('Unit or apartment number for a multi-family property'),
   "technicianName": zod.string(),
   "technicianId": zod.string().nullish(),
   "status": zod.string(),
@@ -62,6 +64,276 @@ export const ReassignInspectionResponse = zod.object({
   "calendarDate": zod.string().describe('YYYY-MM-DD date used to place the entry on the grid (scheduledDate ?? createdAt)'),
   "createdAt": zod.string(),
   "completedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Pre-inspection briefing for a property address — the last 5 inspections at that address, AI-synthesised historical pests/findings from property memory, property notes (access instructions, hazards, special needs), and the active bait station count from the most recent inspection there. Access rules mirror GET /schedule/route-outlook/{inspectionId}: manager/owner/sales see any company address; other roles must have an inspection of their own at that address.
+ */
+export const GetPropertyProfileQueryParams = zod.object({
+  "address": zod.coerce.string().describe('Exact site address to look up (matches inspections.siteAddress)')
+})
+
+export const GetPropertyProfileResponse = zod.object({
+  "address": zod.string(),
+  "addressKey": zod.string(),
+  "recentInspections": zod.array(zod.object({
+  "id": zod.number(),
+  "status": zod.string(),
+  "severity": zod.string().nullish(),
+  "pestTypes": zod.array(zod.string()),
+  "technicianName": zod.string(),
+  "calendarDate": zod.string().describe('YYYY-MM-DD'),
+  "findingsCount": zod.number(),
+  "completedAt": zod.string().nullish()
+})),
+  "historicalPhotos": zod.array(zod.object({
+  "id": zod.number(),
+  "url": zod.string(),
+  "filename": zod.string().nullish(),
+  "caption": zod.string().nullish(),
+  "inspectionId": zod.number(),
+  "calendarDate": zod.string().describe('YYYY-MM-DD'),
+  "createdAt": zod.string()
+})),
+  "materialHistory": zod.array(zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "epaRegistrationNumber": zod.string().nullish(),
+  "targetPest": zod.string(),
+  "siteClassification": zod.string(),
+  "areaSqft": zod.number().nullish(),
+  "linearFt": zod.number().nullish(),
+  "totalProductOz": zod.number().nullish(),
+  "equipmentUsed": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "appliedAt": zod.string(),
+  "compliance": zod.object({
+  "retreatmentIntervalDays": zod.number().nullable().describe('Label-defined minimum days before reapplication; null when the label sets no minimum'),
+  "priorApplicationAt": zod.string().nullable().describe('ISO-8601 datetime of the most recent PRIOR application of the same product at this address; null when there is none'),
+  "daysSincePrior": zod.number().nullable(),
+  "isCompliant": zod.boolean(),
+  "nextEligibleReapplicationDate": zod.string().nullable(),
+  "eligibleNow": zod.boolean()
+})
+})),
+  "activeBaitStations": zod.number(),
+  "historicalPests": zod.array(zod.string()),
+  "historicalFindings": zod.array(zod.object({
+  "category": zod.string(),
+  "description": zod.string(),
+  "frequency": zod.number(),
+  "severity": zod.enum(['low', 'medium', 'high']).optional()
+})),
+  "notes": zod.array(zod.object({
+  "id": zod.number(),
+  "note": zod.string(),
+  "zone": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "authorName": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Complete pre-service history for one scheduled stop, including recent inspection summaries, photo evidence, site notes, recurring findings, and material/chemical history. Inspection-backed history is limited to completed service records before the stop's scheduled timestamp; a same-day sibling completed before that time is included, while pending and later records are excluded. When the guarded PestPac bridge is activated, the response also includes normalized legacy location notes. Technicians must be assigned to the exact stop; manager/owner/sales roles may read any stop in their company.
+ */
+export const GetStopHistoryParams = zod.object({
+  "inspectionId": zod.coerce.number().describe('Scheduled inspection\/stop ID')
+})
+
+export const GetStopHistoryResponse = zod.object({
+  "address": zod.string(),
+  "addressKey": zod.string(),
+  "recentInspections": zod.array(zod.object({
+  "id": zod.number(),
+  "status": zod.string(),
+  "severity": zod.string().nullish(),
+  "pestTypes": zod.array(zod.string()),
+  "technicianName": zod.string(),
+  "calendarDate": zod.string().describe('YYYY-MM-DD'),
+  "findingsCount": zod.number(),
+  "completedAt": zod.string().nullish()
+})),
+  "historicalPhotos": zod.array(zod.object({
+  "id": zod.number(),
+  "url": zod.string(),
+  "filename": zod.string().nullish(),
+  "caption": zod.string().nullish(),
+  "inspectionId": zod.number(),
+  "calendarDate": zod.string().describe('YYYY-MM-DD'),
+  "createdAt": zod.string()
+})),
+  "materialHistory": zod.array(zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "epaRegistrationNumber": zod.string().nullish(),
+  "targetPest": zod.string(),
+  "siteClassification": zod.string(),
+  "areaSqft": zod.number().nullish(),
+  "linearFt": zod.number().nullish(),
+  "totalProductOz": zod.number().nullish(),
+  "equipmentUsed": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "appliedAt": zod.string(),
+  "compliance": zod.object({
+  "retreatmentIntervalDays": zod.number().nullable().describe('Label-defined minimum days before reapplication; null when the label sets no minimum'),
+  "priorApplicationAt": zod.string().nullable().describe('ISO-8601 datetime of the most recent PRIOR application of the same product at this address; null when there is none'),
+  "daysSincePrior": zod.number().nullable(),
+  "isCompliant": zod.boolean(),
+  "nextEligibleReapplicationDate": zod.string().nullable(),
+  "eligibleNow": zod.boolean()
+})
+})),
+  "activeBaitStations": zod.number(),
+  "historicalPests": zod.array(zod.string()),
+  "historicalFindings": zod.array(zod.object({
+  "category": zod.string(),
+  "description": zod.string(),
+  "frequency": zod.number(),
+  "severity": zod.enum(['low', 'medium', 'high']).optional()
+})),
+  "notes": zod.array(zod.object({
+  "id": zod.number(),
+  "note": zod.string(),
+  "zone": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "authorName": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+}).and(zod.object({
+  "stopId": zod.number(),
+  "pestPacHistory": zod.object({
+  "status": zod.enum(['available', 'disabled', 'not_configured', 'not_mapped', 'unavailable']),
+  "notes": zod.array(zod.object({
+  "id": zod.string(),
+  "note": zod.string(),
+  "category": zod.string().nullable(),
+  "authorName": zod.string().nullable(),
+  "createdAt": zod.coerce.date().nullable()
+}))
+})
+}))
+
+
+/**
+ * @summary Drill-down detail for a "visit" — every inspection sharing the same company + site address + calendar date as the given inspection (covers a single-family stop and a same-day multi-unit property alike) — plus every chemical application logged across all of that visit's units, each carrying a retreatment-interval compliance check against the most recent PRIOR application of the same product at this address. Access rules mirror GET /schedule/property-profile.
+ */
+export const GetPropertyVisitParams = zod.object({
+  "inspectionId": zod.coerce.number().describe('Any inspection belonging to the visit — used only to resolve the address and calendar date; the response covers every sibling inspection at that address\/date, not just this one.')
+})
+
+export const GetPropertyVisitResponse = zod.object({
+  "address": zod.string(),
+  "calendarDate": zod.string().describe('YYYY-MM-DD'),
+  "units": zod.array(zod.object({
+  "id": zod.number(),
+  "unitNumber": zod.string().nullish(),
+  "clientName": zod.string().nullish(),
+  "technicianName": zod.string(),
+  "technicianId": zod.string().nullish(),
+  "status": zod.string(),
+  "severity": zod.string().nullish(),
+  "pestTypes": zod.array(zod.string()),
+  "notes": zod.string().nullish(),
+  "visitPurpose": zod.string().nullish(),
+  "findingsCount": zod.number(),
+  "mediaCount": zod.number(),
+  "completedAt": zod.string().nullish()
+})),
+  "chemicalLedger": zod.array(zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "epaRegistrationNumber": zod.string().nullish(),
+  "targetPest": zod.string(),
+  "siteClassification": zod.string(),
+  "areaSqft": zod.number().nullish(),
+  "linearFt": zod.number().nullish(),
+  "totalProductOz": zod.number().nullish(),
+  "equipmentUsed": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "appliedAt": zod.string(),
+  "compliance": zod.object({
+  "retreatmentIntervalDays": zod.number().nullable().describe('Label-defined minimum days before reapplication; null when the label sets no minimum'),
+  "priorApplicationAt": zod.string().nullable().describe('ISO-8601 datetime of the most recent PRIOR application of the same product at this address; null when there is none'),
+  "daysSincePrior": zod.number().nullable(),
+  "isCompliant": zod.boolean(),
+  "nextEligibleReapplicationDate": zod.string().nullable(),
+  "eligibleNow": zod.boolean()
+})
+}))
+})
+
+
+/**
+ * @summary Integrated Route Calendar — stops for a date window grouped by calendar day, each annotated with a Route Readiness flag (has the assigned technician set up their daily rig for that date?) and a rolled-up Route Chemical Outlook count (due-soon/overdue products at that stop's address). Same access scoping as GET /schedule (manager/owner/sales see all company stops; other roles see only their own).
+ */
+export const GetRouteCalendarQueryParams = zod.object({
+  "start": zod.date().describe('Start date (YYYY-MM-DD), inclusive'),
+  "end": zod.date().describe('End date (YYYY-MM-DD), inclusive'),
+  "tzOffsetMinutes": zod.coerce.number().optional().describe('Caller\'s UTC offset in minutes, using the `Date.prototype.getTimezoneOffset()` sign convention. Buckets and labels each stop\'s calendarDate in the caller\'s local frame instead of UTC, keeping it consistent with Route Readiness (which keys off the technician\'s own device-local rig date). Defaults to 0 (UTC) when omitted.')
+})
+
+export const GetRouteCalendarResponseItem = zod.object({
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "stops": zod.array(zod.object({
+  "id": zod.number(),
+  "siteAddress": zod.string(),
+  "clientName": zod.string().nullish(),
+  "unitNumber": zod.string().nullish(),
+  "technicianName": zod.string(),
+  "technicianId": zod.string().nullish(),
+  "status": zod.string(),
+  "severity": zod.string().nullish(),
+  "pestTypes": zod.array(zod.string()).optional(),
+  "calendarDate": zod.string().describe('YYYY-MM-DD'),
+  "readiness": zod.object({
+  "dailyRigSetUp": zod.boolean().nullable().describe('null when the stop has no assigned technician')
+}).describe('Route Readiness — has the assigned technician set up their daily rig for this stop\'s calendar date?'),
+  "outlook": zod.object({
+  "overdueCount": zod.number(),
+  "dueSoonCount": zod.number(),
+  "okCount": zod.number(),
+  "hasOutlookData": zod.boolean().describe('false when no treatment history exists yet at this address')
+}).describe('Rolled-up Route Chemical Outlook counts for this stop\'s address')
+}))
+})
+export const GetRouteCalendarResponse = zod.array(GetRouteCalendarResponseItem)
+
+
+/**
+ * @summary Full Route Chemical Outlook for a stop's address — every product applied there within the lookback window, projected forward from its most recent application to flag due / due-soon / overdue for reapplication. Access rules mirror GET /schedule/property-visit/{id}: manager/owner/sales see any company address; other roles must have an inspection of their own at that address.
+ */
+export const GetRouteOutlookParams = zod.object({
+  "inspectionId": zod.coerce.number().describe('Any inspection at the target address — used only to resolve the address and calendar date; the outlook itself covers every inspection at that address, not just this one.')
+})
+
+export const GetRouteOutlookQueryParams = zod.object({
+  "tzOffsetMinutes": zod.coerce.number().optional().describe('Caller\'s UTC offset in minutes (same convention as \/schedule\/route-calendar). Defaults to 0 (UTC) when omitted.')
+})
+
+export const GetRouteOutlookResponse = zod.object({
+  "address": zod.string(),
+  "calendarDate": zod.string().describe('YYYY-MM-DD'),
+  "products": zod.array(zod.object({
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "targetPest": zod.string(),
+  "lastAppliedAt": zod.string().describe('ISO-8601 datetime of the most recent application at this address'),
+  "daysSinceApplication": zod.number(),
+  "retreatmentIntervalDays": zod.number().nullable().describe('Label-defined minimum days before reapplication; null when the label sets no minimum'),
+  "nextEligibleReapplicationDate": zod.string().nullable().describe('YYYY-MM-DD; null when there is no retreatment interval to project from'),
+  "eligibleNow": zod.boolean(),
+  "outlookStatus": zod.enum(['ok', 'due-soon', 'overdue']),
+  "applicationsLast90Days": zod.number()
+}))
 })
 
 
@@ -85,12 +357,14 @@ export const ListInspectionsResponseItem = zod.object({
   "id": zod.number(),
   "siteAddress": zod.string(),
   "clientName": zod.string().nullish(),
+  "unitNumber": zod.string().nullish(),
   "technicianName": zod.string(),
   "technicianId": zod.string().nullish(),
   "status": zod.string(),
   "pestTypes": zod.array(zod.string()).optional(),
   "severity": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "visitPurpose": zod.string().nullish().describe('Freeform reason for the visit (e.g. \"Routine Inspection\", \"Callback\", \"Initial Service\"). Not a strict enum so it can also be populated by a future enterprise-routing import. Null for historical rows and older clients that predate this field.'),
   "mediaCount": zod.number().optional(),
   "findingsCount": zod.number().optional(),
   "media": zod.array(zod.object({
@@ -104,7 +378,9 @@ export const ListInspectionsResponseItem = zod.object({
   "captureSource": zod.string().optional(),
   "qualityScore": zod.number().nullish(),
   "captureMetadata": zod.record(zod.string(), zod.unknown()).nullish(),
-  "createdAt": zod.string()
+  "unitNumber": zod.string().nullish(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
 })).optional(),
   "aiAnalysisId": zod.number().nullish(),
   "createdAt": zod.string(),
@@ -119,9 +395,11 @@ export const ListInspectionsResponse = zod.array(ListInspectionsResponseItem)
 export const CreateInspectionBody = zod.object({
   "siteAddress": zod.string(),
   "clientName": zod.string().optional(),
+  "unitNumber": zod.string().nullish(),
   "technicianName": zod.string(),
   "technicianId": zod.string().optional(),
   "notes": zod.string().optional(),
+  "visitPurpose": zod.string().optional(),
   "pestTypes": zod.array(zod.string()).optional(),
   "clientKey": zod.string().optional().describe('Client-generated idempotency key (UUID). Retrying a create with the same key returns the previously created inspection (200) instead of duplicating it — required for offline-first sync retries.')
 })
@@ -138,12 +416,14 @@ export const GetInspectionResponse = zod.object({
   "id": zod.number(),
   "siteAddress": zod.string(),
   "clientName": zod.string().nullish(),
+  "unitNumber": zod.string().nullish(),
   "technicianName": zod.string(),
   "technicianId": zod.string().nullish(),
   "status": zod.string(),
   "pestTypes": zod.array(zod.string()).optional(),
   "severity": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "visitPurpose": zod.string().nullish().describe('Freeform reason for the visit (e.g. \"Routine Inspection\", \"Callback\", \"Initial Service\"). Not a strict enum so it can also be populated by a future enterprise-routing import. Null for historical rows and older clients that predate this field.'),
   "mediaCount": zod.number().optional(),
   "findingsCount": zod.number().optional(),
   "media": zod.array(zod.object({
@@ -157,7 +437,9 @@ export const GetInspectionResponse = zod.object({
   "captureSource": zod.string().optional(),
   "qualityScore": zod.number().nullish(),
   "captureMetadata": zod.record(zod.string(), zod.unknown()).nullish(),
-  "createdAt": zod.string()
+  "unitNumber": zod.string().nullish(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
 })).optional(),
   "aiAnalysisId": zod.number().nullish(),
   "createdAt": zod.string(),
@@ -177,19 +459,23 @@ export const UpdateInspectionBody = zod.object({
   "notes": zod.string().optional(),
   "severity": zod.string().optional(),
   "pestTypes": zod.array(zod.string()).optional(),
-  "completedAt": zod.string().optional()
+  "completedAt": zod.string().optional(),
+  "unitNumber": zod.string().nullish(),
+  "visitPurpose": zod.string().nullish()
 })
 
 export const UpdateInspectionResponse = zod.object({
   "id": zod.number(),
   "siteAddress": zod.string(),
   "clientName": zod.string().nullish(),
+  "unitNumber": zod.string().nullish(),
   "technicianName": zod.string(),
   "technicianId": zod.string().nullish(),
   "status": zod.string(),
   "pestTypes": zod.array(zod.string()).optional(),
   "severity": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "visitPurpose": zod.string().nullish().describe('Freeform reason for the visit (e.g. \"Routine Inspection\", \"Callback\", \"Initial Service\"). Not a strict enum so it can also be populated by a future enterprise-routing import. Null for historical rows and older clients that predate this field.'),
   "mediaCount": zod.number().optional(),
   "findingsCount": zod.number().optional(),
   "media": zod.array(zod.object({
@@ -203,7 +489,9 @@ export const UpdateInspectionResponse = zod.object({
   "captureSource": zod.string().optional(),
   "qualityScore": zod.number().nullish(),
   "captureMetadata": zod.record(zod.string(), zod.unknown()).nullish(),
-  "createdAt": zod.string()
+  "unitNumber": zod.string().nullish(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
 })).optional(),
   "aiAnalysisId": zod.number().nullish(),
   "createdAt": zod.string(),
@@ -232,12 +520,14 @@ export const CompleteInspectionResponse = zod.object({
   "id": zod.number(),
   "siteAddress": zod.string(),
   "clientName": zod.string().nullish(),
+  "unitNumber": zod.string().nullish(),
   "technicianName": zod.string(),
   "technicianId": zod.string().nullish(),
   "status": zod.string(),
   "pestTypes": zod.array(zod.string()).optional(),
   "severity": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "visitPurpose": zod.string().nullish().describe('Freeform reason for the visit (e.g. \"Routine Inspection\", \"Callback\", \"Initial Service\"). Not a strict enum so it can also be populated by a future enterprise-routing import. Null for historical rows and older clients that predate this field.'),
   "mediaCount": zod.number().optional(),
   "findingsCount": zod.number().optional(),
   "media": zod.array(zod.object({
@@ -251,7 +541,9 @@ export const CompleteInspectionResponse = zod.object({
   "captureSource": zod.string().optional(),
   "qualityScore": zod.number().nullish(),
   "captureMetadata": zod.record(zod.string(), zod.unknown()).nullish(),
-  "createdAt": zod.string()
+  "unitNumber": zod.string().nullish(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
 })).optional(),
   "aiAnalysisId": zod.number().nullish(),
   "createdAt": zod.string(),
@@ -272,13 +564,31 @@ export const AddInspectionMediaParams = zod.object({
 
 export const AddInspectionMediaBody = zod.object({
   "mediaType": zod.string(),
-  "url": zod.string(),
+  "url": zod.string().describe('Company-scoped private object path, e.g. \/api\/storage\/objects\/companies\/{companyId}\/uploads\/{objectId}'),
   "filename": zod.string().optional(),
   "caption": zod.string().optional(),
   "durationSec": zod.number().optional(),
   "captureSource": zod.string().optional(),
   "qualityScore": zod.number().optional(),
-  "captureMetadata": zod.record(zod.string(), zod.unknown()).optional()
+  "captureMetadata": zod.record(zod.string(), zod.unknown()).optional(),
+  "unitNumber": zod.string().nullish(),
+  "capturedAt": zod.coerce.date().optional()
+})
+
+export const AddInspectionMediaResponse = zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "mediaType": zod.string(),
+  "url": zod.string(),
+  "filename": zod.string().nullish(),
+  "caption": zod.string().nullish(),
+  "durationSec": zod.number().nullish(),
+  "captureSource": zod.string().optional(),
+  "qualityScore": zod.number().nullish(),
+  "captureMetadata": zod.record(zod.string(), zod.unknown()).nullish(),
+  "unitNumber": zod.string().nullish(),
+  "capturedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
 })
 
 
@@ -298,19 +608,35 @@ export const ListAnalysisResultsResponseItem = zod.object({
   "category": zod.string(),
   "description": zod.string(),
   "confidence": zod.number(),
-  "severity": zod.string().optional(),
-  "location": zod.string().nullish(),
-  "imageUrl": zod.string().nullish(),
-  "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish(),
+  "severity": zod.string(),
+  "location": zod.string().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "treatment": zod.string().nullable(),
+  "exclusionOpportunity": zod.boolean().nullable(),
+  "evidenceQuality": zod.union([zod.literal('excellent'),zod.literal('good'),zod.literal('fair'),zod.literal(null)]).nullish(),
+  "possiblePest": zod.string().nullish(),
   "species": zod.string().nullish(),
   "lifeStage": zod.string().nullish(),
   "conduciveCondition": zod.string().nullish(),
   "harborage": zod.string().nullish(),
   "moisture": zod.string().nullish(),
   "structuralIssue": zod.string().nullish(),
-  "zone": zod.string().nullish()
+  "measurementEstimate": zod.union([zod.object({
+  "linearFt": zod.number().nullish(),
+  "gapWidthIn": zod.number().nullish(),
+  "heightFt": zod.number().nullish(),
+  "confidence": zod.number(),
+  "source": zod.enum(['ai_vision_estimate'])
+}),zod.null()]).optional(),
+  "zone": zod.string().nullish(),
+  "candidates": zod.array(zod.object({
+  "species": zod.string(),
+  "confidence": zod.number()
+})).optional(),
+  "confidenceLabel": zod.enum(['identified', 'possible', 'unidentified']).optional(),
+  "reviewStatus": zod.enum(['pending', 'accepted', 'corrected', 'dismissed']).optional(),
+  "technicianSpecies": zod.string().nullish(),
+  "technicianCorrectionNotes": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "videoEvidence": zod.array(zod.object({
@@ -321,6 +647,10 @@ export const ListAnalysisResultsResponseItem = zod.object({
   "frameAnalysisStatus": zod.string()
 })).optional(),
   "analyzedImagePaths": zod.array(zod.string()).optional(),
+  "photoOutcomes": zod.array(zod.object({
+  "imagePath": zod.string(),
+  "status": zod.enum(['completed', 'failed', 'deferred', 'rate_limited'])
+})).optional().describe('Per-photo provider outcome from the most recent analysis run.'),
   "photoZones": zod.record(zod.string(), zod.string()).optional(),
   "coverage": zod.union([zod.object({
   "propertyType": zod.string(),
@@ -444,19 +774,35 @@ export const AnalyzeInspectionBody = zod.object({
   "category": zod.string(),
   "description": zod.string(),
   "confidence": zod.number(),
-  "severity": zod.string().optional(),
-  "location": zod.string().nullish(),
-  "imageUrl": zod.string().nullish(),
-  "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish(),
+  "severity": zod.string(),
+  "location": zod.string().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "treatment": zod.string().nullable(),
+  "exclusionOpportunity": zod.boolean().nullable(),
+  "evidenceQuality": zod.union([zod.literal('excellent'),zod.literal('good'),zod.literal('fair'),zod.literal(null)]).nullish(),
+  "possiblePest": zod.string().nullish(),
   "species": zod.string().nullish(),
   "lifeStage": zod.string().nullish(),
   "conduciveCondition": zod.string().nullish(),
   "harborage": zod.string().nullish(),
   "moisture": zod.string().nullish(),
   "structuralIssue": zod.string().nullish(),
-  "zone": zod.string().nullish()
+  "measurementEstimate": zod.union([zod.object({
+  "linearFt": zod.number().nullish(),
+  "gapWidthIn": zod.number().nullish(),
+  "heightFt": zod.number().nullish(),
+  "confidence": zod.number(),
+  "source": zod.enum(['ai_vision_estimate'])
+}),zod.null()]).optional(),
+  "zone": zod.string().nullish(),
+  "candidates": zod.array(zod.object({
+  "species": zod.string(),
+  "confidence": zod.number()
+})).optional(),
+  "confidenceLabel": zod.enum(['identified', 'possible', 'unidentified']).optional(),
+  "reviewStatus": zod.enum(['pending', 'accepted', 'corrected', 'dismissed']).optional(),
+  "technicianSpecies": zod.string().nullish(),
+  "technicianCorrectionNotes": zod.string().nullish()
 })).optional(),
   "videos": zod.array(zod.object({
   "url": zod.string(),
@@ -484,19 +830,35 @@ export const GetAnalysisResultResponse = zod.object({
   "category": zod.string(),
   "description": zod.string(),
   "confidence": zod.number(),
-  "severity": zod.string().optional(),
-  "location": zod.string().nullish(),
-  "imageUrl": zod.string().nullish(),
-  "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish(),
+  "severity": zod.string(),
+  "location": zod.string().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "treatment": zod.string().nullable(),
+  "exclusionOpportunity": zod.boolean().nullable(),
+  "evidenceQuality": zod.union([zod.literal('excellent'),zod.literal('good'),zod.literal('fair'),zod.literal(null)]).nullish(),
+  "possiblePest": zod.string().nullish(),
   "species": zod.string().nullish(),
   "lifeStage": zod.string().nullish(),
   "conduciveCondition": zod.string().nullish(),
   "harborage": zod.string().nullish(),
   "moisture": zod.string().nullish(),
   "structuralIssue": zod.string().nullish(),
-  "zone": zod.string().nullish()
+  "measurementEstimate": zod.union([zod.object({
+  "linearFt": zod.number().nullish(),
+  "gapWidthIn": zod.number().nullish(),
+  "heightFt": zod.number().nullish(),
+  "confidence": zod.number(),
+  "source": zod.enum(['ai_vision_estimate'])
+}),zod.null()]).optional(),
+  "zone": zod.string().nullish(),
+  "candidates": zod.array(zod.object({
+  "species": zod.string(),
+  "confidence": zod.number()
+})).optional(),
+  "confidenceLabel": zod.enum(['identified', 'possible', 'unidentified']).optional(),
+  "reviewStatus": zod.enum(['pending', 'accepted', 'corrected', 'dismissed']).optional(),
+  "technicianSpecies": zod.string().nullish(),
+  "technicianCorrectionNotes": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "videoEvidence": zod.array(zod.object({
@@ -507,6 +869,10 @@ export const GetAnalysisResultResponse = zod.object({
   "frameAnalysisStatus": zod.string()
 })).optional(),
   "analyzedImagePaths": zod.array(zod.string()).optional(),
+  "photoOutcomes": zod.array(zod.object({
+  "imagePath": zod.string(),
+  "status": zod.enum(['completed', 'failed', 'deferred', 'rate_limited'])
+})).optional().describe('Per-photo provider outcome from the most recent analysis run.'),
   "photoZones": zod.record(zod.string(), zod.string()).optional(),
   "coverage": zod.union([zod.object({
   "propertyType": zod.string(),
@@ -636,19 +1002,35 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
   "category": zod.string(),
   "description": zod.string(),
   "confidence": zod.number(),
-  "severity": zod.string().optional(),
-  "location": zod.string().nullish(),
-  "imageUrl": zod.string().nullish(),
-  "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish(),
+  "severity": zod.string(),
+  "location": zod.string().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "treatment": zod.string().nullable(),
+  "exclusionOpportunity": zod.boolean().nullable(),
+  "evidenceQuality": zod.union([zod.literal('excellent'),zod.literal('good'),zod.literal('fair'),zod.literal(null)]).nullish(),
+  "possiblePest": zod.string().nullish(),
   "species": zod.string().nullish(),
   "lifeStage": zod.string().nullish(),
   "conduciveCondition": zod.string().nullish(),
   "harborage": zod.string().nullish(),
   "moisture": zod.string().nullish(),
   "structuralIssue": zod.string().nullish(),
-  "zone": zod.string().nullish()
+  "measurementEstimate": zod.union([zod.object({
+  "linearFt": zod.number().nullish(),
+  "gapWidthIn": zod.number().nullish(),
+  "heightFt": zod.number().nullish(),
+  "confidence": zod.number(),
+  "source": zod.enum(['ai_vision_estimate'])
+}),zod.null()]).optional(),
+  "zone": zod.string().nullish(),
+  "candidates": zod.array(zod.object({
+  "species": zod.string(),
+  "confidence": zod.number()
+})).optional(),
+  "confidenceLabel": zod.enum(['identified', 'possible', 'unidentified']).optional(),
+  "reviewStatus": zod.enum(['pending', 'accepted', 'corrected', 'dismissed']).optional(),
+  "technicianSpecies": zod.string().nullish(),
+  "technicianCorrectionNotes": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "videoEvidence": zod.array(zod.object({
@@ -659,6 +1041,10 @@ export const SubmitAnalysisFeedbackResponse = zod.object({
   "frameAnalysisStatus": zod.string()
 })).optional(),
   "analyzedImagePaths": zod.array(zod.string()).optional(),
+  "photoOutcomes": zod.array(zod.object({
+  "imagePath": zod.string(),
+  "status": zod.enum(['completed', 'failed', 'deferred', 'rate_limited'])
+})).optional().describe('Per-photo provider outcome from the most recent analysis run.'),
   "photoZones": zod.record(zod.string(), zod.string()).optional(),
   "coverage": zod.union([zod.object({
   "propertyType": zod.string(),
@@ -930,6 +1316,7 @@ export const ListIntelligenceRecordsResponse = zod.object({
   "id": zod.number(),
   "imageUrl": zod.string(),
   "thumbnailUrl": zod.string().nullish(),
+  "mediaType": zod.enum(['photo', 'video']).optional(),
   "aiPrediction": zod.object({
   "category": zod.string().nullish(),
   "subcategory": zod.string().nullish(),
@@ -1002,6 +1389,7 @@ export const GetIntelligenceRecordResponse = zod.object({
   "id": zod.number(),
   "imageUrl": zod.string(),
   "thumbnailUrl": zod.string().nullish(),
+  "mediaType": zod.enum(['photo', 'video']).optional(),
   "aiPrediction": zod.object({
   "category": zod.string().nullish(),
   "subcategory": zod.string().nullish(),
@@ -1079,6 +1467,7 @@ export const ConfirmIntelligenceRecordResponse = zod.object({
   "id": zod.number(),
   "imageUrl": zod.string(),
   "thumbnailUrl": zod.string().nullish(),
+  "mediaType": zod.enum(['photo', 'video']).optional(),
   "aiPrediction": zod.object({
   "category": zod.string().nullish(),
   "subcategory": zod.string().nullish(),
@@ -1135,6 +1524,7 @@ export const SkipIntelligenceRecordResponse = zod.object({
   "id": zod.number(),
   "imageUrl": zod.string(),
   "thumbnailUrl": zod.string().nullish(),
+  "mediaType": zod.enum(['photo', 'video']).optional(),
   "aiPrediction": zod.object({
   "category": zod.string().nullish(),
   "subcategory": zod.string().nullish(),
@@ -1195,6 +1585,7 @@ export const VoteIntelligenceRecordResponse = zod.object({
   "id": zod.number(),
   "imageUrl": zod.string(),
   "thumbnailUrl": zod.string().nullish(),
+  "mediaType": zod.enum(['photo', 'video']).optional(),
   "aiPrediction": zod.object({
   "category": zod.string().nullish(),
   "subcategory": zod.string().nullish(),
@@ -1273,6 +1664,7 @@ export const ReviewIntelligenceRecordResponse = zod.object({
   "id": zod.number(),
   "imageUrl": zod.string(),
   "thumbnailUrl": zod.string().nullish(),
+  "mediaType": zod.enum(['photo', 'video']).optional(),
   "aiPrediction": zod.object({
   "category": zod.string().nullish(),
   "subcategory": zod.string().nullish(),
@@ -1321,6 +1713,10 @@ export const ReviewIntelligenceRecordResponse = zod.object({
 /**
  * @summary List generated reports
  */
+export const listReportsResponseEvidenceRecoverySyncedPhotoCountMin = 0;
+
+
+
 export const ListReportsResponseItem = zod.object({
   "id": zod.number(),
   "inspectionId": zod.number(),
@@ -1333,19 +1729,35 @@ export const ListReportsResponseItem = zod.object({
   "category": zod.string(),
   "description": zod.string(),
   "confidence": zod.number(),
-  "severity": zod.string().optional(),
-  "location": zod.string().nullish(),
-  "imageUrl": zod.string().nullish(),
-  "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish(),
+  "severity": zod.string(),
+  "location": zod.string().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "treatment": zod.string().nullable(),
+  "exclusionOpportunity": zod.boolean().nullable(),
+  "evidenceQuality": zod.union([zod.literal('excellent'),zod.literal('good'),zod.literal('fair'),zod.literal(null)]).nullish(),
+  "possiblePest": zod.string().nullish(),
   "species": zod.string().nullish(),
   "lifeStage": zod.string().nullish(),
   "conduciveCondition": zod.string().nullish(),
   "harborage": zod.string().nullish(),
   "moisture": zod.string().nullish(),
   "structuralIssue": zod.string().nullish(),
-  "zone": zod.string().nullish()
+  "measurementEstimate": zod.union([zod.object({
+  "linearFt": zod.number().nullish(),
+  "gapWidthIn": zod.number().nullish(),
+  "heightFt": zod.number().nullish(),
+  "confidence": zod.number(),
+  "source": zod.enum(['ai_vision_estimate'])
+}),zod.null()]).optional(),
+  "zone": zod.string().nullish(),
+  "candidates": zod.array(zod.object({
+  "species": zod.string(),
+  "confidence": zod.number()
+})).optional(),
+  "confidenceLabel": zod.enum(['identified', 'possible', 'unidentified']).optional(),
+  "reviewStatus": zod.enum(['pending', 'accepted', 'corrected', 'dismissed']).optional(),
+  "technicianSpecies": zod.string().nullish(),
+  "technicianCorrectionNotes": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "treatmentNotes": zod.string().nullish(),
@@ -1372,6 +1784,11 @@ export const ListReportsResponseItem = zod.object({
   "conduciveConditions": zod.string().optional(),
   "customerRecommendations": zod.array(zod.string()).optional()
 })]).optional(),
+  "evidenceRecovery": zod.object({
+  "syncedPhotoCount": zod.number().min(listReportsResponseEvidenceRecoverySyncedPhotoCountMin),
+  "needsRegeneration": zod.boolean(),
+  "latestEvidenceAt": zod.coerce.date().nullable()
+}).optional().describe('Present on report-detail responses. Signals when photo media or analysis finished syncing after the current narrative was generated.'),
   "createdAt": zod.string()
 })
 export const ListReportsResponse = zod.array(ListReportsResponseItem)
@@ -1396,6 +1813,10 @@ export const GetReportParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const getReportResponseEvidenceRecoverySyncedPhotoCountMin = 0;
+
+
+
 export const GetReportResponse = zod.object({
   "id": zod.number(),
   "inspectionId": zod.number(),
@@ -1408,19 +1829,35 @@ export const GetReportResponse = zod.object({
   "category": zod.string(),
   "description": zod.string(),
   "confidence": zod.number(),
-  "severity": zod.string().optional(),
-  "location": zod.string().nullish(),
-  "imageUrl": zod.string().nullish(),
-  "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish(),
+  "severity": zod.string(),
+  "location": zod.string().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "treatment": zod.string().nullable(),
+  "exclusionOpportunity": zod.boolean().nullable(),
+  "evidenceQuality": zod.union([zod.literal('excellent'),zod.literal('good'),zod.literal('fair'),zod.literal(null)]).nullish(),
+  "possiblePest": zod.string().nullish(),
   "species": zod.string().nullish(),
   "lifeStage": zod.string().nullish(),
   "conduciveCondition": zod.string().nullish(),
   "harborage": zod.string().nullish(),
   "moisture": zod.string().nullish(),
   "structuralIssue": zod.string().nullish(),
-  "zone": zod.string().nullish()
+  "measurementEstimate": zod.union([zod.object({
+  "linearFt": zod.number().nullish(),
+  "gapWidthIn": zod.number().nullish(),
+  "heightFt": zod.number().nullish(),
+  "confidence": zod.number(),
+  "source": zod.enum(['ai_vision_estimate'])
+}),zod.null()]).optional(),
+  "zone": zod.string().nullish(),
+  "candidates": zod.array(zod.object({
+  "species": zod.string(),
+  "confidence": zod.number()
+})).optional(),
+  "confidenceLabel": zod.enum(['identified', 'possible', 'unidentified']).optional(),
+  "reviewStatus": zod.enum(['pending', 'accepted', 'corrected', 'dismissed']).optional(),
+  "technicianSpecies": zod.string().nullish(),
+  "technicianCorrectionNotes": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "treatmentNotes": zod.string().nullish(),
@@ -1447,6 +1884,11 @@ export const GetReportResponse = zod.object({
   "conduciveConditions": zod.string().optional(),
   "customerRecommendations": zod.array(zod.string()).optional()
 })]).optional(),
+  "evidenceRecovery": zod.object({
+  "syncedPhotoCount": zod.number().min(getReportResponseEvidenceRecoverySyncedPhotoCountMin),
+  "needsRegeneration": zod.boolean(),
+  "latestEvidenceAt": zod.coerce.date().nullable()
+}).optional().describe('Present on report-detail responses. Signals when photo media or analysis finished syncing after the current narrative was generated.'),
   "createdAt": zod.string()
 })
 
@@ -1470,6 +1912,10 @@ export const GenerateReportNarrativeBody = zod.object({
   "refreshFindings": zod.boolean().optional().describe('When true, re-snapshot the report\'s findings and recommendations from the inspection\'s latest AI analysis before generating the narrative (used by the live report builder).')
 })
 
+export const generateReportNarrativeResponseEvidenceRecoverySyncedPhotoCountMin = 0;
+
+
+
 export const GenerateReportNarrativeResponse = zod.object({
   "id": zod.number(),
   "inspectionId": zod.number(),
@@ -1482,19 +1928,35 @@ export const GenerateReportNarrativeResponse = zod.object({
   "category": zod.string(),
   "description": zod.string(),
   "confidence": zod.number(),
-  "severity": zod.string().optional(),
-  "location": zod.string().nullish(),
-  "imageUrl": zod.string().nullish(),
-  "treatment": zod.string().nullish(),
-  "exclusionOpportunity": zod.boolean().nullish(),
-  "evidenceQuality": zod.string().nullish(),
+  "severity": zod.string(),
+  "location": zod.string().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "treatment": zod.string().nullable(),
+  "exclusionOpportunity": zod.boolean().nullable(),
+  "evidenceQuality": zod.union([zod.literal('excellent'),zod.literal('good'),zod.literal('fair'),zod.literal(null)]).nullish(),
+  "possiblePest": zod.string().nullish(),
   "species": zod.string().nullish(),
   "lifeStage": zod.string().nullish(),
   "conduciveCondition": zod.string().nullish(),
   "harborage": zod.string().nullish(),
   "moisture": zod.string().nullish(),
   "structuralIssue": zod.string().nullish(),
-  "zone": zod.string().nullish()
+  "measurementEstimate": zod.union([zod.object({
+  "linearFt": zod.number().nullish(),
+  "gapWidthIn": zod.number().nullish(),
+  "heightFt": zod.number().nullish(),
+  "confidence": zod.number(),
+  "source": zod.enum(['ai_vision_estimate'])
+}),zod.null()]).optional(),
+  "zone": zod.string().nullish(),
+  "candidates": zod.array(zod.object({
+  "species": zod.string(),
+  "confidence": zod.number()
+})).optional(),
+  "confidenceLabel": zod.enum(['identified', 'possible', 'unidentified']).optional(),
+  "reviewStatus": zod.enum(['pending', 'accepted', 'corrected', 'dismissed']).optional(),
+  "technicianSpecies": zod.string().nullish(),
+  "technicianCorrectionNotes": zod.string().nullish()
 })).optional(),
   "recommendations": zod.array(zod.string()).optional(),
   "treatmentNotes": zod.string().nullish(),
@@ -1521,6 +1983,11 @@ export const GenerateReportNarrativeResponse = zod.object({
   "conduciveConditions": zod.string().optional(),
   "customerRecommendations": zod.array(zod.string()).optional()
 })]).optional(),
+  "evidenceRecovery": zod.object({
+  "syncedPhotoCount": zod.number().min(generateReportNarrativeResponseEvidenceRecoverySyncedPhotoCountMin),
+  "needsRegeneration": zod.boolean(),
+  "latestEvidenceAt": zod.coerce.date().nullable()
+}).optional().describe('Present on report-detail responses. Signals when photo media or analysis finished syncing after the current narrative was generated.'),
   "createdAt": zod.string()
 })
 
@@ -3247,6 +3714,1300 @@ export const GenerateGeminiImageBody = zod.object({
 export const GenerateGeminiImageResponse = zod.object({
   "b64_json": zod.string(),
   "mimeType": zod.string()
+})
+
+
+/**
+ * @summary Fetch the authenticated technician's own route chemical assignments for a date (defaults to today, server UTC clock), each enriched with the full product record (including label rules).
+ */
+export const GetDailyRigQueryParams = zod.object({
+  "date": zod.date().optional().describe('Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted')
+})
+
+export const GetDailyRigResponse = zod.object({
+  "id": zod.number(),
+  "technicianId": zod.string(),
+  "rigDate": zod.string().describe('YYYY-MM-DD'),
+  "assignments": zod.array(zod.object({
+  "productId": zod.number(),
+  "targetPest": zod.string().describe('Canonical pest name, e.g. \"German Cockroaches\"'),
+  "notes": zod.string().optional().describe('Optional free-text context, e.g. \"perimeter only\"'),
+  "product": zod.union([zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "epaRegistrationNumber": zod.string().nullable(),
+  "productType": zod.enum(['restricted-use', 'general-use']),
+  "activeIngredients": zod.string(),
+  "signalWord": zod.union([zod.literal('DANGER'),zod.literal('WARNING'),zod.literal('CAUTION'),zod.literal('NONE'),zod.literal(null)]).nullable(),
+  "manufacturerName": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string(),
+  "labelRules": zod.union([zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "approvedPestTypes": zod.array(zod.string()),
+  "approvedSiteClassifications": zod.array(zod.string()),
+  "requiredEquipmentTypes": zod.array(zod.string()),
+  "nozzleSpec": zod.string().nullable(),
+  "pressurePsi": zod.string().nullable(),
+  "dropletSize": zod.string().nullable(),
+  "maxRateOzPer1000Sqft": zod.number().nullable(),
+  "maxRateOzPerGallon": zod.number().nullable(),
+  "mixingSteps": zod.array(zod.string()),
+  "maxTempF": zod.number().nullable(),
+  "phytotoxicityNotes": zod.string().nullable(),
+  "reEntryIntervalHours": zod.number().nullable(),
+  "retreatmentIntervalDays": zod.number().nullable().describe('Minimum whole days before this product may legally be reapplied to the same site'),
+  "createdAt": zod.string()
+}),zod.null()]).describe('Inlined product_label_rules row; null when none has been configured for this product')
+}),zod.null()]).describe('null if the product has since been deleted from the catalogue')
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Create or replace the authenticated technician's route chemical assignments for a date (defaults to today, server UTC clock). Upserts on (companyId, technicianId, rigDate), so retries are safe.
+ */
+
+
+
+export const UpsertDailyRigBody = zod.object({
+  "assignments": zod.array(zod.object({
+  "productId": zod.number(),
+  "targetPest": zod.string().min(1).describe('Canonical pest name, e.g. \"German Cockroaches\"'),
+  "notes": zod.string().optional().describe('Optional free-text context, e.g. \"perimeter only\"')
+})),
+  "date": zod.coerce.date().optional().describe('Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted')
+})
+
+
+/**
+ * @summary Last-30-day treatment logs for the authenticated technician, deduped by (productId, siteClassification), newest first, capped at 5 — used for quick-pick suggestions in the treatment wizard.
+ */
+export const GetRecentMixesResponseItem = zod.object({
+  "logId": zod.number(),
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "productActiveIngredients": zod.string(),
+  "targetPest": zod.string(),
+  "siteClassification": zod.string(),
+  "areaSqft": zod.number().nullish(),
+  "linearFt": zod.number().nullish(),
+  "totalProductOz": zod.number().nullish(),
+  "equipmentUsed": zod.string().nullish(),
+  "appliedAt": zod.string()
+})
+export const GetRecentMixesResponse = zod.array(GetRecentMixesResponseItem)
+
+
+/**
+ * @summary Read-only Route Readiness lookup for any technician/date pair. Used by the Integrated Route Calendar so a manager (or a technician looking at a future date) can see whether a stop's daily rig has been set up, without the editing affordances of GET/POST /technician/daily-rig (which always target the authenticated technician's own current-day rig). Self-lookups are always allowed; looking up another technician requires manager/owner/sales.
+ */
+export const LookupDailyRigQueryParams = zod.object({
+  "technicianId": zod.coerce.string().describe('Clerk user ID of the technician whose daily rig to look up'),
+  "date": zod.date().describe('Rig date (YYYY-MM-DD), matching the technician\'s device-local calendar date')
+})
+
+export const LookupDailyRigResponse = zod.object({
+  "setUp": zod.literal(true),
+  "technicianId": zod.string(),
+  "rigDate": zod.string().describe('YYYY-MM-DD'),
+  "assignments": zod.array(zod.object({
+  "productId": zod.number(),
+  "targetPest": zod.string().describe('Canonical pest name, e.g. \"German Cockroaches\"'),
+  "notes": zod.string().optional().describe('Optional free-text context, e.g. \"perimeter only\"'),
+  "product": zod.union([zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "epaRegistrationNumber": zod.string().nullable(),
+  "productType": zod.enum(['restricted-use', 'general-use']),
+  "activeIngredients": zod.string(),
+  "signalWord": zod.union([zod.literal('DANGER'),zod.literal('WARNING'),zod.literal('CAUTION'),zod.literal('NONE'),zod.literal(null)]).nullable(),
+  "manufacturerName": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string(),
+  "labelRules": zod.union([zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "approvedPestTypes": zod.array(zod.string()),
+  "approvedSiteClassifications": zod.array(zod.string()),
+  "requiredEquipmentTypes": zod.array(zod.string()),
+  "nozzleSpec": zod.string().nullable(),
+  "pressurePsi": zod.string().nullable(),
+  "dropletSize": zod.string().nullable(),
+  "maxRateOzPer1000Sqft": zod.number().nullable(),
+  "maxRateOzPerGallon": zod.number().nullable(),
+  "mixingSteps": zod.array(zod.string()),
+  "maxTempF": zod.number().nullable(),
+  "phytotoxicityNotes": zod.string().nullable(),
+  "reEntryIntervalHours": zod.number().nullable(),
+  "retreatmentIntervalDays": zod.number().nullable().describe('Minimum whole days before this product may legally be reapplied to the same site'),
+  "createdAt": zod.string()
+}),zod.null()]).describe('Inlined product_label_rules row; null when none has been configured for this product')
+}),zod.null()]).describe('null if the product has since been deleted from the catalogue')
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Today's Route Readiness for one technician — compares their scheduled stops for a calendar date against their truck's on-hand quantities for the products declared on that date's rig, using recent per-application usage history to project what today is likely to consume. Proactive, TODAY-scoped signal; distinct from Truck Stock Health (a longer-range trending projection) and from the existing reactive restockThreshold alert. Self-lookups are always allowed; looking up another technician requires manager/owner/sales.
+ */
+export const GetRouteReadinessQueryParams = zod.object({
+  "technicianId": zod.coerce.string().optional().describe('Clerk user ID to look up; defaults to the authenticated caller'),
+  "date": zod.date().optional().describe('Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted'),
+  "tzOffsetMinutes": zod.coerce.number().optional().describe('Caller\'s UTC offset in minutes (same convention as \/schedule\/route-calendar). Defaults to 0 (UTC) when omitted.')
+})
+
+export const GetRouteReadinessResponse = zod.object({
+  "technicianId": zod.string(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "stopCount": zod.number(),
+  "rigSetUp": zod.boolean(),
+  "overallStatus": zod.enum(['ready', 'short', 'not-set-up']),
+  "products": zod.array(zod.object({
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "targetPest": zod.string(),
+  "unit": zod.string(),
+  "quantityOnHand": zod.number(),
+  "avgUsagePerStop": zod.number().nullable().describe('Average quantity used per application over the last 30 days; null when there is no history yet'),
+  "expectedUsageToday": zod.number().nullable().describe('avgUsagePerStop \* stopCount; null when avgUsagePerStop is null'),
+  "status": zod.enum(['ready', 'short', 'insufficient-data'])
+}))
+})
+
+
+/**
+ * @summary Today's Route Readiness computed for every technician in the company, for a calendar date. Manager/owner only.
+ */
+export const GetTeamRouteReadinessQueryParams = zod.object({
+  "date": zod.date().optional().describe('Rig date (YYYY-MM-DD); defaults to today (server UTC) when omitted'),
+  "tzOffsetMinutes": zod.coerce.number().optional().describe('Caller\'s UTC offset in minutes (same convention as \/schedule\/route-calendar). Defaults to 0 (UTC) when omitted.')
+})
+
+export const GetTeamRouteReadinessResponseItem = zod.object({
+  "technicianId": zod.string(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "stopCount": zod.number(),
+  "rigSetUp": zod.boolean(),
+  "overallStatus": zod.enum(['ready', 'short', 'not-set-up']),
+  "products": zod.array(zod.object({
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "targetPest": zod.string(),
+  "unit": zod.string(),
+  "quantityOnHand": zod.number(),
+  "avgUsagePerStop": zod.number().nullable().describe('Average quantity used per application over the last 30 days; null when there is no history yet'),
+  "expectedUsageToday": zod.number().nullable().describe('avgUsagePerStop \* stopCount; null when avgUsagePerStop is null'),
+  "status": zod.enum(['ready', 'short', 'insufficient-data'])
+}))
+})
+export const GetTeamRouteReadinessResponse = zod.array(GetTeamRouteReadinessResponseItem)
+
+
+/**
+ * @summary Check whether the authenticated user is a super admin
+ */
+export const GetMissionControlMeResponse = zod.object({
+  "userId": zod.string(),
+  "isSuperAdmin": zod.boolean()
+})
+
+
+/**
+ * Operational KPI counts use the same eligibility cohorts as their matching paginated directory filters. Incident counts are source incident records, including acknowledged and investigating records where the active-incident cohort is used.
+ * @summary Real platform-wide operational counts and recent alerts
+ */
+export const GetMissionControlOverviewResponse = zod.object({
+  "kpis": zod.object({
+  "companyCount": zod.number(),
+  "activeCompanyCount": zod.number(),
+  "userCount": zod.number(),
+  "technicianCount": zod.number(),
+  "activeTechnicianCount": zod.number(),
+  "inspectionCount": zod.number(),
+  "inspectionsTodayCount": zod.number(),
+  "inspectionsProcessingCount": zod.number(),
+  "inspectionsCompletedCount": zod.number(),
+  "failedSyncCount": zod.number(),
+  "failedAnalysisCount": zod.number(),
+  "pendingAnalysisCount": zod.number(),
+  "openIncidentCount": zod.number().describe('Active incident records (open'),
+  "unacknowledgedAlertCount": zod.number().describe('Unrecovered incident records whose status is open'),
+  "problemDeviceSessionCount": zod.number().describe('Active incident records linked to a device session; this is a record count'),
+  "pendingApprovalCount": zod.number()
+}),
+  "recentAlerts": zod.array(zod.object({
+  "id": zod.number(),
+  "severity": zod.enum(['low', 'medium', 'high', 'critical']),
+  "title": zod.string(),
+  "message": zod.string(),
+  "companyId": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "aiAnalysisHealth": zod.object({
+  "windowHours": zod.number(),
+  "completedCount": zod.number(),
+  "failedCount": zod.number(),
+  "pendingCount": zod.number(),
+  "latestResultAt": zod.coerce.date().nullable()
+})
+})
+
+
+/**
+ * @summary Search platform records available to super-admins
+ */
+export const searchMissionControlQueryQMin = 2;
+export const searchMissionControlQueryQMax = 120;
+
+
+
+export const SearchMissionControlQueryParams = zod.object({
+  "q": zod.coerce.string().min(searchMissionControlQueryQMin).max(searchMissionControlQueryQMax)
+})
+
+export const SearchMissionControlResponse = zod.object({
+  "items": zod.array(zod.object({
+  "kind": zod.enum(['company', 'technician', 'property', 'inspection', 'evidence', 'incident']),
+  "id": zod.string(),
+  "title": zod.string(),
+  "subtitle": zod.string().nullable(),
+  "companyId": zod.number().nullable(),
+  "inspectionId": zod.number().nullable()
+}))
+})
+
+
+/**
+ * @summary Search and paginate platform companies
+ */
+
+
+
+
+export const ListMissionControlCompaniesQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).optional(),
+  "search": zod.coerce.string().optional(),
+  "accessStatus": zod.enum(['enabled', 'suspended']).optional().describe('Filter by enabled or suspended company access')
+})
+
+export const ListMissionControlCompaniesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "accessStatus": zod.enum(['enabled', 'suspended']),
+  "createdAt": zod.coerce.date(),
+  "userCount": zod.number(),
+  "technicianCount": zod.number(),
+  "inspectionCount": zod.number(),
+  "lastActivityAt": zod.coerce.date().nullable()
+}).and(zod.object({
+  "inspectionsTodayCount": zod.number(),
+  "inspectionsProcessingCount": zod.number(),
+  "inspectionsCompletedCount": zod.number(),
+  "failedSyncCount": zod.number(),
+  "failedAnalysisCount": zod.number(),
+  "pendingAnalysisCount": zod.number(),
+  "openIncidentCount": zod.number()
+}))),
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total": zod.number(),
+  "totalPages": zod.number()
+})
+
+
+/**
+ * @summary Get platform company detail
+ */
+export const GetMissionControlCompanyParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMissionControlCompanyResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "accessStatus": zod.enum(['enabled', 'suspended']),
+  "createdAt": zod.coerce.date(),
+  "userCount": zod.number(),
+  "technicianCount": zod.number(),
+  "inspectionCount": zod.number(),
+  "lastActivityAt": zod.coerce.date().nullable()
+}).and(zod.object({
+  "inspectionsTodayCount": zod.number(),
+  "inspectionsProcessingCount": zod.number(),
+  "inspectionsCompletedCount": zod.number(),
+  "failedSyncCount": zod.number(),
+  "failedAnalysisCount": zod.number(),
+  "pendingAnalysisCount": zod.number(),
+  "openIncidentCount": zod.number()
+})).and(zod.object({
+  "owner": zod.union([zod.object({
+  "userId": zod.string(),
+  "name": zod.string().nullable().describe('Null because user profile names are not persisted in this backend'),
+  "email": zod.string().email().nullable().describe('Null because email addresses are not persisted in this backend')
+}),zod.null()]),
+  "users": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string().nullable().describe('Null because user profile names are not persisted in this backend'),
+  "email": zod.string().email().nullable().describe('Null because email addresses are not persisted in this backend'),
+  "role": zod.string().nullish(),
+  "betaAccessEnabled": zod.boolean()
+})),
+  "recentInspections": zod.array(zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "technicianId": zod.string().nullable(),
+  "technicianName": zod.string().nullish(),
+  "status": zod.string(),
+  "siteAddress": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}))
+}))
+
+
+/**
+ * @summary Suspend or enable company access with required approval
+ */
+export const UpdateMissionControlCompanyAccessParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateMissionControlCompanyAccessBody = zod.object({
+  "action": zod.enum(['suspend', 'enable']),
+  "approvalId": zod.number().describe('Approval authorizing this access change'),
+  "reason": zod.string().optional()
+})
+
+export const UpdateMissionControlCompanyAccessResponse = zod.object({
+  "companyId": zod.number(),
+  "accessStatus": zod.enum(['enabled', 'suspended']),
+  "approvalId": zod.number(),
+  "changedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Search technicians, optionally scoped to a company
+ */
+
+
+
+
+export const ListMissionControlTechniciansQueryParams = zod.object({
+  "companyId": zod.coerce.number().optional(),
+  "companyAccess": zod.enum(['enabled', 'suspended']).optional().describe('Filter technicians by their company\'s access state'),
+  "search": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).optional()
+})
+
+export const ListMissionControlTechniciansResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string().nullable().describe('Null when no persisted inspection provides a display name'),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "status": zod.string(),
+  "lastActiveAt": zod.coerce.date().nullish(),
+  "inspectionCount": zod.number(),
+  "failedSyncCount": zod.number(),
+  "failedAnalysisCount": zod.number(),
+  "pendingAnalysisCount": zod.number()
+})),
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total": zod.number(),
+  "totalPages": zod.number()
+})
+
+
+/**
+ * Returns privacy-safe property directory summaries for super-admin drill-down. Customer names, notes, technician knowledge, hotspots, media URLs, and other private property content are withheld.
+ * @summary Search platform properties, optionally scoped to a company
+ */
+
+
+
+
+
+export const ListMissionControlPropertiesQueryParams = zod.object({
+  "companyId": zod.coerce.number().min(1).optional(),
+  "search": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).optional()
+})
+
+export const ListMissionControlPropertiesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number().describe('Property profile ID; stable drill-down identifier'),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "siteAddress": zod.string().describe('Property address for directory identification'),
+  "propertyType": zod.string().nullable(),
+  "inspectionCount": zod.number(),
+  "latestInspectionId": zod.number().nullable(),
+  "updatedAt": zod.coerce.date()
+})),
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total": zod.number(),
+  "totalPages": zod.number()
+})
+
+
+/**
+ * @summary Get a privacy-safe platform property detail
+ */
+
+
+
+export const GetMissionControlPropertyParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetMissionControlPropertyResponse = zod.object({
+  "id": zod.number().describe('Property profile ID; stable drill-down identifier'),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "siteAddress": zod.string().describe('Property address for directory identification'),
+  "propertyType": zod.string().nullable(),
+  "inspectionCount": zod.number(),
+  "latestInspectionId": zod.number().nullable(),
+  "updatedAt": zod.coerce.date()
+}).and(zod.object({
+  "inspections": zod.array(zod.object({
+  "id": zod.number(),
+  "status": zod.string(),
+  "createdAt": zod.coerce.date()
+}))
+}))
+
+
+/**
+ * @summary Inspect one technician and their recent inspection references
+ */
+export const GetMissionControlTechnicianParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetMissionControlTechnicianResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string().nullable().describe('Null when no persisted inspection provides a display name'),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "status": zod.string(),
+  "lastActiveAt": zod.coerce.date().nullish(),
+  "inspectionCount": zod.number(),
+  "failedSyncCount": zod.number(),
+  "failedAnalysisCount": zod.number(),
+  "pendingAnalysisCount": zod.number()
+}).and(zod.object({
+  "inspections": zod.array(zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "technicianId": zod.string().nullable(),
+  "technicianName": zod.string().nullish(),
+  "status": zod.string(),
+  "siteAddress": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "deviceSessions": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "eventCount": zod.number()
+}))
+}))
+
+
+/**
+ * @summary Inspect one device session and sanitized event history
+ */
+export const GetMissionControlDeviceSessionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMissionControlDeviceSessionResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "eventCount": zod.number()
+}).and(zod.object({
+  "inspectionId": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "events": zod.array(zod.object({
+  "type": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "detail": zod.string().nullish()
+}))
+}))
+
+
+/**
+ * @summary Enable or disable beta access with required approval
+ */
+export const UpdateMissionControlUserAccessParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateMissionControlUserAccessBody = zod.object({
+  "action": zod.enum(['enable', 'disable']),
+  "approvalId": zod.number().describe('Approval authorizing this beta-access change'),
+  "reason": zod.string().optional()
+})
+
+export const UpdateMissionControlUserAccessResponse = zod.object({
+  "userId": zod.string(),
+  "betaAccessEnabled": zod.boolean(),
+  "approvalId": zod.number(),
+  "changedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Search inspections across the platform
+ */
+
+
+
+
+export const ListMissionControlInspectionsQueryParams = zod.object({
+  "companyId": zod.coerce.number().optional(),
+  "technicianId": zod.coerce.string().optional().describe('Filter by technician ID; when companyId is provided, both filters are applied together'),
+  "createdToday": zod.enum(['true', 'false']).optional().describe('Pass true to include inspections created in the UTC calendar day [midnight today, midnight tomorrow), matching the overview KPI. Future-dated records are excluded.'),
+  "status": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional(),
+  "syncStatus": zod.enum(['failed', 'success']).optional().describe('Filter by the latest durable sync log for each company + inspection; no sync log is not equivalent to a failure.'),
+  "analysisStatus": zod.enum(['failed', 'pending', 'complete']).optional().describe('Filter by the latest persisted analysis for each company + inspection. Failed includes failed status or one or more analysis errors, matching the overview KPI.'),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).optional()
+})
+
+export const ListMissionControlInspectionsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "technicianId": zod.string().nullable(),
+  "technicianName": zod.string().nullish(),
+  "status": zod.string(),
+  "siteAddress": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total": zod.number(),
+  "totalPages": zod.number()
+})
+
+
+/**
+ * @summary Get diagnostic inspection detail and synchronization history
+ */
+export const GetMissionControlInspectionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMissionControlInspectionResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "technicianId": zod.string().nullable(),
+  "technicianName": zod.string().nullish(),
+  "status": zod.string(),
+  "siteAddress": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "mediaCounts": zod.object({
+  "total": zod.number(),
+  "photos": zod.number(),
+  "videos": zod.number(),
+  "pendingAnalysis": zod.number()
+}),
+  "analysisStatuses": zod.array(zod.object({
+  "mediaId": zod.number(),
+  "status": zod.enum(['completed', 'failed', 'deferred', 'rate_limited', 'pending', 'partial']),
+  "error": zod.string().nullable(),
+  "updatedAt": zod.coerce.date().nullable()
+})),
+  "syncLogs": zod.array(zod.object({
+  "id": zod.number(),
+  "status": zod.string(),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "media": zod.array(zod.object({
+  "id": zod.number(),
+  "mediaType": zod.string(),
+  "durationSec": zod.number().nullish(),
+  "captureSource": zod.string().nullish(),
+  "qualityScore": zod.number().nullish(),
+  "capturedAt": zod.coerce.date().nullish()
+})),
+  "deviceSessions": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "eventCount": zod.number()
+})),
+  "completedAt": zod.coerce.date().nullish(),
+  "propertyId": zod.number().nullish(),
+  "requiredZones": zod.array(zod.object({
+  "slug": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "capturedZones": zod.array(zod.object({
+  "slug": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "reportStatus": zod.enum(['available', 'unavailable']).optional()
+}))
+
+
+/**
+ * New clients should persist clientKey before sending for crash-safe idempotency. The key is unique within the authenticated company and inspection. A matching retry returns the original station (200); reusing a key with a different create payload returns 409. Legacy clients may omit clientKey and receive a normal 201 create response, but retries without a key are not guaranteed to replay the original row.
+ * @summary Create a bait station
+ */
+export const CreateBaitStationParams = zod.object({
+  "inspectionId": zod.coerce.number()
+})
+
+export const createBaitStationBodyClientKeyMax = 200;
+
+export const createBaitStationBodyLabelMax = 100;
+
+export const createBaitStationBodyStatusDefault = `active`;
+
+export const CreateBaitStationBody = zod.object({
+  "clientKey": zod.string().min(1).max(createBaitStationBodyClientKeyMax).optional().describe('Optional stable client-generated key persisted before the POST. Required for idempotent replay semantics.'),
+  "label": zod.string().min(1).max(createBaitStationBodyLabelMax),
+  "locationType": zod.string().optional(),
+  "latitude": zod.string().optional(),
+  "longitude": zod.string().optional(),
+  "status": zod.enum(['active', 'missing', 'damaged', 'removed']).default(createBaitStationBodyStatusDefault),
+  "notes": zod.string().optional(),
+  "lastCheckedAt": zod.coerce.date().optional()
+})
+
+export const CreateBaitStationResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "label": zod.string(),
+  "locationType": zod.string().nullish(),
+  "latitude": zod.string().nullish(),
+  "longitude": zod.string().nullish(),
+  "status": zod.enum(['active', 'missing', 'damaged', 'removed']),
+  "notes": zod.string().nullish(),
+  "lastCheckedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List privacy-safe evidence metadata for an inspection
+ */
+
+
+
+export const ListMissionControlInspectionEvidenceParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const listMissionControlInspectionEvidenceResponseItemsItemQualityScoreMin = 0;
+export const listMissionControlInspectionEvidenceResponseItemsItemQualityScoreMax = 100;
+
+
+
+export const ListMissionControlInspectionEvidenceResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "companyId": zod.number(),
+  "mediaType": zod.enum(['photo', 'video', 'voice']),
+  "filename": zod.string().nullable(),
+  "captureSource": zod.string(),
+  "capturedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "qualityScore": zod.number().min(listMissionControlInspectionEvidenceResponseItemsItemQualityScoreMin).max(listMissionControlInspectionEvidenceResponseItemsItemQualityScoreMax).nullish(),
+  "processingStatus": zod.enum(['pending', 'completed', 'partial', 'failed', 'timed_out', 'deferred']),
+  "analysisStatus": zod.enum(['pending', 'completed', 'partial', 'failed', 'timed_out', 'deferred', 'unsupported']),
+  "zone": zod.string().nullable(),
+  "findings": zod.array(zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "confidence": zod.number(),
+  "severity": zod.string(),
+  "location": zod.string().nullable()
+})),
+  "error": zod.string().nullish(),
+  "provider": zod.string().nullish(),
+  "model": zod.string().nullish()
+})),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Get an evidence item with actual analysis findings, if present
+ */
+
+
+
+
+export const GetMissionControlInspectionEvidenceParams = zod.object({
+  "id": zod.coerce.number().min(1),
+  "evidenceId": zod.coerce.number().min(1)
+})
+
+export const getMissionControlInspectionEvidenceResponseOneQualityScoreMin = 0;
+export const getMissionControlInspectionEvidenceResponseOneQualityScoreMax = 100;
+
+
+
+export const GetMissionControlInspectionEvidenceResponse = zod.object({
+  "id": zod.number(),
+  "inspectionId": zod.number(),
+  "companyId": zod.number(),
+  "mediaType": zod.enum(['photo', 'video', 'voice']),
+  "filename": zod.string().nullable(),
+  "captureSource": zod.string(),
+  "capturedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "qualityScore": zod.number().min(getMissionControlInspectionEvidenceResponseOneQualityScoreMin).max(getMissionControlInspectionEvidenceResponseOneQualityScoreMax).nullish(),
+  "processingStatus": zod.enum(['pending', 'completed', 'partial', 'failed', 'timed_out', 'deferred']),
+  "analysisStatus": zod.enum(['pending', 'completed', 'partial', 'failed', 'timed_out', 'deferred', 'unsupported']),
+  "zone": zod.string().nullable(),
+  "findings": zod.array(zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "confidence": zod.number(),
+  "severity": zod.string(),
+  "location": zod.string().nullable()
+})),
+  "error": zod.string().nullish(),
+  "provider": zod.string().nullish(),
+  "model": zod.string().nullish()
+})
+
+
+/**
+ * @summary Read persisted AI processing runs, findings, coverage, and errors
+ */
+
+
+
+export const GetMissionControlInspectionAnalysisParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetMissionControlInspectionAnalysisResponse = zod.object({
+  "inspectionId": zod.number(),
+  "state": zod.enum(['queued', 'processing', 'completed', 'partial', 'failed', 'timed_out', 'deferred', 'unavailable']),
+  "latestAnalysisId": zod.number().nullable(),
+  "provider": zod.string().nullable().describe('Null when the persisted result has no provider metadata'),
+  "model": zod.string().nullable().describe('Null when the persisted result has no model metadata'),
+  "runs": zod.array(zod.object({
+  "id": zod.number(),
+  "state": zod.enum(['queued', 'processing', 'completed', 'partial', 'failed', 'timed_out', 'deferred', 'unavailable']),
+  "recordedAt": zod.coerce.date().describe('Persisted result row timestamp; this is not a processing-start timestamp'),
+  "error": zod.string().nullable(),
+  "findings": zod.array(zod.object({
+  "id": zod.number(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "confidence": zod.number(),
+  "severity": zod.string(),
+  "location": zod.string().nullable()
+})),
+  "requiredZones": zod.array(zod.object({
+  "slug": zod.string(),
+  "label": zod.string()
+})),
+  "coveredZones": zod.array(zod.object({
+  "slug": zod.string(),
+  "label": zod.string()
+})),
+  "uncoveredZones": zod.array(zod.object({
+  "slug": zod.string(),
+  "label": zod.string()
+})),
+  "analysisErrors": zod.number().nullable()
+}))
+})
+
+
+/**
+ * @summary Read provenance-aware inspection events and current-state snapshots
+ */
+
+
+
+export const GetMissionControlInspectionTimelineParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetMissionControlInspectionTimelineResponse = zod.object({
+  "inspectionId": zod.number(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['inspection', 'evidence', 'analysis', 'sync', 'device_session', 'incident', 'incident_action', 'event']),
+  "eventType": zod.string(),
+  "status": zod.string().nullable(),
+  "occurredAt": zod.coerce.date().nullable(),
+  "recordedAt": zod.coerce.date().nullable(),
+  "observedAt": zod.coerce.date().nullable(),
+  "provenance": zod.enum(['persisted_historical_event', 'current_state_derived', 'newly_generated_event']),
+  "sourceType": zod.string(),
+  "sourceId": zod.string(),
+  "companyId": zod.number(),
+  "inspectionId": zod.number(),
+  "relatedId": zod.number().nullable(),
+  "detail": zod.string()
+}))
+})
+
+
+/**
+ * @summary Filter and paginate platform incidents
+ */
+
+
+
+
+export const ListMissionControlIncidentsQueryParams = zod.object({
+  "severity": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional(),
+  "companyId": zod.coerce.number().optional(),
+  "activeOnly": zod.enum(['true', 'false']).optional().describe('Pass true to include only open, acknowledged, or investigating incidents and exclude recovered sources'),
+  "hasSession": zod.enum(['true', 'false']).optional().describe('Pass true to include only incidents related to a device session'),
+  "sourceType": zod.enum(['error_event', 'sync_log', 'analysis']).optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).optional()
+})
+
+export const ListMissionControlIncidentsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "severity": zod.enum(['low', 'medium', 'high', 'critical']),
+  "status": zod.enum(['open', 'acknowledged', 'investigating', 'resolved', 'dismissed']),
+  "title": zod.string(),
+  "description": zod.string(),
+  "assignedTo": zod.string().nullish(),
+  "acknowledgedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().optional(),
+  "sourceType": zod.string().optional(),
+  "sourceId": zod.string().optional(),
+  "inspectionId": zod.number().optional(),
+  "userId": zod.string().optional(),
+  "sessionId": zod.number().optional()
+})),
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total": zod.number(),
+  "totalPages": zod.number()
+})
+
+
+/**
+ * @summary Get incident detail
+ */
+export const GetMissionControlIncidentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMissionControlIncidentResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "severity": zod.enum(['low', 'medium', 'high', 'critical']),
+  "status": zod.enum(['open', 'acknowledged', 'investigating', 'resolved', 'dismissed']),
+  "title": zod.string(),
+  "description": zod.string(),
+  "assignedTo": zod.string().nullish(),
+  "acknowledgedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().optional(),
+  "sourceType": zod.string().optional(),
+  "sourceId": zod.string().optional(),
+  "inspectionId": zod.number().optional(),
+  "userId": zod.string().optional(),
+  "sessionId": zod.number().optional()
+})
+
+
+/**
+ * @summary Acknowledge, assign, or escalate an incident
+ */
+export const UpdateMissionControlIncidentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateMissionControlIncidentBodyAssigneeIdMax = 128;
+
+export const updateMissionControlIncidentBodyNoteMax = 1000;
+
+
+
+export const UpdateMissionControlIncidentBody = zod.object({
+  "action": zod.enum(['acknowledge', 'assign', 'claim', 'resolve', 'escalate']),
+  "assigneeId": zod.string().min(1).max(updateMissionControlIncidentBodyAssigneeIdMax).optional(),
+  "severity": zod.enum(['low', 'medium', 'high', 'critical']).optional(),
+  "note": zod.string().max(updateMissionControlIncidentBodyNoteMax).optional()
+})
+
+export const UpdateMissionControlIncidentResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "severity": zod.enum(['low', 'medium', 'high', 'critical']),
+  "status": zod.enum(['open', 'acknowledged', 'investigating', 'resolved', 'dismissed']),
+  "title": zod.string(),
+  "description": zod.string(),
+  "assignedTo": zod.string().nullish(),
+  "acknowledgedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().optional(),
+  "sourceType": zod.string().optional(),
+  "sourceId": zod.string().optional(),
+  "inspectionId": zod.number().optional(),
+  "userId": zod.string().optional(),
+  "sessionId": zod.number().optional()
+})
+
+
+/**
+ * @summary Paginated super-admin action history
+ */
+
+
+
+
+export const ListMissionControlAuditQueryParams = zod.object({
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).optional(),
+  "action": zod.coerce.string().optional(),
+  "actorId": zod.coerce.string().optional(),
+  "targetType": zod.coerce.string().optional(),
+  "targetId": zod.coerce.string().optional().describe('Exact audit target ID, such as a numeric incident ID encoded as text')
+})
+
+export const ListMissionControlAuditResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "actorId": zod.string(),
+  "actorName": zod.string().nullish(),
+  "action": zod.string(),
+  "targetType": zod.string(),
+  "targetId": zod.string(),
+  "details": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total": zod.number(),
+  "totalPages": zod.number()
+})
+
+
+/**
+ * @summary List executive agents and real-task-backed Agent Zero availability
+ */
+export const listMissionControlAgentsResponseAgentZeroRealTaskCountMin = 0;
+
+
+
+export const ListMissionControlAgentsResponse = zod.object({
+  "agents": zod.array(zod.object({
+  "identity": zod.enum(['quinn', 'ada', 'mara', 'theo', 'nadia', 'iris', 'dario']),
+  "displayName": zod.enum(['Quinn', 'Ada', 'Mara', 'Theo', 'Nadia', 'Iris', 'Dario']),
+  "role": zod.string(),
+  "capability": zod.string().optional(),
+  "status": zod.enum(['available', 'busy', 'unavailable'])
+})),
+  "agentZero": zod.object({
+  "available": zod.boolean().describe('Availability is true only when at least one real Agent Zero task is available.'),
+  "realTaskCount": zod.number().min(listMissionControlAgentsResponseAgentZeroRealTaskCountMin).describe('Number of actual Agent Zero tasks currently available'),
+  "basis": zod.enum(['real_tasks']).describe('Availability is derived from real persisted tasks, never a fabricated default.'),
+  "approvalRequired": zod.boolean().optional().describe('Consequential execution requires a human approval; investigations are not executable jobs.')
+})
+})
+
+
+/**
+ * @summary List agent tasks
+ */
+
+
+
+
+export const ListMissionControlAgentTasksQueryParams = zod.object({
+  "companyId": zod.coerce.number().optional(),
+  "status": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).optional()
+})
+
+export const ListMissionControlAgentTasksResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "prompt": zod.string(),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  "createdBy": zod.string(),
+  "result": zod.string().nullish(),
+  "error": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "startedAt": zod.coerce.date().nullish(),
+  "completedAt": zod.coerce.date().nullish(),
+  "delegations": zod.array(zod.object({
+  "id": zod.number(),
+  "specialist": zod.string(),
+  "scope": zod.string(),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "result": zod.string().nullish(),
+  "error": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullish()
+})).optional(),
+  "traces": zod.array(zod.object({
+  "id": zod.number(),
+  "delegationId": zod.number().nullish(),
+  "actor": zod.string(),
+  "event": zod.string(),
+  "detail": zod.string(),
+  "createdAt": zod.coerce.date()
+})).optional()
+})),
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total": zod.number(),
+  "totalPages": zod.number()
+})
+
+
+/**
+ * @summary Create a company-scoped agent investigation task
+ */
+
+
+
+export const CreateMissionControlAgentTaskBody = zod.object({
+  "companyId": zod.number(),
+  "prompt": zod.string().min(1)
+})
+
+
+/**
+ * @summary Get an agent task and its results
+ */
+export const GetMissionControlAgentTaskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMissionControlAgentTaskResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "companyName": zod.string(),
+  "prompt": zod.string(),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  "createdBy": zod.string(),
+  "result": zod.string().nullish(),
+  "error": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "startedAt": zod.coerce.date().nullish(),
+  "completedAt": zod.coerce.date().nullish(),
+  "delegations": zod.array(zod.object({
+  "id": zod.number(),
+  "specialist": zod.string(),
+  "scope": zod.string(),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "result": zod.string().nullish(),
+  "error": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullish()
+})).optional(),
+  "traces": zod.array(zod.object({
+  "id": zod.number(),
+  "delegationId": zod.number().nullish(),
+  "actor": zod.string(),
+  "event": zod.string(),
+  "detail": zod.string(),
+  "createdAt": zod.coerce.date()
+})).optional()
+})
+
+
+/**
+ * @summary List approval requests
+ */
+
+
+
+
+export const ListMissionControlApprovalsQueryParams = zod.object({
+  "status": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).optional(),
+  "limit": zod.coerce.number().min(1).optional()
+})
+
+export const ListMissionControlApprovalsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "requestedBy": zod.string(),
+  "request": zod.string(),
+  "note": zod.string().nullish(),
+  "decidedBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "decidedAt": zod.coerce.date().nullish(),
+  "targetType": zod.enum(['company', 'user']),
+  "targetId": zod.string(),
+  "action": zod.string(),
+  "reason": zod.string().optional(),
+  "grantAuditId": zod.number().optional(),
+  "verifiedEmail": zod.string().email().optional()
+})),
+  "page": zod.number(),
+  "limit": zod.number(),
+  "total": zod.number(),
+  "totalPages": zod.number()
+})
+
+
+/**
+ * @summary Resolve a verified primary email to an existing application user
+ */
+export const ResolveMissionControlSuperAdminTargetQueryParams = zod.object({
+  "email": zod.coerce.string().email()
+})
+
+export const ResolveMissionControlSuperAdminTargetResponse = zod.object({
+  "clerkUserId": zod.string(),
+  "appUserId": zod.number(),
+  "isSuperAdmin": zod.boolean(),
+  "companyId": zod.number().nullable(),
+  "verifiedEmail": zod.string().email()
+})
+
+
+/**
+ * Requires the authenticated sole Super Admin whose Clerk subject is pinned in server configuration. Does not create a user or change access.
+ * @summary Preview the one-time, explicitly authorized second-Super-Admin bootstrap target
+ */
+export const PreviewMissionControlSuperAdminBootstrapResponse = zod.object({
+  "clerkUserId": zod.string(),
+  "appUserId": zod.number(),
+  "verifiedEmail": zod.string().email(),
+  "isSuperAdmin": zod.boolean(),
+  "companyId": zod.number().nullable(),
+  "bootstrapOperationId": zod.string()
+})
+
+
+/**
+ * Requires an authenticated Clerk bearer session from the configured sole Super Admin, a fresh server-side Production Clerk resolution, and exact target confirmation. Exact retries return the prior audit ID without a new grant. Never used for subsequent grants.
+ * @summary Atomically grant the pinned second Super Admin once and append an immutable audit event
+ */
+export const executeMissionControlSuperAdminBootstrapBodyReasonMax = 1000;
+
+
+
+export const ExecuteMissionControlSuperAdminBootstrapBody = zod.object({
+  "requestId": zod.string().uuid(),
+  "reason": zod.string().min(1).max(executeMissionControlSuperAdminBootstrapBodyReasonMax),
+  "confirmation": zod.object({
+  "verifiedEmail": zod.string().email(),
+  "clerkUserId": zod.string(),
+  "appUserId": zod.number()
+})
+})
+
+export const ExecuteMissionControlSuperAdminBootstrapResponse = zod.object({
+  "auditId": zod.number(),
+  "operationId": zod.string().uuid(),
+  "requestId": zod.string().uuid(),
+  "bootstrapOperationId": zod.string(),
+  "replayed": zod.boolean(),
+  "targetClerkId": zod.string().optional(),
+  "targetUserId": zod.number().optional(),
+  "previousIsSuperAdmin": zod.boolean().optional(),
+  "isSuperAdmin": zod.boolean().optional(),
+  "createdAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary Request a second administrator's approval for an access change
+ */
+
+export const requestMissionControlApprovalBodyReasonMax = 1000;
+
+export const requestMissionControlApprovalBodyIdempotencyKeyMax = 128;
+
+
+
+export const RequestMissionControlApprovalBody = zod.object({
+  "targetType": zod.enum(['company', 'user']),
+  "targetId": zod.string().min(1),
+  "action": zod.enum(['suspend', 'enable', 'beta_enable', 'beta_disable', 'super_admin_enable', 'super_admin_disable']),
+  "reason": zod.string().min(1).max(requestMissionControlApprovalBodyReasonMax),
+  "idempotencyKey": zod.string().max(requestMissionControlApprovalBodyIdempotencyKeyMax).optional(),
+  "verifiedEmail": zod.string().email().optional()
+})
+
+
+/**
+ * @summary Approve or reject an approval request with a note
+ */
+export const DecideMissionControlApprovalParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const DecideMissionControlApprovalBody = zod.object({
+  "decision": zod.enum(['approve', 'reject']),
+  "note": zod.string().min(1)
+})
+
+export const DecideMissionControlApprovalResponse = zod.object({
+  "id": zod.number(),
+  "type": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "requestedBy": zod.string(),
+  "request": zod.string(),
+  "note": zod.string().nullish(),
+  "decidedBy": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "decidedAt": zod.coerce.date().nullish(),
+  "targetType": zod.enum(['company', 'user']),
+  "targetId": zod.string(),
+  "action": zod.string(),
+  "reason": zod.string().optional(),
+  "grantAuditId": zod.number().optional(),
+  "verifiedEmail": zod.string().email().optional()
 })
 
 

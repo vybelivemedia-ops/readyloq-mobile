@@ -15,6 +15,7 @@ import {
   SafeAreaView,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SvgXml } from "react-native-svg";
@@ -30,6 +31,8 @@ type Props = {
   technicianSignature: string | null;
   ownerSignature: string | null;
   ownerNotAvailable: boolean;
+  /** Unit / apartment number pre-filled from the local record. */
+  unitNumber?: string | null;
   /** Re-render parent when signatures change. */
   onUpdated?: () => void;
 };
@@ -43,9 +46,24 @@ export function InspectionSignaturePanel({
   technicianSignature,
   ownerSignature,
   ownerNotAvailable,
+  unitNumber,
   onUpdated,
 }: Props) {
   const colors = useColors();
+
+  // Local draft of the unit number — editable inline before blur-save.
+  const [draftUnit, setDraftUnit] = useState(unitNumber ?? "");
+
+  const saveUnitNumber = async (value: string) => {
+    const trimmed = value.trim() || null;
+    await updateLocalInspection(localId, (r) => {
+      r.unitNumber = trimmed;
+      // Mark as needing sync so the engine re-queues this record even when
+      // serverCompleted is already true.
+      r.unitNumberSynced = false;
+    });
+    onUpdated?.();
+  };
 
   // Which slot the modal is capturing
   const [activeSlot, setActiveSlot] = useState<SlotKey | null>(null);
@@ -81,11 +99,18 @@ export function InspectionSignaturePanel({
     await updateLocalInspection(localId, (r) => {
       if (activeSlot === "technician") {
         r.technicianSignature = draftSvg;
+        // Signing clears any outstanding explicit-clear consent for this slot.
+        r.techSigClear = false;
       } else {
         r.ownerSignature = draftSvg;
         r.ownerNotAvailable = false;
+        r.ownerSigConsent = false;
       }
       r.signedAt = r.signedAt ?? signedAt;
+      // Bump revision and mark dirty so the sync engine re-queues this record
+      // even when serverCompleted is already true.
+      r.sigRev = (r.sigRev ?? 0) + 1;
+      r.signaturesSynced = false;
     });
     closeModal();
     onUpdated?.();
@@ -95,6 +120,11 @@ export function InspectionSignaturePanel({
     await updateLocalInspection(localId, (r) => {
       r.ownerNotAvailable = true;
       r.ownerSignature = null;
+      // The owner sig is being intentionally nulled — tell the sync engine to
+      // send resignatureConsent: true so the server will accept the clear.
+      r.ownerSigConsent = true;
+      r.sigRev = (r.sigRev ?? 0) + 1;
+      r.signaturesSynced = false;
     });
     onUpdated?.();
   };
@@ -102,14 +132,26 @@ export function InspectionSignaturePanel({
   const clearOwnerNotAvailable = async () => {
     await updateLocalInspection(localId, (r) => {
       r.ownerNotAvailable = false;
+      // ownerSignature is unchanged; no consent flag needed.
+      r.sigRev = (r.sigRev ?? 0) + 1;
+      r.signaturesSynced = false;
     });
     onUpdated?.();
   };
 
   const clearSignature = async (slot: SlotKey) => {
     await updateLocalInspection(localId, (r) => {
-      if (slot === "technician") r.technicianSignature = null;
-      else r.ownerSignature = null;
+      if (slot === "technician") {
+        r.technicianSignature = null;
+        // Mark that this was intentional so the engine sends null to the server.
+        r.techSigClear = true;
+      } else {
+        r.ownerSignature = null;
+        // Need resignatureConsent: true to clear an existing server-side value.
+        r.ownerSigConsent = true;
+      }
+      r.sigRev = (r.sigRev ?? 0) + 1;
+      r.signaturesSynced = false;
     });
     onUpdated?.();
   };
@@ -153,6 +195,50 @@ export function InspectionSignaturePanel({
           >
             Both parties sign to acknowledge the inspection findings.
           </Text>
+        </View>
+
+        {/* Unit / Apartment # — pre-filled at booking; editable in the field */}
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontFamily: "Inter_500Medium",
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: 0.6,
+              marginBottom: 6,
+            }}
+          >
+            Unit / Apt # <Text style={{ fontFamily: "Inter_400Regular", textTransform: "none" }}>(optional)</Text>
+          </Text>
+          <TextInput
+            value={draftUnit}
+            onChangeText={setDraftUnit}
+            onBlur={() => void saveUnitNumber(draftUnit)}
+            placeholder="e.g. 4B, 12, 301"
+            placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="characters"
+            returnKeyType="done"
+            onSubmitEditing={() => void saveUnitNumber(draftUnit)}
+            style={{
+              backgroundColor: colors.muted,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 8,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              color: colors.foreground,
+              fontFamily: "Inter_400Regular",
+              fontSize: 14,
+            }}
+          />
         </View>
 
         {/* Owner / Tenant slot */}

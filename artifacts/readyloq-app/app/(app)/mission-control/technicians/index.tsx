@@ -1,0 +1,1 @@
+export { Technicians as default } from "@/components/mission-control/lists";

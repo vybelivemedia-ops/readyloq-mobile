@@ -68,6 +68,13 @@ export const treatmentLogsTable = pgTable(
      *  appliedRate = (totalProductOz / areaSqft) × 1000 must not exceed
      *  label_rules.maxRateOzPer1000Sqft. */
     totalProductOz: real("total_product_oz"),
+    /** Actual quantity subtracted from tech_inventory.quantity_on_hand when
+     *  this log was created. This can be LESS than totalProductOz when the
+     *  deduction was capped at 0 (technician applied more than they had on
+     *  hand). Deleting the log must add back exactly this amount — never
+     *  totalProductOz — or a capped deduction would over-restore stock.
+     *  Null when no inventory row existed to deduct from (no baseline). */
+    inventoryDeductedOz: real("inventory_deducted_oz"),
 
     // ── Equipment ──────────────────────────────────────────────────────────
     /** Equipment type used (technician-confirmed, e.g. "compressed_air_sprayer"). */

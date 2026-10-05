@@ -5,32 +5,21 @@
  * without duplicating the existing MainActivity entry:
  *
  *   1. Two <meta-data> tags in <application>:
- *        com.meta.wearable.mwdat.APPLICATION_ID  → process.env.META_APP_ID
- *        com.meta.wearable.mwdat.CLIENT_TOKEN    → process.env.META_CLIENT_TOKEN
+ *        com.meta.wearable.mwdat.APPLICATION_ID  → @string/meta_wearables_application_id
+ *        com.meta.wearable.mwdat.CLIENT_TOKEN    → @string/meta_wearables_client_token
  *
  *   2. A new <intent-filter> inside the existing .MainActivity for the
  *      deep-link scheme used by Meta Wearables:
  *        readyloq://mwdat
  *
- * Values are read from environment variables at EAS build time so that
- * no credentials are committed to source control.
+ * Gradle injects the resource values at build time; never write credentials
+ * into the generated manifest. Keep the callback even without build credentials.
  */
 
 const { withAndroidManifest } = require("expo/config-plugins");
 
 module.exports = function withMetaWearables(config) {
   return withAndroidManifest(config, (mod) => {
-    const appId = process.env.META_APP_ID;
-    const clientToken = process.env.META_CLIENT_TOKEN;
-
-    if (!appId || !clientToken) {
-      console.warn(
-        "[withMetaWearables] META_APP_ID or META_CLIENT_TOKEN is not set. " +
-          "Meta Wearables will not be registered in this build."
-      );
-      return mod;
-    }
-
     const application = mod.modResults.manifest.application?.[0];
     if (!application) return mod;
 
@@ -40,19 +29,21 @@ module.exports = function withMetaWearables(config) {
     const META_KEYS = [
       {
         name: "com.meta.wearable.mwdat.APPLICATION_ID",
-        value: appId,
+        value: "@string/meta_wearables_application_id",
       },
       {
         name: "com.meta.wearable.mwdat.CLIENT_TOKEN",
-        value: clientToken,
+        value: "@string/meta_wearables_client_token",
       },
     ];
 
     for (const { name, value } of META_KEYS) {
-      const alreadyPresent = application["meta-data"].some(
+      const existing = application["meta-data"].find(
         (m) => m.$?.["android:name"] === name
       );
-      if (!alreadyPresent) {
+      if (existing) {
+        existing.$["android:value"] = value;
+      } else {
         application["meta-data"].push({
           $: { "android:name": name, "android:value": value },
         });

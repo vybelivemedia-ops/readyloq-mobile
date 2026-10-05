@@ -48,7 +48,7 @@ export const betaFeedbackTable = pgTable(
   }),
 );
 
-export type ErrorCategory = "upload" | "ai" | "report" | "auth" | "notification";
+export type ErrorCategory = "upload" | "ai" | "report" | "auth" | "notification" | "inventory";
 
 // Centralized, company-scoped error/event log. Anonymous 401 / no_company
 // failures are intentionally NOT persisted here (no safe tenant boundary) and

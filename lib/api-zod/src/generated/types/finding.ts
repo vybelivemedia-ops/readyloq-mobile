@@ -5,23 +5,30 @@
  * ReadyLoq - AI-powered inspection intelligence platform
  * OpenAPI spec version: 0.1.0
  */
+import type { FindingCandidatesItem } from './findingCandidatesItem';
+import type { FindingConfidenceLabel } from './findingConfidenceLabel';
+import type { FindingEvidenceQuality } from './findingEvidenceQuality';
+import type { FindingMeasurementEstimate } from './findingMeasurementEstimate';
+import type { FindingReviewStatus } from './findingReviewStatus';
 
 export interface Finding {
   id: number;
   category: string;
   description: string;
   confidence: number;
-  severity?: string;
+  severity: string;
   /** @nullable */
-  location?: string | null;
+  location: string | null;
   /** @nullable */
-  imageUrl?: string | null;
+  imageUrl: string | null;
   /** @nullable */
-  treatment?: string | null;
+  treatment: string | null;
   /** @nullable */
-  exclusionOpportunity?: boolean | null;
+  exclusionOpportunity: boolean | null;
   /** @nullable */
-  evidenceQuality?: string | null;
+  evidenceQuality?: FindingEvidenceQuality;
+  /** @nullable */
+  possiblePest?: string | null;
   /** @nullable */
   species?: string | null;
   /** @nullable */
@@ -34,6 +41,14 @@ export interface Finding {
   moisture?: string | null;
   /** @nullable */
   structuralIssue?: string | null;
+  measurementEstimate?: FindingMeasurementEstimate;
   /** @nullable */
   zone?: string | null;
+  candidates?: FindingCandidatesItem[];
+  confidenceLabel?: FindingConfidenceLabel;
+  reviewStatus?: FindingReviewStatus;
+  /** @nullable */
+  technicianSpecies?: string | null;
+  /** @nullable */
+  technicianCorrectionNotes?: string | null;
 }

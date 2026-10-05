@@ -9,6 +9,7 @@ import type { MediaInputCaptureMetadata } from './mediaInputCaptureMetadata';
 
 export interface MediaInput {
   mediaType: string;
+  /** Company-scoped private object path, e.g. /api/storage/objects/companies/{companyId}/uploads/{objectId} */
   url: string;
   filename?: string;
   caption?: string;
@@ -16,4 +17,7 @@ export interface MediaInput {
   captureSource?: string;
   qualityScore?: number;
   captureMetadata?: MediaInputCaptureMetadata;
+  /** @nullable */
+  unitNumber?: string | null;
+  capturedAt?: Date;
 }

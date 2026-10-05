@@ -11,6 +11,11 @@ export interface ScheduleEntry {
   siteAddress: string;
   /** @nullable */
   clientName?: string | null;
+  /**
+     * Unit or apartment number for a multi-family property
+     * @nullable
+     */
+  unitNumber?: string | null;
   technicianName: string;
   /** @nullable */
   technicianId?: string | null;

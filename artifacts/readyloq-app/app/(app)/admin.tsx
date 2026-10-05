@@ -2,8 +2,8 @@
  * Platform Super Admin — cross-tenant account manager
  *
  * Visible only to users with isSuperAdmin === true. Accessible from Settings.
- * Lists every account in the system, lets the super admin change roles,
- * toggle beta access, and grant/revoke super admin status.
+ * Lists every account in the system and lets the super admin change roles or
+ * toggle beta access. Super Admin grants/revocations require governed approval.
  */
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@clerk/expo";
@@ -203,23 +203,6 @@ function EditUserModal({
               sublabel: "Can access beta data routes",
               value: user.betaAccess,
               onChange: (v: boolean) => void update({ betaAccess: v }),
-            },
-            {
-              label: "Super Admin",
-              sublabel: "Cross-tenant account management",
-              value: user.isSuperAdmin,
-              onChange: (v: boolean) => {
-                Alert.alert(
-                  v ? "Grant Super Admin?" : "Revoke Super Admin?",
-                  v
-                    ? "This user will have full cross-tenant access."
-                    : "This user will lose super admin privileges.",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Confirm", style: "destructive", onPress: () => void update({ isSuperAdmin: v }) },
-                  ],
-                );
-              },
             },
           ].map((item, i, arr) => (
             <View

@@ -12,6 +12,8 @@ export interface Inspection {
   siteAddress: string;
   /** @nullable */
   clientName?: string | null;
+  /** @nullable */
+  unitNumber?: string | null;
   technicianName: string;
   /** @nullable */
   technicianId?: string | null;
@@ -21,6 +23,11 @@ export interface Inspection {
   severity?: string | null;
   /** @nullable */
   notes?: string | null;
+  /**
+     * Freeform reason for the visit (e.g. "Routine Inspection", "Callback", "Initial Service"). Not a strict enum so it can also be populated by a future enterprise-routing import. Null for historical rows and older clients that predate this field.
+     * @nullable
+     */
+  visitPurpose?: string | null;
   mediaCount?: number;
   findingsCount?: number;
   media?: InspectionMedia[];

@@ -41,6 +41,11 @@ interface SeedProduct {
     maxTempF: number | null;
     phytotoxicityNotes: string | null;
     reEntryIntervalHours: number | null;
+    /** Minimum whole days before this product may legally be reapplied to the
+     *  same site, per label. Null when the label sets no such minimum (e.g.
+     *  a continuously-maintained bait station). Approximate, illustrative
+     *  values consistent with typical labels for each product class. */
+    retreatmentIntervalDays: number | null;
   };
 }
 
@@ -78,6 +83,7 @@ const SEED_PRODUCTS: SeedProduct[] = [
       maxTempF: 110,
       phytotoxicityNotes: null,
       reEntryIntervalHours: 0,
+      retreatmentIntervalDays: null, // continuously-maintained bait station, not a discrete retreat cycle
     },
   },
   {
@@ -114,6 +120,7 @@ const SEED_PRODUCTS: SeedProduct[] = [
       phytotoxicityNotes:
         "Avoid contact with ornamental plants, turf, and water bodies. Product is for soil applications only; overspray onto foliage can cause phytotoxic symptoms.",
       reEntryIntervalHours: 12,
+      retreatmentIntervalDays: 365, // long-residual soil termiticide — typical annual service cadence
     },
   },
   {
@@ -156,6 +163,7 @@ const SEED_PRODUCTS: SeedProduct[] = [
       phytotoxicityNotes:
         "May cause spotting or marginal leaf burn on sensitive ornamental plants. Avoid direct application to flowers, new growth, and foliage of houseplants.",
       reEntryIntervalHours: 12,
+      retreatmentIntervalDays: 30, // general residual insecticide — monthly service cadence
     },
   },
   {
@@ -193,6 +201,7 @@ const SEED_PRODUCTS: SeedProduct[] = [
       maxTempF: 100,
       phytotoxicityNotes: null,
       reEntryIntervalHours: 4,
+      retreatmentIntervalDays: 30, // crack-and-crevice residual — monthly service cadence
     },
   },
   {
@@ -228,6 +237,7 @@ const SEED_PRODUCTS: SeedProduct[] = [
       phytotoxicityNotes:
         "May temporarily yellow cool-season grasses at the high label rate. Irrigate immediately after application to minimize phytotoxic risk.",
       reEntryIntervalHours: 12,
+      retreatmentIntervalDays: 30, // broadcast granular perimeter treatment — monthly service cadence
     },
   },
   {
@@ -261,6 +271,7 @@ const SEED_PRODUCTS: SeedProduct[] = [
       maxTempF: 100,
       phytotoxicityNotes: null,
       reEntryIntervalHours: 2,
+      retreatmentIntervalDays: 90, // IGR — long efficacy window before retreatment is needed
     },
   },
   {
@@ -295,6 +306,7 @@ const SEED_PRODUCTS: SeedProduct[] = [
       phytotoxicityNotes:
         "Do not apply directly to ornamental plants, water features, or aquatic areas. Maintain a minimum 25-foot buffer from ponds, streams, and wetlands.",
       reEntryIntervalHours: 4,
+      retreatmentIntervalDays: 14, // short-residual ULV/fogger adulticide — biweekly service cadence
     },
   },
   {
@@ -330,6 +342,7 @@ const SEED_PRODUCTS: SeedProduct[] = [
       phytotoxicityNotes:
         "Avoid application to ornamental plants in bloom; product contains a neonicotinoid — potential bee toxicity risk in flowering areas.",
       reEntryIntervalHours: 12,
+      retreatmentIntervalDays: 14, // residual bed bug/cockroach treatment — biweekly service cadence
     },
   },
 ];

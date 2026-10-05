@@ -3,32 +3,22 @@
  * Uses the same customFetch / base-URL infrastructure as the generated client.
  */
 import { customFetch } from "./custom-fetch";
+import {
+  createBaitStation as createBaitStationGenerated,
+  type BaitStation as ApiBaitStation,
+  type BaitStationInput as ApiBaitStationInput,
+} from "@workspace/api-client-react";
 
-export interface BaitStationInput {
-  label: string;
-  locationType?: string;
-  status: "active" | "missing" | "damaged" | "removed";
-  notes?: string;
-  lastCheckedAt?: string;
-}
-
-export interface BaitStationRecord extends BaitStationInput {
-  id: number;
-  inspectionId: number;
-  companyId: number;
-  createdAt: string;
-  lastCheckedAt?: string;
-}
+export type BaitStationInput = Omit<ApiBaitStationInput, "status"> & {
+  status: NonNullable<ApiBaitStationInput["status"]>;
+};
+export type BaitStationRecord = ApiBaitStation;
 
 export async function createBaitStation(
   inspectionId: number,
   input: BaitStationInput,
 ): Promise<BaitStationRecord> {
-  return customFetch<BaitStationRecord>(`/api/inspections/${inspectionId}/bait-stations`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+  return createBaitStationGenerated(inspectionId, input);
 }
 
 export async function updateBaitStation(

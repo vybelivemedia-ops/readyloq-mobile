@@ -26,6 +26,8 @@ export type SessionStateUpdate = {
   action: ConfidenceAction;
   /** True when this update was produced by a force-flush rather than isFinal */
   forceFlushed?: boolean;
+  /** Frame-only follow-up; consumers must not apply the inspection action twice. */
+  contextOnly?: boolean;
 };
 
 /**
@@ -67,6 +69,7 @@ export class AudioSessionManager {
    */
   private _onStateUpdate?: (update: SessionStateUpdate) => void;
   private _getFrame?: () => Promise<string | null | undefined>;
+  private _sessionGeneration = 0;
 
   constructor(private readonly provider: SpeechProvider) {}
 
@@ -86,8 +89,15 @@ export class AudioSessionManager {
     // Store for use by stopSession's force-flush path.
     this._onStateUpdate = onStateUpdate;
     this._getFrame = getFrame;
+    const sessionGeneration = ++this._sessionGeneration;
     await this.provider.initialize(providerOptions);
+    if (sessionGeneration !== this._sessionGeneration) return;
     await this.provider.start();
+    if (sessionGeneration !== this._sessionGeneration) {
+      // A newer start may already own this shared provider. Never cancel from
+      // a stale continuation because that would stop the newer active session.
+      return;
+    }
 
     /** Shared dispatch path for both isFinal and force-flush results. */
     const processText = async (
@@ -95,6 +105,7 @@ export class AudioSessionManager {
       confidence: number,
       forceFlushed: boolean,
     ): Promise<void> => {
+      if (sessionGeneration !== this._sessionGeneration) return;
       if (!text.trim()) return;
 
       // Force-flushed partials may be incomplete — cap confidence so they
@@ -106,18 +117,18 @@ export class AudioSessionManager {
       const action = AudioConfidence.evaluate(effectiveConfidence);
       const event = this.intentEngine.parse(text, effectiveConfidence, this.visionContext);
 
-      // Capture the live camera frame at the exact moment of this command.
-      // Best-effort: a failure here never blocks event dispatch.
-      if (getFrame) {
-        try {
-          const uri = await getFrame();
-          if (uri) event.imageUri = uri;
-        } catch {
-          // intentionally swallowed
-        }
-      }
-
+      // Apply the command immediately. Camera context is a best-effort follow-up
+      // and must never delay field updates, notes, or a voice-triggered shutter.
+      if (sessionGeneration !== this._sessionGeneration) return;
       onStateUpdate({ event, action, forceFlushed });
+      this._attachFrameAsync(
+        event,
+        action,
+        forceFlushed,
+        onStateUpdate,
+        getFrame,
+        sessionGeneration,
+      );
     };
 
     this.provider.onTranscription(async (result) => {
@@ -156,10 +167,12 @@ export class AudioSessionManager {
     } else {
       this._clearFlushTimer();
     }
+    this._sessionGeneration += 1;
     await this.provider.stop();
   }
 
   async cancelSession(): Promise<void> {
+    this._sessionGeneration += 1;
     this._clearFlushTimer();
     this.pendingPartial = undefined;
     // Clear stored callbacks so a stale reference never fires after unmount.
@@ -186,17 +199,48 @@ export class AudioSessionManager {
    */
   private async _dispatchImmediate(text: string, confidence: number): Promise<void> {
     if (!this._onStateUpdate) return;
+    const sessionGeneration = this._sessionGeneration;
     const effectiveConfidence = Math.min(confidence, FORCE_FLUSH_CONFIDENCE_CAP);
     const action = AudioConfidence.evaluate(effectiveConfidence);
     const event = this.intentEngine.parse(text, effectiveConfidence, this.visionContext);
-    if (this._getFrame) {
-      try {
-        const uri = await this._getFrame();
-        if (uri) event.imageUri = uri;
-      } catch {
-        // best-effort; never block dispatch
-      }
-    }
     this._onStateUpdate({ event, action, forceFlushed: true });
+    this._attachFrameAsync(
+      event,
+      action,
+      true,
+      this._onStateUpdate,
+      this._getFrame,
+      sessionGeneration,
+    );
+  }
+
+  private _attachFrameAsync(
+    event: StructuredInspectionEvent,
+    action: ConfidenceAction,
+    forceFlushed: boolean,
+    onStateUpdate: (update: SessionStateUpdate) => void,
+    getFrame?: () => Promise<string | null | undefined>,
+    sessionGeneration?: number,
+  ): void {
+    if (!getFrame) return;
+    void getFrame()
+      .then((uri) => {
+        // cancelSession clears the active callback. Do not update an unmounted
+        // screen or a newer session after a delayed frame resolves.
+        if (
+          !uri ||
+          this._onStateUpdate !== onStateUpdate ||
+          sessionGeneration !== this._sessionGeneration
+        ) return;
+        onStateUpdate({
+          event: { ...event, imageUri: uri },
+          action,
+          forceFlushed,
+          contextOnly: true,
+        });
+      })
+      .catch(() => {
+        // Best-effort context only; command dispatch already succeeded.
+      });
   }
 }

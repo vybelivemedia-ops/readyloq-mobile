@@ -68,6 +68,8 @@ import {
   saveLocalInspection,
   updateLocalInspection,
   getLocalInspection,
+  setLocalInspectionOwner,
+  hasPendingWork,
 } from "../inspection-store";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,6 +96,7 @@ beforeEach(() => {
   _store.clear();
   _readDelay = 0;
   _uuidCounter = 0;
+  setLocalInspectionOwner("local-store-test-owner");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -131,6 +134,26 @@ describe("updateLocalInspection — sequential mutations", () => {
     const final = await getLocalInspection(insp.localId);
     expect(final!.notes).toBe("applied bait");
     expect(final!.technicianSignature).toBe("<svg>sig</svg>");
+  });
+
+  it("marks changed bait-station data pending for durable retry", async () => {
+    const insp = makeInspection();
+    insp.serverId = 42;
+    insp.baitStations = [{
+      id: "station-1",
+      label: "North wall",
+      status: "active",
+      serverId: 501,
+      synced: true,
+    }];
+    await saveLocalInspection(insp);
+
+    const updated = await updateLocalInspection(insp.localId, (record) => {
+      record.baitStations[0]!.status = "damaged";
+    });
+
+    expect(updated?.baitStations[0]?.synced).toBe(false);
+    expect(updated && hasPendingWork(updated)).toBe(true);
   });
 });
 

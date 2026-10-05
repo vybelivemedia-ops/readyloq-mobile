@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
-pnpm install --frozen-lockfile --prefer-offline
+# Task merges can introduce a valid workspace dependency but omit a peer snapshot
+# in pnpm-lock.yaml. Refresh the lockfile non-interactively so one merge cannot
+# prevent all subsequent database setup and workflow reconciliation.
+pnpm install --no-frozen-lockfile --prefer-offline
 
 # Guard: fail fast if a task agent re-enabled R8 minification flags.
 # These flags cause startup crashes (NoClassDefFoundError). See scripts/check-r8-flags.sh.

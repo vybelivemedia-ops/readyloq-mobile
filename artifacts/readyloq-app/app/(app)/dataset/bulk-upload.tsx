@@ -25,6 +25,8 @@ import {
   bulkIngestDataset,
   requestUploadUrl,
 } from "@/lib/api";
+import { createSanitizedPhotoCopy } from "@/lib/privacy/image-sanitizer";
+import * as FileSystem from "expo-file-system/legacy";
 
 // ── Taxonomy (mirrors INTELLIGENCE_TAXONOMY from the server) ──────────────────
 const CATEGORIES = [
@@ -50,13 +52,31 @@ interface UploadResult {
   failed: number;
 }
 
+// No hard limit exists elsewhere in the app for uploaded media size — this is
+// a friendly, client-side-only guard so a technician doesn't sit through a
+// multi-minute upload on cellular data before finding out it failed. It does
+// not touch the shared presigned-upload endpoint, which stays unrestricted.
+const MAX_VIDEO_BYTES = 250 * 1024 * 1024; // 250 MB
+
+function isVideoAsset(asset: ImagePicker.ImagePickerAsset) {
+  return asset.type === "video" || (asset.mimeType?.startsWith("video/") ?? false);
+}
+
+function formatDuration(ms: number | null | undefined) {
+  if (!ms || ms <= 0) return null;
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 export default function BulkUploadScreen() {
   const colors = useColors();
   const router = useRouter();
   const { getToken } = useAuth();
 
-  // ── Selected images ─────────────────────────────────────────────────────────
-  const [images, setImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  // ── Selected media (photos and/or videos) ───────────────────────────────────
+  const [assets, setAssets] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
   // ── Metadata form ───────────────────────────────────────────────────────────
   const [category, setCategory] = useState("");
@@ -73,84 +93,113 @@ export default function BulkUploadScreen() {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const pickImages = async () => {
+  const pickMedia = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission required", "Please allow access to your photo library to upload training images.");
+      Alert.alert("Permission required", "Please allow access to your photo library to upload training photos and videos.");
       return;
     }
     const picked = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ["images", "videos"],
       allowsMultipleSelection: true,
       quality: 0.85,
       exif: false,
     });
     if (!picked.canceled && picked.assets.length > 0) {
-      setImages((prev) => {
-        const combined = [...prev, ...picked.assets];
+      const oversizedVideos = picked.assets.filter(
+        (a) => isVideoAsset(a) && (a.fileSize ?? 0) > MAX_VIDEO_BYTES,
+      ).length;
+      const withinLimit = picked.assets.filter(
+        (a) => !isVideoAsset(a) || (a.fileSize ?? 0) <= MAX_VIDEO_BYTES,
+      );
+      if (oversizedVideos > 0) {
+        Alert.alert(
+          "Video too large",
+          `${oversizedVideos} video${oversizedVideos !== 1 ? "s were" : " was"} skipped for exceeding the 250 MB limit.`,
+        );
+      }
+      setAssets((prev) => {
+        const combined = [...prev, ...withinLimit];
         // Cap at 50 per batch
         return combined.slice(0, 50);
       });
     }
   };
 
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
+  const removeAsset = (index: number) => {
+    setAssets((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const canUpload = images.length > 0 && category.length > 0;
+  const canUpload = assets.length > 0 && category.length > 0;
 
   const handleUpload = async () => {
     if (!canUpload) return;
     setPhase("uploading");
-    setProgress({ done: 0, total: images.length });
+    setProgress({ done: 0, total: assets.length });
     setUploadError(null);
 
     const token = await getToken();
-    const uploadedPaths: Array<{ objectPath: string; filename: string }> = [];
+    const uploadedItems: Array<{ objectPath: string; filename: string; mediaType: "photo" | "video" }> = [];
     let failedCount = 0;
 
-    for (let i = 0; i < images.length; i++) {
-      const asset = images[i];
+    for (let i = 0; i < assets.length; i++) {
+      const asset = assets[i];
+      const isVideo = isVideoAsset(asset);
       try {
+        let sanitizedUri: string | undefined;
+        if (!isVideo) {
+          sanitizedUri = await createSanitizedPhotoCopy(asset.uri);
+        }
         // Step 1: Request a presigned PUT URL from the server.
-        const filename = asset.fileName ?? `photo_${i + 1}.jpg`;
-        const contentType = asset.mimeType ?? "image/jpeg";
-        const { uploadURL, objectPath } = await requestUploadUrl(token, {
-          name: filename,
-          size: asset.fileSize,
-          contentType,
-        });
+        const filename = isVideo
+          ? asset.fileName ?? `video_${i + 1}.mp4`
+          : `photo_${i + 1}.jpg`;
+        const contentType = isVideo ? asset.mimeType ?? "video/mp4" : "image/jpeg";
+        try {
+          const sourceUri = sanitizedUri ?? asset.uri;
+          const info = sanitizedUri
+            ? await FileSystem.getInfoAsync(sanitizedUri)
+            : undefined;
+          const { uploadURL, objectPath } = await requestUploadUrl(token, {
+            name: filename,
+            size: info?.exists && typeof info.size === "number" ? info.size : asset.fileSize,
+            contentType,
+            purpose: "generic",
+          });
 
-        // Step 2: Read the local file as a Blob, then PUT directly to GCS
-        // via the presigned URL. fetch() handles file:// URIs natively in
-        // React Native (Hermes), making this the most portable upload path.
-        const fileResponse = await fetch(asset.uri);
-        const blob = await fileResponse.blob();
-        const putResponse = await fetch(uploadURL, {
-          method: "PUT",
-          body: blob,
-          headers: { "Content-Type": contentType },
-        });
+          // Photos use a metadata-free JPEG. P1 privacy residual: video
+          // metadata is not inspected/sanitized; GPS retention is unknown.
+          const fileResponse = await fetch(sourceUri);
+          const blob = await fileResponse.blob();
+          const putResponse = await fetch(uploadURL, {
+            method: "PUT",
+            body: blob,
+            headers: { "Content-Type": contentType },
+          });
 
-        if (putResponse.ok) {
-          uploadedPaths.push({ objectPath, filename });
-        } else {
-          failedCount++;
+          if (putResponse.ok) {
+            uploadedItems.push({ objectPath, filename, mediaType: isVideo ? "video" : "photo" });
+          } else {
+            failedCount++;
+          }
+        } finally {
+          if (sanitizedUri) {
+            await FileSystem.deleteAsync(sanitizedUri, { idempotent: true }).catch(() => {});
+          }
         }
       } catch {
         failedCount++;
       }
-      setProgress({ done: i + 1, total: images.length });
+      setProgress({ done: i + 1, total: assets.length });
     }
 
-    if (uploadedPaths.length === 0) {
-      setUploadError("All image uploads failed. Check your connection and try again.");
+    if (uploadedItems.length === 0) {
+      setUploadError("All uploads failed. Check your connection and try again.");
       setPhase("compose");
       return;
     }
 
-    // Step 3: Register all successfully-uploaded images into the training dataset.
+    // Step 3: Register all successfully-uploaded media into the training dataset.
     try {
       const meta: BulkIngestMetadata = {
         category,
@@ -161,23 +210,23 @@ export default function BulkUploadScreen() {
         ...(locationType.trim() ? { locationType: locationType.trim() } : {}),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
       };
-      const ingestResult = await bulkIngestDataset(token, uploadedPaths, meta);
+      const ingestResult = await bulkIngestDataset(token, uploadedItems, meta);
       setResult({
         created: ingestResult.created,
         failed: failedCount + ingestResult.failed,
       });
     } catch (e) {
       setResult({
-        created: uploadedPaths.length,
+        created: uploadedItems.length,
         failed: failedCount,
       });
-      setUploadError(e instanceof ApiError ? e.message : "Failed to register images in dataset");
+      setUploadError(e instanceof ApiError ? e.message : "Failed to register media in dataset");
     }
     setPhase("done");
   };
 
   const handleReset = () => {
-    setImages([]);
+    setAssets([]);
     setCategory("");
     setPossiblePest("");
     setConduciveCondition("");
@@ -211,7 +260,7 @@ export default function BulkUploadScreen() {
             Uploading…
           </Text>
           <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 15, textAlign: "center" }}>
-            {progress.done} of {progress.total} photos
+            {progress.done} of {progress.total} items
           </Text>
           <View
             style={{
@@ -257,14 +306,14 @@ export default function BulkUploadScreen() {
             />
           </View>
           <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 22, textAlign: "center" }}>
-            {result.created > 0 ? "Photos Ingested" : "Upload Failed"}
+            {result.created > 0 ? "Media Ingested" : "Upload Failed"}
           </Text>
           {result.created > 0 ? (
             <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 15, textAlign: "center", lineHeight: 22 }}>
               <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{result.created}</Text>
-              {" photo" + (result.created !== 1 ? "s" : "") + " added to the training dataset."}
+              {" item" + (result.created !== 1 ? "s" : "") + " added to the training dataset."}
               {result.failed > 0
-                ? `\n\n${result.failed} photo${result.failed !== 1 ? "s" : ""} could not be uploaded.`
+                ? `\n\n${result.failed} item${result.failed !== 1 ? "s" : ""} could not be uploaded.`
                 : ""}
             </Text>
           ) : null}
@@ -275,11 +324,11 @@ export default function BulkUploadScreen() {
           ) : null}
           <Card style={{ width: "100%", gap: 8 }}>
             <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19, textAlign: "center" }}>
-              These photos are now stored in your training dataset with the metadata you provided. A manager can review and approve them for model training.
+              These photos and videos are now stored in your training dataset with the metadata you provided. A manager can review and approve them for model training.
             </Text>
           </Card>
           <View style={{ width: "100%", gap: 10 }}>
-            <Button title="Upload More Photos" variant="outline" icon="cloud-upload-outline" onPress={handleReset} />
+            <Button title="Upload More Media" variant="outline" icon="cloud-upload-outline" onPress={handleReset} />
             <Button title="Done" onPress={() => router.back()} />
           </View>
         </View>
@@ -306,49 +355,49 @@ export default function BulkUploadScreen() {
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 19 }}>
-            Upload Training Photos
+            Upload Training Photos & Videos
           </Text>
           <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13 }}>
-            Add historical photos to the dataset
+            Add historical photos and videos to the dataset
           </Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 20, paddingBottom: 100 }}>
 
-        {/* Image Picker */}
+        {/* Media Picker */}
         <View style={{ gap: 12 }}>
-          <SectionLabel label="Photos" required />
+          <SectionLabel label="Photos & Videos" required />
           <Pressable
-            onPress={pickImages}
+            onPress={pickMedia}
             style={{
               borderWidth: 2,
-              borderColor: images.length > 0 ? colors.primary : colors.border,
+              borderColor: assets.length > 0 ? colors.primary : colors.border,
               borderStyle: "dashed",
               borderRadius: 12,
               padding: 20,
               alignItems: "center",
               gap: 10,
-              backgroundColor: images.length > 0 ? colors.primary + "08" : colors.card,
+              backgroundColor: assets.length > 0 ? colors.primary + "08" : colors.card,
             }}
           >
             <Ionicons
               name="images-outline"
               size={36}
-              color={images.length > 0 ? colors.primary : colors.mutedForeground}
+              color={assets.length > 0 ? colors.primary : colors.mutedForeground}
             />
             <Text
               style={{
-                color: images.length > 0 ? colors.primary : colors.mutedForeground,
+                color: assets.length > 0 ? colors.primary : colors.mutedForeground,
                 fontFamily: "Inter_600SemiBold",
                 fontSize: 15,
               }}
             >
-              {images.length > 0 ? `${images.length} photo${images.length !== 1 ? "s" : ""} selected` : "Select photos from library"}
+              {assets.length > 0 ? `${assets.length} item${assets.length !== 1 ? "s" : ""} selected` : "Select photos or videos from library"}
             </Text>
-            {images.length === 0 ? (
+            {assets.length === 0 ? (
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" }}>
-                Multi-select up to 50 photos at once
+                Multi-select up to 50 photos or videos at once
               </Text>
             ) : (
               <Text style={{ color: colors.primary, fontFamily: "Inter_400Regular", fontSize: 13 }}>
@@ -357,33 +406,58 @@ export default function BulkUploadScreen() {
             )}
           </Pressable>
 
-          {images.length > 0 ? (
+          {assets.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-              {images.map((img, idx) => (
-                <View key={`${img.uri}-${idx}`} style={{ position: "relative" }}>
-                  <Image
-                    source={{ uri: img.uri }}
-                    style={{ width: 72, height: 72, borderRadius: 8 }}
-                    contentFit="cover"
-                  />
-                  <Pressable
-                    onPress={() => removeImage(idx)}
-                    style={{
-                      position: "absolute",
-                      top: -6,
-                      right: -6,
-                      width: 22,
-                      height: 22,
-                      borderRadius: 11,
-                      backgroundColor: colors.destructive,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Ionicons name="close" size={13} color="#fff" />
-                  </Pressable>
-                </View>
-              ))}
+              {assets.map((asset, idx) => {
+                const isVideo = isVideoAsset(asset);
+                const duration = isVideo ? formatDuration(asset.duration) : null;
+                return (
+                  <View key={`${asset.uri}-${idx}`} style={{ position: "relative" }}>
+                    {isVideo ? (
+                      <View
+                        style={{
+                          width: 72,
+                          height: 72,
+                          borderRadius: 8,
+                          backgroundColor: colors.foreground + "CC",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 2,
+                        }}
+                      >
+                        <Ionicons name="videocam" size={22} color={colors.background} />
+                        {duration ? (
+                          <Text style={{ color: colors.background, fontFamily: "Inter_600SemiBold", fontSize: 11 }}>
+                            {duration}
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : (
+                      <Image
+                        source={{ uri: asset.uri }}
+                        style={{ width: 72, height: 72, borderRadius: 8 }}
+                        contentFit="cover"
+                      />
+                    )}
+                    <Pressable
+                      onPress={() => removeAsset(idx)}
+                      style={{
+                        position: "absolute",
+                        top: -6,
+                        right: -6,
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        backgroundColor: colors.destructive,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons name="close" size={13} color="#fff" />
+                    </Pressable>
+                  </View>
+                );
+              })}
             </ScrollView>
           ) : null}
         </View>
@@ -529,7 +603,7 @@ export default function BulkUploadScreen() {
           <TextInput
             value={notes}
             onChangeText={setNotes}
-            placeholder="Context about the photos, inspection conditions, date range, etc."
+            placeholder="Context about the media, inspection conditions, date range, etc."
             placeholderTextColor={colors.mutedForeground}
             style={[inputStyle, { minHeight: 80, textAlignVertical: "top", paddingTop: 10 }]}
             multiline
@@ -552,7 +626,7 @@ export default function BulkUploadScreen() {
             </Text>
           </View>
           <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 18 }}>
-            Photos are stored in your company's private storage, scoped only to your account. They are added to your training dataset as confirmed examples for manager review.
+            Photos and videos are stored in your company's private storage, scoped only to your account. They are added to your training dataset as confirmed examples for manager review.
           </Text>
         </Card>
       </ScrollView>
@@ -575,10 +649,10 @@ export default function BulkUploadScreen() {
         <Button
           title={
             !canUpload
-              ? images.length === 0
-                ? "Select photos to continue"
+              ? assets.length === 0
+                ? "Select photos or videos to continue"
                 : "Select a category to continue"
-              : `Upload ${images.length} Photo${images.length !== 1 ? "s" : ""} to Dataset`
+              : `Upload ${assets.length} Item${assets.length !== 1 ? "s" : ""} to Dataset`
           }
           icon="cloud-upload-outline"
           disabled={!canUpload}

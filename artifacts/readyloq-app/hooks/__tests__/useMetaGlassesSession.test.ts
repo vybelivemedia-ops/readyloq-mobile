@@ -135,6 +135,322 @@ async function mountRegistered(inspectionId = 1) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("useMetaGlassesSession.postTelemetryEvent — ble_frame_dropped forwarding", () => {
+  it("preserves the server inspection ID and reports a company-scoped cloud registration 404", async () => {
+    vi.mocked(global.fetch).mockResolvedValue(makeJsonResponse({ error: "Inspection not found" }, 404));
+    const rendered = await mountRegistered(91);
+    const calls = vi.mocked(global.fetch).mock.calls as [string, RequestInit][];
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe("/api/meta-glasses/session");
+    expect(calls[0][1]).toMatchObject({
+      method: "POST",
+      headers: { Authorization: "Bearer test-bearer-token" },
+      body: JSON.stringify({ inspectionId: 91 }),
+    });
+    expect(rendered.result.current.status).toBe(
+      "Cloud Relay unavailable (404). This inspection was not found for your company on the configured server. Phone camera remains active.",
+    );
+    expect(rendered.result.current.isActive).toBe(false);
+    expect(rendered.result.current.sessionId).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
+    expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(1);
+    rendered.unmount();
+  });
+
+  it("does not misdiagnose a non-JSON API 404 as unavailable glasses or another company's inspection", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: () => Promise.reject(new SyntaxError("HTML response")),
+    } as Response);
+    const rendered = await mountRegistered(92);
+    expect(rendered.result.current.status).toBe(
+      "Cloud Relay unavailable (404). Check the configured Cloud Relay API route and inspection ID. Phone camera remains active.",
+    );
+    rendered.unmount();
+  });
+
+  it("retries a failed cloud registration only on explicit retry, without changing the inspection ID", async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce(makeJsonResponse({ error: "Inspection not found" }, 404));
+    const rendered = await mountRegistered(93);
+    expect(rendered.result.current.sessionId).toBeNull();
+    await act(async () => {
+      rendered.result.current.retrySession();
+      await flushMicrotasks(15);
+    });
+    expect(fetchCallsFor("/api/meta-glasses/session").map(init => JSON.parse(init.body as string)))
+      .toEqual([{ inspectionId: 93 }, { inspectionId: 93 }]);
+    expect(rendered.result.current.status).toBe("Cloud Relay ready");
+    expect(rendered.result.current.sessionId).toBe(SESSION_ID);
+    rendered.unmount();
+  });
+
+  it("does not restore a cloud error after disabling the relay while its error body is being read", async () => {
+    let resolveBody!: (body: unknown) => void;
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      json: () => new Promise(resolve => { resolveBody = resolve; }),
+    } as Response);
+    const rendered = renderHook(
+      ({ active }) => useMetaGlassesSession({ active, inspectionId: 94, onFinding: vi.fn() }),
+      { initialProps: { active: true } },
+    );
+    await act(async () => { await flushMicrotasks(15); });
+    rendered.rerender({ active: false });
+    await act(async () => {
+      resolveBody({ error: "Inspection not found" });
+      await flushMicrotasks(15);
+    });
+    expect(rendered.result.current.status).toBeNull();
+    expect(rendered.result.current.sessionId).toBeNull();
+    expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(1);
+    rendered.unmount();
+  });
+
+  it("keeps a replacement registration's cloud 404 explanation visible during reconnect backoff", async () => {
+    const rendered = await mountRegistered(95);
+    vi.mocked(global.fetch).mockImplementation(async url =>
+      String(url).includes("/api/meta-glasses/session")
+        ? makeJsonResponse({ error: "Inspection not found" }, 404)
+        : makeJsonResponse({ error: "Session not found or expired" }, 404));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_100);
+      await flushMicrotasks(15);
+    });
+    expect(rendered.result.current.status).toContain("Cloud Relay unavailable (404). This inspection");
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
+    expect(rendered.result.current.status).toContain("Cloud Relay unavailable (404). This inspection");
+    expect(fetchCallsFor("/api/meta-glasses/session")).toHaveLength(2);
+    rendered.unmount();
+  });
+
+  it("reports network registration failures as a cloud problem while leaving phone capture available", async () => {
+    vi.mocked(global.fetch).mockRejectedValueOnce(new Error("Network unavailable"));
+    const rendered = await mountRegistered(96);
+    expect(rendered.result.current.status).toBe("Cloud Relay unavailable. Phone camera remains active.");
+    expect(rendered.result.current.sessionId).toBeNull();
+    rendered.unmount();
+  });
+
+  it("makes zero Meta requests for a persisted phone-only inspection", async () => {
+    const { rerender, unmount } = renderHook(
+      ({ inspectionId, active }) =>
+        useMetaGlassesSession({
+          active,
+          inspectionId,
+          onFinding: vi.fn(),
+        }),
+      { initialProps: { inspectionId: 41, active: false } },
+    );
+
+    await act(async () => {
+      await flushMicrotasks(10);
+      await vi.advanceTimersByTimeAsync(12_000);
+    });
+    rerender({ inspectionId: 41, active: false });
+    await act(async () => {
+      await flushMicrotasks(10);
+      await vi.advanceTimersByTimeAsync(12_000);
+    });
+
+    expect(vi.mocked(global.fetch)).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("registers once after explicit enablement and does not duplicate on rerender", async () => {
+    const onFinding = vi.fn();
+    const { rerender, unmount } = renderHook(
+      ({ active }) =>
+        useMetaGlassesSession({
+          active,
+          inspectionId: 52,
+          onFinding,
+        }),
+      { initialProps: { active: false } },
+    );
+
+    rerender({ active: true });
+    await act(async () => {
+      await flushMicrotasks(15);
+    });
+    rerender({ active: true });
+    rerender({ active: true });
+    await act(async () => {
+      await flushMicrotasks(10);
+    });
+
+    const registrations = (vi.mocked(global.fetch).mock.calls as [string, RequestInit][])
+      .filter(([url]) => url.includes("/api/meta-glasses/session"));
+    expect(registrations).toHaveLength(1);
+    unmount();
+  });
+
+  it("stops polling and clears the optional session when Meta is disabled", async () => {
+    const onFinding = vi.fn();
+    const { result, rerender, unmount } = renderHook(
+      ({ active }) =>
+        useMetaGlassesSession({
+          active,
+          inspectionId: 63,
+          onFinding,
+        }),
+      { initialProps: { active: true } },
+    );
+
+    await act(async () => {
+      await flushMicrotasks(15);
+      await vi.advanceTimersByTimeAsync(3_100);
+    });
+    expect(result.current.isActive).toBe(true);
+
+    rerender({ active: false });
+    await act(async () => {
+      await flushMicrotasks(10);
+    });
+    const callsAfterDisable = vi.mocked(global.fetch).mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(12_000);
+    });
+
+    expect(vi.mocked(global.fetch).mock.calls).toHaveLength(callsAfterDisable);
+    expect(result.current.sessionId).toBeNull();
+    expect(result.current.isActive).toBe(false);
+    expect(result.current.status).toBeNull();
+    unmount();
+  });
+
+  it("starts exactly one new session after disable then explicit reconnect", async () => {
+    const { rerender, unmount } = renderHook(
+      ({ active }) =>
+        useMetaGlassesSession({
+          active,
+          inspectionId: 74,
+          onFinding: vi.fn(),
+        }),
+      { initialProps: { active: true } },
+    );
+
+    await act(async () => {
+      await flushMicrotasks(15);
+    });
+    rerender({ active: false });
+    await act(async () => {
+      await flushMicrotasks(10);
+    });
+    rerender({ active: true });
+    await act(async () => {
+      await flushMicrotasks(15);
+    });
+
+    const registrations = (vi.mocked(global.fetch).mock.calls as [string, RequestInit][])
+      .filter(([url]) => url.includes("/api/meta-glasses/session"));
+    expect(registrations).toHaveLength(2);
+    unmount();
+  });
+
+  it("does not deliver or continue an in-flight poll after Meta is disabled", async () => {
+    const onFinding = vi.fn();
+    const rendered = renderHook(
+      ({ active }) =>
+        useMetaGlassesSession({
+          active,
+          inspectionId: 85,
+          onFinding,
+        }),
+      { initialProps: { active: true } },
+    );
+    await act(async () => {
+      await flushMicrotasks(15);
+    });
+
+    let resolvePoll!: (response: Response) => void;
+    const pendingPoll = new Promise<Response>((resolve) => {
+      resolvePoll = resolve;
+    });
+    vi.mocked(global.fetch).mockImplementationOnce(() => pendingPoll);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_100);
+    });
+    const callsBeforeDisable = vi.mocked(global.fetch).mock.calls.length;
+    rendered.rerender({ active: false });
+
+    await act(async () => {
+      resolvePoll(makeJsonResponse({
+        events: [{
+          id: "stale-event",
+          type: "finding",
+          timestamp: Date.now(),
+          text: "must not deliver",
+        }],
+        serverTime: Date.now(),
+      }));
+      await flushMicrotasks(10);
+      await vi.advanceTimersByTimeAsync(9_000);
+    });
+
+    expect(onFinding).not.toHaveBeenCalled();
+    expect(vi.mocked(global.fetch).mock.calls).toHaveLength(callsBeforeDisable);
+    rendered.unmount();
+  });
+
+  it("does not create a replacement session when a pending poll returns 404 after disable", async () => {
+    const onFinding = vi.fn();
+    const rendered = renderHook(
+      ({ active }) =>
+        useMetaGlassesSession({
+          active,
+          inspectionId: 86,
+          onFinding,
+        }),
+      { initialProps: { active: true } },
+    );
+    await act(async () => {
+      await flushMicrotasks(15);
+    });
+
+    let resolvePoll!: (response: Response) => void;
+    const pendingPoll = new Promise<Response>((resolve) => {
+      resolvePoll = resolve;
+    });
+    vi.mocked(global.fetch).mockImplementationOnce(() => pendingPoll);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_100);
+    });
+
+    rendered.rerender({ active: false });
+    const registrationsBefore404 = (vi.mocked(global.fetch).mock.calls as [string, RequestInit][])
+      .filter(([url]) => url.includes("/api/meta-glasses/session")).length;
+    await act(async () => {
+      resolvePoll(makeJsonResponse({ error: "gone" }, 404));
+      await flushMicrotasks(10);
+      await vi.advanceTimersByTimeAsync(9_000);
+    });
+
+    const registrationsAfter404 = (vi.mocked(global.fetch).mock.calls as [string, RequestInit][])
+      .filter(([url]) => url.includes("/api/meta-glasses/session")).length;
+    expect(registrationsAfter404).toBe(registrationsBefore404);
+    rendered.unmount();
+  });
+
+  it("paces replacement sessions when polling keeps returning 404", async () => {
+    const rendered = await mountRegistered(87);
+    vi.mocked(global.fetch).mockImplementation(async (url) =>
+      String(url).includes("/api/meta-glasses/session")
+        ? makeJsonResponse({ error: "unavailable" }, 503)
+        : makeJsonResponse({ error: "gone" }, 404));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(fetchCallsFor("/api/meta-glasses/session")).toHaveLength(2); // initial + one replacement
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(fetchCallsFor("/api/meta-glasses/session")).toHaveLength(3);
+    rendered.unmount();
+  });
+
   it("makes a POST to /api/meta-glasses/events/:sessionId with the ble_frame_dropped payload", async () => {
     const { result, unmount } = await mountRegistered();
 

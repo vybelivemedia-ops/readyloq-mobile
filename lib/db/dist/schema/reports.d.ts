@@ -313,6 +313,40 @@ export declare const reportsTable: import("drizzle-orm/pg-core").PgTableWithColu
         }, {}, {
             $type: AiReportNarrative;
         }>;
+        approvedByUserId: import("drizzle-orm/pg-core").PgColumn<{
+            name: "approved_by_user_id";
+            tableName: "reports";
+            dataType: "number";
+            columnType: "PgInteger";
+            data: number;
+            driverParam: string | number;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        approvedAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "approved_at";
+            tableName: "reports";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
         createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "reports";
@@ -340,14 +374,16 @@ export declare const insertReportSchema: z.ZodObject<{
     status: z.ZodOptional<z.ZodString>;
     severity: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     inspectionId: z.ZodInt;
+    title: z.ZodString;
     findings: z.ZodOptional<z.ZodNullable<z.ZodType<Finding[], Finding[], z.core.$ZodTypeInternals<Finding[], Finding[]>>>>;
     recommendations: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;
-    title: z.ZodString;
     treatmentNotes: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     exclusionOpportunities: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;
     inspectionDate: z.ZodString;
     pdfUrl: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     aiNarrative: z.ZodOptional<z.ZodNullable<z.ZodType<AiReportNarrative, AiReportNarrative, z.core.$ZodTypeInternals<AiReportNarrative, AiReportNarrative>>>>;
+    approvedByUserId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
+    approvedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
 }, {
     out: {};
     in: {};

@@ -12,7 +12,7 @@
  * Rows with PERMANENT_FAILURE, UNAUTHORIZED, or INVALID_CONFIGURATION must
  * NOT be retried automatically — they require human intervention.
  */
-export type OutboxStatus = "QUEUED" | "DELIVERED" | "RETRYABLE_FAILURE" | "PERMANENT_FAILURE" | "UNAUTHORIZED" | "INVALID_CONFIGURATION" | "TIMEOUT";
+export type OutboxStatus = "QUEUED" | "PROCESSING" | "DELIVERED" | "RETRYABLE_FAILURE" | "PERMANENT_FAILURE" | "UNAUTHORIZED" | "INVALID_CONFIGURATION" | "TIMEOUT";
 /** Statuses that a background retry worker is allowed to re-attempt. */
 export declare const RETRYABLE_OUTBOX_STATUSES: OutboxStatus[];
 export declare const enterpriseOutboxTable: import("drizzle-orm/pg-core").PgTableWithColumns<{
@@ -66,6 +66,23 @@ export declare const enterpriseOutboxTable: import("drizzle-orm/pg-core").PgTabl
             isAutoincrement: false;
             hasRuntimeDefault: false;
             enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        idempotencyKey: import("drizzle-orm/pg-core").PgColumn<{
+            name: "idempotency_key";
+            tableName: "enterprise_outbox";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -170,6 +187,57 @@ export declare const enterpriseOutboxTable: import("drizzle-orm/pg-core").PgTabl
             isAutoincrement: false;
             hasRuntimeDefault: false;
             enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        nextAttemptAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "next_attempt_at";
+            tableName: "enterprise_outbox";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        lockedAt: import("drizzle-orm/pg-core").PgColumn<{
+            name: "locked_at";
+            tableName: "enterprise_outbox";
+            dataType: "date";
+            columnType: "PgTimestamp";
+            data: Date;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: undefined;
+            baseColumn: never;
+            identity: undefined;
+            generated: undefined;
+        }, {}, {}>;
+        lockedBy: import("drizzle-orm/pg-core").PgColumn<{
+            name: "locked_by";
+            tableName: "enterprise_outbox";
+            dataType: "string";
+            columnType: "PgText";
+            data: string;
+            driverParam: string;
+            notNull: false;
+            hasDefault: false;
+            isPrimaryKey: false;
+            isAutoincrement: false;
+            hasRuntimeDefault: false;
+            enumValues: [string, ...string[]];
             baseColumn: never;
             identity: undefined;
             generated: undefined;

@@ -1,6 +1,6 @@
 /**
  * Thin fetch helpers for the few backend endpoints that are NOT part of the
- * generated `@/lib/api-client` client (auth bootstrap + object
+ * generated `@/lib/api-client` client (auth account setup + object
  * storage upload URLs). All inspection / analysis / report data goes through
  * the generated React Query hooks instead — see those imports in the screens.
  *
@@ -129,15 +129,7 @@ export function acceptInvite(token: string | null, inviteToken: string) {
   });
 }
 
-// ─── Super-admin helpers ──────────────────────────────────────────────────────
-
-export function bootstrapSuperAdmin(token: string | null, bootstrapToken: string) {
-  return request<{ success: boolean; message: string; isSuperAdmin: boolean }>(
-    "/api/admin/bootstrap",
-    token,
-    { method: "POST", body: JSON.stringify({ token: bootstrapToken }) },
-  );
-}
+// ─── Governed Super Admin administration ─────────────────────────────────────
 
 export function fetchAdminUsers(token: string | null) {
   return request<AdminUser[]>("/api/admin/users", token);
@@ -146,7 +138,7 @@ export function fetchAdminUsers(token: string | null) {
 export function patchAdminUser(
   token: string | null,
   userId: number,
-  updates: { role?: string; isSuperAdmin?: boolean; betaAccess?: boolean },
+  updates: { role?: string; betaAccess?: boolean },
 ) {
   return request<AdminUser>(`/api/admin/users/${userId}`, token, {
     method: "PATCH",
@@ -165,11 +157,23 @@ export function setRoleOverride(token: string | null, role: string | null) {
 export interface UploadUrlResponse {
   uploadURL: string;
   objectPath: string;
+  uploadIntentId?: number;
 }
 
 export function requestUploadUrl(
   token: string | null,
-  args: { name: string; size?: number; contentType?: string },
+  args:
+    | { name: string; size?: number; contentType?: string; purpose: "generic" }
+    | {
+        name: string;
+        size: number;
+        contentType: string;
+        purpose: "inspection-evidence";
+        inspectionId: number;
+        mediaType: "photo" | "image" | "video" | "document" | "audio" | "voice";
+        clientKey: string;
+        checksum?: { algorithm: "md5"; value: string };
+      },
 ) {
   return request<UploadUrlResponse>("/api/storage/uploads/request-url", token, {
     method: "POST",
@@ -685,7 +689,11 @@ export interface BulkIngestResult {
 
 export function bulkIngestDataset(
   token: string | null,
-  images: Array<{ objectPath: string; filename?: string }>,
+  images: Array<{
+    objectPath: string;
+    filename?: string;
+    mediaType?: "photo" | "video";
+  }>,
   metadata: BulkIngestMetadata,
 ) {
   return request<BulkIngestResult>("/api/intelligence-dataset/bulk-ingest", token, {

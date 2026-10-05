@@ -7,6 +7,7 @@
  */
 import type { AiReportNarrative } from './aiReportNarrative';
 import type { Finding } from './finding';
+import type { ReportEvidenceRecovery } from './reportEvidenceRecovery';
 export interface Report {
     id: number;
     inspectionId: number;
@@ -27,6 +28,7 @@ export interface Report {
     /** @nullable */
     pdfUrl?: string | null;
     aiNarrative?: null | AiReportNarrative;
+    evidenceRecovery?: ReportEvidenceRecovery;
     createdAt: string;
 }
 //# sourceMappingURL=report.d.ts.map

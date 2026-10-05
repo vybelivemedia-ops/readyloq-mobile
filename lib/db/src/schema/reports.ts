@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { inspectionsTable } from "./inspections";
 import { companiesTable } from "./companies";
+import { usersTable } from "./users";
 import type { Finding } from "./analysis";
 
 /**
@@ -52,6 +53,8 @@ export const reportsTable = pgTable("reports", {
   severity: text("severity"),
   pdfUrl: text("pdf_url"),
   aiNarrative: jsonb("ai_narrative").$type<AiReportNarrative>(),
+  approvedByUserId: integer("approved_by_user_id").references(() => usersTable.id),
+  approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

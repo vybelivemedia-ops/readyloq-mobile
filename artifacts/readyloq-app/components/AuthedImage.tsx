@@ -34,7 +34,8 @@ export function AuthedImage({
     };
   }, [getToken]);
 
-  const uri = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const isLocalFile = path.startsWith("file:");
+  const uri = path.startsWith("http") || isLocalFile ? path : `${API_BASE}${path}`;
 
   if (!token) {
     return (
@@ -51,7 +52,7 @@ export function AuthedImage({
 
   return (
     <Image
-      source={{ uri, headers: { Authorization: `Bearer ${token}` } }}
+      source={isLocalFile ? { uri } : { uri, headers: { Authorization: `Bearer ${token}` } }}
       style={style}
       contentFit={contentFit}
       transition={150}

@@ -1,4 +1,6 @@
 import { AppState } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Crypto from "expo-crypto";
 
 import {
   addInspectionMedia,
@@ -19,9 +21,20 @@ import {
   listLocalInspections,
   subscribeLocalInspections,
   updateLocalInspection,
+  canonicalStoragePath,
+  getLocalInspectionCompanyId,
+  getLocalInspectionOwner,
+  setLocalInspectionScope,
   type LocalInspection,
+  type LocalBaitStation,
+  type LocalBaitStationCreatePayload,
 } from "@/lib/local/inspection-store";
 import { doUpload, probeStoragePath, reserveUploadPath } from "@/lib/upload";
+import {
+  createSanitizedPhotoCopy,
+  removeLocationMetadata,
+} from "@/lib/privacy/image-sanitizer";
+import { retryDelayMs } from "./retry-policy";
 
 /**
  * Offline-first sync engine.
@@ -45,12 +58,52 @@ import { doUpload, probeStoragePath, reserveUploadPath } from "@/lib/upload";
 
 type EngineListener = () => void;
 
+function getBaitStationCreatePayload(
+  station: LocalBaitStation,
+): LocalBaitStationCreatePayload {
+  return {
+    label: station.label,
+    locationType: station.locationType,
+    latitude: station.latitude,
+    longitude: station.longitude,
+    status: station.status,
+    notes: station.notes,
+    lastCheckedAt: station.lastCheckedAt,
+  };
+}
+
+function matchesBaitStationPayload(
+  station: LocalBaitStation,
+  payload: LocalBaitStationCreatePayload,
+): boolean {
+  return JSON.stringify([
+    station.label,
+    station.locationType,
+    station.latitude,
+    station.longitude,
+    station.status,
+    station.notes,
+    station.lastCheckedAt,
+  ]) === JSON.stringify([
+    payload.label,
+    payload.locationType,
+    payload.latitude,
+    payload.longitude,
+    payload.status,
+    payload.notes,
+    payload.lastCheckedAt,
+  ]);
+}
+
 const state = {
   configured: false,
+  lifecycleManaged: false,
+  ownerId: null as string | null,
+  companyId: null as number | null,
+  generation: 0,
   getToken: null as (() => Promise<string | null>) | null,
   syncingIds: new Set<string>(),
   running: false,
-  runQueued: false,
   debounceTimer: null as ReturnType<typeof setTimeout> | null,
   retryTimer: null as ReturnType<typeof setTimeout> | null,
   listeners: new Set<EngineListener>(),
@@ -60,8 +113,31 @@ const state = {
 
 export function configureSyncEngine(opts: {
   getToken: () => Promise<string | null>;
+  ownerId?: string;
+  companyId?: number | null;
   onSynced?: (record: LocalInspection) => void;
 }) {
+  const nextOwnerId = opts.ownerId ?? getLocalInspectionOwner();
+  const nextCompanyId = opts.companyId !== undefined
+    ? opts.companyId
+    : getLocalInspectionCompanyId();
+  if (!nextOwnerId) {
+    deactivateSyncEngine();
+    return;
+  }
+  state.lifecycleManaged = true;
+  if (state.ownerId !== nextOwnerId || state.companyId !== nextCompanyId) {
+    state.generation += 1;
+    state.ownerId = nextOwnerId;
+    state.companyId = nextCompanyId;
+    state.syncingIds.clear();
+    setLocalInspectionScope(nextOwnerId, nextCompanyId);
+    if (state.debounceTimer) clearTimeout(state.debounceTimer);
+    if (state.retryTimer) clearTimeout(state.retryTimer);
+    state.debounceTimer = null;
+    state.retryTimer = null;
+    notifyEngine();
+  }
   state.getToken = opts.getToken;
   state.onSynced = opts.onSynced ?? null;
   if (state.configured) return;
@@ -92,6 +168,26 @@ export function configureSyncEngine(opts: {
   requestSync(0);
 }
 
+/**
+ * Stop authenticated work without deleting any offline records. Pending local
+ * data remains available to its owner after that owner signs in again.
+ */
+export function deactivateSyncEngine(): void {
+  state.lifecycleManaged = true;
+  state.generation += 1;
+  state.ownerId = null;
+  state.companyId = null;
+  state.getToken = null;
+  state.onSynced = null;
+  state.syncingIds.clear();
+  setLocalInspectionScope(null, null);
+  if (state.debounceTimer) clearTimeout(state.debounceTimer);
+  if (state.retryTimer) clearTimeout(state.retryTimer);
+  state.debounceTimer = null;
+  state.retryTimer = null;
+  notifyEngine();
+}
+
 /** Subscribe to engine activity changes (which inspections are syncing). */
 export function subscribeSyncEngine(cb: EngineListener): () => void {
   state.listeners.add(cb);
@@ -104,7 +200,10 @@ export function getSyncingIds(): ReadonlySet<string> {
 
 /** Ask the engine to sync soon (debounced; safe to call constantly). */
 export function requestSync(delayMs = 1200) {
-  if (!state.configured) return;
+  if (!state.configured || !state.ownerId) return;
+  // Local store notifications emitted by our own checkpoint writes must not
+  // queue an immediate second pass while the first pass is still running.
+  if (state.running) return;
   if (state.debounceTimer) clearTimeout(state.debounceTimer);
   state.debounceTimer = setTimeout(() => {
     state.debounceTimer = null;
@@ -114,16 +213,19 @@ export function requestSync(delayMs = 1200) {
 
 /**
  * Sync one inspection immediately (used by explicit Complete / manual retry).
- * Shares the same single-flight lock as `syncAll` — if a pass is already
- * running (or this record is mid-sync), it queues another pass instead of
- * starting a concurrent one, so a photo can never be uploaded twice.
+ * Shares the single-flight lock with all other triggers. A busy worker leaves
+ * scheduling to its finally block rather than creating a second retry loop.
  */
 export async function syncNow(localId: string): Promise<LocalInspection | null> {
+  if (!state.ownerId) return null;
   const record = await getLocalInspection(localId);
   if (!record) return null;
   if (!hasPendingWork(record)) return record;
+  if (!isDue(record)) {
+    if (state.configured) void scheduleRetryIfNeeded();
+    return record;
+  }
   if (state.running || state.syncingIds.has(localId)) {
-    state.runQueued = true;
     return record;
   }
   state.running = true;
@@ -131,12 +233,7 @@ export async function syncNow(localId: string): Promise<LocalInspection | null> 
     return await syncOne(record).catch(() => getLocalInspection(localId));
   } finally {
     state.running = false;
-    if (state.runQueued) {
-      state.runQueued = false;
-      requestSync(0);
-    } else {
-      await scheduleRetryIfNeeded();
-    }
+    if (state.configured) await scheduleRetryIfNeeded();
   }
 }
 
@@ -153,30 +250,53 @@ function notifyEngine() {
 }
 
 async function syncAll(): Promise<void> {
-  if (state.running) {
-    state.runQueued = true;
-    return;
-  }
+  if (state.running || !state.ownerId) return;
   state.running = true;
   try {
-    const records = (await listLocalInspections()).filter(hasPendingWork);
+    const ownerAtStart = state.ownerId;
+    const records = (await listLocalInspections()).filter((r) => hasPendingWork(r) && isDue(r));
     // Oldest first: finish earlier inspections before newer ones.
     records.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (const record of records) {
-      await syncOne(record).catch(() => null);
+      if (state.ownerId !== ownerAtStart) break;
+      try {
+        await syncOne(record);
+      } catch (error) {
+        // Identity changes deliberately cancel in-flight work. All other
+        // unexpected failures must remain visible rather than disappearing
+        // behind the batch loop's best-effort handling.
+        if (!(error instanceof Error && error.name === "SyncIdentityChangedError")) {
+          console.error("[Sync] inspection batch failed:", record.localId, error);
+        }
+      }
     }
   } finally {
     state.running = false;
-    if (state.runQueued) {
-      state.runQueued = false;
-      requestSync(0);
-    } else {
-      await scheduleRetryIfNeeded();
-    }
+    await scheduleRetryIfNeeded();
   }
 }
 
 async function syncOne(record: LocalInspection): Promise<LocalInspection> {
+  const ownerAtStart = state.ownerId;
+  const companyAtStart = state.companyId;
+  const generationAtStart = state.generation;
+  if (
+    !ownerAtStart ||
+    record.ownerUserId !== ownerAtStart ||
+    record.companyId === undefined ||
+    record.companyId !== companyAtStart
+  ) return record;
+  const assertCurrentOwner = () => {
+    if (
+      state.ownerId !== ownerAtStart ||
+      state.companyId !== companyAtStart ||
+      state.generation !== generationAtStart
+    ) {
+      const error = new Error("Sync cancelled because the authenticated account/company changed");
+      error.name = "SyncIdentityChangedError";
+      throw error;
+    }
+  };
   // A second concurrent run over the same record would double-upload photos.
   if (state.syncingIds.has(record.localId)) return record;
   state.syncingIds.add(record.localId);
@@ -187,13 +307,19 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
   // versa). `rec` is refreshed after each merge so later steps see the truth.
   let rec = record;
   const merge = async (mutate: (r: LocalInspection) => void): Promise<void> => {
+    assertCurrentOwner();
     const updated = await updateLocalInspection(rec.localId, mutate);
+    if (!updated && (state.ownerId !== ownerAtStart || state.generation !== generationAtStart)) {
+      assertCurrentOwner();
+    }
     if (updated) rec = updated;
   };
 
   try {
+    assertCurrentOwner();
     // 1. Create the server inspection (idempotent — clientKey = localId).
     if (rec.serverId == null) {
+      assertCurrentOwner();
       const composedNotes = [
         rec.propertyType ? `Property type: ${rec.propertyType}` : "",
         rec.notes.trim(),
@@ -207,6 +333,10 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
         notes: composedNotes || undefined,
         pestTypes: rec.pestTypes.length ? rec.pestTypes : undefined,
         clientKey: rec.localId,
+        // Preserve the unit selected at booking when the mobile record is
+        // first created server-side (offline-first or unscheduled captures).
+        unitNumber: rec.unitNumber ?? null,
+        visitPurpose: rec.visitPurpose?.trim() || undefined,
       });
       await merge((r) => {
         r.serverId = created.id;
@@ -228,15 +358,35 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     //   Checkpoint C — `storagePath` promoted from `pendingStoragePath`.
     //
     // On the next launch `parseRecord` resets `uploading: false` (was `true`),
-    // but intentionally leaves `pendingStoragePath` intact.  The engine then
-    // probes whether the object was already written and either reuses the path
-    // (no re-upload) or uploads fresh (rare orphaned object, but safe because
-    // the server's `POST /media` endpoint deduplicates by URL).
+    // but intentionally leaves the path and upload intent intact. The engine
+    // probes only paths backed by a persisted intent, then renews that same
+    // owner-bound reservation before registering evidence.
     const snapshot = [...rec.photos];
     for (let i = 0; i < snapshot.length; i++) {
-      const localUri = snapshot[i].localUri;
+      let localUri = snapshot[i].localUri;
       let photo = rec.photos.find((p) => p.localUri === localUri);
       if (!photo) continue; // removed while syncing
+      let uploadFinishedThisPass = false;
+      if (
+        photo.storagePath &&
+        photo.mediaRowId == null &&
+        (!photo.uploadIntentId || !photo.uploadIntentKey)
+      ) {
+        // Old unregistered paths have no durable owner-bound reservation and
+        // cannot be attached to evidence. Keep the object for reconciliation;
+        // re-upload the local bytes under a new intent instead.
+        await merge((r) => {
+          const p = r.photos.find((x) => x.localUri === localUri);
+          if (p) {
+            p.storagePath = undefined;
+            p.pendingStoragePath = undefined;
+            p.uploadIntentId = undefined;
+            p.uploadIntentKey = undefined;
+          }
+        });
+        photo = rec.photos.find((p) => p.localUri === localUri);
+      }
+      if (!photo) continue;
       if (!photo.storagePath && !photo.uploading) {
         // Mark as in-flight BEFORE the network request so removePhoto sees it
         // and refuses to delete a photo that is mid-upload.
@@ -247,50 +397,137 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
         photo = rec.photos.find((p) => p.localUri === localUri);
 
         try {
-          const token = state.getToken ? await state.getToken() : null;
-          let resolvedPath: string;
-
-          if (photo?.pendingStoragePath) {
-            // ── Crash-recovery path ──────────────────────────────────────────
-            // A path was reserved in a previous run (Checkpoint A reached) but
-            // the process died before Checkpoint C was written.  Probe whether
-            // the bytes actually landed so we can skip a redundant PUT.
-            const alreadyUploaded = await probeStoragePath(photo.pendingStoragePath, token);
-            if (alreadyUploaded) {
-              // Object exists — reuse the pre-reserved path, no PUT needed.
-              resolvedPath = photo.pendingStoragePath;
-            } else {
-              // Object wasn't written (died before or during the PUT).
-              // Reserve a fresh path and upload.
-              const { uploadURL, storagePath: freshPath } = await reserveUploadPath(
-                token,
-                `inspection-${serverId}-${Date.now()}-${i}.jpg`,
-                localUri,
-              );
-              // Update the stored candidate to the new reservation.
+          // Upgrade legacy pending records before probing or uploading. In
+          // particular, discard any pre-privacy pending path: it may identify
+          // an object uploaded from the old unsanitized local bytes.
+          if (photo && !photo.privacySanitized) {
+            const unsanitizedUri = localUri;
+            const sanitizedUri = await createSanitizedPhotoCopy(unsanitizedUri);
+            await merge((r) => {
+              const p = r.photos.find((x) => x.localUri === unsanitizedUri);
+              if (p) {
+                p.localUri = sanitizedUri;
+                p.privacySanitized = true;
+                p.captureMetadata = removeLocationMetadata(p.captureMetadata ?? {});
+                p.pendingStoragePath = undefined;
+                if (p.mediaRowId == null) {
+                  // Existing registered evidence is not retroactively replaced.
+                  // An unregistered legacy path lacks an owner-bound intent, so
+                  // reserve a fresh path for the sanitized local copy.
+                  p.storagePath = undefined;
+                  p.uploadIntentId = undefined;
+                  p.uploadIntentKey = undefined;
+                }
+              }
+              for (const candidate of r.photos) {
+                if (candidate.duplicateOf === unsanitizedUri) candidate.duplicateOf = sanitizedUri;
+              }
+            });
+            localUri = sanitizedUri;
+            await FileSystem.deleteAsync(unsanitizedUri, { idempotent: true }).catch(() => {});
+            photo = rec.photos.find((p) => p.localUri === localUri);
+          } else if (photo?.captureMetadata) {
+            const safeMetadata = removeLocationMetadata(photo.captureMetadata);
+            if (JSON.stringify(safeMetadata) !== JSON.stringify(photo.captureMetadata)) {
               await merge((r) => {
                 const p = r.photos.find((x) => x.localUri === localUri);
-                if (p) p.pendingStoragePath = freshPath;
+                if (p) p.captureMetadata = safeMetadata;
               });
-              await doUpload(uploadURL, localUri); // Checkpoint B
-              resolvedPath = freshPath;
+              photo = rec.photos.find((p) => p.localUri === localUri);
             }
+          }
+
+          if (photo && !photo.uploadIntentKey) {
+            const uploadIntentKey = Crypto.randomUUID();
+            await merge((r) => {
+              const p = r.photos.find((x) => x.localUri === localUri);
+              if (p) p.uploadIntentKey = uploadIntentKey;
+            });
+            photo = rec.photos.find((p) => p.localUri === localUri);
+          }
+          if (!photo?.uploadIntentKey) {
+            throw new Error("Unable to persist a stable upload reservation key");
+          }
+
+          assertCurrentOwner();
+          const token = state.getToken ? await state.getToken() : null;
+          assertCurrentOwner();
+          let resolvedPath: string;
+
+          if (photo?.pendingStoragePath && photo.uploadIntentId) {
+            // ── Crash-recovery path ──────────────────────────────────────────
+            // The create-only server PUT verifies the digest on an existing
+            // object. A HEAD probe alone cannot prove these local bytes match.
+            const reservation = await reserveUploadPath(
+              token,
+              serverId,
+              photo.uploadIntentKey,
+              `inspection-${serverId}-${Date.now()}-${i}.jpg`,
+              localUri,
+              "image/jpeg",
+              "image",
+            );
+            const { uploadURL, storagePath, uploadIntentId } = reservation;
+            if (
+              storagePath !== photo.pendingStoragePath ||
+              uploadIntentId !== photo.uploadIntentId
+            ) {
+              throw new Error("Upload reservation changed during crash recovery");
+            }
+            assertCurrentOwner();
+            if (uploadURL) {
+              await doUpload(
+                uploadURL,
+                localUri,
+                "image/jpeg",
+                reservation.expectedSize,
+                reservation.checksum,
+                token,
+              );
+              uploadFinishedThisPass = true;
+            } else if (!(await probeStoragePath(photo.pendingStoragePath, token))) {
+              throw new Error("Registered upload object is missing; retry the reservation");
+            }
+            assertCurrentOwner();
+            resolvedPath = photo.pendingStoragePath;
           } else {
             // ── Normal (first-attempt) path ──────────────────────────────────
             // Reserve the upload path and persist it BEFORE sending any bytes
             // (Checkpoint A).  If the process dies after this write but before
             // Checkpoint C the next launch takes the crash-recovery path above.
-            const { uploadURL, storagePath: candidatePath } = await reserveUploadPath(
+            const reservation = await reserveUploadPath(
               token,
+              serverId,
+              photo.uploadIntentKey,
               `inspection-${serverId}-${Date.now()}-${i}.jpg`,
               localUri,
+              "image/jpeg",
+              "image",
             );
+            const { uploadURL, storagePath: candidatePath, uploadIntentId } = reservation;
+            assertCurrentOwner();
             // Checkpoint A: durable marker written before the PUT.
             await merge((r) => {
               const p = r.photos.find((x) => x.localUri === localUri);
-              if (p) p.pendingStoragePath = candidatePath;
+              if (p) {
+                p.pendingStoragePath = candidatePath;
+                p.uploadIntentId = uploadIntentId;
+              }
             });
-            await doUpload(uploadURL, localUri); // Checkpoint B
+            if (uploadURL) {
+              await doUpload(
+                uploadURL,
+                localUri,
+                "image/jpeg",
+                reservation.expectedSize,
+                reservation.checksum,
+                token,
+              ); // Checkpoint B
+              uploadFinishedThisPass = true;
+            } else if (!(await probeStoragePath(candidatePath, token))) {
+              throw new Error("Registered upload object is missing; retry the reservation");
+            }
+            assertCurrentOwner();
             resolvedPath = candidatePath;
           }
 
@@ -309,23 +546,68 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
             const p = r.photos.find((x) => x.localUri === localUri);
             if (p) p.uploading = false;
             // pendingStoragePath is intentionally left intact so the next
-            // attempt takes the crash-recovery path and probes before retrying.
+            // attempt reuses the reservation and lets the server verify bytes.
           });
           throw uploadErr;
         }
       }
       if (photo?.storagePath && photo.mediaRowId == null) {
+        assertCurrentOwner();
+        if (!photo.uploadIntentId || !photo.uploadIntentKey) {
+          throw new Error("Photo has no durable upload reservation; retry the upload");
+        }
+        const token = state.getToken ? await state.getToken() : null;
+        assertCurrentOwner();
+        const renewed = await reserveUploadPath(
+          token,
+          serverId,
+          photo.uploadIntentKey,
+          `inspection-${serverId}-${Date.now()}-${i}.jpg`,
+          localUri,
+          "image/jpeg",
+          "image",
+        );
+        if (
+          renewed.uploadIntentId !== photo.uploadIntentId ||
+          renewed.storagePath !== photo.storagePath
+        ) {
+          throw new Error("Upload reservation does not match the pending photo");
+        }
+        if (!uploadFinishedThisPass) {
+          if (renewed.uploadURL) {
+            assertCurrentOwner();
+            await doUpload(
+              renewed.uploadURL,
+              localUri,
+              "image/jpeg",
+              renewed.expectedSize,
+              renewed.checksum,
+              token,
+            );
+            assertCurrentOwner();
+          } else if (!(await probeStoragePath(photo.storagePath, token))) {
+            throw new Error("Registered upload object is missing; retry the reservation");
+          }
+        }
+        assertCurrentOwner();
         const media = await addInspectionMedia(serverId, {
           mediaType: "image",
           url: photo.storagePath,
+          uploadIntentId: photo.uploadIntentId,
+          // Preserve the timestamp recorded when the photo was captured.
+          // Never derive this from upload/registration time (retries may be delayed).
+          capturedAt: photo.capturedAt,
           // Vision Platform provenance — where the evidence came from and how
           // the on-device quality gate scored it.
           captureSource: photo.captureSource,
           qualityScore: photo.qualityScore,
-          captureMetadata: photo.captureMetadata,
+          captureMetadata: removeLocationMetadata(photo.captureMetadata ?? {}),
           // Technician-authored note (set during or after capture). Stored as
           // caption on the server so AI analysis and reports can reference it.
           caption: photo.description ?? undefined,
+          // Every photo inherits the inspection's active unit context so a
+          // multi-family compliance export can trace evidence to an apartment.
+          unitNumber: rec.unitNumber ?? null,
         });
         await merge((r) => {
           const p = r.photos.find((x) => x.localUri === localUri);
@@ -337,22 +619,71 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     // 4. Draft AI analysis over the full uploaded set (server-side vision).
     // `draft: true` — Opportunity Intelligence and the scorecard wait for
     // the explicit completion step.
-    if (rec.photos.length > 0 && rec.analyzedCount < rec.photos.length) {
+    const acknowledgedPaths = new Set(
+      (rec.analyzedPhotoPaths ?? []).map(canonicalStoragePath),
+    );
+    if (
+      rec.photos.some(
+        (p) =>
+          p.storagePath != null &&
+          !acknowledgedPaths.has(canonicalStoragePath(p.storagePath)),
+      )
+    ) {
       const uploaded = rec.photos.filter((p) => p.storagePath);
       // Near-duplicate photos are still uploaded and kept as evidence, but
       // excluded from AI analysis to avoid redundant detections and cost.
-      // They still count toward analyzedCount so the pending-work invariant
-      // (photos.length > analyzedCount) can settle.
-      const toAnalyze = uploaded.filter((p) => !p.duplicateOf);
+      // They are acknowledged locally by exact path so the pending-work
+      // invariant can settle without sending them to the provider.
+      const toAnalyze = uploaded.filter(
+        (p) =>
+          !p.duplicateOf &&
+          p.storagePath != null &&
+          !acknowledgedPaths.has(canonicalStoragePath(p.storagePath)),
+      );
+      let analyzedPaths: string[] = [];
       if (toAnalyze.length > 0) {
-        await analyzeInspection({
+        assertCurrentOwner();
+        const result = await analyzeInspection({
           inspectionId: serverId,
           images: toAnalyze.map((p) => ({ imageUrl: p.storagePath as string })),
           draft: true,
         });
+        analyzedPaths = result.analyzedImagePaths ?? [];
       }
       await merge((r) => {
-        r.analyzedCount = Math.max(r.analyzedCount, uploaded.length);
+        const currentPathsByCanonical = new Map(
+          r.photos.flatMap((p) =>
+            p.storagePath
+              ? [[canonicalStoragePath(p.storagePath), p.storagePath] as const]
+              : [],
+          ),
+        );
+        const settledPaths = new Set(
+          (r.analyzedPhotoPaths ?? []).flatMap((path) => {
+            const currentPath = currentPathsByCanonical.get(
+              canonicalStoragePath(path),
+            );
+            return currentPath ? [currentPath] : [];
+          }),
+        );
+        for (const path of analyzedPaths) {
+          const currentPath = currentPathsByCanonical.get(
+            canonicalStoragePath(path),
+          );
+          if (currentPath) settledPaths.add(currentPath);
+        }
+        for (const photo of r.photos) {
+          if (photo.duplicateOf && photo.storagePath) {
+            settledPaths.add(photo.storagePath);
+          }
+        }
+        // Failed and timed-out paths deliberately remain unsettled. The local
+        // pending-work invariant will schedule another sync, while the server
+        // reuses successful paths and only calls the provider for failures.
+        r.analyzedPhotoPaths = [...settledPaths];
+        r.analyzedCount = r.photos.filter(
+          (p) => p.storagePath != null && settledPaths.has(p.storagePath),
+        ).length;
       });
     }
 
@@ -363,49 +694,116 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     ]
       .filter(Boolean)
       .join("\n\n");
-    // Signatures are only sent when they are a non-null string.  Omitting the
-    // key entirely (rather than sending null) ensures the server's
-    // resignatureConsent guard can distinguish "not yet captured on this device"
-    // from an intentional clear, preventing a momentarily-null local state from
-    // accidentally wiping a valid signature that is already on the server.
+
+    // Snapshot the signature revision BEFORE sending so we can detect whether
+    // the user mutated signatures while the PATCH was in-flight.  If sigRev
+    // changed by the time the round-trip completes we leave signaturesSynced=false
+    // and let the next pass pick up the newer state — preventing a concurrent
+    // "tap Re-sign" from being silently dropped.
+    const sigRevAtSync = rec.sigRev ?? 0;
+    // Snapshot unit number state before the PATCH for the same race-guard
+    // reason as sigRevAtSync: if the user edits unitNumber mid-flight we
+    // leave unitNumberSynced=false so the next pass picks up the newer value.
+    const unitNumberAtSync = rec.unitNumber;
+
+    // Build the signature slice of the PATCH body.
+    //   • Non-null string  → include normally (new or updated value).
+    //   • null + explicit-clear flag → include null so the server wipes its value.
+    //     ownerSignature null also needs resignatureConsent: true to bypass the
+    //     server's accidental-clear guard.
+    //   • null without a clear flag → omit entirely (never captured; don't touch
+    //     the server's value, which may have been set by another device).
+    const sigPatch: {
+      technicianSignature?: string | null;
+      ownerSignature?: string | null;
+      ownerNotAvailable?: boolean;
+      signedAt?: string;
+      resignatureConsent?: boolean;
+    } = {
+      ownerNotAvailable: rec.ownerNotAvailable,
+      ...(rec.signedAt != null ? { signedAt: rec.signedAt } : {}),
+    };
+
+    if (typeof rec.technicianSignature === "string") {
+      sigPatch.technicianSignature = rec.technicianSignature;
+    } else if (rec.techSigClear && rec.technicianSignature === null) {
+      // Explicit clear: send null so the server wipes its copy.
+      sigPatch.technicianSignature = null;
+    }
+
+    if (typeof rec.ownerSignature === "string") {
+      sigPatch.ownerSignature = rec.ownerSignature;
+    } else if (rec.ownerSigConsent && rec.ownerSignature === null) {
+      // Explicit clear (owner re-sign or "not available"): send null + consent.
+      sigPatch.ownerSignature = null;
+      sigPatch.resignatureConsent = true;
+    }
+
+    assertCurrentOwner();
     await updateInspection(serverId, {
       notes: composedNotes || undefined,
       pestTypes: rec.pestTypes.length ? rec.pestTypes : undefined,
-      ...(typeof rec.technicianSignature === "string"
-        ? { technicianSignature: rec.technicianSignature }
-        : {}),
-      ...(typeof rec.ownerSignature === "string"
-        ? { ownerSignature: rec.ownerSignature }
-        : {}),
-      ownerNotAvailable: rec.ownerNotAvailable,
-      signedAt: rec.signedAt ?? undefined,
+      // Unit number: always send the current value so the server stays in sync.
+      // Sending null explicitly clears any previously stored value.
+      unitNumber: rec.unitNumber ?? null,
+      ...sigPatch,
+    });
+
+    // Acknowledge only if the local state hasn't changed since we built the
+    // payload. A changed sigRev means a concurrent mutation won the race;
+    // keep signaturesSynced=false so the next pass sends the newer state.
+    await merge((r) => {
+      if ((r.sigRev ?? 0) === sigRevAtSync) {
+        r.signaturesSynced = true;
+        r.techSigClear = false;
+        r.ownerSigConsent = false;
+      }
+      // unitNumberSynced: acknowledge if the value hasn't changed since we sent it.
+      if (r.unitNumber === unitNumberAtSync) {
+        r.unitNumberSynced = true;
+      }
     });
 
     // 5.5. Bait station sync — each station is created once on the server
     // (tracked by serverId) and subsequently kept up-to-date via PATCH.
     // Idempotent: POST only fires for stations without a serverId; PATCH
     // always overwrites so a status change made offline is never lost.
-    const stations = (rec.baitStations ?? []).slice();
+    const stations = (rec.baitStations ?? []).filter((station) => station.synced === false);
     for (const station of stations) {
-      try {
-        const input = {
-          label: station.label,
-          locationType: station.locationType,
-          status: station.status,
-          notes: station.notes,
-          lastCheckedAt: station.lastCheckedAt,
-        };
-        if (!station.serverId) {
-          const created = await createBaitStation(serverId, input);
-          await merge((r) => {
-            const s = r.baitStations?.find((b) => b.id === station.id);
-            if (s) s.serverId = created.id;
-          });
-        } else {
-          await updateBaitStation(serverId, station.serverId, input);
-        }
-      } catch {
-        // Non-fatal: bait station errors must never block the main sync path.
+      assertCurrentOwner();
+      const input = getBaitStationCreatePayload(station);
+      if (!station.serverId) {
+        // Persist the stable key before the network call: a process death after
+        // the server commit but before the response checkpoint must retry with
+        // the same key AND the original POST body, even if the station was
+        // edited locally in the meantime.
+        const clientKey = station.clientKey ?? station.id;
+        await merge((r) => {
+          const s = r.baitStations?.find((b) => b.id === station.id);
+          if (s) {
+            s.clientKey ??= clientKey;
+            s.createPayload ??= getBaitStationCreatePayload(s);
+          }
+        });
+        const latest = rec.baitStations?.find((b) => b.id === station.id);
+        if (!latest?.createPayload) continue;
+        const createPayload = latest.createPayload;
+        const created = await createBaitStation(serverId, { ...createPayload, clientKey });
+        await merge((r) => {
+          const s = r.baitStations?.find((b) => b.id === station.id);
+          if (s) {
+            s.serverId = created.id;
+            // Do not acknowledge edits made while POST was in flight. The
+            // following sync pass will PATCH the latest local state by ID.
+            s.synced = matchesBaitStationPayload(s, createPayload);
+          }
+        });
+      } else {
+        await updateBaitStation(serverId, station.serverId, input);
+        await merge((r) => {
+          const s = r.baitStations?.find((b) => b.id === station.id);
+          if (s) s.synced = matchesBaitStationPayload(s, input);
+        });
       }
     }
 
@@ -438,6 +836,7 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     // finalization pipeline (report, narrative, summary, opportunities,
     // scorecard) exactly once.
     if (rec.completed && !rec.serverCompleted) {
+      assertCurrentOwner();
       const result = await completeInspection(serverId);
       await merge((r) => {
         r.serverCompleted = true;
@@ -483,15 +882,28 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
     await merge((r) => {
       r.syncError = null;
       r.syncAttempts = 0;
+      // Partial AI outcomes remain pending; don't immediately re-request the
+      // same unresolved photo via the store subscription or foreground events.
+      r.nextSyncAt = hasPendingWork(r)
+        ? new Date(Date.now() + 30_000).toISOString()
+        : null;
+      r.lastSyncSuccess = new Date().toISOString();
     });
     state.onSynced?.(rec);
     return rec;
   } catch (e) {
+    if (
+      e instanceof Error &&
+      e.name === "SyncIdentityChangedError"
+    ) {
+      throw e;
+    }
     const msg = e instanceof Error ? e.message : "Sync failed";
     console.error("[Sync] syncOne failed for", record.localId, "—", msg, e);
     await merge((r) => {
       r.syncError = msg;
       r.syncAttempts += 1;
+      r.nextSyncAt = new Date(Date.now() + retryDelayMs(e, r.syncAttempts)).toISOString();
     });
     throw e;
   } finally {
@@ -513,14 +925,43 @@ async function syncOne(record: LocalInspection): Promise<LocalInspection> {
  */
 export async function runBackgroundSync(
   getToken: () => Promise<string | null>,
+  ownerId?: string,
+  companyId?: number | null,
 ): Promise<boolean> {
   if (state.running) return false;
+  // In the live app, a null identity means logout or tenant revalidation is in
+  // progress. Only a fresh background isolate (never configured) may establish
+  // its identity from the owner/company-bound cached credential.
+  if (state.lifecycleManaged && !state.ownerId) return false;
+  const backgroundOwnerId = ownerId ?? getLocalInspectionOwner();
+  const backgroundCompanyId = companyId !== undefined
+    ? companyId
+    : getLocalInspectionCompanyId();
+  if (!backgroundOwnerId) return false;
+  // A background fetch can be delivered to the live foreground JS context on
+  // some platforms. Never let a stale cached credential replace its active
+  // authenticated identity.
+  if (
+    state.ownerId &&
+    (state.ownerId !== backgroundOwnerId || state.companyId !== backgroundCompanyId)
+  ) return false;
+  const previousOwnerId = getLocalInspectionOwner();
+  const previousCompanyId = getLocalInspectionCompanyId();
+  setLocalInspectionScope(backgroundOwnerId, backgroundCompanyId);
   // Inject the token getter so syncOne can authenticate.
+  const previousToken = state.getToken;
+  const previousEngineOwner = state.ownerId;
+  const previousEngineCompanyId = state.companyId;
+  const previousGeneration = state.generation;
+  state.ownerId = backgroundOwnerId;
+  state.companyId = backgroundCompanyId;
+  state.generation += 1;
+  const backgroundGeneration = state.generation;
   state.getToken = getToken;
   state.running = true;
   let didWork = false;
   try {
-    const records = (await listLocalInspections()).filter(hasPendingWork);
+    const records = (await listLocalInspections()).filter((r) => hasPendingWork(r) && isDue(r));
     if (records.length === 0) return false;
     records.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (const record of records) {
@@ -529,12 +970,25 @@ export async function runBackgroundSync(
     didWork = true;
   } finally {
     state.running = false;
-    state.getToken = null;
+    // If the foreground identity changed during this one-shot task, do not
+    // restore its stale owner/token over the newly authenticated session.
+    if (state.generation === backgroundGeneration) {
+      state.getToken = previousToken;
+      state.ownerId = previousEngineOwner;
+      state.companyId = previousEngineCompanyId;
+      state.generation = previousGeneration + 1;
+      setLocalInspectionScope(previousOwnerId, previousCompanyId);
+    }
+    if (state.configured) await scheduleRetryIfNeeded();
   }
   return didWork;
 }
 
-/** Exponential backoff retry while anything is pending: 10s → 20s → … → 5min. */
+function isDue(record: LocalInspection, now = Date.now()): boolean {
+  return !record.nextSyncAt || new Date(record.nextSyncAt).getTime() <= now;
+}
+
+/** Exactly one timer for the earliest durable per-inspection deadline. */
 async function scheduleRetryIfNeeded() {
   if (state.retryTimer) {
     clearTimeout(state.retryTimer);
@@ -543,8 +997,11 @@ async function scheduleRetryIfNeeded() {
   const records = await listLocalInspections();
   const pending = records.filter(hasPendingWork);
   if (pending.length === 0) return;
-  const attempts = Math.max(...pending.map((r) => r.syncAttempts), 0);
-  const delay = Math.min(10_000 * 2 ** Math.max(attempts - 1, 0), 300_000);
+  const delay = Math.max(0, Math.min(
+    ...pending.map((r) => r.nextSyncAt
+      ? (new Date(r.nextSyncAt).getTime() || 0) - Date.now()
+      : 0),
+  ));
   state.retryTimer = setTimeout(() => {
     state.retryTimer = null;
     void syncAll();

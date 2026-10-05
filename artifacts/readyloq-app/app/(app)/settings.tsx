@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -34,7 +33,6 @@ import { useViewPreference, resolveViewMode } from "@/hooks/useViewPreference";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGetBriefingQueryOptions } from "@/lib/api-client";
 import {
-  bootstrapSuperAdmin,
   setRoleOverride,
   fetchIntegrationConfig,
   saveIntegrationConfig,
@@ -672,89 +670,6 @@ function RoleSwitcher({
   );
 }
 
-// ─── Bootstrap modal (claim super admin) ──────────────────────────────────────
-
-function BootstrapModal({
-  visible,
-  onClose,
-  onSuccess,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const colors = useColors();
-  const { getToken } = useAuth();
-  const [tokenInput, setTokenInput] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-
-  const handleSubmit = async () => {
-    if (!tokenInput.trim()) return;
-    setLoading(true);
-    try {
-      const t = await getToken();
-      await bootstrapSuperAdmin(t, tokenInput.trim());
-      Alert.alert("Access granted", "You now have super admin privileges. Restart the app to fully refresh.");
-      onSuccess();
-      onClose();
-    } catch (e: unknown) {
-      Alert.alert("Failed", e instanceof Error ? e.message : "Invalid token");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }} onPress={onClose} />
-      <View style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-        padding: 24, paddingBottom: 40, gap: 16,
-      }}>
-        <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 4 }} />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Ionicons name="shield-outline" size={22} color="#7c3aed" />
-          <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 18 }}>
-            Claim Super Admin
-          </Text>
-        </View>
-        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19 }}>
-          Enter the platform bootstrap token to elevate this account to super admin.
-        </Text>
-        <TextInput
-          value={tokenInput}
-          onChangeText={setTokenInput}
-          placeholder="Bootstrap token…"
-          placeholderTextColor={colors.mutedForeground}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          style={{
-            backgroundColor: colors.muted, borderRadius: 10, padding: 14,
-            color: colors.foreground, fontFamily: "Inter_400Regular", fontSize: 15,
-            borderWidth: 1, borderColor: colors.border,
-          }}
-        />
-        <Pressable
-          onPress={handleSubmit}
-          disabled={loading || !tokenInput.trim()}
-          style={({ pressed }) => ({
-            backgroundColor: "#7c3aed", borderRadius: 10, paddingVertical: 14,
-            alignItems: "center", opacity: pressed || loading || !tokenInput.trim() ? 0.6 : 1,
-          })}
-        >
-          {loading ? <ActivityIndicator color="#fff" /> : (
-            <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 15 }}>
-              Claim Access
-            </Text>
-          )}
-        </Pressable>
-      </View>
-    </Modal>
-  );
-}
-
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function SettingsScreen() {
@@ -768,7 +683,6 @@ export default function SettingsScreen() {
   const isOwner = user?.role === "owner";
   const isSuperAdmin = !!user?.isSuperAdmin;
   const [roleSwitching, setRoleSwitching] = React.useState(false);
-  const [showBootstrap, setShowBootstrap] = React.useState(false);
 
   const handleSwitchRole = async (role: RoleOption) => {
     if (roleSwitching) return;
@@ -1124,6 +1038,47 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* ── Chemical Inventory (all techs, managers, owners) ─────────── */}
+        {isLoaded && (
+          <View>
+            <SectionHeader label="Chemical Inventory" />
+            <Card style={{ overflow: "hidden", padding: 0 }}>
+              <SettingRow
+                icon="flask-outline"
+                label="My Inventory"
+                sublabel="Track on-hand chemicals and log restocks"
+                onPress={() => router.push("/inventory" as Href)}
+              />
+              <SettingRow
+                icon="time-outline"
+                label="Restock History"
+                sublabel="Deliveries, manual additions, supplier imports"
+                onPress={() => router.push("/inventory" as Href)}
+                isLast
+              />
+            </Card>
+          </View>
+        )}
+
+        {/* ── Supplier Connections (owners only) ───────────────────────── */}
+        {isOwner && isLoaded && (
+          <View>
+            <SectionHeader label="Supplier Connections" />
+            <Card style={{ overflow: "hidden", padding: 0 }}>
+              <SettingRow
+                icon="cloud-upload-outline"
+                label="Veseris / Target Specialty / Univar"
+                sublabel="Register distributor accounts for CSV order import"
+                onPress={() => router.push("/supplier-connections" as Href)}
+                isLast
+              />
+            </Card>
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 8, paddingHorizontal: 4, lineHeight: 17 }}>
+              Connect your distribution account so that when you export a CSV from your supplier portal, ReadyLoq can match orders to each technician's on-hand inventory automatically.
+            </Text>
+          </View>
+        )}
+
         {/* ── Dispatch Integration (owners only) ───────────────────────── */}
         {isOwner && <DispatchIntegrationSection />}
 
@@ -1172,22 +1127,6 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        {/* ── Claim Super Admin (non-superAdmin) ───────────────────────── */}
-        {!isSuperAdmin && (
-          <View>
-            <SectionHeader label="Platform" />
-            <Card style={{ overflow: "hidden", padding: 0 }}>
-              <SettingRow
-                icon="shield-outline"
-                label="Claim Super Admin"
-                sublabel="Enter the platform bootstrap token"
-                onPress={() => setShowBootstrap(true)}
-                isLast
-              />
-            </Card>
-          </View>
-        )}
-
         {/* ── App ─────────────────────────────────────────────────────── */}
         <View>
           <SectionHeader label="App" />
@@ -1226,12 +1165,6 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
 
-      {/* Bootstrap modal */}
-      <BootstrapModal
-        visible={showBootstrap}
-        onClose={() => setShowBootstrap(false)}
-        onSuccess={() => refetchUser()}
-      />
     </Screen>
   );
 }
