@@ -23,11 +23,14 @@ import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.session.DeviceSessionState
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
+import com.meta.wearable.dat.core.types.PermissionError
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
@@ -51,6 +54,13 @@ class MetaWearablesModule(
   private val reactContext: ReactApplicationContext,
 ) : ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+  // Status work has its own cancellation boundary; camera/session work is unchanged.
+  private val statusScope = CoroutineScope(
+    SupervisorJob() + Dispatchers.Main.immediate +
+      CoroutineExceptionHandler { _, error -> Log.w(TAG, "Meta status worker failed", error) },
+  )
+  @Volatile private var statusClosed = false
+  private var statusObserversStarted = false
   private var session: DeviceSession? = null
   private var camera: Camera? = null
   private var stream: Stream? = null
@@ -69,16 +79,7 @@ class MetaWearablesModule(
 
   init {
     reactContext.addLifecycleEventListener(this)
-    scope.launch {
-      Wearables.registrationState.collect {
-        emitStatus()
-      }
-    }
-    scope.launch {
-      Wearables.devices.collect {
-        emitStatus()
-      }
-    }
+    statusScope.launch { ensureStatusObservers() }
   }
 
   @ReactMethod
@@ -86,8 +87,19 @@ class MetaWearablesModule(
     // A refresh is an explicit retry. Preserve errors only until the user has
     // asked us to re-check current DAT state, then report fresh state instead.
     latestError = null
-    refreshCameraPermission { permission ->
-      promise.resolve(statusMap(permission))
+    if (statusClosed) {
+      rejectStatus(promise, IllegalStateException("The Meta status bridge has closed."))
+      return
+    }
+    statusScope.launch {
+      ensureStatusObservers()
+      MetaWearablesStatusSafety.deliverOnce(
+        isCurrent = { !statusClosed },
+        read = { readStatus() },
+        onSuccess = { promise.resolve(it) },
+        onFailure = { rejectStatus(promise, it) },
+        onCallbackError = { Log.w(TAG, "Meta status callback failed", it) },
+      )
     }
   }
 
@@ -305,6 +317,7 @@ class MetaWearablesModule(
 
   override fun invalidate() {
     reactContext.removeLifecycleEventListener(this)
+    closeStatus()
     scope.cancel()
     clearSession()
     super.invalidate()
@@ -322,6 +335,8 @@ class MetaWearablesModule(
     }
   }
 
+  // An activity may be recreated while the React module survives. Only module
+  // invalidation permanently closes status work; preserve normal resume behavior.
   override fun onHostDestroy() = onHostPause()
 
   private fun startCameraStream(promise: Promise) {
@@ -517,21 +532,125 @@ class MetaWearablesModule(
       sessionState = sessionState,
       streamState = streamState,
     )
+    return buildStatusMap(snapshot, latestError)
+  }
+
+  private fun buildStatusMap(snapshot: MetaWearablesSnapshot, error: String?): WritableMap {
     return Arguments.createMap().apply {
       putString("platform", "android")
-      putString("registrationState", registration)
-      putString("cameraPermission", permission?.toString() ?: "UNKNOWN")
-      putInt("deviceCount", Wearables.devices.value.size)
-      putString("sessionState", sessionState)
-      putString("streamState", streamState)
-      if (latestError != null) putString("error", latestError)
+      putString("registrationState", snapshot.registrationState)
+      putString("cameraPermission", snapshot.cameraPermission ?: "UNKNOWN")
+      putInt("deviceCount", snapshot.deviceCount)
+      putString("sessionState", snapshot.sessionState)
+      putString("streamState", snapshot.streamState)
+      if (error != null) putString("error", error)
       putBoolean("canStartSession", MetaWearablesContract.canStartSession(snapshot))
       putBoolean("canCapture", MetaWearablesContract.canCapture(snapshot))
     }
   }
 
   private fun emitStatus() {
-    refreshCameraPermission { permission -> emit(EVENT_STATUS, statusMap(permission)) }
+    if (statusClosed) return
+    statusScope.launch {
+      ensureStatusObservers()
+      MetaWearablesStatusSafety.deliverOnce(
+        isCurrent = { !statusClosed && reactContext.hasActiveReactInstance() },
+        read = { readStatus() },
+        onSuccess = { emit(EVENT_STATUS, it) },
+        onFailure = {
+          Log.w(TAG, "Meta status read failed", it)
+          emit(EVENT_STATUS, unavailableStatus("Meta DAT status is temporarily unavailable."))
+        },
+        onCallbackError = { Log.w(TAG, "Meta status event failed", it) },
+      )
+    }
+  }
+
+  private suspend fun readStatus(): WritableMap {
+    val initialization = MetaWearablesInitialization.state
+    if (!initialization.ready) {
+      return unavailableStatus(initialization.error ?: "Meta DAT is unavailable.")
+    }
+    val registration = Wearables.registrationState.value.toString()
+    var deviceCount = Wearables.devices.value.size
+    var permission: PermissionStatus? = null
+    var error = latestError
+    if (deviceCount == 0) {
+      // No glasses is normal. Do not query a device-specific permission.
+      error = null
+    }
+    MetaWearablesStatusSafety.permissionIfConnected(deviceCount) {
+      Wearables.checkPermissionStatus(Permission.CAMERA)
+    }?.onSuccess { permission = it }
+      ?.onFailure { failure, _ ->
+        if (failure == PermissionError.NO_DEVICE ||
+          failure == PermissionError.NO_DEVICE_WITH_CONNECTION) {
+          deviceCount = 0
+          error = null
+        } else {
+          error = failure.description
+        }
+      }
+    return buildStatusMap(
+      MetaWearablesSnapshot(
+        registration, permission?.toString(), deviceCount,
+        session?.state?.value?.toString() ?: "IDLE",
+        stream?.state?.value?.toString() ?: "STOPPED",
+      ),
+      error,
+    )
+  }
+
+  private fun unavailableStatus(message: String): WritableMap = buildStatusMap(
+    MetaWearablesSnapshot("UNAVAILABLE", null, 0, "IDLE", "STOPPED"), message,
+  )
+
+  private fun ensureStatusObservers() {
+    if (statusClosed || statusObserversStarted || !MetaWearablesInitialization.state.ready) return
+    statusObserversStarted = true
+    launchStatusObserver { Wearables.registrationState.collect { emitStatus() } }
+    launchStatusObserver { Wearables.devices.collect { emitStatus() } }
+  }
+
+  private fun launchStatusObserver(observe: suspend () -> Unit) {
+    statusScope.launch {
+      try {
+        observe()
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (error: Exception) {
+        reportStatusObserverError(error)
+      } catch (error: LinkageError) {
+        reportStatusObserverError(error)
+      }
+    }
+  }
+
+  private fun reportStatusObserverError(error: Throwable) {
+    Log.w(TAG, "Meta status observer failed", error)
+    if (statusClosed || !reactContext.hasActiveReactInstance()) return
+    try {
+      emit(EVENT_STATUS, unavailableStatus("Meta DAT status is temporarily unavailable."))
+    } catch (callbackError: Exception) {
+      Log.w(TAG, "Meta status observer event failed", callbackError)
+    } catch (callbackError: LinkageError) {
+      Log.w(TAG, "Meta status observer event failed", callbackError)
+    }
+  }
+
+  private fun rejectStatus(promise: Promise, error: Throwable) {
+    try {
+      promise.reject("META_STATUS_UNAVAILABLE", "Unable to read Meta DAT status.", error)
+    } catch (callbackError: Exception) {
+      Log.w(TAG, "Meta status rejection failed", callbackError)
+    } catch (callbackError: LinkageError) {
+      Log.w(TAG, "Meta status rejection failed", callbackError)
+    }
+  }
+
+  private fun closeStatus() {
+    statusClosed = true
+    statusScope.cancel()
   }
 
   private fun emit(name: String, payload: WritableMap) {

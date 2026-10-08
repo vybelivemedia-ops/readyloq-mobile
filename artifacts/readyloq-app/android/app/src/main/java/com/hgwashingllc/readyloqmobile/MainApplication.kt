@@ -13,6 +13,7 @@ import com.facebook.react.common.ReleaseLevel
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.meta.wearable.dat.core.Wearables
+import com.meta.wearable.dat.core.types.WearablesError
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
@@ -51,8 +52,23 @@ class MainApplication : Application(), ReactApplication {
     }
     loadReactNative(this)
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
-    Wearables.initialize(this).onFailure { error, _ ->
-      android.util.Log.w("ReadyLoq", "Meta Wearables initialization failed: ${error.description}")
+    try {
+      Wearables.initialize(this)
+        .onSuccess { MetaWearablesInitialization.ready() }
+        .onFailure { error, _ ->
+          if (error == WearablesError.ALREADY_INITIALIZED) {
+            MetaWearablesInitialization.ready()
+          } else {
+            MetaWearablesInitialization.unavailable("Meta DAT initialization failed.")
+            android.util.Log.w("ReadyLoq", "Meta Wearables initialization failed: $error")
+          }
+        }
+    } catch (error: Exception) {
+      MetaWearablesInitialization.unavailable("Meta DAT initialization failed.")
+      android.util.Log.w("ReadyLoq", "Meta Wearables initialization failed", error)
+    } catch (error: LinkageError) {
+      MetaWearablesInitialization.unavailable("Meta DAT is unavailable in this build.")
+      android.util.Log.w("ReadyLoq", "Meta Wearables initialization failed", error)
     }
   }
 

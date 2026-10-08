@@ -94,20 +94,7 @@ export function deriveMetaWearablesState(
     };
   }
 
-  if (permission !== "GRANTED") {
-    return {
-      availability: "needs_permission",
-      title: "Allow Meta glasses camera access",
-      guidance:
-        "Grant camera access in the Meta AI app. ReadyLoq cannot read photos until Meta AI approves this permission.",
-      canRegister: false,
-      canRequestPermission: true,
-      canStartSession: false,
-      canCapture: false,
-      error: null,
-    };
-  }
-
+  // A disconnected device has no permission to query. Registration still comes first.
   if (deviceCount < 1) {
     return {
       availability: "no_device",
@@ -116,6 +103,20 @@ export function deriveMetaWearablesState(
         "Turn on and unfold the glasses, keep them nearby, and confirm they are connected in Meta AI. Development builds also require Developer Mode.",
       canRegister: false,
       canRequestPermission: false,
+      canStartSession: false,
+      canCapture: false,
+      error: null,
+    };
+  }
+
+  if (permission !== "GRANTED") {
+    return {
+      availability: "needs_permission",
+      title: "Allow Meta glasses camera access",
+      guidance:
+        "Grant camera access in the Meta AI app. ReadyLoq cannot read photos until Meta AI approves this permission.",
+      canRegister: false,
+      canRequestPermission: true,
       canStartSession: false,
       canCapture: false,
       error: null,

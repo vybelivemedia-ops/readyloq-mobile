@@ -64,6 +64,27 @@ describe("Meta Wearables Device Access Toolkit state", () => {
     expect(state.canCapture).toBe(false);
   });
 
+  it("treats no device and unknown permission as disconnected, not a permission request", () => {
+    const state = deriveMetaWearablesState({
+      registrationState: "REGISTERED", cameraPermission: "UNKNOWN",
+      deviceCount: 0, sessionState: "IDLE", streamState: "STOPPED",
+    }, true, "android");
+    expect(state.availability).toBe("no_device");
+    expect(state.canRequestPermission).toBe(false);
+    expect(state.canStartSession).toBe(false);
+    expect(state.canCapture).toBe(false);
+  });
+
+  it("shows unavailable initialization safely even without a device", () => {
+    const state = deriveMetaWearablesState({
+      registrationState: "UNAVAILABLE", cameraPermission: "UNKNOWN",
+      deviceCount: 0, error: "Meta DAT initialization failed.",
+    }, true, "android");
+    expect(state.availability).toBe("error");
+    expect(state.canStartSession).toBe(false);
+    expect(state.canCapture).toBe(false);
+  });
+
   it("allows capture only once the native camera stream is actually streaming", () => {
     const state = deriveMetaWearablesState(
       {
