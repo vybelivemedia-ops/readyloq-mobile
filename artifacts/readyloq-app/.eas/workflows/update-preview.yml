@@ -1,0 +1,27 @@
+name: ReadyLoq Android preview update
+
+# Manual only. Run against an immutable, reviewed GitHub commit through the
+# connected Expo workflow service; never publish implicitly on every push.
+defaults:
+  tools:
+    node: "22.14.0"
+    pnpm: "10.11.0"
+
+jobs:
+  publish_preview:
+    name: Validate and publish Android JS to preview
+    type: update
+    environment: production
+    env:
+      EXPO_NO_DOTENV: "1"
+    params:
+      platform: android
+      channel: preview
+      message: ReadyLoq preview screen update
+    hooks:
+      after_checkout:
+        - name: Load only the production public bundle configuration
+          run: node scripts/preview-update-config.cjs --eas
+      before_update:
+        - name: Verify configuration and compiled Android bundle before publishing
+          run: node scripts/preview-update-config.cjs --bundle

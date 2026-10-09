@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
+import { PreviewUpdateIdentity } from "@/components/PreviewUpdateIdentity";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
@@ -135,6 +136,7 @@ export default function SignInScreen() {
             <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>Sign up</Text>
           </Link>
         </View>
+        <PreviewUpdateIdentity />
       </ScrollView>
     </Screen>
   );

@@ -4,6 +4,7 @@ import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { Card } from "@/components/ui/Card";
+import { PreviewUpdateIdentity } from "@/components/PreviewUpdateIdentity";
 import { Screen } from "@/components/ui/Screen";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -92,6 +93,8 @@ export default function AboutScreen() {
             ))}
           </View>
         </Card>
+
+        <PreviewUpdateIdentity />
 
         {RELEASE_NOTES.map((section) => (
           <Card key={section.title}>
