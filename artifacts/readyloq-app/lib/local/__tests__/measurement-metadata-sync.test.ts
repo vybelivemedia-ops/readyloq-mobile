@@ -33,6 +33,9 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 let _uuid = 0;
+vi.mock("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg" }, manipulateAsync: vi.fn(),
+}));
 vi.mock("expo-crypto", () => ({ randomUUID: () => `uuid-${++_uuid}` }));
 
 vi.mock("expo-file-system/legacy", () => ({

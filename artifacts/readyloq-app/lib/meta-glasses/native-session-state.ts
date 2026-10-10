@@ -38,7 +38,20 @@ export interface MetaWearablesState {
   error: string | null;
 }
 
-const normalized = (value: string | undefined) => value?.toUpperCase() ?? "";
+const normalized = (value: unknown) => typeof value === "string" ? value.toUpperCase() : "";
+
+/** Validate native events/results before they reach React rendering. */
+export function isMetaWearablesNativeStatus(value: unknown): value is MetaWearablesNativeStatus {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const status = value as Record<string, unknown>;
+  return ["registrationState", "cameraPermission", "sessionState", "streamState"]
+    .every(key => typeof status[key] === "string") &&
+    typeof status.deviceCount === "number" &&
+    Number.isInteger(status.deviceCount) && status.deviceCount >= 0 &&
+    (status.error === undefined || typeof status.error === "string") &&
+    ["canCapture", "canStartSession"].every(key =>
+      status[key] === undefined || typeof status[key] === "boolean");
+}
 
 export function deriveMetaWearablesState(
   status: MetaWearablesNativeStatus | null,
@@ -155,7 +168,7 @@ export function deriveMetaWearablesState(
     guidance: "Start a glasses session to make the camera available for this inspection.",
     canRegister: false,
     canRequestPermission: false,
-    canStartSession: !["STARTING", "STOPPING"].includes(session) &&
+    canStartSession: !["STARTING", "STARTED", "STOPPING"].includes(session) &&
       !["STARTING", "STARTED", "STOPPING", "STREAMING"].includes(stream),
     canCapture: false,
     error: null,

@@ -33,6 +33,11 @@ export default defineConfig({
       "__tests__/\\(app\\)/inspection-summary/**/*.test.ts",
       "__tests__/\\(app\\)/frame-buffer-delete-failure.test.ts",
       "__tests__/\\(app\\)/audio-session-latency.test.ts",
+      "__tests__/\\(app\\)/voice-capture-lifecycle.test.ts",
+      "__tests__/\\(app\\)/local-whisper-final.test.ts",
+      "__tests__/\\(app\\)/voice-photo-evidence.test.ts",
+      "__tests__/\\(app\\)/voice-audio-device-contract.test.ts",
+      "lib/audio/intelligence/__tests__/multilingual-voice.test.ts",
       "lib/voice-context/__tests__/**/*.test.ts",
       "lib/sync-history/__tests__/**/*.test.ts",
       "lib/sync/__tests__/**/*.test.ts",
@@ -46,6 +51,8 @@ export default defineConfig({
     alias: {
       // Path alias used throughout the app
       "@": path.resolve(__dirname, "."),
+      // Native Whisper is mocked at its SDK boundary in audio contract tests.
+      "whisper.rn": path.resolve(__dirname, "node_modules/whisper.rn/src/index.ts"),
       // Stub expo-file-system so BurstMeasurementManager.ts can be imported
       // without hitting React Native's Flow-typed entry point.
       "expo-file-system/legacy": path.resolve(

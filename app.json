@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "995cc6e6-b530-429a-a1e0-b5cd8d398027"
+      }
+    },
+    "android": {
+      "package": "com.hgwashingllc.workspace"
+    },
+    "ios": {
+      "bundleIdentifier": "com.hgwashingllc.workspace",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

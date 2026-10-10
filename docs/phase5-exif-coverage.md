@@ -1,0 +1,29 @@
+# Phase 5 EXIF and location-data coverage
+
+**Scope:** source/fixture audit of the current mobile photo sanitizer and its reachable call sites. This is not a Fold 7 test, a Production-artifact review, or a claim that all ReadyLoq upload clients sanitize media.
+
+## Byte behavior verified
+
+`createSanitizedPhotoCopy` asks Expo ImageManipulator to re-encode the source as JPEG (`compress: 1`), parses that JPEG, removes every JPEG APP0–APP15 and COM segment, then writes a separate durable JPEG copy. Standard EXIF and XMP segments use APP1; IPTC/Photoshop segments use APP13. Consequently this also drops non-location APP data such as ICC color profiles and other camera-specific application segments. The test fixture inserts GPS-bearing EXIF/XMP, IPTC/Photoshop, and COM segments into a valid JPEG; the sanitizer test inspects the output marker stream, checks fixture values are absent, and decodes the resulting 3×2 JPEG.
+
+The `createSanitizedPhotoCopy` integration test stubs Expo's native manipulation and file-system APIs. It verifies the helper requests a JPEG re-encode, strips the fixture segments from the returned bytes, writes a durable copy, and removes the intermediate file. **The test does not invoke a real iOS/Android decoder or camera.** Orientation normalization is expected from the native re-encode path but was not exercised with an orientation-tagged device image.
+
+`removeLocationMetadata` recursively removes object keys whose names match its GPS/coordinate/location/position regex. It preserves other JSON, including source/device, capture-time, and calibration fields used by the app. It does not redact arbitrary string contents that happen to contain coordinates, nor binary metadata embedded in formats other than the sanitized JPEG.
+
+## Requested coverage
+
+| Input/path | Result | Evidence and exact boundary |
+| --- | --- | --- |
+| New native-camera JPEG | **PASS — fixture bytes; NOT RUN — physical capture** | `lib/vision/native-camera-provider.ts` requests a hardware JPEG with `skipProcessing: true, exif: true`; `(app)/new-inspection.tsx` sends every provider URI to `persistPhoto`, which calls `createSanitizedPhotoCopy` before the durable inspection photo is stored. The privacy test verifies fixture APP/COM stripping and JPEG decodability through a mocked native re-encode. Actual Fold 7 output, orientation, and native encoder behavior remain untested. |
+| Imported JPEG | **PASS — shared fixture path; NOT RUN — physical import** | `lib/vision/media-import-provider.ts` requests `exif: true`, returns the picked original URI, and copies selected fields (`DateTimeOriginal`, make/model, focal length, dimensions) instead of persisting full EXIF JSON. The shared `new-inspection.tsx` ingestion calls the same `persistPhoto` sanitizer and filters location-like JSON keys. A real library asset and its platform-specific picker behavior were not tested. |
+| Already remote JPEG | **PASS — outbound FAIE copy; NOT RUN — remote object rewrite** | `lib/faie-ingest.ts` downloads a remote URI to cache before sanitization. `lib/privacy/__tests__/faie-ingest.privacy.test.ts` supplies a GPS-bearing remote-JPEG fixture, runs the download → re-encode → strip → FAIE JSON payload path, and decodes the transmitted base64 bytes to confirm GPS fixture strings are absent. This sanitizes only the temporary bytes sent to FAIE; the existing remote object is **not** modified or replaced. No real remote object was fetched. |
+| Non-mobile image upload | **NOT RUN — no sanitizer on the non-mobile ingress established here** | This audit found the mobile app sanitizer and the mobile FAIE re-encode path. It did not establish an equivalent server/non-mobile image decode-and-strip boundary. No server route/storage code or real non-mobile upload was tested. Do not infer that a mobile-sanitized record can never be written by another client. |
+| Bulk photo upload | **PASS — source branch and helper fixture; NOT RUN — picker-to-PUT integration** | `(app)/dataset/bulk-upload.tsx` requests library media with `exif: false`; for non-video assets it calls `createSanitizedPhotoCopy`, uploads the resulting URI as `image/jpeg`, and removes the temporary sanitized file. The byte-level helper fixture passes. No UI-driven picker or actual object-storage PUT was exercised; `exif: false` alone is not byte-sanitization evidence. |
+| Bulk video upload | **FAIL — sanitizer intentionally bypassed; metadata retention NOT RUN** | The same bulk uploader enters the sanitizer only when `!isVideo`; the video branch sends the original `asset.uri` bytes (`exif: false` only affects picker metadata). No video parser, location-metadata inspection, or video fixture test exists in this work. Embedded GPS/creation/device data may remain; actual video content is **NOT RUN**. Do not claim video privacy sanitization. |
+
+## Test results and residuals
+
+- `pnpm --filter @workspace/readyloq-app exec vitest run lib/privacy/__tests__/image-sanitizer.test.ts lib/privacy/__tests__/faie-ingest.privacy.test.ts`: **5 tests passed**. These cover a synthetic GPS EXIF/XMP, IPTC/Photoshop, and comment-segment JPEG; its sanitized bytes decode successfully. The FAIE case uses a mocked remote download and mocked Expo native transforms/storage.
+- The fixtures contain marker payloads with representative location strings; they are **not** real camera-produced binary EXIF GPS IFDs, HEIFs, orientation-tagged source photos, production bucket objects, or video files.
+- Already stored upload objects are neither scanned nor changed. Non-mobile image ingress and video uploads remain unverified/unsanitized in this audit. JPEG APP stripping also removes color/camera metadata; quality/calibration impact has not been tested on a Fold 7.
+- The Expo web preview and Android Metro export do not substitute for actual native capture/import/device verification.

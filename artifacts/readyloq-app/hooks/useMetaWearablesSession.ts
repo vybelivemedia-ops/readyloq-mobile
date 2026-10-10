@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createMetaCaptureDelivery } from "@/lib/meta-glasses/capture-delivery";
 import {
   deriveMetaWearablesState,
+  isMetaWearablesNativeStatus,
   type MetaWearablesCapture,
   type MetaWearablesNativeStatus,
 } from "@/lib/meta-glasses/native-session-state";
@@ -43,26 +44,41 @@ export function useMetaWearablesSession(options: UseMetaWearablesSessionOptions 
   const captureConsumer = useRef(options.onCapture);
   captureConsumer.current = options.onCapture;
   const ownsCaptures = Boolean(options.onCapture);
+  const eventsReady = useRef(false);
+  const lifecycle = useRef({ mounted: false, generation: 0 });
+  const isCurrent = useCallback((generation: number) =>
+    lifecycle.current.mounted && generation === lifecycle.current.generation, []);
+  const acceptStatus = useCallback((next: unknown, generation: number) => {
+    if (!isCurrent(generation)) return;
+    if (!isMetaWearablesNativeStatus(next)) {
+      setActionError("Meta glasses returned an invalid status. Retry the connection.");
+      return;
+    }
+    setStatus(next);
+    if (eventsReady.current) setActionError(null);
+  }, [isCurrent]);
 
   const refresh = useCallback(async () => {
     if (!nativeModule) return;
+    const generation = lifecycle.current.generation;
     try {
       const next = await nativeModule.getStatus();
-      setStatus(next);
-      setActionError(null);
+      acceptStatus(next, generation);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to check Meta glasses.");
+      if (isCurrent(generation)) {
+        setActionError(error instanceof Error ? error.message : "Unable to check Meta glasses.");
+      }
     }
-  }, [nativeModule]);
+  }, [nativeModule, acceptStatus, isCurrent]);
 
   useEffect(() => {
+    lifecycle.current.mounted = true;
+    eventsReady.current = false;
+    const generation = ++lifecycle.current.generation;
     void refresh();
-    if (!nativeModule) return;
-    const emitter = new NativeEventEmitter(nativeModule as never);
-    const statusSubscription = emitter.addListener(STATUS_EVENT, (next: MetaWearablesNativeStatus) => {
-      setStatus(next);
-      setActionError(null);
-    });
+    if (!nativeModule) return () => { lifecycle.current.mounted = false; };
+    let statusSubscription: { remove(): void } | undefined;
+    let captureSubscription: { remove(): void } | undefined;
     // Only an inspection owns a capture event. Connections displays status but
     // must never race the durable evidence consumer by deleting its cache file.
     let mounted = true;
@@ -74,18 +90,31 @@ export function useMetaWearablesSession(options: UseMetaWearablesSessionOptions 
       },
       (uri) => nativeModule.removeCapture(uri),
     );
-    const captureSubscription = ownsCaptures ? emitter.addListener(CAPTURE_EVENT, (capture: unknown) => {
-      void deliver(capture).catch((error) => {
-        if (mounted) setActionError(error instanceof Error ? error.message : "Meta glasses evidence could not be saved.");
+    try {
+      const emitter = new NativeEventEmitter(nativeModule as never);
+      statusSubscription = emitter.addListener(STATUS_EVENT, (next: unknown) => {
+        acceptStatus(next, generation);
       });
-    }) : null;
+      if (ownsCaptures) captureSubscription = emitter.addListener(CAPTURE_EVENT, (capture: unknown) => {
+        void deliver(capture).catch((error) => {
+          if (isCurrent(generation)) setActionError(error instanceof Error ? error.message : "Meta glasses evidence could not be saved.");
+        });
+      });
+      eventsReady.current = true;
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to listen to Meta glasses.");
+    }
     return () => {
       mounted = false;
-      statusSubscription.remove();
-      captureSubscription?.remove();
-      if (ownsCaptures) void nativeModule.stopSession().catch(() => undefined);
+      lifecycle.current.mounted = false;
+      eventsReady.current = false;
+      lifecycle.current.generation++;
+      for (const subscription of [statusSubscription, captureSubscription]) {
+        try { subscription?.remove(); } catch { /* Bridge may already be invalidated. */ }
+      }
+      if (ownsCaptures) void Promise.resolve().then(() => nativeModule.stopSession()).catch(() => undefined);
     };
-  }, [nativeModule, ownsCaptures, refresh]);
+  }, [nativeModule, ownsCaptures, refresh, acceptStatus, isCurrent]);
 
   const run = useCallback(
     async (operation: keyof Pick<
@@ -93,15 +122,18 @@ export function useMetaWearablesSession(options: UseMetaWearablesSessionOptions 
       "startRegistration" | "requestCameraPermission" | "startSession" | "stopSession" | "capturePhoto"
     >) => {
       if (!nativeModule) return;
+      const generation = lifecycle.current.generation;
       try {
         const next = await nativeModule[operation]();
-        if (operation !== "capturePhoto") setStatus(next as MetaWearablesNativeStatus);
-        setActionError(null);
+        if (operation !== "capturePhoto") acceptStatus(next, generation);
+        else if (isCurrent(generation) && eventsReady.current) setActionError(null);
       } catch (error) {
-        setActionError(error instanceof Error ? error.message : "Meta glasses action failed.");
+        if (isCurrent(generation)) {
+          setActionError(error instanceof Error ? error.message : "Meta glasses action failed.");
+        }
       }
     },
-    [nativeModule],
+    [nativeModule, acceptStatus, isCurrent],
   );
 
   const state = deriveMetaWearablesState(

@@ -53,7 +53,11 @@ import kotlinx.coroutines.withContext
 class MetaWearablesModule(
   private val reactContext: ReactApplicationContext,
 ) : ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+  private val scope = CoroutineScope(
+    // Queue work so collectors are registered before SDK callbacks can re-enter.
+    SupervisorJob() + Dispatchers.Main +
+      CoroutineExceptionHandler { _, error -> Log.w(TAG, "Meta session worker failed", error) },
+  )
   // Status work has its own cancellation boundary; camera/session work is unchanged.
   private val statusScope = CoroutineScope(
     SupervisorJob() + Dispatchers.Main.immediate +
@@ -64,13 +68,16 @@ class MetaWearablesModule(
   private var session: DeviceSession? = null
   private var camera: Camera? = null
   private var stream: Stream? = null
-  private var pendingSessionPromise: Promise? = null
-  private var pendingStreamPromise: Promise? = null
+  private var pendingSessionPromise: SessionPromise? = null
+  private var pendingStreamPromise: SessionPromise? = null
+  private var startup: MetaWearablesStartup? = null
+  @Volatile private var sessionClosed = false
+  @Volatile private var hostPaused = false
   private var sessionStartInFlight = false
   private var streamStartInFlight = false
   private var lifecycleGeneration = 0L
   private var latestError: String? = null
-  private var pendingCapturePromise: Promise? = null
+  private var pendingCapturePromise: SessionPromise? = null
   private val sessionObservers = mutableListOf<Job>()
   private val streamObservers = mutableListOf<Job>()
   private var startupDeadline: Job? = null
@@ -80,6 +87,12 @@ class MetaWearablesModule(
   init {
     reactContext.addLifecycleEventListener(this)
     statusScope.launch { ensureStatusObservers() }
+    // A permission result may arrive after JS has mounted. Start existing
+    // guarded status observation then, without touching camera/session state.
+    // invalidate() cancels statusScope, removing this subscription as well.
+    launchStatusObserver {
+      MetaWearablesInitialization.changes.collect { emitStatus() }
+    }
   }
 
   @ReactMethod
@@ -145,9 +158,15 @@ class MetaWearablesModule(
   }
 
   @ReactMethod
-  fun startSession(promise: Promise) {
+  fun startSession(rawPromise: Promise) {
+    val promise = SessionPromise(rawPromise)
     scope.launch {
-    if (sessionStartInFlight) {
+    if (sessionClosed) return@launch
+    if (hostPaused) {
+      promise.reject("APP_BACKGROUNDED", "Return to ReadyLoq before connecting Meta glasses.")
+      return@launch
+    }
+    if (sessionStartInFlight || streamStartInFlight) {
       promise.reject("SESSION_STARTING", "A Meta glasses session is already starting.")
       return@launch
     }
@@ -155,7 +174,7 @@ class MetaWearablesModule(
       startCameraStream(promise)
       return@launch
     }
-    if (session != null) {
+    if (session != null || sessionStartInFlight || streamStartInFlight) {
       // Keep exactly one lifecycle operation in flight. Reporting a second
       // request as successful while DAT is still starting would mislead the
       // technician into thinking a capture stream exists.
@@ -163,15 +182,26 @@ class MetaWearablesModule(
       return@launch
     }
 
+    // Retrying a stopped/failed stream releases the previous session first.
+    if (stream?.state?.value == StreamState.STREAMING) {
+      resolveSessionStatus(promise)
+      return@launch
+    }
+    clearSession()
     val generation = lifecycleGeneration
+    startup = MetaWearablesStartup()
     sessionStartInFlight = true
     pendingSessionPromise = promise
     scheduleStartupDeadline()
     try {
     Wearables.createSession(AutoDeviceSelector())
       .onSuccess { created ->
-        if (generation != lifecycleGeneration) {
-          created.stop()
+        if (generation != lifecycleGeneration || sessionClosed || hostPaused) {
+          releaseSdk { created.stop() }
+          if (!sessionClosed && generation == lifecycleGeneration) {
+            clearSession()
+            emitStatus()
+          }
           return@onSuccess
         }
         session = created
@@ -192,17 +222,19 @@ class MetaWearablesModule(
         emitStatus()
         promise.reject("NO_ELIGIBLE_META_DEVICE", error.description)
       }
+    } catch (cancelled: CancellationException) {
+      throw cancelled
     } catch (error: Exception) {
-      latestError = error.message ?: "Unable to create a Meta glasses session."
-      promise.reject("SESSION_START_FAILED", latestError, error)
-      clearSession()
-      emitStatus()
+      failSession(generation, error)
+    } catch (error: LinkageError) {
+      failSession(generation, error)
     }
     }
   }
 
   @ReactMethod
-  fun stopSession(promise: Promise) {
+  fun stopSession(rawPromise: Promise) {
+    val promise = SessionPromise(rawPromise)
     scope.launch {
     try {
       lifecycleGeneration += 1
@@ -215,7 +247,7 @@ class MetaWearablesModule(
       clearSession()
       latestError = null
       emitStatus()
-      promise.resolve(statusMap())
+      resolveSessionStatus(promise)
     } catch (error: Exception) {
       latestError = error.message ?: "Unable to stop the Meta glasses session."
       emitStatus()
@@ -225,7 +257,8 @@ class MetaWearablesModule(
   }
 
   @ReactMethod
-  fun capturePhoto(promise: Promise) {
+  fun capturePhoto(rawPromise: Promise) {
+    val promise = SessionPromise(rawPromise)
     scope.launch capture@ {
     val activeStream = stream
     if (activeStream == null || activeStream.state.value != StreamState.STREAMING ||
@@ -255,17 +288,18 @@ class MetaWearablesModule(
               file.delete()
               return@delivery
             }
-            val payload = Arguments.createMap().apply {
-              putString("uri", "file://${file.absolutePath}")
-              putString("capturedAt", capturedAt)
-              putString("source", "meta_wearables_dat")
-              putString("mimeType", "image/jpeg")
-            }
-            emit(EVENT_CAPTURE, payload)
+            val capture = hashMapOf<String, Any>(
+              "uri" to "file://${file.absolutePath}",
+              "capturedAt" to capturedAt,
+              "source" to "meta_wearables_dat",
+              "mimeType" to "image/jpeg",
+            )
+            // WritableNativeMap is consumable. Event and promise need distinct maps.
+            emit(EVENT_CAPTURE, Arguments.makeNativeMap(capture))
             latestError = null
             emitStatus()
             pendingCapturePromise = null
-            promise.resolve(payload)
+            promise.resolve(Arguments.makeNativeMap(capture))
           } catch (error: Exception) {
             if (pendingCapturePromise !== promise) return@delivery
             latestError = error.message ?: "Meta glasses returned an unreadable photo."
@@ -318,20 +352,33 @@ class MetaWearablesModule(
   override fun invalidate() {
     reactContext.removeLifecycleEventListener(this)
     closeStatus()
-    scope.cancel()
-    clearSession()
+    sessionClosed = true
+    // SDK cleanup belongs on Main, including when RN invalidates on its module queue.
+    scope.launch {
+      clearSession()
+      scope.cancel()
+    }
     super.invalidate()
   }
 
-  override fun onHostResume() = emitStatus()
+  override fun onHostResume() {
+    hostPaused = false
+    emitStatus()
+  }
   // No foreground service is owned by this bridge: release the camera when
   // backgrounded instead of retaining a hidden stream or delivering late photos.
   override fun onHostPause() {
+    hostPaused = true
+    val generation = lifecycleGeneration
+    scope.launch {
+    // A queued pause from an older activity/session must not stop a replacement.
+    if (generation != lifecycleGeneration || sessionClosed) return@launch
     if (session != null) {
       pendingSessionPromise?.reject("SESSION_CANCELLED", "ReadyLoq was backgrounded.")
       pendingStreamPromise?.reject("STREAM_CANCELLED", "ReadyLoq was backgrounded.")
       clearSession()
       emitStatus()
+    }
     }
   }
 
@@ -339,7 +386,7 @@ class MetaWearablesModule(
   // invalidation permanently closes status work; preserve normal resume behavior.
   override fun onHostDestroy() = onHostPause()
 
-  private fun startCameraStream(promise: Promise) {
+  private fun startCameraStream(promise: SessionPromise) {
     val activeSession = session
     if (activeSession == null || activeSession.state.value != DeviceSessionState.STARTED) {
       promise.reject("SESSION_NOT_READY", "Meta glasses are not ready for a camera session.")
@@ -354,14 +401,19 @@ class MetaWearablesModule(
     streamStartInFlight = true
     pendingStreamPromise = promise
     scheduleStartupDeadline()
-    refreshCameraPermission { permission ->
-      if (generation != lifecycleGeneration) return@refreshCameraPermission
+    refreshCameraPermission(generation, activeSession) { permission ->
+      if (!isCurrentSession(generation, activeSession)) return@refreshCameraPermission
+      if (activeSession.state.value != DeviceSessionState.STARTED) {
+        failSession(generation, IllegalStateException("Meta session paused during camera startup. Retry the session."))
+        return@refreshCameraPermission
+      }
       if (permission != PermissionStatus.Granted) {
         startupDeadline?.cancel()
         startupDeadline = null
         streamStartInFlight = false
         pendingStreamPromise = null
-        promise.resolve(statusMap(permission))
+        resolveSessionStatus(promise, permission)
+        clearSession()
         return@refreshCameraPermission
       }
       if (stream?.state?.value == StreamState.STREAMING) {
@@ -369,14 +421,15 @@ class MetaWearablesModule(
         startupDeadline = null
         streamStartInFlight = false
         pendingStreamPromise = null
-        promise.resolve(statusMap(permission))
+        sessionStartInFlight = false
+        resolveSessionStatus(promise, permission)
         return@refreshCameraPermission
       }
 
       activeSession.addCamera(StreamConfiguration())
         .onSuccess { addedCamera ->
-          if (generation != lifecycleGeneration) {
-            addedCamera.close()
+          if (!isCurrentSession(generation, activeSession)) {
+            releaseSdk { addedCamera.close() }
             return@onSuccess
           }
           camera = addedCamera
@@ -384,54 +437,41 @@ class MetaWearablesModule(
           observeStream(addedCamera.stream)
           addedCamera.stream.start()
             .onSuccess {
-              if (generation != lifecycleGeneration) {
-                addedCamera.close()
+              if (!isCurrentSession(generation, activeSession) || camera !== addedCamera) {
+                releaseSdk { addedCamera.close() }
                 return@onSuccess
               }
-              streamStartInFlight = false
-              pendingStreamPromise = null
               latestError = null
               emitStatus()
-              promise.resolve(statusMap(permission))
+              // start() accepts a request; only STREAMING completes Connect.
+              if (addedCamera.stream.state.value == StreamState.STREAMING) {
+                completeStreamStartup(generation, activeSession)
+              }
             }
             .onFailure { error, _ ->
-              if (generation != lifecycleGeneration) return@onFailure
-              startupDeadline?.cancel()
-              startupDeadline = null
-              streamStartInFlight = false
-              pendingStreamPromise = null
-              latestError = error.description
-              camera?.close()
-              camera = null
-              stream = null
-              emitStatus()
-              promise.reject("STREAM_START_FAILED", error.description)
+              if (!isCurrentSession(generation, activeSession)) return@onFailure
+              failSession(generation, IllegalStateException(error.description))
             }
         }
         .onFailure { error, _ ->
-          if (generation != lifecycleGeneration) return@onFailure
-          startupDeadline?.cancel()
-          startupDeadline = null
-          streamStartInFlight = false
-          pendingStreamPromise = null
-          latestError = error.description
-          emitStatus()
-          promise.reject("CAMERA_UNAVAILABLE", error.description)
+          if (!isCurrentSession(generation, activeSession)) return@onFailure
+          failSession(generation, IllegalStateException(error.description))
         }
     }
   }
 
   private fun observeSession(observed: DeviceSession) {
-    sessionObservers += scope.launch {
+    val generation = lifecycleGeneration
+    sessionObservers += launchSessionObserver(generation) {
       observed.state.collect { state ->
-        if (observed !== session) return@collect
+        if (!isCurrentSession(generation, observed)) return@collect
         if (state == DeviceSessionState.STARTED) {
-          sessionStartInFlight = false
           latestError = null
-          pendingSessionPromise?.let { pending ->
-            pendingSessionPromise = null
+          pendingSessionPromise?.takeIf { startup?.claimCamera() == true }?.let { pending ->
             startCameraStream(pending)
+            if (pendingSessionPromise === pending) pendingSessionPromise = null
           }
+          completeStreamStartup(generation, observed)
         }
         if (state == DeviceSessionState.STOPPED) {
           lifecycleGeneration += 1
@@ -452,9 +492,9 @@ class MetaWearablesModule(
         emitStatus()
       }
     }
-    sessionObservers += scope.launch {
+    sessionObservers += launchSessionObserver(generation) {
       observed.errors.collect { error ->
-        if (observed !== session) return@collect
+        if (!isCurrentSession(generation, observed)) return@collect
         latestError = error.description
         emitStatus()
       }
@@ -462,62 +502,55 @@ class MetaWearablesModule(
   }
 
   private fun observeStream(observed: Stream) {
+    val generation = lifecycleGeneration
+    val observedSession = session ?: return
     streamObservers.forEach { it.cancel() }
     streamObservers.clear()
-    streamObservers += scope.launch {
+    streamObservers += launchSessionObserver(generation) {
       var leftInitialStopped = false
       observed.state.collect { state ->
-        if (observed !== stream) return@collect
+        if (!isCurrentSession(generation, observedSession) || observed !== stream) return@collect
         // StateFlow immediately emits STOPPED for a new stream. It is not a
         // disconnect until startup has actually begun.
         if (state != StreamState.STOPPED) leftInitialStopped = true
         if (state == StreamState.STREAMING) {
           latestError = null
-          startupDeadline?.cancel()
-          startupDeadline = null
+          completeStreamStartup(generation, observedSession)
         }
         if (MetaWearablesContract.shouldReleaseStream(state.toString(), leftInitialStopped)) {
-          lifecycleGeneration += 1
-          streamStartInFlight = false
-          pendingStreamPromise?.reject(
-            "STREAM_START_FAILED",
-            latestError ?: "The Meta glasses camera stream stopped before it was ready.",
-          )
-          pendingStreamPromise = null
-          pendingCapturePromise?.reject("CAPTURE_CANCELLED", "The Meta camera stream ended.")
-          pendingCapturePromise = null
-          camera?.close()
-          streamStartInFlight = false
-          camera = null
-          stream = null
-          streamObservers.forEach { it.cancel() }
-          streamObservers.clear()
+          clearSession()
         }
         emitStatus()
       }
     }
-    streamObservers += scope.launch {
+    streamObservers += launchSessionObserver(generation) {
       observed.errorStream.collect { error ->
-        if (observed !== stream) return@collect
+        if (!isCurrentSession(generation, observedSession) || observed !== stream) return@collect
         latestError = error.description
         emitStatus()
       }
     }
   }
 
-  private fun refreshCameraPermission(callback: (PermissionStatus?) -> Unit) {
+  private fun refreshCameraPermission(
+    generation: Long,
+    observedSession: DeviceSession,
+    callback: (PermissionStatus?) -> Unit,
+  ) {
     scope.launch {
-      try {
-        Wearables.checkPermissionStatus(Permission.CAMERA)
-        .onSuccess { callback(it) }
-        .onFailure { error, _ ->
-          latestError = error.description
-          callback(null)
-        }
-      } catch (error: Exception) {
-        latestError = error.message ?: "Unable to check Meta camera permission."
-        callback(null)
-      }
+      MetaWearablesStatusSafety.deliverOnce(
+        isCurrent = { isCurrentSession(generation, observedSession) },
+        read = {
+          var permission: PermissionStatus? = null
+          Wearables.checkPermissionStatus(Permission.CAMERA)
+            .onSuccess { permission = it }
+            .onFailure { error, _ -> throw IllegalStateException(error.description) }
+          permission
+        },
+        onSuccess = callback,
+        onFailure = { failSession(generation, it) },
+        onCallbackError = { failSession(generation, it) },
+      )
     }
   }
 
@@ -654,34 +687,112 @@ class MetaWearablesModule(
   }
 
   private fun emit(name: String, payload: WritableMap) {
+    if (sessionClosed || !reactContext.hasActiveReactInstance()) return
     reactContext
       .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
       .emit(name, payload)
   }
 
   private fun clearSession() {
-    try {
-      lifecycleGeneration += 1
-      startupDeadline?.cancel()
-      startupDeadline = null
-      pendingCapturePromise?.reject("CAPTURE_CANCELLED", "The Meta glasses session ended.")
-      pendingCapturePromise = null
-      sessionObservers.forEach { it.cancel() }
-      sessionObservers.clear()
-      streamObservers.forEach { it.cancel() }
-      streamObservers.clear()
-      camera?.close()
-      session?.stop()
-    } catch (error: Exception) {
-      Log.w(TAG, "Meta DAT session cleanup failed", error)
-    } finally {
-      camera = null
-      stream = null
-      session = null
-      pendingSessionPromise = null
-      pendingStreamPromise = null
-      sessionStartInFlight = false
-      streamStartInFlight = false
+    // Invalidate and detach ownership BEFORE SDK close/stop emits more states.
+    lifecycleGeneration += 1
+    startup?.cancel()
+    startup = null
+    val oldCamera = camera
+    val oldSession = session
+    val connect = pendingSessionPromise
+    val cameraStart = pendingStreamPromise
+    val capture = pendingCapturePromise
+    val observers = sessionObservers.toList() + streamObservers.toList()
+    camera = null
+    stream = null
+    session = null
+    pendingSessionPromise = null
+    pendingStreamPromise = null
+    pendingCapturePromise = null
+    sessionStartInFlight = false
+    streamStartInFlight = false
+    sessionObservers.clear()
+    streamObservers.clear()
+    startupDeadline?.cancel()
+    startupDeadline = null
+    observers.forEach { it.cancel() }
+    connect?.reject("SESSION_CANCELLED", latestError ?: "The Meta glasses session ended.")
+    cameraStart?.reject("STREAM_CANCELLED", latestError ?: "The Meta glasses camera stream ended.")
+    capture?.reject("CAPTURE_CANCELLED", "The Meta glasses session ended.")
+    MetaWearablesSessionSafety.release(
+      { Log.w(TAG, "Meta DAT session cleanup failed", it) },
+      { oldCamera?.close() },
+      { oldSession?.stop() },
+    )
+  }
+
+  private fun isCurrentSession(generation: Long, observed: DeviceSession): Boolean =
+    !sessionClosed && !hostPaused && generation == lifecycleGeneration && observed === session
+
+  private fun releaseSdk(action: () -> Unit) {
+    MetaWearablesSessionSafety.attempt(
+      { Log.w(TAG, "Meta DAT stale resource cleanup failed", it) }, action,
+    )
+  }
+
+  private fun failSession(generation: Long, error: Throwable) {
+    if (sessionClosed || generation != lifecycleGeneration) return
+    Log.w(TAG, "Meta DAT session transition failed", error)
+    latestError = error.message ?: "Meta glasses camera could not become ready. Retry the session."
+    pendingSessionPromise?.reject("SESSION_START_FAILED", latestError, error)
+    pendingStreamPromise?.reject("STREAM_START_FAILED", latestError, error)
+    clearSession()
+    emitStatus()
+  }
+
+  private fun launchSessionObserver(generation: Long, observe: suspend () -> Unit): Job =
+    scope.launch {
+      MetaWearablesSessionSafety.observe(
+        { !sessionClosed && generation == lifecycleGeneration },
+        { failSession(generation, it) },
+        observe,
+      )
+    }
+
+  private fun completeStreamStartup(generation: Long, observed: DeviceSession) {
+    if (!isCurrentSession(generation, observed) ||
+      observed.state.value != DeviceSessionState.STARTED ||
+      stream?.state?.value != StreamState.STREAMING ||
+      startup?.markStreaming() != true) return
+    startupDeadline?.cancel()
+    startupDeadline = null
+    sessionStartInFlight = false
+    streamStartInFlight = false
+    val promise = pendingStreamPromise
+    pendingStreamPromise = null
+    promise?.let { resolveSessionStatus(it, PermissionStatus.Granted) }
+  }
+
+  private fun resolveSessionStatus(promise: SessionPromise, permission: PermissionStatus? = null) {
+    val generation = lifecycleGeneration
+    MetaWearablesSessionSafety.attempt(
+      {
+        promise.reject("META_STATUS_UNAVAILABLE", "Unable to read Meta session state.", it)
+        failSession(generation, it)
+      },
+      { promise.resolve(statusMap(permission)) },
+    )
+  }
+
+  private inner class SessionPromise(private val delegate: Promise) {
+    private val terminal = MetaWearablesTerminal()
+
+    fun resolve(value: Any?) = settle { delegate.resolve(value) }
+    fun reject(code: String, message: String?, error: Throwable? = null) = settle {
+      if (error == null) delegate.reject(code, message) else delegate.reject(code, message, error)
+    }
+
+    private fun settle(callback: () -> Unit) {
+      terminal.deliver(
+        { Log.w(TAG, "Meta session React callback failed", it) },
+        { if (!sessionClosed && reactContext.hasActiveReactInstance()) callback() },
+      )
     }
   }
 

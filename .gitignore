@@ -1,3 +1,4 @@
 artifacts/readyloq-app/.tsbuildinfo
 *.zip
 *.tar.gz
+/artifacts/api-server/dist/

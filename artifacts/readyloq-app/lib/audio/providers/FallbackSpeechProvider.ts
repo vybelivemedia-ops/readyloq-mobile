@@ -1,4 +1,5 @@
 import { LocalWhisperProvider } from "./LocalWhisperProvider";
+import { Platform } from "react-native";
 import { OpenAIWhisperProvider } from "./OpenAIWhisperProvider";
 import type { SpeechProvider } from "./SpeechProvider";
 import type { SpeechProviderOptions, SpeechTranscriptionResult } from "../types/audio.types";
@@ -23,6 +24,16 @@ export class FallbackSpeechProvider implements SpeechProvider {
   private usingFallback = false;
 
   async initialize(options: SpeechProviderOptions): Promise<void> {
+    this.active = undefined;
+    // Expo AV uses Android MediaRecorder (AAC/MPEG-4), not PCM WAV. The
+    // installed whisper.rn file decoder only accepts PCM WAV. Never pretend
+    // that renaming an AAC file makes offline Android transcription usable.
+    if (Platform.OS === "android") {
+      await this.cloud.initialize(options);
+      this.active = this.cloud;
+      this.usingFallback = true;
+      return;
+    }
     try {
       await this.local.initialize(options);
       this.active = this.local;
@@ -41,7 +52,8 @@ export class FallbackSpeechProvider implements SpeechProvider {
   }
 
   async start(): Promise<void> {
-    return this.active?.start();
+    if (!this.active) throw new Error("Voice provider has not initialized.");
+    return this.active.start();
   }
 
   async stop(): Promise<void> {

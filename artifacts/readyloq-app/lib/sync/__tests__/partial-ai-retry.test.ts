@@ -16,6 +16,9 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
   },
 }));
 
+vi.mock("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg" }, manipulateAsync: vi.fn(),
+}));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "partial-ai-retry" }));
 
 vi.mock("expo-file-system/legacy", () => ({

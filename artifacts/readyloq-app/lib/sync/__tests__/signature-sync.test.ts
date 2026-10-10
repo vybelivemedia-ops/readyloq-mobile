@@ -24,6 +24,9 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 const _store = new Map<string, string>();
+vi.mock("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg" }, manipulateAsync: vi.fn(),
+}));
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "f1a2b3c4-d5e6-7f89-a0b1-c2d3e4f5a6b7",
+    "position": 1,
+    "filepath": "src/pages/slides/Slide01Cover.tsx",
+    "title": "ReadyLoq",
+    "description": "Cover slide — product launch title with version badge and feature pills",
+    "speakerNotes": ""
+  },
+  {
+    "id": "b2c3d4e5-f6a7-8b90-c1d2-e3f4a5b6c7d8",
+    "position": 2,
+    "filepath": "src/pages/slides/Slide02Problem.tsx",
+    "title": "Your operation is running on fragile memory.",
+    "description": "Problem slide — four pain points with split image",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c3d4e5f6-a7b8-9c01-d2e3-f4a5b6c7d8e9",
+    "position": 3,
+    "filepath": "src/pages/slides/Slide03Solution.tsx",
+    "title": "Don't let your best technicians walk away with your data.",
+    "description": "Solution slide — three core value props",
+    "speakerNotes": ""
+  },
+  {
+    "id": "d4e5f6a7-b8c9-0d12-e3f4-a5b6c7d8e9f0",
+    "position": 4,
+    "filepath": "src/pages/slides/Slide04Features.tsx",
+    "title": "Everything a tech needs. Nothing they don't.",
+    "description": "Feature list — five platform capabilities",
+    "speakerNotes": ""
+  },
+  {
+    "id": "e5f6a7b8-c9d0-1e23-f4a5-b6c7d8e9f0a1",
+    "position": 5,
+    "filepath": "src/pages/slides/Slide05Roles.tsx",
+    "title": "Built for two roles. One platform.",
+    "description": "Technician vs Management two-column benefits",
+    "speakerNotes": ""
+  },
+  {
+    "id": "f6a7b8c9-d0e1-2f34-a5b6-c7d8e9f0a1b2",
+    "position": 6,
+    "filepath": "src/pages/slides/Slide06Metrics.tsx",
+    "title": "The numbers don't lie.",
+    "description": "ROI metrics — four headline stats with bar chart",
+    "speakerNotes": ""
+  },
+  {
+    "id": "a7b8c9d0-e1f2-3a45-b6c7-d8e9f0a1b2c3",
+    "position": 7,
+    "filepath": "src/pages/slides/Slide07Pricing.tsx",
+    "title": "Simple pricing. Serious results.",
+    "description": "Solo Operator vs Growth Team pricing cards",
+    "speakerNotes": ""
+  },
+  {
+    "id": "b8c9d0e1-f2a3-4b56-c7d8-e9f0a1b2c3d4",
+    "position": 8,
+    "filepath": "src/pages/slides/Slide08Onboarding.tsx",
+    "title": "Up and running in 15 minutes.",
+    "description": "Four-step onboarding process",
+    "speakerNotes": ""
+  },
+  {
+    "id": "c9d0e1f2-a3b4-5c67-d8e9-f0a1b2c3d4e5",
+    "position": 9,
+    "filepath": "src/pages/slides/Slide09Close.tsx",
+    "title": "Stop losing knowledge. Start building it.",
+    "description": "Closing CTA slide",
+    "speakerNotes": ""
+  }
+]

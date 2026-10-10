@@ -14,6 +14,7 @@ import { Image } from "expo-image";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Crypto from "expo-crypto";
 import { createFrameBuffer, type FrameBuffer } from "@/lib/voice-context/frame-buffer";
+import { VoiceCaptureSession, type VoiceCapturePhase } from "@/lib/audio/VoiceCaptureSession";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -501,10 +502,15 @@ export default function NewInspectionScreen() {
   const stopDictationRef = useRef<(() => void) | null>(null);
 
   // ── FAIE (Field Audio Intelligence Engine) state ──────────────────────────
-  const [isFaieListening, setIsFaieListening] = useState(false);
+  const [faiePhase, setFaiePhase] = useState<VoiceCapturePhase>("idle");
+  const isFaieListening = faiePhase === "recording";
+  const faieBusy = faiePhase === "starting" || faiePhase === "processing";
   const [faieStatus, setFaieStatus] = useState<string | null>(null);
   const [faiePendingConfirm, setFaiePendingConfirm] = useState<StructuredInspectionEvent | null>(null);
   const sessionManagerRef = useRef<AudioSessionManager | null>(null);
+  const faieSessionRef = useRef<VoiceCaptureSession | null>(null);
+  const faieMountedRef = useRef(true);
+  const takePhotoRef = useRef<(allowed?: () => boolean) => Promise<boolean>>(async () => false);
   const faieStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showFaieStatus = useCallback(
@@ -517,7 +523,8 @@ export default function NewInspectionScreen() {
       if (durationMs != null) {
         faieStatusTimerRef.current = setTimeout(() => {
           faieStatusTimerRef.current = null;
-          setFaieStatus(nextMessage);
+          // Final batch recognition stops the mic; don't restore "Listening".
+          setFaieStatus(faieSessionRef.current?.phase === "recording" ? nextMessage : null);
         }, durationMs);
       }
     },
@@ -554,10 +561,7 @@ export default function NewInspectionScreen() {
       deleteFile: FileSystem.deleteAsync,
     }),
   );
-  // Controls the co-pilot always-on voice watchdog loop.
-  // Set to true when FAIE starts in copilot mode; cleared when the user stops.
-  const faieAutoRestartRef = useRef(false);
-  // Animated value for the frame-capture flash overlay (0 = transparent, 1 = white).
+  // Only a durably saved voice-command photo triggers this flash.
   const frameCaptureAnim = useRef(new Animated.Value(0)).current;
   // True when the most-recently dispatched voice event carried an imageUri.
   const [lastEventHadFrame, setLastEventHadFrame] = useState(false);
@@ -662,7 +666,9 @@ export default function NewInspectionScreen() {
 
   // Clean up any live recording if the screen is dismissed mid-dictation.
   useEffect(() => {
+    faieMountedRef.current = true;
     return () => {
+      faieMountedRef.current = false;
       // Stop the rolling frame-buffer: marks active=false so any in-flight
       // takePictureAsync calls self-delete their output, clears the interval,
       // and fires a best-effort delete of the last buffered frame.
@@ -670,10 +676,20 @@ export default function NewInspectionScreen() {
       if (faieStatusTimerRef.current) clearTimeout(faieStatusTimerRef.current);
       stopDictationRef.current?.();
       stopDictationRef.current = null;
-      void sessionManagerRef.current?.cancelSession();
+      void faieSessionRef.current?.cancel().catch(() => {});
+      faieSessionRef.current = null;
       sessionManagerRef.current = null;
     };
   }, []);
+
+  // Leaving capture cancels (rather than submits) unfinished speech. The
+  // microphone and context timer must not remain hidden on review/setup.
+  useEffect(() => {
+    if (step === "capture" || !faieSessionRef.current || faieSessionRef.current.phase === "idle") return;
+    setFaieStatus(null);
+    setLastEventHadFrame(false);
+    void faieSessionRef.current.cancel().catch(() => {});
+  }, [step]);
 
   const handleDictationPress = async () => {
     if (isDictating) {
@@ -709,26 +725,46 @@ export default function NewInspectionScreen() {
 
   // Frame-buffer convenience aliases — delegate to the stable frameBufferRef
   // instance created at mount time.
-  const startFrameBuffer = () => frameBufferRef.current.start();
-  const stopFrameBuffer = () => frameBufferRef.current.stop();
   const getFrameWithBuffer = () => frameBufferRef.current.getFrame();
 
   // ── FAIE handlers ──────────────────────────────────────────────────────────
   const handleFaiePress = async () => {
-    if (isFaieListening) {
-      // Clear the watchdog flag first so the loop exits after stopSession resolves.
-      faieAutoRestartRef.current = false;
-      setIsFaieListening(false);
-      setFaieStatus(null);
+    const active = faieSessionRef.current;
+    if (AppState.currentState === "background" || AppState.currentState === "inactive") {
+      void active?.cancel().catch(() => {});
+      return;
+    }
+    if (active?.phase === "starting" || active?.phase === "processing") return;
+    if (active?.phase === "recording") {
+      const generation = active.generationId;
+      setFaieStatus("Processing voice…");
       setFaiePendingConfirm(null);
-      stopFrameBuffer();
-      await sessionManagerRef.current?.stopSession();
+      try {
+        await active.stop();
+        if (faieMountedRef.current && active.generationId === generation) {
+          setFaieStatus((status) => status === "Processing voice…" ? "No command recognized. Try again." : status);
+        }
+      } catch (error) {
+        if (faieMountedRef.current && active.generationId === generation) {
+          setFaieStatus("Voice command could not be completed.");
+          Alert.alert("Voice unavailable", error instanceof Error ? error.message : "Could not process voice.");
+        }
+      }
       return;
     }
     if (!sessionManagerRef.current) {
       sessionManagerRef.current = new AudioSessionManager(new FallbackSpeechProvider());
+      faieSessionRef.current = new VoiceCaptureSession(
+        sessionManagerRef.current,
+        frameBufferRef.current,
+        (phase) => { if (faieMountedRef.current) setFaiePhase(phase); },
+      );
     }
     const formatEvent = (ev: StructuredInspectionEvent): string => {
+      // Unstructured dictation is still a note, not just "inspected".
+      // Keep its wording/languages when no canonical finding was extracted.
+      if (ev.action === "inspected" && !ev.product && !ev.room && !ev.pest
+        && !ev.evidence && !ev.visionTarget && !ev.severity) return ev.rawText;
       const parts: string[] = [ev.action];
       if (ev.product) parts.push(ev.product);
       if (ev.room) parts.push(`in ${ev.room}`);
@@ -738,32 +774,23 @@ export default function NewInspectionScreen() {
       else if (ev.evidence) parts.push(`(${ev.evidence})`);
       return parts.join(" ").trim();
     };
-    // Co-pilot mode: keep the mic alive between recognition cycles so the
-    // technician never has to re-tap.  Other modes (manual / voice) are
-    // unaffected — the loop exits immediately after one session ends.
-    faieAutoRestartRef.current = mode === "copilot";
     try {
-      setIsFaieListening(true);
-      setFaieStatus("Listening for commands…");
+      setFaieStatus("Preparing microphone…");
       setFaiePendingConfirm(null);
       setLastEventHadFrame(false);
-      // Start rolling background snapshots so getFrameWithBuffer always has a
-      // recent frame ready even if the on-demand capture is slow or fails.
-      startFrameBuffer();
-      do {
       // Stamp the session start time so the session manager can timestamp events.
       sessionManagerRef.current.setVisionContext({ timestamp: Date.now() });
-      await sessionManagerRef.current.startSession(({ event, action, contextOnly }) => {
-        // Flash the camera overlay and update the banner icon whenever the
-        // session manager successfully attached a room snapshot to this event.
+      await faieSessionRef.current!.start(async ({ event, action, contextOnly }) => {
+        // Camera context is temporary, NOT a saved inspection photo.
         if (contextOnly) {
           setLastEventHadFrame(true);
-          frameCaptureAnim.setValue(0.5);
-          Animated.timing(frameCaptureAnim, {
-            toValue: 0,
-            duration: 400,
-            useNativeDriver: true,
-          }).start();
+          return;
+        }
+        if (event.targetField === "notes" && event.fieldValue
+          && action !== ConfidenceAction.ASK_AGAIN) {
+          const value = event.fieldValue;
+          setNotes((prev) => prev.trim() ? `${prev.trim()}\n${value}` : value);
+          showFaieStatus("Notes added.", 2500);
           return;
         }
         setLastEventHadFrame(false);
@@ -771,9 +798,7 @@ export default function NewInspectionScreen() {
           case ConfidenceAction.AUTO_COMMIT: {
             // 1. Voice-triggered photo capture ("snap", "take a photo", "capture")
             if (event.capturePhoto) {
-              void takePhoto();
-              showFaieStatus("Capturing photo…", 2500);
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await saveVoicePhoto();
               break;
             }
 
@@ -859,9 +884,7 @@ export default function NewInspectionScreen() {
               break;
             }
             if (event.capturePhoto) {
-              void takePhoto();
-              showFaieStatus("Capturing photo…", 2500);
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await saveVoicePhoto();
               break;
             }
             if (event.targetField === "clientName" && event.fieldValue) {
@@ -914,35 +937,44 @@ export default function NewInspectionScreen() {
             break;
         }
       }, {
-        // getFrameWithBuffer: tries a fresh on-demand capture (500 ms deadline),
-        // falls back to the rolling 1.5 s background buffer so imageUri is
-        // populated even when the camera pipeline is momentarily busy.
+        // Best-effort temporary context; does not create inspection evidence.
         getFrame: getFrameWithBuffer,
         // Token getter for cloud-backed providers (FallbackSpeechProvider routes
         // this to OpenAIWhisperProvider when the local model is unavailable).
         getToken: () => getToken(),
       });
-      // Session ended naturally — in co-pilot mode pause briefly then loop back.
-      if (faieAutoRestartRef.current) {
-        setFaieStatus("Restarting…");
-        await new Promise<void>((resolve) => setTimeout(resolve, 300));
-        setFaieStatus("Listening for commands…");
+      if (faieMountedRef.current && faieSessionRef.current?.phase === "recording") {
+        setFaieStatus("Recording · temporary context only. Tap mic to process.");
       }
-      } while (faieAutoRestartRef.current);
-      // Watchdog loop exited (user stopped or non-copilot mode) — clean up.
-      stopFrameBuffer();
-      setIsFaieListening(false);
-      setFaieStatus(null);
     } catch (e) {
-      faieAutoRestartRef.current = false;
-      stopFrameBuffer();
-      setIsFaieListening(false);
+      if (!faieMountedRef.current) return;
       setFaieStatus(null);
       Alert.alert(
         "Voice unavailable",
         e instanceof Error ? e.message : "Could not start voice session.",
       );
     }
+  };
+
+  const saveVoicePhoto = async () => {
+    const session = faieSessionRef.current;
+    const generation = session?.generationId;
+    const inspectionId = recordRef.current?.localId;
+    const allowed = () => faieMountedRef.current && faieSessionRef.current === session
+      && session?.generationId === generation && session?.phase !== "idle"
+      && recordRef.current?.localId === inspectionId
+      && AppState.currentState !== "background" && AppState.currentState !== "inactive";
+    showFaieStatus("Saving inspection photo…");
+    const saved = await takePhotoRef.current(allowed);
+    if (!allowed()) return;
+    if (!saved) {
+      showFaieStatus("Photo not saved — retry with the shutter.", 4000, null);
+      return;
+    }
+    setLastEventHadFrame(false);
+    showFaieStatus("Photo saved to inspection", 4000, null);
+    frameCaptureAnim.setValue(0.5);
+    Animated.timing(frameCaptureAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start();
   };
 
   const confirmFaieEvent = () => {
@@ -1338,6 +1370,19 @@ export default function NewInspectionScreen() {
   useEffect(() => {
     if (step !== "capture") return;
     const sub = AppState.addEventListener("change", (nextState) => {
+      // iOS permission prompts temporarily report inactive while starting.
+      // Genuine backgrounding always cancels, including startup.
+      if (nextState === "background"
+        || (nextState === "inactive" && faieSessionRef.current?.phase !== "starting")) {
+        const voice = faieSessionRef.current;
+        if (voice && voice.phase !== "idle") {
+          if (faieStatusTimerRef.current) clearTimeout(faieStatusTimerRef.current);
+          setFaiePendingConfirm(null);
+          setLastEventHadFrame(false);
+          setFaieStatus("Voice Capture cancelled in background. Tap mic to restart.");
+          void voice.cancel().catch(() => {});
+        }
+      }
       if (nextState === "active") {
         void requestPermission().catch(() => {
           // Silently ignored — if the OS blocks the call (denied/never-ask-again),
@@ -1489,7 +1534,7 @@ export default function NewInspectionScreen() {
 
           void ingestAllUploadedPhotos({
             photoUri: durableUri,
-            companyId: clerkUser?.id ?? "",
+            getToken,
             technicianId: clerkUser?.id ?? "",
             source: "technician_field_upload",
           });
@@ -1570,34 +1615,46 @@ export default function NewInspectionScreen() {
     }
   };
 
-  const takePhoto = async () => {
+  const takePhoto = async (allowed?: () => boolean): Promise<boolean> => {
     const rec = recordRef.current;
     // captureLockedRef is a synchronous guard — checked and set before any
     // await so rapid taps during a lag spike cannot queue up multiple captures.
-    if (!cameraRef.current || captureLockedRef.current || capturing || importing || !rec) return;
+    if (!cameraRef.current || captureLockedRef.current || capturing || importing || !rec) return false;
+    if (allowed && !allowed()) return false;
     captureLockedRef.current = true;
     // Fire haptic immediately on press (before the async pipeline starts) so
     // the technician feels confirmation the moment they tap, not seconds later.
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       setCapturing(true);
-      const items = await cameraCaptureQueueRef.current.enqueue(() =>
-        cameraProvider.capture(),
-      );
+      const items = await cameraCaptureQueueRef.current.enqueue(async () => {
+        // A voice command queued behind a rolling snapshot may be cancelled
+        // or backgrounded before its turn. Never fire that stale shutter.
+        if (allowed && !allowed()) return [];
+        return cameraProvider.capture();
+      });
       // ── Release the camera lock as soon as we have the captured URIs. ──────
       // File copy and AsyncStorage write continue in the background so the
       // shutter is ready for the next shot in ~200 ms instead of ~8 s.
       setCapturing(false);
-      void ingestEvidence(items);
+      if (allowed && !allowed()) {
+        for (const item of items) {
+          void FileSystem.deleteAsync(item.uri, { idempotent: true }).catch(() => {});
+        }
+        return false;
+      }
+      return ingestEvidence(items);
     } catch {
       setCapturing(false);
       setError("Couldn't capture photo. Please try again.");
+      return false;
     } finally {
       // A short debounce discards accidental double taps while allowing a
       // deliberate multi-shot sequence as soon as the native camera is ready.
       setTimeout(() => { captureLockedRef.current = false; }, 250);
     }
   };
+  takePhotoRef.current = takePhoto;
 
   // Import existing footage (GoPro / smart-glasses / drone shots synced to the
   // camera roll) into this inspection — same pipeline as live captures.
@@ -1962,7 +2019,7 @@ export default function NewInspectionScreen() {
 
     const captureButton = (
       <Pressable
-        onPress={takePhoto}
+        onPress={() => void takePhoto()}
         disabled={capturing}
         style={{
           width: 76,
@@ -2037,6 +2094,8 @@ export default function NewInspectionScreen() {
     const faieButton = mode === "voice" ? (
       <Pressable
         onPress={() => void handleFaiePress()}
+        disabled={faieBusy}
+        accessibilityLabel={isFaieListening ? "Stop recording and process voice commands" : "Start voice recording"}
         style={{
           width: 44,
           height: 44,
@@ -2048,19 +2107,19 @@ export default function NewInspectionScreen() {
           borderColor: isFaieListening ? "#ef4444" : "transparent",
         }}
       >
-        <Ionicons
+        {faieBusy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons
           name={isFaieListening ? "mic" : "mic-outline"}
           size={20}
           color="#fff"
-        />
+        />}
       </Pressable>
     ) : null;
 
     // FAIE: live status banner — purely informational, no action required.
     // Low-confidence events are auto-committed (marked with "~"); the banner
     // echoes what was logged and shows a camera icon when a room snapshot was
-    // captured alongside the audio note.
-    const faieBanner = isFaieListening ? (
+    // attached as temporary context. That icon never means evidence was saved.
+    const faieBanner = isFaieListening || faieBusy || faieStatus ? (
       <View
         style={{
           flexDirection: "row",
@@ -2082,6 +2141,9 @@ export default function NewInspectionScreen() {
         {lastEventHadFrame ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
             <Ionicons name="camera" size={12} color="rgba(255,255,255,0.6)" />
+            <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 10 }}>
+              Temporary context · not saved
+            </Text>
           </View>
         ) : null}
       </View>
@@ -3157,7 +3219,7 @@ export default function NewInspectionScreen() {
             reference endpoint pair; touch coords are relative to this View so
             clipping evaluates against the full-screen camera in portrait/landscape. */}
         {refSelectionOverlay}
-        {/* Frame-capture flash: briefly pulses white when a voice note grabs a room snapshot */}
+        {/* Saved-photo flash: only after a voice-command photo commits durably */}
         <Animated.View
           pointerEvents="none"
           style={{
@@ -4326,7 +4388,7 @@ const MODE_CONFIG: {
   {
     key: "voice",
     label: "Voice",
-    sub: "Offline AI",
+    sub: "Speech commands",
     icon: "mic-outline",
     available: true,
   },

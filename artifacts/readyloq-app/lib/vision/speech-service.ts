@@ -21,6 +21,7 @@ const RECORDING_OPTIONS: Audio.RecordingOptions = {
   },
   ios: {
     ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
+    outputFormat: Audio.IOSOutputFormat.LINEARPCM,
     extension: '.wav',
     sampleRate: 16000,
     numberOfChannels: 1,
@@ -32,25 +33,28 @@ const RECORDING_OPTIONS: Audio.RecordingOptions = {
 
 class SpeechService {
   private whisperContext: WhisperContext | null = null;
-  private isDownloading = false;
+  private initializing?: Promise<void>;
 
   /**
    * Initialises the Whisper model.
    * Call once during app startup or when a technician opens an inspection.
    * Downloads the ~75 MB tiny model on first run (Wi-Fi recommended).
    */
-  async initialize(): Promise<void> {
-    if (this.whisperContext) return;
+  initialize(): Promise<void> {
+    if (this.whisperContext) return Promise.resolve();
+    if (!this.initializing) {
+      this.initializing = this.loadModel().finally(() => { this.initializing = undefined; });
+    }
+    return this.initializing;
+  }
 
+  private async loadModel(): Promise<void> {
     const fileInfo = await FileSystem.getInfoAsync(MODEL_FILE_PATH);
 
     if (!fileInfo.exists) {
-      if (this.isDownloading) return;
-      this.isDownloading = true;
       console.log('[SpeechService] Downloading offline speech model (one-time)…');
 
       const result = await FileSystem.downloadAsync(MODEL_URL, MODEL_FILE_PATH);
-      this.isDownloading = false;
 
       if (result.status !== 200) {
         throw new Error(
@@ -84,8 +88,9 @@ class SpeechService {
    * stop();
    */
   async startDictation(
-    onProgress: (transcript: string) => void,
-  ): Promise<() => void> {
+    onProgress: (transcript: string) => void | Promise<void>,
+    options: { throwOnError?: boolean } = {},
+  ): Promise<(options?: { cancel?: boolean }) => Promise<void>> {
     if (!this.whisperContext) {
       throw new Error('[SpeechService] Not initialised — call initialize() first.');
     }
@@ -101,52 +106,76 @@ class SpeechService {
     });
 
     const recording = new Audio.Recording();
-    await recording.prepareToRecordAsync(RECORDING_OPTIONS);
-    await recording.startAsync();
+    try {
+      await recording.prepareToRecordAsync(RECORDING_OPTIONS);
+      await recording.startAsync();
+    } catch (error) {
+      await recording.stopAndUnloadAsync().catch(() => {});
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+      const uri = recording.getURI();
+      if (uri) await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+      throw error;
+    }
     console.log('[SpeechService] Recording started.');
 
-    let stopped = false;
+    let stopPromise: Promise<void> | undefined;
+    let cancelled = false;
+    let stopTranscription: (() => Promise<void>) | undefined;
 
-    const stop = () => {
-      if (stopped) return;
-      stopped = true;
-
-      (async () => {
+    const stop = (stopOptions?: { cancel?: boolean }) => {
+      if (stopOptions?.cancel) {
+        cancelled = true;
+        void stopTranscription?.().catch(() => {});
+      }
+      if (stopPromise) return stopPromise;
+      stopPromise = (async () => {
+        let fileUri: string | null = null;
         try {
           await recording.stopAndUnloadAsync();
           await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
 
-          const fileUri = recording.getURI();
+          fileUri = recording.getURI();
+          if (cancelled) return;
           if (!fileUri) {
-            console.warn('[SpeechService] No recording file URI after stop.');
-            return;
+            throw new Error("Voice recording did not produce an audio file.");
           }
 
-          onProgress('…');
+          await onProgress('…');
 
           const ctx = this.whisperContext;
-          if (!ctx) return;
+          if (!ctx) throw new Error("Local voice model is unavailable.");
 
-          const { promise } = ctx.transcribe(fileUri, {
+          const task = ctx.transcribe(fileUri, {
             language: 'auto',
-            initialPrompt: BILINGUAL_PEST_JARGON_PROMPT,
+            translate: false,
+            initialPrompt: `Multilingual pest-control inspection; preserve the spoken languages and code-switching. ${BILINGUAL_PEST_JARGON_PROMPT}`,
           } as Parameters<typeof ctx.transcribe>[1]);
 
-          const result = await promise;
-          const transcript = (result.segments ?? [])
+          stopTranscription = task.stop;
+          if (cancelled) await task.stop();
+          const result = await task.promise;
+          const transcript = result.result?.trim() || (result.segments ?? [])
             .map((s: { text: string }) => s.text)
             .join(' ')
             .trim();
 
-          if (transcript.length > 0) {
-            onProgress(transcript);
+          if (!cancelled && transcript.length > 0) {
+            await onProgress(transcript);
           }
 
-          await FileSystem.deleteAsync(fileUri, { idempotent: true });
         } catch (err) {
-          console.error('[SpeechService] Transcription error:', err);
+          if (!cancelled) {
+            console.error('[SpeechService] Transcription error:', err);
+            if (options.throwOnError) throw err;
+          }
+        } finally {
+          stopTranscription = undefined;
+          await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+          fileUri ??= recording.getURI();
+          if (fileUri) await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
         }
       })();
+      return stopPromise;
     };
 
     return stop;

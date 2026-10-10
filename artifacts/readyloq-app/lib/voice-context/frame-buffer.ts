@@ -38,6 +38,9 @@ export interface FrameBuffer {
    */
   start(): void;
 
+  /** Stop snapshots but retain the selected context until final dispatch. */
+  pause?(): void;
+
   /**
    * Stops the rolling snapshot loop and fires a best-effort delete of the
    * currently buffered frame.  Safe to call when the buffer is already stopped.
@@ -132,6 +135,16 @@ export function createFrameBuffer(deps: FrameBufferDeps): FrameBuffer {
     }, FRAME_BUFFER_INTERVAL_MS);
   }
 
+  function pause(): void {
+    // In-flight output is obsolete and self-deletes; keep the cached frame
+    // available until the final transcript's consumer has finished.
+    generation += 1;
+    if (intervalHandle !== null) {
+      clearInterval(intervalHandle);
+      intervalHandle = null;
+    }
+  }
+
   function stop(): void {
     // Mark inactive first so any in-flight captures self-delete when they resolve.
     active = false;
@@ -167,5 +180,5 @@ export function createFrameBuffer(deps: FrameBufferDeps): FrameBuffer {
     return lastFrameUri ?? null;
   }
 
-  return { start, stop, getFrame, getLastUri: () => lastFrameUri };
+  return { start, pause, stop, getFrame, getLastUri: () => lastFrameUri };
 }

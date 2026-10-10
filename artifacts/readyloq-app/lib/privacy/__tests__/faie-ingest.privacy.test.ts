@@ -26,7 +26,7 @@ vi.mock("expo-image-manipulator", () => ({
 vi.mock("@/lib/api", () => ({ API_BASE: "https://readyloq.example" }));
 
 import * as ImageManipulator from "expo-image-manipulator";
-import { ingestAllUploadedPhotos } from "../../faie-ingest";
+import { ingestAllUploadedPhotos, sendPhotoToFaieDataset, ingestAnonymizedFaieData } from "../../faie-ingest";
 
 function segment(marker: number, payload: string): number[] {
   const bytes = Array.from(payload, (character) => character.charCodeAt(0));
@@ -90,18 +90,24 @@ describe("remote photo FAIE privacy boundary", () => {
 
     try {
       await ingestAllUploadedPhotos({
+        getToken: async () => "test-auth-token",
         photoUri: "/api/storage/previously-uploaded.jpg",
         companyId: "company-test",
         technicianId: "technician-test",
       });
 
       expect(fsState.downloadAsync).toHaveBeenCalledOnce();
+      expect(fsState.downloadAsync.mock.calls[0][2]).toEqual({
+        headers: { Authorization: "Bearer test-auth-token" },
+      });
       expect(ImageManipulator.manipulateAsync).toHaveBeenCalledWith(
         "file:///cache/faie-source-remote-privacy-test-id",
         [],
         { compress: 1, format: ImageManipulator.SaveFormat.JPEG },
       );
       expect(fetchMock).toHaveBeenCalledOnce();
+      expect(fetchMock.mock.calls[0][0]).toBe("https://readyloq.example/api/v1/faie/training/ingest-global");
+      expect(fetchMock.mock.calls[0][1]?.headers.Authorization).toBe("Bearer test-auth-token");
 
       const postedBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as { imageBytes: string };
       const sanitizedBytes = new Uint8Array(Buffer.from(postedBody.imageBytes, "base64"));
@@ -109,6 +115,26 @@ describe("remote photo FAIE privacy boundary", () => {
       const decoded = jpegDecode(sanitizedBytes, { useTArray: true });
       expect([decoded.width, decoded.height]).toEqual([3, 2]);
     } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it.each(["dataset", "global", "anonymized"])("skips unsigned %s training without touching evidence", async (kind) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const base = { photoUri: "file:///saved-inspection-photo.jpg", getToken: async () => null };
+      if (kind === "dataset") await sendPhotoToFaieDataset({ ...base, findingId: 1, label: "Ants", confidence: 0.9 });
+      if (kind === "global") await ingestAllUploadedPhotos({ ...base, technicianId: "test-tech" });
+      if (kind === "anonymized") await ingestAnonymizedFaieData({
+        ...base, pestOrDefectCategory: "Ants", visualConfidence: 0.9, structuralContext: "Kitchen",
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(fsState.downloadAsync).not.toHaveBeenCalled();
+      expect(fsState.readAsStringAsync).not.toHaveBeenCalled();
+      expect(fsState.deleteAsync).not.toHaveBeenCalled();
+    } finally {
+      warning.mockRestore();
       vi.unstubAllGlobals();
     }
   });

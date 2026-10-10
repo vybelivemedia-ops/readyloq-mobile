@@ -1,5 +1,6 @@
 import { INSPECTION_DICTIONARY } from "./VocabularyRegistry";
 import { InspectionCommandParser } from "./InspectionCommandParser";
+import { normalizeMultilingualVoice } from "./MultilingualNormalizer";
 import type { StructuredInspectionEvent, VisionContext } from "../types/intent.types";
 
 /**
@@ -88,8 +89,16 @@ export class SpeechIntentEngine {
     baseConfidence: number,
     visionContext?: VisionContext,
   ): StructuredInspectionEvent {
-    // 1. Lowercase
-    let normalized = rawText.toLowerCase();
+    const multilingual = normalizeMultilingualVoice(rawText);
+    // Explicit dictation must not trigger a shutter or reinterpret names,
+    // addresses, and notes as actions. Preserve their original case/language.
+    if (multilingual.field) {
+      return {
+        rawText, action: "inspected", confidence: baseConfidence,
+        capturePhoto: false, isSpatial: false, ...multilingual.field,
+      };
+    }
+    let normalized = multilingual.text;
 
     // 2. Strip filler words — prevents "um german cockroaches" from missing
     //    a field-prefix match or creating noise in entity extraction.
@@ -112,7 +121,9 @@ export class SpeechIntentEngine {
     const isSpatial = SPATIAL_RE.test(normalized);
 
     return {
+      ...parsed,
       rawText,
+      capturePhoto: multilingual.declinedPhoto ? false : parsed.capturePhoto,
       action: parsed.action ?? "inspected",
       product: parsed.product,
       pest: parsed.pest,

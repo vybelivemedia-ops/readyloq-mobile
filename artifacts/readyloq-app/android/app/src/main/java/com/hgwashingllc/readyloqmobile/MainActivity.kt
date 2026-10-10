@@ -1,11 +1,16 @@
 package com.hgwashingllc.readyloqmobile
 import expo.modules.splashscreen.SplashScreenManager
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
+import com.meta.wearable.dat.core.types.WearablesError
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -31,6 +36,74 @@ class MainActivity : ReactActivity() {
           metaPermissionCallback = null
         }
     }
+
+  private var metaBluetoothPermissionRequested = false
+  private var metaBluetoothPermissionInFlight = false
+  // Keep this separate from Meta AI camera consent and the app's BLE scan flow.
+  private val metaBluetoothPermissionLauncher =
+    registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      metaBluetoothPermissionInFlight = false
+      if (isDestroyed || isFinishing) return@registerForActivityResult
+      MetaWearablesInitialization.initializeAfterBluetoothPermission(
+        granted && hasMetaBluetoothPermission(),
+      ) {
+        try {
+          Wearables.initialize(applicationContext)
+            .onSuccess { MetaWearablesInitialization.ready() }
+            .onFailure { error, _ ->
+              if (error == WearablesError.ALREADY_INITIALIZED) {
+                MetaWearablesInitialization.ready()
+              } else {
+                MetaWearablesInitialization.unavailable("Meta DAT initialization failed.")
+                android.util.Log.w("ReadyLoq", "Meta Wearables initialization failed: $error")
+              }
+            }
+        } catch (error: Exception) {
+          MetaWearablesInitialization.unavailable("Meta DAT initialization failed.")
+          android.util.Log.w("ReadyLoq", "Meta Wearables initialization failed", error)
+        } catch (error: LinkageError) {
+          MetaWearablesInitialization.unavailable("Meta DAT is unavailable in this build.")
+          android.util.Log.w("ReadyLoq", "Meta Wearables initialization failed", error)
+        }
+      }
+    }
+
+  private fun hasMetaBluetoothPermission() =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) ==
+      PackageManager.PERMISSION_GRANTED
+
+  private fun requestMetaBluetoothPermission() {
+    if (isDestroyed || isFinishing || MetaWearablesInitialization.attempted ||
+      metaBluetoothPermissionInFlight) return
+    // Do not repeatedly prompt after denial. A later Settings/BLE grant is
+    // confirmed through the contract again before initializing DAT.
+    if (metaBluetoothPermissionRequested && !hasMetaBluetoothPermission()) return
+    metaBluetoothPermissionRequested = true
+    metaBluetoothPermissionInFlight = true
+    try {
+      metaBluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+    } catch (error: Exception) {
+      metaBluetoothPermissionInFlight = false
+      MetaWearablesInitialization.unavailable("Bluetooth permission could not be requested.")
+      android.util.Log.w("ReadyLoq", "Meta Bluetooth permission request failed", error)
+    } catch (error: LinkageError) {
+      metaBluetoothPermissionInFlight = false
+      MetaWearablesInitialization.unavailable("Bluetooth permission could not be requested.")
+      android.util.Log.w("ReadyLoq", "Meta Bluetooth permission request failed", error)
+    }
+  }
+
+  override fun onStart() {
+    super.onStart()
+    requestMetaBluetoothPermission()
+  }
+
+  override fun onResume() {
+    super.onResume()
+    // Recovery when returning from Settings, including multi-window cases
+    // where the activity was paused but never stopped.
+    if (hasMetaBluetoothPermission()) requestMetaBluetoothPermission()
+  }
 
   /**
    * Called by the local DAT bridge. The launcher must belong to this activity:

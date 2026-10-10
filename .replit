@@ -1,0 +1,89 @@
+modules = ["nodejs-24", "python-3.11", "java-graalvm22.3", "postgresql-16"]
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "artifacts/readyloq-api: metro"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "API Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "android-r8-guard"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "android-metro-check"
+
+[[workflows.workflow]]
+name = "API Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace/artifacts/api-server && PORT=3000 node --enable-source-maps ./dist/index.mjs"
+waitForPort = 3000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "android-r8-guard"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-r8-flags.sh"
+
+[[workflows.workflow]]
+name = "android-metro-check"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash artifacts/readyloq-app/scripts/check-metro-bundle.sh"
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
+
+[nix]
+channel = "stable-25_05"
+packages = ["eas-cli", "android-tools", "glib", "nspr", "nss", "expat", "libdrm", "libxkbcommon", "mesa", "pango", "atk", "at-spi2-atk", "dbus", "cups", "alsa-lib", "pandoc", "texliveSmall"]
+
+[[ports]]
+localPort = 8081
+
+[userenv]
+
+[userenv.production]
+VITE_APP_URL = "https://pest-insight-engine.replit.app"
+
+[userenv.shared]

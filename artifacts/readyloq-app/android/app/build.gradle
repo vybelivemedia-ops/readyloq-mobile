@@ -127,7 +127,7 @@ android {
         applicationId 'com.hgwashingllc.readyloqmobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 222
+        versionCode 223
         versionName "1.0.0"
 
         // Official DAT Developer Mode uses 0 placeholders when app attestation

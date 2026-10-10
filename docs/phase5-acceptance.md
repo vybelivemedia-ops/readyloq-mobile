@@ -1,0 +1,37 @@
+# Phase 5 — Production Hardening & Data Isolation: interim acceptance report
+
+**Status: NOT ACCEPTED.** This is a Development code audit and test pass, not a Production rollout or physical Fold 7 acceptance. Phase 3 remains pending physical Fold 7 acceptance; Phase 4 and Phase 6 must not start automatically. Roadmap order and acceptance gate: [mission-control-roadmap.md](mission-control-roadmap.md).
+
+## Security findings and fixes implemented
+
+| Finding | Change in Development | Remaining boundary |
+| --- | --- | --- |
+| Offline inspection records had no durable authenticated account/company scope and could appear after account changes. | Persist and enforce both the authenticated Clerk subject and current server-verified company scope for local reads, writes, deletes, sync, and background credentials. Logout retains the original owner's offline data without exposing it to the next account. Unscoped legacy data fails closed. | An explicit, verified recovery path for legacy unscoped records is not implemented. Cold offline launches cannot confirm the current company and must wait for server verification; no physical-device validation yet. |
+| Failed bait-station writes could be silently lost. | Persist pending edits and retry/backoff state; checkpoint successful updates. | A successful server POST followed by a process crash before saving the returned server ID can still create a duplicate station on retry. Server-side idempotency is required. |
+| Inspection-media registration accepted paths without enforcing the parent inspection's company and concurrent retries could create duplicate rows. | Require a company-owned object path, check the company-scoped parent, serialize concurrent registration of the same object, return the existing row for retries, and update the count atomically. | This does not prove that bytes exist, bind a signed reservation to the particular inspection/user, or collect orphaned objects. Existing historical external media URLs need compatibility review before Production rollout. |
+| A caller-controlled AI 429 retry setting could increase provider attempts. | Hard cap 429 retries at two, or three provider attempts per call. | Repeated independent analysis requests or ambiguous provider outcomes can still incur further cost; cross-request durable attempt budgeting needs acceptance testing. |
+| CRM client listing and inspection push used shared server-wide credentials across companies. | Both operations now require the caller company's enabled integration and its stored credentials. Push rechecks the parent inspection and filters nested analysis/media by company; status is company-specific. | Companies that relied only on global CRM environment keys will now receive a configuration error until a company integration is configured. Vendor-specific office/account mapping and outbound idempotency require further review. |
+| Checked-in Android release config referenced the debug signing key. | Release builds now require a separate release signing configuration and fail if release credentials are absent; a static guard rejects a debug-signed release configuration. | Actual EAS credentials, resulting Android signer, iOS signing, and an installed production build were **not** verified. |
+
+## Verification
+
+- Mobile: 77 focused tests across 9 files passed for account/company isolation, legacy fail-closed behavior, background credential scoping, account switching during sync, and existing retry/checkpoint behavior. Mobile `typecheck` passed with **zero** current diagnostics; the previously reported 34 `@platform/*` errors were not reproducible. The platform package declaration build also passed during investigation. A static Android release-signing guard passed.
+- Server: 115 focused tests across six existing route/AI suites passed, including direct media cross-company registration, duplicate concurrent registration, alias replay, and bounded 429 retries. The new CRM tenant-isolation suite passed 4/4 after correcting a test mock's call-history setup. API build and shared API code generation/library typecheck passed. The broader API-server typecheck still reports unrelated errors in existing test files; it is **not** a clean full-project typecheck.
+- The managed Development API started and `/api/healthz` returned HTTP 200; Metro started and the Android bundle check passed. A browser screenshot attempt of Expo timed out and the Mission Control screenshot browser crashed, so neither establishes mobile UI behavior. No Production deployment, signing, APK, OTA, or real-user access change was performed.
+
+## Independent security scan findings (not all remediated)
+
+- Dependency scan: **11 critical, 92 high, 41 moderate, 5 low** advisories in the workspace. The 11 critical findings concern the `orval` 8.9.1 code-generation package (development tooling); production runtime exposure was **not** established. Other high findings include `@xmldom/xmldom` 0.7.13. Package upgrades and lockfile provenance must be assessed before acceptance.
+- Static scan: **4 high** possible path-traversal findings in the Expo static serving files (`artifacts/readyloq-app/server/serve.js` and `artifacts/readyloq-api/server/serve.js`). These have not been triaged as exploitable or fixed.
+- Dataflow/privacy scan: no findings. A zero finding count does not prove data isolation.
+
+## Remaining acceptance work
+
+1. Verify account A→B, company A→B, Super Admin→normal user, logout/login, and warm/cold offline launches on a physical Fold 7. Confirm legacy-unscoped records can be recovered by the right owner without claiming another user's data. Do not wipe all offline data.
+2. Exercise real app-kill during upload, crash during every durable checkpoint, network loss, duplicate/concurrent and partial retries, schema migration, storage exhaustion, and queued item visibility/recovery. Make bait-station POST replay server-idempotent. Ensure permanent failures stop retrying and are visible.
+3. Finish direct-ID/path authorization coverage across every listed API family with authenticated company-A/company-B tests. Inspections, analysis, storage, reports, datasets, properties, intelligence-dataset, CRM, and Mission Control were inspected or tested to varying degrees; this is **not** exhaustive coverage of all routers.
+4. Prove signed upload reservation ownership, expiry, object existence/cleanup, media revision and EXIF/location policy, and full capture→upload→registration→AI→report recovery. Prevent indefinite cross-request provider work after ambiguous outcomes and enforce an auditable cost budget.
+5. Audit Production runtime values without exposing credentials: Clerk and API environment, tenant-specific CRM config, EAS signing credentials/artifact signature, iOS provisioning, app/native version discrepancy, release dependency hosts, debug/test endpoints and credentials. Static configuration inspection alone cannot verify these.
+6. Triage scanner findings and clean the full API typecheck. Perform physical Fold 7 acceptance before declaring Phase 5 complete.
+
+**Database/schema:** No migration or schema change in this pass. Local inspection JSON gains owner/company scope fields; pre-existing unscoped records are deliberately hidden pending an explicit recovery design. **Production configuration:** No change made; Android release Gradle source changed in Development only.

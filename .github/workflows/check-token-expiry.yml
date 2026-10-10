@@ -1,0 +1,129 @@
+name: Check GH_TOKEN Expiry
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  check-token-expiry:
+    name: Warn if GH_TOKEN is expiring soon
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Check token expiry and open issue if needed
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # ── 1. Fetch token metadata ───────────────────────────────────────────
+          RESPONSE_HEADERS=$(curl -sS --fail-with-body -I \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/user)
+
+          # Extract expiry header; grep exits 1 when absent — that is expected, so
+          # we append || true so set -e does not abort the script in that case.
+          EXPIRY_HEADER=$(echo "$RESPONSE_HEADERS" \
+            | grep -i "^github-authentication-token-expiration:" \
+            | tr -d '\r' \
+            | sed 's/^[^:]*: //' \
+            || true)
+
+          if [ -z "$EXPIRY_HEADER" ]; then
+            echo "No expiry header in response. The token either has no expiry date (never-expiring classic PAT) or is already invalid."
+            exit 0
+          fi
+
+          echo "Token expires: ${EXPIRY_HEADER}"
+
+          # ── 2. Calculate days remaining ───────────────────────────────────────
+          EXPIRY_TS=$(date -d "${EXPIRY_HEADER}" +%s)
+          NOW_TS=$(date -u +%s)
+          DAYS_LEFT=$(( (EXPIRY_TS - NOW_TS) / 86400 ))
+
+          echo "Days until expiry: ${DAYS_LEFT}"
+
+          if [ "$DAYS_LEFT" -gt 7 ]; then
+            echo "Token is valid for ${DAYS_LEFT} more day(s). No action needed."
+            exit 0
+          fi
+
+          echo "Token expires in ${DAYS_LEFT} day(s) — creating a GitHub issue."
+
+          # ── 3. Ensure the token-expiry label exists ───────────────────────────
+          # A 422 from this call means the label already exists — that is fine.
+          LABEL_STATUS=$(curl -sS -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/labels" \
+            -d '{"name":"token-expiry","color":"d93f0b","description":"GitHub token is expiring soon"}')
+
+          if [ "$LABEL_STATUS" != "201" ] && [ "$LABEL_STATUS" != "422" ]; then
+            echo "Warning: could not ensure token-expiry label exists (HTTP ${LABEL_STATUS}). Proceeding without label."
+            USE_LABEL="false"
+          else
+            USE_LABEL="true"
+          fi
+
+          # ── 4. Skip if an open warning issue already exists ───────────────────
+          EXISTING_COUNT=$(curl -sS --fail-with-body \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/issues?state=open&labels=token-expiry" \
+            | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+
+          if [ "$EXISTING_COUNT" -gt 0 ]; then
+            echo "An open token-expiry issue already exists — skipping duplicate creation."
+            exit 0
+          fi
+
+          # ── 5. Build issue payload ────────────────────────────────────────────
+          ISSUE_TITLE="GH_TOKEN expires in ${DAYS_LEFT} day(s) — rotate before pushes break"
+          ISSUE_BODY="## GitHub Token Expiry Warning
+
+          The **GH_TOKEN** secret (classic Personal Access Token) stored in this repository expires on **${EXPIRY_HEADER}** — that is **${DAYS_LEFT} day(s) from now**.
+
+          Once it lapses, any workflow or Replit push that uses this token will fail with a 401 error.
+
+          ### How to rotate the token
+
+          1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)**
+          2. Generate a new token with exactly two scopes: \`repo\` and \`workflow\`
+          3. Copy the new token value
+          4. In the Replit project, open **Secrets** and update \`GH_TOKEN\` with the new value
+          5. Close this issue once updated
+
+          > This issue was opened automatically by the \`check-token-expiry\` workflow."
+
+          if [ "$USE_LABEL" = "true" ]; then
+            PAYLOAD=$(python3 -c "
+          import json
+          print(json.dumps({'title': '$ISSUE_TITLE', 'body': '''$ISSUE_BODY''', 'labels': ['token-expiry']}))
+          ")
+          else
+            PAYLOAD=$(python3 -c "
+          import json
+          print(json.dumps({'title': '$ISSUE_TITLE', 'body': '''$ISSUE_BODY'''}))
+          ")
+          fi
+
+          # ── 6. Create the issue and confirm success ───────────────────────────
+          HTTP_STATUS=$(curl -sS -o /tmp/issue_response.json -w "%{http_code}" -X POST \
+            -H "Authorization: token ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/issues" \
+            -d "$PAYLOAD")
+
+          if [ "$HTTP_STATUS" = "201" ]; then
+            ISSUE_URL=$(python3 -c "import json; print(json.load(open('/tmp/issue_response.json'))['html_url'])")
+            echo "Issue created successfully: ${ISSUE_URL}"
+          else
+            echo "ERROR: Failed to create issue (HTTP ${HTTP_STATUS})."
+            cat /tmp/issue_response.json
+            exit 1
+          fi

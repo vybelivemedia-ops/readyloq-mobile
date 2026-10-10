@@ -7,8 +7,9 @@ import type { SpeechProviderOptions, SpeechTranscriptionResult } from "../types/
  * Default provider — works without internet, ~75 MB model downloaded on first use.
  */
 export class LocalWhisperProvider implements SpeechProvider {
+  private generation = 0;
   private listener?: (result: SpeechTranscriptionResult) => void;
-  private stopFn?: () => void;
+  private stopFn?: (options?: { cancel?: boolean }) => Promise<void>;
   private lastConfidence = 0;
 
   async initialize(_options: SpeechProviderOptions): Promise<void> {
@@ -16,26 +17,35 @@ export class LocalWhisperProvider implements SpeechProvider {
   }
 
   async start(): Promise<void> {
-    this.stopFn = await speechService.startDictation((transcript) => {
-      if (!this.listener) return;
+    const generation = ++this.generation;
+    const stop = await speechService.startDictation(async (transcript) => {
+      if (generation !== this.generation || !this.listener) return;
       if (transcript === "…") {
         this.listener({ text: "", confidence: 0, isFinal: false });
         return;
       }
       this.lastConfidence = 0.85;
-      this.listener({ text: transcript, confidence: this.lastConfidence, isFinal: true });
-    });
+      await this.listener({ text: transcript, confidence: this.lastConfidence, isFinal: true });
+    }, { throwOnError: true });
+    if (generation !== this.generation) {
+      await stop({ cancel: true });
+      return;
+    }
+    this.stopFn = stop;
   }
 
   async stop(): Promise<void> {
-    this.stopFn?.();
-    this.stopFn = undefined;
+    const stop = this.stopFn;
+    try { await stop?.(); }
+    finally { if (this.stopFn === stop) this.stopFn = undefined; }
   }
 
   async cancel(): Promise<void> {
-    this.stopFn?.();
+    this.generation += 1;
+    const stop = this.stopFn;
     this.stopFn = undefined;
     this.listener = undefined;
+    await stop?.({ cancel: true });
   }
 
   onTranscription(callback: (result: SpeechTranscriptionResult) => void): void {

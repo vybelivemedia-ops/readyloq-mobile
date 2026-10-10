@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+// Isolate the native codec, not the ownership or evidence-store implementation.
+vi.mock("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg" }, manipulateAsync: vi.fn(),
+}));
 
 const storage = new Map<string, string>();
 let uuidCounter = 0;

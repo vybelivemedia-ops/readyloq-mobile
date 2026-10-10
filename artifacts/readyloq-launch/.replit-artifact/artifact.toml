@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/readyloq-launch/"
+title = "ReadyLoq Product Launch"
+description = "9-slide SaaS product launch deck for ReadyLoq — dark tech aesthetic, covering the problem, solution, features, ROI metrics, pricing, and CTA."
+version = "1.0.0"
+id = "artifacts/readyloq-launch"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/readyloq-launch/" ]
+localPort = 20920
+
+[services.development]
+run = "pnpm --filter @workspace/readyloq-launch run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/readyloq-launch", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/readyloq-launch/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20920"
+BASE_PATH = "/readyloq-launch/"

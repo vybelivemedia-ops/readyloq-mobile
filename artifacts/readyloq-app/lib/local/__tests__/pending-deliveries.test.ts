@@ -1,3 +1,6 @@
+vi.mock("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg" }, manipulateAsync: vi.fn(),
+}));
 /**
  * Unit tests — queued delivery persistence & deduplication
  *

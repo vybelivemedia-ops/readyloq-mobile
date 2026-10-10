@@ -432,6 +432,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
       // Fire FAIE ingest non-blocking — failures must never surface to the tech
       if (action === "accept" && finding?.imageUrl) {
         void sendPhotoToFaieDataset({
+          getToken,
           photoUri: finding.imageUrl,
           findingId: String(findingId),
           label: finding.category,
@@ -439,6 +440,7 @@ export function InspectionDetail({ id, embedded = false }: InspectionDetailProps
         });
       } else if (action === "correct" && finding?.imageUrl) {
         void ingestAnonymizedFaieData({
+          getToken,
           photoUri: finding.imageUrl,
           pestOrDefectCategory: species ?? finding.category,
           visualConfidence: finding.confidence ?? 0,
