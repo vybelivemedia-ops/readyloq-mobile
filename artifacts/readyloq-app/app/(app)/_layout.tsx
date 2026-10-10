@@ -32,6 +32,7 @@ import { BetaPaused } from "@/components/BetaPaused";
 import { Onboarding } from "@/components/Onboarding";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { FullScreenLoader } from "@/components/ui/Loader";
+import { TenantWorkspaceFrame } from "@/components/TenantWorkspaceFrame";
 import { useColors } from "@/hooks/useColors";
 import { CurrentUserProvider, useCurrentUser } from "@/hooks/useCurrentUser";
 import {
@@ -106,6 +107,7 @@ function Gate() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeLocalScopeKey, setActiveLocalScopeKey] = useState<string | null>(null);
+  const admittedTenantScope = useRef<string | null>(null);
   const signOut = useSignOut();
   const { user, isLoading, isServerVerified, error, refetch } = useCurrentUser();
   const { getToken, isSignedIn, userId } = useAuth();
@@ -449,6 +451,54 @@ function Gate() {
     })();
   }, [ready, router]);
 
+  const tenantScope = user && userId && user.clerkUserId === userId && user.companyId != null
+    ? `${userId}:company:${user.companyId}` : null;
+  const betaPaused = user?.role === "technician" && user.betaAccess === false;
+  // Never retain an old account/company, a denied workspace, or platform access.
+  // Retention is only mount continuity: existing scope revocation above is unchanged.
+  if (!tenantScope || admittedTenantScope.current !== tenantScope ||
+    error || betaPaused || routeDecision !== "tenant") {
+    admittedTenantScope.current = null;
+  }
+  if (tenantScope && companyScopeReady &&
+    activeLocalScopeKey === targetLocalScopeKey &&
+    routeDecision === "tenant" && !betaPaused) {
+    admittedTenantScope.current = tenantScope;
+  }
+  const tenantWorkspace = (blocked?: string) => (
+    <TenantWorkspaceFrame blocked={blocked}>
+      <Stack
+        key={tenantScope ?? `${userId}:company:none`}
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="new-inspection"
+          options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen name="inspection-summary/[localId]" />
+        <Stack.Screen name="inspection/[id]" />
+        <Stack.Screen name="report/[id]" />
+        <Stack.Screen name="about" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="admin" />
+        <Stack.Screen name="billing" options={{ presentation: "modal" }} />
+        <Stack.Screen name="dataset" />
+        <Stack.Screen name="executive-dashboard" />
+        <Stack.Screen name="executive-risk-inspections" />
+        <Stack.Screen name="executive-velocity-inspections" />
+        <Stack.Screen name="executive-week-inspections" />
+        <Stack.Screen name="reports-detail" />
+      </Stack>
+    </TenantWorkspaceFrame>
+  );
+  if (tenantScope && admittedTenantScope.current === tenantScope &&
+    (isLoading || !isServerVerified || activeLocalScopeKey !== targetLocalScopeKey)) {
+    return tenantWorkspace("Confirming your workspace…");
+  }
   if (isLoading) return <FullScreenLoader label="Loading your workspace…" />;
   if (error || !user) {
     // Brand-new user (no local cache) who launched while offline: the profile
@@ -563,32 +613,5 @@ function Gate() {
     );
   }
 
-  return (
-    <Stack
-      key={`${userId}:company:${user.companyId === null ? "none" : user.companyId}`}
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    >
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen
-        name="new-inspection"
-        options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
-      />
-      <Stack.Screen name="inspection-summary/[localId]" />
-      <Stack.Screen name="inspection/[id]" />
-      <Stack.Screen name="report/[id]" />
-      <Stack.Screen name="about" />
-      <Stack.Screen name="settings" />
-      <Stack.Screen name="admin" />
-      <Stack.Screen name="billing" options={{ presentation: "modal" }} />
-      <Stack.Screen name="dataset" />
-      <Stack.Screen name="executive-dashboard" />
-      <Stack.Screen name="executive-risk-inspections" />
-      <Stack.Screen name="executive-velocity-inspections" />
-      <Stack.Screen name="executive-week-inspections" />
-      <Stack.Screen name="reports-detail" />
-    </Stack>
-  );
+  return tenantWorkspace();
 }

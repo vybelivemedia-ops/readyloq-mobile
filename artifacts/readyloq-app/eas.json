@@ -17,14 +17,14 @@
       }
     },
     "preview": {
-      "autoIncrement": true,
+      "autoIncrement": false,
       "developmentClient": false,
       "distribution": "internal",
       "channel": "preview",
       "node": "22.14.0",
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a"
+        "gradleCommand": ":app:assembleRelease"
       },
       "env": {
         "EXPO_PUBLIC_DOMAIN": "readyloq.com",
