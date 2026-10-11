@@ -24,6 +24,8 @@ import { ClientPortal } from '@/pages/client';
 import { BleHealth } from '@/pages/ble-health';
 import { IntelligenceReview } from '@/pages/intelligence-review';
 import { Integrations } from '@/pages/integrations';
+import { GeminiDemo } from '@/pages/gemini-demo';
+import { isPublicGeminiDemoPath } from '@/lib/gemini-demo-path';
 import { Layout } from '@/components/layout';
 
 const queryClient = new QueryClient();
@@ -123,6 +125,25 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 }
 
 function App() {
+  const [browserPath] = useLocation();
+  // Preserve the current workspace's exact public, stateless hackathon-demo
+  // exception. Every other route still uses Clerk and existing role guards.
+  if (isPublicGeminiDemoPath(browserPath, import.meta.env.BASE_URL)) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+            <Switch>
+              <Route path="/gemini-demo" component={GeminiDemo} />
+              <Route component={NotFound} />
+            </Switch>
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
   const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   if (!clerkPubKey) {
     return <div className="p-8 text-destructive">Error: VITE_CLERK_PUBLISHABLE_KEY is not set.</div>;

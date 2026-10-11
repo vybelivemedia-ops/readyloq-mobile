@@ -44,6 +44,8 @@ import type {
   GeminiConversation,
   GeminiConversationInput,
   GeminiConversationWithMessages,
+  GeminiDemoAssessment,
+  GeminiDemoPhotoInput,
   GeminiError,
   GeminiImageInput,
   GeminiImageOutput,
@@ -131,6 +133,148 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getCheckGeminiInspectionDemoVersionUrl = () => {
+
+
+
+
+  return `/api/gemini-inspection-demo/analyze`
+}
+
+/**
+ * @summary Check stateless demo availability and compatibility without an analysis call
+ */
+export const checkGeminiInspectionDemoVersion = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getCheckGeminiInspectionDemoVersionUrl(),
+  {
+    ...options,
+    method: 'HEAD'
+
+
+  }
+);}
+
+
+
+
+export const getCheckGeminiInspectionDemoVersionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkGeminiInspectionDemoVersion>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkGeminiInspectionDemoVersion>>, TError,void, TContext> => {
+
+const mutationKey = ['checkGeminiInspectionDemoVersion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkGeminiInspectionDemoVersion>>, void> = () => {
+
+
+          return  checkGeminiInspectionDemoVersion(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckGeminiInspectionDemoVersionMutationResult = NonNullable<Awaited<ReturnType<typeof checkGeminiInspectionDemoVersion>>>
+
+    export type CheckGeminiInspectionDemoVersionMutationError = ErrorType<void>
+
+    /**
+ * @summary Check stateless demo availability and compatibility without an analysis call
+ */
+export const useCheckGeminiInspectionDemoVersion = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkGeminiInspectionDemoVersion>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof checkGeminiInspectionDemoVersion>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCheckGeminiInspectionDemoVersionMutationOptions(options));
+    }
+
+export const getAnalyzeGeminiInspectionDemoUrl = () => {
+
+
+
+
+  return `/api/gemini-inspection-demo/analyze`
+}
+
+/**
+ * Stateless, rate-limited demo. Disabled in production unless explicitly enabled. Photos are sent to Gemini but are not stored by ReadyLoq.
+ * @summary Analyze a sample photo without creating inspection records
+ */
+export const analyzeGeminiInspectionDemo = async (geminiDemoPhotoInput: GeminiDemoPhotoInput, options?: RequestInit): Promise<GeminiDemoAssessment> => {
+
+  return customFetch<GeminiDemoAssessment>(getAnalyzeGeminiInspectionDemoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      geminiDemoPhotoInput,)
+  }
+);}
+
+
+
+
+export const getAnalyzeGeminiInspectionDemoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeGeminiInspectionDemo>>, TError,{data: BodyType<GeminiDemoPhotoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeGeminiInspectionDemo>>, TError,{data: BodyType<GeminiDemoPhotoInput>}, TContext> => {
+
+const mutationKey = ['analyzeGeminiInspectionDemo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeGeminiInspectionDemo>>, {data: BodyType<GeminiDemoPhotoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  analyzeGeminiInspectionDemo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeGeminiInspectionDemoMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeGeminiInspectionDemo>>>
+    export type AnalyzeGeminiInspectionDemoMutationBody = BodyType<GeminiDemoPhotoInput>
+    export type AnalyzeGeminiInspectionDemoMutationError = ErrorType<void>
+
+    /**
+ * @summary Analyze a sample photo without creating inspection records
+ */
+export const useAnalyzeGeminiInspectionDemo = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeGeminiInspectionDemo>>, TError,{data: BodyType<GeminiDemoPhotoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeGeminiInspectionDemo>>,
+        TError,
+        {data: BodyType<GeminiDemoPhotoInput>},
+        TContext
+      > => {
+      return useMutation(getAnalyzeGeminiInspectionDemoMutationOptions(options));
+    }
 
 export const getGetScheduleUrl = (params: GetScheduleParams,) => {
   const normalizedParams = new URLSearchParams();

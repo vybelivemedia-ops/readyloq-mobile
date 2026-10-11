@@ -35,6 +35,64 @@ tags:
     description: Gemini AI chat and image operations
 
 paths:
+  /gemini-inspection-demo/analyze:
+    head:
+      operationId: checkGeminiInspectionDemoVersion
+      tags: [gemini]
+      summary: Check stateless demo availability and compatibility without an analysis call
+      security: []
+      responses:
+        "204":
+          description: Available demo, with public build/parser markers
+          headers:
+            X-ReadyLoq-Demo-Build:
+              schema: { type: string }
+            X-ReadyLoq-Demo-Parser:
+              schema: { type: string }
+        "404":
+          description: Demo disabled
+        "429":
+          description: Metadata rate limit reached
+    post:
+      operationId: analyzeGeminiInspectionDemo
+      tags: [gemini]
+      summary: Analyze a sample photo without creating inspection records
+      description: Stateless, rate-limited demo. Disabled in production unless explicitly enabled. Photos are sent to Gemini but are not stored by ReadyLoq.
+      security: []
+      parameters:
+        - in: header
+          name: X-ReadyLoq-Demo-Client
+          required: true
+          schema: { type: string, enum: [demo-compat-3] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiDemoPhotoInput"
+      responses:
+        "200":
+          description: AI-assisted assessment requiring technician review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiDemoAssessment"
+        "400":
+          description: Invalid photo or notes
+        "404":
+          description: Demo disabled
+        "409":
+          description: Stale or mismatched client version; no analysis was run
+        "413":
+          description: Photo request exceeds the body size limit
+        "429":
+          description: Demo rate or concurrency limit reached
+        "502":
+          description: Provider failure or invalid assessment
+        "503":
+          description: Gemini not configured
+        "504":
+          description: Analysis timed out
   # ── SCHEDULE ─────────────────────────────────────────────────────────────────
   /schedule:
     get:
@@ -1862,6 +1920,61 @@ paths:
 
 components:
   schemas:
+    GeminiDemoPhotoInput:
+      type: object
+      additionalProperties: false
+      required: [imageBase64, mimeType]
+      properties:
+        imageBase64: { type: string, maxLength: 6990508 }
+        mimeType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        notes: { type: string, maxLength: 1500 }
+    GeminiDemoHypothesis:
+      type: object
+      additionalProperties: false
+      required: [finding, evidenceIndices, uncertainty]
+      properties:
+        finding: { type: string, minLength: 1 }
+        evidenceIndices:
+          type: array
+          minItems: 1
+          items: { type: integer, minimum: 0 }
+        uncertainty: { type: string, minLength: 1 }
+    GeminiDemoConfidence:
+      type: object
+      additionalProperties: false
+      required: [level, explanation]
+      properties:
+        level: { type: string, enum: [low, moderate, high] }
+        explanation: { type: string, minLength: 1 }
+    GeminiDemoAssessment:
+      type: object
+      additionalProperties: false
+      required: [model, demoOnly, reviewRequired, observations, hypotheses, confidence, cannotDetermine, nextChecks, reportReadyFinding]
+      properties:
+        model: { type: string, enum: [gemini-2.5-flash] }
+        demoOnly: { type: boolean, enum: [true] }
+        reviewRequired: { type: boolean, enum: [true] }
+        observations:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items: { type: string, minLength: 1 }
+        hypotheses:
+          type: array
+          maxItems: 3
+          items: { $ref: "#/components/schemas/GeminiDemoHypothesis" }
+        confidence: { $ref: "#/components/schemas/GeminiDemoConfidence" }
+        cannotDetermine:
+          type: array
+          minItems: 1
+          maxItems: 6
+          items: { type: string, minLength: 1 }
+        nextChecks:
+          type: array
+          minItems: 1
+          maxItems: 6
+          items: { type: string, minLength: 1 }
+        reportReadyFinding: { type: string }
     OkResponse:
       type: object
       required: [ok]

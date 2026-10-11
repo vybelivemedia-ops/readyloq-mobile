@@ -12,6 +12,7 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import faieRouter from "./routes/faie";
+import geminiInspectionDemoRouter from "./routes/gemini-inspection-demo";
 import { logger } from "./lib/logger";
 import { WebhookHandlers } from "./lib/webhookHandlers";
 import { setupInspectionTriggers } from "./lib/inspection-triggers";
@@ -129,6 +130,19 @@ app.post(
 // uploads and finding reviews. Payloads include base64 JPEG images (~1–4 MB).
 app.use("/v1/faie", express.json({ limit: "20mb" }), faieRouter);
 
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+
+// Stateless sample-photo demo only. Its availability gate, request bounds,
+// version handshake and rate limits run before the normal small body parser.
+// All existing authenticated application routes retain their middleware.
+app.use("/api/gemini-inspection-demo", apiLimiter, geminiInspectionDemoRouter);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -140,14 +154,6 @@ app.use(
     ),
   })),
 );
-
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many requests, please try again later." },
-});
 
 app.use("/api", apiLimiter, router);
 

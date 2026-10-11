@@ -9,6 +9,65 @@ import * as zod from 'zod';
 
 
 /**
+ * Stateless, rate-limited demo. Disabled in production unless explicitly enabled. Photos are sent to Gemini but are not stored by ReadyLoq.
+ * @summary Analyze a sample photo without creating inspection records
+ */
+export const AnalyzeGeminiInspectionDemoHeader = zod.object({
+  "X-ReadyLoq-Demo-Client": zod.enum(['demo-compat-3'])
+})
+
+export const analyzeGeminiInspectionDemoBodyImageBase64Max = 6990508;
+
+export const analyzeGeminiInspectionDemoBodyNotesMax = 1500;
+
+
+
+export const AnalyzeGeminiInspectionDemoBody = zod.object({
+  "imageBase64": zod.string().max(analyzeGeminiInspectionDemoBodyImageBase64Max),
+  "mimeType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "notes": zod.string().max(analyzeGeminiInspectionDemoBodyNotesMax).optional()
+})
+
+
+export const analyzeGeminiInspectionDemoResponseObservationsMax = 8;
+
+
+export const analyzeGeminiInspectionDemoResponseHypothesesItemEvidenceIndicesItemMin = 0;
+
+
+
+export const analyzeGeminiInspectionDemoResponseHypothesesMax = 3;
+
+
+
+export const analyzeGeminiInspectionDemoResponseCannotDetermineMax = 6;
+
+
+export const analyzeGeminiInspectionDemoResponseNextChecksMax = 6;
+
+
+
+export const AnalyzeGeminiInspectionDemoResponse = zod.object({
+  "model": zod.enum(['gemini-2.5-flash']),
+  "demoOnly": zod.literal(true),
+  "reviewRequired": zod.literal(true),
+  "observations": zod.array(zod.string().min(1)).min(1).max(analyzeGeminiInspectionDemoResponseObservationsMax),
+  "hypotheses": zod.array(zod.object({
+  "finding": zod.string().min(1),
+  "evidenceIndices": zod.array(zod.number().min(analyzeGeminiInspectionDemoResponseHypothesesItemEvidenceIndicesItemMin)).min(1),
+  "uncertainty": zod.string().min(1)
+})).max(analyzeGeminiInspectionDemoResponseHypothesesMax),
+  "confidence": zod.object({
+  "level": zod.enum(['low', 'moderate', 'high']),
+  "explanation": zod.string().min(1)
+}),
+  "cannotDetermine": zod.array(zod.string().min(1)).min(1).max(analyzeGeminiInspectionDemoResponseCannotDetermineMax),
+  "nextChecks": zod.array(zod.string().min(1)).min(1).max(analyzeGeminiInspectionDemoResponseNextChecksMax),
+  "reportReadyFinding": zod.string()
+})
+
+
+/**
  * @summary List inspections for the scheduling calendar (manager+)
  */
 export const GetScheduleQueryParams = zod.object({

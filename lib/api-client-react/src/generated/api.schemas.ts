@@ -5,6 +5,79 @@
  * ReadyLoq - AI-powered inspection intelligence platform
  * OpenAPI spec version: 0.1.0
  */
+export type GeminiDemoPhotoInputMimeType = typeof GeminiDemoPhotoInputMimeType[keyof typeof GeminiDemoPhotoInputMimeType];
+
+
+export const GeminiDemoPhotoInputMimeType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface GeminiDemoPhotoInput {
+  /** @maxLength 6990508 */
+  imageBase64: string;
+  mimeType: GeminiDemoPhotoInputMimeType;
+  /** @maxLength 1500 */
+  notes?: string;
+}
+
+export interface GeminiDemoHypothesis {
+  /** @minLength 1 */
+  finding: string;
+  /** @minItems 1 */
+  evidenceIndices: number[];
+  /** @minLength 1 */
+  uncertainty: string;
+}
+
+export type GeminiDemoConfidenceLevel = typeof GeminiDemoConfidenceLevel[keyof typeof GeminiDemoConfidenceLevel];
+
+
+export const GeminiDemoConfidenceLevel = {
+  low: 'low',
+  moderate: 'moderate',
+  high: 'high',
+} as const;
+
+export interface GeminiDemoConfidence {
+  level: GeminiDemoConfidenceLevel;
+  /** @minLength 1 */
+  explanation: string;
+}
+
+export type GeminiDemoAssessmentModel = typeof GeminiDemoAssessmentModel[keyof typeof GeminiDemoAssessmentModel];
+
+
+export const GeminiDemoAssessmentModel = {
+  'gemini-25-flash': 'gemini-2.5-flash',
+} as const;
+
+export interface GeminiDemoAssessment {
+  model: GeminiDemoAssessmentModel;
+  demoOnly: true;
+  reviewRequired: true;
+  /**
+     * @minItems 1
+     * @maxItems 8
+     */
+  observations: string[];
+  /** @maxItems 3 */
+  hypotheses: GeminiDemoHypothesis[];
+  confidence: GeminiDemoConfidence;
+  /**
+     * @minItems 1
+     * @maxItems 6
+     */
+  cannotDetermine: string[];
+  /**
+     * @minItems 1
+     * @maxItems 6
+     */
+  nextChecks: string[];
+  reportReadyFinding: string;
+}
+
 export interface OkResponse {
   ok: boolean;
 }

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "noEmit": true,
+    "types": ["node", "pino-http"]
+  },
+  "include": [
+    "src/lib/gemini-inspection-demo.ts",
+    "src/routes/gemini-inspection-demo.ts"
+  ],
+  "exclude": ["src/**/*.test.ts"]
+}
