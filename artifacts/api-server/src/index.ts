@@ -24,6 +24,7 @@ import { migrateEnterpriseSync } from "./lib/migrate-enterprise-sync";
 import { migrateMissionControl } from "./lib/migrate-mission-control";
 import { migrateBaitStationIdempotency } from "./lib/migrate-bait-station-idempotency";
 import { migrateInspectionUploadIntents } from "./lib/migrate-inspection-upload-intents";
+import { migratePropertyFoundation } from "./lib/migrate-property-foundation";
 import { startMissionControlAgentWorker } from "./lib/mission-control-worker";
 import { startBriefingScheduler } from "./lib/briefing-scheduler";
 import { startPredictiveRestockScheduler } from "./lib/predictive-restocking-scheduler";
@@ -64,6 +65,7 @@ async function startup() {
   await migrateMissionControl();
   await migrateBaitStationIdempotency();
   await migrateInspectionUploadIntents();
+  await migratePropertyFoundation();
   startMissionControlAgentWorker();
 
   // ── Development fixture seed (blocking) ──────────────────────────────────────

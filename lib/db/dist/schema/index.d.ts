@@ -8,6 +8,7 @@ export * from "./training";
 export * from "./branding";
 export * from "./users";
 export * from "./properties";
+export * from "./property-foundation";
 export * from "./companies";
 export * from "./leads";
 export * from "./intelligence-dataset";

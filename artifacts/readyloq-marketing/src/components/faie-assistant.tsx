@@ -17,6 +17,14 @@ const SUGGESTED_QUESTIONS = [
 const GREETING =
   "Hi, I'm FAIE — ReadyLoq's AI assistant. Ask me about inspections, route readiness, inventory, security, or pricing.";
 
+// The shared assistant API also serves other pages. Keep this homepage-only
+// boundary until its broader product prompt has had its own credibility review.
+function homepageAnswer(response: string): string {
+  const unsupportedClaim = /immutable|chain[- ]of[- ]custody|linear\s+(?:feet|footage)|door\s+frames?|brick\s+courses?|\d+(?:\.\d+)?\s*%|SOC\s*2|certifi(?:ed|cation)|guarantee|end[- ]to[- ]end\s+encrypt|no\s+cross[- ]tenant|every\s+(?:record|management|chemical|ounce)|eliminat(?:e|es|ed)\b.{0,40}\brisk|reconcil(?:e|es|ed)\b.{0,40}\bautomatically/i;
+  if (!unsupportedClaim.test(response.replace(/\s+/g, " "))) return response;
+  return "That answer included claims that need verification. ReadyLoq supports recorded inspection history, AI-assisted drafts for review, inventory transaction records, and role-based API checks. Voice Capture and Meta glasses capture remain in physical-device validation. We do not publish a calibrated FAIE accuracy score or promise automatic measurements, complete chemical custody, universal immutable audit coverage, or security certification. Confirm pricing and availability with the ReadyLoq team.";
+}
+
 function makeId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -27,7 +35,7 @@ function normalizeForDeduplication(value: string): string {
   return value.replace(/\s+/g, " ").trim().toLocaleLowerCase();
 }
 
-export function FaieAssistant({ className = "" }: { className?: string }) {
+export function FaieAssistant({ className = "", homepageContext = false }: { className?: string; homepageContext?: boolean }) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -72,6 +80,7 @@ export function FaieAssistant({ className = "" }: { className?: string }) {
         // the duplicate check can run.
         onToken: (token) => { responseText += token; },
       });
+      if (homepageContext) responseText = homepageAnswer(responseText);
 
       const normalizedResponse = normalizeForDeduplication(responseText);
       const hasAnsweredAlready = messages.some(
@@ -113,18 +122,20 @@ export function FaieAssistant({ className = "" }: { className?: string }) {
         </div>
         <div className="min-w-0">
           <p className="font-bold text-slate-900 text-sm leading-tight">FAIE</p>
-          <p className="text-xs text-slate-500 truncate">ReadyLoq's AI Assistant</p>
+          <p className="text-xs text-slate-500 truncate">{homepageContext ? "ReadyLoq product information" : "ReadyLoq's AI Assistant"}</p>
         </div>
         <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-600 shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Online
+          {homepageContext ? "Product Q&A" : "Online"}
         </span>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3 min-h-[220px] max-h-[360px]">
         <div className="flex">
           <div className="max-w-[90%] rounded-2xl rounded-tl-sm bg-slate-100 text-slate-700 text-sm px-4 py-2.5 leading-relaxed">
-            {GREETING}
+            {homepageContext
+              ? "Hi, I'm FAIE. Ask about ReadyLoq's inspection, inventory, security, pricing, and route-readiness features. This is general product information, not access to your company's records."
+              : GREETING}
           </div>
         </div>
         {messages.map((m) => (
@@ -136,6 +147,9 @@ export function FaieAssistant({ className = "" }: { className?: string }) {
                   : "bg-slate-100 text-slate-700 rounded-tl-sm"
               }`}
             >
+              {homepageContext && m.role === "assistant" && m.content.length > 0 && (
+                <p className="mb-2 text-xs font-semibold">AI-generated draft — verify with the ReadyLoq team</p>
+              )}
               {m.content.length > 0 ? m.content : <Loader2 size={14} className="animate-spin" />}
             </div>
           </div>
@@ -158,6 +172,15 @@ export function FaieAssistant({ className = "" }: { className?: string }) {
         </div>
       )}
 
+      {homepageContext && (
+        <p className="px-5 pb-3 text-xs leading-relaxed text-slate-500">
+          Answers may contain unverified claims. Confirm pricing and feature
+          availability with the team; some capabilities remain in validation.
+          Answers do not establish immutable audit coverage, complete chemical
+          custody, comprehensive data isolation, compliance certification, or
+          freedom from security risks.
+        </p>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();

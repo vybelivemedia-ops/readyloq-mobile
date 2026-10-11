@@ -21,6 +21,7 @@ import intelligenceRouter from "./intelligence";
 import intelligenceDatasetRouter from "./intelligence-dataset";
 import brandingRouter from "./branding";
 import propertiesRouter from "./properties";
+import propertyFoundationRouter from "./property-foundation";
 import storageRouter from "./storage";
 import leadsRouter from "./leads";
 import betaRouter from "./beta";
@@ -134,6 +135,7 @@ router.use(
 );
 router.use("/branding", brandingRouter);
 router.use("/properties", requireAuth, requireCompany, requireActiveCompany, requireBetaAccess, propertiesRouter);
+router.use("/property-foundation", requireAuth, requireCompany, requireActiveCompany, requireBetaAccess, propertyFoundationRouter);
 // Beta Center + all-user feedback. NOT behind requireBetaAccess so a paused
 // technician can still submit feedback and report client-side errors.
 router.use("/beta", requireAuth, requireCompany, requireActiveCompany, betaRouter);

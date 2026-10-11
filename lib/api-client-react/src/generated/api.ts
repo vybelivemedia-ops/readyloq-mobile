@@ -38,6 +38,8 @@ import type {
   CompanyAccessChangeInput,
   CompanyAccessChangeResult,
   CompleteInspectionResult,
+  CreateFoundationLocationBody,
+  CreateFoundationVisitBody,
   CreateInviteInput,
   CustomerSummary,
   CustomerSummaryApprove,
@@ -50,6 +52,10 @@ import type {
   Error,
   ErrorEventList,
   FeedbackInput,
+  FoundationCoverage,
+  FoundationLocation,
+  FoundationVisit,
+  FoundationVisitDetail,
   GeminiConversation,
   GeminiConversationInput,
   GeminiConversationWithMessages,
@@ -59,14 +65,17 @@ import type {
   GeminiMessage,
   GeminiMessageInput,
   GenerateNarrativeInput,
+  GenericUploadUrlRequest,
   GetAnalyticsTrendsParams,
   GetDailyRigParams,
+  GetFoundationRoster200,
   GetPropertyProfileParams,
   GetRouteCalendarParams,
   GetRouteOutlookParams,
   GetRouteReadinessParams,
   GetScheduleParams,
   GetTeamRouteReadinessParams,
+  GetUploadReconciliation200,
   HealthStatus,
   IncidentUpdate,
   InfestationRisk,
@@ -76,6 +85,8 @@ import type {
   InspectionScorecard,
   InspectionScorecardListItem,
   InspectionUpdate,
+  InspectionUploadReservationRequest,
+  InspectionUploadUpgradeRequired,
   IntelligenceAnalytics,
   IntelligenceCategory,
   IntelligenceConfirmInput,
@@ -143,6 +154,8 @@ import type {
   OpportunityNoteCreate,
   OpportunitySettings,
   OpportunitySettingsUpdate,
+  PatchFoundationCoverageBody,
+  PatchFoundationLocationBody,
   PropertyFeed,
   PropertyLookupResult,
   PropertyNote,
@@ -181,6 +194,7 @@ import type {
   ToggleChecklistInput,
   TrendDataPoint,
   UpdateFeedbackInput,
+  UploadUrlResponse,
   UpsertDailyRigInput,
   UserAccessChangeInput,
   UserAccessChangeResult
@@ -195,6 +209,227 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getRequestUploadUrlUrl = () => {
+
+
+
+
+  return `/api/storage/uploads/request-url`
+}
+
+/**
+ * New clients must explicitly select purpose=inspection-evidence and reserve the inspection, size, content type, idempotency key, and optional checksum before PUT. Non-evidence callers must send purpose=generic. Inspection evidence receives an authenticated API PUT endpoint (same-origin browser session or mobile Clerk bearer token) and is streamed server-side to GCS with ifGenerationMatch=0; the API validates actual byte count, content type, optional MD5, and GCS CRC32C. The Replit sidecar signer ignores requested extension constraints, so inspection evidence does not use its signed URL flow. Browsers need not set Content-Length. Requests using the pre-intent contract receive 426 without an upload URL. Upgrade the client, retain queued local evidence, reserve an intent, PUT to the authenticated endpoint, then register by uploadIntentId. Previously uploaded legacy objects are not auto-attached or deleted; reconcile them separately. Previously deployed clients remain unable to sync until their app/static-client upgrade is delivered; deploy the first-party generic callers' explicit purpose migration with this contract.
+ * @summary Request an upload URL; inspection evidence requires an authenticated create-only PUT
+ */
+export const requestUploadUrl = async (genericUploadUrlRequestInspectionUploadReservationRequest: GenericUploadUrlRequest | InspectionUploadReservationRequest, options?: RequestInit): Promise<UploadUrlResponse> => {
+
+  return customFetch<UploadUrlResponse>(getRequestUploadUrlUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      genericUploadUrlRequestInspectionUploadReservationRequest,)
+  }
+);}
+
+
+
+
+export const getRequestUploadUrlMutationOptions = <TError = ErrorType<void | InspectionUploadUpgradeRequired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,{data: BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,{data: BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>}, TContext> => {
+
+const mutationKey = ['requestUploadUrl'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestUploadUrl>>, {data: BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestUploadUrl(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestUploadUrlMutationResult = NonNullable<Awaited<ReturnType<typeof requestUploadUrl>>>
+    export type RequestUploadUrlMutationBody = BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>
+    export type RequestUploadUrlMutationError = ErrorType<void | InspectionUploadUpgradeRequired>
+
+    /**
+ * @summary Request an upload URL; inspection evidence requires an authenticated create-only PUT
+ */
+export const useRequestUploadUrl = <TError = ErrorType<void | InspectionUploadUpgradeRequired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,{data: BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestUploadUrl>>,
+        TError,
+        {data: BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>},
+        TContext
+      > => {
+      return useMutation(getRequestUploadUrlMutationOptions(options));
+    }
+
+export const getPutInspectionUploadContentUrl = (intentId: number,) => {
+
+
+
+
+  return `/api/storage/uploads/intents/${intentId}/content`
+}
+
+/**
+ * @summary Stream reserved inspection evidence into GCS with a create-only precondition
+ */
+export const putInspectionUploadContent = async (intentId: number,
+    putInspectionUploadContentBody: Blob, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getPutInspectionUploadContentUrl(intentId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...options?.headers },
+    body: JSON.stringify(
+      putInspectionUploadContentBody,)
+  }
+);}
+
+
+
+
+export const getPutInspectionUploadContentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putInspectionUploadContent>>, TError,{intentId: number;data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putInspectionUploadContent>>, TError,{intentId: number;data: BodyType<Blob>}, TContext> => {
+
+const mutationKey = ['putInspectionUploadContent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putInspectionUploadContent>>, {intentId: number;data: BodyType<Blob>}> = (props) => {
+          const {intentId,data} = props ?? {};
+
+          return  putInspectionUploadContent(intentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutInspectionUploadContentMutationResult = NonNullable<Awaited<ReturnType<typeof putInspectionUploadContent>>>
+    export type PutInspectionUploadContentMutationBody = BodyType<Blob>
+    export type PutInspectionUploadContentMutationError = ErrorType<void>
+
+    /**
+ * @summary Stream reserved inspection evidence into GCS with a create-only precondition
+ */
+export const usePutInspectionUploadContent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putInspectionUploadContent>>, TError,{intentId: number;data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof putInspectionUploadContent>>,
+        TError,
+        {intentId: number;data: BodyType<Blob>},
+        TContext
+      > => {
+      return useMutation(getPutInspectionUploadContentMutationOptions(options));
+    }
+
+export const getGetUploadReconciliationUrl = () => {
+
+
+
+
+  return `/api/storage/uploads/reconciliation`
+}
+
+/**
+ * @summary Complete paginated company-scoped report of upload and registration orphans (manager+)
+ */
+export const getUploadReconciliation = async ( options?: RequestInit): Promise<GetUploadReconciliation200> => {
+
+  return customFetch<GetUploadReconciliation200>(getGetUploadReconciliationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUploadReconciliationQueryKey = () => {
+    return [
+    `/api/storage/uploads/reconciliation`
+    ] as const;
+    }
+
+
+export const getGetUploadReconciliationQueryOptions = <TData = Awaited<ReturnType<typeof getUploadReconciliation>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUploadReconciliation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUploadReconciliationQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUploadReconciliation>>> = ({ signal }) => getUploadReconciliation({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUploadReconciliation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUploadReconciliationQueryResult = NonNullable<Awaited<ReturnType<typeof getUploadReconciliation>>>
+export type GetUploadReconciliationQueryError = ErrorType<void>
+
+
+/**
+ * @summary Complete paginated company-scoped report of upload and registration orphans (manager+)
+ */
+
+export function useGetUploadReconciliation<TData = Awaited<ReturnType<typeof getUploadReconciliation>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUploadReconciliation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUploadReconciliationQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 
@@ -10949,5 +11184,493 @@ export const useDecideMissionControlApproval = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDecideMissionControlApprovalMutationOptions(options));
+    }
+
+export const getGetFoundationRosterUrl = (propertyId: number,) => {
+
+
+
+
+  return `/api/property-foundation/${propertyId}/roster`
+}
+
+export const getFoundationRoster = async (propertyId: number, options?: RequestInit): Promise<GetFoundationRoster200> => {
+
+  return customFetch<GetFoundationRoster200>(getGetFoundationRosterUrl(propertyId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFoundationRosterQueryKey = (propertyId: number,) => {
+    return [
+    `/api/property-foundation/${propertyId}/roster`
+    ] as const;
+    }
+
+
+export const getGetFoundationRosterQueryOptions = <TData = Awaited<ReturnType<typeof getFoundationRoster>>, TError = ErrorType<unknown>>(propertyId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFoundationRoster>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFoundationRosterQueryKey(propertyId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFoundationRoster>>> = ({ signal }) => getFoundationRoster(propertyId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(propertyId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFoundationRoster>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFoundationRosterQueryResult = NonNullable<Awaited<ReturnType<typeof getFoundationRoster>>>
+export type GetFoundationRosterQueryError = ErrorType<unknown>
+
+
+
+export function useGetFoundationRoster<TData = Awaited<ReturnType<typeof getFoundationRoster>>, TError = ErrorType<unknown>>(
+ propertyId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFoundationRoster>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFoundationRosterQueryOptions(propertyId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateFoundationLocationUrl = (propertyId: number,) => {
+
+
+
+
+  return `/api/property-foundation/${propertyId}/locations`
+}
+
+export const createFoundationLocation = async (propertyId: number,
+    createFoundationLocationBody: CreateFoundationLocationBody, options?: RequestInit): Promise<FoundationLocation> => {
+
+  return customFetch<FoundationLocation>(getCreateFoundationLocationUrl(propertyId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createFoundationLocationBody,)
+  }
+);}
+
+
+
+
+export const getCreateFoundationLocationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFoundationLocation>>, TError,{propertyId: number;data: BodyType<CreateFoundationLocationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFoundationLocation>>, TError,{propertyId: number;data: BodyType<CreateFoundationLocationBody>}, TContext> => {
+
+const mutationKey = ['createFoundationLocation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFoundationLocation>>, {propertyId: number;data: BodyType<CreateFoundationLocationBody>}> = (props) => {
+          const {propertyId,data} = props ?? {};
+
+          return  createFoundationLocation(propertyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFoundationLocationMutationResult = NonNullable<Awaited<ReturnType<typeof createFoundationLocation>>>
+    export type CreateFoundationLocationMutationBody = BodyType<CreateFoundationLocationBody>
+    export type CreateFoundationLocationMutationError = ErrorType<unknown>
+
+    export const useCreateFoundationLocation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFoundationLocation>>, TError,{propertyId: number;data: BodyType<CreateFoundationLocationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFoundationLocation>>,
+        TError,
+        {propertyId: number;data: BodyType<CreateFoundationLocationBody>},
+        TContext
+      > => {
+      return useMutation(getCreateFoundationLocationMutationOptions(options));
+    }
+
+export const getPatchFoundationLocationUrl = (propertyId: number,
+    locationId: string,) => {
+
+
+
+
+  return `/api/property-foundation/${propertyId}/locations/${locationId}`
+}
+
+export const patchFoundationLocation = async (propertyId: number,
+    locationId: string,
+    patchFoundationLocationBody: PatchFoundationLocationBody, options?: RequestInit): Promise<FoundationLocation> => {
+
+  return customFetch<FoundationLocation>(getPatchFoundationLocationUrl(propertyId,locationId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      patchFoundationLocationBody,)
+  }
+);}
+
+
+
+
+export const getPatchFoundationLocationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchFoundationLocation>>, TError,{propertyId: number;locationId: string;data: BodyType<PatchFoundationLocationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchFoundationLocation>>, TError,{propertyId: number;locationId: string;data: BodyType<PatchFoundationLocationBody>}, TContext> => {
+
+const mutationKey = ['patchFoundationLocation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchFoundationLocation>>, {propertyId: number;locationId: string;data: BodyType<PatchFoundationLocationBody>}> = (props) => {
+          const {propertyId,locationId,data} = props ?? {};
+
+          return  patchFoundationLocation(propertyId,locationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchFoundationLocationMutationResult = NonNullable<Awaited<ReturnType<typeof patchFoundationLocation>>>
+    export type PatchFoundationLocationMutationBody = BodyType<PatchFoundationLocationBody>
+    export type PatchFoundationLocationMutationError = ErrorType<unknown>
+
+    export const usePatchFoundationLocation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchFoundationLocation>>, TError,{propertyId: number;locationId: string;data: BodyType<PatchFoundationLocationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof patchFoundationLocation>>,
+        TError,
+        {propertyId: number;locationId: string;data: BodyType<PatchFoundationLocationBody>},
+        TContext
+      > => {
+      return useMutation(getPatchFoundationLocationMutationOptions(options));
+    }
+
+export const getListFoundationVisitsUrl = (propertyId: number,) => {
+
+
+
+
+  return `/api/property-foundation/${propertyId}/visits`
+}
+
+export const listFoundationVisits = async (propertyId: number, options?: RequestInit): Promise<FoundationVisit[]> => {
+
+  return customFetch<FoundationVisit[]>(getListFoundationVisitsUrl(propertyId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFoundationVisitsQueryKey = (propertyId: number,) => {
+    return [
+    `/api/property-foundation/${propertyId}/visits`
+    ] as const;
+    }
+
+
+export const getListFoundationVisitsQueryOptions = <TData = Awaited<ReturnType<typeof listFoundationVisits>>, TError = ErrorType<unknown>>(propertyId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFoundationVisits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFoundationVisitsQueryKey(propertyId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFoundationVisits>>> = ({ signal }) => listFoundationVisits(propertyId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(propertyId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFoundationVisits>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFoundationVisitsQueryResult = NonNullable<Awaited<ReturnType<typeof listFoundationVisits>>>
+export type ListFoundationVisitsQueryError = ErrorType<unknown>
+
+
+
+export function useListFoundationVisits<TData = Awaited<ReturnType<typeof listFoundationVisits>>, TError = ErrorType<unknown>>(
+ propertyId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFoundationVisits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFoundationVisitsQueryOptions(propertyId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateFoundationVisitUrl = (propertyId: number,) => {
+
+
+
+
+  return `/api/property-foundation/${propertyId}/visits`
+}
+
+export const createFoundationVisit = async (propertyId: number,
+    createFoundationVisitBody: CreateFoundationVisitBody, options?: RequestInit): Promise<FoundationVisitDetail> => {
+
+  return customFetch<FoundationVisitDetail>(getCreateFoundationVisitUrl(propertyId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createFoundationVisitBody,)
+  }
+);}
+
+
+
+
+export const getCreateFoundationVisitMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFoundationVisit>>, TError,{propertyId: number;data: BodyType<CreateFoundationVisitBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFoundationVisit>>, TError,{propertyId: number;data: BodyType<CreateFoundationVisitBody>}, TContext> => {
+
+const mutationKey = ['createFoundationVisit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFoundationVisit>>, {propertyId: number;data: BodyType<CreateFoundationVisitBody>}> = (props) => {
+          const {propertyId,data} = props ?? {};
+
+          return  createFoundationVisit(propertyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFoundationVisitMutationResult = NonNullable<Awaited<ReturnType<typeof createFoundationVisit>>>
+    export type CreateFoundationVisitMutationBody = BodyType<CreateFoundationVisitBody>
+    export type CreateFoundationVisitMutationError = ErrorType<unknown>
+
+    export const useCreateFoundationVisit = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFoundationVisit>>, TError,{propertyId: number;data: BodyType<CreateFoundationVisitBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFoundationVisit>>,
+        TError,
+        {propertyId: number;data: BodyType<CreateFoundationVisitBody>},
+        TContext
+      > => {
+      return useMutation(getCreateFoundationVisitMutationOptions(options));
+    }
+
+export const getGetFoundationVisitUrl = (propertyId: number,
+    visitId: string,) => {
+
+
+
+
+  return `/api/property-foundation/${propertyId}/visits/${visitId}`
+}
+
+export const getFoundationVisit = async (propertyId: number,
+    visitId: string, options?: RequestInit): Promise<FoundationVisitDetail> => {
+
+  return customFetch<FoundationVisitDetail>(getGetFoundationVisitUrl(propertyId,visitId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFoundationVisitQueryKey = (propertyId: number,
+    visitId: string,) => {
+    return [
+    `/api/property-foundation/${propertyId}/visits/${visitId}`
+    ] as const;
+    }
+
+
+export const getGetFoundationVisitQueryOptions = <TData = Awaited<ReturnType<typeof getFoundationVisit>>, TError = ErrorType<unknown>>(propertyId: number,
+    visitId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFoundationVisit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFoundationVisitQueryKey(propertyId,visitId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFoundationVisit>>> = ({ signal }) => getFoundationVisit(propertyId,visitId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(propertyId && visitId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFoundationVisit>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFoundationVisitQueryResult = NonNullable<Awaited<ReturnType<typeof getFoundationVisit>>>
+export type GetFoundationVisitQueryError = ErrorType<unknown>
+
+
+
+export function useGetFoundationVisit<TData = Awaited<ReturnType<typeof getFoundationVisit>>, TError = ErrorType<unknown>>(
+ propertyId: number,
+    visitId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFoundationVisit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFoundationVisitQueryOptions(propertyId,visitId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPatchFoundationCoverageUrl = (propertyId: number,
+    visitId: string,
+    coverageId: string,) => {
+
+
+
+
+  return `/api/property-foundation/${propertyId}/visits/${visitId}/coverage/${coverageId}`
+}
+
+export const patchFoundationCoverage = async (propertyId: number,
+    visitId: string,
+    coverageId: string,
+    patchFoundationCoverageBody: PatchFoundationCoverageBody, options?: RequestInit): Promise<FoundationCoverage> => {
+
+  return customFetch<FoundationCoverage>(getPatchFoundationCoverageUrl(propertyId,visitId,coverageId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      patchFoundationCoverageBody,)
+  }
+);}
+
+
+
+
+export const getPatchFoundationCoverageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchFoundationCoverage>>, TError,{propertyId: number;visitId: string;coverageId: string;data: BodyType<PatchFoundationCoverageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchFoundationCoverage>>, TError,{propertyId: number;visitId: string;coverageId: string;data: BodyType<PatchFoundationCoverageBody>}, TContext> => {
+
+const mutationKey = ['patchFoundationCoverage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchFoundationCoverage>>, {propertyId: number;visitId: string;coverageId: string;data: BodyType<PatchFoundationCoverageBody>}> = (props) => {
+          const {propertyId,visitId,coverageId,data} = props ?? {};
+
+          return  patchFoundationCoverage(propertyId,visitId,coverageId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchFoundationCoverageMutationResult = NonNullable<Awaited<ReturnType<typeof patchFoundationCoverage>>>
+    export type PatchFoundationCoverageMutationBody = BodyType<PatchFoundationCoverageBody>
+    export type PatchFoundationCoverageMutationError = ErrorType<unknown>
+
+    export const usePatchFoundationCoverage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchFoundationCoverage>>, TError,{propertyId: number;visitId: string;coverageId: string;data: BodyType<PatchFoundationCoverageBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof patchFoundationCoverage>>,
+        TError,
+        {propertyId: number;visitId: string;coverageId: string;data: BodyType<PatchFoundationCoverageBody>},
+        TContext
+      > => {
+      return useMutation(getPatchFoundationCoverageMutationOptions(options));
     }
 

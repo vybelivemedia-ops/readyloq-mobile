@@ -28,7 +28,7 @@ BASE_PATH = "/api"
 
 [[services]]
 name = "metro"
-paths = [ "/" ]
+paths = [ "/app" ]
 localPort = 8082
 
 [services.development]

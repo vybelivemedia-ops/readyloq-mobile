@@ -270,8 +270,9 @@ describe("POST /inspections/:id/treatment-logs", () => {
         dilutionOzPerGallon: 0.5,
         equipmentUsed: "compressed_air_sprayer",
         // TestCide Pro: ppeRequired=null, requiresSuit=null, requiresRespirator=null,
-        // mixingSteps=3 → expected checklist count = 3
+        // Three mixing steps plus the required sprayer equipment check.
         checklistItems: [
+          { label: "compressed_air_sprayer", checked: true },
           { label: "Add half water", checked: true },
           { label: "Add product", checked: true },
           { label: "Fill remainder", checked: true },
@@ -298,6 +299,7 @@ describe("POST /inspections/:id/treatment-logs", () => {
         totalProductOz: 5.0, // ← 5× over the label maximum
         equipmentUsed: "compressed_air_sprayer",
         checklistItems: [
+          { label: "compressed_air_sprayer", checked: true },
           { label: "Add half water", checked: true },
           { label: "Add product", checked: true },
           { label: "Fill remainder", checked: true },
@@ -323,6 +325,7 @@ describe("POST /inspections/:id/treatment-logs", () => {
         areaSqft: 1000,
         totalProductOz: 1.001,
         checklistItems: [
+          { label: "compressed_air_sprayer", checked: true },
           { label: "Add half water", checked: true },
           { label: "Add product", checked: true },
           { label: "Fill remainder", checked: true },
@@ -346,6 +349,7 @@ describe("POST /inspections/:id/treatment-logs", () => {
         totalProductOz: 99, // high, but sqft-based rate check doesn't run for linearFt
         linearFt: 50,
         checklistItems: [
+          { label: "compressed_air_sprayer", checked: true },
           { label: "Add half water", checked: true },
           { label: "Add product", checked: true },
           { label: "Fill remainder", checked: true },
@@ -400,6 +404,7 @@ describe("POST /inspections/:id/treatment-logs", () => {
         areaSqft: 500,
         totalProductOz: 0.3,
         checklistItems: [
+          { label: "compressed_air_sprayer", checked: true },
           { label: "Add half water", checked: true },
           { label: "Add product", checked: true },
           { label: "Fill remainder", checked: true },
@@ -420,6 +425,7 @@ describe("POST /inspections/:id/treatment-logs", () => {
         areaSqft: 500,
         totalProductOz: 0.3,
         checklistItems: [
+          { label: "compressed_air_sprayer", checked: true },
           { label: "Add half water", checked: true },
           { label: "Add product", checked: true },
           { label: "Fill remainder", checked: true },
@@ -457,6 +463,7 @@ describe("POST /inspections/:id/treatment-logs", () => {
         areaSqft: 500,
         totalProductOz: 0.3,
         checklistItems: [
+          { label: "compressed_air_sprayer", checked: true },
           { label: "Add half water", checked: true },
           { label: "Add product", checked: false }, // ← unchecked
           { label: "Fill remainder", checked: true },
@@ -478,6 +485,7 @@ describe("POST /inspections/:id/treatment-logs", () => {
         areaSqft: 1000,
         totalProductOz: 0.5,
         checklistItems: [
+          { label: "compressed_air_sprayer", checked: true },
           { label: "Add half water", checked: true },
           { label: "Add product", checked: true },
           { label: "Fill remainder", checked: true },
@@ -500,6 +508,7 @@ describe("POST /inspections/:id/treatment-logs", () => {
         areaSqft: 1000,
         totalProductOz: 0.5,
         checklistItems: [
+          { label: "compressed_air_sprayer", checked: true },
           { label: "Add half water", checked: true },
           { label: "Add product", checked: true },
           { label: "Fill remainder", checked: true },

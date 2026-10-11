@@ -1,10 +1,92 @@
 import type { QueryKey, UseMutationOptions, UseMutationResult, UseQueryOptions, UseQueryResult } from '@tanstack/react-query';
-import type { AgentTaskInput, AnalysisResult, AnalysisSummary, AnalyticsDashboard, AnalyzeInspectionInput, ApprovalDecisionInput, BaitStation, BaitStationInput, BetaFeedback, BrandingProfile, BrandingProfileInput, CallbackIntelligence, ChecklistResponse, ChecklistToggleResult, ClientErrorInput, CompanyAccessChangeInput, CompanyAccessChangeResult, CompleteInspectionResult, CreateInviteInput, CustomerSummary, CustomerSummaryApprove, CustomerSummaryUpdate, DailyRig, DailyRigLookupResult, DailyRigNotSetUp, DatasetCategory, DatasetPage, Error, ErrorEventList, FeedbackInput, GeminiConversation, GeminiConversationInput, GeminiConversationWithMessages, GeminiError, GeminiImageInput, GeminiImageOutput, GeminiMessage, GeminiMessageInput, GenerateNarrativeInput, GetAnalyticsTrendsParams, GetDailyRigParams, GetPropertyProfileParams, GetRouteCalendarParams, GetRouteOutlookParams, GetRouteReadinessParams, GetScheduleParams, GetTeamRouteReadinessParams, HealthStatus, IncidentUpdate, InfestationRisk, Inspection, InspectionInput, InspectionMedia, InspectionScorecard, InspectionScorecardListItem, InspectionUpdate, IntelligenceAnalytics, IntelligenceCategory, IntelligenceConfirmInput, IntelligenceRecord, IntelligenceRecordInput, IntelligenceRecordPage, IntelligenceReviewInput, IntelligenceSettings, IntelligenceSettingsInput, IntelligenceVoteInput, Invite, Lead, LeadInput, ListAnalysisResultsParams, ListDatasetImagesParams, ListFeedbackParams, ListInspectionsParams, ListIntelligenceRecordsParams, ListMissionControlAgentTasksParams, ListMissionControlApprovalsParams, ListMissionControlAuditParams, ListMissionControlCompaniesParams, ListMissionControlIncidentsParams, ListMissionControlInspectionsParams, ListMissionControlPropertiesParams, ListMissionControlTechniciansParams, ListProposalsParams, ListSalesOpportunitiesParams, ListScorecardsParams, LookupDailyRigParams, LookupPropertyParams, MediaInput, MissionControlAgentRoster, MissionControlAgentTask, MissionControlAgentTaskPage, MissionControlAnalysisDetail, MissionControlApproval, MissionControlApprovalPage, MissionControlApprovalRequest, MissionControlAuditPage, MissionControlBootstrapRequest, MissionControlBootstrapResult, MissionControlBootstrapTarget, MissionControlCompanyDetail, MissionControlCompanyPage, MissionControlDeviceSessionDetail, MissionControlEvidenceDetail, MissionControlEvidencePage, MissionControlIncident, MissionControlIncidentPage, MissionControlInspectionDetail, MissionControlInspectionPage, MissionControlMe, MissionControlOverview, MissionControlPropertyDetail, MissionControlPropertyPage, MissionControlSearchResults, MissionControlSuperAdminTarget, MissionControlTechnicianDetail, MissionControlTechnicianPage, MissionControlTimeline, OkResponse, OpportunityIntelligence, OpportunityNote, OpportunityNoteCreate, OpportunitySettings, OpportunitySettingsUpdate, PropertyFeed, PropertyLookupResult, PropertyNote, PropertyNoteInput, PropertyProfile, PropertyProfileUpdate, PropertyRiskInsights, PropertySummary, PropertyVisitDetail, ReassignInput, RecentMix, Report, ReportInput, ResolveMissionControlSuperAdminTargetParams, RoleBriefing, RouteCalendarDay, RouteOutlookDetail, RouteReadiness, SalesOpportunity, SalesOpportunityDetail, SalesOpportunityTrends, SalesOpportunityUpdate, SalesProposal, SalesProposalCreate, SalesProposalDetail, SalesProposalUpdate, ScheduleEntry, ScorecardSummary, SearchMissionControlParams, StopHistory, SubmitFeedbackInput, TechnicianPerformance, Tester, TesterAccessResult, ToggleAccessInput, ToggleChecklistInput, TrendDataPoint, UpdateFeedbackInput, UpsertDailyRigInput, UserAccessChangeInput, UserAccessChangeResult } from './api.schemas';
+import type { AgentTaskInput, AnalysisResult, AnalysisSummary, AnalyticsDashboard, AnalyzeInspectionInput, ApprovalDecisionInput, BaitStation, BaitStationInput, BetaFeedback, BrandingProfile, BrandingProfileInput, CallbackIntelligence, ChecklistResponse, ChecklistToggleResult, ClientErrorInput, CompanyAccessChangeInput, CompanyAccessChangeResult, CompleteInspectionResult, CreateFoundationLocationBody, CreateFoundationVisitBody, CreateInviteInput, CustomerSummary, CustomerSummaryApprove, CustomerSummaryUpdate, DailyRig, DailyRigLookupResult, DailyRigNotSetUp, DatasetCategory, DatasetPage, Error, ErrorEventList, FeedbackInput, FoundationCoverage, FoundationLocation, FoundationVisit, FoundationVisitDetail, GeminiConversation, GeminiConversationInput, GeminiConversationWithMessages, GeminiError, GeminiImageInput, GeminiImageOutput, GeminiMessage, GeminiMessageInput, GenerateNarrativeInput, GenericUploadUrlRequest, GetAnalyticsTrendsParams, GetDailyRigParams, GetFoundationRoster200, GetPropertyProfileParams, GetRouteCalendarParams, GetRouteOutlookParams, GetRouteReadinessParams, GetScheduleParams, GetTeamRouteReadinessParams, GetUploadReconciliation200, HealthStatus, IncidentUpdate, InfestationRisk, Inspection, InspectionInput, InspectionMedia, InspectionScorecard, InspectionScorecardListItem, InspectionUpdate, InspectionUploadReservationRequest, InspectionUploadUpgradeRequired, IntelligenceAnalytics, IntelligenceCategory, IntelligenceConfirmInput, IntelligenceRecord, IntelligenceRecordInput, IntelligenceRecordPage, IntelligenceReviewInput, IntelligenceSettings, IntelligenceSettingsInput, IntelligenceVoteInput, Invite, Lead, LeadInput, ListAnalysisResultsParams, ListDatasetImagesParams, ListFeedbackParams, ListInspectionsParams, ListIntelligenceRecordsParams, ListMissionControlAgentTasksParams, ListMissionControlApprovalsParams, ListMissionControlAuditParams, ListMissionControlCompaniesParams, ListMissionControlIncidentsParams, ListMissionControlInspectionsParams, ListMissionControlPropertiesParams, ListMissionControlTechniciansParams, ListProposalsParams, ListSalesOpportunitiesParams, ListScorecardsParams, LookupDailyRigParams, LookupPropertyParams, MediaInput, MissionControlAgentRoster, MissionControlAgentTask, MissionControlAgentTaskPage, MissionControlAnalysisDetail, MissionControlApproval, MissionControlApprovalPage, MissionControlApprovalRequest, MissionControlAuditPage, MissionControlBootstrapRequest, MissionControlBootstrapResult, MissionControlBootstrapTarget, MissionControlCompanyDetail, MissionControlCompanyPage, MissionControlDeviceSessionDetail, MissionControlEvidenceDetail, MissionControlEvidencePage, MissionControlIncident, MissionControlIncidentPage, MissionControlInspectionDetail, MissionControlInspectionPage, MissionControlMe, MissionControlOverview, MissionControlPropertyDetail, MissionControlPropertyPage, MissionControlSearchResults, MissionControlSuperAdminTarget, MissionControlTechnicianDetail, MissionControlTechnicianPage, MissionControlTimeline, OkResponse, OpportunityIntelligence, OpportunityNote, OpportunityNoteCreate, OpportunitySettings, OpportunitySettingsUpdate, PatchFoundationCoverageBody, PatchFoundationLocationBody, PropertyFeed, PropertyLookupResult, PropertyNote, PropertyNoteInput, PropertyProfile, PropertyProfileUpdate, PropertyRiskInsights, PropertySummary, PropertyVisitDetail, ReassignInput, RecentMix, Report, ReportInput, ResolveMissionControlSuperAdminTargetParams, RoleBriefing, RouteCalendarDay, RouteOutlookDetail, RouteReadiness, SalesOpportunity, SalesOpportunityDetail, SalesOpportunityTrends, SalesOpportunityUpdate, SalesProposal, SalesProposalCreate, SalesProposalDetail, SalesProposalUpdate, ScheduleEntry, ScorecardSummary, SearchMissionControlParams, StopHistory, SubmitFeedbackInput, TechnicianPerformance, Tester, TesterAccessResult, ToggleAccessInput, ToggleChecklistInput, TrendDataPoint, UpdateFeedbackInput, UploadUrlResponse, UpsertDailyRigInput, UserAccessChangeInput, UserAccessChangeResult } from './api.schemas';
 import { customFetch } from '../custom-fetch';
 import type { ErrorType, BodyType } from '../custom-fetch';
 type AwaitedInput<T> = PromiseLike<T> | T;
 type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export declare const getRequestUploadUrlUrl: () => string;
+/**
+ * New clients must explicitly select purpose=inspection-evidence and reserve the inspection, size, content type, idempotency key, and optional checksum before PUT. Non-evidence callers must send purpose=generic. Inspection evidence receives an authenticated API PUT endpoint (same-origin browser session or mobile Clerk bearer token) and is streamed server-side to GCS with ifGenerationMatch=0; the API validates actual byte count, content type, optional MD5, and GCS CRC32C. The Replit sidecar signer ignores requested extension constraints, so inspection evidence does not use its signed URL flow. Browsers need not set Content-Length. Requests using the pre-intent contract receive 426 without an upload URL. Upgrade the client, retain queued local evidence, reserve an intent, PUT to the authenticated endpoint, then register by uploadIntentId. Previously uploaded legacy objects are not auto-attached or deleted; reconcile them separately. Previously deployed clients remain unable to sync until their app/static-client upgrade is delivered; deploy the first-party generic callers' explicit purpose migration with this contract.
+ * @summary Request an upload URL; inspection evidence requires an authenticated create-only PUT
+ */
+export declare const requestUploadUrl: (genericUploadUrlRequestInspectionUploadReservationRequest: GenericUploadUrlRequest | InspectionUploadReservationRequest, options?: RequestInit) => Promise<UploadUrlResponse>;
+export declare const getRequestUploadUrlMutationOptions: <TError = ErrorType<void | InspectionUploadUpgradeRequired>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError, {
+        data: BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError, {
+    data: BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>;
+}, TContext>;
+export type RequestUploadUrlMutationResult = NonNullable<Awaited<ReturnType<typeof requestUploadUrl>>>;
+export type RequestUploadUrlMutationBody = BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>;
+export type RequestUploadUrlMutationError = ErrorType<void | InspectionUploadUpgradeRequired>;
+/**
+* @summary Request an upload URL; inspection evidence requires an authenticated create-only PUT
+*/
+export declare const useRequestUploadUrl: <TError = ErrorType<void | InspectionUploadUpgradeRequired>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError, {
+        data: BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationResult<Awaited<ReturnType<typeof requestUploadUrl>>, TError, {
+    data: BodyType<GenericUploadUrlRequest | InspectionUploadReservationRequest>;
+}, TContext>;
+export declare const getPutInspectionUploadContentUrl: (intentId: number) => string;
+/**
+ * @summary Stream reserved inspection evidence into GCS with a create-only precondition
+ */
+export declare const putInspectionUploadContent: (intentId: number, putInspectionUploadContentBody: Blob, options?: RequestInit) => Promise<void>;
+export declare const getPutInspectionUploadContentMutationOptions: <TError = ErrorType<void>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof putInspectionUploadContent>>, TError, {
+        intentId: number;
+        data: BodyType<Blob>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationOptions<Awaited<ReturnType<typeof putInspectionUploadContent>>, TError, {
+    intentId: number;
+    data: BodyType<Blob>;
+}, TContext>;
+export type PutInspectionUploadContentMutationResult = NonNullable<Awaited<ReturnType<typeof putInspectionUploadContent>>>;
+export type PutInspectionUploadContentMutationBody = BodyType<Blob>;
+export type PutInspectionUploadContentMutationError = ErrorType<void>;
+/**
+* @summary Stream reserved inspection evidence into GCS with a create-only precondition
+*/
+export declare const usePutInspectionUploadContent: <TError = ErrorType<void>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof putInspectionUploadContent>>, TError, {
+        intentId: number;
+        data: BodyType<Blob>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationResult<Awaited<ReturnType<typeof putInspectionUploadContent>>, TError, {
+    intentId: number;
+    data: BodyType<Blob>;
+}, TContext>;
+export declare const getGetUploadReconciliationUrl: () => string;
+/**
+ * @summary Complete paginated company-scoped report of upload and registration orphans (manager+)
+ */
+export declare const getUploadReconciliation: (options?: RequestInit) => Promise<GetUploadReconciliation200>;
+export declare const getGetUploadReconciliationQueryKey: () => readonly ["/api/storage/uploads/reconciliation"];
+export declare const getGetUploadReconciliationQueryOptions: <TData = Awaited<ReturnType<typeof getUploadReconciliation>>, TError = ErrorType<void>>(options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getUploadReconciliation>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseQueryOptions<Awaited<ReturnType<typeof getUploadReconciliation>>, TError, TData> & {
+    queryKey: QueryKey;
+};
+export type GetUploadReconciliationQueryResult = NonNullable<Awaited<ReturnType<typeof getUploadReconciliation>>>;
+export type GetUploadReconciliationQueryError = ErrorType<void>;
+/**
+ * @summary Complete paginated company-scoped report of upload and registration orphans (manager+)
+ */
+export declare function useGetUploadReconciliation<TData = Awaited<ReturnType<typeof getUploadReconciliation>>, TError = ErrorType<void>>(options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getUploadReconciliation>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+};
 export declare const getGetScheduleUrl: (params: GetScheduleParams) => string;
 /**
  * @summary List inspections for the scheduling calendar (manager+)
@@ -3554,6 +3636,169 @@ export declare const useDecideMissionControlApproval: <TError = ErrorType<void>,
 }) => UseMutationResult<Awaited<ReturnType<typeof decideMissionControlApproval>>, TError, {
     id: number;
     data: BodyType<ApprovalDecisionInput>;
+}, TContext>;
+export declare const getGetFoundationRosterUrl: (propertyId: number) => string;
+export declare const getFoundationRoster: (propertyId: number, options?: RequestInit) => Promise<GetFoundationRoster200>;
+export declare const getGetFoundationRosterQueryKey: (propertyId: number) => readonly [`/api/property-foundation/${number}/roster`];
+export declare const getGetFoundationRosterQueryOptions: <TData = Awaited<ReturnType<typeof getFoundationRoster>>, TError = ErrorType<unknown>>(propertyId: number, options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getFoundationRoster>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseQueryOptions<Awaited<ReturnType<typeof getFoundationRoster>>, TError, TData> & {
+    queryKey: QueryKey;
+};
+export type GetFoundationRosterQueryResult = NonNullable<Awaited<ReturnType<typeof getFoundationRoster>>>;
+export type GetFoundationRosterQueryError = ErrorType<unknown>;
+export declare function useGetFoundationRoster<TData = Awaited<ReturnType<typeof getFoundationRoster>>, TError = ErrorType<unknown>>(propertyId: number, options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getFoundationRoster>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+};
+export declare const getCreateFoundationLocationUrl: (propertyId: number) => string;
+export declare const createFoundationLocation: (propertyId: number, createFoundationLocationBody: CreateFoundationLocationBody, options?: RequestInit) => Promise<FoundationLocation>;
+export declare const getCreateFoundationLocationMutationOptions: <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof createFoundationLocation>>, TError, {
+        propertyId: number;
+        data: BodyType<CreateFoundationLocationBody>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationOptions<Awaited<ReturnType<typeof createFoundationLocation>>, TError, {
+    propertyId: number;
+    data: BodyType<CreateFoundationLocationBody>;
+}, TContext>;
+export type CreateFoundationLocationMutationResult = NonNullable<Awaited<ReturnType<typeof createFoundationLocation>>>;
+export type CreateFoundationLocationMutationBody = BodyType<CreateFoundationLocationBody>;
+export type CreateFoundationLocationMutationError = ErrorType<unknown>;
+export declare const useCreateFoundationLocation: <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof createFoundationLocation>>, TError, {
+        propertyId: number;
+        data: BodyType<CreateFoundationLocationBody>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationResult<Awaited<ReturnType<typeof createFoundationLocation>>, TError, {
+    propertyId: number;
+    data: BodyType<CreateFoundationLocationBody>;
+}, TContext>;
+export declare const getPatchFoundationLocationUrl: (propertyId: number, locationId: string) => string;
+export declare const patchFoundationLocation: (propertyId: number, locationId: string, patchFoundationLocationBody: PatchFoundationLocationBody, options?: RequestInit) => Promise<FoundationLocation>;
+export declare const getPatchFoundationLocationMutationOptions: <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof patchFoundationLocation>>, TError, {
+        propertyId: number;
+        locationId: string;
+        data: BodyType<PatchFoundationLocationBody>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationOptions<Awaited<ReturnType<typeof patchFoundationLocation>>, TError, {
+    propertyId: number;
+    locationId: string;
+    data: BodyType<PatchFoundationLocationBody>;
+}, TContext>;
+export type PatchFoundationLocationMutationResult = NonNullable<Awaited<ReturnType<typeof patchFoundationLocation>>>;
+export type PatchFoundationLocationMutationBody = BodyType<PatchFoundationLocationBody>;
+export type PatchFoundationLocationMutationError = ErrorType<unknown>;
+export declare const usePatchFoundationLocation: <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof patchFoundationLocation>>, TError, {
+        propertyId: number;
+        locationId: string;
+        data: BodyType<PatchFoundationLocationBody>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationResult<Awaited<ReturnType<typeof patchFoundationLocation>>, TError, {
+    propertyId: number;
+    locationId: string;
+    data: BodyType<PatchFoundationLocationBody>;
+}, TContext>;
+export declare const getListFoundationVisitsUrl: (propertyId: number) => string;
+export declare const listFoundationVisits: (propertyId: number, options?: RequestInit) => Promise<FoundationVisit[]>;
+export declare const getListFoundationVisitsQueryKey: (propertyId: number) => readonly [`/api/property-foundation/${number}/visits`];
+export declare const getListFoundationVisitsQueryOptions: <TData = Awaited<ReturnType<typeof listFoundationVisits>>, TError = ErrorType<unknown>>(propertyId: number, options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof listFoundationVisits>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseQueryOptions<Awaited<ReturnType<typeof listFoundationVisits>>, TError, TData> & {
+    queryKey: QueryKey;
+};
+export type ListFoundationVisitsQueryResult = NonNullable<Awaited<ReturnType<typeof listFoundationVisits>>>;
+export type ListFoundationVisitsQueryError = ErrorType<unknown>;
+export declare function useListFoundationVisits<TData = Awaited<ReturnType<typeof listFoundationVisits>>, TError = ErrorType<unknown>>(propertyId: number, options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof listFoundationVisits>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+};
+export declare const getCreateFoundationVisitUrl: (propertyId: number) => string;
+export declare const createFoundationVisit: (propertyId: number, createFoundationVisitBody: CreateFoundationVisitBody, options?: RequestInit) => Promise<FoundationVisitDetail>;
+export declare const getCreateFoundationVisitMutationOptions: <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof createFoundationVisit>>, TError, {
+        propertyId: number;
+        data: BodyType<CreateFoundationVisitBody>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationOptions<Awaited<ReturnType<typeof createFoundationVisit>>, TError, {
+    propertyId: number;
+    data: BodyType<CreateFoundationVisitBody>;
+}, TContext>;
+export type CreateFoundationVisitMutationResult = NonNullable<Awaited<ReturnType<typeof createFoundationVisit>>>;
+export type CreateFoundationVisitMutationBody = BodyType<CreateFoundationVisitBody>;
+export type CreateFoundationVisitMutationError = ErrorType<unknown>;
+export declare const useCreateFoundationVisit: <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof createFoundationVisit>>, TError, {
+        propertyId: number;
+        data: BodyType<CreateFoundationVisitBody>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationResult<Awaited<ReturnType<typeof createFoundationVisit>>, TError, {
+    propertyId: number;
+    data: BodyType<CreateFoundationVisitBody>;
+}, TContext>;
+export declare const getGetFoundationVisitUrl: (propertyId: number, visitId: string) => string;
+export declare const getFoundationVisit: (propertyId: number, visitId: string, options?: RequestInit) => Promise<FoundationVisitDetail>;
+export declare const getGetFoundationVisitQueryKey: (propertyId: number, visitId: string) => readonly [`/api/property-foundation/${number}/visits/${string}`];
+export declare const getGetFoundationVisitQueryOptions: <TData = Awaited<ReturnType<typeof getFoundationVisit>>, TError = ErrorType<unknown>>(propertyId: number, visitId: string, options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getFoundationVisit>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseQueryOptions<Awaited<ReturnType<typeof getFoundationVisit>>, TError, TData> & {
+    queryKey: QueryKey;
+};
+export type GetFoundationVisitQueryResult = NonNullable<Awaited<ReturnType<typeof getFoundationVisit>>>;
+export type GetFoundationVisitQueryError = ErrorType<unknown>;
+export declare function useGetFoundationVisit<TData = Awaited<ReturnType<typeof getFoundationVisit>>, TError = ErrorType<unknown>>(propertyId: number, visitId: string, options?: {
+    query?: UseQueryOptions<Awaited<ReturnType<typeof getFoundationVisit>>, TError, TData>;
+    request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+};
+export declare const getPatchFoundationCoverageUrl: (propertyId: number, visitId: string, coverageId: string) => string;
+export declare const patchFoundationCoverage: (propertyId: number, visitId: string, coverageId: string, patchFoundationCoverageBody: PatchFoundationCoverageBody, options?: RequestInit) => Promise<FoundationCoverage>;
+export declare const getPatchFoundationCoverageMutationOptions: <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof patchFoundationCoverage>>, TError, {
+        propertyId: number;
+        visitId: string;
+        coverageId: string;
+        data: BodyType<PatchFoundationCoverageBody>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationOptions<Awaited<ReturnType<typeof patchFoundationCoverage>>, TError, {
+    propertyId: number;
+    visitId: string;
+    coverageId: string;
+    data: BodyType<PatchFoundationCoverageBody>;
+}, TContext>;
+export type PatchFoundationCoverageMutationResult = NonNullable<Awaited<ReturnType<typeof patchFoundationCoverage>>>;
+export type PatchFoundationCoverageMutationBody = BodyType<PatchFoundationCoverageBody>;
+export type PatchFoundationCoverageMutationError = ErrorType<unknown>;
+export declare const usePatchFoundationCoverage: <TError = ErrorType<unknown>, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof patchFoundationCoverage>>, TError, {
+        propertyId: number;
+        visitId: string;
+        coverageId: string;
+        data: BodyType<PatchFoundationCoverageBody>;
+    }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+}) => UseMutationResult<Awaited<ReturnType<typeof patchFoundationCoverage>>, TError, {
+    propertyId: number;
+    visitId: string;
+    coverageId: string;
+    data: BodyType<PatchFoundationCoverageBody>;
 }, TContext>;
 export {};
 //# sourceMappingURL=api.d.ts.map

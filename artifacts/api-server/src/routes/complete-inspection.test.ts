@@ -109,7 +109,7 @@ import {
   analysisResultsTable,
   inspectionUploadIntentsTable,
 } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { migrateInspectionUploadIntents } from "../lib/migrate-inspection-upload-intents";
 
 const OWNER_ID = "complete_owner_clerk_id";
@@ -482,7 +482,8 @@ describe("POST /inspections/:id/complete", () => {
     await db.insert(analysisResultsTable).values({
       companyId,
       inspectionId,
-      findings: [validFinding, ...invalidFindings],
+      // Deliberately seed malformed legacy JSON below the typed API boundary.
+      findings: sql`${JSON.stringify([validFinding, ...invalidFindings])}::jsonb`,
       recommendations: ["Apply gel bait"],
       overallConfidence: 0.88,
     });

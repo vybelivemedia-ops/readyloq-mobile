@@ -167,7 +167,12 @@ describe("runDailyBriefingJob", () => {
 
     // The DB filter should have excluded OPTOUT_CLERK entirely — no Clerk call for it
     expect(clerkCalledFor).not.toContain(OPTOUT_CLERK);
-    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(clerkCalledFor).not.toContain(OWNER_CLERK);
+    // Other isolated suites may have opted-in owners. Assert this company's
+    // opt-out, rather than requiring the entire shared test DB to send nothing.
+    expect(mockSendMail).not.toHaveBeenCalledWith(expect.objectContaining({
+      subject: expect.stringContaining("BriefingSched Co"),
+    }));
 
     // Restore
     await db.update(usersTable).set({ briefingEmailOptOut: false }).where(eq(usersTable.id, ownerUserId));

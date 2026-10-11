@@ -19,7 +19,7 @@ import {
 // ─── Quiz content ───────────────────────────────────────────────────────────
 //
 // Each question scores 0-2 points per answer. Max total = 6, scaled to a
-// 100-point "security score" for the result screen.
+// 100-point answer summary, not a measured security or compliance score.
 
 interface AuditOption {
   label: string;
@@ -38,42 +38,42 @@ interface AuditQuestion {
 const QUESTIONS: AuditQuestion[] = [
   {
     icon: <ClipboardList size={22} />,
-    eyebrow: "Audit Trails & Access Control",
+    eyebrow: "Recorded Actions & Access Control",
     question:
-      "Does your current software provide immutable audit trails for every chemical transfer and management action, with role-based access control (RBAC) so technicians can't alter management data?",
+      "Does your current software record stock transactions and restrict management actions to authorized roles?",
     options: [
-      { label: "Yes, every action is logged and access-controlled", points: 2 },
-      { label: "Some logging, but roles aren't well enforced", points: 1 },
+      { label: "We record transactions and regularly review role permissions", points: 2 },
+      { label: "Some records or permissions need review", points: 1 },
       { label: "No / Not sure", points: 0 },
     ],
     readyloqAnswer:
-      "Every chemical transfer, override, and management action writes to an append-only record. Access follows a strict role hierarchy — technician < sales < manager < owner — enforced on every API call, not just hidden in the UI.",
+      "ReadyLoq records inventory transactions in a protected ledger and uses role-based checks for restricted API actions. This is not a guarantee of immutable records for every management action or complete audit coverage.",
   },
   {
     icon: <Boxes size={22} />,
-    eyebrow: "Inventory & Chemical Custody",
+    eyebrow: "Inventory Transaction Records",
     question:
-      "When a technician's truck stock doesn't match your warehouse records, can you trace the exact transaction that caused it — or does someone just re-count and guess?",
+      "Can your team review recorded warehouse and truck-stock transfers when investigating a discrepancy?",
     options: [
-      { label: "Every transfer is logged and traceable to the source", points: 2 },
+      { label: "We record transfers and review discrepancies", points: 2 },
       { label: "We can usually figure it out with some digging", points: 1 },
       { label: "We just re-count and move on", points: 0 },
     ],
     readyloqAnswer:
-      "Every ounce of product moving between warehouse and truck posts to a transaction ledger. Discrepancies are reconciled automatically and flagged — not discovered three weeks later during a compliance audit.",
+      "ReadyLoq tracks recorded stock transfers and adjustments so managers can investigate discrepancies. Record completeness depends on what teams enter; this is not a complete chemical chain-of-custody guarantee or automatic physical-stock reconciliation.",
   },
   {
     icon: <Lock size={22} />,
     eyebrow: "Data Isolation & Security",
     question:
-      "If your software serves multiple client companies or locations, can you guarantee one location's staff can never see another's records, with data encrypted end-to-end?",
+      "Does your team review company-level data access and verify that sensitive information is shared only with authorized users?",
     options: [
-      { label: "Yes — strict isolation and encryption everywhere", points: 2 },
-      { label: "Mostly, but I couldn't prove it under audit", points: 1 },
+      { label: "We review access and test the relevant controls", points: 2 },
+      { label: "Some access controls still need verification", points: 1 },
       { label: "No / Not sure", points: 0 },
     ],
     readyloqAnswer:
-      "Every record is scoped to a company at the database layer — no cross-tenant query can ever return another company's data — and all traffic is encrypted in transit. The architecture is built around SOC 2-aligned controls from day one.",
+      "ReadyLoq uses authenticated, tenant-scoped API checks and role permissions for company data. These controls have regression coverage, but do not constitute a security certification or eliminate security risks. Company-level access is not a promise of separate isolation for every location.",
   },
 ];
 
@@ -89,28 +89,28 @@ type Tier = {
 function getTier(scorePct: number): Tier {
   if (scorePct < 40) {
     return {
-      label: "High Risk — Audit Gap",
+      label: "Areas to Review",
       tone: "red",
       icon: <ShieldX size={28} />,
       summary:
-        "Your current setup likely can't withstand a real compliance audit or a data-loss incident. Chemical custody and access control are probably tracked informally, if at all.",
+        "Your answers suggest areas to discuss with your team. This questionnaire has not tested your software, records, or security controls.",
     };
   }
   if (scorePct < 75) {
     return {
-      label: "Moderate Risk — Partial Controls",
+      label: "Some Practices Reported",
       tone: "yellow",
       icon: <ShieldAlert size={28} />,
       summary:
-        "You have some controls in place, but gaps in traceability or access enforcement mean you'd struggle to prove compliance on demand.",
+        "You reported some practices in place and others that may need review. Verify them independently before drawing security or compliance conclusions.",
     };
   }
   return {
-    label: "Strong Foundation",
+    label: "More Practices Reported",
     tone: "green",
     icon: <ShieldCheck size={28} />,
     summary:
-      "You're ahead of most operations in this industry. Even so, most legacy platforms can't produce a real-time, tamper-evident audit trail on demand — see how ReadyLoq closes that last gap.",
+      "You reported practices across these topics. This does not verify their effectiveness, certify compliance, or establish that your system is secure.",
   };
 }
 
@@ -161,7 +161,7 @@ export function SecurityAuditWidget() {
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-primary">
                 Step {step + 1} of {QUESTIONS.length}
               </span>
-              <span className="text-xs font-mono text-slate-400">Security Self-Audit</span>
+              <span className="text-xs font-mono text-slate-400">Informational Self-Assessment</span>
             </div>
             <Progress value={((step + 1) / QUESTIONS.length) * 100} />
           </div>
@@ -236,7 +236,7 @@ export function SecurityAuditWidget() {
                     disabled={currentAnswer === null}
                     data-testid="button-audit-next"
                   >
-                    {step === QUESTIONS.length - 1 ? "See My Score" : "Next Step"} <ArrowRight size={16} />
+                    {step === QUESTIONS.length - 1 ? "See My Summary" : "Next Step"} <ArrowRight size={16} />
                   </Button>
                 </div>
               </motion.div>
@@ -254,11 +254,16 @@ export function SecurityAuditWidget() {
                     {tier.icon}
                     {tier.label}
                   </div>
+                  <p className="text-sm font-semibold text-slate-500 mb-2">Answer summary — not a security rating</p>
                   <div className="text-6xl font-bold text-slate-900 mb-2" data-testid="text-audit-score">
                     {scorePct}
                     <span className="text-2xl text-slate-400">/100</span>
                   </div>
                   <p className="text-slate-600 max-w-xl mx-auto">{tier.summary}</p>
+                  <p className="mt-4 text-sm text-slate-500 max-w-xl mx-auto">
+                    Calculated only from your three answers. Informational only:
+                    not a security audit, compliance certification, or proof of security.
+                  </p>
                 </div>
 
                 <div className="space-y-4 mb-10">
@@ -281,7 +286,7 @@ export function SecurityAuditWidget() {
                               {q.eyebrow}
                             </p>
                             <p className="text-sm text-slate-500">
-                              {gap ? "Gap identified in your current setup." : "Solid answer — here's how ReadyLoq goes further:"}
+                              {gap ? "You reported an area for review." : "You reported practices in this area."}
                             </p>
                           </div>
                         </div>
@@ -300,7 +305,7 @@ export function SecurityAuditWidget() {
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                   <Link href="/demo">
                     <Button size="lg" className="w-full sm:w-auto px-8" data-testid="button-audit-cta-demo">
-                      Get Your Full Security Deep-Dive <ArrowRight size={16} />
+                      Discuss ReadyLoq's Controls <ArrowRight size={16} />
                     </Button>
                   </Link>
                   <Button
@@ -310,7 +315,7 @@ export function SecurityAuditWidget() {
                     data-testid="button-audit-restart"
                     className="w-full sm:w-auto"
                   >
-                    <RotateCcw size={16} /> Retake Audit
+                    <RotateCcw size={16} /> Retake Self-Assessment
                   </Button>
                 </div>
               </motion.div>

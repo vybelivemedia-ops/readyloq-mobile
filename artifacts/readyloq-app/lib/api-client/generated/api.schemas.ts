@@ -1392,6 +1392,8 @@ export interface Hotspot {
 }
 
 export interface PropertySummary {
+  /** Stable property_profiles ID; null for an address-only legacy property. */
+  profileId?: number | null;
   addressKey: string;
   siteAddress: string;
   /** @nullable */

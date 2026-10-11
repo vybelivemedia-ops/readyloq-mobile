@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, jsonb, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, jsonb, timestamp, uniqueIndex, unique, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { companiesTable } from "./companies";
@@ -34,6 +34,9 @@ export const propertyProfilesTable = pgTable(
   },
   (t) => ({
     companyAddressKey: uniqueIndex("property_profiles_company_address_key").on(t.companyId, t.addressKey),
+    // drizzle-kit introspects UNIQUE columns in table order, not key order.
+    // Keep the same key set; never replace an existing FK target to reorder it.
+    companyIdKey: unique("property_profiles_company_id_uq").on(t.id, t.companyId),
   }),
 );
 

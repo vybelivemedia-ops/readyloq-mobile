@@ -128,6 +128,7 @@ async function buildSummaries(companyId: number) {
         openIssueCount: categoriesByKey.get(key)?.size ?? 0,
         lastVisit,
         hasProfile: !!profile,
+        profileId: profile?.id ?? null,
       };
     })
     .sort((a, b) => (b.lastVisit ?? "").localeCompare(a.lastVisit ?? ""));

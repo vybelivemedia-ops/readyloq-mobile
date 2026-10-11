@@ -1,4 +1,5 @@
 import { useAuth, useUser } from "@clerk/expo";
+import { PropertyBriefingLoader, briefingForIdentity, type IdentityBriefing } from "@/lib/local/property-briefing";
 import { Ionicons } from "@expo/vector-icons";
 import {
   deleteInspection,
@@ -68,6 +69,7 @@ import {
 } from "@/lib/meta-glasses/calibration";
 import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/ui/Screen";
+import { CaptureDoneAction } from "@/components/CaptureDoneAction";
 import { TextField } from "@/components/ui/TextField";
 import { useColors } from "@/hooks/useColors";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
@@ -167,7 +169,7 @@ export default function NewInspectionScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user: clerkUser } = useUser();
-  const { getToken } = useAuth();
+  const { getToken, sessionId, orgId } = useAuth();
   const params = useLocalSearchParams<{
     resume?: string;
     /** Pre-filled site address from the Schedule tab stop card. */
@@ -640,29 +642,29 @@ export default function NewInspectionScreen() {
   const { isConnected } = useNetworkStatus();
 
   // ── Property memory — prior-visit context banner ──────────────────────────
-  const [propertyMemory, setPropertyMemory] = useState<PropertyMemoryData | null>(null);
+  const memoryIdentity = JSON.stringify([clerkUser?.id ?? null, sessionId ?? null, orgId ?? null, siteAddress.trim()]);
+  const [propertyBriefing, setPropertyBriefing] = useState<IdentityBriefing<PropertyMemoryData> | null>(null);
+  const propertyMemory = briefingForIdentity(propertyBriefing, memoryIdentity);
+  const briefingLoader = useRef(new PropertyBriefingLoader<PropertyMemoryData>());
 
   useEffect(() => {
     if (siteAddress.trim().length < 6) {
-      setPropertyMemory(null);
+      setPropertyBriefing({ identity: memoryIdentity, value: null });
       return;
     }
-    let cancelled = false;
+    setPropertyBriefing({ identity: memoryIdentity, value: null });
+    let cancelLoad: (() => void) | undefined;
     const timer = setTimeout(() => {
-      getToken()
-        .then((token) => fetchPropertyMemory(token, siteAddress))
-        .then((res) => {
-          if (!cancelled) setPropertyMemory(res.found ? res.data : null);
-        })
-        .catch(() => {
-          // Non-blocking — failure just means no banner is shown.
-        });
+      cancelLoad = briefingLoader.current.load(memoryIdentity, async () => {
+        const res = await fetchPropertyMemory(await getToken(), siteAddress);
+        return res.found ? res.data : null;
+      }, setPropertyBriefing);
     }, 600);
     return () => {
-      cancelled = true;
+      cancelLoad?.();
       clearTimeout(timer);
     };
-  }, [siteAddress, getToken]);
+  }, [siteAddress, getToken, memoryIdentity]);
 
   // Clean up any live recording if the screen is dismissed mid-dictation.
   useEffect(() => {
@@ -1927,8 +1929,16 @@ export default function NewInspectionScreen() {
 
   // ─── Capture step (full camera) ─────────────────────────────────────────────
   if (step === "capture") {
+    const renderDoneAction = (safeAreaHandled = false) => (
+      <CaptureDoneAction
+        onPress={() => setStep("review")}
+        disabled={photos.length === 0}
+        color={colors.primary}
+        safeAreaHandled={safeAreaHandled}
+      />
+    );
     if (!permission) {
-      return <Screen edges={["top", "bottom"]} />;
+      return <Screen edges={["top", "bottom"]}>{renderDoneAction(true)}</Screen>;
     }
     if (!permission.granted) {
       return (
@@ -1957,6 +1967,7 @@ export default function NewInspectionScreen() {
             </Text>
             <Button title="Grant camera access" onPress={requestPermission} />
           </View>
+          {renderDoneAction(true)}
         </Screen>
       );
     }
@@ -2031,18 +2042,6 @@ export default function NewInspectionScreen() {
         }}
       >
         <View style={{ width: 62, height: 62, borderRadius: 31, backgroundColor: "#fff" }} />
-      </Pressable>
-    );
-
-    const doneButton = (
-      <Pressable
-        onPress={() => setStep("review")}
-        disabled={photos.length === 0}
-        style={{ width: 64, alignItems: "center", opacity: photos.length === 0 ? 0.4 : 1 }}
-      >
-        <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 16 }}>
-          Done
-        </Text>
       </Pressable>
     );
 
@@ -3124,7 +3123,6 @@ export default function NewInspectionScreen() {
                   </Pressable>
                   {faieButton}
                   {captureButton}
-                  {doneButton}
                 </View>
                 {thumbs}
               </View>
@@ -3133,9 +3131,9 @@ export default function NewInspectionScreen() {
                 onClose={() => setShowWifiCamera(false)}
                 onConnected={() => setWifiCameraConnected(true)}
               />
-              {/* Measure-mode overlay — must be the LAST camera-pane child so it
-                  paints above (and captures touches before) the control bars. */}
+              {/* Measurement stays above tools; Done has its own reachable layer. */}
               {measureOverlay}
+              {renderDoneAction(true)}
             </View>
 
             {/* Right: AI Insights / Co-Pilot pane — strict 50% of screen */}
@@ -3337,7 +3335,6 @@ export default function NewInspectionScreen() {
               {flashButton}
               {importButton}
               {captureButton}
-              {doneButton}
               {faieButton}
               {refSelectChip}
               {measureChip}
@@ -3487,7 +3484,8 @@ export default function NewInspectionScreen() {
                 </Pressable>
               </View>
               {captureButton}
-              {doneButton}
+              {/* Reserve the old action slot; Done is independent of this tall row. */}
+              <View style={{ width: 64 }} />
             </View>
           </View>
         )}
@@ -3722,6 +3720,8 @@ export default function NewInspectionScreen() {
           visible={lightboxIndex != null}
           onClose={() => setLightboxIndex(null)}
         />
+        {/* Last non-modal layer: insights/status/measurement cannot cover Done. */}
+        {renderDoneAction()}
       </View>
     );
   }

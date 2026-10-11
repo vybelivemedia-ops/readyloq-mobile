@@ -715,7 +715,7 @@ describe("executive email-preview endpoint: HTML escaping of user-supplied strin
     await db.delete(usersTable).where(eq(usersTable.clerkUserId, SPECIAL_OWNER_ID));
     // Delete branding profiles first (FK references companies).
     await db.delete(brandingProfilesTable).where(eq(brandingProfilesTable.companyId, specialCompanyId));
-    await db.delete(companiesTable).where(eq(companiesTable.slug, SPECIAL_CO_SLUG));
+    // Retain the fixture company: append-only events intentionally outlive inspections.
   });
 
   it("HTML-escapes the company name so special characters appear as entities, not raw markup", async () => {
@@ -1381,9 +1381,7 @@ describe("executive briefing ?date param: date-scoped queries honour companyId",
     await db.delete(brandingProfilesTable).where(
       inArray(brandingProfilesTable.companyId, [dateIsoCoAId, dateIsoCoBId]),
     );
-    await db.delete(companiesTable).where(
-      inArray(companiesTable.slug, [DATE_ISO_CO_A_SLUG, DATE_ISO_CO_B_SLUG]),
-    );
+    // Retain companies referenced by immutable inspection events.
   });
 
   it("company A sees only its own inspection count when requesting a shared historical date", async () => {
@@ -1524,7 +1522,7 @@ describe("executive briefing: midnight boundary accuracy", () => {
     await db.delete(opportunitiesTable).where(eq(opportunitiesTable.companyId, midnightCompanyId));
     await db.delete(usersTable).where(eq(usersTable.clerkUserId, MIDNIGHT_OWNER_ID));
     await db.delete(brandingProfilesTable).where(eq(brandingProfilesTable.companyId, midnightCompanyId));
-    await db.delete(companiesTable).where(eq(companiesTable.slug, MIDNIGHT_CO_SLUG));
+    // Retain the company referenced by immutable inspection events.
   });
 
   it("counts an inspection created one second before midnight as part of that day's briefing", async () => {
@@ -1717,7 +1715,7 @@ describe("executive briefing: timezone-aware midnight boundary", () => {
     await db.delete(opportunitiesTable).where(eq(opportunitiesTable.companyId, tzCompanyId));
     await db.delete(usersTable).where(eq(usersTable.clerkUserId, TZ_OWNER_ID));
     await db.delete(brandingProfilesTable).where(eq(brandingProfilesTable.companyId, tzCompanyId));
-    await db.delete(companiesTable).where(eq(companiesTable.slug, TZ_CO_SLUG));
+    // Retain the company referenced by immutable inspection events.
   });
 
   it("counts inspTzA (59 min before end of Eastern window) inside targetDate's briefing", async () => {

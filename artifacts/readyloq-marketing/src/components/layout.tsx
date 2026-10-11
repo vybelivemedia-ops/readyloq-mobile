@@ -3,6 +3,7 @@ import { asset } from "@/config";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
+import { PilotSignup } from "@/components/pilot-signup";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col font-sans bg-background text-foreground selection:bg-primary/20">
+      {location === "/" && <PilotSignup />}
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">

@@ -24,6 +24,7 @@ function makeInspection(overrides: Record<string, unknown> = {}) {
     scheduledDate: null, createdAt: new Date(), completedAt: new Date(),
     technicianSignature: null, ownerSignature: null,
     ownerNotAvailable: false, signedAt: null,
+    unitNumber: null, visitPurpose: null,
     ...overrides,
   } as Parameters<typeof buildServerReportHtml>[1];
 }

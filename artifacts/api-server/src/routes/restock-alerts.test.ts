@@ -156,12 +156,9 @@ afterAll(async () => {
   await db.execute(sql`DELETE FROM treatment_logs WHERE company_id = ${companyId}`);
   await db.delete(inspectionsTable).where(eq(inspectionsTable.companyId, companyId));
   await db.delete(techInventoryTable).where(eq(techInventoryTable.companyId, companyId));
-  await db.delete(productLabelRulesTable).where(eq(productLabelRulesTable.productId, productId));
-  await db.delete(productsTable).where(eq(productsTable.id, productId));
-  await db.delete(usersTable).where(eq(usersTable.companyId, companyId));
-  await db.delete(usersTable).where(eq(usersTable.companyId, otherCompanyId));
-  await db.delete(companiesTable).where(and(eq(companiesTable.slug, SLUG)));
-  await db.delete(companiesTable).where(and(eq(companiesTable.slug, OTHER_SLUG)));
+  // Ledger history retains product/company/user references. Retire only this
+  // fixture's product; never bypass immutable ledger protections for cleanup.
+  await db.update(productsTable).set({ isActive: false }).where(eq(productsTable.id, productId));
 });
 
 // ── Threshold trigger tests ───────────────────────────────────────────────────

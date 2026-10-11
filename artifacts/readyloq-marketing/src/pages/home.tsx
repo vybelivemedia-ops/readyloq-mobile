@@ -23,12 +23,7 @@ export default function Home() {
           "name": "ReadyLoq",
           "applicationCategory": "BusinessApplication",
           "operatingSystem": "Web, Mobile",
-          "description": "Property intelligence and operational knowledge platform for pest control.",
-          "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "USD"
-          }
+          "description": "Property intelligence and operational knowledge platform for pest control."
         })}
       </script>
 
@@ -49,13 +44,13 @@ export default function Home() {
             >
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30 text-sm font-mono mb-8">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                The System of Record for Field Operations
+                Property Intelligence for Field Operations
               </div>
               <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 leading-tight">
                 Don't let your best technicians <span className="text-primary">walk away with your data.</span>
               </h1>
               <p className="text-xl text-slate-300 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-                ReadyLoq captures property knowledge, standardizes communication, and turns field expertise into permanent institutional memory.
+                ReadyLoq captures property knowledge, standardizes communication, and turns recorded field expertise into shared institutional memory.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
                 <Link href="/demo">
@@ -76,7 +71,7 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.15 }}
             >
-              <FaieAssistant />
+              <FaieAssistant homepageContext />
             </motion.div>
           </div>
         </div>
@@ -144,7 +139,7 @@ export default function Home() {
             <h2 className="text-sm font-mono text-primary font-bold uppercase tracking-wider mb-3">The Solution</h2>
             <h3 className="text-3xl md:text-4xl font-bold mb-6 text-slate-900">Institutional Knowledge, Standardized.</h3>
             <p className="text-lg text-slate-600">
-              ReadyLoq provides a structured, mobile-first interface for technicians to log site conditions, access requirements, and historical data, making every property completely transparent to anyone on your team.
+              ReadyLoq provides a structured, mobile-first interface for technicians to log site conditions, access requirements, and historical data, helping authorized team members build a shared understanding of each property.
             </p>
           </div>
 
@@ -173,17 +168,17 @@ export default function Home() {
               {
                 icon: <Shield className="text-primary" size={32} />,
                 title: "Callback Reduction",
-                desc: "Equip every technician with the historical context needed to solve the problem the first time."
+                desc: "Help technicians prepare for follow-up visits with recorded findings and prior-visit context."
               },
               {
                 icon: <FileText className="text-primary" size={32} />,
-                title: "White-Labeled Reporting",
-                desc: "Generate professional, branded reports that prove your value to commercial clients."
+                title: "Inspection Reporting",
+                desc: "Create company-named inspection reports from recorded findings and photos, with review and approval before client sharing."
               },
               {
                 icon: <LineChart className="text-primary" size={32} />,
                 title: "Management Visibility",
-                desc: "See exactly what's happening in the field with dashboard analytics on property risk and tech performance."
+                desc: "Review recorded inspection activity, AI-assisted risk indicators, and technician workload."
               },
               {
                 icon: <Smartphone className="text-primary" size={32} />,
@@ -193,12 +188,12 @@ export default function Home() {
               {
                 icon: <Users className="text-primary" size={32} />,
                 title: "Standardized Communication",
-                desc: "Ensure handoffs between technicians are seamless with structured notes and media."
+                desc: "Help technicians share recorded property knowledge through structured notes and media."
               },
               {
                 icon: <Ruler className="text-primary" size={32} />,
-                title: "FAIE AI Vision Estimation",
-                desc: "Snap a photo of any structural defect and FAIE automatically measures linear footage using visible scale references — door frames, tiles, brick courses — with no external tools."
+                title: "FAIE Visual Assistance",
+                desc: "AI-assisted photo analysis helps technicians review visible conditions and consider possible findings. Technicians verify suggestions; FAIE does not replace on-site measurements or professional judgment."
               }
             ].map((feature, i) => (
               <motion.div
@@ -227,14 +222,15 @@ export default function Home() {
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-3xl mx-auto mb-14">
             <h2 className="text-sm font-mono text-primary font-bold uppercase tracking-wider mb-3">
-              Security Self-Audit
+              Security Self-Assessment
             </h2>
             <h3 className="text-3xl md:text-4xl font-bold mb-6 text-slate-900">
-              How would your current software score?
+              Review your operational controls.
             </h3>
             <p className="text-lg text-slate-600">
-              Answer three questions about your audit trails, chemical custody, and data isolation to get an
-              instant security score — and see exactly where ReadyLoq closes the gaps legacy platforms leave open.
+              Answer three questions about recorded transactions, access controls, and company data access.
+              This informational self-assessment summarizes your answers; it is not a security audit,
+              compliance certification, or proof that security risks have been eliminated.
             </p>
           </div>
 
@@ -262,7 +258,7 @@ export default function Home() {
               <h3 className="text-3xl font-bold mb-8">For Technicians</h3>
               <ul className="space-y-6">
                 {[
-                  "No more guessing game when taking over a new route.",
+                  "Recorded property context when taking over a new route.",
                   "Clear access notes, gate codes, and key locations.",
                   "Historical photos of equipment and past infestations.",
                   "Mobile-first interface that doesn't slow them down."
@@ -287,9 +283,9 @@ export default function Home() {
               <ul className="space-y-6">
                 {[
                   "Protect your company's most valuable asset: property data.",
-                  "Reduce expensive callbacks through better information sharing.",
-                  "Onboard new technicians faster with existing route intelligence.",
-                  "Provide proof of service to commercial clients automatically."
+                  "Help reduce avoidable follow-up work through better information sharing.",
+                  "Support new technicians with recorded property and route context.",
+                  "Prepare service reports for review and sharing with commercial clients."
                 ].map((item, i) => (
                   <li key={i} className="flex items-start gap-4">
                     <div className="mt-1 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">

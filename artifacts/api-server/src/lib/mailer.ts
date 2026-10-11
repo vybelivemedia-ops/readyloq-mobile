@@ -24,6 +24,8 @@ export interface SendMailOptions {
   subject: string;
   html: string;
   text?: string;
+  /** Optional per-call transport deadline; existing callers keep their defaults. */
+  timeoutMs?: number;
 }
 
 /**
@@ -77,6 +79,7 @@ async function sendViaResend(opts: SendMailOptions): Promise<MailResult> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
     });
   } catch (err) {
     // Network-level error (DNS, TCP timeout, etc.) — treat as per-recipient
@@ -110,6 +113,11 @@ async function sendViaSmtp(opts: SendMailOptions): Promise<MailResult> {
     port: Number(process.env["SMTP_PORT"] ?? 587),
     secure: process.env["SMTP_SECURE"] === "true",
     auth: { user, pass },
+    ...(opts.timeoutMs ? {
+      connectionTimeout: opts.timeoutMs,
+      greetingTimeout: opts.timeoutMs,
+      socketTimeout: opts.timeoutMs,
+    } : {}),
   });
 
   try {

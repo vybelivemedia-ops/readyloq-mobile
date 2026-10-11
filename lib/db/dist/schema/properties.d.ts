@@ -516,10 +516,10 @@ export interface HistoricalFinding {
     severity?: "low" | "medium" | "high";
 }
 export declare const insertPropertyProfileSchema: z.ZodObject<{
+    addressKey: z.ZodString;
     siteAddress: z.ZodString;
     clientName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     propertyType: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    addressKey: z.ZodString;
     technicianKnowledge: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     hotspots: z.ZodOptional<z.ZodNullable<z.ZodType<Hotspot[], Hotspot[], z.core.$ZodTypeInternals<Hotspot[], Hotspot[]>>>>;
 }, {
@@ -527,18 +527,18 @@ export declare const insertPropertyProfileSchema: z.ZodObject<{
     in: {};
 }>;
 export declare const insertPropertyNoteSchema: z.ZodObject<{
-    note: z.ZodString;
-    category: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     addressKey: z.ZodString;
+    note: z.ZodString;
     zone: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    category: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     authorName: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, {
     out: {};
     in: {};
 }>;
 export declare const insertPropertyMemorySchema: z.ZodObject<{
-    siteAddress: z.ZodString;
     addressKey: z.ZodString;
+    siteAddress: z.ZodString;
     lastInspectionId: z.ZodOptional<z.ZodNullable<z.ZodInt>>;
     lastVisitedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
     historicalPests: z.ZodOptional<z.ZodNullable<z.ZodType<string[], string[], z.core.$ZodTypeInternals<string[], string[]>>>>;

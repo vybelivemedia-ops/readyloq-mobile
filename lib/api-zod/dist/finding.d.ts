@@ -52,16 +52,15 @@ export declare const FindingSchema: import("zod").ZodObject<{
         species: string;
     }>, "many">>;
 }, "strict", import("zod").ZodTypeAny, {
+    imageUrl: string | null;
     id: number;
-    severity: string;
     category: string;
     description: string;
     confidence: number;
+    severity: string;
     location: string | null;
-    imageUrl: string | null;
     treatment: string | null;
     exclusionOpportunity: boolean | null;
-    zone?: string | null | undefined;
     evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
     possiblePest?: string | null | undefined;
     species?: string | null | undefined;
@@ -77,6 +76,7 @@ export declare const FindingSchema: import("zod").ZodObject<{
         gapWidthIn?: number | null | undefined;
         heightFt?: number | null | undefined;
     } | null | undefined;
+    zone?: string | null | undefined;
     candidates?: {
         confidence: number;
         species: string;
@@ -86,16 +86,15 @@ export declare const FindingSchema: import("zod").ZodObject<{
     technicianSpecies?: string | null | undefined;
     technicianCorrectionNotes?: string | null | undefined;
 }, {
+    imageUrl: string | null;
     id: number;
-    severity: string;
     category: string;
     description: string;
     confidence: number;
+    severity: string;
     location: string | null;
-    imageUrl: string | null;
     treatment: string | null;
     exclusionOpportunity: boolean | null;
-    zone?: string | null | undefined;
     evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
     possiblePest?: string | null | undefined;
     species?: string | null | undefined;
@@ -111,6 +110,7 @@ export declare const FindingSchema: import("zod").ZodObject<{
         gapWidthIn?: number | null | undefined;
         heightFt?: number | null | undefined;
     } | null | undefined;
+    zone?: string | null | undefined;
     candidates?: {
         confidence: number;
         species: string;

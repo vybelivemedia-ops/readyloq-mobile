@@ -279,7 +279,7 @@ beforeAll(async () => {
       status: "approved",
       siteAddress: SHARED_ADDRESS,
       technicianName: "Tech A",
-      inspectionDate: completedAt,
+      inspectionDate: completedAt.toISOString().slice(0, 10),
     })
     .returning();
   reportAId = repA.id;
@@ -293,7 +293,7 @@ beforeAll(async () => {
       status: "approved",
       siteAddress: SHARED_ADDRESS,
       technicianName: "Tech B",
-      inspectionDate: completedAt,
+      inspectionDate: completedAt.toISOString().slice(0, 10),
     })
     .returning();
   reportBId = repB.id;
@@ -661,7 +661,7 @@ describe("GET /api/client/reports/:id/html — laser measurement strip", () => {
         status: "approved",
         siteAddress: SHARED_ADDRESS,
         technicianName: "Tech A",
-        inspectionDate: new Date(),
+        inspectionDate: new Date().toISOString().slice(0, 10),
         findings: JSON.parse(findingsJson),
       })
       .returning();
@@ -715,12 +715,13 @@ describe("GET /api/client/reports/:id/html — laser measurement strip", () => {
         status: "approved",
         siteAddress: SHARED_ADDRESS,
         technicianName: "Tech A",
-        inspectionDate: new Date(),
+        inspectionDate: new Date().toISOString().slice(0, 10),
         findings: [
           {
             id: 100,
             category: "Crack",
             description: "Hairline crack",
+            treatment: null,
             confidence: 0.7,
             severity: "medium",
             location: null,
@@ -756,7 +757,7 @@ describe("GET /api/client/reports/:id/html — laser measurement strip", () => {
         status: "draft",
         siteAddress: SHARED_ADDRESS,
         technicianName: "Tech A",
-        inspectionDate: new Date(),
+        inspectionDate: new Date().toISOString().slice(0, 10),
       })
       .returning();
 
@@ -844,7 +845,7 @@ describe("client report PDF generation and download", () => {
       status: "approved",
       siteAddress: PDF_BUILDING_ADDRESS,
       technicianName: "PDF Fixture Technician",
-      inspectionDate: completedAt,
+      inspectionDate: completedAt.toISOString().slice(0, 10),
       findings: [pdfFinding],
     }).returning();
     pdfReportId = report.id;
@@ -856,7 +857,7 @@ describe("client report PDF generation and download", () => {
       status: "approved",
       siteAddress: "99 Restricted Ave, Anytown",
       technicianName: "PDF Fixture Technician",
-      inspectionDate: completedAt,
+      inspectionDate: completedAt.toISOString().slice(0, 10),
       findings: [pdfFinding],
     }).returning();
     restrictedPdfReportId = restrictedReport.id;

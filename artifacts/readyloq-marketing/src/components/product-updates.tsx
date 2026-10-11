@@ -8,23 +8,21 @@ import {
 } from "lucide-react";
 
 const activeFeatures = [
-  "Offline-first mobile inspections",
-  "AI-assisted findings and summaries",
+  "Local inspection evidence capture with deferred synchronization",
+  "AI-assisted finding and summary drafts for review",
   "Property memory and prior-visit context",
-  "Professional client-ready reporting",
-  "Voice-guided field workflows",
+  "Inspection reports with review and approval workflows",
+  "Recorded inspection activity and inventory transactions",
 ];
 
 const plannedFeatures = [
-  "Richer camera and wearable support",
-  "Deeper operations and route insights",
-  "More connected scheduling and inventory workflows",
-  "Learning loops that improve field guidance",
+  "Expanded camera and wearable integrations",
+  "Further operations and route insights",
+  "Additional scheduling and inventory integrations",
+  "Learning workflows to support field guidance",
 ];
 
 export function ProductUpdates() {
-  const confidenceLevel = 76;
-
   return (
     <section
       id="updates"
@@ -49,9 +47,9 @@ export function ProductUpdates() {
             Built in the open. Focused on the field.
           </h2>
           <p className="text-lg leading-relaxed text-slate-600">
-            A clear view of what teams can use today and where ReadyLoq is
-            headed next. We share the product direction without exposing
-            private customer or implementation details.
+            A clear view of implemented capabilities, ongoing validation, and
+            product direction. Core workflows have automated regression coverage;
+            that is not the same as end-to-end verification on every device.
           </p>
         </motion.div>
 
@@ -66,7 +64,7 @@ export function ProductUpdates() {
             <div className="mb-7 flex items-start justify-between gap-4">
               <div>
                 <p className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-emerald-600">
-                  Available now
+                  Implemented capabilities
                 </p>
                 <h3 className="text-2xl font-bold text-slate-900">
                   In the product
@@ -86,6 +84,10 @@ export function ProductUpdates() {
                 </li>
               ))}
             </ul>
+            <p className="mt-6 text-sm leading-relaxed text-slate-500">
+              AI processing and synchronization depend on service availability
+              and connectivity. Reports and AI suggestions require review.
+            </p>
           </motion.div>
 
           <motion.div
@@ -137,49 +139,29 @@ export function ProductUpdates() {
                 </div>
                 <div>
                   <p className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-primary">
-                  FAIE confidence
+                  In validation
                   </p>
-                  <h3 className="text-2xl font-bold">Confidence is building</h3>
+                  <h3 className="text-2xl font-bold">AI-assisted. Technician-reviewed.</h3>
                 </div>
               </div>
 
-              <div
-                className="mb-3 flex items-end justify-between"
-                aria-label={`FAIE confidence level: ${confidenceLevel}%`}
-              >
-                <span className="text-sm text-slate-400">
-                  Current confidence level
-                </span>
-                <span className="text-4xl font-bold tracking-tight text-white">
-                  {confidenceLevel}%
-                </span>
-              </div>
-              <div
-                className="h-3 overflow-hidden rounded-full bg-white/10"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={confidenceLevel}
-                aria-label="FAIE confidence level"
-              >
-                <motion.div
-                  initial={{ width: 0 }}
-                  whileInView={{ width: `${confidenceLevel}%` }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1, delay: 0.25, ease: "easeOut" }}
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-secondary"
-                />
-              </div>
-
-              <p className="mt-6 leading-relaxed text-slate-300">
-                FAIE’s confidence is growing as she connects photos, voice,
-                and field context to useful next steps for technicians.
+              <p className="leading-relaxed text-slate-300">
+                Voice Capture and multilingual commands are implemented and
+                undergoing physical-device validation. Android transcription
+                currently requires connectivity.
+              </p>
+              <p className="mt-4 leading-relaxed text-slate-300">
+                Meta glasses capture is implemented but still in end-to-end
+                physical-hardware validation. It is not a verified replacement
+                for phone-camera capture.
               </p>
               <div className="mt-6 border-t border-white/10 pt-5 text-sm text-slate-400">
                 <span className="font-semibold text-slate-200">
-                  Building toward:
+                  Being validated:
                 </span>{" "}
-                dependable confidence across everyday inspections.
+                photo-analysis quality, spoken-command delivery, and wearable
+                capture reliability in real inspections. No calibrated FAIE
+                accuracy score is published here.
               </div>
             </div>
           </motion.div>

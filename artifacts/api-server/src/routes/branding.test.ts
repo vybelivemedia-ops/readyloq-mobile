@@ -26,7 +26,7 @@ import {
   intelligenceRecordsTable,
   READYLOQ_DEFAULT_PROFILE,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const MANAGER_ID = "test_manager_clerk_id";
 const TECH_ID = "test_tech_clerk_id";
@@ -53,20 +53,20 @@ beforeAll(async () => {
   // an ordinary tenant whose managers manage their own branding.
   platformCompanyId = await findOrCreateCompany("ReadyLoq Platform", "platform");
   testCompanyId = await findOrCreateCompany("Branding Test Co", "branding-test-co");
-  // intelligence_records FK to users (cascades to its tags/reviews/votes); clear
-  // them before deleting users so shared-DB reruns don't hit the FK constraint.
-  await db.delete(intelligenceRecordsTable);
-  await db.delete(usersTable);
+  // Preserve unrelated fixtures and historical user references on reruns.
   await db.insert(usersTable).values([
     { clerkUserId: MANAGER_ID, role: "manager", companyId: testCompanyId },
     { clerkUserId: TECH_ID, role: "technician", companyId: testCompanyId },
-  ]);
+  ]).onConflictDoUpdate({
+    target: usersTable.clerkUserId,
+    set: { role: sql`excluded.role`, companyId: sql`excluded.company_id` },
+  });
 });
 
 beforeEach(async () => {
   asUser(null);
   // Reset branding for both the platform (pre-login brand) and the test company.
-  await db.delete(brandingProfilesTable);
+  await db.delete(brandingProfilesTable).where(sql`${brandingProfilesTable.companyId} IN (${platformCompanyId}, ${testCompanyId})`);
   await db.insert(brandingProfilesTable).values([
     { ...READYLOQ_DEFAULT_PROFILE, companyId: platformCompanyId, isDefault: true, isActive: true },
     { ...READYLOQ_DEFAULT_PROFILE, companyId: testCompanyId, isDefault: true, isActive: true },

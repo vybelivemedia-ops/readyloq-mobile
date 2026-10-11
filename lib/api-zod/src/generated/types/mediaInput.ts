@@ -9,6 +9,11 @@ import type { MediaInputCaptureMetadata } from './mediaInputCaptureMetadata';
 
 export interface MediaInput {
   mediaType: string;
+  /**
+     * Authenticated user's durable inspection-upload reservation.
+     * @minimum 1
+     */
+  uploadIntentId: number;
   /** Company-scoped private object path, e.g. /api/storage/objects/companies/{companyId}/uploads/{objectId} */
   url: string;
   filename?: string;

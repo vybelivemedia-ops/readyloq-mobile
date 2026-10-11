@@ -1,0 +1,14 @@
+.pilot-signup{background:var(--color-slate-950);color:var(--color-slate-300);padding:32px 16px;font-family:'Source Sans 3',sans-serif;font-weight:400;font-size:17px;line-height:1.5}
+@media(min-width:768px){.pilot-signup{font-size:18px;padding:40px 24px}}
+.pilot-signup__in{max-width:720px;margin:0 auto}
+.pilot-signup h1{font-family:'Archivo',sans-serif;font-weight:700;font-size:clamp(26px,5vw,38px);line-height:1.15;color:#fff;margin:0 0 12px}
+.pilot-signup p{margin:0 0 10px}
+.pilot-signup label{display:block;margin-top:18px;margin-bottom:6px;color:#fff}
+.pilot-signup__row{display:flex;gap:10px;flex-direction:column}
+@media(min-width:640px){.pilot-signup__row{flex-direction:row}}
+.pilot-signup input{flex:1;min-width:0;min-height:46px;padding:0 12px;border-radius:6px;border:1px solid var(--color-slate-700);background:var(--color-slate-900);color:#fff;font:inherit}
+.pilot-signup input:focus-visible,.pilot-signup button:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
+.pilot-signup button{min-height:46px;padding:0 20px;border-radius:6px;border:0;background:var(--color-primary);color:var(--color-slate-950);font:inherit;font-weight:700;cursor:pointer}
+.pilot-signup button:disabled{opacity:.7;cursor:not-allowed}
+.pilot-signup__err{color:hsl(0 90% 75%);margin-top:8px}
+.pilot-signup__ok{font-size:18px;color:var(--color-primary);margin-top:18px}

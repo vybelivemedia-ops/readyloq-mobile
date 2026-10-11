@@ -126,7 +126,7 @@ beforeAll(async () => {
       status: "approved",
       siteAddress: ADDRESS,
       technicianName: "Tech Both",
-      inspectionDate: new Date(),
+      inspectionDate: new Date().toISOString().slice(0, 10),
     })
     .returning();
   bothSignedReportId = bothSignedReport.id;
@@ -156,7 +156,7 @@ beforeAll(async () => {
       status: "approved",
       siteAddress: ADDRESS,
       technicianName: "Tech NA",
-      inspectionDate: new Date(),
+      inspectionDate: new Date().toISOString().slice(0, 10),
     })
     .returning();
   ownerNotAvailableReportId = ownerNaReport.id;

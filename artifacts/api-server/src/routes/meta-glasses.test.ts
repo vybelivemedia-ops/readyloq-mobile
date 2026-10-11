@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import crypto from "node:crypto";
+import type { GlassesEvent } from "./meta-glasses";
 
 /**
  * Meta Glasses session tests.
@@ -92,8 +93,6 @@ beforeAll(async () => {
       .insert(usersTable)
       .values({
         clerkUserId: TECH_A_CLERK,
-        email: "tech-a@mg-test.example",
-        name: "Tech A",
         role: "technician",
         companyId: companyAId,
         betaAccess: true,
@@ -114,8 +113,6 @@ beforeAll(async () => {
       .insert(usersTable)
       .values({
         clerkUserId: TECH_B_CLERK,
-        email: "tech-b@mg-test.example",
-        name: "Tech B",
         role: "technician",
         companyId: companyBId,
         betaAccess: true,
@@ -136,8 +133,6 @@ beforeAll(async () => {
       .insert(usersTable)
       .values({
         clerkUserId: MANAGER_A_CLERK,
-        email: "manager-a@mg-test.example",
-        name: "Manager A",
         role: "manager",
         companyId: companyAId,
         betaAccess: true,
@@ -151,7 +146,7 @@ beforeAll(async () => {
     .insert(inspectionsTable)
     .values({
       companyId: companyAId,
-      technicianId: techAId,
+      technicianId: TECH_A_CLERK,
       technicianName: "Tech A",
       siteAddress: "1 Alpha St",
       status: "in_progress",
@@ -163,7 +158,7 @@ beforeAll(async () => {
     .insert(inspectionsTable)
     .values({
       companyId: companyBId,
-      technicianId: techBId,
+      technicianId: TECH_B_CLERK,
       technicianName: "Tech B",
       siteAddress: "2 Beta Ave",
       status: "in_progress",
@@ -207,7 +202,7 @@ describe("POST /api/meta-glasses/session — cross-company isolation", () => {
   it("returns one pairing code for concurrent registrations of a new inspection", async () => {
     const [inspection] = await db.insert(inspectionsTable).values({
       companyId: companyAId,
-      technicianId: techAId,
+      technicianId: TECH_A_CLERK,
       technicianName: "Tech A",
       siteAddress: "3 Concurrent St",
       status: "in_progress",

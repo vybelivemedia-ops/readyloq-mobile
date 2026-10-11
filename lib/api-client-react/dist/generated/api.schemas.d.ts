@@ -5,6 +5,85 @@
  * ReadyLoq - AI-powered inspection intelligence platform
  * OpenAPI spec version: 0.1.0
  */
+export type FoundationLocationKind = typeof FoundationLocationKind[keyof typeof FoundationLocationKind];
+export declare const FoundationLocationKind: {
+    readonly building: "building";
+    readonly floor: "floor";
+    readonly unit: "unit";
+    readonly common_area: "common_area";
+};
+export interface FoundationLocation {
+    id: string;
+    companyId: number;
+    propertyId: number;
+    /** @nullable */
+    parentId: string | null;
+    kind: FoundationLocationKind;
+    label: string;
+    /** @nullable */
+    commonAreaType: string | null;
+    revision: number;
+    /** @nullable */
+    archivedAt: string | null;
+    createdAt: string;
+}
+export interface FoundationVisit {
+    id: string;
+    companyId: number;
+    propertyId: number;
+    clientKey: string;
+    createdBy: string;
+    createdAt: string;
+}
+export type FoundationCoverageSnapshotKind = typeof FoundationCoverageSnapshotKind[keyof typeof FoundationCoverageSnapshotKind];
+export declare const FoundationCoverageSnapshotKind: {
+    readonly unit: "unit";
+    readonly common_area: "common_area";
+};
+export type FoundationCoverageSnapshotAncestorsItemKind = typeof FoundationCoverageSnapshotAncestorsItemKind[keyof typeof FoundationCoverageSnapshotAncestorsItemKind];
+export declare const FoundationCoverageSnapshotAncestorsItemKind: {
+    readonly building: "building";
+    readonly floor: "floor";
+    readonly unit: "unit";
+    readonly common_area: "common_area";
+};
+export type FoundationCoverageSnapshotAncestorsItem = {
+    id: string;
+    label: string;
+    kind: FoundationCoverageSnapshotAncestorsItemKind;
+};
+export type FoundationCoverageSnapshot = {
+    label: string;
+    kind: FoundationCoverageSnapshotKind;
+    /** @nullable */
+    commonAreaType: string | null;
+    ancestors: FoundationCoverageSnapshotAncestorsItem[];
+};
+export type FoundationCoverageState = typeof FoundationCoverageState[keyof typeof FoundationCoverageState];
+export declare const FoundationCoverageState: {
+    readonly not_inspected: "not_inspected";
+    readonly in_progress: "in_progress";
+    readonly inspected: "inspected";
+    readonly no_access: "no_access";
+};
+export interface FoundationCoverage {
+    id: string;
+    companyId: number;
+    propertyId: number;
+    visitId: string;
+    spaceId: string;
+    snapshot: FoundationCoverageSnapshot;
+    state: FoundationCoverageState;
+    /** @nullable */
+    inspectionId: number | null;
+    /** @nullable */
+    reason: string | null;
+    revision: number;
+}
+export interface FoundationVisitDetail {
+    visit: FoundationVisit;
+    coverage: FoundationCoverage[];
+}
 export interface OkResponse {
     ok: boolean;
 }
@@ -662,12 +741,95 @@ export interface BaitStation {
     lastCheckedAt?: string | null;
     createdAt: string;
 }
+export interface GenericUploadUrlRequest {
+    /**
+       * @minLength 1
+       * @maxLength 255
+       */
+    name: string;
+    /**
+       * @minimum 1
+       * @maximum 157286400
+       */
+    size?: number;
+    /**
+       * @minLength 1
+       * @maxLength 255
+       */
+    contentType?: string;
+    purpose: 'generic';
+}
+export type InspectionUploadReservationRequestMediaType = typeof InspectionUploadReservationRequestMediaType[keyof typeof InspectionUploadReservationRequestMediaType];
+export declare const InspectionUploadReservationRequestMediaType: {
+    readonly photo: "photo";
+    readonly image: "image";
+    readonly video: "video";
+    readonly document: "document";
+    readonly audio: "audio";
+    readonly voice: "voice";
+};
+export type InspectionUploadReservationRequestChecksumAlgorithm = typeof InspectionUploadReservationRequestChecksumAlgorithm[keyof typeof InspectionUploadReservationRequestChecksumAlgorithm];
+export declare const InspectionUploadReservationRequestChecksumAlgorithm: {
+    readonly md5: "md5";
+};
+export type InspectionUploadReservationRequestChecksum = {
+    algorithm: InspectionUploadReservationRequestChecksumAlgorithm;
+    /** @pattern ^[A-Za-z0-9+/]{22}==$ */
+    value: string;
+};
+export interface InspectionUploadReservationRequest {
+    /**
+       * @minLength 1
+       * @maxLength 255
+       */
+    name: string;
+    /**
+       * @minimum 1
+       * @maximum 157286400
+       */
+    size: number;
+    /**
+       * @minLength 1
+       * @maxLength 255
+       */
+    contentType: string;
+    purpose: 'inspection-evidence';
+    /** @minimum 1 */
+    inspectionId: number;
+    mediaType: InspectionUploadReservationRequestMediaType;
+    /**
+       * @minLength 1
+       * @maxLength 200
+       */
+    clientKey: string;
+    checksum?: InspectionUploadReservationRequestChecksum;
+}
+export interface InspectionUploadUpgradeRequired {
+    error: string;
+    code: 'inspection_upload_upgrade_required';
+    minimumClientContract: 'inspection-upload-intents-v1';
+    migration: string;
+}
+export type UploadUrlResponseMetadata = {
+    name?: string;
+    size?: number;
+    contentType?: string;
+};
+export interface UploadUrlResponse {
+    uploadURL: string;
+    objectPath: string;
+    uploadIntentId?: number;
+    metadata?: UploadUrlResponseMetadata;
+}
 export type MediaInputCaptureMetadata = {
     [key: string]: unknown;
 };
 export interface MediaInput {
     mediaType: string;
-    /** Authenticated user's durable inspection-upload reservation. */
+    /**
+       * Authenticated user's durable inspection-upload reservation.
+       * @minimum 1
+       */
     uploadIntentId: number;
     /** Company-scoped private object path, e.g. /api/storage/objects/companies/{companyId}/uploads/{objectId} */
     url: string;
@@ -1590,6 +1752,11 @@ export interface PropertySummary {
     /** @nullable */
     lastVisit?: string | null;
     hasProfile: boolean;
+    /**
+       * Stable existing property_profiles ID, absent for legacy address-only properties
+       * @nullable
+       */
+    profileId?: number | null;
 }
 export interface RecurringIssue {
     category: string;
@@ -3142,6 +3309,9 @@ export interface ApprovalDecisionInput {
     /** @minLength 1 */
     note: string;
 }
+export type GetUploadReconciliation200 = {
+    [key: string]: unknown;
+};
 export type GetScheduleParams = {
     /**
      * Start date (YYYY-MM-DD), inclusive
@@ -3483,5 +3653,79 @@ export type ListMissionControlApprovalsParams = {
 };
 export type ResolveMissionControlSuperAdminTargetParams = {
     email: string;
+};
+export type GetFoundationRoster200 = {
+    propertyId: number;
+    locations: FoundationLocation[];
+};
+export type CreateFoundationLocationBodyKind = typeof CreateFoundationLocationBodyKind[keyof typeof CreateFoundationLocationBodyKind];
+export declare const CreateFoundationLocationBodyKind: {
+    readonly building: "building";
+    readonly floor: "floor";
+    readonly unit: "unit";
+    readonly common_area: "common_area";
+};
+export type CreateFoundationLocationBody = {
+    id: string;
+    kind: CreateFoundationLocationBodyKind;
+    /**
+       * @minLength 1
+       * @maxLength 120
+       */
+    label: string;
+    /** @nullable */
+    parentId?: string | null;
+    /**
+       * @maxLength 40
+       * @nullable
+       */
+    commonAreaType?: string | null;
+};
+export type PatchFoundationLocationBody = {
+    /** @minimum 1 */
+    revision: number;
+    /**
+       * @minLength 1
+       * @maxLength 120
+       */
+    label?: string;
+    /** @nullable */
+    parentId?: string | null;
+    /**
+       * @maxLength 40
+       * @nullable
+       */
+    commonAreaType?: string | null;
+    archived?: boolean;
+    /**
+       * @minLength 1
+       * @maxLength 500
+       */
+    reason?: string;
+};
+export type CreateFoundationVisitBody = {
+    clientKey: string;
+};
+export type PatchFoundationCoverageBodyState = typeof PatchFoundationCoverageBodyState[keyof typeof PatchFoundationCoverageBodyState];
+export declare const PatchFoundationCoverageBodyState: {
+    readonly not_inspected: "not_inspected";
+    readonly in_progress: "in_progress";
+    readonly inspected: "inspected";
+    readonly no_access: "no_access";
+};
+export type PatchFoundationCoverageBody = {
+    /** @minimum 1 */
+    revision: number;
+    state: PatchFoundationCoverageBodyState;
+    /**
+       * @minimum 1
+       * @nullable
+       */
+    inspectionId?: number | null;
+    /**
+       * @minLength 1
+       * @maxLength 500
+       */
+    reason?: string;
 };
 //# sourceMappingURL=api.schemas.d.ts.map

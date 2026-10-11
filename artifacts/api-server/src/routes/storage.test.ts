@@ -65,7 +65,7 @@ import {
   inspectionMediaTable,
   inspectionUploadIntentsTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { migrateInspectionUploadIntents } from "../lib/migrate-inspection-upload-intents";
 
 const TECH_ID = "test_storage_tech_clerk_id";
@@ -77,10 +77,7 @@ let userId: number;
 
 beforeAll(async () => {
   await migrateInspectionUploadIntents();
-  // intelligence_records FK to users (cascades to its tags/reviews/votes); clear
-  // them before deleting users so shared-DB reruns don't hit the FK constraint.
-  await db.delete(intelligenceRecordsTable);
-  await db.delete(usersTable);
+  // Only refresh this suite's identities; do not delete other suites' users.
   const [company] = await db
     .insert(companiesTable)
     .values({ name: "Storage Test Co", slug: `storage-test-${Date.now()}` })
@@ -92,7 +89,10 @@ beforeAll(async () => {
       { clerkUserId: TECH_ID, role: "technician", companyId: company.id },
       { clerkUserId: PEER_TECH_ID, role: "technician", companyId: company.id },
       { clerkUserId: MANAGER_ID, role: "manager", companyId: company.id },
-    ]);
+    ]).onConflictDoUpdate({
+      target: usersTable.clerkUserId,
+      set: { role: sql`excluded.role`, companyId: sql`excluded.company_id` },
+    });
   const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkUserId, TECH_ID));
   userId = user.id;
   authState.userId = TECH_ID;

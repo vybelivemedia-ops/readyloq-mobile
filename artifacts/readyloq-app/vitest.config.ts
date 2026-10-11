@@ -45,6 +45,7 @@ export default defineConfig({
       "components/__tests__/device-health-strip-sensor-race.test.ts",
       "components/__tests__/wifi-camera-chip-status.test.ts",
       "components/__tests__/device-health-strip-chip-visibility.test.tsx",
+      "components/__tests__/capture-done-action.test.tsx",
     ],
   },
   resolve: {

@@ -107,7 +107,7 @@ paths:
           application/pdf:
             schema: { type: string, format: binary }
       responses:
-        "204": { description: Stream stored or an identical retry verified by size, type, and digest }
+        "204": { description: "Stream stored or an identical retry verified by size, type, and digest" }
         "400": { description: Request metadata or streamed size/checksum does not match its reservation }
         "404": { description: Reservation is not owned by the caller's company/user }
         "408": { description: Upload timed out; retry the same reservation }
@@ -3158,8 +3158,210 @@ paths:
         "404":
           description: Approval request not found
 
+  /property-foundation/{propertyId}/roster:
+    parameters:
+      - { name: propertyId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getFoundationRoster
+      tags: [PropertyFoundation]
+      responses:
+        "200":
+          description: Authorized roster, including archived locations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [propertyId, locations]
+                properties:
+                  propertyId: { type: integer }
+                  locations: { type: array, items: { $ref: "#/components/schemas/FoundationLocation" } }
+  /property-foundation/{propertyId}/locations:
+    parameters:
+      - { name: propertyId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      operationId: createFoundationLocation
+      tags: [PropertyFoundation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, kind, label]
+              properties:
+                id: { type: string, format: uuid }
+                kind: { type: string, enum: [building, floor, unit, common_area] }
+                label: { type: string, minLength: 1, maxLength: 120 }
+                parentId: { type: ["string", "null"], format: uuid }
+                commonAreaType: { type: ["string", "null"], maxLength: 40 }
+      responses:
+        "201":
+          description: Location created or idempotently returned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FoundationLocation" }
+  /property-foundation/{propertyId}/locations/{locationId}:
+    parameters:
+      - { name: propertyId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      - { name: locationId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      operationId: patchFoundationLocation
+      tags: [PropertyFoundation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [revision]
+              properties:
+                revision: { type: integer, minimum: 1 }
+                label: { type: string, minLength: 1, maxLength: 120 }
+                parentId: { type: ["string", "null"], format: uuid }
+                commonAreaType: { type: ["string", "null"], maxLength: 40 }
+                archived: { type: boolean }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        "200":
+          description: Updated location; revision conflicts return 409
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FoundationLocation" }
+  /property-foundation/{propertyId}/visits:
+    parameters:
+      - { name: propertyId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: listFoundationVisits
+      tags: [PropertyFoundation]
+      responses:
+        "200":
+          description: Latest 100 visits
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/FoundationVisit" } }
+    post:
+      operationId: createFoundationVisit
+      tags: [PropertyFoundation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [clientKey]
+              properties:
+                clientKey: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Visit with immutable expected-space snapshot; all coverage initially not_inspected
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FoundationVisitDetail" }
+  /property-foundation/{propertyId}/visits/{visitId}:
+    parameters:
+      - { name: propertyId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getFoundationVisit
+      tags: [PropertyFoundation]
+      responses:
+        "200":
+          description: Visit and coverage; coverage does not imply evidence synchronization or a clear outcome
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FoundationVisitDetail" }
+  /property-foundation/{propertyId}/visits/{visitId}/coverage/{coverageId}:
+    parameters:
+      - { name: propertyId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      - { name: visitId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: coverageId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      operationId: patchFoundationCoverage
+      tags: [PropertyFoundation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [revision, state]
+              properties:
+                revision: { type: integer, minimum: 1 }
+                state: { type: string, enum: [not_inspected, in_progress, inspected, no_access] }
+                inspectionId: { type: ["integer", "null"], minimum: 1 }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        "200":
+          description: Explicit coverage update with authorized inspection linkage; no count-derived completion
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FoundationCoverage" }
+
 components:
   schemas:
+    FoundationLocation:
+      type: object
+      required: [id, companyId, propertyId, parentId, kind, label, commonAreaType, revision, archivedAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        companyId: { type: integer }
+        propertyId: { type: integer }
+        parentId: { type: ["string", "null"], format: uuid }
+        kind: { type: string, enum: [building, floor, unit, common_area] }
+        label: { type: string }
+        commonAreaType: { type: ["string", "null"] }
+        revision: { type: integer }
+        archivedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    FoundationVisit:
+      type: object
+      required: [id, companyId, propertyId, clientKey, createdBy, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        companyId: { type: integer }
+        propertyId: { type: integer }
+        clientKey: { type: string, format: uuid }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+    FoundationCoverage:
+      type: object
+      required: [id, companyId, propertyId, visitId, spaceId, snapshot, state, inspectionId, reason, revision]
+      properties:
+        id: { type: string, format: uuid }
+        companyId: { type: integer }
+        propertyId: { type: integer }
+        visitId: { type: string, format: uuid }
+        spaceId: { type: string, format: uuid }
+        snapshot:
+          type: object
+          required: [label, kind, commonAreaType, ancestors]
+          properties:
+            label: { type: string }
+            kind: { type: string, enum: [unit, common_area] }
+            commonAreaType: { type: ["string", "null"] }
+            ancestors:
+              type: array
+              items:
+                type: object
+                required: [id, label, kind]
+                properties:
+                  id: { type: string, format: uuid }
+                  label: { type: string }
+                  kind: { type: string, enum: [building, floor, unit, common_area] }
+        state: { type: string, enum: [not_inspected, in_progress, inspected, no_access] }
+        inspectionId: { type: ["integer", "null"] }
+        reason: { type: ["string", "null"] }
+        revision: { type: integer }
+    FoundationVisitDetail:
+      type: object
+      required: [visit, coverage]
+      properties:
+        visit: { $ref: "#/components/schemas/FoundationVisit" }
+        coverage: { type: array, items: { $ref: "#/components/schemas/FoundationCoverage" } }
     OkResponse:
       type: object
       required: [ok]
@@ -4967,6 +5169,7 @@ components:
         openIssueCount:  { type: integer }
         lastVisit:       { type: ["string", "null"] }
         hasProfile:      { type: boolean }
+        profileId:       { type: ["integer", "null"], description: "Stable existing property_profiles ID, absent for legacy address-only properties" }
 
     RecurringIssue:
       type: object

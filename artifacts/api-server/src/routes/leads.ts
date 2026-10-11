@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import rateLimit from "express-rate-limit";
 import { db, leadsTable, type Lead } from "@workspace/db";
 import { CreateLeadBody } from "@workspace/api-zod";
+import { sendPilotDetails } from "../lib/pilot-details-mailer";
 
 const router: IRouter = Router();
 
@@ -29,6 +30,18 @@ router.post("/", leadsLimiter, async (req, res) => {
   }
   try {
     const [row] = await db.insert(leadsTable).values(parsed.data).returning();
+    // Persist first. Never display the inbox confirmation for an unsent email.
+    // Other marketing contact/demo workflows retain their existing behavior.
+    if (row.source === "readyloq-pilot") {
+      const delivery = await sendPilotDetails(row.email, row.id);
+      if (delivery !== "accepted") {
+        return res.status(delivery === "unconfigured" ? 503 : 502).json({
+          error: delivery === "unconfigured"
+            ? "Your signup was saved, but pilot email delivery is not configured yet. Please try again later."
+            : "Your signup was saved, but we couldn't send the pilot email. Please try again later.",
+        });
+      }
+    }
     return res.status(201).json(serialize(row));
   } catch {
     return res.status(500).json({ error: "Failed to submit. Please try again." });

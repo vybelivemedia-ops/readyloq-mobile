@@ -7,6 +7,126 @@
  */
 import * as zod from 'zod';
 /**
+ * New clients must explicitly select purpose=inspection-evidence and reserve the inspection, size, content type, idempotency key, and optional checksum before PUT. Non-evidence callers must send purpose=generic. Inspection evidence receives an authenticated API PUT endpoint (same-origin browser session or mobile Clerk bearer token) and is streamed server-side to GCS with ifGenerationMatch=0; the API validates actual byte count, content type, optional MD5, and GCS CRC32C. The Replit sidecar signer ignores requested extension constraints, so inspection evidence does not use its signed URL flow. Browsers need not set Content-Length. Requests using the pre-intent contract receive 426 without an upload URL. Upgrade the client, retain queued local evidence, reserve an intent, PUT to the authenticated endpoint, then register by uploadIntentId. Previously uploaded legacy objects are not auto-attached or deleted; reconcile them separately. Previously deployed clients remain unable to sync until their app/static-client upgrade is delivered; deploy the first-party generic callers' explicit purpose migration with this contract.
+ * @summary Request an upload URL; inspection evidence requires an authenticated create-only PUT
+ */
+export declare const requestUploadUrlBodyOneNameMax = 255;
+export declare const requestUploadUrlBodyOneSizeMax = 157286400;
+export declare const requestUploadUrlBodyOneContentTypeMax = 255;
+export declare const requestUploadUrlBodyTwoNameMax = 255;
+export declare const requestUploadUrlBodyTwoSizeMax = 157286400;
+export declare const requestUploadUrlBodyTwoContentTypeMax = 255;
+export declare const requestUploadUrlBodyTwoClientKeyMax = 200;
+export declare const requestUploadUrlBodyTwoChecksumValueRegExp: RegExp;
+export declare const RequestUploadUrlBody: zod.ZodUnion<[zod.ZodObject<{
+    name: zod.ZodString;
+    size: zod.ZodOptional<zod.ZodNumber>;
+    contentType: zod.ZodOptional<zod.ZodString>;
+    purpose: zod.ZodLiteral<"generic">;
+}, "strip", zod.ZodTypeAny, {
+    name: string;
+    purpose: "generic";
+    size?: number | undefined;
+    contentType?: string | undefined;
+}, {
+    name: string;
+    purpose: "generic";
+    size?: number | undefined;
+    contentType?: string | undefined;
+}>, zod.ZodObject<{
+    name: zod.ZodString;
+    size: zod.ZodNumber;
+    contentType: zod.ZodString;
+    purpose: zod.ZodLiteral<"inspection-evidence">;
+    inspectionId: zod.ZodNumber;
+    mediaType: zod.ZodEnum<["photo", "image", "video", "document", "audio", "voice"]>;
+    clientKey: zod.ZodString;
+    checksum: zod.ZodOptional<zod.ZodObject<{
+        algorithm: zod.ZodEnum<["md5"]>;
+        value: zod.ZodString;
+    }, "strip", zod.ZodTypeAny, {
+        value: string;
+        algorithm: "md5";
+    }, {
+        value: string;
+        algorithm: "md5";
+    }>>;
+}, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
+    name: string;
+    size: number;
+    contentType: string;
+    purpose: "inspection-evidence";
+    mediaType: "photo" | "image" | "video" | "document" | "audio" | "voice";
+    clientKey: string;
+    checksum?: {
+        value: string;
+        algorithm: "md5";
+    } | undefined;
+}, {
+    inspectionId: number;
+    name: string;
+    size: number;
+    contentType: string;
+    purpose: "inspection-evidence";
+    mediaType: "photo" | "image" | "video" | "document" | "audio" | "voice";
+    clientKey: string;
+    checksum?: {
+        value: string;
+        algorithm: "md5";
+    } | undefined;
+}>]>;
+export declare const RequestUploadUrlResponse: zod.ZodObject<{
+    uploadURL: zod.ZodString;
+    objectPath: zod.ZodString;
+    uploadIntentId: zod.ZodOptional<zod.ZodNumber>;
+    metadata: zod.ZodOptional<zod.ZodObject<{
+        name: zod.ZodOptional<zod.ZodString>;
+        size: zod.ZodOptional<zod.ZodNumber>;
+        contentType: zod.ZodOptional<zod.ZodString>;
+    }, "strip", zod.ZodTypeAny, {
+        name?: string | undefined;
+        size?: number | undefined;
+        contentType?: string | undefined;
+    }, {
+        name?: string | undefined;
+        size?: number | undefined;
+        contentType?: string | undefined;
+    }>>;
+}, "strip", zod.ZodTypeAny, {
+    uploadURL: string;
+    objectPath: string;
+    uploadIntentId?: number | undefined;
+    metadata?: {
+        name?: string | undefined;
+        size?: number | undefined;
+        contentType?: string | undefined;
+    } | undefined;
+}, {
+    uploadURL: string;
+    objectPath: string;
+    uploadIntentId?: number | undefined;
+    metadata?: {
+        name?: string | undefined;
+        size?: number | undefined;
+        contentType?: string | undefined;
+    } | undefined;
+}>;
+/**
+ * @summary Stream reserved inspection evidence into GCS with a create-only precondition
+ */
+export declare const PutInspectionUploadContentParams: zod.ZodObject<{
+    intentId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    intentId: number;
+}, {
+    intentId: number;
+}>;
+/**
+ * @summary Complete paginated company-scoped report of upload and registration orphans (manager+)
+ */
+export declare const GetUploadReconciliationResponse: zod.ZodRecord<zod.ZodString, zod.ZodUnknown>;
+/**
  * @summary List inspections for the scheduling calendar (manager+)
  */
 export declare const GetScheduleQueryParams: zod.ZodObject<{
@@ -40,10 +160,10 @@ export declare const GetScheduleResponseItem: zod.ZodObject<{
     technicianName: string;
     calendarDate: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     scheduledDate?: string | null | undefined;
     completedAt?: string | null | undefined;
@@ -54,10 +174,10 @@ export declare const GetScheduleResponseItem: zod.ZodObject<{
     technicianName: string;
     calendarDate: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     scheduledDate?: string | null | undefined;
     completedAt?: string | null | undefined;
@@ -83,10 +203,10 @@ export declare const GetScheduleResponse: zod.ZodArray<zod.ZodObject<{
     technicianName: string;
     calendarDate: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     scheduledDate?: string | null | undefined;
     completedAt?: string | null | undefined;
@@ -97,10 +217,10 @@ export declare const GetScheduleResponse: zod.ZodArray<zod.ZodObject<{
     technicianName: string;
     calendarDate: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     scheduledDate?: string | null | undefined;
     completedAt?: string | null | undefined;
@@ -149,10 +269,10 @@ export declare const ReassignInspectionResponse: zod.ZodObject<{
     technicianName: string;
     calendarDate: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     scheduledDate?: string | null | undefined;
     completedAt?: string | null | undefined;
@@ -163,10 +283,10 @@ export declare const ReassignInspectionResponse: zod.ZodObject<{
     technicianName: string;
     calendarDate: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     scheduledDate?: string | null | undefined;
     completedAt?: string | null | undefined;
@@ -221,19 +341,19 @@ export declare const GetPropertyProfileResponse: zod.ZodObject<{
         calendarDate: zod.ZodString;
         createdAt: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
+        inspectionId: number;
         id: number;
+        url: string;
         calendarDate: string;
         createdAt: string;
-        url: string;
-        inspectionId: number;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
     }, {
+        inspectionId: number;
         id: number;
+        url: string;
         calendarDate: string;
         createdAt: string;
-        url: string;
-        inspectionId: number;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
     }>, "many">;
@@ -274,8 +394,8 @@ export declare const GetPropertyProfileResponse: zod.ZodObject<{
             eligibleNow: boolean;
         }>;
     }, "strip", zod.ZodTypeAny, {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -289,15 +409,15 @@ export declare const GetPropertyProfileResponse: zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
     }, {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -311,9 +431,9 @@ export declare const GetPropertyProfileResponse: zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
@@ -372,17 +492,17 @@ export declare const GetPropertyProfileResponse: zod.ZodObject<{
         completedAt?: string | null | undefined;
     }[];
     historicalPhotos: {
+        inspectionId: number;
         id: number;
+        url: string;
         calendarDate: string;
         createdAt: string;
-        url: string;
-        inspectionId: number;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
     }[];
     materialHistory: {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -396,9 +516,9 @@ export declare const GetPropertyProfileResponse: zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
@@ -433,17 +553,17 @@ export declare const GetPropertyProfileResponse: zod.ZodObject<{
         completedAt?: string | null | undefined;
     }[];
     historicalPhotos: {
+        inspectionId: number;
         id: number;
+        url: string;
         calendarDate: string;
         createdAt: string;
-        url: string;
-        inspectionId: number;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
     }[];
     materialHistory: {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -457,9 +577,9 @@ export declare const GetPropertyProfileResponse: zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
@@ -531,19 +651,19 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
         calendarDate: zod.ZodString;
         createdAt: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
+        inspectionId: number;
         id: number;
+        url: string;
         calendarDate: string;
         createdAt: string;
-        url: string;
-        inspectionId: number;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
     }, {
+        inspectionId: number;
         id: number;
+        url: string;
         calendarDate: string;
         createdAt: string;
-        url: string;
-        inspectionId: number;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
     }>, "many">;
@@ -584,8 +704,8 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
             eligibleNow: boolean;
         }>;
     }, "strip", zod.ZodTypeAny, {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -599,15 +719,15 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
     }, {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -621,9 +741,9 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
@@ -682,17 +802,17 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
         completedAt?: string | null | undefined;
     }[];
     historicalPhotos: {
+        inspectionId: number;
         id: number;
+        url: string;
         calendarDate: string;
         createdAt: string;
-        url: string;
-        inspectionId: number;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
     }[];
     materialHistory: {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -706,9 +826,9 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
@@ -743,17 +863,17 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
         completedAt?: string | null | undefined;
     }[];
     historicalPhotos: {
+        inspectionId: number;
         id: number;
+        url: string;
         calendarDate: string;
         createdAt: string;
-        url: string;
-        inspectionId: number;
         filename?: string | null | undefined;
         caption?: string | null | undefined;
     }[];
     materialHistory: {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -767,9 +887,9 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
@@ -802,14 +922,14 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
             createdAt: zod.ZodNullable<zod.ZodDate>;
         }, "strip", zod.ZodTypeAny, {
             id: string;
-            createdAt: Date | null;
             category: string | null;
+            createdAt: Date | null;
             note: string;
             authorName: string | null;
         }, {
             id: string;
-            createdAt: Date | null;
             category: string | null;
+            createdAt: Date | null;
             note: string;
             authorName: string | null;
         }>, "many">;
@@ -817,8 +937,8 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
         status: "available" | "disabled" | "not_configured" | "not_mapped" | "unavailable";
         notes: {
             id: string;
-            createdAt: Date | null;
             category: string | null;
+            createdAt: Date | null;
             note: string;
             authorName: string | null;
         }[];
@@ -826,8 +946,8 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
         status: "available" | "disabled" | "not_configured" | "not_mapped" | "unavailable";
         notes: {
             id: string;
-            createdAt: Date | null;
             category: string | null;
+            createdAt: Date | null;
             note: string;
             authorName: string | null;
         }[];
@@ -838,8 +958,8 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
         status: "available" | "disabled" | "not_configured" | "not_mapped" | "unavailable";
         notes: {
             id: string;
-            createdAt: Date | null;
             category: string | null;
+            createdAt: Date | null;
             note: string;
             authorName: string | null;
         }[];
@@ -850,8 +970,8 @@ export declare const GetStopHistoryResponse: zod.ZodIntersection<zod.ZodObject<{
         status: "available" | "disabled" | "not_configured" | "not_mapped" | "unavailable";
         notes: {
             id: string;
-            createdAt: Date | null;
             category: string | null;
+            createdAt: Date | null;
             note: string;
             authorName: string | null;
         }[];
@@ -891,10 +1011,10 @@ export declare const GetPropertyVisitResponse: zod.ZodObject<{
         pestTypes: string[];
         findingsCount: number;
         mediaCount: number;
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         completedAt?: string | null | undefined;
         notes?: string | null | undefined;
         visitPurpose?: string | null | undefined;
@@ -905,10 +1025,10 @@ export declare const GetPropertyVisitResponse: zod.ZodObject<{
         pestTypes: string[];
         findingsCount: number;
         mediaCount: number;
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         completedAt?: string | null | undefined;
         notes?: string | null | undefined;
         visitPurpose?: string | null | undefined;
@@ -950,8 +1070,8 @@ export declare const GetPropertyVisitResponse: zod.ZodObject<{
             eligibleNow: boolean;
         }>;
     }, "strip", zod.ZodTypeAny, {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -965,15 +1085,15 @@ export declare const GetPropertyVisitResponse: zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
     }, {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -987,9 +1107,9 @@ export declare const GetPropertyVisitResponse: zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
@@ -1004,17 +1124,17 @@ export declare const GetPropertyVisitResponse: zod.ZodObject<{
         pestTypes: string[];
         findingsCount: number;
         mediaCount: number;
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         completedAt?: string | null | undefined;
         notes?: string | null | undefined;
         visitPurpose?: string | null | undefined;
     }[];
     chemicalLedger: {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -1028,9 +1148,9 @@ export declare const GetPropertyVisitResponse: zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
@@ -1045,17 +1165,17 @@ export declare const GetPropertyVisitResponse: zod.ZodObject<{
         pestTypes: string[];
         findingsCount: number;
         mediaCount: number;
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         completedAt?: string | null | undefined;
         notes?: string | null | undefined;
         visitPurpose?: string | null | undefined;
     }[];
     chemicalLedger: {
-        id: number;
         inspectionId: number;
+        id: number;
         productId: number;
         productName: string;
         targetPest: string;
@@ -1069,9 +1189,9 @@ export declare const GetPropertyVisitResponse: zod.ZodObject<{
             nextEligibleReapplicationDate: string | null;
             eligibleNow: boolean;
         };
+        linearFt?: number | null | undefined;
         epaRegistrationNumber?: string | null | undefined;
         areaSqft?: number | null | undefined;
-        linearFt?: number | null | undefined;
         totalProductOz?: number | null | undefined;
         equipmentUsed?: string | null | undefined;
         notes?: string | null | undefined;
@@ -1144,10 +1264,10 @@ export declare const GetRouteCalendarResponseItem: zod.ZodObject<{
             okCount: number;
             hasOutlookData: boolean;
         };
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
     }, {
         status: string;
@@ -1164,10 +1284,10 @@ export declare const GetRouteCalendarResponseItem: zod.ZodObject<{
             okCount: number;
             hasOutlookData: boolean;
         };
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
@@ -1187,10 +1307,10 @@ export declare const GetRouteCalendarResponseItem: zod.ZodObject<{
             okCount: number;
             hasOutlookData: boolean;
         };
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
     }[];
 }, {
@@ -1210,10 +1330,10 @@ export declare const GetRouteCalendarResponseItem: zod.ZodObject<{
             okCount: number;
             hasOutlookData: boolean;
         };
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
     }[];
 }>;
@@ -1268,10 +1388,10 @@ export declare const GetRouteCalendarResponse: zod.ZodArray<zod.ZodObject<{
             okCount: number;
             hasOutlookData: boolean;
         };
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
     }, {
         status: string;
@@ -1288,10 +1408,10 @@ export declare const GetRouteCalendarResponse: zod.ZodArray<zod.ZodObject<{
             okCount: number;
             hasOutlookData: boolean;
         };
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
@@ -1311,10 +1431,10 @@ export declare const GetRouteCalendarResponse: zod.ZodArray<zod.ZodObject<{
             okCount: number;
             hasOutlookData: boolean;
         };
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
     }[];
 }, {
@@ -1334,10 +1454,10 @@ export declare const GetRouteCalendarResponse: zod.ZodArray<zod.ZodObject<{
             okCount: number;
             hasOutlookData: boolean;
         };
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
     }[];
 }>, "many">;
@@ -1478,29 +1598,29 @@ export declare const ListInspectionsResponseItem: zod.ZodObject<{
         capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
         createdAt: zod.ZodDate;
     }, "strip", zod.ZodTypeAny, {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
         capturedAt?: Date | null | undefined;
     }, {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1515,10 +1635,10 @@ export declare const ListInspectionsResponseItem: zod.ZodObject<{
     siteAddress: string;
     technicianName: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
     findingsCount?: number | undefined;
@@ -1526,15 +1646,15 @@ export declare const ListInspectionsResponseItem: zod.ZodObject<{
     visitPurpose?: string | null | undefined;
     mediaCount?: number | undefined;
     media?: {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1547,10 +1667,10 @@ export declare const ListInspectionsResponseItem: zod.ZodObject<{
     siteAddress: string;
     technicianName: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
     findingsCount?: number | undefined;
@@ -1558,15 +1678,15 @@ export declare const ListInspectionsResponseItem: zod.ZodObject<{
     visitPurpose?: string | null | undefined;
     mediaCount?: number | undefined;
     media?: {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1603,29 +1723,29 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
         capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
         createdAt: zod.ZodDate;
     }, "strip", zod.ZodTypeAny, {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
         capturedAt?: Date | null | undefined;
     }, {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1640,10 +1760,10 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
     siteAddress: string;
     technicianName: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
     findingsCount?: number | undefined;
@@ -1651,15 +1771,15 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
     visitPurpose?: string | null | undefined;
     mediaCount?: number | undefined;
     media?: {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1672,10 +1792,10 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
     siteAddress: string;
     technicianName: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
     findingsCount?: number | undefined;
@@ -1683,15 +1803,15 @@ export declare const ListInspectionsResponse: zod.ZodArray<zod.ZodObject<{
     visitPurpose?: string | null | undefined;
     mediaCount?: number | undefined;
     media?: {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1715,23 +1835,23 @@ export declare const CreateInspectionBody: zod.ZodObject<{
 }, "strip", zod.ZodTypeAny, {
     siteAddress: string;
     technicianName: string;
+    clientKey?: string | undefined;
     clientName?: string | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | undefined;
     pestTypes?: string[] | undefined;
     notes?: string | undefined;
     visitPurpose?: string | undefined;
-    clientKey?: string | undefined;
 }, {
     siteAddress: string;
     technicianName: string;
+    clientKey?: string | undefined;
     clientName?: string | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | undefined;
     pestTypes?: string[] | undefined;
     notes?: string | undefined;
     visitPurpose?: string | undefined;
-    clientKey?: string | undefined;
 }>;
 /**
  * @summary Get inspection by ID
@@ -1772,29 +1892,29 @@ export declare const GetInspectionResponse: zod.ZodObject<{
         capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
         createdAt: zod.ZodDate;
     }, "strip", zod.ZodTypeAny, {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
         capturedAt?: Date | null | undefined;
     }, {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1809,10 +1929,10 @@ export declare const GetInspectionResponse: zod.ZodObject<{
     siteAddress: string;
     technicianName: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
     findingsCount?: number | undefined;
@@ -1820,15 +1940,15 @@ export declare const GetInspectionResponse: zod.ZodObject<{
     visitPurpose?: string | null | undefined;
     mediaCount?: number | undefined;
     media?: {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1841,10 +1961,10 @@ export declare const GetInspectionResponse: zod.ZodObject<{
     siteAddress: string;
     technicianName: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
     findingsCount?: number | undefined;
@@ -1852,15 +1972,15 @@ export declare const GetInspectionResponse: zod.ZodObject<{
     visitPurpose?: string | null | undefined;
     mediaCount?: number | undefined;
     media?: {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1888,16 +2008,16 @@ export declare const UpdateInspectionBody: zod.ZodObject<{
     visitPurpose: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
     status?: string | undefined;
-    unitNumber?: string | null | undefined;
     severity?: string | undefined;
+    unitNumber?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | undefined;
     notes?: string | undefined;
     visitPurpose?: string | null | undefined;
 }, {
     status?: string | undefined;
-    unitNumber?: string | null | undefined;
     severity?: string | undefined;
+    unitNumber?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | undefined;
     notes?: string | undefined;
@@ -1932,29 +2052,29 @@ export declare const UpdateInspectionResponse: zod.ZodObject<{
         capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
         createdAt: zod.ZodDate;
     }, "strip", zod.ZodTypeAny, {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
         capturedAt?: Date | null | undefined;
     }, {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -1969,10 +2089,10 @@ export declare const UpdateInspectionResponse: zod.ZodObject<{
     siteAddress: string;
     technicianName: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
     findingsCount?: number | undefined;
@@ -1980,15 +2100,15 @@ export declare const UpdateInspectionResponse: zod.ZodObject<{
     visitPurpose?: string | null | undefined;
     mediaCount?: number | undefined;
     media?: {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -2001,10 +2121,10 @@ export declare const UpdateInspectionResponse: zod.ZodObject<{
     siteAddress: string;
     technicianName: string;
     createdAt: string;
+    severity?: string | null | undefined;
     clientName?: string | null | undefined;
     unitNumber?: string | null | undefined;
     technicianId?: string | null | undefined;
-    severity?: string | null | undefined;
     pestTypes?: string[] | undefined;
     completedAt?: string | null | undefined;
     findingsCount?: number | undefined;
@@ -2012,15 +2132,15 @@ export declare const UpdateInspectionResponse: zod.ZodObject<{
     visitPurpose?: string | null | undefined;
     mediaCount?: number | undefined;
     media?: {
-        id: number;
-        createdAt: Date;
-        url: string;
         inspectionId: number;
+        id: number;
+        url: string;
         mediaType: string;
-        unitNumber?: string | null | undefined;
+        createdAt: Date;
         filename?: string | null | undefined;
-        caption?: string | null | undefined;
         durationSec?: number | null | undefined;
+        unitNumber?: string | null | undefined;
+        caption?: string | null | undefined;
         captureSource?: string | undefined;
         qualityScore?: number | null | undefined;
         captureMetadata?: Record<string, unknown> | null | undefined;
@@ -2079,29 +2199,29 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
             capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
             createdAt: zod.ZodDate;
         }, "strip", zod.ZodTypeAny, {
-            id: number;
-            createdAt: Date;
-            url: string;
             inspectionId: number;
+            id: number;
+            url: string;
             mediaType: string;
-            unitNumber?: string | null | undefined;
+            createdAt: Date;
             filename?: string | null | undefined;
-            caption?: string | null | undefined;
             durationSec?: number | null | undefined;
+            unitNumber?: string | null | undefined;
+            caption?: string | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
             capturedAt?: Date | null | undefined;
         }, {
-            id: number;
-            createdAt: Date;
-            url: string;
             inspectionId: number;
+            id: number;
+            url: string;
             mediaType: string;
-            unitNumber?: string | null | undefined;
+            createdAt: Date;
             filename?: string | null | undefined;
-            caption?: string | null | undefined;
             durationSec?: number | null | undefined;
+            unitNumber?: string | null | undefined;
+            caption?: string | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
@@ -2116,10 +2236,10 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         siteAddress: string;
         technicianName: string;
         createdAt: string;
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
         completedAt?: string | null | undefined;
         findingsCount?: number | undefined;
@@ -2127,15 +2247,15 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         visitPurpose?: string | null | undefined;
         mediaCount?: number | undefined;
         media?: {
-            id: number;
-            createdAt: Date;
-            url: string;
             inspectionId: number;
+            id: number;
+            url: string;
             mediaType: string;
-            unitNumber?: string | null | undefined;
+            createdAt: Date;
             filename?: string | null | undefined;
-            caption?: string | null | undefined;
             durationSec?: number | null | undefined;
+            unitNumber?: string | null | undefined;
+            caption?: string | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
@@ -2148,10 +2268,10 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         siteAddress: string;
         technicianName: string;
         createdAt: string;
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
         completedAt?: string | null | undefined;
         findingsCount?: number | undefined;
@@ -2159,15 +2279,15 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         visitPurpose?: string | null | undefined;
         mediaCount?: number | undefined;
         media?: {
-            id: number;
-            createdAt: Date;
-            url: string;
             inspectionId: number;
+            id: number;
+            url: string;
             mediaType: string;
-            unitNumber?: string | null | undefined;
+            createdAt: Date;
             filename?: string | null | undefined;
-            caption?: string | null | undefined;
             durationSec?: number | null | undefined;
+            unitNumber?: string | null | undefined;
+            caption?: string | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
@@ -2185,10 +2305,10 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         siteAddress: string;
         technicianName: string;
         createdAt: string;
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
         completedAt?: string | null | undefined;
         findingsCount?: number | undefined;
@@ -2196,15 +2316,15 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         visitPurpose?: string | null | undefined;
         mediaCount?: number | undefined;
         media?: {
-            id: number;
-            createdAt: Date;
-            url: string;
             inspectionId: number;
+            id: number;
+            url: string;
             mediaType: string;
-            unitNumber?: string | null | undefined;
+            createdAt: Date;
             filename?: string | null | undefined;
-            caption?: string | null | undefined;
             durationSec?: number | null | undefined;
+            unitNumber?: string | null | undefined;
+            caption?: string | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
@@ -2222,10 +2342,10 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         siteAddress: string;
         technicianName: string;
         createdAt: string;
+        severity?: string | null | undefined;
         clientName?: string | null | undefined;
         unitNumber?: string | null | undefined;
         technicianId?: string | null | undefined;
-        severity?: string | null | undefined;
         pestTypes?: string[] | undefined;
         completedAt?: string | null | undefined;
         findingsCount?: number | undefined;
@@ -2233,15 +2353,15 @@ export declare const CompleteInspectionResponse: zod.ZodObject<{
         visitPurpose?: string | null | undefined;
         mediaCount?: number | undefined;
         media?: {
-            id: number;
-            createdAt: Date;
-            url: string;
             inspectionId: number;
+            id: number;
+            url: string;
             mediaType: string;
-            unitNumber?: string | null | undefined;
+            createdAt: Date;
             filename?: string | null | undefined;
-            caption?: string | null | undefined;
             durationSec?: number | null | undefined;
+            unitNumber?: string | null | undefined;
+            caption?: string | null | undefined;
             captureSource?: string | undefined;
             qualityScore?: number | null | undefined;
             captureMetadata?: Record<string, unknown> | null | undefined;
@@ -2265,6 +2385,7 @@ export declare const AddInspectionMediaParams: zod.ZodObject<{
 }>;
 export declare const AddInspectionMediaBody: zod.ZodObject<{
     mediaType: zod.ZodString;
+    uploadIntentId: zod.ZodNumber;
     url: zod.ZodString;
     filename: zod.ZodOptional<zod.ZodString>;
     caption: zod.ZodOptional<zod.ZodString>;
@@ -2277,10 +2398,11 @@ export declare const AddInspectionMediaBody: zod.ZodObject<{
 }, "strip", zod.ZodTypeAny, {
     url: string;
     mediaType: string;
-    unitNumber?: string | null | undefined;
+    uploadIntentId: number;
     filename?: string | undefined;
-    caption?: string | undefined;
     durationSec?: number | undefined;
+    unitNumber?: string | null | undefined;
+    caption?: string | undefined;
     captureSource?: string | undefined;
     qualityScore?: number | undefined;
     captureMetadata?: Record<string, unknown> | undefined;
@@ -2288,10 +2410,11 @@ export declare const AddInspectionMediaBody: zod.ZodObject<{
 }, {
     url: string;
     mediaType: string;
-    unitNumber?: string | null | undefined;
+    uploadIntentId: number;
     filename?: string | undefined;
-    caption?: string | undefined;
     durationSec?: number | undefined;
+    unitNumber?: string | null | undefined;
+    caption?: string | undefined;
     captureSource?: string | undefined;
     qualityScore?: number | undefined;
     captureMetadata?: Record<string, unknown> | undefined;
@@ -2312,29 +2435,29 @@ export declare const AddInspectionMediaResponse: zod.ZodObject<{
     capturedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
     createdAt: zod.ZodDate;
 }, "strip", zod.ZodTypeAny, {
-    id: number;
-    createdAt: Date;
-    url: string;
     inspectionId: number;
+    id: number;
+    url: string;
     mediaType: string;
-    unitNumber?: string | null | undefined;
+    createdAt: Date;
     filename?: string | null | undefined;
-    caption?: string | null | undefined;
     durationSec?: number | null | undefined;
+    unitNumber?: string | null | undefined;
+    caption?: string | null | undefined;
     captureSource?: string | undefined;
     qualityScore?: number | null | undefined;
     captureMetadata?: Record<string, unknown> | null | undefined;
     capturedAt?: Date | null | undefined;
 }, {
-    id: number;
-    createdAt: Date;
-    url: string;
     inspectionId: number;
+    id: number;
+    url: string;
     mediaType: string;
-    unitNumber?: string | null | undefined;
+    createdAt: Date;
     filename?: string | null | undefined;
-    caption?: string | null | undefined;
     durationSec?: number | null | undefined;
+    unitNumber?: string | null | undefined;
+    caption?: string | null | undefined;
     captureSource?: string | undefined;
     qualityScore?: number | null | undefined;
     captureMetadata?: Record<string, unknown> | null | undefined;
@@ -2407,16 +2530,15 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -2432,6 +2554,7 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -2441,16 +2564,15 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         technicianSpecies?: string | null | undefined;
         technicianCorrectionNotes?: string | null | undefined;
     }, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -2466,6 +2588,7 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -2485,15 +2608,15 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }, {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }>, "many">>;
     analyzedImagePaths: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     photoOutcomes: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -2753,16 +2876,16 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
             visits: zod.ZodNumber;
             lastSeen: zod.ZodNullable<zod.ZodString>;
         }, "strip", zod.ZodTypeAny, {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
         }, {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -2835,16 +2958,16 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         }, "strip", zod.ZodTypeAny, {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }, {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }>, "many">;
     }, "strip", zod.ZodTypeAny, {
@@ -2857,9 +2980,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -2884,9 +3007,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     }, {
@@ -2899,9 +3022,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -2926,9 +3049,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     }>, zod.ZodNull]>>;
@@ -2940,21 +3063,20 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
     failureReason: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -2970,6 +3092,7 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -2983,9 +3106,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
     videoEvidence?: {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
     photoOutcomes?: {
@@ -3057,9 +3180,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -3084,9 +3207,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     } | null | undefined;
@@ -3097,21 +3220,20 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
     analysisErrors?: number | null | undefined;
     failureReason?: string | null | undefined;
 }, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -3127,6 +3249,7 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -3140,9 +3263,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
     videoEvidence?: {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
     photoOutcomes?: {
@@ -3214,9 +3337,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -3241,9 +3364,9 @@ export declare const ListAnalysisResultsResponseItem: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     } | null | undefined;
@@ -3311,16 +3434,15 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -3336,6 +3458,7 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -3345,16 +3468,15 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         technicianSpecies?: string | null | undefined;
         technicianCorrectionNotes?: string | null | undefined;
     }, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -3370,6 +3492,7 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -3389,15 +3512,15 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }, {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }>, "many">>;
     analyzedImagePaths: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     photoOutcomes: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -3657,16 +3780,16 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
             visits: zod.ZodNumber;
             lastSeen: zod.ZodNullable<zod.ZodString>;
         }, "strip", zod.ZodTypeAny, {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
         }, {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -3739,16 +3862,16 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         }, "strip", zod.ZodTypeAny, {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }, {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }>, "many">;
     }, "strip", zod.ZodTypeAny, {
@@ -3761,9 +3884,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -3788,9 +3911,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     }, {
@@ -3803,9 +3926,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -3830,9 +3953,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     }>, zod.ZodNull]>>;
@@ -3844,21 +3967,20 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
     failureReason: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -3874,6 +3996,7 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -3887,9 +4010,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
     videoEvidence?: {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
     photoOutcomes?: {
@@ -3961,9 +4084,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -3988,9 +4111,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     } | null | undefined;
@@ -4001,21 +4124,20 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
     analysisErrors?: number | null | undefined;
     failureReason?: string | null | undefined;
 }, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -4031,6 +4153,7 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -4044,9 +4167,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
     videoEvidence?: {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
     photoOutcomes?: {
@@ -4118,9 +4241,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -4145,9 +4268,9 @@ export declare const ListAnalysisResultsResponse: zod.ZodArray<zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     } | null | undefined;
@@ -4226,16 +4349,15 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
         technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -4251,6 +4373,7 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -4260,16 +4383,15 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
         technicianSpecies?: string | null | undefined;
         technicianCorrectionNotes?: string | null | undefined;
     }, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -4285,6 +4407,7 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -4301,14 +4424,14 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
         label: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         url: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }, {
         url: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }>, "many">>;
     draft: zod.ZodOptional<zod.ZodBoolean>;
 }, "strip", zod.ZodTypeAny, {
@@ -4318,16 +4441,15 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     technicianFindings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -4343,6 +4465,7 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -4354,9 +4477,9 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
     }[] | undefined;
     videos?: {
         url: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     draft?: boolean | undefined;
 }, {
@@ -4366,16 +4489,15 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
         label?: string | null | undefined;
     }[] | undefined;
     technicianFindings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -4391,6 +4513,7 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -4402,9 +4525,9 @@ export declare const AnalyzeInspectionBody: zod.ZodObject<{
     }[] | undefined;
     videos?: {
         url: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     draft?: boolean | undefined;
 }>;
@@ -4475,16 +4598,15 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -4500,6 +4622,7 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -4509,16 +4632,15 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         technicianSpecies?: string | null | undefined;
         technicianCorrectionNotes?: string | null | undefined;
     }, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -4534,6 +4656,7 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -4553,15 +4676,15 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }, {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }>, "many">>;
     analyzedImagePaths: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     photoOutcomes: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -4821,16 +4944,16 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
             visits: zod.ZodNumber;
             lastSeen: zod.ZodNullable<zod.ZodString>;
         }, "strip", zod.ZodTypeAny, {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
         }, {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -4903,16 +5026,16 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         }, "strip", zod.ZodTypeAny, {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }, {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }>, "many">;
     }, "strip", zod.ZodTypeAny, {
@@ -4925,9 +5048,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -4952,9 +5075,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     }, {
@@ -4967,9 +5090,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -4994,9 +5117,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     }>, zod.ZodNull]>>;
@@ -5008,21 +5131,20 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
     failureReason: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -5038,6 +5160,7 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -5051,9 +5174,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
     videoEvidence?: {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
     photoOutcomes?: {
@@ -5125,9 +5248,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -5152,9 +5275,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     } | null | undefined;
@@ -5165,21 +5288,20 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
     analysisErrors?: number | null | undefined;
     failureReason?: string | null | undefined;
 }, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -5195,6 +5317,7 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -5208,9 +5331,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
     videoEvidence?: {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
     photoOutcomes?: {
@@ -5282,9 +5405,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -5309,9 +5432,9 @@ export declare const GetAnalysisResultResponse: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     } | null | undefined;
@@ -5399,16 +5522,15 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -5424,6 +5546,7 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -5433,16 +5556,15 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         technicianSpecies?: string | null | undefined;
         technicianCorrectionNotes?: string | null | undefined;
     }, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -5458,6 +5580,7 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -5477,15 +5600,15 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }, {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }>, "many">>;
     analyzedImagePaths: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
     photoOutcomes: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -5745,16 +5868,16 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
             visits: zod.ZodNumber;
             lastSeen: zod.ZodNullable<zod.ZodString>;
         }, "strip", zod.ZodTypeAny, {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
         }, {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -5827,16 +5950,16 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         }, "strip", zod.ZodTypeAny, {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }, {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }>, "many">;
     }, "strip", zod.ZodTypeAny, {
@@ -5849,9 +5972,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -5876,9 +5999,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     }, {
@@ -5891,9 +6014,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -5918,9 +6041,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     }>, zod.ZodNull]>>;
@@ -5932,21 +6055,20 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
     failureReason: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -5962,6 +6084,7 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -5975,9 +6098,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
     videoEvidence?: {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
     photoOutcomes?: {
@@ -6049,9 +6172,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -6076,9 +6199,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     } | null | undefined;
@@ -6089,21 +6212,20 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
     analysisErrors?: number | null | undefined;
     failureReason?: string | null | undefined;
 }, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -6119,6 +6241,7 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -6132,9 +6255,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
     videoEvidence?: {
         url: string;
         frameAnalysisStatus: string;
+        label?: string | null | undefined;
         filename?: string | null | undefined;
         durationSec?: number | null | undefined;
-        label?: string | null | undefined;
     }[] | undefined;
     analyzedImagePaths?: string[] | undefined;
     photoOutcomes?: {
@@ -6206,9 +6329,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         priorVisitCount: number;
         lastVisitDate: string | null;
         pestActivity: {
+            label: string;
             severity: string;
             zone: string | null;
-            label: string;
             key: string;
             visits: number;
             lastSeen: string | null;
@@ -6233,9 +6356,9 @@ export declare const SubmitAnalysisFeedbackResponse: zod.ZodObject<{
         highlights: {
             message: string;
             type: "area_not_inspected" | "bait_station_missing" | "rodent_area_not_photographed";
+            label: string;
             id: string;
             zone: string | null;
-            label: string;
             lastSeen: string | null;
         }[];
     } | null | undefined;
@@ -6338,26 +6461,26 @@ export declare const ListDatasetImagesResponse: zod.ZodObject<{
         tags: zod.ZodOptional<zod.ZodArray<zod.ZodString, "many">>;
         createdAt: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        id: number;
-        createdAt: string;
-        category: string;
         imageUrl: string;
+        id: number;
+        category: string;
+        createdAt: string;
         title: string;
         pestType: string;
-        severity?: string | null | undefined;
         description?: string | null | undefined;
+        severity?: string | null | undefined;
         location?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         tags?: string[] | undefined;
     }, {
-        id: number;
-        createdAt: string;
-        category: string;
         imageUrl: string;
+        id: number;
+        category: string;
+        createdAt: string;
         title: string;
         pestType: string;
-        severity?: string | null | undefined;
         description?: string | null | undefined;
+        severity?: string | null | undefined;
         location?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         tags?: string[] | undefined;
@@ -6368,14 +6491,14 @@ export declare const ListDatasetImagesResponse: zod.ZodObject<{
 }, "strip", zod.ZodTypeAny, {
     total: number;
     items: {
-        id: number;
-        createdAt: string;
-        category: string;
         imageUrl: string;
+        id: number;
+        category: string;
+        createdAt: string;
         title: string;
         pestType: string;
-        severity?: string | null | undefined;
         description?: string | null | undefined;
+        severity?: string | null | undefined;
         location?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         tags?: string[] | undefined;
@@ -6385,14 +6508,14 @@ export declare const ListDatasetImagesResponse: zod.ZodObject<{
 }, {
     total: number;
     items: {
-        id: number;
-        createdAt: string;
-        category: string;
         imageUrl: string;
+        id: number;
+        category: string;
+        createdAt: string;
         title: string;
         pestType: string;
-        severity?: string | null | undefined;
         description?: string | null | undefined;
+        severity?: string | null | undefined;
         location?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         tags?: string[] | undefined;
@@ -6409,14 +6532,14 @@ export declare const ListDatasetCategoriesResponseItem: zod.ZodObject<{
     count: zod.ZodNumber;
     icon: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
+    name: string;
     slug: string;
     count: number;
-    name: string;
     icon?: string | null | undefined;
 }, {
+    name: string;
     slug: string;
     count: number;
-    name: string;
     icon?: string | null | undefined;
 }>;
 export declare const ListDatasetCategoriesResponse: zod.ZodArray<zod.ZodObject<{
@@ -6425,14 +6548,14 @@ export declare const ListDatasetCategoriesResponse: zod.ZodArray<zod.ZodObject<{
     count: zod.ZodNumber;
     icon: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
+    name: string;
     slug: string;
     count: number;
-    name: string;
     icon?: string | null | undefined;
 }, {
+    name: string;
     slug: string;
     count: number;
-    name: string;
     icon?: string | null | undefined;
 }>, "many">;
 /**
@@ -6457,8 +6580,8 @@ export declare const ListIntelligenceCategoriesResponseItem: zod.ZodObject<{
         count: number;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
-    description: string;
     label: string;
+    description: string;
     slug: string;
     count: number;
     subcategories: {
@@ -6467,8 +6590,8 @@ export declare const ListIntelligenceCategoriesResponseItem: zod.ZodObject<{
         count: number;
     }[];
 }, {
-    description: string;
     label: string;
+    description: string;
     slug: string;
     count: number;
     subcategories: {
@@ -6496,8 +6619,8 @@ export declare const ListIntelligenceCategoriesResponse: zod.ZodArray<zod.ZodObj
         count: number;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
-    description: string;
     label: string;
+    description: string;
     slug: string;
     count: number;
     subcategories: {
@@ -6506,8 +6629,8 @@ export declare const ListIntelligenceCategoriesResponse: zod.ZodArray<zod.ZodObj
         count: number;
     }[];
 }, {
-    description: string;
     label: string;
+    description: string;
     slug: string;
     count: number;
     subcategories: {
@@ -6796,9 +6919,9 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         reviewedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
         status: string;
+        imageUrl: string;
         id: number;
         createdAt: string;
-        imageUrl: string;
         tags: {
             source: string;
             tag: string;
@@ -6820,11 +6943,11 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         confirmVotes: number;
         disputeVotes: number;
         updatedAt: string;
-        severity?: string | null | undefined;
-        notes?: string | null | undefined;
         category?: string | null | undefined;
-        mediaType?: "photo" | "video" | undefined;
+        severity?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        mediaType?: "photo" | "video" | undefined;
+        notes?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
@@ -6843,9 +6966,9 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         reviewedAt?: string | null | undefined;
     }, {
         status: string;
+        imageUrl: string;
         id: number;
         createdAt: string;
-        imageUrl: string;
         tags: {
             source: string;
             tag: string;
@@ -6867,11 +6990,11 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         confirmVotes: number;
         disputeVotes: number;
         updatedAt: string;
-        severity?: string | null | undefined;
-        notes?: string | null | undefined;
         category?: string | null | undefined;
-        mediaType?: "photo" | "video" | undefined;
+        severity?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        mediaType?: "photo" | "video" | undefined;
+        notes?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
@@ -6896,9 +7019,9 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
     total: number;
     items: {
         status: string;
+        imageUrl: string;
         id: number;
         createdAt: string;
-        imageUrl: string;
         tags: {
             source: string;
             tag: string;
@@ -6920,11 +7043,11 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         confirmVotes: number;
         disputeVotes: number;
         updatedAt: string;
-        severity?: string | null | undefined;
-        notes?: string | null | undefined;
         category?: string | null | undefined;
-        mediaType?: "photo" | "video" | undefined;
+        severity?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        mediaType?: "photo" | "video" | undefined;
+        notes?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
@@ -6948,9 +7071,9 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
     total: number;
     items: {
         status: string;
+        imageUrl: string;
         id: number;
         createdAt: string;
-        imageUrl: string;
         tags: {
             source: string;
             tag: string;
@@ -6972,11 +7095,11 @@ export declare const ListIntelligenceRecordsResponse: zod.ZodObject<{
         confirmVotes: number;
         disputeVotes: number;
         updatedAt: string;
-        severity?: string | null | undefined;
-        notes?: string | null | undefined;
         category?: string | null | undefined;
-        mediaType?: "photo" | "video" | undefined;
+        severity?: string | null | undefined;
         possiblePest?: string | null | undefined;
+        mediaType?: "photo" | "video" | undefined;
+        notes?: string | null | undefined;
         thumbnailUrl?: string | null | undefined;
         subcategory?: string | null | undefined;
         possibleConduciveCondition?: string | null | undefined;
@@ -7095,9 +7218,9 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7119,11 +7242,11 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -7142,9 +7265,9 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt?: string | null | undefined;
 }, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7166,11 +7289,11 @@ export declare const GetIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -7216,8 +7339,8 @@ export declare const ConfirmIntelligenceRecordBody: zod.ZodObject<{
 }, "strip", zod.ZodTypeAny, {
     category: string;
     severity?: "low" | "high" | "moderate" | "critical" | undefined;
-    notes?: string | undefined;
     possiblePest?: string | undefined;
+    notes?: string | undefined;
     tags?: string[] | undefined;
     subcategory?: string | undefined;
     possibleConduciveCondition?: string | undefined;
@@ -7230,8 +7353,8 @@ export declare const ConfirmIntelligenceRecordBody: zod.ZodObject<{
 }, {
     category: string;
     severity?: "low" | "high" | "moderate" | "critical" | undefined;
-    notes?: string | undefined;
     possiblePest?: string | undefined;
+    notes?: string | undefined;
     tags?: string[] | undefined;
     subcategory?: string | undefined;
     possibleConduciveCondition?: string | undefined;
@@ -7317,9 +7440,9 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7341,11 +7464,11 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -7364,9 +7487,9 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt?: string | null | undefined;
 }, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7388,11 +7511,11 @@ export declare const ConfirmIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -7495,9 +7618,9 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7519,11 +7642,11 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -7542,9 +7665,9 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt?: string | null | undefined;
 }, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7566,11 +7689,11 @@ export declare const SkipIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -7680,9 +7803,9 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7704,11 +7827,11 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -7727,9 +7850,9 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt?: string | null | undefined;
 }, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7751,11 +7874,11 @@ export declare const VoteIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -7802,10 +7925,10 @@ export declare const ReviewIntelligenceRecordBody: zod.ZodObject<{
     force: zod.ZodOptional<zod.ZodBoolean>;
 }, "strip", zod.ZodTypeAny, {
     action: "approve" | "reject" | "edit" | "expert_verify";
-    severity?: "low" | "high" | "moderate" | "critical" | undefined;
-    notes?: string | undefined;
     category?: string | undefined;
+    severity?: "low" | "high" | "moderate" | "critical" | undefined;
     possiblePest?: string | undefined;
+    notes?: string | undefined;
     subcategory?: string | undefined;
     possibleConduciveCondition?: string | undefined;
     possibleEntryPoint?: string | undefined;
@@ -7818,10 +7941,10 @@ export declare const ReviewIntelligenceRecordBody: zod.ZodObject<{
     force?: boolean | undefined;
 }, {
     action: "approve" | "reject" | "edit" | "expert_verify";
-    severity?: "low" | "high" | "moderate" | "critical" | undefined;
-    notes?: string | undefined;
     category?: string | undefined;
+    severity?: "low" | "high" | "moderate" | "critical" | undefined;
     possiblePest?: string | undefined;
+    notes?: string | undefined;
     subcategory?: string | undefined;
     possibleConduciveCondition?: string | undefined;
     possibleEntryPoint?: string | undefined;
@@ -7908,9 +8031,9 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7932,11 +8055,11 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -7955,9 +8078,9 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     reviewedAt?: string | null | undefined;
 }, {
     status: string;
+    imageUrl: string;
     id: number;
     createdAt: string;
-    imageUrl: string;
     tags: {
         source: string;
         tag: string;
@@ -7979,11 +8102,11 @@ export declare const ReviewIntelligenceRecordResponse: zod.ZodObject<{
     confirmVotes: number;
     disputeVotes: number;
     updatedAt: string;
-    severity?: string | null | undefined;
-    notes?: string | null | undefined;
     category?: string | null | undefined;
-    mediaType?: "photo" | "video" | undefined;
+    severity?: string | null | undefined;
     possiblePest?: string | null | undefined;
+    mediaType?: "photo" | "video" | undefined;
+    notes?: string | null | undefined;
     thumbnailUrl?: string | null | undefined;
     subcategory?: string | null | undefined;
     possibleConduciveCondition?: string | null | undefined;
@@ -8065,16 +8188,15 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
         technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8090,6 +8212,7 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8099,16 +8222,15 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
         technicianSpecies?: string | null | undefined;
         technicianCorrectionNotes?: string | null | undefined;
     }, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8124,6 +8246,7 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8207,26 +8330,25 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
     }>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     title: string;
+    severity?: string | null | undefined;
     siteAddress?: string | undefined;
     clientName?: string | null | undefined;
     technicianName?: string | undefined;
-    severity?: string | null | undefined;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8242,6 +8364,7 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8280,26 +8403,25 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
         latestEvidenceAt: Date | null;
     } | undefined;
 }, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     title: string;
+    severity?: string | null | undefined;
     siteAddress?: string | undefined;
     clientName?: string | null | undefined;
     technicianName?: string | undefined;
-    severity?: string | null | undefined;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8315,6 +8437,7 @@ export declare const ListReportsResponseItem: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8413,16 +8536,15 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
         technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8438,6 +8560,7 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8447,16 +8570,15 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
         technicianSpecies?: string | null | undefined;
         technicianCorrectionNotes?: string | null | undefined;
     }, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8472,6 +8594,7 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8555,26 +8678,25 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
     }>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     title: string;
+    severity?: string | null | undefined;
     siteAddress?: string | undefined;
     clientName?: string | null | undefined;
     technicianName?: string | undefined;
-    severity?: string | null | undefined;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8590,6 +8712,7 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8628,26 +8751,25 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
         latestEvidenceAt: Date | null;
     } | undefined;
 }, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     title: string;
+    severity?: string | null | undefined;
     siteAddress?: string | undefined;
     clientName?: string | null | undefined;
     technicianName?: string | undefined;
-    severity?: string | null | undefined;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8663,6 +8785,7 @@ export declare const ListReportsResponse: zod.ZodArray<zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8794,16 +8917,15 @@ export declare const GetReportResponse: zod.ZodObject<{
         technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8819,6 +8941,7 @@ export declare const GetReportResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8828,16 +8951,15 @@ export declare const GetReportResponse: zod.ZodObject<{
         technicianSpecies?: string | null | undefined;
         technicianCorrectionNotes?: string | null | undefined;
     }, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8853,6 +8975,7 @@ export declare const GetReportResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -8936,26 +9059,25 @@ export declare const GetReportResponse: zod.ZodObject<{
     }>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     title: string;
+    severity?: string | null | undefined;
     siteAddress?: string | undefined;
     clientName?: string | null | undefined;
     technicianName?: string | undefined;
-    severity?: string | null | undefined;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -8971,6 +9093,7 @@ export declare const GetReportResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -9009,26 +9132,25 @@ export declare const GetReportResponse: zod.ZodObject<{
         latestEvidenceAt: Date | null;
     } | undefined;
 }, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     title: string;
+    severity?: string | null | undefined;
     siteAddress?: string | undefined;
     clientName?: string | null | undefined;
     technicianName?: string | undefined;
-    severity?: string | null | undefined;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -9044,6 +9166,7 @@ export declare const GetReportResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -9170,16 +9293,15 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
         technicianSpecies: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         technicianCorrectionNotes: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -9195,6 +9317,7 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -9204,16 +9327,15 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
         technicianSpecies?: string | null | undefined;
         technicianCorrectionNotes?: string | null | undefined;
     }, {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -9229,6 +9351,7 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -9312,26 +9435,25 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
     }>>;
     createdAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     title: string;
+    severity?: string | null | undefined;
     siteAddress?: string | undefined;
     clientName?: string | null | undefined;
     technicianName?: string | undefined;
-    severity?: string | null | undefined;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -9347,6 +9469,7 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -9385,26 +9508,25 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
         latestEvidenceAt: Date | null;
     } | undefined;
 }, {
+    inspectionId: number;
     status: string;
     id: number;
     createdAt: string;
-    inspectionId: number;
     title: string;
+    severity?: string | null | undefined;
     siteAddress?: string | undefined;
     clientName?: string | null | undefined;
     technicianName?: string | undefined;
-    severity?: string | null | undefined;
     findings?: {
+        imageUrl: string | null;
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
-        imageUrl: string | null;
         treatment: string | null;
         exclusionOpportunity: boolean | null;
-        zone?: string | null | undefined;
         evidenceQuality?: "excellent" | "good" | "fair" | null | undefined;
         possiblePest?: string | null | undefined;
         species?: string | null | undefined;
@@ -9420,6 +9542,7 @@ export declare const GenerateReportNarrativeResponse: zod.ZodObject<{
             gapWidthIn?: number | null | undefined;
             heightFt?: number | null | undefined;
         } | null | undefined;
+        zone?: string | null | undefined;
         candidates?: {
             confidence: number;
             species: string;
@@ -9491,16 +9614,16 @@ export declare const GetAnalyticsDashboardResponse: zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         type: string;
         id: number;
+        description: string;
         technicianName: string;
         createdAt: string;
-        description: string;
         siteAddress?: string | null | undefined;
     }, {
         type: string;
         id: number;
+        description: string;
         technicianName: string;
         createdAt: string;
-        description: string;
         siteAddress?: string | null | undefined;
     }>, "many">;
     inspectionsByStatus: zod.ZodArray<zod.ZodObject<{
@@ -9521,13 +9644,13 @@ export declare const GetAnalyticsDashboardResponse: zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         value: number;
         date: string;
-        category?: string | null | undefined;
         label?: string | null | undefined;
+        category?: string | null | undefined;
     }, {
         value: number;
         date: string;
-        category?: string | null | undefined;
         label?: string | null | undefined;
+        category?: string | null | undefined;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
     totalInspections: number;
@@ -9541,9 +9664,9 @@ export declare const GetAnalyticsDashboardResponse: zod.ZodObject<{
     recentActivity: {
         type: string;
         id: number;
+        description: string;
         technicianName: string;
         createdAt: string;
-        description: string;
         siteAddress?: string | null | undefined;
     }[];
     inspectionsByStatus: {
@@ -9553,8 +9676,8 @@ export declare const GetAnalyticsDashboardResponse: zod.ZodObject<{
     monthlyInspections: {
         value: number;
         date: string;
-        category?: string | null | undefined;
         label?: string | null | undefined;
+        category?: string | null | undefined;
     }[];
     totalReports?: number | undefined;
     photosCaptured?: number | undefined;
@@ -9573,9 +9696,9 @@ export declare const GetAnalyticsDashboardResponse: zod.ZodObject<{
     recentActivity: {
         type: string;
         id: number;
+        description: string;
         technicianName: string;
         createdAt: string;
-        description: string;
         siteAddress?: string | null | undefined;
     }[];
     inspectionsByStatus: {
@@ -9585,8 +9708,8 @@ export declare const GetAnalyticsDashboardResponse: zod.ZodObject<{
     monthlyInspections: {
         value: number;
         date: string;
-        category?: string | null | undefined;
         label?: string | null | undefined;
+        category?: string | null | undefined;
     }[];
     totalReports?: number | undefined;
     photosCaptured?: number | undefined;
@@ -9613,13 +9736,13 @@ export declare const GetAnalyticsTrendsResponseItem: zod.ZodObject<{
 }, "strip", zod.ZodTypeAny, {
     value: number;
     date: string;
-    category?: string | null | undefined;
     label?: string | null | undefined;
+    category?: string | null | undefined;
 }, {
     value: number;
     date: string;
-    category?: string | null | undefined;
     label?: string | null | undefined;
+    category?: string | null | undefined;
 }>;
 export declare const GetAnalyticsTrendsResponse: zod.ZodArray<zod.ZodObject<{
     date: zod.ZodString;
@@ -9629,13 +9752,13 @@ export declare const GetAnalyticsTrendsResponse: zod.ZodArray<zod.ZodObject<{
 }, "strip", zod.ZodTypeAny, {
     value: number;
     date: string;
-    category?: string | null | undefined;
     label?: string | null | undefined;
+    category?: string | null | undefined;
 }, {
     value: number;
     date: string;
-    category?: string | null | undefined;
     label?: string | null | undefined;
+    category?: string | null | undefined;
 }>, "many">;
 /**
  * @summary Get technician performance metrics
@@ -9717,13 +9840,13 @@ export declare const GetInfestationRiskResponse: zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         value: number;
         date: string;
-        category?: string | null | undefined;
         label?: string | null | undefined;
+        category?: string | null | undefined;
     }, {
         value: number;
         date: string;
-        category?: string | null | undefined;
         label?: string | null | undefined;
+        category?: string | null | undefined;
     }>, "many">;
     highRiskSites: zod.ZodArray<zod.ZodObject<{
         siteAddress: zod.ZodString;
@@ -9748,8 +9871,8 @@ export declare const GetInfestationRiskResponse: zod.ZodObject<{
     riskTrend: {
         value: number;
         date: string;
-        category?: string | null | undefined;
         label?: string | null | undefined;
+        category?: string | null | undefined;
     }[];
     highRiskSites: {
         siteAddress: string;
@@ -9767,8 +9890,8 @@ export declare const GetInfestationRiskResponse: zod.ZodObject<{
     riskTrend: {
         value: number;
         date: string;
-        category?: string | null | undefined;
         label?: string | null | undefined;
+        category?: string | null | undefined;
     }[];
     highRiskSites: {
         siteAddress: string;
@@ -9818,35 +9941,35 @@ export declare const GetOpportunityIntelligenceResponse: zod.ZodObject<{
         recommendation: zod.ZodString;
         documented: zod.ZodBoolean;
     }, "strip", zod.ZodTypeAny, {
+        inspectionId: number;
         type: string;
         id: string;
-        siteAddress: string;
-        severity: string;
-        inspectionId: number;
         category: string;
         confidence: number;
+        severity: string;
+        siteAddress: string;
         propertyType: string;
         typeLabel: string;
         finding: string;
         recommendation: string;
         documented: boolean;
-        location?: string | null | undefined;
         imageUrl?: string | null | undefined;
+        location?: string | null | undefined;
     }, {
+        inspectionId: number;
         type: string;
         id: string;
-        siteAddress: string;
-        severity: string;
-        inspectionId: number;
         category: string;
         confidence: number;
+        severity: string;
+        siteAddress: string;
         propertyType: string;
         typeLabel: string;
         finding: string;
         recommendation: string;
         documented: boolean;
-        location?: string | null | undefined;
         imageUrl?: string | null | undefined;
+        location?: string | null | undefined;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
     totalOpportunities: number;
@@ -9863,20 +9986,20 @@ export declare const GetOpportunityIntelligenceResponse: zod.ZodObject<{
         count: number;
     }[];
     opportunities: {
+        inspectionId: number;
         type: string;
         id: string;
-        siteAddress: string;
-        severity: string;
-        inspectionId: number;
         category: string;
         confidence: number;
+        severity: string;
+        siteAddress: string;
         propertyType: string;
         typeLabel: string;
         finding: string;
         recommendation: string;
         documented: boolean;
-        location?: string | null | undefined;
         imageUrl?: string | null | undefined;
+        location?: string | null | undefined;
     }[];
 }, {
     totalOpportunities: number;
@@ -9893,20 +10016,20 @@ export declare const GetOpportunityIntelligenceResponse: zod.ZodObject<{
         count: number;
     }[];
     opportunities: {
+        inspectionId: number;
         type: string;
         id: string;
-        siteAddress: string;
-        severity: string;
-        inspectionId: number;
         category: string;
         confidence: number;
+        severity: string;
+        siteAddress: string;
         propertyType: string;
         typeLabel: string;
         finding: string;
         recommendation: string;
         documented: boolean;
-        location?: string | null | undefined;
         imageUrl?: string | null | undefined;
+        location?: string | null | undefined;
     }[];
 }>;
 /**
@@ -10182,15 +10305,15 @@ export declare const GetPropertyRiskInsightsResponse: zod.ZodObject<{
         conditions: zod.ZodArray<zod.ZodString, "many">;
         findingCount: zod.ZodNumber;
     }, "strip", zod.ZodTypeAny, {
-        siteAddress: string;
         inspectionId: number;
+        siteAddress: string;
         propertyType: string;
         riskScore: number;
         conditions: string[];
         findingCount: number;
     }, {
-        siteAddress: string;
         inspectionId: number;
+        siteAddress: string;
         propertyType: string;
         riskScore: number;
         conditions: string[];
@@ -10224,8 +10347,8 @@ export declare const GetPropertyRiskInsightsResponse: zod.ZodObject<{
         condition: string;
     }[];
     highRiskProperties: {
-        siteAddress: string;
         inspectionId: number;
+        siteAddress: string;
         propertyType: string;
         riskScore: number;
         conditions: string[];
@@ -10246,8 +10369,8 @@ export declare const GetPropertyRiskInsightsResponse: zod.ZodObject<{
         condition: string;
     }[];
     highRiskProperties: {
-        siteAddress: string;
         inspectionId: number;
+        siteAddress: string;
         propertyType: string;
         riskScore: number;
         conditions: string[];
@@ -10285,8 +10408,8 @@ export declare const GetBrandingResponse: zod.ZodObject<{
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10311,8 +10434,8 @@ export declare const GetBrandingResponse: zod.ZodObject<{
     emailFooter?: string | null | undefined;
 }, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10367,8 +10490,8 @@ export declare const GetActiveBrandingResponse: zod.ZodObject<{
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10393,8 +10516,8 @@ export declare const GetActiveBrandingResponse: zod.ZodObject<{
     emailFooter?: string | null | undefined;
 }, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10449,8 +10572,8 @@ export declare const GetCompanyBrandingResponse: zod.ZodObject<{
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10475,8 +10598,8 @@ export declare const GetCompanyBrandingResponse: zod.ZodObject<{
     emailFooter?: string | null | undefined;
 }, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10531,8 +10654,8 @@ export declare const ListBrandingProfilesResponseItem: zod.ZodObject<{
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10557,8 +10680,8 @@ export declare const ListBrandingProfilesResponseItem: zod.ZodObject<{
     emailFooter?: string | null | undefined;
 }, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10610,8 +10733,8 @@ export declare const ListBrandingProfilesResponse: zod.ZodArray<zod.ZodObject<{
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10636,8 +10759,8 @@ export declare const ListBrandingProfilesResponse: zod.ZodArray<zod.ZodObject<{
     emailFooter?: string | null | undefined;
 }, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10766,8 +10889,8 @@ export declare const GetBrandingProfileResponse: zod.ZodObject<{
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10792,8 +10915,8 @@ export declare const GetBrandingProfileResponse: zod.ZodObject<{
     emailFooter?: string | null | undefined;
 }, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10919,8 +11042,8 @@ export declare const UpdateBrandingProfileResponse: zod.ZodObject<{
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -10945,8 +11068,8 @@ export declare const UpdateBrandingProfileResponse: zod.ZodObject<{
     emailFooter?: string | null | undefined;
 }, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -11028,8 +11151,8 @@ export declare const ActivateBrandingProfileResponse: zod.ZodObject<{
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -11054,8 +11177,8 @@ export declare const ActivateBrandingProfileResponse: zod.ZodObject<{
     emailFooter?: string | null | undefined;
 }, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -11110,8 +11233,8 @@ export declare const RestoreBrandingDefaultsResponse: zod.ZodObject<{
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -11136,8 +11259,8 @@ export declare const RestoreBrandingDefaultsResponse: zod.ZodObject<{
     emailFooter?: string | null | undefined;
 }, {
     id: number;
-    createdAt: string;
     name: string;
+    createdAt: string;
     updatedAt: string;
     isDefault: boolean;
     isActive: boolean;
@@ -11175,6 +11298,7 @@ export declare const ListPropertiesResponseItem: zod.ZodObject<{
     openIssueCount: zod.ZodNumber;
     lastVisit: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     hasProfile: zod.ZodBoolean;
+    profileId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
 }, "strip", zod.ZodTypeAny, {
     siteAddress: string;
     addressKey: string;
@@ -11186,6 +11310,7 @@ export declare const ListPropertiesResponseItem: zod.ZodObject<{
     hasProfile: boolean;
     clientName?: string | null | undefined;
     lastVisit?: string | null | undefined;
+    profileId?: number | null | undefined;
 }, {
     siteAddress: string;
     addressKey: string;
@@ -11197,6 +11322,7 @@ export declare const ListPropertiesResponseItem: zod.ZodObject<{
     hasProfile: boolean;
     clientName?: string | null | undefined;
     lastVisit?: string | null | undefined;
+    profileId?: number | null | undefined;
 }>;
 export declare const ListPropertiesResponse: zod.ZodArray<zod.ZodObject<{
     addressKey: zod.ZodString;
@@ -11209,6 +11335,7 @@ export declare const ListPropertiesResponse: zod.ZodArray<zod.ZodObject<{
     openIssueCount: zod.ZodNumber;
     lastVisit: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     hasProfile: zod.ZodBoolean;
+    profileId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
 }, "strip", zod.ZodTypeAny, {
     siteAddress: string;
     addressKey: string;
@@ -11220,6 +11347,7 @@ export declare const ListPropertiesResponse: zod.ZodArray<zod.ZodObject<{
     hasProfile: boolean;
     clientName?: string | null | undefined;
     lastVisit?: string | null | undefined;
+    profileId?: number | null | undefined;
 }, {
     siteAddress: string;
     addressKey: string;
@@ -11231,6 +11359,7 @@ export declare const ListPropertiesResponse: zod.ZodArray<zod.ZodObject<{
     hasProfile: boolean;
     clientName?: string | null | undefined;
     lastVisit?: string | null | undefined;
+    profileId?: number | null | undefined;
 }>, "many">;
 /**
  * @summary Look up property intelligence by free-text site address (pre-inspection)
@@ -11257,12 +11386,12 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             description: zod.ZodString;
             severity: zod.ZodEnum<["low", "medium", "high"]>;
         }, "strip", zod.ZodTypeAny, {
-            severity: "low" | "medium" | "high";
             description: string;
+            severity: "low" | "medium" | "high";
             zone: string;
         }, {
-            severity: "low" | "medium" | "high";
             description: string;
+            severity: "low" | "medium" | "high";
             zone: string;
         }>, "many">;
         recurringIssues: zod.ZodArray<zod.ZodObject<{
@@ -11272,14 +11401,14 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             lastSeen: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
             sampleDescription: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         }, "strip", zod.ZodTypeAny, {
-            severity: string;
             category: string;
+            severity: string;
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
         }, {
-            severity: string;
             category: string;
+            severity: string;
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
@@ -11290,13 +11419,13 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             inspectionId: zod.ZodNumber;
             createdAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         }, "strip", zod.ZodTypeAny, {
-            url: string;
             inspectionId: number;
+            url: string;
             createdAt?: string | null | undefined;
             caption?: string | null | undefined;
         }, {
-            url: string;
             inspectionId: number;
+            url: string;
             createdAt?: string | null | undefined;
             caption?: string | null | undefined;
         }>, "many">;
@@ -11309,20 +11438,20 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
             findingsCount: zod.ZodNumber;
             completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         }, "strip", zod.ZodTypeAny, {
+            inspectionId: number;
             status: string;
             createdAt: string;
             findingsCount: number;
-            inspectionId: number;
-            technicianName?: string | null | undefined;
             severity?: string | null | undefined;
+            technicianName?: string | null | undefined;
             completedAt?: string | null | undefined;
         }, {
+            inspectionId: number;
             status: string;
             createdAt: string;
             findingsCount: number;
-            inspectionId: number;
-            technicianName?: string | null | undefined;
             severity?: string | null | undefined;
+            technicianName?: string | null | undefined;
             completedAt?: string | null | undefined;
         }>, "many">;
         notes: zod.ZodArray<zod.ZodObject<{
@@ -11354,8 +11483,8 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         siteAddress: string;
         addressKey: string;
         historicalPhotos: {
-            url: string;
             inspectionId: number;
+            url: string;
             createdAt?: string | null | undefined;
             caption?: string | null | undefined;
         }[];
@@ -11371,24 +11500,24 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         propertyType: string;
         hasProfile: boolean;
         hotspots: {
-            severity: "low" | "medium" | "high";
             description: string;
+            severity: "low" | "medium" | "high";
             zone: string;
         }[];
         recurringIssues: {
-            severity: string;
             category: string;
+            severity: string;
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
         }[];
         visitHistory: {
+            inspectionId: number;
             status: string;
             createdAt: string;
             findingsCount: number;
-            inspectionId: number;
-            technicianName?: string | null | undefined;
             severity?: string | null | undefined;
+            technicianName?: string | null | undefined;
             completedAt?: string | null | undefined;
         }[];
         clientName?: string | null | undefined;
@@ -11398,8 +11527,8 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         siteAddress: string;
         addressKey: string;
         historicalPhotos: {
-            url: string;
             inspectionId: number;
+            url: string;
             createdAt?: string | null | undefined;
             caption?: string | null | undefined;
         }[];
@@ -11415,24 +11544,24 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         propertyType: string;
         hasProfile: boolean;
         hotspots: {
-            severity: "low" | "medium" | "high";
             description: string;
+            severity: "low" | "medium" | "high";
             zone: string;
         }[];
         recurringIssues: {
-            severity: string;
             category: string;
+            severity: string;
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
         }[];
         visitHistory: {
+            inspectionId: number;
             status: string;
             createdAt: string;
             findingsCount: number;
-            inspectionId: number;
-            technicianName?: string | null | undefined;
             severity?: string | null | undefined;
+            technicianName?: string | null | undefined;
             completedAt?: string | null | undefined;
         }[];
         clientName?: string | null | undefined;
@@ -11450,6 +11579,7 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         openIssueCount: zod.ZodNumber;
         lastVisit: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         hasProfile: zod.ZodBoolean;
+        profileId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
     }, "strip", zod.ZodTypeAny, {
         siteAddress: string;
         addressKey: string;
@@ -11461,6 +11591,7 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         hasProfile: boolean;
         clientName?: string | null | undefined;
         lastVisit?: string | null | undefined;
+        profileId?: number | null | undefined;
     }, {
         siteAddress: string;
         addressKey: string;
@@ -11472,6 +11603,7 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         hasProfile: boolean;
         clientName?: string | null | undefined;
         lastVisit?: string | null | undefined;
+        profileId?: number | null | undefined;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
     matchStatus: string;
@@ -11486,13 +11618,14 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         hasProfile: boolean;
         clientName?: string | null | undefined;
         lastVisit?: string | null | undefined;
+        profileId?: number | null | undefined;
     }[];
     feed?: {
         siteAddress: string;
         addressKey: string;
         historicalPhotos: {
-            url: string;
             inspectionId: number;
+            url: string;
             createdAt?: string | null | undefined;
             caption?: string | null | undefined;
         }[];
@@ -11508,24 +11641,24 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         propertyType: string;
         hasProfile: boolean;
         hotspots: {
-            severity: "low" | "medium" | "high";
             description: string;
+            severity: "low" | "medium" | "high";
             zone: string;
         }[];
         recurringIssues: {
-            severity: string;
             category: string;
+            severity: string;
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
         }[];
         visitHistory: {
+            inspectionId: number;
             status: string;
             createdAt: string;
             findingsCount: number;
-            inspectionId: number;
-            technicianName?: string | null | undefined;
             severity?: string | null | undefined;
+            technicianName?: string | null | undefined;
             completedAt?: string | null | undefined;
         }[];
         clientName?: string | null | undefined;
@@ -11545,13 +11678,14 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         hasProfile: boolean;
         clientName?: string | null | undefined;
         lastVisit?: string | null | undefined;
+        profileId?: number | null | undefined;
     }[];
     feed?: {
         siteAddress: string;
         addressKey: string;
         historicalPhotos: {
-            url: string;
             inspectionId: number;
+            url: string;
             createdAt?: string | null | undefined;
             caption?: string | null | undefined;
         }[];
@@ -11567,24 +11701,24 @@ export declare const LookupPropertyResponse: zod.ZodObject<{
         propertyType: string;
         hasProfile: boolean;
         hotspots: {
-            severity: "low" | "medium" | "high";
             description: string;
+            severity: "low" | "medium" | "high";
             zone: string;
         }[];
         recurringIssues: {
-            severity: string;
             category: string;
+            severity: string;
             count: number;
             lastSeen?: string | null | undefined;
             sampleDescription?: string | null | undefined;
         }[];
         visitHistory: {
+            inspectionId: number;
             status: string;
             createdAt: string;
             findingsCount: number;
-            inspectionId: number;
-            technicianName?: string | null | undefined;
             severity?: string | null | undefined;
+            technicianName?: string | null | undefined;
             completedAt?: string | null | undefined;
         }[];
         clientName?: string | null | undefined;
@@ -11615,12 +11749,12 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         description: zod.ZodString;
         severity: zod.ZodEnum<["low", "medium", "high"]>;
     }, "strip", zod.ZodTypeAny, {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }, {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }>, "many">;
     recurringIssues: zod.ZodArray<zod.ZodObject<{
@@ -11630,14 +11764,14 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         lastSeen: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         sampleDescription: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
-        severity: string;
         category: string;
+        severity: string;
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
     }, {
-        severity: string;
         category: string;
+        severity: string;
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
@@ -11648,13 +11782,13 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         inspectionId: zod.ZodNumber;
         createdAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
-        url: string;
         inspectionId: number;
+        url: string;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }, {
-        url: string;
         inspectionId: number;
+        url: string;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }>, "many">;
@@ -11667,20 +11801,20 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
         findingsCount: zod.ZodNumber;
         completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        inspectionId: number;
         status: string;
         createdAt: string;
         findingsCount: number;
-        inspectionId: number;
-        technicianName?: string | null | undefined;
         severity?: string | null | undefined;
+        technicianName?: string | null | undefined;
         completedAt?: string | null | undefined;
     }, {
+        inspectionId: number;
         status: string;
         createdAt: string;
         findingsCount: number;
-        inspectionId: number;
-        technicianName?: string | null | undefined;
         severity?: string | null | undefined;
+        technicianName?: string | null | undefined;
         completedAt?: string | null | undefined;
     }>, "many">;
     notes: zod.ZodArray<zod.ZodObject<{
@@ -11712,8 +11846,8 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
     siteAddress: string;
     addressKey: string;
     historicalPhotos: {
-        url: string;
         inspectionId: number;
+        url: string;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }[];
@@ -11729,24 +11863,24 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
     propertyType: string;
     hasProfile: boolean;
     hotspots: {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }[];
     recurringIssues: {
-        severity: string;
         category: string;
+        severity: string;
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
     }[];
     visitHistory: {
+        inspectionId: number;
         status: string;
         createdAt: string;
         findingsCount: number;
-        inspectionId: number;
-        technicianName?: string | null | undefined;
         severity?: string | null | undefined;
+        technicianName?: string | null | undefined;
         completedAt?: string | null | undefined;
     }[];
     clientName?: string | null | undefined;
@@ -11756,8 +11890,8 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
     siteAddress: string;
     addressKey: string;
     historicalPhotos: {
-        url: string;
         inspectionId: number;
+        url: string;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }[];
@@ -11773,24 +11907,24 @@ export declare const GetPropertyFeedResponse: zod.ZodObject<{
     propertyType: string;
     hasProfile: boolean;
     hotspots: {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }[];
     recurringIssues: {
-        severity: string;
         category: string;
+        severity: string;
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
     }[];
     visitHistory: {
+        inspectionId: number;
         status: string;
         createdAt: string;
         findingsCount: number;
-        inspectionId: number;
-        technicianName?: string | null | undefined;
         severity?: string | null | undefined;
+        technicianName?: string | null | undefined;
         completedAt?: string | null | undefined;
     }[];
     clientName?: string | null | undefined;
@@ -11817,12 +11951,12 @@ export declare const UpdatePropertyProfileBody: zod.ZodObject<{
         description: zod.ZodString;
         severity: zod.ZodEnum<["low", "medium", "high"]>;
     }, "strip", zod.ZodTypeAny, {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }, {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }>, "many">>;
 }, "strip", zod.ZodTypeAny, {
@@ -11831,8 +11965,8 @@ export declare const UpdatePropertyProfileBody: zod.ZodObject<{
     propertyType?: string | undefined;
     technicianKnowledge?: string | undefined;
     hotspots?: {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }[] | undefined;
 }, {
@@ -11841,8 +11975,8 @@ export declare const UpdatePropertyProfileBody: zod.ZodObject<{
     propertyType?: string | undefined;
     technicianKnowledge?: string | undefined;
     hotspots?: {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }[] | undefined;
 }>;
@@ -11859,12 +11993,12 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         description: zod.ZodString;
         severity: zod.ZodEnum<["low", "medium", "high"]>;
     }, "strip", zod.ZodTypeAny, {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }, {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }>, "many">;
     recurringIssues: zod.ZodArray<zod.ZodObject<{
@@ -11874,14 +12008,14 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         lastSeen: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         sampleDescription: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
-        severity: string;
         category: string;
+        severity: string;
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
     }, {
-        severity: string;
         category: string;
+        severity: string;
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
@@ -11892,13 +12026,13 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         inspectionId: zod.ZodNumber;
         createdAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
-        url: string;
         inspectionId: number;
+        url: string;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }, {
-        url: string;
         inspectionId: number;
+        url: string;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }>, "many">;
@@ -11911,20 +12045,20 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
         findingsCount: zod.ZodNumber;
         completedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
+        inspectionId: number;
         status: string;
         createdAt: string;
         findingsCount: number;
-        inspectionId: number;
-        technicianName?: string | null | undefined;
         severity?: string | null | undefined;
+        technicianName?: string | null | undefined;
         completedAt?: string | null | undefined;
     }, {
+        inspectionId: number;
         status: string;
         createdAt: string;
         findingsCount: number;
-        inspectionId: number;
-        technicianName?: string | null | undefined;
         severity?: string | null | undefined;
+        technicianName?: string | null | undefined;
         completedAt?: string | null | undefined;
     }>, "many">;
     notes: zod.ZodArray<zod.ZodObject<{
@@ -11956,8 +12090,8 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
     siteAddress: string;
     addressKey: string;
     historicalPhotos: {
-        url: string;
         inspectionId: number;
+        url: string;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }[];
@@ -11973,24 +12107,24 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
     propertyType: string;
     hasProfile: boolean;
     hotspots: {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }[];
     recurringIssues: {
-        severity: string;
         category: string;
+        severity: string;
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
     }[];
     visitHistory: {
+        inspectionId: number;
         status: string;
         createdAt: string;
         findingsCount: number;
-        inspectionId: number;
-        technicianName?: string | null | undefined;
         severity?: string | null | undefined;
+        technicianName?: string | null | undefined;
         completedAt?: string | null | undefined;
     }[];
     clientName?: string | null | undefined;
@@ -12000,8 +12134,8 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
     siteAddress: string;
     addressKey: string;
     historicalPhotos: {
-        url: string;
         inspectionId: number;
+        url: string;
         createdAt?: string | null | undefined;
         caption?: string | null | undefined;
     }[];
@@ -12017,24 +12151,24 @@ export declare const UpdatePropertyProfileResponse: zod.ZodObject<{
     propertyType: string;
     hasProfile: boolean;
     hotspots: {
-        severity: "low" | "medium" | "high";
         description: string;
+        severity: "low" | "medium" | "high";
         zone: string;
     }[];
     recurringIssues: {
-        severity: string;
         category: string;
+        severity: string;
         count: number;
         lastSeen?: string | null | undefined;
         sampleDescription?: string | null | undefined;
     }[];
     visitHistory: {
+        inspectionId: number;
         status: string;
         createdAt: string;
         findingsCount: number;
-        inspectionId: number;
-        technicianName?: string | null | undefined;
         severity?: string | null | undefined;
+        technicianName?: string | null | undefined;
         completedAt?: string | null | undefined;
     }[];
     clientName?: string | null | undefined;
@@ -12090,8 +12224,8 @@ export declare const CreateLeadBody: zod.ZodObject<{
     source: zod.ZodOptional<zod.ZodString>;
 }, "strip", zod.ZodTypeAny, {
     type: "demo" | "contact";
-    email: string;
     name: string;
+    email: string;
     message?: string | undefined;
     source?: string | undefined;
     companyName?: string | undefined;
@@ -12100,8 +12234,8 @@ export declare const CreateLeadBody: zod.ZodObject<{
     teamSize?: string | undefined;
 }, {
     type: "demo" | "contact";
-    email: string;
     name: string;
+    email: string;
     message?: string | undefined;
     source?: string | undefined;
     companyName?: string | undefined;
@@ -12124,16 +12258,16 @@ export declare const SubmitFeedbackBody: zod.ZodObject<{
     type: "bug" | "feature" | "ai_accuracy";
     description: string;
     title: string;
-    severity?: "low" | "medium" | "high" | undefined;
     inspectionId?: number | undefined;
+    severity?: "low" | "medium" | "high" | undefined;
     reportId?: number | undefined;
     analysisId?: number | undefined;
 }, {
     type: "bug" | "feature" | "ai_accuracy";
     description: string;
     title: string;
-    severity?: "low" | "medium" | "high" | undefined;
     inspectionId?: number | undefined;
+    severity?: "low" | "medium" | "high" | undefined;
     reportId?: number | undefined;
     analysisId?: number | undefined;
 }>;
@@ -12167,12 +12301,12 @@ export declare const ListFeedbackResponseItem: zod.ZodObject<{
     type: string;
     status: string;
     id: number;
-    createdAt: string;
     description: string;
+    createdAt: string;
     title: string;
     updatedAt: string;
-    severity?: string | null | undefined;
     inspectionId?: number | null | undefined;
+    severity?: string | null | undefined;
     reportId?: number | null | undefined;
     userId?: number | null | undefined;
     analysisId?: number | null | undefined;
@@ -12180,12 +12314,12 @@ export declare const ListFeedbackResponseItem: zod.ZodObject<{
     type: string;
     status: string;
     id: number;
-    createdAt: string;
     description: string;
+    createdAt: string;
     title: string;
     updatedAt: string;
-    severity?: string | null | undefined;
     inspectionId?: number | null | undefined;
+    severity?: string | null | undefined;
     reportId?: number | null | undefined;
     userId?: number | null | undefined;
     analysisId?: number | null | undefined;
@@ -12207,12 +12341,12 @@ export declare const ListFeedbackResponse: zod.ZodArray<zod.ZodObject<{
     type: string;
     status: string;
     id: number;
-    createdAt: string;
     description: string;
+    createdAt: string;
     title: string;
     updatedAt: string;
-    severity?: string | null | undefined;
     inspectionId?: number | null | undefined;
+    severity?: string | null | undefined;
     reportId?: number | null | undefined;
     userId?: number | null | undefined;
     analysisId?: number | null | undefined;
@@ -12220,12 +12354,12 @@ export declare const ListFeedbackResponse: zod.ZodArray<zod.ZodObject<{
     type: string;
     status: string;
     id: number;
-    createdAt: string;
     description: string;
+    createdAt: string;
     title: string;
     updatedAt: string;
-    severity?: string | null | undefined;
     inspectionId?: number | null | undefined;
+    severity?: string | null | undefined;
     reportId?: number | null | undefined;
     userId?: number | null | undefined;
     analysisId?: number | null | undefined;
@@ -12267,12 +12401,12 @@ export declare const UpdateFeedbackResponse: zod.ZodObject<{
     type: string;
     status: string;
     id: number;
-    createdAt: string;
     description: string;
+    createdAt: string;
     title: string;
     updatedAt: string;
-    severity?: string | null | undefined;
     inspectionId?: number | null | undefined;
+    severity?: string | null | undefined;
     reportId?: number | null | undefined;
     userId?: number | null | undefined;
     analysisId?: number | null | undefined;
@@ -12280,12 +12414,12 @@ export declare const UpdateFeedbackResponse: zod.ZodObject<{
     type: string;
     status: string;
     id: number;
-    createdAt: string;
     description: string;
+    createdAt: string;
     title: string;
     updatedAt: string;
-    severity?: string | null | undefined;
     inspectionId?: number | null | undefined;
+    severity?: string | null | undefined;
     reportId?: number | null | undefined;
     userId?: number | null | undefined;
     analysisId?: number | null | undefined;
@@ -12348,9 +12482,9 @@ export declare const ListErrorEventsResponse: zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         message: string;
         id: number;
-        createdAt: string;
         category: string;
         source: string;
+        createdAt: string;
         inspectionId?: number | null | undefined;
         reportId?: number | null | undefined;
         userId?: number | null | undefined;
@@ -12358,9 +12492,9 @@ export declare const ListErrorEventsResponse: zod.ZodObject<{
     }, {
         message: string;
         id: number;
-        createdAt: string;
         category: string;
         source: string;
+        createdAt: string;
         inspectionId?: number | null | undefined;
         reportId?: number | null | undefined;
         userId?: number | null | undefined;
@@ -12377,9 +12511,9 @@ export declare const ListErrorEventsResponse: zod.ZodObject<{
     events: {
         message: string;
         id: number;
-        createdAt: string;
         category: string;
         source: string;
+        createdAt: string;
         inspectionId?: number | null | undefined;
         reportId?: number | null | undefined;
         userId?: number | null | undefined;
@@ -12396,9 +12530,9 @@ export declare const ListErrorEventsResponse: zod.ZodObject<{
     events: {
         message: string;
         id: number;
-        createdAt: string;
         category: string;
         source: string;
+        createdAt: string;
         inspectionId?: number | null | undefined;
         reportId?: number | null | undefined;
         userId?: number | null | undefined;
@@ -12417,15 +12551,15 @@ export declare const GetChecklistResponse: zod.ZodObject<{
         done: zod.ZodBoolean;
         doneAt: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
-        category: string;
         label: string;
+        category: string;
         key: string;
         done: boolean;
         detail?: string | null | undefined;
         doneAt?: string | null | undefined;
     }, {
-        category: string;
         label: string;
+        category: string;
         key: string;
         done: boolean;
         detail?: string | null | undefined;
@@ -12437,8 +12571,8 @@ export declare const GetChecklistResponse: zod.ZodObject<{
     completed: number;
     total: number;
     items: {
-        category: string;
         label: string;
+        category: string;
         key: string;
         done: boolean;
         detail?: string | null | undefined;
@@ -12448,8 +12582,8 @@ export declare const GetChecklistResponse: zod.ZodObject<{
     completed: number;
     total: number;
     items: {
-        category: string;
         label: string;
+        category: string;
         key: string;
         done: boolean;
         detail?: string | null | undefined;
@@ -12687,12 +12821,12 @@ export declare const ListSalesOpportunitiesResponseItem: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
-    createdAt: string;
-    inspectionId: number;
     category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
     confidence: number;
+    createdAt: string;
     title: string;
     rationale: string;
     updatedAt: string;
@@ -12707,12 +12841,12 @@ export declare const ListSalesOpportunitiesResponseItem: zod.ZodObject<{
     riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }, {
+    inspectionId: number;
     status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
-    createdAt: string;
-    inspectionId: number;
     category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
     confidence: number;
+    createdAt: string;
     title: string;
     rationale: string;
     updatedAt: string;
@@ -12748,12 +12882,12 @@ export declare const ListSalesOpportunitiesResponse: zod.ZodArray<zod.ZodObject<
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
-    createdAt: string;
-    inspectionId: number;
     category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
     confidence: number;
+    createdAt: string;
     title: string;
     rationale: string;
     updatedAt: string;
@@ -12768,12 +12902,12 @@ export declare const ListSalesOpportunitiesResponse: zod.ZodArray<zod.ZodObject<
     riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }, {
+    inspectionId: number;
     status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
-    createdAt: string;
-    inspectionId: number;
     category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
     confidence: number;
+    createdAt: string;
     title: string;
     rationale: string;
     updatedAt: string;
@@ -12919,12 +13053,12 @@ export declare const GetSalesOpportunityResponse: zod.ZodIntersection<zod.ZodObj
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
-    createdAt: string;
-    inspectionId: number;
     category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
     confidence: number;
+    createdAt: string;
     title: string;
     rationale: string;
     updatedAt: string;
@@ -12939,12 +13073,12 @@ export declare const GetSalesOpportunityResponse: zod.ZodIntersection<zod.ZodObj
     riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }, {
+    inspectionId: number;
     status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
-    createdAt: string;
-    inspectionId: number;
     category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
     confidence: number;
+    createdAt: string;
     title: string;
     rationale: string;
     updatedAt: string;
@@ -13044,12 +13178,12 @@ export declare const UpdateSalesOpportunityResponse: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
-    createdAt: string;
-    inspectionId: number;
     category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
     confidence: number;
+    createdAt: string;
     title: string;
     rationale: string;
     updatedAt: string;
@@ -13064,12 +13198,12 @@ export declare const UpdateSalesOpportunityResponse: zod.ZodObject<{
     riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
     estimatedAnnualValue?: number | null | undefined;
 }, {
+    inspectionId: number;
     status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
     id: number;
-    createdAt: string;
-    inspectionId: number;
     category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
     confidence: number;
+    createdAt: string;
     title: string;
     rationale: string;
     updatedAt: string;
@@ -13199,13 +13333,13 @@ export declare const ListScorecardsResponseItem: zod.ZodIntersection<zod.ZodObje
         description: zod.ZodString;
         severity: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }, {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }>, "many">;
@@ -13216,11 +13350,11 @@ export declare const ListScorecardsResponseItem: zod.ZodIntersection<zod.ZodObje
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     id: number;
     technicianName: string;
     createdAt: string;
     findingsCount: number;
-    inspectionId: number;
     qualityScore: number;
     riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
@@ -13233,18 +13367,18 @@ export declare const ListScorecardsResponseItem: zod.ZodIntersection<zod.ZodObje
         recommendationCoverage: number;
     };
     missedOpportunities: {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }[];
     photosAnalyzed: number;
 }, {
+    inspectionId: number;
     id: number;
     technicianName: string;
     createdAt: string;
     findingsCount: number;
-    inspectionId: number;
     qualityScore: number;
     riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
@@ -13257,8 +13391,8 @@ export declare const ListScorecardsResponseItem: zod.ZodIntersection<zod.ZodObje
         recommendationCoverage: number;
     };
     missedOpportunities: {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }[];
@@ -13301,13 +13435,13 @@ export declare const ListScorecardsResponse: zod.ZodArray<zod.ZodIntersection<zo
         description: zod.ZodString;
         severity: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }, {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }>, "many">;
@@ -13318,11 +13452,11 @@ export declare const ListScorecardsResponse: zod.ZodArray<zod.ZodIntersection<zo
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     id: number;
     technicianName: string;
     createdAt: string;
     findingsCount: number;
-    inspectionId: number;
     qualityScore: number;
     riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
@@ -13335,18 +13469,18 @@ export declare const ListScorecardsResponse: zod.ZodArray<zod.ZodIntersection<zo
         recommendationCoverage: number;
     };
     missedOpportunities: {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }[];
     photosAnalyzed: number;
 }, {
+    inspectionId: number;
     id: number;
     technicianName: string;
     createdAt: string;
     findingsCount: number;
-    inspectionId: number;
     qualityScore: number;
     riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
@@ -13359,8 +13493,8 @@ export declare const ListScorecardsResponse: zod.ZodArray<zod.ZodIntersection<zo
         recommendationCoverage: number;
     };
     missedOpportunities: {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }[];
@@ -13499,13 +13633,13 @@ export declare const GetInspectionScorecardResponse: zod.ZodObject<{
         description: zod.ZodString;
         severity: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }, {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }>, "many">;
@@ -13516,11 +13650,11 @@ export declare const GetInspectionScorecardResponse: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     id: number;
     technicianName: string;
     createdAt: string;
     findingsCount: number;
-    inspectionId: number;
     qualityScore: number;
     riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
@@ -13533,18 +13667,18 @@ export declare const GetInspectionScorecardResponse: zod.ZodObject<{
         recommendationCoverage: number;
     };
     missedOpportunities: {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }[];
     photosAnalyzed: number;
 }, {
+    inspectionId: number;
     id: number;
     technicianName: string;
     createdAt: string;
     findingsCount: number;
-    inspectionId: number;
     qualityScore: number;
     riskLevel: "low" | "medium" | "high" | "critical";
     updatedAt: string;
@@ -13557,8 +13691,8 @@ export declare const GetInspectionScorecardResponse: zod.ZodObject<{
         recommendationCoverage: number;
     };
     missedOpportunities: {
-        severity: string;
         description: string;
+        severity: string;
         findingId: number;
         serviceType: string;
     }[];
@@ -13587,10 +13721,10 @@ export declare const GetCustomerSummaryForInspectionResponse: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13599,10 +13733,10 @@ export declare const GetCustomerSummaryForInspectionResponse: zod.ZodObject<{
     shareToken: string | null;
     shareExpiresAt: string | null;
 }, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13634,10 +13768,10 @@ export declare const GenerateCustomerSummaryResponse: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13646,10 +13780,10 @@ export declare const GenerateCustomerSummaryResponse: zod.ZodObject<{
     shareToken: string | null;
     shareExpiresAt: string | null;
 }, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13688,10 +13822,10 @@ export declare const UpdateCustomerSummaryResponse: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13700,10 +13834,10 @@ export declare const UpdateCustomerSummaryResponse: zod.ZodObject<{
     shareToken: string | null;
     shareExpiresAt: string | null;
 }, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13743,10 +13877,10 @@ export declare const ApproveCustomerSummaryResponse: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13755,10 +13889,10 @@ export declare const ApproveCustomerSummaryResponse: zod.ZodObject<{
     shareToken: string | null;
     shareExpiresAt: string | null;
 }, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13790,10 +13924,10 @@ export declare const RevokeCustomerSummaryShareResponse: zod.ZodObject<{
     createdAt: zod.ZodString;
     updatedAt: zod.ZodString;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13802,10 +13936,10 @@ export declare const RevokeCustomerSummaryShareResponse: zod.ZodObject<{
     shareToken: string | null;
     shareExpiresAt: string | null;
 }, {
+    inspectionId: number;
     status: "draft" | "approved";
     id: number;
     createdAt: string;
-    inspectionId: number;
     updatedAt: string;
     companyId: number;
     body: string;
@@ -13988,12 +14122,12 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
         createdAt: zod.ZodString;
         updatedAt: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
+        inspectionId: number;
         status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
         id: number;
-        createdAt: string;
-        inspectionId: number;
         category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
         confidence: number;
+        createdAt: string;
         title: string;
         rationale: string;
         updatedAt: string;
@@ -14008,12 +14142,12 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
         riskLevel?: "low" | "medium" | "high" | "critical" | null | undefined;
         estimatedAnnualValue?: number | null | undefined;
     }, {
+        inspectionId: number;
         status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
         id: number;
-        createdAt: string;
-        inspectionId: number;
         category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
         confidence: number;
+        createdAt: string;
         title: string;
         rationale: string;
         updatedAt: string;
@@ -14030,12 +14164,12 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
     opportunities: {
+        inspectionId: number;
         status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
         id: number;
-        createdAt: string;
-        inspectionId: number;
         category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
         confidence: number;
+        createdAt: string;
         title: string;
         rationale: string;
         updatedAt: string;
@@ -14052,12 +14186,12 @@ export declare const GetProposalResponse: zod.ZodIntersection<zod.ZodObject<{
     }[];
 }, {
     opportunities: {
+        inspectionId: number;
         status: "dismissed" | "new" | "reviewed" | "quoted" | "won" | "lost";
         id: number;
-        createdAt: string;
-        inspectionId: number;
         category: "revenue" | "additional_service" | "structural" | "conducive_condition" | "property_risk" | "pest_trend" | "preventative";
         confidence: number;
+        createdAt: string;
         title: string;
         rationale: string;
         updatedAt: string;
@@ -14280,22 +14414,22 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             status: zod.ZodString;
             createdAt: zod.ZodString;
         }, "strip", zod.ZodTypeAny, {
+            inspectionId: number;
             status: string;
             id: number;
-            createdAt: string;
-            inspectionId: number;
             category: string;
+            createdAt: string;
             priority: number;
             title: string;
             propertyAddress: string;
             estimatedValueTier: string;
             riskLevel?: string | null | undefined;
         }, {
+            inspectionId: number;
             status: string;
             id: number;
-            createdAt: string;
-            inspectionId: number;
             category: string;
+            createdAt: string;
             priority: number;
             title: string;
             propertyAddress: string;
@@ -14331,11 +14465,11 @@ export declare const GetBriefingResponse: zod.ZodObject<{
         pipelineValue: number;
         staleCount: number;
         topOpportunities: {
+            inspectionId: number;
             status: string;
             id: number;
-            createdAt: string;
-            inspectionId: number;
             category: string;
+            createdAt: string;
             priority: number;
             title: string;
             propertyAddress: string;
@@ -14361,11 +14495,11 @@ export declare const GetBriefingResponse: zod.ZodObject<{
         pipelineValue: number;
         staleCount: number;
         topOpportunities: {
+            inspectionId: number;
             status: string;
             id: number;
-            createdAt: string;
-            inspectionId: number;
             category: string;
+            createdAt: string;
             priority: number;
             title: string;
             propertyAddress: string;
@@ -14388,16 +14522,16 @@ export declare const GetBriefingResponse: zod.ZodObject<{
             createdAt: zod.ZodString;
             ageDays: zod.ZodNumber;
         }, "strip", zod.ZodTypeAny, {
+            inspectionId: number;
             id: number;
             siteAddress: string;
             createdAt: string;
-            inspectionId: number;
             ageDays: number;
         }, {
+            inspectionId: number;
             id: number;
             siteAddress: string;
             createdAt: string;
-            inspectionId: number;
             ageDays: number;
         }>, "many">;
         team: zod.ZodObject<{
@@ -14461,10 +14595,10 @@ export declare const GetBriefingResponse: zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         pendingApprovals: number;
         approvalsQueue: {
+            inspectionId: number;
             id: number;
             siteAddress: string;
             createdAt: string;
-            inspectionId: number;
             ageDays: number;
         }[];
         team: {
@@ -14488,10 +14622,10 @@ export declare const GetBriefingResponse: zod.ZodObject<{
     }, {
         pendingApprovals: number;
         approvalsQueue: {
+            inspectionId: number;
             id: number;
             siteAddress: string;
             createdAt: string;
-            inspectionId: number;
             ageDays: number;
         }[];
         team: {
@@ -14589,10 +14723,10 @@ export declare const GetBriefingResponse: zod.ZodObject<{
     manager?: {
         pendingApprovals: number;
         approvalsQueue: {
+            inspectionId: number;
             id: number;
             siteAddress: string;
             createdAt: string;
-            inspectionId: number;
             ageDays: number;
         }[];
         team: {
@@ -14648,11 +14782,11 @@ export declare const GetBriefingResponse: zod.ZodObject<{
         pipelineValue: number;
         staleCount: number;
         topOpportunities: {
+            inspectionId: number;
             status: string;
             id: number;
-            createdAt: string;
-            inspectionId: number;
             category: string;
+            createdAt: string;
             priority: number;
             title: string;
             propertyAddress: string;
@@ -14688,10 +14822,10 @@ export declare const GetBriefingResponse: zod.ZodObject<{
     manager?: {
         pendingApprovals: number;
         approvalsQueue: {
+            inspectionId: number;
             id: number;
             siteAddress: string;
             createdAt: string;
-            inspectionId: number;
             ageDays: number;
         }[];
         team: {
@@ -14747,11 +14881,11 @@ export declare const GetBriefingResponse: zod.ZodObject<{
         pipelineValue: number;
         staleCount: number;
         topOpportunities: {
+            inspectionId: number;
             status: string;
             id: number;
-            createdAt: string;
-            inspectionId: number;
             category: string;
+            createdAt: string;
             priority: number;
             title: string;
             propertyAddress: string;
@@ -15054,9 +15188,9 @@ export declare const GetDailyRigResponse: zod.ZodObject<{
             }>, zod.ZodNull]>;
         }, "strip", zod.ZodTypeAny, {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15082,9 +15216,9 @@ export declare const GetDailyRigResponse: zod.ZodObject<{
             } | null;
         }, {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15114,9 +15248,9 @@ export declare const GetDailyRigResponse: zod.ZodObject<{
         targetPest: string;
         product: {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15147,9 +15281,9 @@ export declare const GetDailyRigResponse: zod.ZodObject<{
         targetPest: string;
         product: {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15189,9 +15323,9 @@ export declare const GetDailyRigResponse: zod.ZodObject<{
         targetPest: string;
         product: {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15229,9 +15363,9 @@ export declare const GetDailyRigResponse: zod.ZodObject<{
         targetPest: string;
         product: {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15315,8 +15449,8 @@ export declare const GetRecentMixesResponseItem: zod.ZodObject<{
     appliedAt: string;
     logId: number;
     productActiveIngredients: string;
-    areaSqft?: number | null | undefined;
     linearFt?: number | null | undefined;
+    areaSqft?: number | null | undefined;
     totalProductOz?: number | null | undefined;
     equipmentUsed?: string | null | undefined;
 }, {
@@ -15327,8 +15461,8 @@ export declare const GetRecentMixesResponseItem: zod.ZodObject<{
     appliedAt: string;
     logId: number;
     productActiveIngredients: string;
-    areaSqft?: number | null | undefined;
     linearFt?: number | null | undefined;
+    areaSqft?: number | null | undefined;
     totalProductOz?: number | null | undefined;
     equipmentUsed?: string | null | undefined;
 }>;
@@ -15352,8 +15486,8 @@ export declare const GetRecentMixesResponse: zod.ZodArray<zod.ZodObject<{
     appliedAt: string;
     logId: number;
     productActiveIngredients: string;
-    areaSqft?: number | null | undefined;
     linearFt?: number | null | undefined;
+    areaSqft?: number | null | undefined;
     totalProductOz?: number | null | undefined;
     equipmentUsed?: string | null | undefined;
 }, {
@@ -15364,8 +15498,8 @@ export declare const GetRecentMixesResponse: zod.ZodArray<zod.ZodObject<{
     appliedAt: string;
     logId: number;
     productActiveIngredients: string;
-    areaSqft?: number | null | undefined;
     linearFt?: number | null | undefined;
+    areaSqft?: number | null | undefined;
     totalProductOz?: number | null | undefined;
     equipmentUsed?: string | null | undefined;
 }>, "many">;
@@ -15376,11 +15510,11 @@ export declare const LookupDailyRigQueryParams: zod.ZodObject<{
     technicianId: zod.ZodString;
     date: zod.ZodDate;
 }, "strip", zod.ZodTypeAny, {
-    technicianId: string;
     date: Date;
+    technicianId: string;
 }, {
-    technicianId: string;
     date: Date;
+    technicianId: string;
 }>;
 export declare const LookupDailyRigResponse: zod.ZodObject<{
     setUp: zod.ZodLiteral<true>;
@@ -15454,9 +15588,9 @@ export declare const LookupDailyRigResponse: zod.ZodObject<{
             }>, zod.ZodNull]>;
         }, "strip", zod.ZodTypeAny, {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15482,9 +15616,9 @@ export declare const LookupDailyRigResponse: zod.ZodObject<{
             } | null;
         }, {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15514,9 +15648,9 @@ export declare const LookupDailyRigResponse: zod.ZodObject<{
         targetPest: string;
         product: {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15547,9 +15681,9 @@ export declare const LookupDailyRigResponse: zod.ZodObject<{
         targetPest: string;
         product: {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15588,9 +15722,9 @@ export declare const LookupDailyRigResponse: zod.ZodObject<{
         targetPest: string;
         product: {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15628,9 +15762,9 @@ export declare const LookupDailyRigResponse: zod.ZodObject<{
         targetPest: string;
         product: {
             id: number;
+            name: string;
             createdAt: string;
             epaRegistrationNumber: string | null;
-            name: string;
             isActive: boolean;
             productType: "restricted-use" | "general-use";
             activeIngredients: string;
@@ -15667,12 +15801,12 @@ export declare const GetRouteReadinessQueryParams: zod.ZodObject<{
     date: zod.ZodOptional<zod.ZodDate>;
     tzOffsetMinutes: zod.ZodOptional<zod.ZodNumber>;
 }, "strip", zod.ZodTypeAny, {
-    technicianId?: string | undefined;
     date?: Date | undefined;
+    technicianId?: string | undefined;
     tzOffsetMinutes?: number | undefined;
 }, {
-    technicianId?: string | undefined;
     date?: Date | undefined;
+    technicianId?: string | undefined;
     tzOffsetMinutes?: number | undefined;
 }>;
 export declare const GetRouteReadinessResponse: zod.ZodObject<{
@@ -15710,8 +15844,8 @@ export declare const GetRouteReadinessResponse: zod.ZodObject<{
         expectedUsageToday: number | null;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
-    technicianId: string;
     date: string;
+    technicianId: string;
     products: {
         status: "ready" | "short" | "insufficient-data";
         productId: number;
@@ -15726,8 +15860,8 @@ export declare const GetRouteReadinessResponse: zod.ZodObject<{
     rigSetUp: boolean;
     overallStatus: "ready" | "short" | "not-set-up";
 }, {
-    technicianId: string;
     date: string;
+    technicianId: string;
     products: {
         status: "ready" | "short" | "insufficient-data";
         productId: number;
@@ -15790,8 +15924,8 @@ export declare const GetTeamRouteReadinessResponseItem: zod.ZodObject<{
         expectedUsageToday: number | null;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
-    technicianId: string;
     date: string;
+    technicianId: string;
     products: {
         status: "ready" | "short" | "insufficient-data";
         productId: number;
@@ -15806,8 +15940,8 @@ export declare const GetTeamRouteReadinessResponseItem: zod.ZodObject<{
     rigSetUp: boolean;
     overallStatus: "ready" | "short" | "not-set-up";
 }, {
-    technicianId: string;
     date: string;
+    technicianId: string;
     products: {
         status: "ready" | "short" | "insufficient-data";
         productId: number;
@@ -15857,8 +15991,8 @@ export declare const GetTeamRouteReadinessResponse: zod.ZodArray<zod.ZodObject<{
         expectedUsageToday: number | null;
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
-    technicianId: string;
     date: string;
+    technicianId: string;
     products: {
         status: "ready" | "short" | "insufficient-data";
         productId: number;
@@ -15873,8 +16007,8 @@ export declare const GetTeamRouteReadinessResponse: zod.ZodArray<zod.ZodObject<{
     rigSetUp: boolean;
     overallStatus: "ready" | "short" | "not-set-up";
 }, {
-    technicianId: string;
     date: string;
+    technicianId: string;
     products: {
         status: "ready" | "short" | "insufficient-data";
         productId: number;
@@ -16090,15 +16224,15 @@ export declare const SearchMissionControlResponse: zod.ZodObject<{
         companyId: zod.ZodNullable<zod.ZodNumber>;
         inspectionId: zod.ZodNullable<zod.ZodNumber>;
     }, "strip", zod.ZodTypeAny, {
-        id: string;
         inspectionId: number | null;
+        id: string;
         title: string;
         companyId: number | null;
         kind: "inspection" | "evidence" | "technician" | "company" | "property" | "incident";
         subtitle: string | null;
     }, {
-        id: string;
         inspectionId: number | null;
+        id: string;
         title: string;
         companyId: number | null;
         kind: "inspection" | "evidence" | "technician" | "company" | "property" | "incident";
@@ -16106,8 +16240,8 @@ export declare const SearchMissionControlResponse: zod.ZodObject<{
     }>, "many">;
 }, "strip", zod.ZodTypeAny, {
     items: {
-        id: string;
         inspectionId: number | null;
+        id: string;
         title: string;
         companyId: number | null;
         kind: "inspection" | "evidence" | "technician" | "company" | "property" | "incident";
@@ -16115,8 +16249,8 @@ export declare const SearchMissionControlResponse: zod.ZodObject<{
     }[];
 }, {
     items: {
-        id: string;
         inspectionId: number | null;
+        id: string;
         title: string;
         companyId: number | null;
         kind: "inspection" | "evidence" | "technician" | "company" | "property" | "incident";
@@ -16154,8 +16288,8 @@ export declare const ListMissionControlCompaniesResponse: zod.ZodObject<{
         lastActivityAt: zod.ZodNullable<zod.ZodDate>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
-        createdAt: Date;
         name: string;
+        createdAt: Date;
         inspectionCount: number;
         userCount: number;
         technicianCount: number;
@@ -16163,8 +16297,8 @@ export declare const ListMissionControlCompaniesResponse: zod.ZodObject<{
         lastActivityAt: Date | null;
     }, {
         id: number;
-        createdAt: Date;
         name: string;
+        createdAt: Date;
         inspectionCount: number;
         userCount: number;
         technicianCount: number;
@@ -16203,8 +16337,8 @@ export declare const ListMissionControlCompaniesResponse: zod.ZodObject<{
     total: number;
     items: ({
         id: number;
-        createdAt: Date;
         name: string;
+        createdAt: Date;
         inspectionCount: number;
         userCount: number;
         technicianCount: number;
@@ -16226,8 +16360,8 @@ export declare const ListMissionControlCompaniesResponse: zod.ZodObject<{
     total: number;
     items: ({
         id: number;
-        createdAt: Date;
         name: string;
+        createdAt: Date;
         inspectionCount: number;
         userCount: number;
         technicianCount: number;
@@ -16267,8 +16401,8 @@ export declare const GetMissionControlCompanyResponse: zod.ZodIntersection<zod.Z
     lastActivityAt: zod.ZodNullable<zod.ZodDate>;
 }, "strip", zod.ZodTypeAny, {
     id: number;
-    createdAt: Date;
     name: string;
+    createdAt: Date;
     inspectionCount: number;
     userCount: number;
     technicianCount: number;
@@ -16276,8 +16410,8 @@ export declare const GetMissionControlCompanyResponse: zod.ZodIntersection<zod.Z
     lastActivityAt: Date | null;
 }, {
     id: number;
-    createdAt: Date;
     name: string;
+    createdAt: Date;
     inspectionCount: number;
     userCount: number;
     technicianCount: number;
@@ -16313,12 +16447,12 @@ export declare const GetMissionControlCompanyResponse: zod.ZodIntersection<zod.Z
         name: zod.ZodNullable<zod.ZodString>;
         email: zod.ZodNullable<zod.ZodString>;
     }, "strip", zod.ZodTypeAny, {
-        email: string | null;
         name: string | null;
+        email: string | null;
         userId: string;
     }, {
-        email: string | null;
         name: string | null;
+        email: string | null;
         userId: string;
     }>, zod.ZodNull]>;
     users: zod.ZodArray<zod.ZodObject<{
@@ -16329,14 +16463,14 @@ export declare const GetMissionControlCompanyResponse: zod.ZodIntersection<zod.Z
         betaAccessEnabled: zod.ZodBoolean;
     }, "strip", zod.ZodTypeAny, {
         id: string;
-        email: string | null;
         name: string | null;
+        email: string | null;
         betaAccessEnabled: boolean;
         role?: string | null | undefined;
     }, {
         id: string;
-        email: string | null;
         name: string | null;
+        email: string | null;
         betaAccessEnabled: boolean;
         role?: string | null | undefined;
     }>, "many">;
@@ -16380,14 +16514,14 @@ export declare const GetMissionControlCompanyResponse: zod.ZodIntersection<zod.Z
         technicianName?: string | null | undefined;
     }[];
     owner: {
-        email: string | null;
         name: string | null;
+        email: string | null;
         userId: string;
     } | null;
     users: {
         id: string;
-        email: string | null;
         name: string | null;
+        email: string | null;
         betaAccessEnabled: boolean;
         role?: string | null | undefined;
     }[];
@@ -16403,14 +16537,14 @@ export declare const GetMissionControlCompanyResponse: zod.ZodIntersection<zod.Z
         technicianName?: string | null | undefined;
     }[];
     owner: {
-        email: string | null;
         name: string | null;
+        email: string | null;
         userId: string;
     } | null;
     users: {
         id: string;
-        email: string | null;
         name: string | null;
+        email: string | null;
         betaAccessEnabled: boolean;
         role?: string | null | undefined;
     }[];
@@ -17071,13 +17205,13 @@ export declare const GetMissionControlInspectionResponse: zod.ZodIntersection<zo
         videos: zod.ZodNumber;
         pendingAnalysis: zod.ZodNumber;
     }, "strip", zod.ZodTypeAny, {
-        total: number;
         videos: number;
+        total: number;
         photos: number;
         pendingAnalysis: number;
     }, {
-        total: number;
         videos: number;
+        total: number;
         photos: number;
         pendingAnalysis: number;
     }>;
@@ -17194,8 +17328,8 @@ export declare const GetMissionControlInspectionResponse: zod.ZodIntersection<zo
         eventCount: number;
     }[];
     mediaCounts: {
-        total: number;
         videos: number;
+        total: number;
         photos: number;
         pendingAnalysis: number;
     };
@@ -17239,8 +17373,8 @@ export declare const GetMissionControlInspectionResponse: zod.ZodIntersection<zo
         eventCount: number;
     }[];
     mediaCounts: {
-        total: number;
         videos: number;
+        total: number;
         photos: number;
         pendingAnalysis: number;
     };
@@ -17294,8 +17428,8 @@ export declare const CreateBaitStationBody: zod.ZodObject<{
 }, "strip", zod.ZodTypeAny, {
     status: "active" | "missing" | "damaged" | "removed";
     label: string;
-    notes?: string | undefined;
     clientKey?: string | undefined;
+    notes?: string | undefined;
     locationType?: string | undefined;
     latitude?: string | undefined;
     longitude?: string | undefined;
@@ -17303,8 +17437,8 @@ export declare const CreateBaitStationBody: zod.ZodObject<{
 }, {
     label: string;
     status?: "active" | "missing" | "damaged" | "removed" | undefined;
-    notes?: string | undefined;
     clientKey?: string | undefined;
+    notes?: string | undefined;
     locationType?: string | undefined;
     latitude?: string | undefined;
     longitude?: string | undefined;
@@ -17323,11 +17457,11 @@ export declare const CreateBaitStationResponse: zod.ZodObject<{
     lastCheckedAt: zod.ZodOptional<zod.ZodNullable<zod.ZodDate>>;
     createdAt: zod.ZodDate;
 }, "strip", zod.ZodTypeAny, {
+    inspectionId: number;
     status: "active" | "missing" | "damaged" | "removed";
+    label: string;
     id: number;
     createdAt: Date;
-    inspectionId: number;
-    label: string;
     companyId: number;
     notes?: string | null | undefined;
     locationType?: string | null | undefined;
@@ -17335,11 +17469,11 @@ export declare const CreateBaitStationResponse: zod.ZodObject<{
     longitude?: string | null | undefined;
     lastCheckedAt?: Date | null | undefined;
 }, {
+    inspectionId: number;
     status: "active" | "missing" | "damaged" | "removed";
+    label: string;
     id: number;
     createdAt: Date;
-    inspectionId: number;
-    label: string;
     companyId: number;
     notes?: string | null | undefined;
     locationType?: string | null | undefined;
@@ -17382,37 +17516,37 @@ export declare const ListMissionControlInspectionEvidenceResponse: zod.ZodObject
             location: zod.ZodNullable<zod.ZodString>;
         }, "strip", zod.ZodTypeAny, {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }, {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }>, "many">;
         error: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         provider: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
         model: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, "strip", zod.ZodTypeAny, {
-        id: number;
-        createdAt: Date;
-        filename: string | null;
         inspectionId: number;
+        id: number;
         zone: string | null;
+        filename: string | null;
         mediaType: "photo" | "video" | "voice";
+        createdAt: Date;
         captureSource: string;
         capturedAt: Date | null;
         findings: {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }[];
         companyId: number;
@@ -17423,20 +17557,20 @@ export declare const ListMissionControlInspectionEvidenceResponse: zod.ZodObject
         error?: string | null | undefined;
         provider?: string | null | undefined;
     }, {
-        id: number;
-        createdAt: Date;
-        filename: string | null;
         inspectionId: number;
+        id: number;
         zone: string | null;
+        filename: string | null;
         mediaType: "photo" | "video" | "voice";
+        createdAt: Date;
         captureSource: string;
         capturedAt: Date | null;
         findings: {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }[];
         companyId: number;
@@ -17451,20 +17585,20 @@ export declare const ListMissionControlInspectionEvidenceResponse: zod.ZodObject
 }, "strip", zod.ZodTypeAny, {
     total: number;
     items: {
-        id: number;
-        createdAt: Date;
-        filename: string | null;
         inspectionId: number;
+        id: number;
         zone: string | null;
+        filename: string | null;
         mediaType: "photo" | "video" | "voice";
+        createdAt: Date;
         captureSource: string;
         capturedAt: Date | null;
         findings: {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }[];
         companyId: number;
@@ -17478,20 +17612,20 @@ export declare const ListMissionControlInspectionEvidenceResponse: zod.ZodObject
 }, {
     total: number;
     items: {
-        id: number;
-        createdAt: Date;
-        filename: string | null;
         inspectionId: number;
+        id: number;
         zone: string | null;
+        filename: string | null;
         mediaType: "photo" | "video" | "voice";
+        createdAt: Date;
         captureSource: string;
         capturedAt: Date | null;
         findings: {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }[];
         companyId: number;
@@ -17540,37 +17674,37 @@ export declare const GetMissionControlInspectionEvidenceResponse: zod.ZodObject<
         location: zod.ZodNullable<zod.ZodString>;
     }, "strip", zod.ZodTypeAny, {
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
     }, {
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
     }>, "many">;
     error: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     provider: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     model: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, "strip", zod.ZodTypeAny, {
-    id: number;
-    createdAt: Date;
-    filename: string | null;
     inspectionId: number;
+    id: number;
     zone: string | null;
+    filename: string | null;
     mediaType: "photo" | "video" | "voice";
+    createdAt: Date;
     captureSource: string;
     capturedAt: Date | null;
     findings: {
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
     }[];
     companyId: number;
@@ -17581,20 +17715,20 @@ export declare const GetMissionControlInspectionEvidenceResponse: zod.ZodObject<
     error?: string | null | undefined;
     provider?: string | null | undefined;
 }, {
-    id: number;
-    createdAt: Date;
-    filename: string | null;
     inspectionId: number;
+    id: number;
     zone: string | null;
+    filename: string | null;
     mediaType: "photo" | "video" | "voice";
+    createdAt: Date;
     captureSource: string;
     capturedAt: Date | null;
     findings: {
         id: number;
-        severity: string;
         category: string;
         description: string;
         confidence: number;
+        severity: string;
         location: string | null;
     }[];
     companyId: number;
@@ -17635,17 +17769,17 @@ export declare const GetMissionControlInspectionAnalysisResponse: zod.ZodObject<
             location: zod.ZodNullable<zod.ZodString>;
         }, "strip", zod.ZodTypeAny, {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }, {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }>, "many">;
         requiredZones: zod.ZodArray<zod.ZodObject<{
@@ -17683,10 +17817,10 @@ export declare const GetMissionControlInspectionAnalysisResponse: zod.ZodObject<
         id: number;
         findings: {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }[];
         requiredZones: {
@@ -17709,10 +17843,10 @@ export declare const GetMissionControlInspectionAnalysisResponse: zod.ZodObject<
         id: number;
         findings: {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }[];
         requiredZones: {
@@ -17742,10 +17876,10 @@ export declare const GetMissionControlInspectionAnalysisResponse: zod.ZodObject<
         id: number;
         findings: {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }[];
         requiredZones: {
@@ -17775,10 +17909,10 @@ export declare const GetMissionControlInspectionAnalysisResponse: zod.ZodObject<
         id: number;
         findings: {
             id: number;
-            severity: string;
             category: string;
             description: string;
             confidence: number;
+            severity: string;
             location: string | null;
         }[];
         requiredZones: {
@@ -17827,10 +17961,10 @@ export declare const GetMissionControlInspectionTimelineResponse: zod.ZodObject<
         relatedId: zod.ZodNullable<zod.ZodNumber>;
         detail: zod.ZodString;
     }, "strip", zod.ZodTypeAny, {
+        inspectionId: number;
         type: "inspection" | "evidence" | "incident" | "analysis" | "sync" | "device_session" | "incident_action" | "event";
         status: string | null;
         id: string;
-        inspectionId: number;
         detail: string;
         companyId: number;
         recordedAt: Date | null;
@@ -17842,10 +17976,10 @@ export declare const GetMissionControlInspectionTimelineResponse: zod.ZodObject<
         sourceId: string;
         relatedId: number | null;
     }, {
+        inspectionId: number;
         type: "inspection" | "evidence" | "incident" | "analysis" | "sync" | "device_session" | "incident_action" | "event";
         status: string | null;
         id: string;
-        inspectionId: number;
         detail: string;
         companyId: number;
         recordedAt: Date | null;
@@ -17860,10 +17994,10 @@ export declare const GetMissionControlInspectionTimelineResponse: zod.ZodObject<
 }, "strip", zod.ZodTypeAny, {
     inspectionId: number;
     items: {
+        inspectionId: number;
         type: "inspection" | "evidence" | "incident" | "analysis" | "sync" | "device_session" | "incident_action" | "event";
         status: string | null;
         id: string;
-        inspectionId: number;
         detail: string;
         companyId: number;
         recordedAt: Date | null;
@@ -17878,10 +18012,10 @@ export declare const GetMissionControlInspectionTimelineResponse: zod.ZodObject<
 }, {
     inspectionId: number;
     items: {
+        inspectionId: number;
         type: "inspection" | "evidence" | "incident" | "analysis" | "sync" | "device_session" | "incident_action" | "event";
         status: string | null;
         id: string;
-        inspectionId: number;
         detail: string;
         companyId: number;
         recordedAt: Date | null;
@@ -17946,9 +18080,9 @@ export declare const ListMissionControlIncidentsResponse: zod.ZodObject<{
     }, "strip", zod.ZodTypeAny, {
         status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
         id: number;
+        description: string;
         severity: "low" | "medium" | "high" | "critical";
         createdAt: Date;
-        description: string;
         title: string;
         companyName: string;
         companyId: number;
@@ -17963,9 +18097,9 @@ export declare const ListMissionControlIncidentsResponse: zod.ZodObject<{
     }, {
         status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
         id: number;
+        description: string;
         severity: "low" | "medium" | "high" | "critical";
         createdAt: Date;
-        description: string;
         title: string;
         companyName: string;
         companyId: number;
@@ -17987,9 +18121,9 @@ export declare const ListMissionControlIncidentsResponse: zod.ZodObject<{
     items: {
         status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
         id: number;
+        description: string;
         severity: "low" | "medium" | "high" | "critical";
         createdAt: Date;
-        description: string;
         title: string;
         companyName: string;
         companyId: number;
@@ -18010,9 +18144,9 @@ export declare const ListMissionControlIncidentsResponse: zod.ZodObject<{
     items: {
         status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
         id: number;
+        description: string;
         severity: "low" | "medium" | "high" | "critical";
         createdAt: Date;
-        description: string;
         title: string;
         companyName: string;
         companyId: number;
@@ -18059,9 +18193,9 @@ export declare const GetMissionControlIncidentResponse: zod.ZodObject<{
 }, "strip", zod.ZodTypeAny, {
     status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
     id: number;
+    description: string;
     severity: "low" | "medium" | "high" | "critical";
     createdAt: Date;
-    description: string;
     title: string;
     companyName: string;
     companyId: number;
@@ -18076,9 +18210,9 @@ export declare const GetMissionControlIncidentResponse: zod.ZodObject<{
 }, {
     status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
     id: number;
+    description: string;
     severity: "low" | "medium" | "high" | "critical";
     createdAt: Date;
-    description: string;
     title: string;
     companyName: string;
     companyId: number;
@@ -18139,9 +18273,9 @@ export declare const UpdateMissionControlIncidentResponse: zod.ZodObject<{
 }, "strip", zod.ZodTypeAny, {
     status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
     id: number;
+    description: string;
     severity: "low" | "medium" | "high" | "critical";
     createdAt: Date;
-    description: string;
     title: string;
     companyName: string;
     companyId: number;
@@ -18156,9 +18290,9 @@ export declare const UpdateMissionControlIncidentResponse: zod.ZodObject<{
 }, {
     status: "dismissed" | "resolved" | "open" | "acknowledged" | "investigating";
     id: number;
+    description: string;
     severity: "low" | "medium" | "high" | "critical";
     createdAt: Date;
-    description: string;
     title: string;
     companyName: string;
     companyId: number;
@@ -19032,5 +19166,537 @@ export declare const DecideMissionControlApprovalResponse: zod.ZodObject<{
     decidedAt?: Date | null | undefined;
     grantAuditId?: number | undefined;
     verifiedEmail?: string | undefined;
+}>;
+export declare const GetFoundationRosterParams: zod.ZodObject<{
+    propertyId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    propertyId: number;
+}, {
+    propertyId: number;
+}>;
+export declare const GetFoundationRosterResponse: zod.ZodObject<{
+    propertyId: zod.ZodNumber;
+    locations: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodString;
+        companyId: zod.ZodNumber;
+        propertyId: zod.ZodNumber;
+        parentId: zod.ZodNullable<zod.ZodString>;
+        kind: zod.ZodEnum<["building", "floor", "unit", "common_area"]>;
+        label: zod.ZodString;
+        commonAreaType: zod.ZodNullable<zod.ZodString>;
+        revision: zod.ZodNumber;
+        archivedAt: zod.ZodNullable<zod.ZodDate>;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        label: string;
+        id: string;
+        createdAt: Date;
+        companyId: number;
+        kind: "unit" | "building" | "floor" | "common_area";
+        propertyId: number;
+        parentId: string | null;
+        commonAreaType: string | null;
+        revision: number;
+        archivedAt: Date | null;
+    }, {
+        label: string;
+        id: string;
+        createdAt: Date;
+        companyId: number;
+        kind: "unit" | "building" | "floor" | "common_area";
+        propertyId: number;
+        parentId: string | null;
+        commonAreaType: string | null;
+        revision: number;
+        archivedAt: Date | null;
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    propertyId: number;
+    locations: {
+        label: string;
+        id: string;
+        createdAt: Date;
+        companyId: number;
+        kind: "unit" | "building" | "floor" | "common_area";
+        propertyId: number;
+        parentId: string | null;
+        commonAreaType: string | null;
+        revision: number;
+        archivedAt: Date | null;
+    }[];
+}, {
+    propertyId: number;
+    locations: {
+        label: string;
+        id: string;
+        createdAt: Date;
+        companyId: number;
+        kind: "unit" | "building" | "floor" | "common_area";
+        propertyId: number;
+        parentId: string | null;
+        commonAreaType: string | null;
+        revision: number;
+        archivedAt: Date | null;
+    }[];
+}>;
+export declare const CreateFoundationLocationParams: zod.ZodObject<{
+    propertyId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    propertyId: number;
+}, {
+    propertyId: number;
+}>;
+export declare const createFoundationLocationBodyLabelMax = 120;
+export declare const createFoundationLocationBodyCommonAreaTypeMax = 40;
+export declare const CreateFoundationLocationBody: zod.ZodObject<{
+    id: zod.ZodString;
+    kind: zod.ZodEnum<["building", "floor", "unit", "common_area"]>;
+    label: zod.ZodString;
+    parentId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    commonAreaType: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+}, "strip", zod.ZodTypeAny, {
+    label: string;
+    id: string;
+    kind: "unit" | "building" | "floor" | "common_area";
+    parentId?: string | null | undefined;
+    commonAreaType?: string | null | undefined;
+}, {
+    label: string;
+    id: string;
+    kind: "unit" | "building" | "floor" | "common_area";
+    parentId?: string | null | undefined;
+    commonAreaType?: string | null | undefined;
+}>;
+export declare const PatchFoundationLocationParams: zod.ZodObject<{
+    propertyId: zod.ZodNumber;
+    locationId: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    propertyId: number;
+    locationId: string;
+}, {
+    propertyId: number;
+    locationId: string;
+}>;
+export declare const patchFoundationLocationBodyLabelMax = 120;
+export declare const patchFoundationLocationBodyCommonAreaTypeMax = 40;
+export declare const patchFoundationLocationBodyReasonMax = 500;
+export declare const PatchFoundationLocationBody: zod.ZodObject<{
+    revision: zod.ZodNumber;
+    label: zod.ZodOptional<zod.ZodString>;
+    parentId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    commonAreaType: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    archived: zod.ZodOptional<zod.ZodBoolean>;
+    reason: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    revision: number;
+    label?: string | undefined;
+    reason?: string | undefined;
+    parentId?: string | null | undefined;
+    commonAreaType?: string | null | undefined;
+    archived?: boolean | undefined;
+}, {
+    revision: number;
+    label?: string | undefined;
+    reason?: string | undefined;
+    parentId?: string | null | undefined;
+    commonAreaType?: string | null | undefined;
+    archived?: boolean | undefined;
+}>;
+export declare const PatchFoundationLocationResponse: zod.ZodObject<{
+    id: zod.ZodString;
+    companyId: zod.ZodNumber;
+    propertyId: zod.ZodNumber;
+    parentId: zod.ZodNullable<zod.ZodString>;
+    kind: zod.ZodEnum<["building", "floor", "unit", "common_area"]>;
+    label: zod.ZodString;
+    commonAreaType: zod.ZodNullable<zod.ZodString>;
+    revision: zod.ZodNumber;
+    archivedAt: zod.ZodNullable<zod.ZodDate>;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    label: string;
+    id: string;
+    createdAt: Date;
+    companyId: number;
+    kind: "unit" | "building" | "floor" | "common_area";
+    propertyId: number;
+    parentId: string | null;
+    commonAreaType: string | null;
+    revision: number;
+    archivedAt: Date | null;
+}, {
+    label: string;
+    id: string;
+    createdAt: Date;
+    companyId: number;
+    kind: "unit" | "building" | "floor" | "common_area";
+    propertyId: number;
+    parentId: string | null;
+    commonAreaType: string | null;
+    revision: number;
+    archivedAt: Date | null;
+}>;
+export declare const ListFoundationVisitsParams: zod.ZodObject<{
+    propertyId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    propertyId: number;
+}, {
+    propertyId: number;
+}>;
+export declare const ListFoundationVisitsResponseItem: zod.ZodObject<{
+    id: zod.ZodString;
+    companyId: zod.ZodNumber;
+    propertyId: zod.ZodNumber;
+    clientKey: zod.ZodString;
+    createdBy: zod.ZodString;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    id: string;
+    clientKey: string;
+    createdAt: Date;
+    createdBy: string;
+    companyId: number;
+    propertyId: number;
+}, {
+    id: string;
+    clientKey: string;
+    createdAt: Date;
+    createdBy: string;
+    companyId: number;
+    propertyId: number;
+}>;
+export declare const ListFoundationVisitsResponse: zod.ZodArray<zod.ZodObject<{
+    id: zod.ZodString;
+    companyId: zod.ZodNumber;
+    propertyId: zod.ZodNumber;
+    clientKey: zod.ZodString;
+    createdBy: zod.ZodString;
+    createdAt: zod.ZodDate;
+}, "strip", zod.ZodTypeAny, {
+    id: string;
+    clientKey: string;
+    createdAt: Date;
+    createdBy: string;
+    companyId: number;
+    propertyId: number;
+}, {
+    id: string;
+    clientKey: string;
+    createdAt: Date;
+    createdBy: string;
+    companyId: number;
+    propertyId: number;
+}>, "many">;
+export declare const CreateFoundationVisitParams: zod.ZodObject<{
+    propertyId: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    propertyId: number;
+}, {
+    propertyId: number;
+}>;
+export declare const CreateFoundationVisitBody: zod.ZodObject<{
+    clientKey: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    clientKey: string;
+}, {
+    clientKey: string;
+}>;
+export declare const GetFoundationVisitParams: zod.ZodObject<{
+    propertyId: zod.ZodNumber;
+    visitId: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    propertyId: number;
+    visitId: string;
+}, {
+    propertyId: number;
+    visitId: string;
+}>;
+export declare const GetFoundationVisitResponse: zod.ZodObject<{
+    visit: zod.ZodObject<{
+        id: zod.ZodString;
+        companyId: zod.ZodNumber;
+        propertyId: zod.ZodNumber;
+        clientKey: zod.ZodString;
+        createdBy: zod.ZodString;
+        createdAt: zod.ZodDate;
+    }, "strip", zod.ZodTypeAny, {
+        id: string;
+        clientKey: string;
+        createdAt: Date;
+        createdBy: string;
+        companyId: number;
+        propertyId: number;
+    }, {
+        id: string;
+        clientKey: string;
+        createdAt: Date;
+        createdBy: string;
+        companyId: number;
+        propertyId: number;
+    }>;
+    coverage: zod.ZodArray<zod.ZodObject<{
+        id: zod.ZodString;
+        companyId: zod.ZodNumber;
+        propertyId: zod.ZodNumber;
+        visitId: zod.ZodString;
+        spaceId: zod.ZodString;
+        snapshot: zod.ZodObject<{
+            label: zod.ZodString;
+            kind: zod.ZodEnum<["unit", "common_area"]>;
+            commonAreaType: zod.ZodNullable<zod.ZodString>;
+            ancestors: zod.ZodArray<zod.ZodObject<{
+                id: zod.ZodString;
+                label: zod.ZodString;
+                kind: zod.ZodEnum<["building", "floor", "unit", "common_area"]>;
+            }, "strip", zod.ZodTypeAny, {
+                label: string;
+                id: string;
+                kind: "unit" | "building" | "floor" | "common_area";
+            }, {
+                label: string;
+                id: string;
+                kind: "unit" | "building" | "floor" | "common_area";
+            }>, "many">;
+        }, "strip", zod.ZodTypeAny, {
+            label: string;
+            kind: "unit" | "common_area";
+            commonAreaType: string | null;
+            ancestors: {
+                label: string;
+                id: string;
+                kind: "unit" | "building" | "floor" | "common_area";
+            }[];
+        }, {
+            label: string;
+            kind: "unit" | "common_area";
+            commonAreaType: string | null;
+            ancestors: {
+                label: string;
+                id: string;
+                kind: "unit" | "building" | "floor" | "common_area";
+            }[];
+        }>;
+        state: zod.ZodEnum<["not_inspected", "in_progress", "inspected", "no_access"]>;
+        inspectionId: zod.ZodNullable<zod.ZodNumber>;
+        reason: zod.ZodNullable<zod.ZodString>;
+        revision: zod.ZodNumber;
+    }, "strip", zod.ZodTypeAny, {
+        inspectionId: number | null;
+        id: string;
+        reason: string | null;
+        companyId: number;
+        propertyId: number;
+        state: "not_inspected" | "in_progress" | "inspected" | "no_access";
+        revision: number;
+        visitId: string;
+        spaceId: string;
+        snapshot: {
+            label: string;
+            kind: "unit" | "common_area";
+            commonAreaType: string | null;
+            ancestors: {
+                label: string;
+                id: string;
+                kind: "unit" | "building" | "floor" | "common_area";
+            }[];
+        };
+    }, {
+        inspectionId: number | null;
+        id: string;
+        reason: string | null;
+        companyId: number;
+        propertyId: number;
+        state: "not_inspected" | "in_progress" | "inspected" | "no_access";
+        revision: number;
+        visitId: string;
+        spaceId: string;
+        snapshot: {
+            label: string;
+            kind: "unit" | "common_area";
+            commonAreaType: string | null;
+            ancestors: {
+                label: string;
+                id: string;
+                kind: "unit" | "building" | "floor" | "common_area";
+            }[];
+        };
+    }>, "many">;
+}, "strip", zod.ZodTypeAny, {
+    coverage: {
+        inspectionId: number | null;
+        id: string;
+        reason: string | null;
+        companyId: number;
+        propertyId: number;
+        state: "not_inspected" | "in_progress" | "inspected" | "no_access";
+        revision: number;
+        visitId: string;
+        spaceId: string;
+        snapshot: {
+            label: string;
+            kind: "unit" | "common_area";
+            commonAreaType: string | null;
+            ancestors: {
+                label: string;
+                id: string;
+                kind: "unit" | "building" | "floor" | "common_area";
+            }[];
+        };
+    }[];
+    visit: {
+        id: string;
+        clientKey: string;
+        createdAt: Date;
+        createdBy: string;
+        companyId: number;
+        propertyId: number;
+    };
+}, {
+    coverage: {
+        inspectionId: number | null;
+        id: string;
+        reason: string | null;
+        companyId: number;
+        propertyId: number;
+        state: "not_inspected" | "in_progress" | "inspected" | "no_access";
+        revision: number;
+        visitId: string;
+        spaceId: string;
+        snapshot: {
+            label: string;
+            kind: "unit" | "common_area";
+            commonAreaType: string | null;
+            ancestors: {
+                label: string;
+                id: string;
+                kind: "unit" | "building" | "floor" | "common_area";
+            }[];
+        };
+    }[];
+    visit: {
+        id: string;
+        clientKey: string;
+        createdAt: Date;
+        createdBy: string;
+        companyId: number;
+        propertyId: number;
+    };
+}>;
+export declare const PatchFoundationCoverageParams: zod.ZodObject<{
+    propertyId: zod.ZodNumber;
+    visitId: zod.ZodString;
+    coverageId: zod.ZodString;
+}, "strip", zod.ZodTypeAny, {
+    propertyId: number;
+    visitId: string;
+    coverageId: string;
+}, {
+    propertyId: number;
+    visitId: string;
+    coverageId: string;
+}>;
+export declare const patchFoundationCoverageBodyReasonMax = 500;
+export declare const PatchFoundationCoverageBody: zod.ZodObject<{
+    revision: zod.ZodNumber;
+    state: zod.ZodEnum<["not_inspected", "in_progress", "inspected", "no_access"]>;
+    inspectionId: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
+    reason: zod.ZodOptional<zod.ZodString>;
+}, "strip", zod.ZodTypeAny, {
+    state: "not_inspected" | "in_progress" | "inspected" | "no_access";
+    revision: number;
+    inspectionId?: number | null | undefined;
+    reason?: string | undefined;
+}, {
+    state: "not_inspected" | "in_progress" | "inspected" | "no_access";
+    revision: number;
+    inspectionId?: number | null | undefined;
+    reason?: string | undefined;
+}>;
+export declare const PatchFoundationCoverageResponse: zod.ZodObject<{
+    id: zod.ZodString;
+    companyId: zod.ZodNumber;
+    propertyId: zod.ZodNumber;
+    visitId: zod.ZodString;
+    spaceId: zod.ZodString;
+    snapshot: zod.ZodObject<{
+        label: zod.ZodString;
+        kind: zod.ZodEnum<["unit", "common_area"]>;
+        commonAreaType: zod.ZodNullable<zod.ZodString>;
+        ancestors: zod.ZodArray<zod.ZodObject<{
+            id: zod.ZodString;
+            label: zod.ZodString;
+            kind: zod.ZodEnum<["building", "floor", "unit", "common_area"]>;
+        }, "strip", zod.ZodTypeAny, {
+            label: string;
+            id: string;
+            kind: "unit" | "building" | "floor" | "common_area";
+        }, {
+            label: string;
+            id: string;
+            kind: "unit" | "building" | "floor" | "common_area";
+        }>, "many">;
+    }, "strip", zod.ZodTypeAny, {
+        label: string;
+        kind: "unit" | "common_area";
+        commonAreaType: string | null;
+        ancestors: {
+            label: string;
+            id: string;
+            kind: "unit" | "building" | "floor" | "common_area";
+        }[];
+    }, {
+        label: string;
+        kind: "unit" | "common_area";
+        commonAreaType: string | null;
+        ancestors: {
+            label: string;
+            id: string;
+            kind: "unit" | "building" | "floor" | "common_area";
+        }[];
+    }>;
+    state: zod.ZodEnum<["not_inspected", "in_progress", "inspected", "no_access"]>;
+    inspectionId: zod.ZodNullable<zod.ZodNumber>;
+    reason: zod.ZodNullable<zod.ZodString>;
+    revision: zod.ZodNumber;
+}, "strip", zod.ZodTypeAny, {
+    inspectionId: number | null;
+    id: string;
+    reason: string | null;
+    companyId: number;
+    propertyId: number;
+    state: "not_inspected" | "in_progress" | "inspected" | "no_access";
+    revision: number;
+    visitId: string;
+    spaceId: string;
+    snapshot: {
+        label: string;
+        kind: "unit" | "common_area";
+        commonAreaType: string | null;
+        ancestors: {
+            label: string;
+            id: string;
+            kind: "unit" | "building" | "floor" | "common_area";
+        }[];
+    };
+}, {
+    inspectionId: number | null;
+    id: string;
+    reason: string | null;
+    companyId: number;
+    propertyId: number;
+    state: "not_inspected" | "in_progress" | "inspected" | "no_access";
+    revision: number;
+    visitId: string;
+    spaceId: string;
+    snapshot: {
+        label: string;
+        kind: "unit" | "common_area";
+        commonAreaType: string | null;
+        ancestors: {
+            label: string;
+            id: string;
+            kind: "unit" | "building" | "floor" | "common_area";
+        }[];
+    };
 }>;
 //# sourceMappingURL=api.d.ts.map

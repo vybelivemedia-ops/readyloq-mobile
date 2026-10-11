@@ -19,4 +19,9 @@ export interface PropertySummary {
   /** @nullable */
   lastVisit?: string | null;
   hasProfile: boolean;
+  /**
+     * Stable existing property_profiles ID, absent for legacy address-only properties
+     * @nullable
+     */
+  profileId?: number | null;
 }

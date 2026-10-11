@@ -9,6 +9,76 @@ import * as zod from 'zod';
 
 
 /**
+ * New clients must explicitly select purpose=inspection-evidence and reserve the inspection, size, content type, idempotency key, and optional checksum before PUT. Non-evidence callers must send purpose=generic. Inspection evidence receives an authenticated API PUT endpoint (same-origin browser session or mobile Clerk bearer token) and is streamed server-side to GCS with ifGenerationMatch=0; the API validates actual byte count, content type, optional MD5, and GCS CRC32C. The Replit sidecar signer ignores requested extension constraints, so inspection evidence does not use its signed URL flow. Browsers need not set Content-Length. Requests using the pre-intent contract receive 426 without an upload URL. Upgrade the client, retain queued local evidence, reserve an intent, PUT to the authenticated endpoint, then register by uploadIntentId. Previously uploaded legacy objects are not auto-attached or deleted; reconcile them separately. Previously deployed clients remain unable to sync until their app/static-client upgrade is delivered; deploy the first-party generic callers' explicit purpose migration with this contract.
+ * @summary Request an upload URL; inspection evidence requires an authenticated create-only PUT
+ */
+export const requestUploadUrlBodyOneNameMax = 255;
+
+export const requestUploadUrlBodyOneSizeMax = 157286400;
+
+export const requestUploadUrlBodyOneContentTypeMax = 255;
+
+export const requestUploadUrlBodyTwoNameMax = 255;
+
+export const requestUploadUrlBodyTwoSizeMax = 157286400;
+
+export const requestUploadUrlBodyTwoContentTypeMax = 255;
+
+
+export const requestUploadUrlBodyTwoClientKeyMax = 200;
+
+export const requestUploadUrlBodyTwoChecksumValueRegExp = new RegExp('^[A-Za-z0-9+\/]{22}==$');
+
+
+export const RequestUploadUrlBody = zod.union([zod.object({
+  "name": zod.string().min(1).max(requestUploadUrlBodyOneNameMax),
+  "size": zod.number().min(1).max(requestUploadUrlBodyOneSizeMax).optional(),
+  "contentType": zod.string().min(1).max(requestUploadUrlBodyOneContentTypeMax).optional(),
+  "purpose": zod.literal("generic")
+}),zod.object({
+  "name": zod.string().min(1).max(requestUploadUrlBodyTwoNameMax),
+  "size": zod.number().min(1).max(requestUploadUrlBodyTwoSizeMax),
+  "contentType": zod.string().min(1).max(requestUploadUrlBodyTwoContentTypeMax),
+  "purpose": zod.literal("inspection-evidence"),
+  "inspectionId": zod.number().min(1),
+  "mediaType": zod.enum(['photo', 'image', 'video', 'document', 'audio', 'voice']),
+  "clientKey": zod.string().min(1).max(requestUploadUrlBodyTwoClientKeyMax),
+  "checksum": zod.object({
+  "algorithm": zod.enum(['md5']),
+  "value": zod.string().regex(requestUploadUrlBodyTwoChecksumValueRegExp)
+}).optional()
+})])
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string(),
+  "objectPath": zod.string(),
+  "uploadIntentId": zod.number().optional(),
+  "metadata": zod.object({
+  "name": zod.string().optional(),
+  "size": zod.number().optional(),
+  "contentType": zod.string().optional()
+}).optional()
+})
+
+
+/**
+ * @summary Stream reserved inspection evidence into GCS with a create-only precondition
+ */
+
+
+
+export const PutInspectionUploadContentParams = zod.object({
+  "intentId": zod.coerce.number().min(1)
+})
+
+
+/**
+ * @summary Complete paginated company-scoped report of upload and registration orphans (manager+)
+ */
+export const GetUploadReconciliationResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
  * @summary List inspections for the scheduling calendar (manager+)
  */
 export const GetScheduleQueryParams = zod.object({
@@ -562,8 +632,12 @@ export const AddInspectionMediaParams = zod.object({
   "id": zod.coerce.number()
 })
 
+
+
+
 export const AddInspectionMediaBody = zod.object({
   "mediaType": zod.string(),
+  "uploadIntentId": zod.number().min(1).describe('Authenticated user\'s durable inspection-upload reservation.'),
   "url": zod.string().describe('Company-scoped private object path, e.g. \/api\/storage\/objects\/companies\/{companyId}\/uploads\/{objectId}'),
   "filename": zod.string().optional(),
   "caption": zod.string().optional(),
@@ -2559,7 +2633,8 @@ export const ListPropertiesResponseItem = zod.object({
   "noteCount": zod.number(),
   "openIssueCount": zod.number(),
   "lastVisit": zod.string().nullish(),
-  "hasProfile": zod.boolean()
+  "hasProfile": zod.boolean(),
+  "profileId": zod.number().nullish().describe('Stable existing property_profiles ID, absent for legacy address-only properties')
 })
 export const ListPropertiesResponse = zod.array(ListPropertiesResponseItem)
 
@@ -2628,7 +2703,8 @@ export const LookupPropertyResponse = zod.object({
   "noteCount": zod.number(),
   "openIssueCount": zod.number(),
   "lastVisit": zod.string().nullish(),
-  "hasProfile": zod.boolean()
+  "hasProfile": zod.boolean(),
+  "profileId": zod.number().nullish().describe('Stable existing property_profiles ID, absent for legacy address-only properties')
 }))
 })
 
@@ -5008,6 +5084,208 @@ export const DecideMissionControlApprovalResponse = zod.object({
   "reason": zod.string().optional(),
   "grantAuditId": zod.number().optional(),
   "verifiedEmail": zod.string().email().optional()
+})
+
+
+
+
+
+export const GetFoundationRosterParams = zod.object({
+  "propertyId": zod.coerce.number().min(1)
+})
+
+export const GetFoundationRosterResponse = zod.object({
+  "propertyId": zod.number(),
+  "locations": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "companyId": zod.number(),
+  "propertyId": zod.number(),
+  "parentId": zod.string().uuid().nullable(),
+  "kind": zod.enum(['building', 'floor', 'unit', 'common_area']),
+  "label": zod.string(),
+  "commonAreaType": zod.string().nullable(),
+  "revision": zod.number(),
+  "archivedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+
+
+
+export const CreateFoundationLocationParams = zod.object({
+  "propertyId": zod.coerce.number().min(1)
+})
+
+export const createFoundationLocationBodyLabelMax = 120;
+
+export const createFoundationLocationBodyCommonAreaTypeMax = 40;
+
+
+
+export const CreateFoundationLocationBody = zod.object({
+  "id": zod.string().uuid(),
+  "kind": zod.enum(['building', 'floor', 'unit', 'common_area']),
+  "label": zod.string().min(1).max(createFoundationLocationBodyLabelMax),
+  "parentId": zod.string().uuid().nullish(),
+  "commonAreaType": zod.string().max(createFoundationLocationBodyCommonAreaTypeMax).nullish()
+})
+
+
+
+
+
+export const PatchFoundationLocationParams = zod.object({
+  "propertyId": zod.coerce.number().min(1),
+  "locationId": zod.coerce.string().uuid()
+})
+
+
+export const patchFoundationLocationBodyLabelMax = 120;
+
+export const patchFoundationLocationBodyCommonAreaTypeMax = 40;
+
+export const patchFoundationLocationBodyReasonMax = 500;
+
+
+
+export const PatchFoundationLocationBody = zod.object({
+  "revision": zod.number().min(1),
+  "label": zod.string().min(1).max(patchFoundationLocationBodyLabelMax).optional(),
+  "parentId": zod.string().uuid().nullish(),
+  "commonAreaType": zod.string().max(patchFoundationLocationBodyCommonAreaTypeMax).nullish(),
+  "archived": zod.boolean().optional(),
+  "reason": zod.string().min(1).max(patchFoundationLocationBodyReasonMax).optional()
+})
+
+export const PatchFoundationLocationResponse = zod.object({
+  "id": zod.string().uuid(),
+  "companyId": zod.number(),
+  "propertyId": zod.number(),
+  "parentId": zod.string().uuid().nullable(),
+  "kind": zod.enum(['building', 'floor', 'unit', 'common_area']),
+  "label": zod.string(),
+  "commonAreaType": zod.string().nullable(),
+  "revision": zod.number(),
+  "archivedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+
+
+
+export const ListFoundationVisitsParams = zod.object({
+  "propertyId": zod.coerce.number().min(1)
+})
+
+export const ListFoundationVisitsResponseItem = zod.object({
+  "id": zod.string().uuid(),
+  "companyId": zod.number(),
+  "propertyId": zod.number(),
+  "clientKey": zod.string().uuid(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListFoundationVisitsResponse = zod.array(ListFoundationVisitsResponseItem)
+
+
+
+
+
+export const CreateFoundationVisitParams = zod.object({
+  "propertyId": zod.coerce.number().min(1)
+})
+
+export const CreateFoundationVisitBody = zod.object({
+  "clientKey": zod.string().uuid()
+})
+
+
+
+
+
+export const GetFoundationVisitParams = zod.object({
+  "propertyId": zod.coerce.number().min(1),
+  "visitId": zod.coerce.string().uuid()
+})
+
+export const GetFoundationVisitResponse = zod.object({
+  "visit": zod.object({
+  "id": zod.string().uuid(),
+  "companyId": zod.number(),
+  "propertyId": zod.number(),
+  "clientKey": zod.string().uuid(),
+  "createdBy": zod.string(),
+  "createdAt": zod.coerce.date()
+}),
+  "coverage": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "companyId": zod.number(),
+  "propertyId": zod.number(),
+  "visitId": zod.string().uuid(),
+  "spaceId": zod.string().uuid(),
+  "snapshot": zod.object({
+  "label": zod.string(),
+  "kind": zod.enum(['unit', 'common_area']),
+  "commonAreaType": zod.string().nullable(),
+  "ancestors": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "label": zod.string(),
+  "kind": zod.enum(['building', 'floor', 'unit', 'common_area'])
+}))
+}),
+  "state": zod.enum(['not_inspected', 'in_progress', 'inspected', 'no_access']),
+  "inspectionId": zod.number().nullable(),
+  "reason": zod.string().nullable(),
+  "revision": zod.number()
+}))
+})
+
+
+
+
+
+export const PatchFoundationCoverageParams = zod.object({
+  "propertyId": zod.coerce.number().min(1),
+  "visitId": zod.coerce.string().uuid(),
+  "coverageId": zod.coerce.string().uuid()
+})
+
+
+
+export const patchFoundationCoverageBodyReasonMax = 500;
+
+
+
+export const PatchFoundationCoverageBody = zod.object({
+  "revision": zod.number().min(1),
+  "state": zod.enum(['not_inspected', 'in_progress', 'inspected', 'no_access']),
+  "inspectionId": zod.number().min(1).nullish(),
+  "reason": zod.string().min(1).max(patchFoundationCoverageBodyReasonMax).optional()
+})
+
+export const PatchFoundationCoverageResponse = zod.object({
+  "id": zod.string().uuid(),
+  "companyId": zod.number(),
+  "propertyId": zod.number(),
+  "visitId": zod.string().uuid(),
+  "spaceId": zod.string().uuid(),
+  "snapshot": zod.object({
+  "label": zod.string(),
+  "kind": zod.enum(['unit', 'common_area']),
+  "commonAreaType": zod.string().nullable(),
+  "ancestors": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "label": zod.string(),
+  "kind": zod.enum(['building', 'floor', 'unit', 'common_area'])
+}))
+}),
+  "state": zod.enum(['not_inspected', 'in_progress', 'inspected', 'no_access']),
+  "inspectionId": zod.number().nullable(),
+  "reason": zod.string().nullable(),
+  "revision": zod.number()
 })
 
 

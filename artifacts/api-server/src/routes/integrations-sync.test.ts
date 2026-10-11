@@ -809,7 +809,7 @@ describe("POST /api/integrations/sync", () => {
       );
 
       // Wait until request 1 has acquired the lock and entered the adapter.
-      await vi.waitFor(() => req1InAdapter, { timeout: 10_000 });
+      await vi.waitFor(() => expect(req1InAdapter).toBe(true), { timeout: 10_000 });
 
       // Request 2 arrives while the lock is still held by request 1.
       const req2 = await request(app)

@@ -1,14 +1,32 @@
 import { useState } from 'react';
-import { useListProperties, useGetInfestationRisk } from '@workspace/api-client-react';
+import { useListProperties, useGetInfestationRisk, updatePropertyProfile } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Building, AlertTriangle, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
+import { PropertyRosterPanel } from '@/components/PropertyRosterPanel';
 import { BuildingMessagingPanel } from '@/components/BuildingMessagingPanel';
+import { useAuth } from '@/hooks/use-auth';
 
 export function Properties() {
+  const { me, user } = useAuth();
+  const queryClient = useQueryClient();
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [creatingProfile, setCreatingProfile] = useState<string | null>(null);
+  async function ensureProfile(addressKey: string, siteAddress: string) {
+    setProfileError(null);
+    setCreatingProfile(addressKey);
+    try {
+      await updatePropertyProfile(addressKey, { siteAddress });
+      await queryClient.invalidateQueries();
+    } catch { setProfileError("Could not create the property profile. No roster was created."); }
+    finally { setCreatingProfile(null); }
+  }
   const { data: properties, isLoading: isLoadingProps } = useListProperties();
   const { data: risk, isLoading: isLoadingRisk } = useGetInfestationRisk();
   const [messagingAddress, setMessagingAddress] = useState<string | null>(null);
   const [messagingClientName, setMessagingClientName] = useState<string | null>(null);
+
+  const [rosterKey, setRosterKey] = useState<string | null>(null);
 
   const isLoading = isLoadingProps || isLoadingRisk;
 
@@ -70,6 +88,28 @@ export function Properties() {
         </div>
       )}
 
+      {properties?.filter((p) => p.addressKey === rosterKey).map((p) => (
+        <div key={p.addressKey}>
+        {!p.profileId && (
+          <div className="border border-border rounded-lg p-4 space-y-2">
+            <p>Create the persistent property profile before adding locations. Existing inspections will not be remapped.</p>
+            <button disabled={creatingProfile === p.addressKey} onClick={() => ensureProfile(p.addressKey, p.siteAddress)} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground">
+              {creatingProfile === p.addressKey ? "Creating…" : "Create property profile"}
+            </button>
+            {profileError && <p role="alert">{profileError}</p>}
+          </div>
+        )}
+        <PropertyRosterPanel
+          key={`${user?.id}:${me?.companyId}:${p.addressKey}`}
+          propertyId={p.profileId ?? undefined}
+          companyId={me?.companyId ?? undefined}
+          userId={user?.id}
+          siteAddress={p.siteAddress}
+          onClose={() => setRosterKey(null)}
+        />
+        </div>
+      ))}
+
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-border bg-muted/30">
           <h2 className="font-semibold">Properties</h2>
@@ -129,6 +169,13 @@ export function Properties() {
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
                       Message
+                    </button>
+                    <button
+                      data-testid={`button-roster-${prop.addressKey}`}
+                      onClick={() => setRosterKey(prop.addressKey)}
+                      className="ml-2 inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                    >
+                      Roster
                     </button>
                   </td>
                 </tr>
